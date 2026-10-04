@@ -164,7 +164,7 @@ describe('29.126 the leads_to label on the server reads', () => {
   const lead = (source: string, targetId: string, label: string): LedgerEvent =>
     makeCommitted({ workspaceId: WS, actorId: owner, entity: { kind: 'ticket', id: source }, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId, label } });
 
-  it('29.126 GET …/links carries the label both ways and no key when none; History and /events keep it on a withheld copy with no target id or key', async () => {
+  it('29.126 GET …/links carries the label both ways and no key when none; History and /events keep it on a withheld copy whose hidden end is the TARGET, with no target id or key', async () => {
     await applyCommitted(db.pool, [lead(S, SH, 'Yes'), lead(S, H, 'Maybe')]);
     const sh = { id: SH, projectId: world.world.projectId, key: await keyOf(SH) };
     const memberS = (await linksOf('member')).links;
@@ -178,7 +178,8 @@ describe('29.126 the leads_to label on the server reads', () => {
     for (const l of ownerS) expect('label' in l, l.kind).toBe(l.kind === 'leads_to');
     expect(ownerS.filter((l) => l.kind === 'leads_to').map((l) => [l.ticket.id, (l as { label?: string }).label])).toEqual([[SH, 'Yes'], [H, 'Maybe']]);
 
-    // History (planner ruling 13:01, spec LK-6): the withheld copy keeps the label, and no target id or key.
+    // History (planner ruling 13:01, spec LK-6): a withheld copy whose hidden end is the TARGET keeps the label, and no
+    // target id or key. A hidden SOURCE's label is dropped (planner ruling 2026-10-05 00:13): `draft-link-reads.test.ts`, 29.126.
     const hKey = await keyOf(H);
     const toH = (events: HistoryBody['events']) => events.find((e) => e.type === 'ticket.link_added' && e.payload['kind'] === 'leads_to' && e.payload['label'] === 'Maybe')!;
     const memberEvent = toH(await historyOf('member'));

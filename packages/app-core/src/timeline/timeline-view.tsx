@@ -1,7 +1,9 @@
 import {
+  MIN_BAR_PX,
   ScrollAdapter,
   ZOOM_PRESETS,
   axisLevels,
+  barPx,
   crossFade,
   isMonday,
   isWeekend,
@@ -85,7 +87,8 @@ export type TimelineViewProps = {
 const DEFAULT_PPD: number = ZOOM_PRESETS.week;
 /** The margin on each side of the drawn days is one viewport at the default zoom; this is its width before it is measured. */
 const FALLBACK_WIDTH_PX = 960;
-const KEY_PADDING_PX = 12;
+/** A key inside a bar needs its text plus the bar's padding on both sides, which is the narrowest bar (`MIN_BAR_PX`, pack.ts). */
+const KEY_PADDING_PX = MIN_BAR_PX;
 /** TG-13: the panel fills the height under the filters, but never less than this. */
 const MIN_PANEL_PX = 320;
 const PANEL_BOTTOM_GAP_PX = 16;
@@ -252,8 +255,9 @@ const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
   const detail = [row.key, mark?.word, row.provenance, ...row.customClaims.map((entry) => entry.label)]
     .filter((part): part is string => part !== null && part !== undefined && part !== '')
     .join('; ');
-  const barPx = (row.endDay - row.startDay + 1) * ppd;
-  const outside = row.key !== null && keyOutside(barPx, measure(row.key));
+  // E11: decided on the DRAWN width (never under MIN_BAR_PX), the width the packer reserved and ui.css draws.
+  const drawnPx = barPx(row.endDay - row.startDay + 1, ppd);
+  const outside = row.key !== null && keyOutside(drawnPx, measure(row.key));
   const vars = {
     ['--d0' as string]: row.startDay - firstDay,
     ['--dn' as string]: row.endDay - row.startDay + 1,

@@ -126,10 +126,13 @@ describe('29.120 leads_to and its label', () => {
   });
 });
 
-describe('29.126 the withheld copy keeps a leads_to label (planner ruling 2026-10-04 13:01, spec LK-6)', () => {
-  it('29.126 withheldLinkPayload keeps the label last, in both directions, with no id; control: no label, no key (TL4b and D6 shapes byte for byte)', () => {
+describe("29.126 the withheld copy keeps a leads_to label on 'out' and drops it on 'in' (planner rulings 2026-10-04 13:01 and 2026-10-05 00:13, spec LK-6)", () => {
+  it("29.126 withheldLinkPayload keeps the label last on 'out' (a hidden target), drops it on 'in' (a hidden source), with no id; control: no label, no key (TL4b and D6 shapes byte for byte)", () => {
+    // 'out': the hidden end is the target, the label is the visible source's own branch (LK-6 keeps it)
     expect(JSON.stringify(withheldLinkPayload('leads_to', 'out', 'Yes'))).toBe('{"kind":"leads_to","targetId":null,"label":"Yes"}');
-    expect(JSON.stringify(withheldLinkPayload('leads_to', 'in', 'Yes'))).toBe('{"kind":"leads_to","targetId":null,"from":null,"label":"Yes"}');
+    // 'in': the hidden end IS the source, whose branch the label names: D6's shape exactly, no label key
+    expect(JSON.stringify(withheldLinkPayload('leads_to', 'in', 'Yes'))).toBe('{"kind":"leads_to","targetId":null,"from":null}');
+    expect('label' in withheldLinkPayload('leads_to', 'in', 'Yes')).toBe(false);
     expect(JSON.stringify(withheldLinkPayload('leads_to', 'out'))).toBe('{"kind":"leads_to","targetId":null}'); // control
     expect(JSON.stringify(withheldLinkPayload('leads_to', 'in'))).toBe('{"kind":"leads_to","targetId":null,"from":null}'); // control
     // absent, never `undefined`: JSON would hide an undefined member, an in-process reader would not

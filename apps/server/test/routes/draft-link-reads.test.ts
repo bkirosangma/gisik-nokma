@@ -339,3 +339,47 @@ describe("28.196 a published draft's History reads its from-form links from its 
     expect(describeEvent(await linkLine('owner', d))).toBe(`Linked: is blocked by ${sKey}`); // CONTROL: the owner still sees S
   });
 });
+
+describe("29.126 a published draft's leads_to from-form: the label of a hidden SOURCE is withheld (planner ruling 2026-10-05 00:13)", () => {
+  it("29.126 serves a viewer who sees D but not S {kind: 'leads_to', targetId: null, from: null} with no label, on History (\"Linked: comes after a ticket you can't see\") and /events; CONTROL: while S is visible the line keeps its label, and the owner still reads it", async () => {
+    const LABEL = 'Branch-Q7'; // distinctive: no other text on the line can contain it
+    const [s, d] = [newUlid(), newUlid()];
+    await w.published(s);
+    await w.draft(d);
+    expect(await w.fromLink(d, s, 'leads_to', 'member', LABEL)).toMatchObject({ status: 'committed' }); // S leads to D, filed on D's stream
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    const sKey = (await w.stateOf('owner', s)).key;
+    expect(sKey).toMatch(/-\d+$/); // precondition: S carries a real key
+    const leadLine = async (role: ReadRole) => {
+      const res = await read.app.inject({ method: 'GET', url: `/v1/tickets/${d}/history`, headers: read.authOf(role) });
+      expect(res.statusCode, role).toBe(200);
+      const lines = mapHistory(res.json()).filter((e) => e.type === 'ticket.link_added');
+      expect(lines, role).toHaveLength(1);
+      return lines[0]!;
+    };
+    const leadOnEvents = async (role: ReadRole) => {
+      const res = await w.get(role, `/tickets/${d}/events`);
+      expect(res.statusCode, role).toBe(200);
+      const events = (res.json() as { events: Array<{ type: string; payload: unknown }> }).events.filter((e) => e.type === 'ticket.link_added');
+      expect(events, role).toHaveLength(1);
+      return events[0]!.payload;
+    };
+
+    // CONTROL (leg 3): the member still sees S, so the from-form is served whole and its line keeps the label
+    const visible = await leadLine('member');
+    expect(describeEvent(visible)).toBe(`Linked: comes after ${sKey} (${LABEL})`);
+    expect(visible.payload).toEqual({ kind: 'leads_to', targetId: d, from: s, label: LABEL }); // the stored copy (jsonb: its own key order)
+
+    expect(await hideFromAllButOwner(s)).toMatchObject({ status: 'committed' });
+    const hidden = await leadLine('member'); // the member still sees the published D, and no longer S
+    expect(describeEvent(hidden)).toBe("Linked: comes after a ticket you can't see");
+    expect(JSON.stringify(hidden.payload)).toBe('{"kind":"leads_to","targetId":null,"from":null}');
+    expect([hidden.linkTarget, hidden.linkDirection]).toEqual([null, 'in']);
+    for (const text of [s, sKey, LABEL]) expect(JSON.stringify(hidden)).not.toContain(text);
+    // the /events door serves the same withheld copy
+    expect(JSON.stringify(await leadOnEvents('member'))).toBe('{"kind":"leads_to","targetId":null,"from":null}');
+    // CONTROL: the owner still sees S, on both doors
+    expect(describeEvent(await leadLine('owner'))).toBe(`Linked: comes after ${sKey} (${LABEL})`);
+    expect(await leadOnEvents('owner')).toEqual({ kind: 'leads_to', targetId: d, from: s, label: LABEL });
+  });
+});

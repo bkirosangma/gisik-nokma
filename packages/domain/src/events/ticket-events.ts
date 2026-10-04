@@ -285,10 +285,16 @@ export function isTicketLinkEvent(type: string): boolean {
  * keeps its `from` key with the id withheld, `{kind, targetId: null, from:
  * null}`, so every reader still reads it from the end it points into (drafts
  * T6 FIX 1, planner ruling 2026-10-04 21:08). A `leads_to` branch `label`
- * is KEPT, last, and absent when the link has none (workflow-timeline-graphs
- * LK-6, planner ruling 2026-10-04 13:01): it belongs to the source the viewer
- * sees, never to the withheld end. The purge precedent is
- * `redactedTicketCreatedPayload` (`purge.ts`).
+ * is KEPT, last, on `'out'` only, and absent when the link has none. On
+ * `'out'` the withheld end is the target and the label is the visible
+ * source's own branch (workflow-timeline-graphs LK-6, planner ruling
+ * 2026-10-04 13:01). On `'in'` the hidden end IS the source, so the label is
+ * that hidden ticket's branch text and is DROPPED, fail closed: the copy is
+ * D6's `{kind, targetId: null, from: null}` exactly (planner ruling
+ * 2026-10-05 00:13; LK-6 "a redacted source's label is withheld"). This is
+ * the one place that decides it: the server's doors, the replica (served
+ * copies) and MCP's `redactedPayload` all take the label from here (29.126).
+ * The purge precedent is `redactedTicketCreatedPayload` (`purge.ts`).
  */
 export function withheldLinkPayload(
   kind: TicketLinkKind,
@@ -296,7 +302,7 @@ export function withheldLinkPayload(
   label?: string,
 ): { kind: TicketLinkKind; targetId: null; from?: null; label?: string } {
   const withheld = direction === 'in' ? { kind, targetId: null, from: null } : { kind, targetId: null };
-  return label === undefined ? withheld : { ...withheld, label };
+  return label === undefined || direction === 'in' ? withheld : { ...withheld, label };
 }
 
 /**
