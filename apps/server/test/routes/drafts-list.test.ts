@@ -143,9 +143,14 @@ describe('28.079 G8: GET /v1/me/drafts', () => {
 
     // a workspace in the trash lists nothing; restored, it lists again (the lifecycle projection's own events)
     const lifecycle = async (type: 'workspace.deleted' | 'workspace.undeleted'): Promise<boolean[]> => {
-      await lifecycleProjection.apply(testEnvelope({
-        workspaceId: nb.workspaceId, entity: { kind: 'workspace', id: nb.workspaceId }, type, payload: {}, actorId: read.userIds.neighbour,
-      }), db.pool);
+      const client = await db.pool.connect(); // `applyAll` does not run this projection; same client shape it uses
+      try {
+        await lifecycleProjection.apply(testEnvelope({
+          workspaceId: nb.workspaceId, entity: { kind: 'workspace', id: nb.workspaceId }, type, payload: {}, actorId: read.userIds.neighbour,
+        }), client);
+      } finally {
+        client.release();
+      }
       const { rows } = await db.pool.query<{ deleted_at: Date | null }>('SELECT deleted_at FROM proj_workspaces WHERE workspace_id = $1', [nb.workspaceId]);
       return rows.map((r) => r.deleted_at !== null);
     };
