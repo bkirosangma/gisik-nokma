@@ -193,7 +193,7 @@ describe('28.057 the single-ticket reads', () => {
         // The notes-of-a-ticket read answers 200 `{ notes: [] }` for ANY id, an unknown one included: it has no
         // ticket gate. No note is attached to the draft here, so this leg compares two empty lists and shows
         // nothing. The read is NOT closed: a readable note attached to a draft IS listed (reviewer probe P1).
-        // G11 refuses `note.attached` naming a draft until T9, whose `isClosedDraft` closes the read. Every other
+        // G11 refuses `note.attached` naming a draft until T9, whose `isClosedOrErasedDraft` closes the read. Every other
         // read is a 404.
         expect(answer.statusCode, `${role} ${url}`).toBe(url.endsWith('/notes') ? 200 : 404);
         expect(answer.json(), `${role} ${url}: not the unknown-id answer`).toEqual(unknown.json());

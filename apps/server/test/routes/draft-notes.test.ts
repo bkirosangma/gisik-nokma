@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { NOTE_PERMISSION_RULE } from '../../src/permissions/check-permission.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
-import { discardDraft } from '../../src/purge/discard-draft.js';
 import { purgeItem, type PurgeGate } from '../../src/purge/purge-item.js';
 import { visibleEventsFor, type ReachGrantedInstruction, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { door } from '../helpers/door.js';
@@ -102,9 +101,6 @@ describe('28.186 a note linked to a draft is the author\'s alone (R66, Q16)', ()
   });
 
   // Planner ruling 2026-10-04 (T9-Q1, the owner's no-trace ruling): what was withheld stays withheld after a discard.
-  // Imports for this `it`: `discardDraft` (`../../src/purge/discard-draft.js`), `buildProjectionRegistry`
-  // (`../../src/projections/index.js`), `recordingStore` (`../purge/world.js`), `purgeItem` and `type PurgeGate`
-  // (`../../src/purge/purge-item.js`; planner ruling 2026-10-04, follow-up).
   it('28.186 after a discard\'s erasure the attach stays withheld from the stream, the events route and the bootstrap, for every reader and the author; CONTROL: a live and two trash-purged published tickets\' attaches are delivered to the same readers', async () => {
     // d: a draft, discarded and erased. p: a live published ticket. q: born published, then purged. r: born a draft,
     // published, then purged (its redacted creation still says `draft: true`; only its publish row tells it apart).
@@ -119,8 +115,12 @@ describe('28.186 a note linked to a draft is the author\'s alone (R66, Q16)', ()
       expect(await attach('member', noteId, ticketId)).toMatchObject({ status: 'committed' });
     }
     expect(await door(read, 'member', 'ticket', d, 'ticket.discarded', {})).toMatchObject({ status: 'committed' });
+    // The erasure is the app's own: the test app wires `discardDraft` as the `ticket.discarded` listener exactly as
+    // `src/index.ts` does (drafts T5), so the leg waits for it (T5's 28.100 pattern) instead of erasing a second time.
+    const purged = async (id: string): Promise<number> =>
+      (await db.pool.query(`SELECT 1 FROM purged_entities WHERE entity_kind = 'ticket' AND entity_id = $1`, [id])).rows.length;
+    await expect.poll(() => purged(d), { timeout: 10_000 }).toBe(1);
     const deps = () => ({ projections: buildProjectionRegistry(), store: recordingStore(), now: new Date() });
-    expect(await discardDraft(db.pool, d, deps())).toMatchObject({ status: 'purged' });
     // The trash purge, with its 15-day gate replaced by one that always passes (the gate is not under test here).
     const due: PurgeGate = async () => ({ ok: true, markedBy: read.userIds.owner, markedAt: new Date().toISOString() });
     for (const id of [q, r]) expect(await purgeItem(db.pool, { kind: 'ticket', id }, deps(), due)).toMatchObject({ status: 'purged' });

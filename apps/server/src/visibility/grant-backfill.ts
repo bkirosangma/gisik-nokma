@@ -377,9 +377,11 @@ export async function grantNoticeFor(
 /**
  * The `inherit`-scoped notes attached to any of these tickets — the candidates
  * a ticket-audience change can widen, before any per-reader question is asked
- * (spec §5.2).
+ * (spec §5.2). With `anyScope` (drafts T9, R66; the stream's `ticket.published`
+ * arm only, for the published ticket itself), every non-deleted note attached
+ * to them, whatever its scope.
  *
- * ## Why the filter is `scope_mode = 'inherit'` and nothing else
+ * ## Why the filter is `scope_mode = 'inherit'` and nothing else (unless `anyScope`)
  *
  * Only an `inherit` note's readership depends on a ticket. A `workspace`,
  * `project` or `explicit` note attached to the same ticket is readable or not
@@ -387,6 +389,13 @@ export async function grantNoticeFor(
  * about it and announcing it would be a notice the client could not act on.
  * `private` is excluded by the same clause for the stronger reason: nothing
  * about a private note's audience involves a ticket at all.
+ *
+ * A publish is the one exception, and `anyScope` is its switch: while the
+ * ticket was a draft, `noteEventVisibleTo` withheld the `note.attached` that
+ * names it from every reader of the note but the author, whatever the note's
+ * scope, so the publish IS news about every such note. Its readers are then
+ * decided per note by `noteGrantNoticeFor`'s `canReadNote` (a `private` note
+ * reaches its author alone), which is load-bearing on that path (28.194).
  *
  * ## `deleted = FALSE`, and it is a DELIVERY decision rather than a read rule
  *
@@ -412,6 +421,7 @@ export async function grantNoticeFor(
 export async function notesAttachedTo(
   db: Queryable,
   ticketIds: readonly string[],
+  opts: { anyScope?: boolean } = {},
 ): Promise<string[]> {
   if (ticketIds.length === 0) return [];
   const { rows } = await db.query<{ note_id: string }>(
@@ -419,7 +429,7 @@ export async function notesAttachedTo(
        FROM proj_note_attachments na
        JOIN proj_notes n ON n.note_id = na.note_id
       WHERE na.ticket_id = ANY($1::text[])
-        AND n.scope_mode = 'inherit'
+        ${opts.anyScope === true ? '' : "AND n.scope_mode = 'inherit'"}
         AND n.deleted = FALSE
       ORDER BY 1`,
     [[...ticketIds]],

@@ -11,6 +11,7 @@ import {
   listNotes,
   listNotesForTicket,
 } from '../read/notes.js';
+import { isClosedOrErasedDraft, noteEventVisibleTo } from '../visibility/can-open.js';
 import { NOT_FOUND_BODY, toEventView, type LedgerRow } from './tickets.js';
 
 /**
@@ -91,6 +92,8 @@ export function registerNoteRoutes(
       const userId = request.currentUserId;
       const { workspaceId, ticketId } = request.params;
       const eff = await resolveEffectiveRole(deps.pool, userId, workspaceId);
+      // Another person's draft, or an erased one, has no notes for this caller: the answer an unknown id already gets.
+      if (await isClosedOrErasedDraft(deps.pool, userId, ticketId)) return { notes: [] };
       return { notes: await listNotesForTicket(deps.pool, eff, userId, workspaceId, ticketId) };
     },
   );
@@ -182,7 +185,13 @@ export function registerNoteRoutes(
          ORDER BY seq`,
         [noteId],
       );
-      return { events: rows.map(toEventView) };
+      // A `note.attached` / `note.detached` naming another person's draft is the author's alone (drafts R66);
+      // one naming an erased draft is nobody's (planner ruling 2026-10-04, follow-up).
+      const visible: LedgerRow[] = [];
+      for (const row of rows) {
+        if (await noteEventVisibleTo(deps.pool, userId, row)) visible.push(row);
+      }
+      return { events: visible.map(toEventView) };
     },
   );
 
