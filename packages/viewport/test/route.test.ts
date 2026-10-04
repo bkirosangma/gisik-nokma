@@ -33,6 +33,11 @@ describe('29.065 edge routing on packed rows', () => {
     expect(routeEdge(bar(0, 0, 4), { x: 72, y: 80, w: 48, h: 28 }, []).points).toEqual([
       { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 58, y: 54 }, { x: 58, y: 94 }, { x: 72, y: 94 },
     ]);
+    // a gap of exactly the gutter (14 px): neither gutter is used (one would leave the end anchor straight down along the
+    // source's edge, the other would come down onto the start anchor from above); the arrowhead still enters from the left
+    expect(routeEdge(bar(0, 0, 4), { x: 78, y: 80, w: 48, h: 28 }, []).points).toEqual([
+      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 64, y: 54 }, { x: 64, y: 94 }, { x: 78, y: 94 },
+    ]);
   });
 
   it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ', () => {
@@ -108,6 +113,11 @@ describe('29.065 edge routing on packed rows', () => {
     ]);
     // bars of mixed height (a 40 px box whose middle is level with the source's bottom): the channel's zero-length step and
     // collinear corner are dropped, so no two points repeat and no three lie on one line
+    // a shorter target EARLIER with its middle level with the source's (y = 14): the channel runs under the source's bottom
+    // (y = 28), not along the target's bottom (y = 24), which would cut through the source bar
+    expect(routeEdge({ x: 100, y: 0, w: 64, h: 28 }, { x: 0, y: 4, w: 48, h: 20 }, []).points).toEqual([
+      { x: 164, y: 14 }, { x: 178, y: 14 }, { x: 178, y: 28 }, { x: -14, y: 28 }, { x: -14, y: 14 }, { x: 0, y: 14 },
+    ]);
     const mixed = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: 8, w: 48, h: 40 }, []).points;
     expect(mixed[0]).toEqual({ x: 64, y: 14 });
     expect(mixed[mixed.length - 1]).toEqual({ x: 70, y: 28 });
@@ -135,6 +145,9 @@ describe('29.065 edge routing on packed rows', () => {
     const blocker: Box = { x: 100, y: 40, w: 20, h: 28 };
     expect(routeEdge(t(from), t(to), [t(blocker)], 'portrait').points).toEqual([{ x: 14, y: 64 }, { x: 14, y: 78 }, { x: 94, y: 78 }, { x: 94, y: 128 }]);
     expect(routeEdge(t(from), t(to), [blocker], 'portrait').points).toEqual(port.points);
+    // every candidate blocked (the landscape case's two bars, transposed): portrait reports the crossing too
+    const walls: Box[] = [{ x: 290, y: 0, w: 30, h: 40 }, { x: 72, y: 40, w: 12, h: 10 }];
+    expect(routeEdge(t(from), t(bar(20, 2, 3)), walls.map(t), 'portrait').crossings).toBe(1);
   });
 
   it('29.065 the label sits on the longest segment along the time axis', () => {
@@ -144,6 +157,8 @@ describe('29.065 edge routing on packed rows', () => {
     expect(r.label.x).toBeLessThan(30 * 16);
     // the path is 64 -> 466 on row 0 (402 px), down, then 466 -> 480 (14 px): the middle of the long run
     expect(r.label).toEqual({ x: 265, y: 14 });
+    // two runs of equal length (64 -> 78 on row 0, 78 -> 92 on row 2): the first, nearer the source, takes the label
+    expect(routeEdge(bar(0, 0, 4), { x: 92, y: 80, w: 48, h: 28 }, []).label).toEqual({ x: 71, y: 14 });
   });
 });
 
