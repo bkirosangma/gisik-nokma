@@ -78,7 +78,8 @@ export function problems(table: Record<string, Counts>, scanned: Record<string, 
 /**
  * Measured on task/drafts-t3-projections after Steps 2 to 6 (the plan's 40 rows were measured on ec72d1f8;
  * the KG series added `read/graph-neighbours.ts` and `read/item-visibility.ts`, and the tipmerge of
- * release/workflow-graph f95c2fab brought in KG Home, `routes/home.ts`). `projections/references.ts`
+ * release/workflow-graph f95c2fab brought in KG Home, `routes/home.ts`; KG->WG sync 4 brought in typed-links T4b,
+ * `visibility/withhold-link-targets.ts`, and KG-B Linked from, `read/linked-from.ts` and `routes/references.ts`). `projections/references.ts`
  * (errata E1) is not a row: its draft arm reads the ledger, not `proj_tickets`; 28.068 is its guard.
  */
 const CENSUS: Record<string, Site> = {
@@ -100,6 +101,7 @@ const CENSUS: Record<string, Site> = {
   'read/drafts.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['D'], why: 'G8: listMyDrafts reads the caller\'s own drafts by draft_author_id = viewer; no other reader may call it with another id (28.084 lists its callers)' },
   'read/graph-neighbours.ts': { tickets: 4, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "the KG ring: every edge end passes createGraphVisibility.resolve (LIVE_TICKET_WHERE and visibleTicketsWhere) before it is shown or walked, and no hidden-link count exists (27.293); the raw proj_tickets edge reads only propose ends" },
   'read/item-visibility.ts': { tickets: 2, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'hiddenItems: the live set and the visible set both AND LIVE_TICKET_WHERE, so a draft is neither live nor hidden (a concept is not refused over it)' },
+  'read/linked-from.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "Linked from (KG-B T2): a ticket source, or a comment on one, is listed and counted only through LIVE_TICKET_WHERE and visibleTicketsWhere (:65), so a draft source never appears, the author's included; the target is the caller's check (routes/references.ts:21)" },
   'read/live-ticket.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'ticketIsLive asks LIVE_TICKET_WHERE; T9 adds the openable twin' },
   'read/notes.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'attachedTicketsByNote ANDs LIVE_TICKET_WHERE and visibleTicketsWhere' },
   'read/restricted-parents.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 1, getResolved: 0, groups: ['C'], why: 'the canSeeResolved literal carries draftAuthorId; a draft parent is never offered to the assignee arm' },
@@ -115,10 +117,11 @@ const CENSUS: Record<string, Site> = {
   'routes/home.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "Home's one ticket read ANDs visibleTicketsWhere (:52) and LIVE_TICKET_WHERE (:54), so its counts and ids carry no draft (28.069)" },
   'routes/list.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates are ANDed into the read' },
   'routes/my-work.ts': { tickets: 3, visibility: 2, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'assigned, shared and titles use both predicates; the contest roster (:333) is gated by canSee (:367)' },
+  'routes/references.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'GET references: the target must be ticketIsLive and canSee (:21), so a draft target is the one 404 for every viewer, the author too, before read/linked-from.ts runs' },
   'routes/search.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates; proj_search rows exist for drafts and are read only through this join' },
-  'routes/ticket-history.ts': { tickets: 1, visibility: 0, canSee: 2, resolved: 0, getResolved: 0, groups: ['B'], why: "canSee (:296): closed for the author too, a draft's History is not shown until publish (spec §4.3, ruling 5); the linkTarget lookup (:338) reads owner rows only and keys a target only after canSee (:343), so a draft target renders as linkTarget null" },
+  'routes/ticket-history.ts': { tickets: 1, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "canSee (:301): closed for the author too, a draft's History is not shown until publish (spec §4.3, ruling 5); every event is served through withholdEvent with the reader's targetSight (:338, typed-links T4b), so a draft target is withheld and renders as linkTarget null (:360); the owner-row lookup (:350) keys only the targets that survived" },
   'routes/ticket-links.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'GET links: canSee (:20) closes a draft source for every viewer, the author too, before read/ticket-links.ts runs' },
-  'routes/tickets.ts': { tickets: 0, visibility: 1, canSee: 4, resolved: 0, getResolved: 0, groups: ['B', 'D'], why: 'G7: the detail read and its two crumbs are canOpen (T4, 28.084); canSee at :712 drops every state.links entry whose target the viewer cannot see, so a draft target never reaches the detail; canSee at :743 (events), :882 (attachments list, G10 in T9) and :970 (comments) stay closed for the author' },
+  'routes/tickets.ts': { tickets: 0, visibility: 1, canSee: 3, resolved: 0, getResolved: 0, groups: ['B', 'D'], why: "G7: the detail read and its two crumbs are canOpen (T4, 28.084); the detail's state.links go through withholdLinks with the reader's targetSight (:722, typed-links T4b), so a draft target never reaches the detail; canSee at :749 (events, each served through withholdEvent, :769), :894 (attachments list, G10 in T9) and :982 (comments) stay closed for the author" },
   'sync/contests-route.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['D'], why: 'G6: the roster joins proj_tickets for titles and gates each row by canOpen (28.084)' },
   'sync/snapshot-refresh.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the workflow-publish refresh folds every ticket forward, drafts included (R40, 28.066)' },
   'visibility/assignee-arm.ts': { tickets: 2, visibility: 2, canSee: 0, resolved: 0, getResolved: 0, groups: ['A'], why: 'the arm; canSee returns before it for a draft and visibleTicketsWhere ANDs the draft clause around it' },
@@ -127,8 +130,9 @@ const CENSUS: Record<string, Site> = {
   'visibility/can-see.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 1, getResolved: 1, groups: ['A'], why: 'A1 canSeeResolved and A2 canSee, edited in this task' },
   'visibility/grant-backfill.ts': { tickets: 0, visibility: 1, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'every id in a reach notice passes canSee (:363)' },
   'visibility/rollup.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 1, getResolved: 0, groups: ['C'], why: "C2: the viewer's child tally and restrictedCount" },
-  'visibility/visible-events-for.ts': { tickets: 0, visibility: 2, canSee: 0, resolved: 0, getResolved: 0, groups: ['C', 'D'], why: 'C4 nowInvisibleTicketsInScope (:356, :360) names an own draft only when ticketAccess is none (:371); G2 the stream is canOpen (:503)' },
+  'visibility/visible-events-for.ts': { tickets: 0, visibility: 2, canSee: 0, resolved: 0, getResolved: 0, groups: ['C', 'D'], why: "C4 nowInvisibleTicketsInScope (:357, :361) names an own draft only when ticketAccess is none (:372); G2 the stream is canOpen (:514), and each admitted event is served through withholdEvent with the reader's targetSight (:597)" },
   'visibility/visible-tickets.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "listVisibleTickets is visibleTicketsWhere; G4 (sync/sync-routes.ts) appends the author's own drafts through listMyDrafts (T4, 28.075)" },
+  'visibility/withhold-link-targets.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "typed-links T4b: targetSight memoises canSee (:45) for every door that withholds a link target (the detail, events, History, both bootstraps, the stream, contests); canSee is false for every draft, so a draft target is withheld from every viewer; no stored link names one on this tip (the target gate, check-permission.ts:1692), and the author's own draft target is drafts T6's" },
 };
 
 describe('28.050 the draft census', () => {

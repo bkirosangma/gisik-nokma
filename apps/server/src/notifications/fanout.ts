@@ -335,9 +335,12 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     const original = parsed.data.originalEvent;
     // NO canSee GATE HERE, deliberately, and its own test pins the absence: the
     // payload is the claimant's own refused event echoed back — rule, reason
-    // and their claim's provenance — and carries no title. It discloses nothing
-    // they did not themselves author, and a claimant who is told nothing about
-    // their own refusal cannot act on it.
+    // and their claim's provenance. It discloses nothing they did not author or
+    // could not see when they made the claim: a `link.reverse` /
+    // `link.duplicate` reason does name the other ticket's TITLE, but the
+    // claimant passed `canSee` on that ticket at the gate (typed-links T4b
+    // withholds that cause from every OTHER viewer, `withhold-link-targets.ts`).
+    // A claimant who is told nothing about their own refusal cannot act on it.
     //
     // THE ADDRESSEE IS `original.actorId` — THE CLAIMANT — AND NOT `env.actorId`.
     // That is the whole of the exemption's justification, not an incidental

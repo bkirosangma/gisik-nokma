@@ -1,8 +1,9 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { isTicketLinkEvent } from '@gisik-nokma/domain';
+import { isTicketLinkEvent, isWithheldLinkEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { keysForAncestors } from '../read/ancestry.js';
 import { canSee } from '../visibility/can-see.js';
+import { targetSight, withholdEvent } from '../visibility/withhold-link-targets.js';
 import { NOT_FOUND_BODY } from './tickets.js';
 
 /**
@@ -31,7 +32,11 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * redacted from someone entitled to the state, and every claim-bearing field
  * above goes out whole, with ONE exception: a link event's `payload.targetId`
  * is withheld (`null`) when this viewer cannot see the target (spec A §2.4,
- * see `linkTarget`).
+ * see `linkTarget`), and a contest of such a link claim goes out with that
+ * payload withheld and the gate's cause in place of its own, because a
+ * `link.reverse` reason names the hidden ticket's title (typed-links T4b). The
+ * claim is not cut: only the other end's id and the contest's cause are
+ * withheld, per viewer (`visibility/withhold-link-targets.ts`).
  */
 export type TicketHistoryEvent = {
   id: string;
@@ -321,10 +326,16 @@ export function registerTicketHistoryRoute(
         [id, paging.afterSeq, paging.limit],
       );
 
-      const events = rows.map(toHistoryEvent);
-      // Label link events (spec A §2.4): a visible target's key, or `null` and
-      // the id withheld from the payload. A page is at most `MAX_LIMIT` events,
-      // so the per-target loop is bounded.
+      // Typed-links T4b: every row as this viewer may be served it FIRST, with
+      // ONE sight for the page (`withhold-link-targets.ts`): a link whose target
+      // they cannot see goes out with `targetId: null`, and a contest of such a
+      // claim with the gate's cause. Then the link events are labelled from that
+      // output (spec A §2.4): a withheld one reads `linkTarget: null`, a string
+      // target its key. A page is at most `MAX_LIMIT` events, so the per-target
+      // loop is bounded.
+      const sees = targetSight(deps.pool, request.currentUserId);
+      const events: TicketHistoryEvent[] = [];
+      for (const row of rows) events.push(await withholdEvent(toHistoryEvent(row), sees));
       const linkTargets = [
         ...new Set(
           events
@@ -333,25 +344,23 @@ export function registerTicketHistoryRoute(
             .filter((t): t is string => typeof t === 'string'),
         ),
       ];
+      const keyOf = new Map<string, string | null>();
       if (linkTargets.length > 0) {
         const { rows: owners } = await deps.pool.query<{ ticket_id: string; workspace_id: string; project_id: string }>(
           'SELECT ticket_id, workspace_id, project_id FROM proj_tickets WHERE ticket_id = ANY($1::text[])',
           [linkTargets],
         );
-        const visible = new Map<string, string | null>();
         for (const o of owners) {
-          if (!(await canSee(deps.pool, request.currentUserId, o.ticket_id))) continue;
           const keys = await keysForAncestors(deps.pool, o.workspace_id, [{ ticketId: o.ticket_id, projectId: o.project_id }]);
-          visible.set(o.ticket_id, keys.get(o.ticket_id) ?? null);
+          keyOf.set(o.ticket_id, keys.get(o.ticket_id) ?? null);
         }
-        for (const e of events) {
-          if (!isTicketLinkEvent(e.type)) continue;
-          const p = e.payload as { kind: string; targetId: string };
-          if (visible.has(p.targetId)) e.linkTarget = { key: visible.get(p.targetId)! };
-          else {
-            e.linkTarget = null;
-            e.payload = { kind: p.kind, targetId: null };
-          }
+      }
+      for (const e of events) {
+        if (!isTicketLinkEvent(e.type)) continue;
+        if (isWithheldLinkEvent(e)) e.linkTarget = null;
+        else {
+          const target = (e.payload as { targetId?: unknown }).targetId;
+          if (typeof target === 'string') e.linkTarget = { key: keyOf.get(target) ?? null };
         }
       }
       return { ticketId: id, events };
