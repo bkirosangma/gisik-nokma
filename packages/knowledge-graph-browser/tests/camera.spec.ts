@@ -1,10 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openAdapter, pagePoint, stageAt, still } from './helpers.js';
+import { openAdapter, pageErrors, pagePoint, stageAt, still, takePageErrors } from './helpers.js';
 
 /*
  * The camera on the REAL adapter (`harness/adapter.html`): the wheel, the trackpad and touch gestures, the fit, the glide
  * and reduced motion, measured as `sigtest.cjs` did against the mockup. One test() per case; its control lives inside it.
  */
+
+// an uncaught page error fails every case: a throw inside a rAF callback kills the camera driver and shows nothing else (27.285)
+test.afterEach(() => expect(takePageErrors()).toEqual([]));
 
 const camera = (page: Page) => page.evaluate(() => window.__kg.probe!.camera());
 const frames = (page: Page) => page.evaluate(() => window.__kg.probe!.frames());
@@ -145,7 +148,7 @@ test('27.275 a touch pinch zooms (Sigma\'s own touch handling, undisturbed by th
   await context.close();
 });
 
-test('27.280 selection keeps the view, and the selected card wears the selection ring through a zoom; control: without keepView the camera returns to the fit', async ({ page }) => {
+test('27.280 selection keeps the view, the selected card wears the selection ring through a zoom, and a selected edge is drawn at 3.4 and full opacity; control: without keepView the camera returns to the fit, and another edge keeps its rest size', async ({ page }) => {
   await openAdapter(page);
   const before = await page.evaluate(() => window.__kg.probe!.nodeDisplay('ticket:t160')!.backdropBorderColor);
   const pal = await page.evaluate(() => window.__kg.readPalette());
@@ -164,6 +167,17 @@ test('27.280 selection keeps the view, and the selected card wears the selection
   await still(page);
   const fit = await page.evaluate(() => window.__kg.probe!.fitRatio());
   expect(Math.abs((await camera(page)).ratio / fit - 1)).toBeLessThan(0.01);
+  // a selected EDGE (with t160 selected, the blocks edge t133 → t142 is not `on`, so it rests thinner and translucent)
+  const edges = await page.evaluate(() => {
+    const k = window.__kg, p = k.probe!, id = 'blocks|ticket:t133|ticket:t142', other = 'parent|ticket:t131|ticket:t133';
+    const rest = { sel: p.edgeDisplay(id)!, other: p.edgeDisplay(other)! };
+    k.renderer.setStates({ selected: null, selectedEdge: id, highlight: null });
+    return { rest, sel: p.edgeDisplay(id)!, other: p.edgeDisplay(other)! };
+  });
+  expect(edges.rest.sel).not.toEqual({ size: 3.4, opacity: 1 }); // so the selected leg can fail
+  expect(edges.sel).toEqual({ size: 3.4, opacity: 1 });
+  expect(edges.other.size).toBe(edges.rest.other.size); // control: only the selected edge thickens
+  expect(edges.other.size).toBeLessThan(3.4);
 });
 
 test('27.281 the glide: a new centre tweens the items while the frame (the normalisation) stays fixed, through a resize too; an item that keeps its place never moves; control: an item that moves passes through intermediate positions', async ({ page }) => {
@@ -244,7 +258,7 @@ test('27.284 reduced motion: a zoom lands in one frame and a new centre lands wi
   for (const f of after) expect(f).toEqual(r.end); // no intermediate position
 });
 
-test('27.285 momentum: a drag released while moving coasts on in its direction (Sigma\'s inertia); control: a drag that rests before release does not', async ({ page }) => {
+test('27.285 momentum: a drag released while moving coasts on in its direction (Sigma\'s inertia), and a drag during a running zoom spring leaves the driver alive (no page error, a later notch zooms); control: a drag that rests before release does not coast', async ({ page }) => {
   await openAdapter(page);
   const s = await stageAt(page);
   const drag = async (rest: number) => {
@@ -269,4 +283,25 @@ test('27.285 momentum: a drag released while moving coasts on in its direction (
   expect(Math.abs(moving.coast)).toBeGreaterThanOrEqual(0.2 * Math.abs(moving.dragged));
   const rested = await drag(150);
   expect(Math.abs(rested.coast)).toBeLessThan(1e-9); // control
+  // a drag DURING a running spring: the driver keeps its target while its own loop runs (`raf === 0` clause), so the
+  // loop never reads a null target, and the driver is still alive afterwards
+  const r0 = (await camera(page)).ratio;
+  const at = { x: s.left + s.width * 0.3, y: s.top + s.height * 0.85 };
+  await page.mouse.move(at.x, at.y);
+  await page.evaluate(() => window.__kg.renderer.zoomBy(2));
+  await page.mouse.down();
+  const atDown = (await camera(page)).ratio;
+  for (let i = 1; i <= 10; i += 1) {
+    await page.mouse.move(at.x + 20 * i, at.y);
+    await page.waitForTimeout(12);
+  }
+  await page.mouse.up();
+  await still(page);
+  expect(atDown / (r0 / 2)).toBeGreaterThan(1.01); // control: the drag began while the spring was still running
+  expect(pageErrors(page)).toEqual([]);
+  const r1 = (await camera(page)).ratio;
+  await page.mouse.move(s.left + s.width * 0.5, s.top + s.height * 0.5);
+  await page.mouse.wheel(0, -100);
+  await still(page);
+  expect(Math.abs((await camera(page)).ratio / r1 - 1)).toBeGreaterThan(0.05); // a notch still zooms: the driver is alive
 });

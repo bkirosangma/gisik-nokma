@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openAdapter, pagePoint, stageAt, still } from './helpers.js';
+import { openAdapter, pagePoint, stageAt, still, takePageErrors } from './helpers.js';
 
 /*
  * Spec C §4.2's traps, each measured on the REAL adapter (`harness/adapter.html`: the fixture centred on GN-142, desktop,
@@ -7,6 +7,9 @@ import { openAdapter, pagePoint, stageAt, still } from './helpers.js';
  */
 
 type Pt = { x: number; y: number };
+
+// an uncaught page error fails every case: a throw inside a rAF callback kills the camera driver and shows nothing else (27.285)
+test.afterEach(() => expect(takePageErrors()).toEqual([]));
 
 /** A point near `from`, `dist` px away, with nothing drawn within `clear` px of it (no node, edge or label to hit). */
 async function emptyPointNear(page: Page, from: Pt, dist: number, clear = 14): Promise<Pt> {
@@ -145,7 +148,7 @@ test('27.269 trap 5: a fog dot is drawn the same size in px after a 2× zoom; co
   expect(r1 / r0).toBeCloseTo(0.5, 2); // control: the zoom happened
 });
 
-test('27.270 trap 6 + label: a click on a chip\'s label picks it; a click on a fog dot picks nothing; control: Sigma did fire its own clickNode on the fog dot', async ({ page }) => {
+test('27.270 trap 6 + label: a click on a chip\'s label picks it; a click on a fog dot picks nothing; a click on an edge picks it, and a fog edge Sigma hovers is neither reported nor picked; control: Sigma did fire its own clickNode on the fog dot, and did hover the fog edge', async ({ page }) => {
   await openAdapter(page);
   const label = await pagePoint(page, 'ticket:t133');
   await page.mouse.click(label.x + 30, label.y);
@@ -162,6 +165,47 @@ test('27.270 trap 6 + label: a click on a chip\'s label picks it; a click on a f
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => window.__kg.picks.length)).toBe(1); // no pick recorded
   expect(await page.evaluate(() => window.__kg.rawClicks())).toBeGreaterThan(raw0); // control: Sigma's own clickNode fired
+  // edges: a click on a solid edge's midpoint (where 27.279 hovers it) picks the edge
+  const a = await pagePoint(page, 'ticket:t133'), c = await pagePoint(page, 'ticket:t142');
+  await page.mouse.click((a.x + c.x) / 2, (a.y + c.y) / 2);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.__kg.picks.at(-1))).toEqual({ kind: 'edge', id: 'blocks|ticket:t133|ticket:t142' });
+  // a fog edge, chosen by machine: a point near its middle that is inked, inside the stage, more than 6 px from every
+  // other edge and clear of every dot and card; then Sigma itself must hover it (its hover size, 3.4) for the leg to count
+  const cands = await page.evaluate(() => {
+    const k = window.__kg, p = k.probe!, sc = k.scene();
+    const r = document.querySelector('#mount .gn-kg__stage')!.getBoundingClientRect();
+    const V = (ref: string) => p.viewportOf(ref)!;
+    const segDist = (q: Pt, u: Pt, v: Pt) => {
+      const dx = v.x - u.x, dy = v.y - u.y, t = Math.max(0, Math.min(1, ((q.x - u.x) * dx + (q.y - u.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(q.x - (u.x + t * dx), q.y - (u.y + t * dy));
+    };
+    const pts = sc.edges
+      .filter((e) => e.fog)
+      .flatMap((e) => [0.5, 0.4, 0.6].map((t) => ({ id: e.id, x: V(e.from).x + (V(e.to).x - V(e.from).x) * t, y: V(e.from).y + (V(e.to).y - V(e.from).y) * t })))
+      .filter((q) => q.x > 20 && q.y > 20 && q.x < r.width - 20 && q.y < r.height - 20)
+      .filter((q) => sc.edges.every((o) => o.id === q.id || segDist(q, V(o.from), V(o.to)) > 6))
+      .filter((q) => sc.nodes.every((n) => (n.fog ? Math.hypot(V(n.ref).x - q.x, V(n.ref).y - q.y) > 10 : Math.abs(V(n.ref).x - q.x) > 160 || Math.abs(V(n.ref).y - q.y) > 50)));
+    const ink = p.alphaAt(pts);
+    return pts.filter((_, i) => ink[i]! > 0);
+  });
+  const st = await stageAt(page);
+  let hit: { id: string; x: number; y: number } | null = null;
+  for (const q of cands.slice(0, 6)) {
+    await page.mouse.move(st.left + q.x, st.top + q.y);
+    await still(page);
+    if ((await page.evaluate((id) => window.__kg.probe!.edgeDisplay(id)!.size, q.id)) === 3.4) {
+      hit = q;
+      break;
+    }
+  }
+  expect(cands.length).toBeGreaterThan(0);
+  expect(hit).not.toBeNull(); // control: Sigma did hover a fog edge
+  const n0 = await page.evaluate(() => window.__kg.picks.length);
+  await page.mouse.click(st.left + hit!.x, st.top + hit!.y);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.__kg.picks.length)).toBe(n0); // no pick
+  expect(await page.evaluate((id) => window.__kg.hovers.filter((h) => h.kind === 'edge' && h.id === id), hit!.id)).toEqual([]); // no hover reported
 });
 
 test('27.271 a click exactly on a dot picks it; control: a click in empty space picks the stage', async ({ page }) => {
@@ -176,8 +220,32 @@ test('27.271 a click exactly on a dot picks it; control: a click in empty space 
   expect(await page.evaluate(() => window.__kg.picks)).toEqual([{ kind: 'node', ref: 'ticket:t160', double: false }, { kind: 'stage' }]);
 });
 
-test('27.276 trap 8: after load every clear item is inside the stage and the fit is real; control: the same check after a 2× zoom finds items outside', async ({ page }) => {
+test('27.276 trap 8: after load every clear item is inside the stage and the fit is real, with the two hop rings, their labels and the fog band drawn, and the rings follow a 2× zoom in the same frame; control: the same check after a 2× zoom finds items outside', async ({ page }) => {
   await openAdapter(page);
+  // the ring layer (`rings.ts`), read from the DOM: the fixture has 2 clear hops and fog
+  const rings = () =>
+    page.evaluate(() => {
+      const svg = document.querySelector('#mount .gn-kg__rings')!;
+      const num = (e: Element, k: string) => Number(e.getAttribute(k));
+      return {
+        rings: [...svg.querySelectorAll('ellipse.gn-kg__ring')].map((e) => ({ cx: num(e, 'cx'), cy: num(e, 'cy'), rx: num(e, 'rx'), ry: num(e, 'ry') })),
+        labels: [...svg.querySelectorAll('text.gn-kg__ring-label')].map((t) => ({ text: t.textContent, x: num(t, 'x'), y: num(t, 'y') })),
+        fogBands: svg.querySelectorAll('ellipse.gn-kg__fog-band').length,
+        fogNodes: window.__kg.scene().nodes.filter((n) => n.fog).length,
+      };
+    });
+  const ring0 = await rings();
+  expect(ring0.fogNodes).toBeGreaterThan(0);
+  expect(ring0.rings.length).toBe(2); // hops 2 and 1, outermost first
+  expect(ring0.labels.map((l) => l.text)).toEqual(['2 hops', '1 hop']);
+  expect(ring0.fogBands).toBe(1);
+  expect(ring0.rings[0]!.rx).toBeGreaterThan(ring0.rings[1]!.rx);
+  // each label sits on its own ring, at angle −0.2 rad
+  ring0.labels.forEach((l, i) => {
+    const r = ring0.rings[i]!;
+    expect(Math.abs(l.x - (r.cx + r.rx * Math.cos(-0.2)))).toBeLessThan(0.1);
+    expect(Math.abs(l.y - (r.cy + r.ry * Math.sin(-0.2) - 8))).toBeLessThan(0.1);
+  });
   const check = () =>
     page.evaluate(() => {
       const k = window.__kg, p = k.probe!;
@@ -195,9 +263,13 @@ test('27.276 trap 8: after load every clear item is inside the stage and the fit
   await page.evaluate(() => window.__kg.renderer.zoomBy(2));
   await still(page);
   expect((await check()).out.length).toBeGreaterThan(0); // control: the check does see an item outside
+  // the rings are redrawn from the camera in the same frame: a 2× zoom doubles the outer ring and moves its label with it
+  const ring1 = await rings();
+  expect(Math.abs(ring1.rings[0]!.rx / ring0.rings[0]!.rx - 2)).toBeLessThan(0.04);
+  expect(Math.abs(ring1.labels[0]!.x - (ring1.rings[0]!.cx + ring1.rings[0]!.rx * Math.cos(-0.2)))).toBeLessThan(0.1);
 });
 
-test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to 8%; an edge hover dims nothing and thickens the edge, and back on the item dims again; control: leaving restores every item and edge', async ({ page }) => {
+test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to 8%; an edge hover dims nothing and thickens the edge, and back on the item dims again; control: leaving restores every item and edge and reports node-leave', async ({ page }) => {
   await openAdapter(page);
   const s = await stageAt(page);
   const centre = await pagePoint(page, 'ticket:t142');
@@ -238,9 +310,10 @@ test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to
     return { dimmed: k.scene().nodes.filter((n) => !n.fog && p.nodeDisplay(n.ref)!.opacity !== 1).map((n) => n.ref), edge: p.edgeDisplay('parent|ticket:t131|ticket:t133')!.opacity };
   });
   expect(after).toEqual({ dimmed: [], edge: edge0 }); // control: every non-fog item back to 1, the other edge back to its own
+  expect(await page.evaluate(() => window.__kg.hovers.at(-1))).toEqual({ kind: 'node-leave' }); // the view hides its hover state
 });
 
-test('27.279 trap 11: an edge hover reports the edge and the pointer, and Sigma draws no edge label; control: the edge thickened', async ({ page }) => {
+test('27.279 trap 11: an edge hover reports the edge and the pointer, moving off it reports edge-leave, and Sigma draws no edge label; control: the edge thickened', async ({ page }) => {
   await openAdapter(page);
   const a = await pagePoint(page, 'ticket:t133');
   const c = await pagePoint(page, 'ticket:t142');
@@ -253,6 +326,14 @@ test('27.279 trap 11: an edge hover reports the edge and the pointer, and Sigma 
     const k = window.__kg;
     return { hover: k.hovers.filter((h) => h.kind === 'edge').at(-1), size: k.probe!.edgeDisplay('blocks|ticket:t133|ticket:t142')!.size };
   });
+  // off the edge to an empty point: the view's tooltip hides on edge-leave; then back on it, so the redraw below runs hovered
+  const empty = await emptyPointNear(page, { x: mid.x - s.left, y: mid.y - s.top }, 120);
+  await page.mouse.move(s.left + empty.x, s.top + empty.y);
+  await still(page);
+  expect(await page.evaluate(() => window.__kg.hovers.at(-1))).toEqual({ kind: 'edge-leave' });
+  await page.mouse.move(mid.x, mid.y);
+  await still(page);
+  expect(await page.evaluate(() => window.__kg.hovers.at(-1))).toMatchObject({ kind: 'edge', id: 'blocks|ticket:t133|ticket:t142' });
   // no label: Sigma would centre one ON the line, and other edges and cards crowd its midpoint, so the edge is redrawn
   // ALONE with its two ends (camera kept) and a strip 4.5 px off it on both sides, ±15 px along it (further out, the end cards' shadows reach it), must stay empty
   const off = await page.evaluate(() => {

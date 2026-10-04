@@ -12,8 +12,21 @@ export async function waitStill(page: Page, read: () => Promise<unknown>): Promi
 /** Still = the camera has not moved AND no frame was drawn for 250 ms (the icon atlas and label attachments draw late). */
 export const still = (page: Page) => waitStill(page, () => page.evaluate(() => [window.__kg.probe!.camera(), window.__kg.probe!.frames()]));
 
-/** The adapter harness (`harness/adapter.html`), loaded and still. */
+const errors = new Map<Page, string[]>();
+/** Every uncaught page error since `openAdapter` (a throw in a rAF callback is one: 27.285's mid-spring drag). */
+export const pageErrors = (page: Page): string[] => errors.get(page) ?? [];
+/** Every page `openAdapter` opened since the last call, with its errors; each spec's `afterEach` asserts none. */
+export function takePageErrors(): string[] {
+  const all = [...errors.values()].flat();
+  errors.clear();
+  return all;
+}
+
+/** The adapter harness (`harness/adapter.html`), loaded and still. Uncaught page errors are collected from before the load. */
 export async function openAdapter(page: Page): Promise<void> {
+  const list: string[] = [];
+  errors.set(page, list);
+  page.on('pageerror', (e) => list.push(String(e)));
   await page.goto('/adapter.html');
   await page.waitForFunction(() => window.__kg?.probe, null, { timeout: 60_000 });
   await still(page);
