@@ -100,6 +100,30 @@ describe('27.146 a click opens the source; a comment opens its parent at the com
     render(<LinkedFromSection {...props(live(page))} />);
     expect(fireEvent.click(screen.getByRole('link'))).toBe(true);
   });
+
+  it('27.146 a row with no href is drawn as text, not a link, and a click on it navigates nowhere; a row with one is a link (control)', () => {
+    const onNavigate = vi.fn();
+    const page = { total: 2, nextCursor: null, items: [
+      row(3, { sourceKind: 'comment', sourceId: 'C9', parent: { kind: 'ticket', ticketId: 'S3', projectId: 'P', key: 'GN-3', title: 'x', stateCategory: 'open' } }),
+      row(1),
+    ] };
+    const hrefOf = (r: LinkedFromRow) => (r.sourceKind === 'comment' ? null : `/t/${r.sourceId}`);
+    render(<LinkedFromSection {...props(live(page), { onNavigate, hrefOf })} />);
+    // Found by its text, not by role: an `<a>` without an href has no link role, so a role query would not see the defect.
+    const commentName = screen.getByText('Comment on GN-3 by Ama Rangsa');
+    const commentLi = commentName.closest('li')!;
+    expect(commentLi.querySelector('a')).toBeNull();
+    expect(commentLi.querySelector(':scope > span.gn-linked-from__link')).not.toBeNull();
+    fireEvent.click(commentName);
+    expect(onNavigate).not.toHaveBeenCalled();
+    // CONTROL: the row WITH an href is exactly one anchor to it, and its click navigates once.
+    const ticketLi = screen.getByText('GN-1 Source 1').closest('li')!;
+    const anchors = ticketLi.querySelectorAll('a');
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]!.getAttribute('href')).toBe('/t/S1');
+    fireEvent.click(anchors[0]!);
+    expect(onNavigate.mock.calls).toEqual([['/t/S1']]);
+  });
 });
 
 describe('27.147 "Show all N" pages the rest from the same read', () => {
