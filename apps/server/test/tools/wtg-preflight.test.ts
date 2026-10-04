@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import {
@@ -201,6 +202,18 @@ describe('29.151 report, exit code, read-only', () => {
         { cwd: join(dirname(fileURLToPath(import.meta.url)), '../..'), encoding: 'utf8', env: { ...process.env, DATABASE_URL: shadowed.url }, timeout: 90_000 });
       expect(imported.status).toBe(0);
       expect(imported.stdout.trim()).toBe('imported-only'); // control: the same database, run as the CLI above, prints the report and exits 1
+      // The same from a script FILE, where argv[1] is defined: the guard's URL comparison is what keeps main() from running.
+      const scratch = mkdtempSync(join(tmpdir(), 'wtg-import-'));
+      try {
+        const entry = join(scratch, 'import-only.mts');
+        const target = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '../../src/tools/wtg-preflight.ts')).href;
+        writeFileSync(entry, `await import(${JSON.stringify(target)});\nconsole.log('imported-only');\n`);
+        const viaFile = spawnSync('pnpm', ['exec', 'tsx', entry], { cwd: join(dirname(fileURLToPath(import.meta.url)), '../..'), encoding: 'utf8', env: { ...process.env, DATABASE_URL: shadowed.url }, timeout: 90_000 });
+        expect(viaFile.status).toBe(0);
+        expect(viaFile.stdout.trim()).toBe('imported-only');
+      } finally {
+        rmSync(scratch, { recursive: true, force: true });
+      }
       const clean = run({ ...process.env, DATABASE_URL: fresh.url }); // control: the same CLI, a database with nothing to report
       expect(clean.status).toBe(0);
       expect(clean.stdout).toContain('shadowing custom fields: none');
