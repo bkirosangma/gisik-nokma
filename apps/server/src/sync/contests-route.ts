@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { FieldClaim } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { canSee } from '../visibility/can-see.js';
+import { targetSight, withholdContest } from '../visibility/withhold-link-targets.js';
 
 export type ContestView = {
   contestedEventId: string;
@@ -289,11 +290,14 @@ export function registerContestsRoute(
       );
 
       const contests: ContestView[] = [];
+      const sees = targetSight(deps.pool, request.currentUserId);
       for (const row of rows) {
         if (!(await canSee(deps.pool, request.currentUserId, row.ticket_id))) {
           continue;
         }
-        contests.push(toView(row));
+        // A contested link claim whose target this viewer cannot see: the
+        // embedded payload withheld and the gate's cause (typed-links T4b).
+        contests.push(await withholdContest(toView(row), sees));
       }
       return { contests };
     },

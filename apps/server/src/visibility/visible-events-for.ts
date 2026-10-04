@@ -9,6 +9,7 @@ import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
 import { canSee } from './can-see.js';
+import { targetSight, withholdEvent } from './withhold-link-targets.js';
 import {
   grantNoticeFor,
   isGrantBackfillTrigger,
@@ -455,6 +456,9 @@ export async function* visibleEventsFor(
   );
 
   const eff = await resolveEffectiveRole(db, userId, workspaceId);
+  // Typed-links T4b: one memoised `canSee` per drain for link targets (the
+  // READER's sight, never the actor's), used only in the ticket arm below.
+  const sees = targetSight(db, userId);
 
   if (eff.workspaceRole === null) {
     // Not a member NOW. Either they never were — nothing is owed — or this very
@@ -571,7 +575,7 @@ export async function* visibleEventsFor(
               };
             }
           }
-          yield env;
+          yield await withholdEvent(env, sees);
         }
         // NO per-event purge here, and there used to be one — this is the site
         // the controller's ruling on case 6.101 emptied, so the absence is

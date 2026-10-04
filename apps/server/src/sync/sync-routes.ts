@@ -4,6 +4,7 @@ import type { LedgerEvent, TicketState, WorkspaceRole } from '@gisik-nokma/domai
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { canSee } from '../visibility/can-see.js';
+import { targetSight, withholdEvent, withholdLinks, type TargetSight } from '../visibility/withhold-link-targets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
 import { readStreamSeq } from './stream-seq.js';
@@ -198,12 +199,13 @@ export type BootstrapResponse = {
  * closure 4 populates the snapshot's provenance block INSIDE this function, so
  * a caller that reimplements the body would silently serve tickets without it.
  */
-export async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<BootstrapTicket> {
+export async function bootstrapTicket(client: PoolClient, ticketId: string, sees: TargetSight): Promise<BootstrapTicket> {
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
   const all = await readEntityEvents(client, 'ticket', ticketId);
   const snapSeq = snapshot?.seq ?? 0;
   const backfill: readonly string[] = BOOTSTRAP_BACKFILL_TYPES;
-  const events = all.filter((e) => e.seq > snapSeq || backfill.includes(e.type));
+  const events: LedgerEvent[] = [];
+  for (const e of all) if (e.seq > snapSeq || backfill.includes(e.type)) events.push(await withholdEvent(e, sees));
   return {
     ticketId,
     snapshot:
@@ -216,7 +218,7 @@ export async function bootstrapTicket(client: PoolClient, ticketId: string): Pro
           // a wrong state downstream, never here.
           {
             seq: snapshot.seq,
-            state: snapshot.state as unknown as TicketState,
+            state: await withholdLinks(snapshot.state as unknown as TicketState, sees),
             // Passed through as read. The server does not recompute it here and
             // could not: the events it was read from are, by definition, below
             // this snapshot's seq and are exactly what this payload omits.
@@ -305,6 +307,7 @@ export async function ticketBootstrapFor(
   client: PoolClient,
   workspaceId: string,
   ticketId: string,
+  viewerId: string,
 ): Promise<TicketBootstrapResponse> {
   // The workspace's definitions WHOLE, not scoped to this ticket's workflows —
   // see the route's docblock for why scoping is where the silent failure lives.
@@ -317,7 +320,7 @@ export async function ticketBootstrapFor(
       ORDER BY workspace_seq`,
     [workspaceId],
   );
-  return { workspaceId, definitions: defRows.map(rowToEnvelope), ticket: await bootstrapTicket(client, ticketId) };
+  return { workspaceId, definitions: defRows.map(rowToEnvelope), ticket: await bootstrapTicket(client, ticketId, targetSight(client, viewerId)) };
 }
 
 export function registerSyncRoutes(
@@ -436,7 +439,7 @@ export function registerSyncRoutes(
           // See the docblock: this is the answer for "never existed" too.
           return await reply.code(404).send({ error: 'not_found' });
         }
-        const body = await ticketBootstrapFor(client, workspaceId, ticketId);
+        const body = await ticketBootstrapFor(client, workspaceId, ticketId, userId);
         await client.query('COMMIT');
         return body;
       } catch (err) {
@@ -496,8 +499,10 @@ export function registerSyncRoutes(
         const definitions = defRows.map(rowToEnvelope);
         const visible = await listVisibleTickets(client, userId, workspaceId);
         const tickets: BootstrapTicket[] = [];
+        // ONE sight per request: a workspace names the same link target many times.
+        const sees = targetSight(client, userId);
         for (const row of visible) {
-          tickets.push(await bootstrapTicket(client, row.ticket_id as string));
+          tickets.push(await bootstrapTicket(client, row.ticket_id as string, sees));
         }
         // The notes this caller may read, in ONE query rather than a per-note
         // pull: `listNotes` answers the readable (non-deleted) set through

@@ -461,7 +461,7 @@ export async function createHarness(): Promise<Harness> {
           if (!(await canSee(client, userId, ticketId))) {
             throw new Error(`bootstrapTicket failed: 404 (${ticketId})`);
           }
-          return await ticketBootstrapFor(client, ws, ticketId);
+          return await ticketBootstrapFor(client, ws, ticketId, userId);
         } finally {
           client.release();
         }

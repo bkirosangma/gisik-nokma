@@ -9,6 +9,7 @@ import { listTicketAttachments } from '../attachments/attachment-repo.js';
 import { sanitizeFilename } from '../attachments/filename.js';
 import { listTicketComments } from '../read/ticket-comments.js';
 import { canSee } from '../visibility/can-see.js';
+import { targetSight, withholdEvent, withholdLinks } from '../visibility/withhold-link-targets.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { ticketNumber } from '../read/ticket-numbers.js';
@@ -699,13 +700,9 @@ export function registerTicketRoutes(
 
       // Spec A §2.4: the folded links are the engine's whole truth; a reader gets
       // only the targets they can see, and no key at all when none remain (the
-      // reducer's absent-not-empty shape), so nothing counts a hidden one.
-      const seen = await Promise.all(
-        (state.links ?? []).map(async (l) => ((await canSee(deps.pool, request.currentUserId, l.targetId)) ? l : null)),
-      );
-      const visibleLinks = seen.filter((l): l is NonNullable<typeof l> => l !== null);
-      const { links: _all, ...stateWithoutLinks } = state;
-      const servedState: TicketState = visibleLinks.length > 0 ? { ...stateWithoutLinks, links: visibleLinks } : stateWithoutLinks;
+      // reducer's absent-not-empty shape), so nothing counts a hidden one. The
+      // one predicate every door uses (`withhold-link-targets.ts`, typed-links T4b).
+      const servedState: TicketState = await withholdLinks(state, targetSight(deps.pool, request.currentUserId));
 
       return {
         ticket: toTicketView(ticket),
@@ -747,7 +744,13 @@ export function registerTicketRoutes(
          ORDER BY seq`,
         [ticketId],
       );
-      return { events: rows.map(toEventView) };
+      // A link whose target this viewer cannot see goes out at its own seq
+      // with `targetId: null`, and a contest of such a claim with the gate's
+      // cause (typed-links T4b, spec A §2.4): never skipped, so there is no gap.
+      const sees = targetSight(deps.pool, request.currentUserId);
+      const events: LedgerEventView[] = [];
+      for (const row of rows) events.push(await withholdEvent(toEventView(row), sees));
+      return { events };
     },
   );
 
