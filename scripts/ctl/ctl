@@ -33,6 +33,8 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   inbox [--seat S] [--all] [--watch]  my unacked messages; --watch = the ONE cursor watcher for the seat's Monitor
   ack <id> [--seat S] [--cancel]  receipt for a message (idempotent); stops redelivery
   postman run|once|status|audit|restarted <seat>  the delivery daemon (tmux window `postman`) and its admin
+  postman audit --parity|--since T|--window N  shadow parity + retirement condition A; dispatcher lines before 2026-10-03 name the task after the verb
+                                  and audit as no-ref: run condition A on windows from 10-03 on
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
     exit 0;;

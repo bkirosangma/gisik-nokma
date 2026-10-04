@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059, 13.2070–13.2086 and 13.2240–13.2245. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059, 13.2070–13.2086 and 13.2240–13.2246. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -522,6 +522,9 @@ pa_round() { # LINE BRIEF → one FIX lane1 record for BRIEF 900 s ago and the D
   au_reset; au_q FIX 1 900 p1 "" "$2" ""; au_d 600 "$1"; au --parity | sed -n -e "s/^UNPAIRED .* reason=\([a-z-]*\);.*/\1/p" -e "s/^MATCHED .*/matched/p"; }
 check "13.2245 ONE ref rule for both pairings (kill c): the dispatcher pair reads its ref words and agrees by the BY-ORCH rule's own functions — a lane named BEFORE the verb is no ref word ('lane1 HK-3b FIX 1 delivered once (queued behind its turn)', the real 'lane4 F-5 FIX 1 delivered once (…)' shape, pairs the hk-3b record), whole words ('delivered T1 FIX 1 pointer to lane1' never pairs BRIEF-sm-t10-notes-fix-1.md: ref-mismatch), a contiguous run ('delivered ctl tipmerge FIX 1 …' never pairs BRIEF-ctl-auto-tipmerge-fix-1.md: ref-mismatch); and postman.py holds ONE def ref_agrees, called from names(), the dispatcher pairing and the BY-ORCH agreement and nowhere else; CONTROL in the same check: 'delivered ctl-auto-tipmerge FIX 1 pointer to lane1' pairs that record" \
   '[ "$(pa_round "lane1 HK-3b FIX 1 delivered once (queued behind its turn)" "$HK3B")" = matched ] && [ "$(pa_round "dispatcher: delivered T1 FIX 1 pointer to lane1" BRIEF-sm-t10-notes-fix-1.md)" = ref-mismatch ] && [ "$(pa_round "dispatcher: delivered ctl tipmerge FIX 1 pointer to lane1" BRIEF-ctl-auto-tipmerge-fix-1.md)" = ref-mismatch ] && [ "$(pa_round "dispatcher: delivered ctl-auto-tipmerge FIX 1 pointer to lane1" BRIEF-ctl-auto-tipmerge-fix-1.md)" = matched ] && [ "$(grep -c "def ref_agrees" "$HERE/postman.py")" = 1 ] && [ "$(grep -o "ref_agrees(" "$HERE/postman.py" | wc -l | tr -d " ")" = 4 ] && [ "$(grep -c "def .*agree" "$HERE/postman.py")" = 1 ]'
+
+check "13.2246 ctl help states the parity audit's format boundary (planner 18:57, addition 1): its 'postman audit --parity|--since T|--window N' entry says dispatcher lines before 2026-10-03 name the task after the verb and audit as no-ref, so condition A runs on windows from 10-03 on — the same sentence as the audit's NOTE; CONTROL in the same check: the postman run|once|… entry above it is still listed" \
+  'h="$("$HERE/ctl" help)"; printf "%s" "$h" | grep -q "^  postman run|once|status|audit|restarted <seat> " && printf "%s" "$h" | grep -A1 "^  postman audit --parity|--since T|--window N " | tr -s " \n" " " | grep -q "dispatcher lines before 2026-10-03 name the task after the verb and audit as no-ref: run condition A on windows from 10-03 on"'
 
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────
 # A refusal is "nothing typed AND the message still open"; the control is an idle pane that IS pasted into.
