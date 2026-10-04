@@ -49,6 +49,9 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 <!-- wtg-part1-viewport-timeline-view T3 -->
 <!-- wtg-part1-viewport-timeline-view T4 -->
 <!-- wtg-part1-viewport-timeline-view T5 -->
+- ❌ **29.065 — same row, target later: a straight line from the end anchor to the start anchor; every step axis-aligned | another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor | a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ | the target starts before the source ends: a channel between the rows, five corners at most | portrait is the same route transposed: time runs down, the arrowhead enters from above.** (`packages/viewport/test/route.test.ts`)
+- ❌ **29.066 — a loop is a curved return arrow, with no pill and no corners | landscape: one cubic that leaves the diamond's top anchor going up, rises above both ends, and lands on the target's top edge just inside its start; control: a target on a lower row is entered from above too | portrait: it leaves the diamond's LEFT anchor going left and lands on the target's top edge; control: the landscape curve is not the portrait one | the curve is deterministic, a bar narrower than 12 px takes the arrowhead in its middle, and the same boxes always give the same string.** (`packages/viewport/test/route.test.ts`)
+- ❌ **29.067 — the smallest lift that crosses no third bar wins; with nothing in the way the first lift is used; with all three blocked the one with the fewest crossings is reported.** (`packages/viewport/test/route.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T6 -->
 <!-- wtg-part1-viewport-timeline-view T7 -->
 <!-- wtg-part1-viewport-timeline-view T8 -->
