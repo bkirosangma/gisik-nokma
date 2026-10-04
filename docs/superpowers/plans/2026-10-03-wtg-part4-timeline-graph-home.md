@@ -146,7 +146,7 @@ Names this plan calls but does not write. "Per plan X" means that plan's text; *
 ---
 ### Task 1: The four server reads, measured first (cases 29.290–29.299)
 
-**Blocked until KG E T1 (Home, `apps/server/src/routes/home.ts`) lands on `release/knowledge-graph`.** (Planner ruling P7, 2026-10-03: no origin ref carries it yet. Check `git ls-tree origin/release/knowledge-graph apps/server/src/routes/home.ts` first; if it prints nothing, STOP with `NEEDS: KG E T1`.)
+**Needs KG E T1 (Home, `apps/server/src/routes/home.ts`).** (Planner ruling P7, 2026-10-03; met on `origin/release/workflow-graph` (planner ruling 2026-10-04). Keep the guard: `git ls-tree origin/release/workflow-graph apps/server/src/routes/home.ts`; if it prints nothing, STOP with `NEEDS: KG E T1`.)
 
 **Branch** `task/wtg4-reads`. **Files:**
 - Create:
@@ -174,6 +174,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
      - `grep -n "export function planFlow\|export function analyzeFlow\|export function flowNodeOf\|export function edgeKey\|export type FlowNode\|export type NodePlan\|export type PlannedInterval" packages/domain/src/flow/*.ts`;
      - `grep -n "periods\|passes\|rounds\|outcome\|closed_cause\|draft_author_id" apps/server/src/projections/tickets.ts` (the columns `rowToTicketState` reads; `load.ts` selects `t.*` and folds it exactly as Part 2 T12's `walkFlow` does, so a missing column means Part 2 or Drafts has not landed: STOP);
      - `grep -n "export async function listMyDrafts" apps/server/src/read/drafts.ts`;
+     - the Drafts plan's draft fixture (the helper that files Drafts' `ticket.created { draft: true }`, note (2) under Step 4's world helper): `grep -rln "draft: true" apps/server/test/helpers/`; if no helper files a draft, STOP with `NEEDS: Drafts fixture` (the 29.296 draft case is mandatory, (planner ruling 2026-10-04));
      - `grep -n "export.*cardKeysFor" apps/server/src/read/ticket-cards.ts`;
      - `grep -n "label" apps/server/migrations/*proj-ticket-links*.sql` (Part 2's `label` column);
      - `grep -rn "readHome\b" apps/server/src/routes/home.ts` (KG Home T1 landed).
@@ -221,7 +222,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
 
   const planned = [{ pass: 1, start: '2026-10-05', end: '2026-10-07', basis: 'explicit' as const }]; // Part 2's PlannedInterval: `pruned` only when pruned
   const ghost = [{ pass: 1, start: '2026-10-08', end: '2026-10-09', basis: 'chained' as const, pruned: true as const }];
-  const notTaken = { kind: 'not-taken' as const, decisionTicketId: '01HZ0000000000000000000001', outcome: 'Yes', pass: 1 };
+  // pass 2, not 1: every planned/ghost/period fixture is pass 1, so a stub that took any pass but the resolution's would still pass
+  const notTaken = { kind: 'not-taken' as const, decisionTicketId: '01HZ0000000000000000000001', outcome: 'Yes', pass: 2 };
 
   describe('29.294 segmentsFor', () => {
     it('29.294 planned bar; open period grows to today; closed period stays; control: moving today moves only the open end', () => {
@@ -234,6 +236,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       expect(open('2026-10-09').find((s) => s.type === 'actual')?.end).toBe('2026-10-09');
       const closed = (today: string) =>
         segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned: [], notTaken: null, closedDay: null, today });
+      expect(closed('2026-10-03')).toEqual([{ start: '2026-10-01', end: '2026-10-02', pass: 1, type: 'actual' }]); // the closed period's own end, not a derived one
       expect(closed('2026-10-03')).toEqual(closed('2026-10-20')); // control
     });
 
@@ -254,7 +257,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       const workedWithGhost = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned: [...planned, ...ghost], notTaken, closedDay: '2026-10-04', today: '2026-10-05' });
       expect(workedWithGhost.map((s) => s.type)).toEqual(['actual', 'ghost']);
       expect(segmentsFor({ periods: [], planned: [...planned, ...ghost], notTaken, closedDay: '2026-10-04', today: '2026-10-05' })).toEqual([
-        { start: '2026-10-04', end: '2026-10-04', pass: 1, type: 'stub' },
+        { start: '2026-10-04', end: '2026-10-04', pass: 2, type: 'stub' }, // the stub carries the resolution's pass
         { start: '2026-10-08', end: '2026-10-09', pass: 1, type: 'ghost' },
       ]);
       expect(segmentsFor({ periods: [], planned, notTaken, closedDay: null, today: '2026-10-05' })).toEqual([]); // no close day, no stub
@@ -265,6 +268,10 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     });
   });
   ```
+  **Kills:**
+  - 29.294 planned / open / closed: (a) an open period ends at its start (`end: p.end ?? p.start`) → the `end: '2026-10-03'` leg (it reads 10-01); (b) a closed period moves with today (`end: later(p.end ?? p.start, input.today)`) → the closed `toEqual(… end: '2026-10-02' …)` leg and the control; (c) drop the `planned` push → the unworked planned bar.
+  - 29.294 two passes, skew: (a) drop the final `.sort(…)` → the `[[1, …], [2, …]]` leg (the input lists pass 2 first); (b) `end: p.end ?? input.today` (no `later`) → the skew leg's `end: '2026-10-07'` (it reads 10-06).
+  - 29.294 Not taken: (a) drop the stub push → the never-started `toEqual`; (b) the stub takes `pass: 1` instead of `input.notTaken.pass` → the stub's `pass: 2`; (c) the `pruned` arm moved under `notTaken === null` → the `['actual', 'ghost']` leg.
   Run: `"$SR" wtg4-t1 -- pnpm --filter @gisik-nokma/domain exec vitest run test/flow/segments.test.ts --maxWorkers=2 > /tmp/wtg4-t1.log 2>&1; tail -20 /tmp/wtg4-t1.log`. Expected: FAIL (`segments.js` does not exist).
 
   `packages/domain/src/read-models-timeline.ts`:
@@ -452,6 +459,9 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
         t(3, { estimate: 2 }),                                                                // chained after 2: [10-10, 10-11]
         t(4, { explicitStart: '2026-10-20', estimate: 1 }),                                   // singleton
         t(5, { notTaken: { kind: 'not-taken', decisionTicketId: id(9), outcome: 'No', pass: 1 }, category: 'terminal' }),
+        // Not taken with NO known close day: no segment at all (no stub), and still never a tray row
+        { ...t(6, { notTaken: { kind: 'not-taken', decisionTicketId: id(9), outcome: 'No', pass: 1 }, category: 'terminal' }), closedDay: null },
+        t(7),                                                                                 // undated singleton: the tray is not empty (control for the two tray legs)
       ];
       const core = assembleScope({ tickets, edges: [lead(1, 2), lead(2, 3)], keys: none, pins, today: TODAY });
       const seg = (n: number) => core.entries.find((e) => e.id === id(n))?.segments;
@@ -464,6 +474,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       expect(core.entries.find((e) => e.id === id(1))?.flowId).toBe(id(1));                   // named by the smallest member
       expect(core.entries.find((e) => e.id === id(5))?.segments).toEqual([{ start: '2026-10-02', end: '2026-10-02', pass: 1, type: 'stub' }]); // D-W4-11
       expect(core.tray.find((r) => r.id === id(5))).toBeUndefined();                          // Not taken is never in the tray
+      expect(core.tray.map((r) => r.id)).toEqual([id(7)]);                                    // ... not even with no segment (id 6); control: the undated ticket is
+      expect(core.entries.some((e) => e.id === id(6))).toBe(false);
     });
 
     it('29.295 tray reasons and reachedBy; control: an estimate puts the same ticket on the timeline', () => {
@@ -478,10 +490,14 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       expect(core.entries.some((e) => e.id === id(11))).toBe(true);
       const lone = assembleScope({ tickets: [t(20)], edges: [], keys: none, pins, today: TODAY });
       expect(lone.tray[0]?.reason).toBe('no-dates');
+      // an UNLABELLED edge from a Decision names no outcome: no reachedBy (the door refuses one, LK-2; the assembler must not invent it)
+      const bare = assembleScope({ tickets: [t(40, { typeId: DECISION_TYPE_ID, explicitStart: '2026-10-05', estimate: 1 }), t(41)], edges: [lead(40, 41)], keys: none, pins, today: TODAY });
+      expect(bare.tray.find((r) => r.id === id(41))).toMatchObject({ reachedBy: null });
     });
 
     it('29.295 a started ticket with no dates is drawn (PL-4); a draft has no key', () => {
-      const started = t(30, { category: 'active', periods: [{ start: '2026-10-01T04:00:00.000Z', end: null, pass: 1 }] });
+      // 20:00 UTC on 30 Sep is 01:30 IST on 1 Oct: a UTC slice of the instant would say 09-30
+      const started = t(30, { category: 'active', periods: [{ start: '2026-09-30T20:00:00.000Z', end: null, pass: 1 }] });
       const draft = t(31, { draft: true, explicitStart: '2026-10-06', estimate: 1 });
       const core = assembleScope({ tickets: [started, draft], edges: [], keys: new Map([[id(31), null]]), pins, today: TODAY });
       expect(core.entries.find((e) => e.id === id(30))?.segments).toEqual([{ start: '2026-10-01', end: TODAY, pass: 1, type: 'actual' }]);
@@ -503,7 +519,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       const chain = (n: number) => Array.from({ length: n }, (_, i) => t(i + 1, i === 0 ? { explicitStart: '2026-10-05', estimate: 1 } : { estimate: 1 }));
       const edges = (n: number) => Array.from({ length: n - 1 }, (_, i) => lead(i + 1, i + 2));
       const big = assembleScope({ tickets: chain(5), edges: edges(5), keys: none, pins, today: TODAY }, { index: 100, flow: 4 });
-      expect(big.flows[0]).toMatchObject({ truncated: true, nodes: [] });
+      expect(big.flows[0]).toMatchObject({ truncated: true, nodes: [], edges: [] });
       expect(big.entries).toHaveLength(5);
       const ok = assembleScope({ tickets: chain(4), edges: edges(4), keys: none, pins, today: TODAY }, { index: 100, flow: 4 });
       expect(ok.flows[0]?.truncated).toBe(false);
@@ -511,6 +527,12 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     });
   });
   ```
+  **Kills:**
+  - 29.295 chain / Me / stub: (a) drop `if (!tk.inScope) continue;` → `id(2)` is an entry; (b) `else if (true)` for the tray branch → `tray` is `[id(6), id(7)]`; (c) `flowId: inFlow ? root : null` → `flowId: root` always → `id(4)`'s `toBeNull`.
+  - 29.295 tray reasons and reachedBy: (a) `reason: 'no-dates'` always → `row(12)`'s `no-estimate`; (b) drop `e.label !== null` in `reachedBy` (mutation 8) → `bare`'s `reachedBy: null` (it answers an outcome of `null`); (c) `decisionKey: null` always → `row(12)`'s `GN-151`.
+  - 29.295 started, draft: (a) `dayPeriods` slices the instant (`p.start.slice(0, 10)`) → `start: '2026-10-01'` (it reads 09-30); (b) `const key = i.keys.get(m) ?? m` (fall back to the id) → the draft's `key: null`; (c) `draft: false` on entries → the draft's `draft: true`.
+  - 29.298 index cap: (a) `byEnd.slice(0, limits.index)` (keep the oldest) → the `[id(3), id(4), id(5)]` leg; (b) `all.length >= limits.index` → the at-cap control's `toBeNull`; (c) `before: endOf(byEnd[all.length - limits.index - 1])` → the `before: '2026-10-03'` leg (it reads 10-02).
+  - 29.298 flow cap: (a) `members.length >= limits.flow` → the at-cap control; (b) `edges: inner.map(…)` even when `tooBig` → `edges: []`; (c) skip planning when `tooBig` (`continue`) → `big.entries` length 5.
   Run: `"$SR" wtg4-t1 -- pnpm --filter @gisik-nokma/server exec vitest run test/timeline/assemble.test.ts --maxWorkers=2 > /tmp/wtg4-t1.log 2>&1; tail -30 /tmp/wtg4-t1.log`. Expected: FAIL (`assemble.js` does not exist).
 
   `apps/server/src/timeline/assemble.ts`:
@@ -723,6 +745,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     });
   });
   ```
+  **Kills:**
+  - 29.307 golden (after the split): (a) `toHomeResponse` counts `pastDue: c.dueSoon.length` → the golden (the KG Home world has five past-due and three due-soon tickets of its own, `home.test.ts:369-377`); (b) `collectHome` narrows when `narrow.mine` is not `false` (`if (narrow.mine !== false)`) → the owner's `counts.tickets` drops to her own; (c) the notes WHERE's project clause applied with an empty list (`n.home_project_id = ANY('{}')`) → `counts.notes` (only if the world has a project-homed note; otherwise not killed here). Note: `normaliseHome` sorts arrays, so an ORDER change in the ids is not caught here; that stays with KG Home's `home.test.ts` (27.601 "newest first"), which Step 3 re-runs unedited.
   (`read.users.owner` and `read.world.workspaceId`: copy the names `test/routes/home.test.ts` uses for the owner's id and the workspace id; they are the only two to adapt.) Run it ONCE with `WTG4_CAPTURE=1` on the untouched `home.ts`, run it again WITHOUT the flag (a fresh world, fresh ids: it must still pass, or the normalisation is wrong), check `git diff --stat` shows only the new files, and commit test + helper + fixture: `wtg4 T1: golden of readHome before the collector split`. After the split below, run it without the flag: PASS is the byte-identical proof, and T3's route test reuses `normaliseHome` and the same file. The test title carries 29.307 because that case is the byte-identical claim; its case line is seeded by T3 and flips there, so this commit does not touch it.
 
   In `apps/server/src/routes/home.ts` (KG Home T1), split `readHome`. The landed body is the plan's Step 3 code; the diff is: the signature, two optional clauses, and the two-function split. Replace `readHome` with:
@@ -1133,6 +1157,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   import { afterAll, beforeAll, describe, expect, it } from 'vitest';
   import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
   import { computeScope } from '../../src/timeline/compute.js';
+  import { loadWorkspace } from '../../src/timeline/load.js';
   import { parseTimelineScope, readableWorkspaces } from '../../src/timeline/scope.js';
   import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
   import { seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
@@ -1159,6 +1184,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       expect(await readableWorkspaces(db.pool, w.cy, scopeOf([w.C.workspaceId]))).toHaveLength(1);
       expect(parseTimelineScope({ ws: '' })).toBeNull();
       expect(parseTimelineScope({ ws: `${w.A.workspaceId}`, mine: 'maybe' })).toBeNull();
+      expect(parseTimelineScope({ ws: `${w.A.workspaceId}`, mine: '1' })).toEqual({ workspaceIds: [w.A.workspaceId], projectIds: [], mine: true }); // control: the same scope with a valid mine parses
+      expect(parseTimelineScope({ ws: `${w.A.workspaceId}` })).toEqual({ workspaceIds: [w.A.workspaceId], projectIds: [], mine: false }); // an omitted mine is Everyone (planner ruling 2026-10-04) (spec :198 writes mine=1|0; the client always sends it)
     });
 
     it('29.296 Me = assigned OR collaborating; Everyone adds the rest', async () => {
@@ -1179,6 +1206,10 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       const ama = await core(w.ama, [w.A.workspaceId]);
       const f = ama.flows.find((x) => x.nodes.some((n) => n.id === w.t.hidden));
       expect(f?.nodes.map((n) => n.id).sort()).toEqual([w.t.step1, w.t.hidden, w.t.step2].sort());   // control: the owner sees it whole
+      // the load itself keeps no edge to the hole: the assembler would drop one anyway, so only this leg sees a leak in load.ts
+      const loadAs = async (who: string) => loadWorkspace(db.pool, await resolveEffectiveRole(db.pool, who, w.A.workspaceId), who, w.A.workspaceId, scopeOf([w.A.workspaceId]));
+      expect(JSON.stringify((await loadAs(w.bo)).edges)).not.toContain(w.t.hidden);
+      expect((await loadAs(w.ama)).edges.some((e) => e.to === w.t.hidden)).toBe(true); // control: the owner's load has it
     });
 
     it('29.296 the diamond chains: Yes and No both start the day after the decision ends', async () => {
@@ -1189,9 +1220,27 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       expect(seg(w.t.fYes)?.start).toBe('2026-10-09');
       expect(seg(w.t.fNo)?.start).toBe('2026-10-09');
     });
+
+    it('29.296 a draft is its author\'s alone: ama's core carries her draft with no key, bo's never names it', async () => {
+      // (planner ruling 2026-10-04): mandatory (spec CR-2 :663 "private to its author, with no key"). `seedDraft` is the Drafts plan's fixture helper copied
+      // (Step 0 item 2; use its landed name): it files Drafts' own `ticket.created { draft: true }` by ama in project P of workspace A.
+      const draftId = await seedDraft(db.pool, { authorId: w.ama, workspaceId: w.A.workspaceId, title: 'Draft step', explicitStart: '2026-10-06', estimate: 1 });
+      const ama = await core(w.ama, [w.A.workspaceId], false);
+      expect(ama.entries.find((e) => e.id === draftId)).toMatchObject({ draft: true, key: null });
+      expect(ama.entries.find((e) => e.id === w.t.dated)?.key).not.toBeNull(); // control: a published ticket keeps its key
+      const bo = await core(w.bo, [w.A.workspaceId], false);
+      expect(JSON.stringify(bo, (_k, v) => (v instanceof Map ? [...v] : v))).not.toContain(draftId);
+      expect(bo.entries.some((e) => e.id === w.t.dated)).toBe(true); // control: bo's core is loaded, so the absence is the draft's privacy
+    });
   });
   ```
-  Add the draft case in the same file once the Drafts fixture is copied (Step 0 note): `ama` core has `entries.find(e => e.id === draftId)` with `{ draft: true, key: null }`; `bo` core does not contain `draftId` anywhere.
+  **Kills:**
+  - 29.296 gate: (a) `readableWorkspaces` pushes even when `eff === null` → the `[A, B]` leg (C kept) and the `[]` leg; (b) drop `ws.length === 0 ||` → `{ ws: '' }` parses; (c) drop the `mine` guard line → the `'maybe'` leg (it parses as `mine: false`); (d) `mine: mine === '1' || mine === undefined` → the omitted-`mine` leg (it reads as Me) (planner ruling 2026-10-04).
+  - 29.296 Me: (a) drop the `collaborator_ids` arm of `meClause` (mutation 1) → `me.has(w.t.collab)`; (b) `if (scope.mine)` → `if (false)` (Me ignored) → `me.has(w.t.other)` is true.
+  - 29.296 hole: (a) drop the edge `.filter((e) => ids.has(e.source_id) && ids.has(e.target_id))` in `load.ts` (mutation 3) → the `loadAs(w.bo)` edge leg; `componentsOf` and `inner` skip an edge with an unloaded end, so the core stays clean and this is the only leg it reds; (b) drop `visibleTicketsWhere(…)` from `visible` → `boText` contains the hidden id.
+  - 29.296 diamond: (a) `planFlow({ nodes, edges: [] })` in `assembleScope` → `fDec` has no ready day, is a tray row, and `seg(w.t.fDec)` is undefined; (b) the edge SELECT reads `kind = 'blocks'` only → the same leg. The chaining itself is Part 2's `planFlow` (existing behaviour, guarded here through the load).
+  - 29.296 draft (planner ruling 2026-10-04): (a) load drafts through `visibleTicketsWhere` instead of `listMyDrafts` → ama's draft entry is missing; (b) `key: i.keys.get(m) ?? 'draft'` → `key: null`; (c) load every draft of the workspace (`draft_author_id IS NOT NULL` in place of `listMyDrafts(db, viewerId, …)`) → bo's text contains `draftId`.
+  The draft case above is mandatory (planner ruling 2026-10-04): Step 0 item 2 STOPs with `NEEDS: Drafts fixture` when the helper is absent, so it is never skipped.
 
   `pins.test.ts` (29.297): seed on top of the same world:
   ```ts
@@ -1199,7 +1248,10 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   // a private note by ama attached to t.dated; a deleted one ('note.deleted'); an attachments row:
   //   INSERT INTO attachments (id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key)
   //   VALUES ($1, $2, $3, $4, 'a.pdf', 'application/pdf', 1, $5)
-  // and a note-owned attachment (ticket_id NULL, note_id set) which must not count.
+  // and a note-owned attachment (ticket_id NULL, note_id set) which must not count;
+  // and a PROJECT-scope note by ama (home project: a third project p3 of A, created here; bo is NOT a member of it) attached to t.dated,
+  //   then `project.deleted` for p3, which must not count (without it nothing exercises NOTE_PROJECT_LIVE_WHERE, notes.ts:24-25:
+  //   a workspace-scope note has `home_project_id = ''` and the clause is a no-op for it; the expected counts below are unchanged).
   it('29.297 …', async () => {
     const amaPins = await loadPins(db.pool, await resolveEffectiveRole(db.pool, w.ama, w.A.workspaceId), w.ama, [w.t.dated]);
     const boPins = await loadPins(db.pool, await resolveEffectiveRole(db.pool, w.bo, w.A.workspaceId), w.bo, [w.t.dated]);
@@ -1207,6 +1259,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     expect(boPins.get(w.t.dated)).toEqual({ notes: 1, attachments: 1 }); // control: bo does not see ama's private note
   });
   ```
+  **Kills:**
+  - 29.297 pins: (a) drop `n.deleted = FALSE` (mutation 4) → ama `notes: 3`; (b) drop `${NOTE_PROJECT_LIVE_WHERE}` → the deleted-project note counts, ama `notes: 3`; (c) drop `visibleNotesWhere(…)` → bo `notes: 2`; (d) `pins.set(r.ticket_id, { notes: 0, attachments: r.n })` in the files loop → ama `notes: 0`. The note-owned attachment leg guards the schema (existing behaviour: its `ticket_id` is NULL and `= ANY(…)` never matches NULL).
   Write it out in full in the file (the comment block is the seed list, the `it` is the assertion).
 
   Run: `"$SR" wtg4-t1 -- pnpm --filter @gisik-nokma/server exec vitest run test/timeline --maxWorkers=2 > /tmp/wtg4-t1.log 2>&1; tail -40 /tmp/wtg4-t1.log`. Expected: PASS for 29.296 and 29.297. A failure naming a missing column means Part 2 or Drafts has not landed (Step 0 STOP): `load.ts` selects `t.*` and folds it with `rowToTicketState`. Flip 29.296 and 29.297 to ✅.
@@ -1265,7 +1319,11 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     return { items: page, nextCursor: rows.length > pageSize ? (page[page.length - 1]?.id ?? null) : null };
   }
   ```
-  `reads.test.ts` runs on the same world with `pageSize` 2 and asserts, in this order: the index's `tray.count` equals the tray's total across pages; the chunk of `[2026-10-05, 2026-10-11]` contains `dated`, `mine`, `fStart` and not `bTask` (workspace B is in scope only when listed), page 1 has 2 items and a `nextCursor`, page 2 starts after it, and the pages' union equals an unpaged read; a window `[2026-12-01, 2026-12-28]` returns `[]` (control); the boundary: a window whose `to` equals `dated`'s `start` (`2026-10-05`) includes it and `to = 2026-10-04` does not; `readHomeSummary` over `[A]` unnarrowed equals `toHomeResponse(collectHome(...))` field for field, over `[A, B]` the ticket count is the sum and `dueSoonDays` has two keys, over `[A, B, C]` for `ama` it equals `[A, B]` (C dropped), and Me narrows `counts.tickets` but not `counts.members` or `counts.notes`. `asOf` of the index and of the summary over `[A, B]` equals `{A: head(A), B: head(B)}` (read with `readStreamSeq` in the test), has no key for C, and after appending one event to B (`appendEvent` helper, `grep -n appendEvent apps/server/test/helpers`) a second read raises only B's entry while the first response object is unchanged (control).
+  `reads.test.ts` runs on the same world with `pageSize` 2 and asserts, in this order: the index's `tray.count` equals the tray's total across pages; the chunk of `[2026-10-05, 2026-10-11]` contains `dated`, `mine`, `fStart` and not `bTask` (workspace B is in scope only when listed), page 1 has 2 items and a `nextCursor`, page 2 starts after it, and the pages' union equals an unpaged read; a window `[2026-12-01, 2026-12-28]` returns `[]` (control); the boundary: a window whose `to` equals `dated`'s `start` (`2026-10-05`) includes it and `to = 2026-10-04` does not, and a window whose `from` equals `dated`'s planned end (`2026-10-07`) includes it and `from = 2026-10-08` does not (the other edge of the overlap); `readHomeSummary` over `[A]` unnarrowed equals `toHomeResponse(collectHome(...))` field for field, over `[A, B]` the ticket count is the sum, `dueSoonDays` has two keys and `counts.members` is 2 (ama and bo are in both A and B: distinct people, not 4; this is the leg mutation 7 reds), over `[A, B, C]` for `ama` it equals `[A, B]` (C dropped), and Me narrows `counts.tickets` but not `counts.members` or `counts.notes`. `asOf` of the index and of the summary over `[A, B]` equals `{A: head(A), B: head(B)}` (read with `readStreamSeq` in the test), has no key for C, and after appending one event to B (`appendEvent` helper, `grep -n appendEvent apps/server/test/helpers`) a second read raises only B's entry by exactly one (`B: head(B) + 1`) while A's entry is equal across the two reads (control: the raise is per workspace, not a global counter). The ORDER (D-W4-23, (planner ruling 2026-10-04)): wrap `db.pool` in a recording `Queryable` (`{ query: (text, values) => { log.push(String(text)); return db.pool.query(text, values); } }`), run `readTimelineIndex` and `readHomeSummary` over `[A, B]` through it, and assert that the index in `log` of the first query `readStreamSeq` sends (match the table it reads, copied from `sync/stream-seq.ts:25` at Step 0) is BELOW the index of the first query that reads `proj_tickets`; control: both indexes are found (`>= 0`), so the comparison cannot pass on a missing query.
+
+  **Kills** (`reads.test.ts`, written from the description above):
+  - 29.299 index / chunk / tray: (a) `s.start < window.to` → the `to = 2026-10-05` boundary; (b) `s.end > window.from` → the `from = 2026-10-07` boundary; (c) `nextCursor: page[0]?.id` → page 2 overlaps page 1; (d) `tray: { count: core.tray.length - 1 }` → `tray.count` ≠ the tray's total.
+  - 29.293 summary: (a) `members = rosters.flat()` (per workspace, not distinct; mutation 7) → `counts.members` 4; (b) `collectHome(…, {})` (ignore `scope`) → Me does not narrow `counts.tickets`; (c) `readAsOf` over `scope.workspaceIds` instead of `readable` → a key for C; (d) one stream head for every key (`readStreamSeq(db, readable[0].workspaceId)`) → A's entry moves with B's append. (e) read `asOf` AFTER `computeScope` / `collectHome` → the recording leg's order assertion (planner ruling 2026-10-04).
 
   Run: `"$SR" wtg4-t1 -- pnpm --filter @gisik-nokma/server exec vitest run test/timeline --maxWorkers=2 > /tmp/wtg4-t1.log 2>&1; tail -40 /tmp/wtg4-t1.log`. Expected: PASS. Flip 29.299.
 
@@ -1286,6 +1344,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   // a third carry periods ('ticket.transitioned' to 'doing' then 'done'), one in ten has a note attached (note.created attachTicketId).
   // ONE flow of exactly 300 tickets (a chain with a Decision every 10th) in workspace A for 29.292.
   ```
+  **Kills:** none, guards existing behaviour (cost bars over the reads Steps 3-5 pinned; a mutant that changes an answer is caught there, this file reds only on time).
   Then, for each viewer (`owner` = `ama`, `member` = a member without ownership) and for the Me and Everyone scopes: 10 warm-up calls, 100 timed calls, `percentile(sorted, 0.95)` (copy `home-perf.test.ts`'s helper), print `timeline-perf: <fn> p95 <ms> ms (<n> intervals, <ws> workspaces, owner|member, mine|everyone), machine <platform>/<arch>`, `expect(p95).toBeLessThanOrEqual(bar)`. `readTimelineChunk` is timed per page over six windows spread across the range.
 
   Run: `TIMELINE_PERF=1 "$SR" wtg4-t1 -- pnpm --filter @gisik-nokma/server exec vitest run test/timeline/perf.test.ts --maxWorkers=2 > /tmp/wtg4-t1-perf.log 2>&1; tail -30 /tmp/wtg4-t1-perf.log`. Quote every printed line in the commit message and the case lines, named LOCAL.
@@ -1297,6 +1356,13 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   Send the owner (and write into `HANDOFF-wtg4-reads.md`) the printed lines for 29.290–29.293.
   - **All four met:** proceed.
   - **Any missed (index > 400 ms, chunk > 150 ms, flow > 120 ms, summary > 200 ms):** **STOP.** Run `EXPLAIN (ANALYZE, BUFFERS)` on `loadWorkspace`'s ticket SELECT and time `planFlow` alone over the same components, so the report says whether the SELECT or the planning is the cost. Name the spec's fallback (§13): a rebuildable projection `proj_ticket_plan (ticket_id, workspace_id, plan_start, plan_end, basis)` recomputed per flow component on the events that change a plan, indexed `(workspace_id, plan_start, plan_end)`. **Do not build it, do not tune on your own, and do not start T3.** T2 may continue (it is independent).
+
+**Prose to sweep:**
+- `apps/server/src/read/visible-where.ts:209-217` — the `LIVE_TICKET_WHERE` census ("**17** executable `${LIVE_TICKET_WHERE}` sites across 12 files … **6** array members … 16 import lines — **23 uses of the constant**"): `timeline/load.ts` adds an executable site and an import. Re-measure with the same grep or mark the figure as the KG E T1 tree's.
+- `apps/server/src/routes/home.ts:25-37` — `readHome`'s docblock ("Home's six numbers … ONE ticket SELECT …") describes the body that moves to `collectHome`; move it with the body and leave `readHome` a one-line docblock (the split makes it a wrapper).
+- `apps/server/src/routes/home.ts:15` — `type Dated` is module-private; Step 3 exports it (no prose, listed so the export is not missed).
+- Step 0 item 2's own note "none of these exist on the KG tip" (`HOME_ID_CAP`, `capIds`, `Dated`, `visibleMemberIds`) is already stale on `origin/release/workflow-graph` (`home.ts:2`, `:15`, `:18`, `:11`): they exist; no edit needed in the product, only in the lane's expectations.
+- `Features.md:3796` (KG-E T1 Home endpoint bullet) stays true (the unnarrowed bytes are unchanged); no edit.
 
 - [ ] **Step 8: Catalogue, mutations, Features, DONE**
 
@@ -1336,7 +1402,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
 
 **Interfaces:**
 - **Consumes** (all through `bridge.ts`): `@gisik-nokma/viewport` `ScrollAdapter`, `ViewportDriver` (Part 1).
-- **Produces:** `dayNumber / dayString / addDays / mondayOf / chunkStart` (`days.ts`); the draw-list types; `DrawIndex` (`new DrawIndex(draws, bucketPx?)`, `.query(view): Draw[]`); `TimelinePainter` props `{ draws: readonly Draw[]; index: DrawIndex; view: View; overscan: number; selectedId?: string | null; onPick?: (id: string) => void; width: number; height: number; className?: string }`; `bridge.attachDriver(el, opts)` returning the driver and an `onWindow(cb)` subscription that fires only when the quantised window changes.
+- **Produces:** `dayNumber / dayString / addDays / mondayOf / chunkStart` (`days.ts`); the draw-list types; `DrawIndex` (`new DrawIndex(draws, bucketPx?)`, `.query(view): Draw[]`); `TimelinePainter` props `{ draws: readonly Draw[]; index: DrawIndex; view: View; overscan: number; selectedId?: string | null; onPick?: (ticketId: string) => void; width: number; height: number; className?: string }`; `bridge.attachDriver(el, opts)` returning the driver and an `onWindow(cb)` subscription that fires only when the quantised window changes.
 
 Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page and `tests/*.spec.ts` (Step 0 finds them; if Part 1 has not landed a stress page, copy the browser harness files of KG C T1 on `origin/task/kg-c-t1-measure`); `packages/ui/src/components/segmented-control.tsx` for `.gn-` class naming.
 
@@ -1372,6 +1438,9 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
     });
   });
   ```
+  **Kills:**
+  - round trip / add: (a) `Date.UTC(y, m, d)` (no `- 1`) → the round-trip leg reads `2026-11-03`; (b) `Math.floor(Date.UTC(…) / DAY_MS)` is equivalent (whole days), so the leap-day leg instead guards `dayString`'s `toISOString` (existing behaviour).
+  - mondayOf / chunkStart: (a) `(n + 4) % 7` → the Sunday leg reads `2026-09-27`; (b) `MONDAY_EPOCH = 0` (a Thursday) → `mondayOf(chunkStart(d))` differs; (c) `Math.round` for `Math.floor` → `2027-03-31` is 12 days BEFORE its chunk start, the `>= 0` leg.
   `packages/app-core/src/timeline-graph/days.ts`:
   ```ts
   /** IST day strings (`YYYY-MM-DD`) as whole day numbers. No clock is read here: every call passes its date in (the clock-free scan applies to this directory). */
@@ -1498,6 +1567,9 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
     });
   });
   ```
+  **Kills:**
+  - exactly the touching ones: (a) drop the `seen` dedupe (Step 8 mutation 2) → `new Set(ids).size` < `ids.length` (bars up to 168 px wide cross the 512 px column lines inside `[5000, 6500]`); (b) drop `!touches(d.b, view)` → the brute-force `toEqual` gains every bar of rows outside `y 400–1300` in those columns; (c) `touches` without the `y` terms → the same leg.
+  - span: (a) `last = first` (buckets from `x0` only, Step 8 mutation 1) → `[]` for the column at 4,000. The first `it()` does not see this mutant: no bar in `many` is wide enough to reach `x0 = 5000` from a column left of the view's first one.
   `draw-index.ts`:
   ```ts
   import type { Bounds, Draw, View } from './draw-types.js';
@@ -1588,8 +1660,10 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
       const first = ids();
       expect(first.length).toBeGreaterThan(0);
       expect(first.length).toBeLessThan(10);
-      rerender(<TimelinePainter {...props} view={{ x0: 0, x1: 600, y0: 0, y1: 400 }} />);
+      const el0 = container.querySelector('[data-draw-id="b0"]');
+      rerender(<TimelinePainter {...props} view={{ x0: 10, x1: 610, y0: 0, y1: 400 }} />); // a 10 px move: the same bars touch
       expect(ids()).toEqual(first);
+      expect(container.querySelector('[data-draw-id="b0"]')).toBe(el0); // the same DOM node: no remount (no React churn)
       rerender(<TimelinePainter {...props} view={{ x0: 6_000, x1: 6_600, y0: 0, y1: 400 }} />);
       expect(ids().some((id) => first.includes(id))).toBe(false);
       rerender(<TimelinePainter {...props} overscan={600} view={{ x0: 6_000, x1: 6_600, y0: 0, y1: 400 }} />);
@@ -1600,13 +1674,18 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
       const { container } = render(<TimelinePainter {...props} view={{ x0: 0, x1: 300, y0: 0, y1: 400 }} selectedId="b0" onPick={onPick} />);
       const b0 = container.querySelector('[data-draw-id="b0"]') as HTMLElement;
       expect(b0.getAttribute('aria-pressed')).toBe('true');
+      expect(container.querySelector('[data-draw-id="b1"]')?.getAttribute('aria-pressed')).toBe('false'); // control: only the selected one
       fireEvent.click(b0);
-      expect(onPick).toHaveBeenCalledWith('b0');
+      expect(onPick).toHaveBeenCalledWith('t0'); // the TICKET id (`Bar` calls `onPick(d.ticketId)`; Home's `onSelect` takes a ticket, T5)
       const names = [...container.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') ?? '');
+      expect(names).toContain('Bar 0, done'); // control: the scan sees the painter's names
       expect(names.some((n) => /^(earlier|later|previous|next)$/i.test(n))).toBe(false);
     });
   });
   ```
+  **Kills:**
+  - window / churn / overscan: (a) `mounted = p.draws` (no windowing) → `first.length < 10`; (b) `key={`${d.id}@${p.view.x0}`}` (remount on every view change) → the `toBe(el0)` leg; (c) `win = p.view` (overscan ignored, Step 8 mutation 3) → the overscan control.
+  - pick / select / names: (a) `selected={p.selectedId !== null}` → the `b1` `'false'` control; (b) `onPick?.(d.id)` → `toHaveBeenCalledWith('t0')`; (c) an `aria-label="Next"` pager button → the names leg (reachable only because the control proves the scan reads the painter's labels).
   `painter.tsx`:
   ```tsx
   import { useMemo, type CSSProperties, type ReactElement } from 'react';
@@ -1621,13 +1700,13 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
     width: number;
     height: number;
     selectedId?: string | null;
-    onPick?: (id: string) => void;
+    onPick?: (ticketId: string) => void; // the TICKET id, never the draw id (planner ruling 2026-10-04)
     className?: string;
   };
 
   const box = (b: Draw['b']): CSSProperties => ({ left: b.x0, top: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 });
 
-  function Bar({ d, selected, onPick }: { d: DrawBar; selected: boolean; onPick?: (id: string) => void }): ReactElement {
+  function Bar({ d, selected, onPick }: { d: DrawBar; selected: boolean; onPick?: (ticketId: string) => void }): ReactElement {
     return (
       <button
         type="button" data-draw-id={d.id} data-style={d.style} data-pass-rank={d.passRank} aria-pressed={selected} aria-label={d.ariaLabel} data-dim={d.dim === true} data-draft={d.draft}
@@ -1641,7 +1720,7 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
       </button>
     );
   }
-  function Diamond({ d, selected, onPick }: { d: DrawDiamond; selected: boolean; onPick?: (id: string) => void }): ReactElement {
+  function Diamond({ d, selected, onPick }: { d: DrawDiamond; selected: boolean; onPick?: (ticketId: string) => void }): ReactElement {
     return (
       <button type="button" data-draw-id={d.id} data-style={d.style} aria-pressed={selected} aria-label={d.ariaLabel} className="gn-tlg-diamond" style={box(d.b)} onClick={() => onPick?.(d.ticketId)}>
         {d.mark !== null && <span className="gn-tlg-mark" aria-hidden="true">{d.mark === 'done' ? '✓' : '▶'}</span>}
@@ -1741,7 +1820,7 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
   ```ts
   type Result = { fps: number; worstMs: number; frames: number; maxMounted: number; minMounted: number; emptyFrames: number; scrollYBefore: number; scrollYAfter: number };
   // run: 10 viewports at one viewport per second (desktop 'desktop'), same for 'phone'; per rAF: advance x by viewportW * dt/1000,
-  // record dt, read `canvas.dataset.mounted`; an "empty frame" is a frame whose mounted bar count is 0 while the scene has bars in that window
+  // record dt, read `canvas.dataset.mounted`; an "empty frame" is a frame whose mounted count is below what the window needs
   // (computed from the same index with overscan 0); `unwindowed` mode passes overscan = Infinity-ish (the whole scene) for the control.
   ```
   Write the loop in full:
@@ -1774,7 +1853,8 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
         setView({ x0: x, x1: x + vw, y0: 0, y1: vh });
         const mounted = Number(canvas().dataset['mounted'] ?? 0);
         maxM = Math.max(maxM, mounted); minM = Math.min(minM, mounted);
-        if (mounted === 0 && index.query({ x0: x, x1: x + vw, y0: 0, y1: vh }).length > 0) empty++;
+        // a SHORT frame, not only an empty one: the case line's "fewer mounted bars than the window needs" (a painter that mounts half the window must count)
+        if (mounted < index.query({ x0: x, x1: x + vw, y0: 0, y1: vh }).length) empty++;
         if (x >= total) done(); else requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -1782,7 +1862,7 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
     return { fps: (frames * 1000) / (performance.now() - t0), worstMs: worst, frames, maxMounted: maxM, minMounted: minM, emptyFrames: empty, scrollYBefore, scrollYAfter: scrollY };
   }
   ```
-  (`setView`, `canvas`, `index` and `mountScene` are the module-scope names declared above the function.) (`setView` is the page's `flushSync` state setter, so React renders inside the frame being measured; the mounted count is read after.)
+  (`setView`, `canvas`, `index` and `mountScene` are the module-scope names declared above the function.) The page lays out the stage at `innerHeight - 120` px, then a 120 px `#tlg-outside` block and 2,000 px of page below it, so a leaked wheel or drag WOULD scroll the page (29.301's control). (`setView` is the page's `flushSync` state setter, so React renders inside the frame being measured; the mounted count is read after.)
 
   `tests/timeline-stress.spec.ts`:
   ```ts
@@ -1819,14 +1899,30 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
       expect(r.fps).toBeGreaterThanOrEqual(30);
       expect(r.worstMs).toBeLessThanOrEqual(50);
       expect(r.scrollYAfter).toBe(r.scrollYBefore);
-      // wheel and a touch drag over the canvas must not scroll the page either
+      // the page CAN scroll (the stage is `innerHeight - 120` px tall, then `#tlg-outside`, 120 px, then 2,000 px of page), so the legs below can fail
+      expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(915);
+      // wheel and a touch DRAG over the canvas must not scroll the page either (a tap moves nothing, so it proved nothing)
+      const drag = async (x: number, y0: number, y1: number): Promise<void> => {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+        for (let k = 1; k <= 5; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + ((y1 - y0) * k) / 5 }] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      };
       await page.mouse.move(200, 400);
       await page.mouse.wheel(0, 600);
-      await page.touchscreen.tap(200, 400);
+      await drag(200, 600, 200);
+      await page.waitForTimeout(300); // `mouse.wheel` does not wait for the scroll; the control below proves 300 ms is long enough to see one
       expect(await page.evaluate(() => scrollY)).toBe(r.scrollYBefore);
+      // control: the same wheel over `#tlg-outside` (not the canvas) does scroll the page
+      await page.mouse.move(200, 860);
+      await page.mouse.wheel(0, 600);
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => scrollY)).toBeGreaterThan(r.scrollYBefore);
     });
   });
   ```
+  **Kills:**
+  - 29.300 (gated): (a) `TimelinePainter` with `overscan` widened to the scene (no windowing) → `maxMounted <= 1200`; (b) the painter mounts only bars whose `x0` is in the view → `emptyFrames` (bars entering from the left are missing); the fps legs measure, they kill no mutant of this task's code.
+  - 29.301: (a) the same two as 29.300 at 600; (b) the stage without `touch-action: none` / wheel `preventDefault` → the drag or wheel leg after the 300 ms wait.
   The `phone` scene's density is tuned until `maxMounted` sits near 600 (the generator's `count` and `days` are the knobs; record the final numbers in `HANDOFF`).
 
   Run: `"$SR" wtg4-t2 -- pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test timeline-stress --project=chromium > /tmp/wtg4-t2.log 2>&1; tail -30 /tmp/wtg4-t2.log` (29.301 and the skipped 29.300). On a GPU machine: `TLG_GPU=1 …` (the owner or the primary checkout; note which in the report).
@@ -1846,6 +1942,12 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
 - [ ] **Step 7: STOP AND REPORT: a pan bar misses**
 
   If 29.301 (or a GPU run of 29.300) misses: **STOP** and report the Result JSON. Diagnose in this order and report, without fixing beyond the painter: (a) mounted count above the cap (window or density wrong); (b) React render time per window change (profile `TimelinePainter` with `performance.measure`); (c) the CSS (box-shadow, `will-change`, layer count). The spec's lever is windowing harder (smaller `overscan`, coarser `quantisePx`), which this task may adjust and state; anything structural (canvas) is the owner's call.
+
+**Prose to sweep:**
+- `packages/flow-graph-browser/README.md:25-33` ("## Scenes" table) — lists every harness page; `timeline-stress.html?scene=desktop|phone` is not in it. Add the row.
+- `Features.md:3827` — "one stress page with three scenes (`stress.html?scene=time|flow|view`)": false once `timeline-stress.html` lands; the Part 1 bullet or T2's own bullet says there are two pages.
+- `packages/flow-graph-browser/package.json:11` already lists `"@gisik-nokma/app-core": "workspace:*"` on the ref, so the Files list's "Modify … (dependency …)" is a no-op; no prose made false.
+- None found for `packages/app-core/package.json` exports or `ui.css` (searched: `timeline-graph`, `gn-tlg` in `*.md`, `packages/app-core/src/index.ts`, `packages/ui/src/ui.css`).
 
 - [ ] **Step 8: Mutations, Features, DONE**
 
@@ -1906,6 +2008,12 @@ Sibling copied: `registerAttentionRoutes` (`routes/attention.ts:~410-432`: `deps
       const none = await get(url);
       expect(none.statusCode).toBe(401);
       expect(none.json()).toEqual(UNAUTHENTICATED_BODY);
+      // every route, not only the index: each registers its own preHandler (mutation 4 drops it on ONE route)
+      for (const other of [`/v1/timeline/chunk?ws=${ws}&from=2026-10-01&to=2026-10-07`, `/v1/timeline/tray?ws=${ws}`, `/v1/home/summary?ws=${ws}`]) {
+        const r = await get(other);
+        expect(r.statusCode, other).toBe(401);
+        expect((await get(other, 'member')).statusCode, other).toBe(200); // control
+      }
       const forged = await read.app.inject({ method: 'GET', url, headers: { authorization: 'Bearer forged' } });
       expect(forged.statusCode).toBe(401);
       expect((await get(url, 'member')).statusCode).toBe(200);
@@ -1931,11 +2039,24 @@ Sibling copied: `registerAttentionRoutes` (`routes/attention.ts:~410-432`: `deps
     it('29.304 one readable + one unreadable is 200 and nothing of the unreadable appears', async () => {
       const r = await get(`/v1/timeline/index?ws=${[read.world.workspaceId, read.neighbour.workspaceId].sort().join(',')}`, 'member');
       expect(r.statusCode).toBe(200);
+      expect(Object.keys(r.json().asOf)).toEqual([read.world.workspaceId]); // control: the readable one IS named (asOf has one key per readable workspace)
       expect(r.body).not.toContain(read.neighbour.workspaceId);
+      // 29.307's last clause: the index carries no Home number
+      expect(r.json()).not.toHaveProperty('dueSoonDays');
+      expect(r.json()).toHaveProperty('tray.count'); // control: the matcher reads the body's members
     });
   });
   ```
-  (`read.neighbour.workspaceId` is `NeighbourWorkspace`'s field: `grep -n "NeighbourWorkspace" -A6 apps/server/test/helpers/read-app.ts` first.) The 29.305 tests build windows `from=2026-10-01&to=2026-10-28` (accepted), `to=2026-12-01` (400 `invalid_window`), `from=2026-10-05&to=2026-10-01` (400), `from=2026-02-30` (400), `cursor=zzz` (400 `invalid_cursor`), `from=to` accepted, and page the tray/chunk with a pageSize — the HTTP route fixes it at `TIMELINE_PAGE_SIZE`, so the walk test uses a scope with 450 seeded tickets (generated in `beforeAll` of that `describe`) and asserts 200 + 200 + 50 and `nextCursor === null` last. The 29.306 tests use `seedTimelineWorld` (a second `describe` with its own database) and `workspace.settings_set` to give B `dueSoonDays: 0` (grep the payload at `projections/workspace-settings.ts`), compare `/v1/home/summary?ws=A` to `/v1/workspaces/A/home` field by field, and assert the Members dedupe by granting `bo` in both A and B. The 29.307 golden is T1 Step 3's `apps/server/test/timeline/fixtures/home-golden.json` (normalised: world ids by field name, other ULIDs `#`, sorted, no `generatedAt`); this route test requests `GET /v1/workspaces/:id/home` AS THE OWNER (the viewer the golden was captured for; the app's clock is frozen at `SCENARIO_NOW`, `read-app.ts:215`, the instant the golden used), runs the body through `normaliseHome(body, read.world)` from `test/timeline/home-golden.ts`, and compares it with that file. If the file is missing, STOP: T1 Step 3 was skipped.
+  **Kills:**
+  - 29.304 401: (a) drop `{ preHandler: requireSession }` on any one of the four routes (mutation 4) → that route's `401` leg (index, chunk, tray and summary each have one); (b) forged bearer accepted (a `requireSession` that only checks the header is present) → `forged` 401: existing behaviour of `require-session.ts`, guarded.
+  - 29.304 400 / 404: (a) `reply.status(403)` when every workspace is forbidden (mutation 1) → `forbidden.statusCode` 404; (b) a `gated` that answers `reply.status(400).send({ error: 'bad_request' })` → every `invalid_scope` body leg; (c) no 404 when nothing is readable (`run(readable, scope)` with `[]`) → `unknown.statusCode` 404 (it answers 200).
+  - 29.304 mixed: (a) `readableWorkspaces` keeps an unreadable workspace (T1's code; through the route) → `asOf` has two keys and the body names the neighbour; (b) the index response spreads `readHomeSummary`'s map (`dueSoonDays`) → the `not.toHaveProperty('dueSoonDays')` leg.
+  (`read.neighbour.workspaceId` is `NeighbourWorkspace`'s field: `grep -n "NeighbourWorkspace" -A6 apps/server/test/helpers/read-app.ts` first.) The 29.305 tests build windows `from=2026-10-01&to=2026-10-28` (accepted: 28 days), `from=2026-10-01&to=2026-10-29` (400 `invalid_window`: 29 days, the edge; mutation 2's 60-day window does not see `to=2026-12-01` alone, which is 62 days), `to=2026-12-01` (400 `invalid_window`), `from=2026-10-05&to=2026-10-01` (400), `from=2026-02-30&to=2026-03-05` (400: V8 rolls 02-30 to 03-02, so without the round-trip check this window would be accepted), `cursor=zzz` (400 `invalid_cursor`, on the chunk AND on the tray: each route checks it), `from=to` accepted, and page the tray/chunk with a pageSize — the HTTP route fixes it at `TIMELINE_PAGE_SIZE`, so the walk test uses a scope with 450 seeded tickets (generated in `beforeAll` of that `describe`) and asserts 200 + 200 + 50, `nextCursor === null` last, and that the 450 ids of the three pages are distinct and equal the seeded set (every item once); the tray page after the last is the request with the last page's final id as `cursor`, answering `{ items: [], nextCursor: null }`. The 29.306 tests use `seedTimelineWorld` (a second `describe` with its own database) and `workspace.settings_set` to give B `dueSoonDays: 0` (grep the payload at `projections/workspace-settings.ts`), compare `/v1/home/summary?ws=A` to `/v1/workspaces/A/home` field by field, and assert the Members dedupe by granting `bo` in both A and B. The two-workspace legs are exact: `dueSoonDays` EQUALS `{ [A]: 7, [B]: 0 }` (two keys alone would pass a mutant that copies one workspace's number into both, mutation 3); a ticket due TOMORROW in A is in `ids.dueSoon` and one due tomorrow in B is not (B's window is today only), with a ticket due TODAY in B in it (control: B's window is not empty); Me narrows `counts.tickets` (a strict decrease) and leaves `counts.members` and `counts.notes` equal; a `proj=` of A's p1 narrows both `counts.tickets` and `counts.notes` (a note homed in p2 drops out; a workspace-scope note stays). The 29.307 golden is T1 Step 3's `apps/server/test/timeline/fixtures/home-golden.json` (normalised: world ids by field name, other ULIDs `#`, sorted, no `generatedAt`); this route test requests `GET /v1/workspaces/:id/home` AS THE OWNER (the viewer the golden was captured for; the app's clock is frozen at `SCENARIO_NOW`, `read-app.ts:215`, the instant the golden used), runs the body through `normaliseHome(body, read.world)` from `test/timeline/home-golden.ts`, and compares it with that file. If the file is missing, STOP: T1 Step 3 was skipped.
+
+  **Kills** (the prose-described 29.305–29.307 tests):
+  - 29.305: (a) `> 59` for `> 27` (a 60-day window, mutation 2) → the `to=2026-10-29` leg; (b) `realDay` = `DAY.test(s)` only → the `2026-02-30` leg; (c) drop the cursor check on the tray only → the tray's `cursor=zzz` leg; (d) `from >= to` → the `from=to` control.
+  - 29.306: (a) `dueSoonDays: Object.fromEntries(parts.map((p) => [p.workspaceId, parts[0].dueSoonDays]))` (mutation 3) → the `{ [A]: 7, [B]: 0 }` leg; (b) `collectHome(…, { mine: scope.mine })` (projects dropped) → the `proj=` legs; (c) `members = rosters.flat()` → Members counted twice for `bo`. The per-workspace classification leg guards `collectHome`'s own settings read (existing behaviour, `home.ts`).
+  - 29.307: none, guards existing behaviour (`readHome`'s bytes through the route, after T1's split).
 
   Run: `"$SR" wtg4-t3 -- pnpm --filter @gisik-nokma/server exec vitest run test/timeline/routes.test.ts --maxWorkers=2 > /tmp/wtg4-t3.log 2>&1; tail -40 /tmp/wtg4-t3.log`. Expected: FAIL (404 on every route).
 
@@ -2003,6 +2124,11 @@ Sibling copied: `registerAttentionRoutes` (`routes/attention.ts:~410-432`: `deps
 
   Flip 29.304–29.307. Commit.
 
+**Prose to sweep:**
+- `apps/server/src/app.ts:1046-1051` — "`deps.now` is threaded through UNDEFAULTED … `registerStreamRoute` defaults it too … and so does spec E's `registerHomeRoutes`. All three get this same optional field": `registerTimelineRoutes` defaults it as well (`deps.now ?? (() => new Date())`), so "All three" becomes four.
+- `apps/server/src/app.ts:166-170` — the `now` field's docblock: "Every other route on this branch reads no clock at all": already stale on the ref (stream, Home); the timeline routes are one more. Name them or drop the sentence.
+- `Features.md:3796` (Home endpoint bullet) — unchanged by T3 (the route is untouched); no edit. None found for `/v1/timeline` or `/v1/home/summary` (searched: both paths in `*.md` outside `docs/superpowers`, `apps/server/src/app.ts`).
+
 - [ ] **Step 3: Mutations, Features, DONE**
 
   Mutations: (1) 403 for forbidden → 29.304; (2) accept a 60-day window → 29.305; (3) one workspace's `dueSoonDays` for all in `readHomeSummary` → 29.306; (4) drop `requireSession` on one route → 29.304. Run the server suite's routes and integration folders WHOLE. Features bullet under `<!-- WTG4 bullet T3 -->`: *"Timeline and Home summary routes (⚙️): `GET /v1/timeline/{index,chunk,tray}` and `GET /v1/home/summary` over `?ws=&proj=&mine=`; unreadable workspaces drop silently, 404 only when none is readable. `apps/server/src/routes/timeline.ts`."*
@@ -2012,7 +2138,7 @@ Sibling copied: `registerAttentionRoutes` (`routes/attention.ts:~410-432`: `deps
 ---
 ### Task 4: The client data layer: DataSource, cache, live, today (cases 29.308–29.312)
 
-**Branch** `task/wtg4-client-data`. Depends on T3 (routes) and T2's verdict (bars met, or the owner's ruling). **App-core online/sync change: also run the server integration files WHOLE.**
+**Branch** `task/wtg4-client-data`. Depends on T3 (routes) and T2's verdict (bars met, or the owner's ruling). **NEEDS:** the 12.185 owner-regex edit from KG Home T3 or reference-index T3 on the WG tip (via a KG→WG sync); Step 0 greps the test file for `Knowledge Graph spec [A-E]` and STOPs with NEEDS if it is absent (planner ruling 2026-10-04). **App-core online/sync change: also run the server integration files WHOLE.**
 
 **Files:**
 - Create:
@@ -2024,6 +2150,7 @@ Sibling copied: `registerAttentionRoutes` (`routes/attention.ts:~410-432`: `deps
   - `packages/app-core/src/data-source.ts` (four methods on `DataSourceQuery`, beside `getAttention`, `:419`)
   - `packages/app-core/src/online/online-data-source.ts` (four methods, beside `getAttention`, `:570`)
   - `packages/app-core/src/replica/replica-data-source.ts` (`TIMELINE_ABSENCES`, four rejecting methods beside `:1337`, four `REPLICA_GAPS` keys at `:679`)
+  - `packages/app-core/test/replica/replica-data-source.test.ts` (12.185: the owner regex's `Workflow and Timeline graphs Part [1-5]` alternative, one comment sentence, four refusals appended, the title's count; Step 1) (planner ruling 2026-10-04)
   - every other `DataSource` implementer the Step 0 grep finds (test fakes, the mobile shell)
   - `apps/server/test/integration/soft-delete-client-surface.test.ts` (the `DataSourceQuery` census: four rows in `DECIDED` and `call`, and the `expect(MEMBERS).toHaveLength(…)` pin bumped by four from the number MEASURED on the branch; Drafts T8 and Part 3 T3, T9 and T11 bumped it before this task)
   - `packages/app-core/test/helpers/clock-scan.ts` (`CLOCK_FREE_ROOTS`, `:31`: add `'timeline-graph'`)
@@ -2042,6 +2169,7 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
   2. Find every implementer: `grep -rln "getAttention" --include=*.ts --include=*.tsx packages apps | grep -v node_modules` and list them in `HANDOFF-wtg4-client-data.md`. Each gets the four methods (a fake returns a canned value or `null`; the replica rejects).
   3. Confirm the stream behaviour the live gate depends on: `grep -n "workspaceSeq\|caught-up\|existing" packages/app-core/src/online/stream.ts` and read `:357-359, :409-410, :455-468`. Measured on the KG tip: rooms are shared per workspace; a FIRST subscriber to a room replays from its `afterSeq` (cursor 0 replays history) and gets one `caught-up`; a LATER subscriber to an existing room gets no replay and no `caught-up` (`stream.ts:455-468`); every `event` frame carries `envelope.workspaceSeq`. So `caught-up` cannot tell a hook that history is over, and the hook never waits for it: it compares each event's `workspaceSeq` with the `asOf` of the data it holds (D-W4-23). If the landed stream differs, STOP and report.
   4. `grep -n "export" packages/app-core/test/helpers/clock-scan.ts` and read `:31-60` so the new root's scan is understood; `hasUtc` calls with arguments (`Date.UTC(...)`) are the only date use in this directory.
+  5. **12.185's owner regex** (planner ruling 2026-10-04): `grep -n "Knowledge Graph spec \[A-E\]" packages/app-core/test/replica/replica-data-source.test.ts`. If it prints nothing, the KG→WG sync carrying KG Home T3 / reference-index T3's edit has not landed: STOP with `NEEDS: 12.185 KG owner regex (KG Home T3 or reference-index T3, via a KG→WG sync)`.
 
 - [ ] **Step 1: Scope and the mappers, test first (29.308)**
 
@@ -2065,6 +2193,8 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
     });
   });
   ```
+  **Kills:**
+  - 29.308 scope: (a) `canon` without `.sort()` (mutation 1) → `'ws=B,A&mine=0'`; (b) `canon` without `new Set` → `'ws=A,A,B&mine=0'`; (c) `mine=${s.mine}` → `mine=false`; (d) `scopeKey` ignores `projectIds` → the control `not.toBe`.
   `scope.ts`:
   ```ts
   /** One Home / graph scope: workspaces, optional projects, Me or Everyone (HM-1). */
@@ -2086,7 +2216,7 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
   import { describe, expect, it } from 'vitest';
   import { createOnlineDataSource } from '../../src/online/online-data-source.js';
   import { MappingError } from '../../src/online/mappers.js';
-  import { REPLICA_GAPS, ReplicaGapError } from '../../src/replica/replica-data-source.js';
+  import { REPLICA_GAPS } from '../../src/replica/replica-data-source.js';
 
   function recordingFetch(answers: Record<string, unknown>) {
     const calls: string[] = [];
@@ -2144,11 +2274,21 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
         expect(Object.keys(REPLICA_GAPS)).toContain(m);
         expect(REPLICA_GAPS[m]?.some((a) => /roster|attachment/i.test(a.because))).toBe(true);
       }
-      expect(new ReplicaGapError('getTimelineIndex', REPLICA_GAPS['getTimelineIndex'] ?? []).absences.length).toBeGreaterThan(0);
+      // the absences themselves, exactly (constructing a `ReplicaGapError` from the registry only echoed its argument: it could not fail);
+      // that the replica METHODS reject is 12.185's enumerated list (see the QUESTION in this task's report: that list must gain the four names)
+      expect(REPLICA_GAPS['getTimelineIndex']?.map((a) => a.field)).toEqual(['TimelineEntry.pin', 'HomeSummaryResponse.counts.members', 'scope']);
     });
   });
   ```
-  Add to the replica test that already compares `REPLICA_GAPS` keys with the rejecting methods (`12.185`) nothing: the new keys satisfy it; run it unedited as the proof. Run: `"$SR" wtg4-t4 -- pnpm --filter @gisik-nokma/app-core exec vitest run test/timeline-graph/scope.test.ts test/online/timeline-data-source.test.ts --maxWorkers=2 > /tmp/wtg4-t4.log 2>&1; tail -30 /tmp/wtg4-t4.log`. Expected FAIL.
+  **Kills:**
+  - 29.308 URLs: (a) `getTimelineChunk` drops `&cursor=` → `calls[1]`; (b) the chunk prints `to` before `from` → `calls[1]`; (c) `getHomeSummary` maps a 404 to `{}` (not `null`) → the `toBeNull` leg.
+  - 29.308 corrupt: (a) `SEGMENT_TYPES` gains `'bogus'`-tolerance (`oneOf` → `String(r['type'])`) → the first body; (b) `pin` read as `r['pin'] === true ? { notes: 1, attachments: 0 } : …` → the second; (c) `asOf: r['asOf'] === undefined ? {} : seqMap(…)` → the fourth (a missing cut guessed as empty); (d) `seqMap` with `Number(v)` → the fifth (`NaN`, no throw); (e) drop the node `asString(o['id'], …)` → the sixth. Each body differs from the control body only in its corruption, so each is killed by its own leg.
+  - 29.308 replica: (a) a fourth key missing from `REPLICA_GAPS` → `toContain(m)`; (b) `TIMELINE_ABSENCES` without the roster/attachment rows → the `some(…)` leg and the exact `field` list.
+  Edit 12.185 (`packages/app-core/test/replica/replica-data-source.test.ts`) (planner ruling 2026-10-04): it enumerates the refusing methods by name and compares them ORDER-SENSITIVELY with `Object.keys(REPLICA_GAPS)` (`:571`), so the four new keys red it until it is edited. (1) Append this plan's alternative after the KG one the sync brought (Step 0 item 5):
+  ```ts
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan|Knowledge Graph spec [A-E]|Workflow and Timeline graphs Part [1-5]): /,
+  ```
+  (2) Append one sentence to the comment above it, after the KG sentence: `// Workflow and Timeline graphs Part 4 Task 4 added the next, for the four timeline reads.` (3) Append four entries to the `refusals` list in `REPLICA_GAPS` order, `getTimelineIndex`, `getTimelineChunk`, `getTimelineTray`, `getHomeSummary`, each `[name, () => ds.query.<name>(…)]` with the arguments its signature takes (one `ScopeArg` over the test's own workspace id; the chunk also `{ from: '2026-10-05', to: '2026-11-01' }`). (4) Move the title's spelled count by four from the synced count. Run it with the rest: it is now the only test that the replica METHODS reject. Run: `"$SR" wtg4-t4 -- pnpm --filter @gisik-nokma/app-core exec vitest run test/timeline-graph/scope.test.ts test/online/timeline-data-source.test.ts --maxWorkers=2 > /tmp/wtg4-t4.log 2>&1; tail -30 /tmp/wtg4-t4.log`. Expected FAIL.
 
   `data-source.ts` (inside `DataSourceQuery`, after `getAttention`):
   ```ts
@@ -2292,9 +2432,9 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
   `replica-data-source.ts`:
   ```ts
   const TIMELINE_ABSENCES: readonly ReplicaAbsence[] = [
-    { field: 'TimelineEntry.pin', because: 'attachment counts are not replicated (see ATTACHMENTS_ABSENCES), and a pin that omitted them would say a ticket has no attachment when it has', owner: 'Plan 10: an attachments table' },
-    { field: 'HomeSummaryResponse.counts.members', because: 'no roster is replicated (see MEMBERS_ABSENCES), and a scope can span workspaces the device has not synced', owner: 'Plan 10: a roster accessor' },
-    { field: 'scope', because: 'a scope can name several workspaces and Me | Everyone across them; the replica serves one workspace at a time', owner: 'Plan 10: a multi-workspace local query' },
+    { field: 'TimelineEntry.pin', because: 'attachment counts are not replicated (see ATTACHMENTS_ABSENCES), and a pin that omitted them would say a ticket has no attachment when it has', owner: 'Workflow and Timeline graphs Part 4: an attachments table' }, // (planner ruling 2026-10-04)
+    { field: 'HomeSummaryResponse.counts.members', because: 'no roster is replicated (see MEMBERS_ABSENCES), and a scope can span workspaces the device has not synced', owner: 'Workflow and Timeline graphs Part 4: a roster accessor' },
+    { field: 'scope', because: 'a scope can name several workspaces and Me | Everyone across them; the replica serves one workspace at a time', owner: 'Workflow and Timeline graphs Part 4: a multi-workspace local query' },
   ];
   // in REPLICA_GAPS: getTimelineIndex, getTimelineChunk, getTimelineTray, getHomeSummary: TIMELINE_ABSENCES
   //   (Part 3 T3, T9 and T11 have already put getFlow, publishFlow, previewDecide and decide directly under getAttention; the key order is
@@ -2355,7 +2495,11 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
       expect(r.result).toBe('patched');
       expect(r.next.items.find((e) => e.id === 'A')?.segments[0]).toMatchObject({ start: '2026-10-05', end: '2026-10-09' });
       expect(r.next.items.find((e) => e.id === 'B')?.segments[0]?.start).toBe('2026-10-10'); // chained: the day after A's new end
-      expect(core().items.find((e) => e.id === 'B')?.segments[0]?.start).toBe('2026-10-07'); // control: the input core is untouched
+      // control: the INPUT core is untouched (`core()` builds a fresh one, so asserting on a new call could never fail)
+      const input = core();
+      applyInputEvent(input, ev('ticket.field_set', 'A', { fieldId: 'estimate', value: 5 }), TODAY);
+      expect(input.items.find((e) => e.id === 'B')?.segments[0]?.start).toBe('2026-10-07');
+      expect(input.flows[0]?.nodes[0]?.estimate).toBe(2);
     });
     it('29.309 singleton, link removal, link between flows, assignee, collaborator and transitions are stale', () => {
       for (const e of [
@@ -2366,6 +2510,8 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
         ev('ticket.collaborator_added', 'A', { userId: 'U' }),
         ev('ticket.transitioned', 'A', { to: 'done' }),
       ]) expect(applyInputEvent(core(), e, TODAY).result, e.type).toBe('stale');
+      // control (the case line's): the same dueDate change on a flow MEMBER patches, so the singleton's stale is the singleton's
+      expect(applyInputEvent(core(), ev('ticket.field_set', 'B', { fieldId: 'dueDate', value: { date: '2026-10-22' } }), TODAY).result).toBe('patched');
     });
     it('29.309 a patch that would put a member on or off the tray is stale; a title is patched into details', () => {
       // clearing A's only dates and estimate leaves nothing to draw: the tray changes, which is a server page
@@ -2377,6 +2523,11 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
     });
   });
   ```
+  **Kills:**
+  - 29.309 census: (a) delete any one `EVENT_CLASS` row of a registered watched type → the `toEqual([])` leg names it; (b) `'ticket.transitioned': 'patch'` (mutation 2) → `toBe('stale')`; (c) `classifyEvent` returns `'ignore'` for unknown watched types → `ticket.some_future_type`.
+  - 29.309 re-plan: (a) `replan` writes the old segments (`items[i] = items[i]`) → B's `2026-10-10`; (b) `withField` maps `estimate` to `explicitDue` → A's `end: '2026-10-09'`; (c) `const items = core.items` and in-place `items[i].segments = …`, or a node mutated in place → the `input` control.
+  - 29.309 stale: (a) `if (flow === undefined) return { next: core, result: 'patched' }` → the singleton and the link-between-flows legs; (b) `PLAN_FIELDS` without `dueDate` → the member dueDate control (`'ignored'`); (c) `'ticket.assigned': 'patch'` → its leg.
+  - 29.309 tray / title: (a) drop the `wasDrawn !== nowDrawn` guard → `clear.result` reads `patched`; (b) the title path writes `ev.payload['fieldId']` → `'New'`; (c) the title path returns `stale` → `t.result`.
   `live-patch.ts`:
   ```ts
   import { istDayOf, planFlow, segmentsFor, type FlowNode, type TimelineDetail, type TimelineEntry, type TimelineFlow } from '@gisik-nokma/domain';
@@ -2578,7 +2729,9 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
     }
   }
   ```
-  `scope-cache.test.ts`: stale-while-revalidate keeps details across `applyIndex`; `missing` honours `resident`; `applyChunk(..., false)` (a middle page) does not mark resident; `setToday` extends an open segment and not a closed one (control) and sets stale; `applyEvent` notifies subscribers once. Write each as an `it` under id `29.311`'s sibling? They belong to 29.310's cache half: name them `29.310 ScopeCache …`.
+  `scope-cache.test.ts`: stale-while-revalidate keeps details across `applyIndex` (for ids the new index still has; control: a detail whose id the new index lacks is gone, so "kept" is not "never cleared"); `missing` honours `resident`; `applyChunk(..., false)` (a middle page) does not mark resident; `setToday` extends an open segment and not a closed one (control) and sets stale; `applyEvent` notifies subscribers once. Write each as an `it` under id `29.311`'s sibling? They belong to 29.310's cache half: name them `29.310 ScopeCache …`.
+
+  **Kills** (the prose-described `scope-cache.test.ts`): (a) `applyIndex` clears `details` → the kept-detail leg; (b) drop the "left the scope" delete → the control; (c) `applyChunk` marks resident on any page → the middle-page leg; (d) `setToday` extends every actual segment → the closed control; (e) `bump()` twice in `applyEvent` → notified once.
 
 - [ ] **Step 4: The feed, the hook, per-workspace subscription, debounced refetch (2  `scope-feed.ts` (D-W4-23; T7's `useHomeSummary` calls it too):
   ```ts
@@ -2632,7 +2785,9 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
     };
   }
   ```
-  `scope-feed.test.ts` (pure; a fake `subscribe` that records callbacks): an event at `asOf` is dropped and one above it is delivered, per workspace, with workspace B's own head (control: A's head does not gate B); with `getAsOf` returning `null` nothing is delivered and `missedSince({B: 5})` is true after an event with `workspaceSeq: 6` and false after one with `5` (and a second call returns false: consumed); a `purge` before any answer makes `missedSince` true; a `caught-up` frame is ignored in every state; a workspace absent from `asOf` is ignored. Name them `29.310 subscribeScope …`.
+  `scope-feed.test.ts` (pure; a fake `subscribe` that records callbacks): an event at `asOf` is dropped and one above it is delivered, per workspace, with workspace B's own head (control: A's head does not gate B); with `getAsOf` returning `null` nothing is delivered and `missedSince({B: 5})` is true after an event with `workspaceSeq: 6` and false after one with `5` (and a second call returns false: consumed); a `purge` before any answer makes `missedSince` true; a `caught-up` frame is ignored in every state; a workspace absent from `asOf` is ignored (control: the same frame for a workspace that IS in `asOf` is delivered). Name them `29.310 subscribeScope …`.
+
+  **Kills** (`scope-feed.test.ts`): (a) `seq < head` for `seq <= head` → the at-`asOf` drop; (b) `getAsOf()[workspaceIds[0]]` for every room → "A's head does not gate B"; (c) `missedSince` without `seen.clear()` → the second call's `false`; (d) `purge` not counted as news → the `missedSince` after a purge; (e) `if (head === undefined) onFrame(…)` → the absent-workspace leg.
 
 9.310)**
 
@@ -2757,6 +2912,8 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
       await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
       expect(getIndex).toHaveBeenCalledTimes(1);
       const before = result.current.cache.items.find((e) => e.id === 'B')?.segments[0]?.start;
+      // the seq-4 PATCH was not applied either (a gate that only held back stale events would pass the count above)
+      expect(before).toBe(index().items.find((e) => e.id === 'B')?.segments[0]?.start);
       // above asOf: an estimate change on a member of W2's flow is patched, no request (and NO caught-up frame was ever delivered)
       act(() => { subs.get('W2')?.(frame('W2', 10, 'ticket.field_set', 'A', { fieldId: 'estimate', value: 6 })); });
       expect(result.current.cache.items.find((e) => e.id === 'B')?.segments[0]?.start).not.toBe(before);
@@ -2793,6 +2950,9 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
     });
   });
   ```
+  **Kills:**
+  - 29.310 second workspace: (a) `subscribeScope(source, [scope.workspaceIds[0]] …)` (mutation 3) → `subs.get('W2')` is undefined and B is not patched; (b) `seq < head` (mutation 5, `>=`) → the seq-9 `transitioned` refetches; (c) deliver only after a `caught-up` (mutation 5) → no frame ever passes, B is not patched; (d) `schedule` without the `timer !== null` guard → `toHaveBeenCalledTimes(2)` reads 3; (e) the gate applied to stale events only → the new `before` leg.
+  - 29.310 early events: (a) drop the `missedSince` call in `reload` → `getIndex` 1 (the seq-10 news is lost); (b) `missedSince` that answers `seen.size > 0` → the control's 2.
   Write `fake({ firstAnswer? })`, `deferred<T>()` and `indexWithAsOf(asOf)` in full in the test (a `DataSource`-shaped object cast `as unknown as DataSource` with only `query.getTimelineIndex/Chunk/Tray` and `subscribe`; `subscribe(ws, _after, cb)` stores `cb` and returns an unsubscribe; `firstAnswer`, when given, is what the FIRST `getTimelineIndex` call returns; the index builder returns the `entry` shape of `live-patch.test.ts` plus `asOf`). Flip 29.310 after both the cache half and this pass. Commit.
 
 - [ ] **Step 5: A workspace that stops being readable (29.312)**
@@ -2800,7 +2960,9 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
   Case line:
   - `- ❌ **29.312 — a workspace that becomes unreadable mid-session is dropped without an error (Review Focus 3):** after a refetch whose answer has no item of workspace B the cache holds none of B's ids and status stays `ready` with no error; a refetch answering `null` (nothing readable) sets status `empty`, leaves no error, and keeps the last drawn data out of `items` only after the cache is cleared by the caller (the hook exposes `empty`, the screen decides); a `scope-revoked` frame marks the cache stale and refetches once; control: a thrown read is status `error` with the previous items still held. Mutation: treat `null` as an error → the empty assertion reds.`
 
-  Tests extend `use-timeline-scope.test.tsx`: first index has B items; second answer omits them → `cache.items` has no B id and `status === 'ready'` and `error === null`; third answer `null` → `status === 'empty'`; a `scope-revoked` frame after the first answer → `getIndex` called once more after 400 ms; `mockRejectedValueOnce(new Error('boom'))` → `status === 'error'` and `cache.items` unchanged. In the hook, `empty` leaves the cache as is; the screens render the empty state by `status`, so nothing half-drawn can show (T7's 29.347 pins the screen).
+  Tests extend `use-timeline-scope.test.tsx`: first index has B items; second answer omits them → `cache.items` has no B id and `status === 'ready'` and `error === null`; third answer `null` → `status === 'empty'` and `error === null`; a `scope-revoked` frame after the first answer → `getIndex` called once more after 400 ms; `mockRejectedValueOnce(new Error('boom'))` → `status === 'error'` and `cache.items` unchanged. In the hook, `empty` leaves the cache as is; the screens render the empty state by `status`, so nothing half-drawn can show (T7's 29.347 pins the screen).
+
+  **Kills** (29.312): (a) `resp === null` handled as `setError('nothing readable'); setStatus('error')` (mutation 4) → `status === 'empty'` and `error === null`; (b) the error branch calls `cache.applyIndex(emptyIndex)` → `cache.items` unchanged; (c) non-`event` frames ignored in the hook's `onFrame` → the `scope-revoked` refetch; (d) `applyIndex` keeps the old items → "no B id".
 
   Commit.
 
@@ -2834,7 +2996,16 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
     return day;
   }
   ```
-  Test (`vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T18:29:59Z'))` renders `'2026-10-03'`; `advanceTimersByTime(2_000)` → `'2026-10-04'`; `unmount` leaves `vi.getTimerCount() === 0`). Add `'timeline-graph'` to `CLOCK_FREE_ROOTS` and run the clock-free test: PASS; add the probe control the way the file's own control does (read `clock-scan.test.ts`). Commit.
+  Test (`vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T18:29:59Z'))` renders `'2026-10-03'`; a `rerender()` after `advanceTimersByTime(500)` (before midnight) is still `'2026-10-03'`; `advanceTimersByTime(1_500)` → `'2026-10-04'`; `unmount` leaves `vi.getTimerCount() === 0`, and before the unmount it is 1 (control: the count sees the hook's timer)). Add `'timeline-graph'` to `CLOCK_FREE_ROOTS` and run the clock-free test: PASS; add the probe control the way the file's own control does (read `clock-scan.test.ts`). Commit.
+
+  **Kills** (29.311): (a) no timer at all (drop the `useEffect`) → the `'2026-10-04'` leg (nothing re-renders the hook); (b) `endsAt` from the UTC day (`Date.parse(`${day}T24:00:00Z`)`) → no change at 18:30Z, the same leg; (c) no `clearTimeout` on unmount (mutation 6) → the count after unmount is 1; (d) a `Date.now()` in `timeline-graph/` → the clock-free scan.
+
+**Prose to sweep:**
+- `packages/app-core/test/replica/replica-data-source.test.ts:489-571` — 12.185's enumerated `refusals` list is compared ORDER-SENSITIVELY with `Object.keys(REPLICA_GAPS)` (`:571`); four new keys red it unless the four names are appended in the registry's order (Step 1 says "run it unedited": false). Its title "ELEVEN methods refuse" moves by four.
+- `test-cases/12-offline-sync-apps.md:1395` — "12.185 ✅ **NINE methods refuse**" (already stale; the four make it more so): the count and the membership move together.
+- `Features.md:2447` — "**TEN methods refuse, and they are the REPLICA's own** … `getMyWorkspaces`, `getMembers`, … `putPreferences`": the membership list gains the four timeline reads.
+- `packages/app-core/src/online/online-data-source.ts:100` — "ZERO of the THIRTEEN query methods REFUSE": ZERO stays true; THIRTEEN is a member count the four new query methods change.
+- `apps/server/test/integration/soft-delete-client-surface.test.ts:833` (`MEMBERS = Object.keys(DECIDED)`, the length pin) — already in the Files list; listed so the docblock above `DECIDED` (`:58`) is re-read for a count.
 
 - [ ] **Step 7: Neighbours, mutations, Features, DONE**
 
@@ -2955,10 +3126,14 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       expect(keyAndPin(40, true)).toEqual({ keyOutside: true, pinAt: 'after-key', labelPx: 78 });
       expect(keyAndPin(40, false)).toEqual({ keyOutside: true, pinAt: null, labelPx: 64 });
       expect(keyAndPin(64, false).keyOutside).toBe(false); // control: the boundary
+      expect([keyAndPin(81, true).pinAt, keyAndPin(82, true).pinAt]).toEqual(['after-key', 'inside']); // the pin's own boundary (82)
       expect(LONG_BAR_PX).toBe(150);
     });
   });
   ```
+  **Kills:**
+  - 29.314 zoom: (a) `anchorScroll` = `(scroll + anchorPx) * oldPpd / newPpd - anchorPx` (ratio inverted) → drift far above 0.5 px for 56 → 8; (b) `clampPpd` without the `Math.max` → `clampPpd(1)` is 1; (c) `ZOOM.week = 28` → the presets leg.
+  - 29.318 key and pin: (a) `width <= KEY_INSIDE_MIN_PX` → the 64 boundary; (b) `PIN_INSIDE_MIN_PX` used as 64 (one threshold for both) → `keyAndPin(81, true)` is `inside`; (c) `labelPx` without `+ PIN_PX` → `78`.
   `labels.ts` (the only place the copy lives; no spaced em dash):
   ```ts
   import type { TimelinePin, TimelineTrayItem } from '@gisik-nokma/domain';
@@ -2997,6 +3172,8 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   export const trayActionField = (reason: TimelineTrayItem['reason']): 'dates' | 'estimate' => (reason === 'no-estimate' ? 'estimate' : 'dates');
   ```
   `labels.test.ts` pins every `COPY` string exactly, `linkChip(1)`, `pinText` for (2,1), (1,0), (0,3), null; `reachedSentence` both forms; `trayAction*` for the three reasons; and a scan: `Object.values(COPY).every(s => !/\s—\s/.test(s))`. Run: FAIL then PASS.
+
+  **Kills** (`labels.test.ts`): (a) `linkChip` always plural → `'1 link'`; (b) `pinText` without the `> 0` filters → `(1,0)` reads `1 note, 0 attachments`; (c) `reachedSentence` keeps an empty title (`[r.decisionKey, r.decisionTitle]`) → the no-title form has a double space; (d) `trayActionField('start-after-due')` → `'estimate'` → its leg. The em-dash scan guards the copy rule (every string is also pinned exactly).
 
   `model.ts`:
   ```ts
@@ -3054,7 +3231,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     return { entries, edges, tray };
   }
   ```
-  `model.test.ts`: `readFlag` reads `'1'`, throws → `false` and `writeFlag` does not throw (29.316), `fromFlowRead` on a fixture of a diamond (Decision → Yes / No) with one undated ticket: entries for dated nodes, the undated one in `tray` with `reachedBy` naming the Decision and outcome (29.322), a draft node has `key: null` (29.318). Commit.
+  `model.test.ts`: `readFlag` reads `'1'` as true and `'0'` as false (control: a flag that only checked `!== null` would read `'0'` as on), throws → `false` and `writeFlag` does not throw (29.316), `fromFlowRead` on a fixture of a diamond (Decision → Yes / No) with one undated ticket: entries for dated nodes, the undated one in `tray` with `reachedBy` naming the Decision and outcome (29.322; the undated node ALSO has an unlabelled incoming edge from a second Decision whose id sorts first, so `reachedBy` naming the labelled one is a choice, not the only edge there), a draft node has `key: null` (29.318). Commit.
+
+  **Kills** (`model.test.ts`): (a) `readFlag` = `getItem(key) !== null` → the `'0'` leg; (b) `writeFlag` without its `try` → the throwing store; (c) the tray's `via` filter without `e.label !== null` → `reachedBy` names the lower-id Decision's unlabelled edge; (d) `entries` keep `key` for a draft → `key: null`.
 
 - [ ] **Step 2: The scene builder, test first (29.314–29.321, 29.323)**
 
@@ -3311,17 +3490,21 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       expect(drawnSegments(ent('N', [['2026-10-05', '2026-10-06', 'planned']]), false)).toHaveLength(1);
     });
     it('29.316 the toggle never moves a row', () => {
-      const items = [worked, reopened, ent('Z', [['2026-10-01', '2026-10-10', 'planned']])];
+      // Y starts after W's ACTUAL end but inside W's pass-1 planned outline (drawn only when ON): packing W by its drawn segments would let Y share
+      // W's row when OFF and not when ON. Without Y the three rows came out the same either way and the row-equality leg could not fail.
+      const items = [worked, reopened, ent('Z', [['2026-10-01', '2026-10-10', 'planned']]), ent('Y', [['2026-10-04', '2026-10-05', 'planned']])];
       const off = buildScene(items, [], { ...O, plannedVsActual: false }, greedy, straight);
       const on = buildScene(items, [], { ...O, plannedVsActual: true }, greedy, straight);
       expect([...on.rowOf]).toEqual([...off.rowOf]);
+      expect(off.rowOf.get('Y')).toBe(3); // the union footprint: W (and R) end on 10-06, so Y cannot reuse a row
     });
   });
   describe('29.318 / 29.319 geometry and marks', () => {
     it('29.318 long at 150 px, not at 149; a draft shows Draft; accessible name has the title', () => {
-      const wide = buildScene([ent('L', [['2026-10-05', '2026-10-11', 'planned']])], [], { ...O, ppd: 24 }, greedy, straight); // 7 d × 24 = 168
+      // exactly 150 and just over 149: 168 and 148.8 sit on the same side of BOTH thresholds, so a 149 (or `>`) mutant passed them
+      const wide = buildScene([ent('L', [['2026-10-05', '2026-10-10', 'planned']])], [], { ...O, ppd: 25 }, greedy, straight); // 6 d × 25 = 150
       expect((bar(wide, 'L') as any).long).toBe(true);
-      const w149 = buildScene([ent('S', [['2026-10-05', '2026-10-10', 'planned']])], [], { ...O, ppd: 24.8 }, greedy, straight); // 6 d × 24.8 = 148.8
+      const w149 = buildScene([ent('S', [['2026-10-05', '2026-10-10', 'planned']])], [], { ...O, ppd: 24.9 }, greedy, straight); // 6 d × 24.9 = 149.4
       expect((bar(w149, 'S') as any).long).toBe(false);
       const d = bar(buildScene([ent('D', [['2026-10-05', '2026-10-07', 'planned']], { draft: true, key: null })], [], O, greedy, straight), 'D') as any;
       expect(d.draft).toBe(true);
@@ -3343,17 +3526,23 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     });
   });
   describe('29.320 / 29.321 edges and loops', () => {
-    const a = ent('A', [['2026-10-05', '2026-10-06', 'planned']]), b = ent('B', [['2026-10-08', '2026-10-09', 'planned']]), dec = ent('D', [['2026-10-07', '2026-10-07', 'planned']], { kind: 'decision' });
+    const a = ent('A', [['2026-10-05', '2026-10-06', 'planned']]), dec = ent('D', [['2026-10-07', '2026-10-07', 'planned']], { kind: 'decision' }); // (`b` moved into 29.320 as `b2`)
     it('29.320 anchors, both kinds counted, an edge without a bar skipped', () => {
-      const s = buildScene([a, b], [
+      // two bars each, so the source's LAST bar and the target's FIRST bar are not their only bar (with one bar, first === last and an
+      // anchor taken from the wrong end could not be seen)
+      const a2 = ent('A', [['2026-10-01', '2026-10-01', 'actual'], ['2026-10-03', '2026-10-04', 'actual']], { category: 'terminal' });
+      const b2 = ent('B', [['2026-10-08', '2026-10-08', 'actual'], ['2026-10-10', '2026-10-11', 'planned', 2]], { category: 'active' });
+      const s = buildScene([a2, b2], [
         { from: 'A', to: 'B', kind: 'leads_to', label: null, loop: false, taken: null },
         { from: 'A', to: 'B', kind: 'blocks', label: null, loop: false, taken: null },
         { from: 'A', to: 'GHOST', kind: 'leads_to', label: null, loop: false, taken: null },
       ], O, greedy, straight);
       expect(s.linkCount).toBe(2);
+      const boxes = (id: string) => s.draws.filter((d) => d.kind === 'bar' && d.ticketId === id).map((d) => d.b);
+      expect([boxes('A').length, boxes('B').length]).toEqual([2, 2]);
       const e = s.draws.find((d) => d.kind === 'edge') as any;
-      expect(e.d.startsWith(`M${bar(s, 'A')!.b.x1} `)).toBe(true); // leaves the source's END
-      expect(e.d.endsWith(`H${bar(s, 'B')!.b.x0}`)).toBe(true);    // enters the target's START
+      expect(e.d.startsWith(`M${Math.max(...boxes('A').map((x) => x.x1))} `)).toBe(true); // leaves the source's LAST bar at its END
+      expect(e.d.endsWith(`H${Math.min(...boxes('B').map((x) => x.x0))}`)).toBe(true);    // enters the target's FIRST bar at its START
     });
     it('29.321 a loop is routed by the loop router, labelled with the outcome and passes; no pill; no bar, no loop', () => {
       const s = buildScene([a, dec], [{ from: 'D', to: 'A', kind: 'leads_to', label: 'Needs rework', loop: true, taken: true, passes: 2 }], O, greedy, straight);
@@ -3385,7 +3574,20 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     });
   });
   ```
+  **Kills:**
+  - 29.314: (a) `dayX(seg.end, o)` for `addDays(seg.end, 1)` (mutation 1) → A is 1 px wide; (b) `todayPx` measured from `addDays(originDay, 1)` → the `5 * 24` leg reads 96; (c) `thick = 24` → `a.y1 - a.y0` 28.
+  - 29.315: (a) the scene ignores the patched items (re-renders `before`'s entries) → B moved 0; (b) `dayX` with `ppd` 1 → B moved 3 px.
+  - 29.316 table: (a) `drawnSegments` keeps planned when the pass worked (`!worked.has` dropped) → `['actual', 'planned']` OFF; (b) drop `plannedVsActual ||` → ON reads `['actual']`.
+  - 29.316 rows: (a) `packItems` from `drawnSegments(e, o.plannedVsActual)` (mutation 2) → Y's row differs OFF and ON, and `off.rowOf.get('Y')` is 1.
+  - 29.318: (a) `widthPx > LONG_BAR_PX` → `L` at 150 is not long; (b) `LONG_BAR_PX = 149` (mutation 3) → `S` at 149.4 is long; (c) `barAria` ignores `draft` → no `Draft`.
+  - 29.319: (a) swap the `active` and `done` marks (mutation 4) → `['active', 'done', null]`; (b) `statusWord('active')` returns `'Done'` → the `In progress` leg; (c) a planned segment gets `mark: 'done'` → `C`'s `null`.
+  - 29.320 anchors: (a) `route.edge(from.first, to.first, …)` (mutation 5, the source's start bar) → the `M${lastX1}` leg; (b) `route.edge(from.last, to.last, …)` → the `H${firstX0}` leg; (c) count edges before the missing-anchor `continue` → `linkCount` 3.
+  - 29.321: (a) `route.edge` for loops (mutation 6) → no `C`; (b) drop the `↺ N` suffix → `'Needs rework ↺ 2'`; (c) draw a loop to a missing bar with a fallback anchor → `none.linkCount` 1.
+  - 29.320 Home scope: (a) ignore `o.edges.flowId` → `1` reads 2; (b) treat `{ flowId }` as `'none'` → `1` reads 0.
+  - 29.323: (a) `titleLines` capped at 2 (mutation 9) → `16 + 12 * 3`; (b) `COL_PITCH` used as the width → 120; (c) portrait `place` with landscape axes (`x0: u0`, `y0: v`) → `a.y0` is 0, not 168.
   Also `scene-real-router.test.ts` (29.317, 29.320): uses `bridge.packLanes`, `bridge.edgePath` and `loopPath` (Part 1's real functions) on a fixture of 6 tickets: asserts different rows for overlapping tickets, the gap-sharing case (ticket P with segments `[10-01,10-02]` and `[10-09,10-10]` and ticket Q `[10-04,10-05]` on the same row), the Decision occupying only its end day, an `edgePath` that starts at the source's x1 and ends at the target's x0 and whose segments are axis-aligned (parse `d` into `M/H/V`), and no arrow crossing a third bar (rect-segment intersection over the fixture). Control: non-overlapping tickets share row 0.
+
+  **Kills** (`scene-real-router.test.ts`): (a) `packLanes` passes `spans[0]` only (no gap sharing) → the P/Q same-row leg; (b) `packLanes` merges lanes (one `pack` over all items) → rows of a second lane shift; (c) `router.edge` wired to `routeLoop` → the axis-aligned (`M/H/V` only) leg. The crossing check guards Part 1's router (existing behaviour) on this fixture.
 
   Run: `"$SR" wtg4-t5 -- pnpm --filter @gisik-nokma/app-core exec vitest run test/timeline-graph --maxWorkers=2 > /tmp/wtg4-t5.log 2>&1; tail -40 /tmp/wtg4-t5.log`. Expected FAIL then PASS. In `bridge.ts` add:
   ```ts
@@ -3498,7 +3700,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     );
   }
   ```
-  Tests (`tray.test.tsx`, `toolbar-legend.test.tsx`, jsdom): the exact strings; `Add dates` calls `onOpenField(id,'dates')`, `Add an estimate` calls `'estimate'`, `start-after-due` is `Add dates`; the reached sentence both forms; an unlabelled row has no `.gn-tlg-tray-reached` (control); disclosure collapses on a phone; legend shows the fourth entry only with `waitsForAll` (control same `it()`); zoom group `role=radiogroup` named `Timeline zoom`, clicking Day sets `onZoom('day')` and `aria-checked` follows `ppd`; the switch is off by default and toggles; **no element** in the rendered toolbar, legend or tray has an accessible name matching `/^(earlier|later|previous|next)$/i`; the `N links` chip singular/plural.
+  Tests (`tray.test.tsx`, `toolbar-legend.test.tsx`, jsdom): the exact strings; `Add dates` calls `onOpenField(id,'dates')`, `Add an estimate` calls `'estimate'`, `start-after-due` is `Add dates`; the reached sentence both forms; an unlabelled row has no `.gn-tlg-tray-reached` (control); disclosure collapses on a phone; legend shows the fourth entry only with `waitsForAll` (control same `it()`); zoom group `role=radiogroup` named `Timeline zoom`, clicking Day sets `onZoom('day')` and `aria-checked` follows `ppd`; the switch is off by default and toggles; **no element** in the rendered toolbar, legend or tray has an accessible name matching `/^(earlier|later|previous|next)$/i` (control in the same `it()`: the same scan finds `Today` and `Timeline zoom`, so it reads the rendered names); the `N links` chip singular/plural.
+
+  **Kills** (`tray.test.tsx`, `toolbar-legend.test.tsx`): (a) `onOpenField(t.id, 'dates')` for every reason → the `Add an estimate` call; (b) the legend renders the Waits row always (mutation 7) → the `waitsForAll: false` control; (c) `aria-checked` fixed at the first option → the `ppd` follow leg; (d) the disclosure starts open on a phone (`useState(true)`) → the collapsed leg; (e) `.gn-tlg-tray-reached` rendered for `reachedBy: null` → the unlabelled control.
 
   `timeline-graph.tsx` (the shell used by the sheet now and by Home in T7):
   ```tsx
@@ -3588,6 +3792,8 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```
   (`onNeedWindow` is wired in T7 where chunks are fetched; the sheet never calls it.) Add `scrollTo` to `bridge.ts` over the landed driver (`driver.animateTo` / `driver.setOffset`), and the `Windowed` it returns. Tests (`timeline-graph.test.tsx`, jsdom with a fake `bridge` via `vi.mock('../../src/timeline-graph/bridge.js')` returning a controllable `attachDriver`): the switch is off by default; turning it on writes `'1'` to the injected storage (test sets `localStorage` to a throwing stub → no throw, reads off) (29.316); zoom radio changes the bar widths from 24 to 56 px/day (29.324); the toolbar and tray remain in the DOM outside `.gn-tlg-panel` (29.322/29.325 structure); the panel has `tabIndex 0` and an accessible name. Commit.
 
+  **Kills** (`timeline-graph.test.tsx`): (a) `useState(true)` for `planned` → off by default; (b) `toggle` without `writeFlag` → the stored `'1'`; (c) `onZoom` calls `setPpd(ZOOM.week)` → widths stay 24; (d) the tray rendered inside `.gn-tlg-panel` → the structure leg.
+
 - [ ] **Step 4: The sheet slot and the live wrapper (29.313, 29.326)**
 
   `ticket-timeline.tsx`:
@@ -3625,7 +3831,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```
   The web host passes `timelineGraphSlot={<TicketTimeline source={source} workspaceId={workspaceId} ticketId={ticketId} today={today} orientation={isPhone ? 'portrait' : 'landscape'} selected={selected} onSelect={setSelected} onOpenField={openField} />}` with `today = useIstToday()` (T4) and `openField` = the sheet's own "open at this field" (`grep -n "focusField\|openAt" packages/app-core/src/views/ticket-sheet.tsx`; if none exists, scroll the Details tab to the field and focus it: write that function in the host, with a test).
 
-  `ticket-timeline.test.tsx` (29.313, 29.326): a fake `DataSource` whose `query.getFlow` resolves a diamond fixture and records calls; the fake `fetch` / `getTimelineIndex` throws if called (proof of NO range route); `getFlow` is called once; with the slot absent the switch has no `Timeline` option, with it present it does (control, same `it()`); selecting `Timeline` then back to `Workflow` keeps `selected`; after an `event` frame in the same workspace the debounced reload (fake timers 200 ms, the hook's own) re-fetches, the changed estimate moves the bar and `selected` and the toggle are kept; an event frame for ANOTHER workspace id never reaches this subscription. Commit.
+  `ticket-timeline.test.tsx` (29.313, 29.326): a fake `DataSource` whose `query.getFlow` resolves a diamond fixture and records calls; the fake `getTimelineIndex`, `getTimelineChunk` and `getTimelineTray` are `vi.fn()` asserted `not.toHaveBeenCalled()` (proof of NO range route: a fake that only THROWS would be swallowed by the hook's error path and pass either way); `getFlow` is called once; with the slot absent the switch has no `Timeline` option, with it present it does (control, same `it()`); selecting `Timeline` then back to `Workflow` keeps `selected`; after an `event` frame in the same workspace the debounced reload (fake timers 200 ms, the hook's own) re-fetches, the changed estimate moves the bar and `selected` and the toggle are kept; an event frame for ANOTHER workspace id never reaches this subscription. Commit.
+
+  **Kills** (`ticket-timeline.test.tsx`): (a) the slot's option listed always (mutation 8) → the no-slot control; (b) `TicketTimeline` reads through `useTimelineScope` (the range route) → the `not.toHaveBeenCalled()` legs; (c) the host keeps `selected` in the Timeline view's own state → back in Workflow it is lost; (d) `useLiveQuery(…, otherWorkspaceId, …)` → the same-workspace reload never comes.
 
 - [ ] **Step 5: CSS, the token binding test, real geometry (29.319, 29.325)**
 
@@ -3661,10 +3869,16 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   The `.gn-tlg-bar`'s `position` is `absolute` through the T2 block. Add the token test described in Step 0.3. Run the `ui`, `app-core` and `web` suites WHOLE.
 
   **Geometry on the primary dev stack** (`apps/web/e2e-stack/timeline-graph.spec.ts`, copying the structure of a sibling spec in that folder; the primary stack is rebuilt by the owner or `ctl rebuild`; no lane starts its own stack): open a ticket with a flow of at least 6 members (seeded through the API in the spec's setup), open the Graph tab, choose Timeline, and assert with `boundingBox()`:
-  - at `1240 x 900`: `.gn-tlg-panel` height = the sheet body's height minus the toolbar and legend heights (within 1 px) and >= 320; the sheet width is 1240; a bar's height is 28; a long bar has a `.gn-tlg-title`; `document.scrollingElement.scrollHeight` unchanged after `page.mouse.wheel` over the panel; `scrollY` unchanged;
-  - at `390 x 844`: columns are 112 wide; the tray is a disclosure; the bottom card opens on tap;
+  - at `1240 x 900`: `.gn-tlg-panel` height = the sheet body's height minus the toolbar and legend heights (within 1 px) and >= 320; the sheet width is 1240; a bar's height is 28; a long bar has a `.gn-tlg-title`; `document.scrollingElement.scrollHeight` unchanged after `page.mouse.wheel` over the panel; `scrollY` unchanged, read after a 300 ms wait (`mouse.wheel` does not wait for the scroll), with the control that the SAME wheel moved the panel's content (the canvas layer's transform or `data-mounted` window changed), so the wheel reached the panel and the unchanged page is the panel's doing;
+  - at `390 x 844`: columns are 112 wide; the tray is a disclosure; the bottom card opens on tap; a touch DRAG over the panel (CDP `Input.dispatchTouchEvent` start/move/end, as in T2's 29.301) leaves `scrollY` unchanged after the same 300 ms wait (the case's "touch pan"; a tap is not a pan);
   - print `tlg-geometry <numbers> machine <platform/arch>` and quote it LOCAL in the commit and the case line.
   Flip 29.319, 29.325 after the run. Commit.
+
+  **Kills** (e2e geometry, 29.325): (a) `.gn-tlg { height: auto }` → the panel height leg; (b) drop `touch-action: none` / `overscroll-behavior: contain` on `.gn-tlg-panel` → the drag or wheel `scrollY` leg; (c) `.gn-tlg-bar` `height` not 28 → the bar height leg. The 29.319 contrast `describe` in `tokens.test.ts` kills a binding to a role that misses 3:1 or 4.5:1 (the file's own helper).
+
+**Prose to sweep:**
+- None found on the ref (searched: `Graph views`, `GraphSlot`, `graphView` in `packages/app-core/src/views/ticket-sheet.tsx`; `Graph tab`, `knowledgeGraphSlot`, `workflowGraphSlot` in `docs/manual.md`, `Features.md` and `packages/app-core/src`): the sheet's Graph tab, its switch and its manual paragraph arrive with KG C T9 / Part 3, which are not on `origin/release/workflow-graph`. Re-run the same grep on the branch at Step 6: the Graph tab's docblock and the manual paragraph that lists its views (Workflow, Knowledge) become false when Timeline joins.
+- `docs/manual.md:1065-1080` (the PROJECT Timeline tab, "Not on the timeline yet", **Add dates**) stays true; the sheet's paragraph must not reuse it as if one surface (checked; no edit).
 
 - [ ] **Step 6: Neighbours, mutations, manual, Features, DONE**
 
@@ -3690,7 +3904,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   - `Features.md` §26 (`<!-- WTG4 bullet T6 -->`), `test-cases/29-workflow-timeline-graphs.md` (`<!-- WTG4 T6 -->`)
 
 **Interfaces:**
-- **Consumes:** T5's `buildScene`, `SceneEntry`, `drawnSegments`, `keyAndPin`, `COPY`, `barAria`; T1's `segmentsFor`; Part 2's `PassRecord` (`{ pass; outcome; by; at; revisions: { from; to; by; at }[] }`, PS-2); `formatIstInstant` (`packages/domain/src/clock-skew.ts`, the calendar surface's formatter).
+- **Consumes:** T5's `buildScene`, `SceneEntry`, `drawnSegments`, `keyAndPin`, `COPY`, `barAria`; T1's `segmentsFor`; Part 2's `PassRecord` (`{ pass; outcome; by; at; revisions: { from; to; by; at }[] }`, PS-2); `formatIstInstant` (`packages/domain/src/clock-skew.ts`, the calendar surface's formatter), measured in Step 0 only: `revisedSentence` never calls it, it uses Part 2's History sentence or the `istShort` adapter (planner ruling 2026-10-04).
 - **Produces:**
   - `SceneEntry` gains `revised?: string | null` (the PS-6 sentence, non-null = the revised mark) and `tooltip?: string | null` (the `passTooltip` string);
   - `DrawBar.tooltip?: string | null`; `DrawDiamond.revised: string | null`;
@@ -3699,7 +3913,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut the branch; build. Print `formatIstInstant('2026-10-02T12:34:00.000Z')` with `node -e` against the built domain and write the exact output into the handoff: the revised sentence is `Decision revised: Yes → No by Ama Rangsa, 2 Oct 18:04`, so the formatter must give `2 Oct 18:04` for `12:34Z`. If its form differs, write the three-line adapter in `labels.ts` (day-of-month, English short month, `HH:mm`, IST by +330 minutes arithmetic, no `Intl`).
+  1. Cut the branch; build. Print `formatIstInstant('2026-10-02T12:34:00.000Z')` with `node -e` against the built domain and write the exact output into the handoff: the revised sentence is `Decision revised: Yes → No by Ama Rangsa, 2 Oct 18:04`, so the formatter must give `2 Oct 18:04` for `12:34Z`. If its form differs (on `origin/release/workflow-graph` it prints `20 Aug 2026, 05:30 IST`), write the three-line adapter `istShort` in `labels.ts` (day-of-month, English short month, `HH:mm`, IST by +330 minutes arithmetic, no `Intl`); Step 2's `revisedSentence` calls it; if the form already matches, `istShort` is `formatIstInstant` re-bound under that name (planner ruling 2026-10-04).
   2. `grep -n "passes\|revisions" packages/domain/src/ticket-state.ts packages/domain/src/read-models.ts` to confirm `PassRecord` as landed. Re-read the History sentence for revisions in Part 2's History mapper (`grep -rn "Decision revised"`): the revised mark's tooltip is that very string, so import it if it is a function there.
 
 - [ ] **Step 1: The 8-pass cap, test first (29.329)**
@@ -3708,7 +3922,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   - `- ❌ **29.327 — periods are solid segments joined by a thin dashed connector:** a reopened ticket draws one bar per work period on ONE row; consecutive periods are joined by a 1 px connector at the bars' mid-height across the gap (dashed, 60% opacity); the first bar reads `GN-143`, the later ones `GN-143 ↺2`, `GN-143 ↺3`; an open period ends at today; another ticket's bar fits in the gap on the same row (real `pack`); control: a ticket with one period draws no connector. Mutation: drop the `↺` suffix → the label assertion reds.`
   - `- ❌ **29.328 — a reopened ticket with no period yet in the new pass shows that pass's planned bar in outline, labelled `↺2`, and its tooltip lists each period:** `Pass 1: 2 Oct → 5 Oct. Reopened by GN-145 (Needs rework), 6 Oct. Pass 2: 8 Oct →` where the cause line is present only when the Decision's pass record is held (sheet: always; Home: when the Decision's detail has been loaded); without it the sentence is `Pass 1: 2 Oct → 5 Oct. Pass 2: 8 Oct →`; periods are retroactive (a ticket reopened last month shows both today). Mutation: omit the open period's arrow → the sentence assertion reds.`
   - `- ❌ **29.329 — planned outlines per pass, and the 8-pass cap:** with Planned vs actual ON each pass's planned outline sits behind its own period (lower z, a pass-rank outline style: solid for pass 1, dashed for 2, dotted for 3 or more, so passes differ by more than colour); a ticket with more than 8 passes keeps its 8 most recent in the index and older ones are ONE `+N earlier` summary segment (`pass: 0`, `earlier: N`); control: 8 passes are all kept. Mutation: cap at 9 → the 10-pass assertion reds.`
-  - `- ❌ **29.330 — a Decision is a diamond on the end day of each closed period:** two closed periods give two diamonds, the second labelled `GN-151 ↺2`; an open period gives a diamond at today with ▶; a finished one carries ✓ beside the key; a diamond is 28 px and never touches its neighbour's bar. Mutation: draw only the last period → the count reds.`
+  - `- ❌ **29.330 — a Decision is a diamond on the end day of each closed period:** two closed periods give two diamonds, the second labelled `GN-151 ↺2`; an open period gives a diamond at today with ▶; a finished one carries ✓ beside the key; a diamond is 28 px, centred on its end day's column (at zooms where a day is narrower than 28 px it reaches into the neighbouring days; the packing reserves the day itself) (planner ruling 2026-10-04). Mutation: draw only the last period → the count reds.`
   - `- ❌ **29.331 — Not taken (owner ruling O3, the approved mockups):** a Not-taken ticket that did work keeps its work-period bars in the `notTaken` style (muted fill, dashed edge, never `opacity` below 1, text >= 4.5:1) with the chip `Not taken` (`Not taken (pass 2)` from pass 2) and the tooltip `<key> <title>, <start> to <end>, Not taken (pass n)`, and those bars take a row (packing union); a never-started one draws a 6 px stub at its close day with the tooltip `<key> <title>: Not taken, <day>`, which occupies that day in the union; with Planned vs actual ON and a pruned plan the stub is not drawn and its ghost sits in the Pruned strip, and no live row moves; neither is in the tray; the legend shows `Not taken, after its work` / `Not taken, never started` only when the scene holds one; control: the same worked ticket without a resolution has the done style and no chip. Mutation: draw the worked Not-taken bars in the done style → the style assertion reds; drop the stub → the stub assertion reds; chip text from the wrong pass → the pass-2 assertion reds.`
   - `- ❌ **29.332 — pruned ghosts:** with Planned vs actual ON a lane gains a strip headed `Pruned` under its rows holding the pruned branch's planned bars as ghosts (pale fill, dashed border, label `pruned`, text >= 4.5:1, no `opacity` below 1 on text); OFF the strip is absent; turning it on moves NO live row (PK-3, PK-9); a ghost has no arrows and no edge anchors; control: a lane with no ghosts has no strip. Mutation: include ghosts in the packing footprint → the row-equality assertion reds.`
   - `- ❌ **29.333 — the revised mark:** the diamond of a Decision whose current pass has a revision shows the mark `revised` whose tooltip is `Decision revised: Yes → No by Ama Rangsa, 2 Oct 18:04` (a clearing reads `Cleared the decision (was Yes)`); a Decision with no revisions shows none; control: an earlier pass's revision does not mark a diamond of a later pass. Mutation: mark every Decision with passes → the control reds.`
@@ -3727,13 +3941,17 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     expect(eight).toHaveLength(8);
   });
   ```
+  **Kills:**
+  - 29.329 cap: (a) cap 9 (mutation 3) → `earlier: 1`, not 2; (b) the summary as `type: 'planned'` → `toMatchObject({ type: 'actual' })`; (c) `>= 8` for `> 8` → the 8-pass control gains a summary; (d) the summary's `end` from the first dropped segment only → `end: '2026-09-04'`.
   Implement in `segments.ts`: after building `out`, compute the distinct pass numbers; if more than 8, drop every segment (all three types) of the passes below `maxPass - 7`, and push one `{ start: min(start of dropped), end: max(end of dropped), pass: 0, type: 'actual', earlier: <number of dropped passes> }`; keep the sort. `TimelineSegment` gains `earlier?: number`; `map-timeline.ts`'s `segment()` copies `earlier` when it is a number (add one assertion to 29.308's clean case). Run the domain and app-core mapper tests. Commit.
 
 - [ ] **Step 2: Labels and sentences, test first (29.328, 29.333, 29.331)**
 
   Add to `labels.ts`:
   ```ts
-  import { formatIstInstant } from '@gisik-nokma/domain';
+  // (planner ruling 2026-10-04): no `formatIstInstant` import; on this ref it prints `20 Aug 2026, 05:30 IST`, not spec :516's `2 Oct 18:04`.
+  // `istShort` is Step 0's three-line adapter in this file (day-of-month, English short month, `HH:mm`, IST by +330 minutes). If Step 0 item 2 finds
+  // Part 2's History mapper exports the revised sentence, `revisedSentence` delegates to it instead and `istShort` is not written.
 
   const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   /** "2 Oct" from an IST day. */
@@ -3750,7 +3968,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   export function revisedSentence(r: Rev, name: string | null): string {
     const by = name === null ? '' : ` by ${name}`;
     if (r.to === null) return `Cleared the decision (was ${r.from ?? 'nothing'})`;
-    return `Decision revised: ${r.from ?? 'none'} → ${r.to}${by}, ${formatIstInstant(r.at)}`;
+    return `Decision revised: ${r.from ?? 'none'} → ${r.to}${by}, ${istShort(r.at)}`; // `2 Oct 18:04` (spec :516): Part 2's History sentence when it is exported, else Step 0's adapter, never `formatIstInstant` directly (planner ruling 2026-10-04)
   }
   /** The mark belongs to the CURRENT (last) pass only. */
   export function revisionOf(passes: readonly { revisions: readonly Rev[] }[] | null): Rev | null {
@@ -3763,7 +3981,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     const sorted = [...periods].sort((a, b) => a.pass - b.pass || (a.start < b.start ? -1 : 1));
     return sorted
       .map((p, i) => {
-        const span = `Pass ${p.pass}: ${dayLabel(p.start)} →${p.end === null ? '' : ` ${dayLabel(p.end)}`}.`;
+        const span = `Pass ${p.pass}: ${dayLabel(p.start)} →${p.end === null ? '' : ` ${dayLabel(p.end)}.`}`; // an open span ends at the arrow (spec TG-9 :712) (planner ruling 2026-10-04)
         const next = sorted[i + 1];
         const cause = next === undefined ? undefined : causes[next.pass];
         return cause === undefined ? span : `${span} Reopened by ${cause}.`;
@@ -3771,7 +3989,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       .join(' ');
   }
   ```
-  `labels.test.ts` additions: `notTakenBarTip('GN-163', 'Build page', '2026-09-26', '2026-09-28', 'Not taken (pass 2)')` is `GN-163 Build page, 26 Sep to 28 Sep, Not taken (pass 2)` and `stubTip('GN-165', 'Brief', '2026-09-25')` is `GN-165 Brief: Not taken, 25 Sep` (29.331, the mockup's words); the three sentences exactly (with the `formatIstInstant` form recorded in Step 0), `revisionOf` takes the LAST pass only (control: an earlier pass's revision gives `null`), `notTakenChip` for pass 1 and 2 and `null`, `passTooltip` with and without causes (`causes = { 2: 'GN-145 (Needs rework), 6 Oct' }`), `dayLabel('2026-10-02') === '2 Oct'`. Run: FAIL then PASS. Commit.
+  `labels.test.ts` additions: `notTakenBarTip('GN-163', 'Build page', '2026-09-26', '2026-09-28', 'Not taken (pass 2)')` is `GN-163 Build page, 26 Sep to 28 Sep, Not taken (pass 2)` and `stubTip('GN-165', 'Brief', '2026-09-25')` is `GN-165 Brief: Not taken, 25 Sep` (29.331, the mockup's words); the three sentences exactly (the revised one ends `2 Oct 18:04` for `2026-10-02T12:34:00.000Z`, spec :516, (planner ruling 2026-10-04)), `revisionOf` takes the LAST pass only (control: an earlier pass's revision gives `null`), `notTakenChip` for pass 1 and 2 and `null`, `passTooltip` with and without causes (`causes = { 2: 'GN-145 (Needs rework), 6 Oct' }`), equal to the case line's `Pass 1: 2 Oct → 5 Oct. Reopened by GN-145 (Needs rework), 6 Oct. Pass 2: 8 Oct →` with NO final period, and a closed final span ending `→ 12 Oct.` (control) (planner ruling 2026-10-04), `dayLabel('2026-10-02') === '2 Oct'`. Run: FAIL then PASS. Commit.
+
+  **Kills** (`labels.test.ts` additions): (a) `notTakenChip` ignores `pass` → `Not taken (pass 2)`; (b) `revisionOf` reads `passes[0]` → the earlier-pass control is non-null; (c) `passTooltip` attaches `causes[p.pass]` (its own pass, not the next one's) → the with-causes sentence; (d) drop the open period's `→` (mutation 2) → the sentence ends `8 Oct`; (f) the `.` after every span, open or not → the open sentence ends `8 Oct →.` (planner ruling 2026-10-04); (e) `revisedSentence` for `to === null` prints `Decision revised: Yes → null` → the clearing sentence.
 
 - [ ] **Step 3: The scene: connectors, labels, per-period diamonds, Not taken, ghosts, revised, pin (29.327–29.334)**
 
@@ -3901,9 +4121,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     }
   }
   ```
-  `SceneEntry` gains `revised?: string | null` and `tooltip?: string | null`; the tooltip string is built by the host with `passTooltip` and handed in. In `model.ts`'s `fromFlowRead` set, per node: `revised` from `revisionOf(n.passes)` through `revisedSentence(rev, nameOf(rev.by))` (`nameOf` is an injected argument defaulting to `() => null`), and `tooltip` from `passTooltip(n.periods, causes)` for a node with more than one period or a round above 1, where `causes[pass]` is built from the loop edges into the node: for each `taken` loop edge `D → node` labelled `L`, the Decision's pass records with outcome `L` give pass `k` whose `at` is the day of the reopening: `causes[k + 1] = ` `${D.key} (${L}), ${dayLabel(istDayOf(at))}`.
+  `SceneEntry` gains `revised?: string | null` and `tooltip?: string | null`; the tooltip string is built by the host with `passTooltip` and handed in. In `model.ts`'s `fromFlowRead` set, per node (test in `model.test.ts`: a Decision whose pass 1 was revised and pass 2 was not has `revised: null`, and revising pass 2 gives the sentence; a ticket with one period and round 1 has `tooltip: null`; this is the leg mutation 7, "mark every Decision with passes", reds): `revised` from `revisionOf(n.passes)` through `revisedSentence(rev, nameOf(rev.by))` (`nameOf` is an injected argument defaulting to `() => null`), and `tooltip` from `passTooltip(n.periods, causes)` for a node with more than one period or a round above 1, where `causes[pass]` is built from the loop edges into the node: for each `taken` loop edge `D → node` labelled `L`, the Decision's pass records with outcome `L` give pass `k` whose `at` is the day of the reopening: `causes[k + 1] = ` `${D.key} (${L}), ${dayLabel(istDayOf(at))}`.
 
-  Painter: a `DrawStub` renders a `button` (`className="gn-tlg-stub"`, `title={d.tooltip}`, `aria-label={d.ariaLabel}`, opening the ticket like a bar) and, after it, `<span className="gn-tlg-stub-label"><b>{key}</b> {chip}</span>`; a bar with `style='notTaken'` renders `data-style="notTaken"` and its chip. `legend.tsx` takes `notTaken: { worked: boolean; stub: boolean }` (the host derives both from the scene's draws) and appends `{ style: 'notTaken', text: COPY.legendNotTakenWorked }` and `{ style: 'stub', text: COPY.legendNotTakenStub }` only when each is true (29.324's rows are unchanged otherwise). `DrawDiamond.revised` renders `<span className="gn-tlg-revised" title={d.revised}>revised</span>` when non-null; `DrawBar.tooltip` becomes the button's `title`; the pin span gets `title={pinText(d.pin)}` and stays `aria-hidden`; a ghost bar renders its chip. Painter test additions: the pin is a `span` (not a button, `tabIndex` absent) with the right `title`; the revised span carries the sentence.
+  Painter: a `DrawStub` renders a `button` (`className="gn-tlg-stub"`, `title={d.tooltip}`, `aria-label={d.ariaLabel}`, opening the ticket like a bar) and, after it, `<span className="gn-tlg-stub-label"><b>{key}</b> {chip}</span>`; a bar with `style='notTaken'` renders `data-style="notTaken"` and its chip. `legend.tsx` takes `notTaken: { worked: boolean; stub: boolean }` (the host derives both from the scene's draws; `toolbar-legend.test.tsx` gains: each row appears only with its flag, control: both false gives exactly 29.324's rows) and appends `{ style: 'notTaken', text: COPY.legendNotTakenWorked }` and `{ style: 'stub', text: COPY.legendNotTakenStub }` only when each is true (29.324's rows are unchanged otherwise). `DrawDiamond.revised` renders `<span className="gn-tlg-revised" title={d.revised}>revised</span>` when non-null; `DrawBar.tooltip` becomes the button's `title`; the pin span gets `title={pinText(d.pin)}` and stays `aria-hidden`; a ghost bar renders its chip. Painter test additions: the pin is a `span` (not a button, `tabIndex` absent) with the right `title`; the revised span carries the sentence.
 
   CSS (`/* WTG4 T6 */`):
   ```css
@@ -3920,7 +4140,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   .gn-tlg-pin { background: currentColor; mask: var(--gn-tlg-pin-mask) center / contain no-repeat; }
   .gn-tlg-pin[data-at='after-key'] { position: absolute; left: calc(100% + 6px + 64px); top: 8px; }
   ```
-  `--gn-tlg-pin-mask` is a data-URI paperclip glyph defined once beside the block (a 12 x 12 SVG path; the lane draws it with the icons already in `packages/ui/src/icons`: read that folder first and reuse its paperclip or paper-pin icon if one exists, rendering it as the `span`'s child instead of a mask). Contrast: add to the T5 `describe('29.319 …')` in `tokens.test.ts` a `29.332 / 29.331` block: text (`--gn-text`) on `fillTertiary` >= 4.5 in light and dark for the three styles (ghost and notTaken share it), and the stub mark (`borderStrong`) on the canvas (`surface`) >= 3; if one misses, add a role. Assert in the scene test that no ghost CSS rule sets `opacity` below 1: read `UI_CSS` the way `components.test.tsx`'s `rule()` does and grep the ghost, notTaken and stub selectors' bodies for `opacity` (29.331, 29.332).
+  `--gn-tlg-pin-mask` is a data-URI paperclip glyph defined once beside the block (a 12 x 12 SVG path; the lane draws it with the icons already in `packages/ui/src/icons`: read that folder first and reuse its paperclip or paper-pin icon if one exists, rendering it as the `span`'s child instead of a mask). Contrast: add to the T5 `describe('29.319 …')` in `tokens.test.ts` a `29.332 / 29.331` block: text (`--gn-text`) on `fillTertiary` >= 4.5 in light and dark for the three styles (ghost and notTaken share it), and the stub mark (`borderStrong`) on the canvas (`surface`) >= 3; if one misses, add a role. Assert in the scene test that no ghost CSS rule sets `opacity` below 1: read `UI_CSS` the way `components.test.tsx`'s `rule()` does and grep the ghost, notTaken and stub selectors' bodies for `opacity` (29.331, 29.332); control in the same `it()`: the same `rule()` read of `.gn-tlg-bar[data-dim='true']` DOES find `opacity` (T5), so the scan reads real rule bodies.
 
   Scene tests (extend `scene.test.ts`; the 29.317-style real-pack cases extend `scene-real-router.test.ts`):
   ```ts
@@ -3946,20 +4166,27 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       const ds = buildScene([d], [], O, greedy, straight).draws.filter((x) => x.kind === 'diamond') as any[];
       expect(ds).toHaveLength(2);
       expect(ds[1].key).toBe('GN-D ↺2');
-      const open = buildScene([ent('E', [['2026-10-01', '2026-10-03', 'actual']], { kind: 'decision', category: 'active' })], [], O, greedy, straight).draws.find((x) => x.kind === 'diamond') as any;
+      // the revised mark goes on the LAST diamond only, and a Decision with no revision shows none (29.333's scene half)
+      expect(ds.map((x) => x.revised)).toEqual([null, null]);
+      const rev = buildScene([{ ...d, revised: 'Decision revised: Yes → No' }], [], O, greedy, straight).draws.filter((x) => x.kind === 'diamond') as any[];
+      expect(rev.map((x) => x.revised)).toEqual([null, 'Decision revised: Yes → No']);
+      const openScene = buildScene([ent('E', [['2026-10-01', '2026-10-03', 'actual']], { kind: 'decision', category: 'active' })], [], O, greedy, straight);
+      const open = openScene.draws.find((x) => x.kind === 'diamond') as any;
       expect(open.mark).toBe('active');
+      expect((open.b.x0 + open.b.x1) / 2).toBe(openScene.todayPx + O.ppd / 2); // "at today": centred on today's day column
     });
   });
   describe('29.331 Not taken', () => {
     const nt = { kind: 'not-taken' as const, decisionTicketId: 'D', outcome: 'No', pass: 2 };
     it('29.331 worked: notTaken style, chip and tooltip, in a row; never started: a 6 px stub at the close day that holds its day; control: no resolution, done style, no chip', () => {
-      const worked = ent('W', [['2026-10-01', '2026-10-02', 'actual', 2]], { resolution: nt, category: 'terminal' });
+      // worked in pass 1, Not taken by the Decision's pass 2: the chip must name the RESOLUTION's pass, not the work's (mutation 5)
+      const worked = ent('W', [['2026-10-01', '2026-10-02', 'actual', 1]], { resolution: nt, category: 'terminal' });
       const stubbed = ent('S', [['2026-10-02', '2026-10-02', 'stub' as never, 2]], { resolution: nt, category: 'terminal' });
       const rival = ent('R', [['2026-10-02', '2026-10-03', 'planned']]);
       const s = buildScene([worked, stubbed, rival], [], O, greedy, straight);
       const bar = s.draws.find((d) => d.kind === 'bar' && (d as any).ticketId === 'W') as any;
       expect([bar.style, bar.chip, bar.mark]).toEqual(['notTaken', 'Not taken (pass 2)', null]);
-      expect(bar.tooltip).toBe('GN-W ↺2 Title W, 1 Oct to 2 Oct, Not taken (pass 2)');
+      expect(bar.tooltip).toBe('GN-W Title W, 1 Oct to 2 Oct, Not taken (pass 2)');
       expect(s.rowOf.has('W')).toBe(true); // in the packing union
       const stub = s.draws.find((d) => d.kind === 'stub') as any;
       expect(stub.b.x1 - stub.b.x0).toBe(6);
@@ -3994,6 +4221,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       expect(ghost.chip).toBe('pruned');
       expect(ghost.b.y0).toBeGreaterThan(strip.b.y0);
       expect(on.anchors.has('P')).toBe(false);
+      // a ghost-only ticket takes NO live row: with ghosts in the pack footprint (mutation 6) P would be packed both OFF and ON,
+      // and the row-equality leg above would still pass
+      expect([off.rowOf.has('P'), on.rowOf.has('P')]).toEqual([false, false]);
       const clean = buildScene([live], [], { ...O, plannedVsActual: true }, greedy, straight);
       expect(clean.draws.some((d) => d.kind === 'strip')).toBe(false);
     });
@@ -4012,11 +4242,24 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     });
   });
   ```
+  **Kills:**
+  - 29.327 periods: (a) `keyOf` without the `↺` suffix (mutation 1) → `['GN-R', 'GN-R']`; (b) the connector from `prev.x0` → `c.b.x0`; (c) connectors across ALL segments, planned included, or a row per period → the one-row leg / the control; (d) `dashed: false` → `c.dashed`.
+  - 29.330 diamonds: (a) `if (i !== segs.length - 1) return` kept from T5 (mutation 4) → one diamond; (b) `revised: e.revised ?? null` on every diamond → `[S, S]`; (c) the diamond centred on `u0` (the period's start) → the at-today leg reads 1 Oct; (d) `keyOf` ignores the pass → `'GN-D'`.
+  - 29.331 worked / stub: (a) style `done` for a worked Not-taken bar (mutation 5a) → `'notTaken'`; (b) `notTakenChip({ pass: seg.pass })` (mutation 5) → `'Not taken'`; (c) drop the stub branch (mutation 5b) → `stub` is undefined; (d) the stub kept out of `packItems` → S and R share a row.
+  - 29.331 toggle ON: (a) `drawnSegments` keeps the stub when its ghost shows (mutation 5c) → `on` has a stub; (b) the ghost's `tooltip` from `COPY.ghost` → the `'Not taken'` leg reads `pruned`.
+  - 29.332 ghosts: (a) ghosts in `packItems` (mutation 6) → `rowOf.has('P')`; (b) the strip drawn regardless of the toggle → `off` has a strip; (c) ghosts given anchors → `on.anchors.has('P')`; (d) the ghost placed in the live rows (`gv = vOf(…)`) → `ghost.b.y0 > strip.b.y0`.
+  - 29.334 the pin: (a) `keyAndPin(widthPx, false)` (pin ignored) → `pinAt` null and `labelPx` 64; (b) `pin: e.pin` with zero counts → `N`'s `pin` not null; (c) `barAria` without `pinText` → the `2 notes, 1 attachment` leg.
   (`TODAY_PLUS5` in the 29.327 fixture is `'2026-10-08'`; write the literal. The `'ghost' as never` casts stand for the segment `type`; use the real `TimelineSegment` type in the lane's version.) The 29.329 per-pass test in `scene.test.ts`: with the toggle ON, a reopened ticket's pass-1 and pass-2 planned segments draw with `passRank` 0 and 1 and `z` below the actual bars; OFF only the current pass's planned outline draws (29.316 already pins the table; this pins the rank). The 29.327 gap-sharing real-`pack` case goes in `scene-real-router.test.ts`: ticket P (two periods with a 6-day gap) and Q inside the gap share row 0. The 29.328 and 29.333 sentence cases are Step 2's. Run: FAIL then PASS; flip 29.327–29.334 as they pass. Commit.
 
 - [ ] **Step 4: Real geometry for the pin, the connector and the strip (29.334, 29.332)**
 
   Extend `apps/web/e2e-stack/timeline-graph.spec.ts` (T5): seed a flow with a reopened ticket (two periods), a Decision with a revision, a ticket with a note and an attachment and a pruned branch. Measure and assert with `boundingBox()` on the primary dev stack: the pin is 12 x 12 and its right edge is 6 px (±1) inside the bar's right edge; on a one-day bar at Week zoom it sits to the right of the key; the connector's `y` is the bars' mid-height ±1; with the toggle ON the strip appears below the last live row and `boundingBox()` of every live bar is unchanged (compare before and after); the ghost label reads `pruned`. Print `tlg-passes <numbers> machine <platform/arch>` and quote it LOCAL. Commit.
+
+**Prose to sweep:**
+- `packages/domain/src/flow/segments.ts` — T1's `segmentsFor` docblock lists four kinds (actual, planned, ghost, stub); the 8-pass summary (`pass: 0`, `earlier`) is a fifth behaviour: add its line.
+- `packages/app-core/src/timeline-graph/draw-types.ts` — T2's `DrawDiamond.revised: boolean` and the `BarStyle` comment become `string | null` and gain `notTaken`; T2's `DrawBar` docblock (`chip`: "`Not taken (pass 2)` and similar chips") stays true.
+- `packages/app-core/src/timeline-graph/scene.ts` — T5's `drawnSegments` docblock ("A planned segment shows when …") does not mention the stub rule this task adds; and T5's comment "one diamond, on the end day of the last drawn segment (T6 draws one per closed period)" is deleted with the line.
+- None found on the ref itself (searched: `paper pin`, `Pruned strip`, `↺2`, `8 most recent` in `Features.md`, `docs/manual.md`, `test-cases`): every file this task edits is created by T1, T2 or T5.
 
 - [ ] **Step 5: Mutations, Features, DONE**
 
@@ -4027,7 +4270,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
 ---
 ### Task 7: Home's one scope, numbers and Timeline (cases 29.335–29.349)
 
-**Blocked until KG E T1 (Home, `apps/server/src/routes/home.ts`) lands on `release/knowledge-graph`.** (Planner ruling P7, 2026-10-03: no origin ref carries it yet. Check `git ls-tree origin/release/knowledge-graph apps/server/src/routes/home.ts` first; if it prints nothing, STOP with `NEEDS: KG E T1`.)
+**Blocked until KG Home T2–T4 (`apps/web/src/home/`) reach this branch through the KG→WG sync** (planner ruling 2026-10-04). The server half (KG E T1, `routes/home.ts`) is already on `origin/release/workflow-graph`; the web half is on neither release yet. First run `git ls-tree <branch> apps/web/src/home`; if it prints nothing, STOP with `NEEDS: KG Home web`.
 
 **Branch** `task/wtg4-home-timeline`. **UI task: invoke `frontend-design` in the lane prompt.** **NEEDS:** browser. Depends on T6 and on the KG release's Home (KG Home T1–T4) being on the branch.
 
@@ -4111,6 +4354,8 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```
   `home-scope.test.ts`: defaults; a round trip; a storage whose `getItem`/`setItem` throw gives the default and `writeScope` does not throw; an unknown workspace id is dropped, an all-unknown scope falls back to `current` but keeps `start` and `view`; garbage enums give defaults; a project of an unselected workspace is dropped (29.335). `dueSoonDaysOf({a:7,b:7}) === 7`, `{a:7,b:0} === null`, `{a:0} === 0`, `{} === null` (29.337, 29.339). Run: FAIL then PASS. Commit.
 
+  **Kills** (`home-scope.test.ts`): (a) `readScope` without the `ids.has(w)` filter (mutation 1) → the unknown id survives; (b) the all-unknown branch returns `fallback` (drops `start`/`view`) → "keeps `start` and `view`"; (c) `projects` built from every known workspace, not the selected ones → the unselected workspace's project survives; (d) `writeScope` without its `try` → the throwing store; (e) `dueSoonDaysOf` = `v[0] ?? null` → `{a:7,b:0}` reads 7; (f) `v.length > 0 &&` dropped → `{}` reads `undefined`, not `null`.
+
 - [ ] **Step 2: The scope bar (29.335)**
 
   `home-scope-bar.tsx`:
@@ -4180,7 +4425,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     );
   }
   ```
-  The visible label `Start from` sits beside the group in the layout (`<span id>` + `aria-labelledby` is the alternative; the radiogroup's `aria-label` is the exact string either way). Archived projects are not offered but remain in the numbers (D-W4-7). `home-scope-bar.test.tsx` (jsdom): the exact option names; Me | Everyone default Me; the multi-selects open, check and close with Escape and that Escape's `defaultPrevented` is true (so the highlight listener skips it); unchecking the last workspace is ignored (control: unchecking one of two works); choosing every project emits `[]`; changing the workspaces resets the projects; with two workspaces the project labels are prefixed by the workspace name. Commit.
+  The visible label `Start from` sits beside the group in the layout (`<span id>` + `aria-labelledby` is the alternative; the radiogroup's `aria-label` is the exact string either way). Archived projects are not offered but remain in the numbers (D-W4-7). `home-scope-bar.test.tsx` (jsdom): the exact option names; Me | Everyone default Me; the multi-selects open, check and close with Escape and that Escape's `defaultPrevented` is true (so the highlight listener skips it); unchecking the last workspace is ignored (control: unchecking one of two works); choosing every project emits `[]`; changing the workspaces resets the projects; with two workspaces the project labels are prefixed by the workspace name (control: with one, they are not). Commit.
+
+  **Kills** (`home-scope-bar.test.tsx`): (a) the Escape handler without `preventDefault` → `defaultPrevented`; (b) drop the `minOne` guard → unchecking the last workspace emits `[]`; (c) the "every project" collapse removed → choosing all emits the full list, not `[]`; (d) the workspace `onChange` keeps `projectIds` → the reset leg; (e) `many` always true → the one-workspace control.
 
 - [ ] **Step 3: The summary hook and the numbers (29.336–29.339)**
 
@@ -4244,7 +4491,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```
   `HomeNumbers` and `useHomeHighlight` take `HomeNumbersData` where they took `HomeResponse` (a `HomeResponse` is assignable: `dueSoonDays` number); `HomeNumbers`'s failed-load fallback label stays `Due soon` (KG Home's rule for "never answered"). KG Home's own cases for these components keep passing with a `HomeResponse` argument (run them unedited first; they are the proof the widening broke nothing).
 
-  Tests (`home-summary.test.tsx`, `home-numbers` additions): the hook calls `getHomeSummary` once per scope key (a rerender with a re-spelled but equal scope does not refetch); a `ticket.transitioned` whose `workspaceSeq` is above the answer's `asOf` schedules ONE refetch and one at or below it none (the fake never sends `caught-up`); an event newer than the first answer's `asOf` that arrived before that answer causes one refetch after it; an `ignore` event (`comment.added`) none; a rejection keeps the last numbers and sets `failed` (29.336). The label cases of 29.337 and 29.339 render `HomeNumbers` with `dueSoonDays: 7`, `0`, `1`, `null`. The 29.338 case renders `HomeBody` with a fake source whose `getHomeSummary` records its argument: Me → `mine: true`, flipping to Everyone → `mine: false` and the numbers change; Members and Notes are the same in both answers because the fake serves them so (the server half is 29.306); the collaborator-only ticket appears in the Me timeline lanes (Step 4). Commit.
+  Tests (`home-summary.test.tsx`, `home-numbers` additions): the hook calls `getHomeSummary` once per scope key (a rerender with a re-spelled but equal scope does not refetch); a `ticket.transitioned` whose `workspaceSeq` is above the answer's `asOf` schedules ONE refetch and one at or below it none (the fake never sends `caught-up`); an event newer than the first answer's `asOf` that arrived before that answer causes one refetch after it; an `ignore` event (`comment.added`) none; a rejection keeps the last numbers and sets `failed` (29.336). The label cases of 29.337 and 29.339 render `HomeNumbers` with `dueSoonDays: 7`, `0`, `1`, `null`. The 29.338 case renders `HomeBody` with a fake source whose `getHomeSummary` records its argument: Me → `mine: true`, flipping to Everyone → `mine: false` and the numbers change; Members and Notes are the same in both answers because the fake serves them so (the server half is 29.306); the collaborator-only ticket appears in the Me timeline lanes (Step 4). Of these, the `mine: true` / `mine: false` argument legs are the client's; the Members/Notes equality and the collaborator ticket are served by the fake, so they guard rendering and cannot see the server clause (that half is T1's 29.296 and T3's 29.306). Commit.
+
+  **Kills** (`home-summary.test.tsx`, `home-numbers`): (a) the reload effect keyed on the scope OBJECT, not `scopeKey` → the re-spelled scope refetches; (b) `subscribeScope` given `() => null` for `getAsOf` (no gate) → the at-`asOf` event refetches; (c) drop the `missedSince` call → the early event costs nothing; (d) drop the `classifyEvent(…) === 'ignore'` return → `comment.added` refetches; (e) the reject branch `setSummary(null)` → the last numbers are lost; (f) `dueSoonLabel(null)` falls to `Due in null days` → the `null` label; (g) `toScopeArg` with `mine: s.start !== 'me'` → the Me argument leg.
 
 - [ ] **Step 4: Home's Timeline (29.340–29.346)**
 
@@ -4391,9 +4640,11 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```
   The skeleton uses KG Home's `Skeleton` and `SkeletonRegion` (`packages/ui`); a lane's skeleton height equals the loaded panel's (`.gn-tlg` is `height: 100%` in both), so there is no layout shift (29.346 measures it). `analyzeFlow`'s `backEdges` holds `edgeKey`s (`sourceId>targetId`, Part 2 plan :4027), and `edgesOf` builds each key with `edgeKey` itself, so the key form cannot drift.
 
-  `TimelineGraph` (app-core, T5's file) gains the props `dimKind?: 'lit' | 'flow'` (forwarded to the painter as `data-dim-kind` on the canvas), `glideTo?: { day: string; nonce: number } | null` (an effect on `glideTo?.nonce` scrolls so that day sits a quarter of the viewport in, smoothly) and `onVisibleDays?: (from: string, to: string) => void`; its `onNeedWindow` is now called from an effect on `view` with the preloaded range: the visible range widened by one viewport each side (Part 1's `planRange` through `bridge.planWindow` if it exposes one; otherwise this fixed widening, stated in the handoff). `windowDays(view, ppd, originDay, orientation)` is a pure function in `geometry.ts` with its own test (a view of x 2400..3840 at 24 px/day from origin 2026-09-28 gives days 2027-01-06..2027-03-07... compute the expected values in the test from `addDays`). CSS: `.gn-tlg-canvas[data-dim-kind='lit'] [data-dim='true'] { opacity: 0.25 } .gn-tlg-canvas[data-dim-kind='lit'] .gn-tlg-edges [data-dim='true'] { opacity: 0.12 } .gn-tlg-canvas[data-dim-kind='flow'] [data-dim='true'] { opacity: 0.32 }` and drop T5's generic `[data-dim='true']` opacity rule.
+  `TimelineGraph` (app-core, T5's file) gains the props `dimKind?: 'lit' | 'flow'` (forwarded to the painter as `data-dim-kind` on the canvas), `glideTo?: { day: string; nonce: number } | null` (an effect on `glideTo?.nonce` scrolls so that day sits a quarter of the viewport in, smoothly) and `onVisibleDays?: (from: string, to: string) => void`; its `onNeedWindow` is now called from an effect on `view` with the preloaded range: the visible range widened by one viewport each side (Part 1's `planRange` through `bridge.planWindow` if it exposes one; otherwise this fixed widening, stated in the handoff). `windowDays(view, ppd, originDay, orientation)` is a pure function in `geometry.ts` with its own test (a view of x 2400..3840 at 24 px/day from origin 2026-09-28 gives days 2027-01-06..2027-03-06 (`to` is the last VISIBLE day, inclusive like the chunk window of spec :199; `x1` = 3840 is the exclusive edge where day 160 begins, (planner ruling 2026-10-04))... compute the expected values in the test from `addDays`; and write them as LITERALS too, `'2027-01-06'` (day 100) and `'2027-03-06'` (day 159), so an off-by-one in both the code and an `addDays`-derived expectation cannot pass together). CSS: `.gn-tlg-canvas[data-dim-kind='lit'] [data-dim='true'] { opacity: 0.25 } .gn-tlg-canvas[data-dim-kind='lit'] .gn-tlg-edges [data-dim='true'] { opacity: 0.12 } .gn-tlg-canvas[data-dim-kind='flow'] [data-dim='true'] { opacity: 0.32 }` and drop T5's generic `[data-dim='true']` opacity rule.
 
-  Tests (`home-timeline.test.tsx`, jsdom, a fake source serving an index with two projects, one flow A→B→C and one collaborator-only ticket): 29.340 dim kinds and values by reading the rendered attributes and the stylesheet rule text; pressing glides (the fake `bridge.scrollTo` records the target day = earliest lit start) and a second press of the same number clears; all lit ids undated → no scroll call and the note `None are drawn on the timeline.`; Members → note, no dimming; 29.342 note arithmetic with ids missing from the index; 29.343 lane headings and prefixes (with two workspaces) and `unused projects get no lane`; 29.344 edges only after a click on a flow member, none for a singleton, none across workspaces; 29.346 skeleton, empty text with the tray count, error banner with `Retry` calling `reload` and the graph still mounted, the cut note exactly `Older work isn't drawn: 4 items before 3 Mar`, the pill appears when the visible range has no bars and `Jump to the next bar` moves the glide target to the earliest later start; no element named Earlier/Later/Previous/Next. Commit.
+  Tests (`home-timeline.test.tsx`, jsdom, a fake source serving an index with two projects, one flow A→B→C, a second flow D→E, and one collaborator-only ticket; the pressed number lights at least two DRAWN tickets with different starts, so "the earliest" is a choice): 29.340 dim kinds and values by reading the rendered attributes and the stylesheet rule text (control: nothing pressed, no element has `data-dim="true"`); pressing glides (the fake `bridge.scrollTo` records the target day = earliest lit start) and a second press of the same number clears; all lit ids undated → no scroll call and the note `None are drawn on the timeline.`; Members → note, no dimming; 29.342 note arithmetic with ids missing from the index; 29.343 lane headings and prefixes (with two workspaces) and `unused projects get no lane`; 29.344 edges only after a click on a flow member (selecting A draws exactly A→B→C's 2 edges, not 3: the D→E flow is the one "draw all flows' arrows" would add; selecting D swaps to 1), none for a singleton, none across workspaces; 29.346 skeleton, empty text with the tray count, error banner with `Retry` calling `reload` and the graph still mounted, the cut note exactly `Older work isn't drawn: 4 items before 3 Mar`, the pill appears when the visible range has no bars and `Jump to the next bar` moves the glide target to the earliest later start; no element named Earlier/Later/Previous/Next (control in the same `it()`: the same scan finds `Jump to the next bar`). Commit.
+
+  **Kills** (`home-timeline.test.tsx`): (a) the `lit` opacity rule at 0.32 (mutation 4) → the 0.25 rule text; (b) `.sort()` then `[length - 1]` for the glide day (mutation 5) → the target is the later lit start; (c) `lit: drawnLit.length` replaced by the lit ids' count (mutation 6) → `not drawn` reads 0 with ids missing from the index; (d) `edgeScope: 'all'` (mutation 7) → 3 edges, and edges with nothing selected; (e) the error banner without `Retry` (mutation 8) → the `reload` call; (f) `glide` set on every render (not on the press) → a reload re-glides: the second-press clear leg; (g) `windowDays` (below) off by one day → its own test.
 
 - [ ] **Step 5: HomeBody, the Knowledge view under the scope, Escape order (29.340, 29.349)**
 
@@ -4444,7 +4695,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   - `- ❌ **29.347 — a workspace that stops being readable while Home is open (Review Focus 3):** the next refresh drops it from the numbers, the lanes and the lit set with no error banner and nothing half-drawn; when nothing readable is left the screen shows the empty state; the stored scope keeps working next load because `readScope` drops the id.`
   - `- ❌ **29.348 — a live event in the SECOND workspace (Review Focus 1):** with workspaces A and B picked, finishing a ticket in B (a `ticket.transitioned` whose `workspaceSeq` is above B's `asOf`; the fake sends no `caught-up`) refreshes the summary within 400 ms plus the read, the lit set of a pressed number changes, and a successor's bar in B moves after the index refetch; control: the same event in A does the same.`
 
-  `home-body-scope.test.tsx` (extend; first, the 29.335 roster case: render `HomeBody` with `useMyWorkspaces` mocked to `{ rows: null }` and a fake storage holding a two-workspace scope, assert the storage's `setItem` was never called and the first `getHomeSummary` used the default scope; then rerender with the roster, assert the bar shows both workspaces and the next request carries both; control: choosing `Everyone` calls `setItem` once): a fake source with two workspaces; frames pushed per workspace; assertions through the rendered note text, the bar x positions read from `data-draw-id` boxes (`style.left`) and the call counts of `getHomeSummary` / `getTimelineIndex`. For 29.347 the second answers omit B (`workspaceIds: [A]`, no B lanes, no `role=alert`), the third answers `null` (the empty state `Nothing scheduled in these projects`). Commit.
+  `home-body-scope.test.tsx` (extend; first, the 29.335 roster case: render `HomeBody` with `useMyWorkspaces` mocked to `{ rows: null }` and a fake storage holding a two-workspace scope, assert the storage's `setItem` was never called and the first `getHomeSummary` used the default scope; then rerender with the roster, assert the bar shows both workspaces and the next request carries both; control: choosing `Everyone` calls `setItem` once): a fake source with two workspaces; frames pushed per workspace; assertions through the rendered note text, the bar x positions read from `data-draw-id` boxes (`style.left`) and the call counts of `getHomeSummary` / `getTimelineIndex`. For 29.347 the second answers omit B (`workspaceIds: [A]`, no B lanes, no `role=alert`), the third answers `null` (the empty state `Nothing scheduled in these projects`). For 29.336 at screen level: with the Timeline view mounted, a window load (a `getTimelineChunk` call through `onNeedWindow`) and a zoom change leave `getHomeSummary`'s call count unchanged (control: switching Start from adds exactly one). Commit.
+
+  **Kills** (`home-body-scope.test.tsx`): (a) the scope read ONCE at mount, `useState(() => readScope(workspaceId, workspaces ?? []))` → repaired against an empty roster it is the default, and the request after the roster arrives does not carry both workspaces; (b) a `useEffect` that writes the scope on mount → `setItem` called before any change; (c) `useHomeSummary` refetching on `onNeedWindow` (mutation 2) → the 29.336 count; (d) `subscribeScope(source, [scope.workspaceIds[0]], …)` in `useHomeSummary` (mutation 9) → the B event never refreshes the summary; (e) Escape clears the highlight before the panel closes → the first Escape clears it; (f) a `null` summary rendered as an error → `role=alert` in 29.347.
 
 - [ ] **Step 7: Real geometry, the pan, and the first-load check on the primary dev stack (29.343, 29.345, 29.349)**
 
@@ -4452,6 +4705,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   - `- ❌ **29.349 — nothing else moved:** the Knowledge view's centre under the new scope is the person node for Me and the first selected workspace's node for Everyone (D-W4-14); the 27.6xx cases listed in the handoff table are amended or 🚫 in this commit; `docs/manual.md`'s Home section describes the one scope, the two views and the lit-number glide; prose that says Home is one workspace is rewritten (the sweep list is in the handoff); on routes that open no graph (`/my-work`, `/inbox`, the project routes) `next build`'s First Load JS is within 1 kB of the base tip. Quoted LOCAL.`
 
   `apps/web/e2e-stack/home-timeline.spec.ts` (copy the structure of a sibling in `e2e-stack/`; seed through the API in `beforeAll`: 2 workspaces, 3 projects each, 240 tickets with chained flows, a Decision with a loop, 6 undated; with `HOME_TIMELINE_PERF=1` seed 10,000 intervals over 12 lanes in batches of 100 events):
+  - (every `scrollY` leg below is read after a 300 ms wait, since `mouse.wheel` does not wait for the scroll, with the control that the same pan changed `data-mounted`'s window, so the wheel reached the canvas)
   - at `1440 x 900`: open `/`, choose Timeline; assert lane heading 34 px, the distance between two vertically adjacent bars of one lane is 40 px (±1), a one-day bar is 24 px wide at the default zoom, bars are 28 px; the panel's bottom edge is within 1 px of the viewport's bottom minus the page padding (it fills the height under the numbers) and the page's `scrollHeight` does not change when the graph loads; pan 10 viewports (a loop of `page.mouse.wheel` deltas on the canvas) while reading `data-mounted`: max <= 1,200 and never 0 when the scene has bars in view; `scrollY` unchanged;
   - press `Past due`: the canvas glides (the scroll position changes to the earliest lit start ± 1 day) and dimmed bars have computed `opacity` 0.25;
   - select a bar of a flow: `svg.gn-tlg-edges` appears with the flow's edge count; select a singleton: none;
@@ -4460,11 +4714,17 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
 
   First-load JS: `pnpm turbo run build --filter=@gisik-nokma/web... > /tmp/wtg4-t7-build.log 2>&1; tail -60 /tmp/wtg4-t7-build.log` on the base tip (`git worktree` NOT needed: run it before the first T7 commit and save the route table to the handoff) and again on the branch; compare the rows for routes that open no graph. Commit.
 
+**Prose to sweep:**
+- Step 8.1's own grep (`This workspace|single-workspace|one workspace's|the workspace's numbers`) on the REF finds no Home sentence: its hits are `Features.md:488`, `:2420`, `:2750` and two web test regexes about ticket types (`project-create-gate.test.tsx:469`, `project-page-chrome.test.tsx:130`), none of them about Home. The Home web files (`apps/web/src/home/`), §24's Home web bullets, `docs/manual.md`'s Home section and the 27.6[3-5]x cases do not exist on `origin/release/workflow-graph` (KG Home T2–T4 not on it); the sweep must run on the branch once they are.
+- `Features.md:3796` (KG-E T1 Home endpoint, one workspace) stays true: `GET /v1/workspaces/:id/home` is unchanged (29.307); no edit.
+- `test-cases/27-knowledge-graph.md:134-150` (27.600–27.616, the server read) stay true; the Step 0 amendment table concerns the web cases only.
+- The task header's "Blocked until KG E T1 … lands on `release/knowledge-graph`" is stale: `git ls-tree origin/release/knowledge-graph apps/server/src/routes/home.ts` prints the file now, and it is on this ref too. What T7 still waits for is KG Home T2–T4 (web).
+
 - [ ] **Step 8: The prose sweep, the 27.6xx amendments, manual, mutations, Features, DONE**
 
   1. Sweep: `grep -rn "This workspace\|single-workspace\|one workspace's\|the workspace's numbers" apps/web/src/home apps/web/test docs/manual.md Features.md test-cases/27-knowledge-graph.md docs/superpowers/specs/2026-10-03-home-design.md` and rewrite each hit that is now false; the specs are not edited (they are the record), the code docblocks, `Features.md` §24, `docs/manual.md` and the cases are.
   2. Apply the Step 0 table to `test-cases/27-knowledge-graph.md` and the tests carrying those ids.
-  3. Mutations: (1) keep a stale workspace id → 29.335; (2) refetch the summary on window loads → 29.336; (3) Me as assignee only (change the server clause locally) → 29.338, the T1 case also reds; (4) dim at 32% for lit → 29.340; (5) glide to the last lit start → 29.341; (6) count only lit ids in `ids` → 29.342; (7) draw all flows' edges → 29.344; (8) drop Retry → 29.346; (9) subscribe only the first workspace in `useHomeSummary` → 29.348.
+  3. Mutations: (1) keep a stale workspace id → 29.335; (2) refetch the summary on window loads → 29.336; (3) Me as assignee only (change the server clause locally) → the T1 case (29.296's Me leg) reds; 29.338's web test serves a fake and cannot see a server clause, so it stays green (it pins `mine: true` reaching both reads); (4) dim at 32% for lit → 29.340; (5) glide to the last lit start → 29.341; (6) count only lit ids in `ids` → 29.342; (7) draw all flows' edges → 29.344; (8) drop Retry → 29.346; (9) subscribe only the first workspace in `useHomeSummary` → 29.348.
   4. Run WHOLE: `apps/web`, `packages/app-core`, `packages/ui`, the KG Home cases (`home-*.test.tsx`), then the e2e-stack spec on the primary stack (the owner or `ctl rebuild` has the stack current; report the commit it served).
   5. Features: add under `<!-- WTG4 bullet T7 -->`: *"Home's one scope and Timeline (✅): Workspaces, Projects, Start from Me | Everyone and Home views Knowledge | Timeline drive both the six numbers and the graph; the Timeline lays every project's work in lanes, a pressed number lights its tickets and glides to the first, and a clicked bar shows its flow's arrows. `apps/web/src/home/`, `apps/server/src/timeline/read-summary.ts`."* Edit the §24 Home bullets from single-workspace to scope.
 

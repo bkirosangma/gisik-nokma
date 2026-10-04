@@ -81,7 +81,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
 7. **A cleared pass is a revision** (PS-2 rule 2): `resolve_decision` reports `pass` and `revised` exactly as the Decide door's write answers them (`{filed, pass, revised: {from, to} | null}`, Part 3 T11, planner ruling P2); the tool neither re-reads the Decision nor computes them from its request.
 8. **`get_ticket` and `get_flow` null any id that is not in the visible set** (a Not-taken resolution's Decision, `autoMoves.becauseTicketId`, `alternates`), as defence in depth over the server's redaction.
 9. **`get_timeline`'s `pin` follows TG-11 and §14** (counts `{notes, attachments}` on the index entry), the same as spec :174 since the reconcile (it used to say "true when…"); probe S7 stops if Part 4 shipped a boolean.
-10. **`resolve_decision` consumes Part 3 T11's Decide door for every choice** (the spec names `ingestAtomic` but no client-callable route; planner ruling P1). `close` follows spec §14: by default (`close: true`) the body omits `finishStateId`, so the door finishes an unfinished Decision given an outcome into the workflow's first-declared terminal state when one is reachable (D-W3-44); `close: false` sends `finishStateId: null`, which records the outcome only (no finish, no cascade). The tool never writes through the event door. It sends the same body twice, with `dryRun: true` and then without it, names the plan's moves through `readFlow`, refuses a plan that says `blocked` before writing with the engine's own `blocked.sentence` (planner ruling P3; the dry run does not run the gates, D-W3-41), and validates nothing else the server owns (`closeStarted` membership, unknown or same outcome): those refusals pass through verbatim (`postDecide`). What happened to the Decision itself (`finish`) is read from the write's `filed` list.
+10. **`resolve_decision` consumes Part 3 T11's Decide door for every choice** (the spec names `ingestAtomic` but no client-callable route; planner ruling P1). `close` follows spec §14: by default (`close: true`) the tool reads the Decision's workflow (`GET /v1/workspaces/:ws/workflows/:workflowId`, the read `list_workflows` uses) and finishes an unfinished Decision given an outcome only when EXACTLY ONE terminal state is reachable from its current state by one declared edge, sending that id as `finishStateId` (D-W3-53); with none or several it sends `finishStateId: null` and answers the candidate states (spec §14 :795 and :886; this replaces, for the tool, the door's first-declared default of D-W3-44) (planner ruling 2026-10-04); `close: false` sends `finishStateId: null`, which records the outcome only (no finish, no cascade). The tool never writes through the event door. It sends the same body twice, with `dryRun: true` and then without it, names the plan's moves through `readFlow`, refuses a plan that says `blocked` before writing with the engine's own `blocked.sentence` (planner ruling P3; the dry run does not run the gates, D-W3-41), and validates nothing else the server owns (`closeStarted` membership, unknown or same outcome): those refusals pass through verbatim (`postDecide`). What happened to the Decision itself (`finish`) is read from the write's `filed` list.
 11. **`publish_flow` publishes the drafts of the flow only.** A draft whose parent is a draft outside the flow is not pulled in silently; the server's `draft.parent-unpublished` refusal names the draft and nothing is published (Drafts R51).
 
 - Gate task count and every pinned member/registry count are MEASURED on the tip at execution and pinned in the same task that changes them; never copy a number from this plan.
@@ -298,6 +298,10 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
     });
   });
   ```
+  **Kills:**
+  - SEAM S8: none of this task's code, guards Graph Part 2's domain exports (`DECISION_TYPE_ID`, `estimateValueSchema` 1–365, `BUILTIN_FIELD_IDS`, `TICKET_LINK_KINDS`).
+  - SEAM S1/S3: none of this task's code, guards typed-links T4's links route and Part 2's stored `label` (both directions).
+  - SEAM S2/S3: none of this task's code, guards Drafts T4 G7 (`ticketState.draft`, `key: null`) and R42/R43 (the `from` form commits, the plain form is refused `draft.link-form`).
   Run (LOCAL): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg5-t1-probe -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp/flow-seams.test.ts --maxWorkers=2 > /tmp/wtg5-t1-probe.log 2>&1; tail -40 /tmp/wtg5-t1-probe.log`.
   Expected: PASS. A red probe is a STOP: the message names the owner (`S8`, `S1/S3`, `S2/S3`). If the failure is only a NAME (the thing exists, spelled differently), fix the probe and `flow-seams.ts` here and say so in the handoff.
 
@@ -435,8 +439,9 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
   });
 
   describe('29.376 link_tickets: remove and relabel file on the stored source', () => {
-    const LOOP_A = { links: [row('leads_to', 'out', B, 'Yes'), row('leads_to', 'in', B)] }; // A -> B and B -> A
-    const LOOP_B = { links: [row('leads_to', 'out', A), row('leads_to', 'in', A, 'Yes')] };
+    // A -> B and B -> A. The INCOMING row is listed first in both, so a pickLink that takes the first match picks the wrong edge
+    const LOOP_A = { links: [row('leads_to', 'in', B), row('leads_to', 'out', B, 'Yes')] };
+    const LOOP_B = { links: [row('leads_to', 'in', A, 'Yes'), row('leads_to', 'out', A)] };
     const remove = { workspaceId: WS, kind: 'leads_to', action: 'remove' } as const;
 
     it('29.376 a two-ticket loop: remove (A, B) files on A, (B, A) on B; an incoming-only link is removed from the other stream', async () => {
@@ -468,6 +473,12 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       expect(f.batches, 'pre-checks sent nothing').toHaveLength(1);
       await expect(tool(f.session).handler({ ...relabel, kind: 'blocks', ticketId: D, targetId: A, label: 'x' })).rejects.toThrow('label only applies');
       await expect(tool(f.session).handler({ ...relabel, ticketId: D, targetId: A })).rejects.toThrow('relabel needs kind "leads_to" and the new label');
+      // from the TARGET end: the stored source (D) files, and the other branches are D's own, read from D's links (A's list has none)
+      const fromEnd = fakeFlow({ ...ENDS, [`${tw}/${A}/links`]: { links: [row('leads_to', 'in', D, 'Yes')] }, [`${tw}/${D}/links`]: DEC_LINKS });
+      await expect(tool(fromEnd.session).handler({ ...relabel, ticketId: A, targetId: D, label: 'no' })).rejects.toThrow('already labelled "no"');
+      await tool(fromEnd.session).handler({ ...relabel, ticketId: A, targetId: D, label: 'Approved' });
+      expect(fromEnd.batches).toHaveLength(1);
+      expect(fromEnd.batches[0]!.map((e) => [(e['entity'] as { id: string }).id, (e['payload'] as Record<string, unknown>)['targetId']])).toEqual([[D, A], [D, A]]);
     });
 
     it('29.376 a refused add after a committed remove puts the old link back; if that is refused too, the error names the label to re-add', async () => {
@@ -485,6 +496,13 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
     });
   });
   ```
+  **Kills:**
+  - 29.375 trimmed label, Decision refusal, label on blocks: (a) `label = z.string().min(1).max(60).optional()` (no `.trim()`) → the `label: 'Yes'` leg; (b) delete the `a.label !== undefined && a.kind !== 'leads_to'` guard → the blocks-with-label leg (it is sent); (c) `payload['label'] = spec.label ?? null` on every `link_added` → the `toEqual({ kind: 'blocks', targetId: B })` leg.
+  - 29.375 draft ends: (a) drop `payload['from'] = spec.source.id` → the published → draft leg; (b) `onDraft = spec.target.draft || spec.source.draft` → the draft → published leg (`entity` A, `from` set); (c) `id: spec.source.id` always in `linkEvent`'s envelope → the published → draft leg (`entity` A).
+  - 29.375 get_ticket.links label: none of this task's code, guards typed-links T4's links mapping and Graph Part 2 T2's `label` spread (29.126); non-vacuous: `find(...)!` throws if the row is missing, and the `blocks` row arrives with `label: null`, so an unconditional spread fails the control.
+  - 29.376 loop remove: (a) `pickLink` returns `same[0]` (first match) → both loop legs (the incoming row is first); (b) `[sourceId, targetId] = [a.ticketId, a.targetId]` whatever the direction → the incoming-only leg (`entity` A); (c) drop the `found === undefined` throw → the no-link leg.
+  - 29.376 relabel: (a) `relabelStored` puts the label on `link_removed` too → `[['ticket.link_removed', null], …]`; (b) compare `l === newLabel` instead of `fold(l) === fold(newLabel)` → the `'no'` legs (both ends) send a batch; (c) `const sourceLinks = links` always → the target-end `'no'` leg (A's list has no outgoing branch).
+  - 29.376 compensation: (a) skip the compensating add (throw `describeResult(added, 1)` at once) → `putBack.batches` length 1; (b) put back `{ ...stored, label: undefined }` → the `label: 'Yes'` leg; (c) `restored = true` always → the `stuck` leg.
   `packages/mcp-server/test/flow-tools.test.ts` (29.377 and 29.378):
   ```ts
   import { describe, expect, it } from 'vitest';
@@ -511,7 +529,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
         { type: 'ticket.field_set', origin: 'mcp', actorId: ME, entity: { id: T }, payload: { fieldId: 'waitForAll', value: true } },
         { type: 'ticket.field_set', payload: { fieldId: 'waitForAll', value: null } },
       ]);
-      await expect(wait.handler({ workspaceId: WS, ticketId: T, value: 'yes' })).rejects.toThrow();
+      await expect(wait.handler({ workspaceId: WS, ticketId: T, value: 'yes' })).rejects.toThrow(/boolean/); // the schema's refusal, not any throw
       expect(f.batches).toHaveLength(2);
       const update = find(ticketTools(f.session), 'update_ticket');
       await expect(update.handler({ workspaceId: WS, ticketId: T, fields: { waitForAll: true } })).rejects.toThrow('"waitForAll" is a built-in field: use the set_wait_for_all tool');
@@ -543,9 +561,10 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       const update = find(ticketTools(f.session), 'update_ticket');
       const create = find(writeTools(f.session), 'create_ticket');
       for (const bad of [0, 366, 2.5]) {
-        await expect(update.handler({ workspaceId: WS, ticketId: T, estimate: bad })).rejects.toThrow();
-        await expect(update.handler({ workspaceId: WS, ticketId: T, reworkEstimate: bad })).rejects.toThrow();
-        await expect(create.handler({ workspaceId: WS, projectId: P, typeId: 'task', title: 'x', estimate: bad })).rejects.toThrow();
+        // the ZodError names the member: a throw from anywhere else (a read, a submit) does not satisfy these legs
+        await expect(update.handler({ workspaceId: WS, ticketId: T, estimate: bad })).rejects.toThrow(/"estimate"/);
+        await expect(update.handler({ workspaceId: WS, ticketId: T, reworkEstimate: bad })).rejects.toThrow(/"reworkEstimate"/);
+        await expect(create.handler({ workspaceId: WS, projectId: P, typeId: 'task', title: 'x', estimate: bad })).rejects.toThrow(/"estimate"/);
       }
       expect(f.batches, 'refused by the schema, nothing sent').toEqual([]);
       for (const good of [1, 365]) await update.handler({ workspaceId: WS, ticketId: T, estimate: good }); // control
@@ -555,6 +574,10 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
     });
   });
   ```
+  **Kills:**
+  - 29.377 set_wait_for_all: (a) `value: a.value` (raw) → the off leg files `false`; (b) the loop's message `use the set_wait_for_all tool` for every key → the `"title"` leg; (c) `value: z.unknown()` in the tool's schema → the `'yes'` leg resolves.
+  - 29.378 create and update: (a) drop the `...(a.estimate === undefined ? {} : { estimate: a.estimate })` spread → `estimate` 3 leg; (b) `{ estimate: a.estimate ?? null }` unconditionally → the "absent when omitted" leg; (c) push only when `a.estimate != null` / `a.reworkEstimate != null` → the null update has no events and throws `update_ticket needs at least one change`.
+  - 29.378 bounds and built-ins: (a) `estimate: z.number().int().min(1).max(366)` in `updateShape` → the 366 `estimate` leg; (b) `reworkEstimate: z.number().nullable().optional()` → the 2.5 `reworkEstimate` leg; (c) `birthShape` `estimate: z.number().optional()` → the `create` legs.
   Run (LOCAL): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg5-t1-red -- pnpm --filter @gisik-nokma/mcp-server exec vitest run test/link-tools.test.ts test/flow-tools.test.ts --maxWorkers=2 > /tmp/wtg5-t1-red.log 2>&1; tail -40 /tmp/wtg5-t1-red.log`.
   Expected: FAIL (`flow-tools.js` and `link-events.js` do not exist; `estimate` is not in the schemas).
 
@@ -827,6 +850,8 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       expect(got.links.find((l) => l.ticket.id === no)?.label).toBe('No');
       // a loop: yes -> decision as well; removing (yes, decision) must not touch decision -> yes
       await link({ ticketId: yes, targetId: decision, action: 'add' });
+      const loop = (await ok(w, w.owner, 'get_ticket', { workspaceId: w.workspaceId, ticketId: decision })) as { links: Array<{ direction: string; ticket: { id: string } }> };
+      expect(loop.links.some((l) => l.direction === 'in' && l.ticket.id === yes)).toBe(true); // control for the `false` leg below: the loop's back edge was stored
       await link({ ticketId: yes, targetId: decision, action: 'remove' });
       const after = (await ok(w, w.owner, 'get_ticket', { workspaceId: w.workspaceId, ticketId: decision })) as { links: Array<{ direction: string; ticket: { id: string } }> };
       expect(after.links.some((l) => l.direction === 'out' && l.ticket.id === yes)).toBe(true);
@@ -857,9 +882,21 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
     });
   });
   ```
+  **Kills:**
+  - 29.375 29.376 hosted arrow/relabel/loop: (a) `pickLink` keeps only `direction === 'in'` matches first (`same.find((l) => l.direction === 'in') ?? same[0]`) → the `out … yes` leg after the remove; (b) `relabelStored` drops the `link_added` (sends only the remove) → the `'Approved'` label leg.
+  - 29.377 29.378 hosted History: (a) `value: a.value` (raw) → `['waitForAll', null, 'mcp']` missing; (b) `if (a.estimate != null)` → `['estimate', null, 'mcp']` missing; (c) drop the `reworkEstimate` push → `['reworkEstimate', null, 'mcp']` missing.
+  - 29.375 29.377 door rows: (a) `endOf` reads with `session.get` instead of `readTicket` → the `link_tickets` stranger text; (b) `set_wait_for_all` files on `{ kind: 'workspace' }` → the member row finds no `ticket.field_set` on the ticket.
   Run (LOCAL): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg5-t1-hosted -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp/mcp-flow.test.ts test/mcp/flow-seams.test.ts test/mcp/mcp-tickets.test.ts test/mcp/mcp-http.test.ts --maxWorkers=2 > /tmp/wtg5-t1-hosted.log 2>&1; tail -40 /tmp/wtg5-t1-hosted.log`.
   Expected: PASS (14.262 compares the hosted list to `allTools`, so it follows the new tool).
   If the stranger sentence for `link_tickets` differs (the hosted door may answer the permission refusal first), copy the observed sentence into the row and say so in the handoff; the rule is "uniform and not an oracle".
+
+**Prose to sweep:**
+- `packages/mcp-server/src/tools/ticket-tools.ts:85` — the built-in message "use the ${key} argument" (the plan's Step 4 rewrites it; listed so the docblock-free line is not missed in review).
+- `packages/mcp-server/src/tools/ticket-tools.ts:74-77` — `update_ticket`'s description lists the fields it changes; it gains the estimate sentence (Step 4 says so).
+- `test-cases/14-mcp-server.md:891` — 14.451 "a built-in field id inside `fields` → refused naming the argument to use" (false for `waitForAll`, which now names the `set_wait_for_all` tool).
+- `Features.md:3450` — "`create_ticket` takes a Markdown description, priority, assignee ("me"), starting status and dates; `update_ticket` changes title, description …, dates, custom fields …" (the lists omit `estimate` / `reworkEstimate` once T1 lands).
+- `packages/mcp-server/src/tools/register.ts:18-26` — the `allTools` docblock lists the modules "… then one module per MCP-everything lane (… trash)"; `flow` is last after T1 (Step 4 says "update the docblock's list by one clause").
+- Registry counts: `Features.md:3405` ("sixty-three tools since MCP-everything"), `Features.md:3407` ("…sixty-three since MCP-everything"), `Features.md:3454` ("Sixty-three tools in both doors."), `test-cases/14-mcp-server.md:938` (14.555 "the 63 tools"), `packages/mcp-server/test/register.test.ts:87` (title "the 63 tools of the plan"). Global Constraints names only 3454 and 938; 3405 and 3407 are two more present-tense counts.
 
 - [ ] **Step 6: Features, sweeps, mutations, DONE**
   - **Features:** replace `<!-- wtg-part5-mcp T1 bullet -->` with `- ✅ **MCP: leads_to links, wait-for-all and estimates** (Graph Part 5 T1; `packages/mcp-server/src/tools/link-events.ts`, `ticket-tools.ts`, `flow-tools.ts`, `write-tools.ts`) — …`. Name: `link_tickets` takes `leads_to` with a label, relabels in one batch with a put-back when the add is refused, removes the outgoing edge of a loop, and files links that touch a draft on the draft's stream; `set_wait_for_all`; `estimate` / `reworkEstimate` on create and update. Cases 29.375–29.378.
@@ -934,6 +971,9 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       expect(lone.json<{ nodes: Array<{ id: string }> }>().nodes.map((n) => n.id)).toEqual([alone]);
     });
   ```
+  **Kills:**
+  - SEAM S10: none of this task's code, guards Graph Part 2's folded `outcome` / `passes`.
+  - SEAM S4: none of this task's code, guards Graph Part 3's flow route members, its order and the flow of one.
   Run (LOCAL): `…/slot-run.sh wtg5-t2-probe -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp/flow-seams.test.ts --maxWorkers=2 > /tmp/wtg5-t2-probe.log 2>&1; tail -40 /tmp/wtg5-t2-probe.log`. Expected: PASS. A red probe is a STOP naming Part 2 or Part 3.
   Commit: `wtg-part5 T2: seam probes S4 S10`.
 
@@ -1014,7 +1054,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       delete broken.nodes[1]!['passes'];
       const bad = fakeFlow({ [FLOW]: broken });
       await expect(tool(bad, 'get_flow').handler({ workspaceId: WS, ticketId: T1 })).rejects.toThrow(/nodes\.1\.passes.*server/);
-      await expect(tool(fakeFlow({ [FLOW]: wire() }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })).resolves.toBeTruthy();
+      await expect(tool(fakeFlow({ [FLOW]: wire() }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })).resolves.toMatchObject({ flowId: 'f1', draftCount: 1 }); // the parsed flow, not just "something"
       await expect(tool(fakeFlow({}), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })).rejects.toThrow('ticket not found or not visible to you');
     });
   });
@@ -1025,6 +1065,8 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       w.nodes[2]!.resolution = { kind: 'not-taken', decisionTicketId: HIDDEN, outcome: 'Approved', pass: 2 };
       w.nodes[2]!.alternates = [{ viaDecisionId: HIDDEN, outcome: 'Needs rework', firstTicketId: HIDDEN }];
       w.nodes[2]!.parentId = HIDDEN;
+      w.start.push(HIDDEN);
+      w.end.push(HIDDEN);
       w.edges.push({ kind: 'leads_to', from: HIDDEN, to: T2, label: 'x', loop: false, taken: 0 });
       w.autoMoves.push({ ticketId: T2, at: '2026-10-03T10:00:00.000Z', kind: 'led-to', becauseTicketId: HIDDEN, pass: null }, { ticketId: HIDDEN, at: '2026-10-03T10:00:00.000Z', kind: 'led-to', becauseTicketId: T1, pass: null });
       const out = await tool(fakeFlow({ [FLOW]: w }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 });
@@ -1032,6 +1074,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       const flow = out as ReturnType<typeof wire>;
       expect(flow.nodes[2]).toMatchObject({ parentId: null, resolution: { decisionTicketId: null }, alternates: [{ viaDecisionId: null, firstTicketId: null }] });
       expect(flow.edges).toHaveLength(3); // the edge from HIDDEN is gone
+      expect([flow.start, flow.end]).toEqual([[T1], [DR]]); // a hidden end is dropped from start and end
       expect(flow.autoMoves.map((m) => [m.ticketId, m.becauseTicketId])).toEqual([[T2, D], [T2, null]]);
       // control: with the Decision among the visible nodes every id survives
       const kept = (await tool(fakeFlow({ [FLOW]: wire() }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })) as ReturnType<typeof wire>;
@@ -1046,7 +1089,8 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
     const routes = (id: string, extra: Record<string, unknown>, more: Record<string, unknown> = {}) => ({ [`${tw}/${id}`]: stateOf(extra), [`${tw}/${id}/links`]: { links: [] }, ...more });
 
     it('29.381 passes, round and periods are lifted and leave ticketState; a round-1 ticket has no round or periods', async () => {
-      const f = fakeFlow(routes(D, { outcome: 'Approved', passes: PASSES, rounds: 2, periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }] }));
+      // `resolution: null` is served so the "ticketState.resolution is gone" leg below has a member to remove
+      const f = fakeFlow(routes(D, { outcome: 'Approved', passes: PASSES, rounds: 2, periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], resolution: null }));
       const out = (await getTicket(f).handler({ workspaceId: WS, ticketId: D })) as Record<string, unknown> & { ticketState: Record<string, unknown> };
       expect(out['passes']).toEqual(PASSES);
       expect(out['round']).toBe(2);
@@ -1070,9 +1114,21 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       const out = await getTicket(hidden).handler({ workspaceId: WS, ticketId: T2 });
       expect((out as { resolution: { decision: unknown } }).resolution.decision).toBeNull();
       expect(JSON.stringify(out)).not.toContain(D);
+      // a SERVED resolution (the code accepts one besides the cause) is lifted the same way and leaves ticketState
+      const served = fakeFlow(routes(T2, { resolution: { kind: 'not-taken', decisionTicketId: D, outcome: 'Approved', pass: 1 } }));
+      const fromServed = (await getTicket(served).handler({ workspaceId: WS, ticketId: T2 })) as { resolution: Record<string, unknown>; ticketState: Record<string, unknown> };
+      expect(fromServed.resolution).toEqual({ kind: 'not-taken', outcome: 'Approved', pass: 1, decision: null });
+      expect(fromServed.ticketState).not.toHaveProperty('resolution');
+      expect(JSON.stringify(fromServed)).not.toContain(D);
     });
   });
   ```
+  **Kills:**
+  - 29.379 members: (a) drop `passes` from `flowNodeSchema` (zod strips it) → the passes leg; (b) drop `revisions` from `passRecord` → the same leg (`revisions.length` throws); (c) drop `loop` from the edge schema → `edges.find((e) => e.loop)` is undefined.
+  - 29.379 missing member: (a) `passes: z.array(passRecord).optional()` → the broken wire resolves; (b) `parseWire` throws `the ${what} answer is not the shape this tool reads` without the path → the `nodes\.1\.passes` regex; (c) `readFlow` uses `session.get` instead of `readOrNotFound` → the not-found leg.
+  - 29.380 visibility: (a) `parentId: n.parentId` (no `known`) → `parentId: null` leg and the JSON leg; (b) drop the `edges` filter → `toHaveLength(3)`; (c) drop the `start` / `end` filters → the `[[T1], [DR]]` leg; (d) `autoMoves` without the `seen.has(m.ticketId)` filter → the `[[T2, D], [T2, null]]` leg.
+  - 29.381 lifted facts: (a) `const { passes, rounds, periods, closed, ...rest } = state` (resolution stays) → the `ticketState.resolution` leg; (b) `if (round >= 1)` → the round-1 control; (c) `const { outcome, passes, … } = state` (outcome stripped) → the `outcome` leg.
+  - 29.381 Not-taken resolution: (a) `keptClosed = closed` → `ticketState.closed` `toEqual` and the hidden JSON leg; (b) `readableTicket` returns `{ id, key: null, title: '' }` on a 404 → `decision` `toBeNull`; (c) `const r = fromCause` (a served resolution ignored) → the `fromServed` legs.
   Run (LOCAL): `…/slot-run.sh wtg5-t2-red -- pnpm --filter @gisik-nokma/mcp-server exec vitest run test/flow-get-tools.test.ts --maxWorkers=2 > /tmp/wtg5-t2-red.log 2>&1; tail -40 /tmp/wtg5-t2-red.log`. Expected: FAIL (`get_flow`, `flowWireSchema`, `withFlowFacts` do not exist).
 
 - [ ] **Step 3: Implement**
@@ -1283,6 +1339,9 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       const w = await buildDoorWorld(db, '3765');
       const second = await ok(w, w.owner, 'create_project', { workspaceId: w.workspaceId, name: 'Hidden' });
       const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision', projectId: second['projectId'] as string });
+      const key = ((await ok(w, w.owner, 'get_ticket', { workspaceId: w.workspaceId, ticketId: decision })) as { key: string }).key;
+      await ok(w, w.owner, 'set_visibility', { workspaceId: w.workspaceId, ticketId: decision, mode: 'project', confirm_name: key }); // as in the 29.380 case above
+      expect((await callTool(w.app, w.member.token, 'get_ticket', { workspaceId: w.workspaceId, ticketId: decision })).isError).toBe(true); // control: the hide worked
       const yes = await mk(w, w.owner, 'Pitch');
       const no = await mk(w, w.owner, 'Rework');
       await rawEvents(w, w.owner, [
@@ -1301,9 +1360,20 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       expect(asMember.text).not.toContain(decision); // the WHOLE reply, not just the member this tool knows about
     });
   ```
+  **Kills:**
+  - 29.380 hosted get_flow: (a) `edges: []` in `toFlowAnswer` → the owner's `label 'Yes'` leg; (b) `nodes: wire.nodes.filter((n) => n.kind !== 'decision')` → the owner's `[decision, visible]` leg. The member legs guard Part 3's route redaction end to end (the server already drops the hidden Decision); the unit 29.380 test is the one that kills `known`.
+  - 29.381 hosted passes: (a) drop `facts['passes'] = passes` → the `[[1, 'Yes']]` leg; (b) return `{ state: { ...state }, facts }` → `ticketState` keeps `passes`.
+  - 29.381 hosted Not-taken: (a) `keptClosed = closed` → the member's `text` contains the Decision id; (b) `readableTicket` returns `{ id, … }` on a 404 → `decision` is not null for the member.
   (import `callTool`, `until` from `./helpers/flow-world.js`.)
 
   Run (LOCAL): `…/slot-run.sh wtg5-t2-hosted -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp --maxWorkers=2 > /tmp/wtg5-t2-hosted.log 2>&1; tail -40 /tmp/wtg5-t2-hosted.log`. Expected: PASS.
+
+**Prose to sweep:**
+- `Features.md:3405` — "do not normalise the server's shapes (`get_ticket` returns snake_case `ticket` beside camelCase `ticketState`, untouched)": false once `withFlowFacts` lifts `passes` / `rounds` / `periods` / `resolution` out of `ticketState` and strips `closed.cause`.
+- `test-cases/14-mcp-server.md:315-317` — 14.66 "`get_ticket` passes both casings through untouched … normalising it here would be this package inventing a shape": the casing claim stays, the "untouched" claim does not (say which members move).
+- `packages/mcp-server/test/read-tools.test.ts:132` — 14.66's comment "T9 adds ONE key (`description`, as Markdown); everything else is the server's, untouched" (the test stays green: its `ticketState` has none of the flow members; the comment does not).
+- `packages/mcp-server/src/tools/read-tools.ts:152-154` — `get_ticket`'s description "its folded state (assignee, collaborators, custom fields, transition history)": Step 3 appends the flow-facts sentence; check the first sentence still reads true.
+- Registry counts: `Features.md:3405`, `:3407`, `:3454`, `test-cases/14-mcp-server.md:938`, `packages/mcp-server/test/register.test.ts:87` (`get_flow` adds one; re-derive).
 
 - [ ] **Step 5: Features, sweeps, mutations, DONE**
   - **Features:** replace `<!-- wtg-part5-mcp T2 bullet -->` with `- ✅ **MCP: read a flow and its facts** (Graph Part 5 T2; `packages/mcp-server/src/tools/flow-answer.ts`, `flow-tools.ts`, `ticket-flow-facts.ts`, `read-tools.ts`) — `get_flow` answers the connected tickets in flow order with passes, periods, Not-taken resolutions, alternates, loop counts and automatic moves; ids of tickets the caller cannot see are null and their arrows are dropped; `get_ticket` lifts passes, round, periods and a Not-taken resolution to one place and never names a Decision the caller cannot read. Cases 29.379–29.381.`
@@ -1371,6 +1441,8 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       for (const k of ['id', 'key', 'title', 'reason']) expect(first, `S7 tray item.${k}`).toHaveProperty(k);
     });
   ```
+  **Kills:**
+  - SEAM S7: none of this task's code, guards Graph Part 4's three routes and the counts-shaped `pin` (TG-11). Non-vacuous: `toHaveProperty` on a missing `entry` / `detail` / `first` fails.
   Run (LOCAL): `…/slot-run.sh wtg5-t3-probe -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp/flow-seams.test.ts --maxWorkers=2 > /tmp/wtg5-t3-probe.log 2>&1; tail -40 /tmp/wtg5-t3-probe.log`. Expected: PASS. A red probe is a STOP naming Part 4. The `pin` line is the one known spec disagreement (PR-0 `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md:174` "true when…" vs TG-11 `:714` "the counts ride the index entry"); the plan follows TG-11 and the §14 tool shape `pin: {notes, attachments}`. If Part 4 shipped a boolean, STOP and ask the planner; do not guess counts.
   Commit: `wtg-part5 T3: seam probe S7`.
 
@@ -1466,8 +1538,8 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       expect(p3.items.map((i) => i['key'])).toEqual(['GN-5']);
       expect(p3.nextCursor).toBeNull();
       await expect(run(f(), { workspaceId: WS, cursor: '99' })).rejects.toThrow('cursor is not one this tool gave out');
-      await expect(run(f(), { workspaceId: WS, limit: 501 })).rejects.toThrow(); // the schema caps at 500
-      await expect(run(f(), { workspaceId: WS, limit: 500 })).resolves.toBeTruthy(); // control
+      await expect(run(f(), { workspaceId: WS, limit: 501 })).rejects.toThrow(/500/); // the schema caps at 500 (zod names the bound)
+      await expect(run(f(), { workspaceId: WS, limit: 500 })).resolves.toMatchObject({ nextCursor: null }); // control: all five on one page
     });
 
     it('29.382 refuses a bad scope or window before anything is sent; exactly 180 days is read', async () => {
@@ -1476,7 +1548,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       await expect(run(none, { workspaceId: WS, workspaceIds: [WS] })).rejects.toThrow('get_timeline takes workspaceId OR workspaceIds, not both.');
       await expect(run(none, { workspaceId: WS, from: '2026-10-09', to: '2026-10-05' })).rejects.toThrow('to must not be before from.');
       await expect(run(none, { workspaceId: WS, from: '2026-04-01', to: '2026-09-28' })).rejects.toThrow('the window is 181 days; get_timeline reads at most 180 days at a time');
-      await expect(run(none, { workspaceId: WS, from: '2026-02-30', to: '2026-03-05' })).rejects.toThrow(); // not a real day
+      await expect(run(none, { workspaceId: WS, from: '2026-02-30', to: '2026-03-05' })).rejects.toThrow(/a real day as YYYY-MM-DD/); // not a real day: the refine's own message
       expect(none.gets).toEqual([]); // nothing was sent
       const ok = fakeFlow({ [`${P}/index`]: index([]), [`${P}/chunk`]: { items: [], nextCursor: null } });
       const out = await run(ok, { workspaceId: WS, from: '2026-04-01', to: '2026-09-27' }); // 180 days inclusive
@@ -1525,10 +1597,19 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       const bad = index([entry(X, 'GN-1')]);
       delete (bad.items[0] as Record<string, unknown>)['pin'];
       await expect(run(fakeFlow({ [`${P}/index`]: bad }))).rejects.toThrow(/items\.0\.pin.*server/);
-      await expect(run(fakeFlow({ [`${P}/index`]: index([entry(X, 'GN-1')]), [`${P}/chunk`]: { items: [], nextCursor: null } }))).resolves.toBeTruthy(); // control
+      await expect(run(fakeFlow({ [`${P}/index`]: index([entry(X, 'GN-1')]), [`${P}/chunk`]: { items: [], nextCursor: null } }))).resolves.toMatchObject({ items: [{ id: X, pin: { notes: 0, attachments: 0 } }] }); // control: the same entry with its pin
     });
   });
   ```
+  **Kills:**
+  - 29.382 date helpers: (a) `mondayOnOrBefore` uses `getUTCDay() % 7` → the Wednesday and Sunday legs; (b) `chunkStarts` starts at `from` → the first `chunkStarts` leg; (c) `compareKeys` returns `a < b ? -1 : 1` (plain string order) → the sort leg (`GN-10` before `GN-9`).
+  - 29.382 window, chunks, pages, scope: (a) `addDays(index.today, -7)` for the default `from` → the `[today, from, to]` leg; (b) read only the first page (`while (false)`) → `toHaveLength(6)` and `B`'s title `'Beta'`; (c) `query.set('mine', '0')` always → `get('mine')` `'1'`.
+  - 29.382 overlap and order: (a) `s.end > from` → `H` drops; (b) `s.start < to` → `I` drops; (c) drop `compareKeys(a.key, b.key) ||` from the sort → `[…, A, B, C, …]` (ids order).
+  - 29.382 limit and cursor: (a) `nextCursor: String(offset)` → `p1.nextCursor` `'2'`; (b) drop the `offset > inWindow.length` refusal → the `'99'` leg resolves; (c) `limit: …max(501)` → the 501 leg.
+  - 29.382 bad scope or window: (a) `days >= MAX_WINDOW_DAYS` → the 180-day control is refused; (b) drop the handler's early `windowError` call → `none.gets` is not empty (the index is read first); (c) `dayArg = z.string()` (no `isIsoDay`) → the `'2026-02-30'` leg.
+  - 29.383 pin, ids, flows: (a) `decisionTicketId: e.resolution.decisionTicketId` (no `known`) → the JSON leg and `Y`'s `toEqual`; (b) drop the `edges` filter in `flows` → the `flows` `toEqual` (and the JSON leg); (c) `known` always `null` → `Z`'s control.
+  - 29.383 tray: (a) follow the tray `nextCursor` → `toHaveLength(1)`; (b) `trayCount: answer.tray?.length ?? 0` → both `trayCount` legs; (c) read the tray always → `without.gets.some(…)` is true.
+  - 29.383 not visible, wrong shape: (a) `readOrNotFound(…, 'ticket')` for the index → the `workspace not found` leg; (b) `pin: …optional()` in `timelineIndexSchema` → the `items\.0\.pin` leg resolves.
   Run (LOCAL): `…/slot-run.sh wtg5-t3-red -- pnpm --filter @gisik-nokma/mcp-server exec vitest run test/timeline-tools.test.ts --maxWorkers=2 > /tmp/wtg5-t3-red.log 2>&1; tail -40 /tmp/wtg5-t3-red.log`. Expected: FAIL (`timeline-window.ts` and `get_timeline` do not exist).
 
 - [ ] **Step 3: Implement**
@@ -1761,6 +1842,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
       expect(out.trayCount).toBeGreaterThanOrEqual(1);
       const wide = await callTool(w.app, w.owner.token, 'get_timeline', { workspaceId: w.workspaceId, from: '2026-01-01', to: '2026-12-31' }); // control: refused, same call narrowed above
       expect(wide.isError).toBe(true);
+      expect(wide.text).toContain('the window is 365 days'); // refused for the window, not for anything else
     });
 
     it('29.383 a stranger is answered uniformly; another author\'s draft is absent, the author sees theirs with key null', async () => {
@@ -1778,7 +1860,14 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
     });
   });
   ```
+  **Kills:**
+  - 29.382 hosted: (a) `segments: []` on every item → the overlap leg; (b) drop `includeTray` handling (never read the tray) → `out.tray.map` throws; (c) `MAX_WINDOW_DAYS = 400` → the `wide` legs (365 days is read).
+  - 29.383 hosted: (a) `key: e.key ?? 'draft'` → the author's `key: null` leg; (b) `readOrNotFound(…, 'ticket')` for the index → the stranger text. The "another author's draft is absent" leg guards Part 4's route (the tool never adds items), so no mutant of this task's code reaches it.
   Run (LOCAL): `…/slot-run.sh wtg5-t3-hosted -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp --maxWorkers=2 > /tmp/wtg5-t3-hosted.log 2>&1; tail -40 /tmp/wtg5-t3-hosted.log`. Expected: PASS. If the stranger sentence differs (the timeline route's uniform 404 may carry another body), copy the observed sentence and say so; the rule is "uniform and not an oracle".
+
+**Prose to sweep:**
+- Registry counts only: `Features.md:3405`, `:3407`, `:3454`, `test-cases/14-mcp-server.md:938`, `packages/mcp-server/test/register.test.ts:87` (`get_timeline` adds one; re-derive).
+- Otherwise none found (searched on the ref: `get_timeline`, `/v1/timeline`, `timeline` in `docs/manual.md` §16, `packages/mcp-server/README.md`, `test-cases/14-mcp-server.md`).
 
 - [ ] **Step 5: Features, sweeps, mutations, DONE**
   - **Features:** replace `<!-- wtg-part5-mcp T3 bullet -->` with `- ✅ **MCP: read the timeline** (Graph Part 5 T3; `packages/mcp-server/src/tools/timeline-window.ts`, `flow-tools.ts`) — `get_timeline` reads a window of up to 180 days over one or several workspaces (default 14 days back to 60 ahead), assembled from the timeline index, Monday-aligned 28-day chunks and an optional tray page; items are ordered by start and natural key and paged; pins are counts, Not-taken resolutions name only visible Decisions, and other people's drafts never appear. Cases 29.382–29.383.`
@@ -1823,14 +1912,14 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
   body  { outcome: string | null, from?: string | null, closeStarted?: string[], dryRun?: boolean, finishStateId?: string | null }   (closed: no origin)
         finishStateId omitted -> finish into the FIRST-declared terminal state when one is reachable (D-W3-44)
         finishStateId null    -> record the outcome only: 'ticket.decided', no finish, no cascade
-        finishStateId string  -> finish into that reachable terminal state, else 422 decision.bad-finish-state (this tool never sends one)
+        finishStateId string  -> finish into that reachable terminal state, else 422 decision.bad-finish-state (this tool sends the ONE reachable terminal id (planner ruling 2026-10-04))
   dryRun true   -> 200 { plan: { moves: [{ ticketId, kind: 'reopen' | 'backlog' | 'not-taken' }], hiddenMoves: boolean, started: string[], blocked: { ticketId: string | null, reason: string, sentence: string } | null } }
                    (writes nothing; names only tickets on the caller's own walk; does NOT run the cascade-blocked / bad-close-started gates: `blocked` is the plan's own word, `sentence` the engine's reason text)
   dryRun absent -> 200 { filed: string[], pass: number, revised: { from: string | null, to: string | null } | null }   ('ticket.decided', plus 'ticket.transitioned' when it finished; one batch, origin from authKind)
   refusal       -> 409 { rule: 'decision.stale-from', reason } | 422 { rule, reason } (decision.not-a-decision, decision.unknown-outcome, decision.same-outcome, decision.bad-finish-state,
                    decision.cascade-blocked, decision.bad-close-started) | 400 { rule: 'ingest.<code>', reason } | the shared 404 for anything the caller may not see
 ```
-`close` follows spec §14 (planner ruling P1): `close: true` (the default) omits `finishStateId`, `close: false` sends `null`. `postJson` (`submit.ts:93`) is not used: it rewords only a 400/422 body with `status` or `message` and rethrows a 409, so the door's `{rule, reason}` bodies get their own mapping, `postDecide`.
+`close` follows spec §14 (planner ruling P1): `close: true` (the default) sends the id of the one terminal state reachable from the Decision's current state by one declared edge, or `null` with the candidates when there are none or several (planner ruling 2026-10-04); `close: false` sends `null`; a clear or an already-finished Decision omits it, as before. `postJson` (`submit.ts:93`) is not used: it rewords only a 400/422 body with `status` or `message` and rethrows a 409, so the door's `{rule, reason}` bodies get their own mapping, `postDecide`.
 
 - [ ] **Step 1: The seam probes S5 and S9 (hosted, RED means STOP)**
 
@@ -1882,13 +1971,15 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       expect(rows.rows.every((r) => r.origin === 'mcp'), 'S9: authKind mcp-token files origin mcp').toBe(true);
     });
   ```
+  **Kills:**
+  - SEAM S5 + S9 probe: none of this task's code, guards Graph Part 3 T11's Decide door (the probe injects the route directly, not through `flow-seams.ts`). Non-vacuous: the "dry run writes nothing" count shares its `events` columns with the final S9 query, which must find the two rows; `every()` legs follow the `toEqual` that pins the row count at 2.
   Run (LOCAL): `…/slot-run.sh wtg5-t4-probe -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp/flow-seams.test.ts --maxWorkers=2 > /tmp/wtg5-t4-probe.log 2>&1; tail -40 /tmp/wtg5-t4-probe.log`. Expected: PASS. A red probe is a STOP naming Part 3 (S5/S9). A different NAME (`dry_run`, `ticket_id`) is fixed in `flow-seams.ts` and the probe, and said in the handoff.
   Commit: `wtg-part5 T4: seam probes S5 S9`.
 
 - [ ] **Step 2: Case lines and RED unit tests (29.384–29.386)**
 
   Case lines under `<!-- wtg-part5-mcp T4 -->`, all ❌:
-  - `- ❌ **29.384 — `resolve_decision` files every choice through Graph Part 3's Decide door: with `close` (the default) the body omits `finishStateId`, so the door finishes the Decision into the workflow's first-declared terminal state when one is reachable, and the answer says `finish: {closed: true}` when the door's `filed` lists the transition, otherwise `finish: {closed: false, why: 'no-terminal-state-reachable'}` so the assistant can call `transition_ticket`; `close: false` sends `finishStateId: null` on both requests and records the outcome only (`why: 'close-not-requested'`); a clear (`outcome: null`) and a Decision already in a terminal state are not finished (`outcome-cleared`, `already-finished`); nothing ever goes through the event door;** control: the same unfinished Decision with `close` omitted finishes through the door. Mutation: send `finishStateId: null` whatever `close` says → the default-close case reddens.`
+  - `- ❌ **29.384 — `resolve_decision` files every choice through Graph Part 3's Decide door: with `close` (the default) the tool reads the Decision's workflow and, when exactly one terminal state is reachable from its current state by one declared edge, sends that id as `finishStateId` on both requests, and the answer says `finish: {closed: true}` when the door's `filed` lists the transition; with none or several it sends `finishStateId: null` on both requests and answers `finish: {closed: false, why: 'no-terminal-state-reachable' | 'several-terminal-states', candidates: [{id, name}]}` so the assistant can call `transition_ticket` (planner ruling 2026-10-04); `close: false` sends `finishStateId: null` on both requests and records the outcome only (`why: 'close-not-requested'`); a clear (`outcome: null`) and a Decision already in a terminal state are not finished (`outcome-cleared`, `already-finished`); nothing ever goes through the event door;** control: the same unfinished Decision with `close` omitted finishes through the door. Mutation: send `finishStateId: null` whatever `close` says → the default-close case reddens.`
   - `- ❌ **29.385 — the tool reads the Decision's current outcome once and sends it as `from` on every request (null when there is none), so a first choice is a new pass, a different one a revision and a clear removes the outcome; `pass` and `revised` are the door's write answer passed through (`revised: {from, to}` or `null`), never re-read and never computed from the request; a stale `from` refused by the server (`decision.stale-from`, a 409) reaches the assistant verbatim and no write follows; a ticket that is not a Decision, an unknown outcome, the same outcome again and a bad `closeStarted` are the server's refusals verbatim;** control: the same call with the outcome the Decision really has is accepted. Mutation: send `from: null` always → the revision case reddens.`
   - `- ❌ **29.386 — the plan comes from the door's dry run, its moves named through the caller's own flow read: when it reopens, moves back to Backlog or closes any ticket (or says some moves are hidden), a call without `confirm_name` equal to the Decision's KEY (exact, case and spaces count) returns the house preview `{preview: true, wouldChange, counts: {reopened, backToBacklog, closedNotTaken}, nothingChanged: true, confirm}` plus `tickets`, `startedTickets`, `hiddenMoves` and writes NOTHING (only a `dryRun: true` request was sent); with the key it writes once, with `closeStarted` on both requests; a plan with no effects writes at once; a plan that says `blocked` is refused before any write as `refused by decision.cascade-blocked: <blocked.sentence>`, the engine's own sentence and nothing of the tool's, and the write's own refusals are the server's words;** control: the exact key on the same call writes, a lower-cased key is still a preview. Mutation: compare `confirm_name` case-insensitively → the wrong-case case reddens.`
 
@@ -1907,7 +1998,9 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
   const tw = `/v1/workspaces/${WS}/tickets`;
   const DECIDE = `${tw}/${D}/decide`;
   const FLOW = flowWire([
-    flowNode(D, { key: 'GN-145', kind: 'decision' }), flowNode(T1, { key: 'GN-143' }), flowNode(S1, { key: 'GN-146' }), flowNode(T2, { key: 'GN-147' }),
+    // distinct titles: flowNode's default `Ticket ${id.slice(-3)}` is 'Ticket 000' for every ulid() id, so a title taken from the wrong node would pass
+    flowNode(D, { key: 'GN-145', kind: 'decision', title: 'Client decides' }), flowNode(T1, { key: 'GN-143', title: 'Pitch' }),
+    flowNode(S1, { key: 'GN-146', title: 'Draft deck' }), flowNode(T2, { key: 'GN-147', title: 'Rework' }),
   ]);
   const moved = (id: string, key: string) => ({ id, key, title: `Title ${key}` });
   const EMPTY = { reopened: [], backToBacklog: [], closedNotTaken: [], startedTickets: [], hiddenMoves: false };
@@ -1918,12 +2011,19 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
   /** The door's write answer (Part 3 T11, ruling P2): what it filed, the pass and the revision. */
   const filed = (types: string[] = ['ticket.decided', 'ticket.transitioned'], pass = 1, revised: { from: string | null; to: string | null } | null = null) => ({ filed: types, pass, revised });
   const isDry = (b: unknown) => (b as { dryRun?: boolean }).dryRun === true;
+  /** The Decision's workflow (the `list_workflows` read): todo → doing → each terminal. Spec §14 :795 counts terminal states one declared edge from the current state (planner ruling 2026-10-04). */
+  const WF = `/v1/workspaces/${WS}/workflows/wf`;
+  const wf = (terminals: Array<[string, string]> = [['done', 'Done']]) => ({ workspaceId: WS, workflow: {
+    id: 'wf', version: 1, name: 'Decision flow', initialStateId: 'todo',
+    states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'doing', name: 'Doing', category: 'active' }, ...terminals.map(([id, name]) => ({ id, name, category: 'terminal' }))],
+    transitions: [{ from: 'todo', to: 'doing', rules: [] }, ...terminals.map(([id]) => ({ from: 'doing', to: id, rules: [] }))],
+  } });
   const decisionDetail = (over: { stateId?: string; stateCategory?: string; outcome?: string | null } = {}) =>
     detail({ key: 'GN-145', typeId: 'decision', stateId: over.stateId ?? 'doing', stateCategory: over.stateCategory ?? 'active', outcome: over.outcome ?? null });
   /** The detail read answers `detail`; the door answers `posts`. No event batch is ever expected (every choice goes through the door). */
-  const build = (opts: { detail?: unknown; posts?: (body: unknown) => unknown } = {}) =>
+  const build = (opts: { detail?: unknown; posts?: (body: unknown) => unknown; workflow?: unknown } = {}) =>
     fakeFlow(
-      { [`${tw}/${D}`]: opts.detail ?? decisionDetail(), [`${tw}/${D}/flow`]: FLOW },
+      { [`${tw}/${D}`]: opts.detail ?? decisionDetail(), [`${tw}/${D}/flow`]: FLOW, [WF]: opts.workflow ?? wf() },
       { posts: { [DECIDE]: opts.posts ?? ((body: unknown) => (isDry(body) ? plan() : filed())) } },
     );
   const run = (f: ReturnType<typeof fakeFlow>, args: Record<string, unknown>) =>
@@ -1933,11 +2033,11 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
   const refuse = (status: number, rule: string, reason: string) => () => { throw new HttpError(status, { rule, reason }); };
 
   describe('29.384 every choice goes through the Decide door; close picks finishStateId', () => {
-    it('29.384 close (the default) omits finishStateId and the door finishes; close: false sends finishStateId null on both requests and nothing finishes', async () => {
+    it('29.384 close (the default) sends the one reachable terminal state and the door finishes; close: false sends finishStateId null on both requests and nothing finishes', async () => {
       const one = build();
       const out = await run(one, {});
       expect(bodies(one).map((b) => b['dryRun'])).toEqual([true, undefined]); // the dry run, then the write
-      expect(bodies(one).every((b) => !('finishStateId' in b))).toBe(true); // omitted: the door's first-declared rule
+      expect(bodies(one).map((b) => b['finishStateId'])).toEqual(['done', 'done']); // the ONE terminal state reachable from doing, on both requests (planner ruling 2026-10-04)
       expect(one.batches).toEqual([]); // never the event door
       expect(out['finish']).toEqual({ closed: true });
       expect(out['filed']).toEqual(['ticket.decided', 'ticket.transitioned']);
@@ -1948,17 +2048,25 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       expect(keep.batches).toEqual([]);
     });
 
-    it('29.384 an outcome the door did not finish says so (the assistant can call transition_ticket)', async () => {
+    it('29.384 none or several reachable terminal states: the outcome is recorded only and the answer names the candidates (the assistant can call transition_ticket)', async () => {
+      // (planner ruling 2026-10-04): spec §14 :795 "if none or several, it records the outcome only and answers with the candidate states"; :886 "one, none and several"
       const none = build({ detail: decisionDetail({ stateId: 'todo', stateCategory: 'open' }), posts: (b) => (isDry(b) ? plan() : filed(['ticket.decided'])) });
       const n = await run(none, {});
-      expect(n).toMatchObject({ filed: ['ticket.decided'], cascade: 'none', finish: { closed: false, why: 'no-terminal-state-reachable' } });
-      expect(bodies(none).every((b) => !('finishStateId' in b))).toBe(true); // control: close was asked for; the door found nothing to finish into
+      expect(n).toMatchObject({ filed: ['ticket.decided'], cascade: 'none', finish: { closed: false, why: 'no-terminal-state-reachable', candidates: [] } });
+      expect(bodies(none).map((b) => b['finishStateId'])).toEqual([null, null]); // todo has no declared edge into done: record only, on both requests
+      const two = build({ workflow: wf([['done', 'Done'], ['dropped', 'Dropped']]), posts: (b) => (isDry(b) ? plan() : filed(['ticket.decided'])) });
+      expect(await run(two, {})).toMatchObject({ filed: ['ticket.decided'], finish: { closed: false, why: 'several-terminal-states', candidates: [{ id: 'done', name: 'Done' }, { id: 'dropped', name: 'Dropped' }] } });
+      expect(bodies(two).map((b) => b['finishStateId'])).toEqual([null, null]); // the tool never picks one of several
+      // control: one reachable terminal state (the default workflow) is sent, so the null above is the count's doing
+      const one = build();
+      await run(one, {});
+      expect(bodies(one).map((b) => b['finishStateId'])).toEqual(['done', 'done']);
     });
 
     it('29.384 a clear and an already finished Decision go through the door, which does not finish them', async () => {
       const clear = build({ detail: decisionDetail({ outcome: 'Yes' }), posts: (b) => (isDry(b) ? plan() : filed(['ticket.decided'], 1, { from: 'Yes', to: null })) });
       expect((await run(clear, { outcome: null }))['finish']).toEqual({ closed: false, why: 'outcome-cleared' });
-      expect(bodies(clear).every((b) => b['outcome'] === null && b['from'] === 'Yes')).toBe(true);
+      expect(bodies(clear).map((b) => [b['outcome'], b['from']])).toEqual([[null, 'Yes'], [null, 'Yes']]); // both requests sent, each a clear from the read outcome
       expect(clear.batches).toEqual([]);
       const finished = build({ detail: decisionDetail({ stateId: 'done', stateCategory: 'terminal', outcome: 'No' }), posts: (b) => (isDry(b) ? plan() : filed(['ticket.decided'], 1, { from: 'No', to: 'Yes' })) });
       expect((await run(finished, { outcome: 'Yes' }))['finish']).toEqual({ closed: false, why: 'already-finished' });
@@ -2001,10 +2109,15 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     });
 
     it('29.385 a stale from, an unknown outcome, the same outcome and a non-Decision are the server\'s words, and no write follows the refusal', async () => {
-      const stale = build({ detail: decisionDetail({ outcome: 'Yes' }), posts: refuse(409, 'decision.stale-from', 'The decision changed to Maybe since you looked.') });
+      // the door's own stale guard: it refuses any `from` that is not the outcome it holds (`current`), and accepts the right one
+      const guarded = (current: string | null) => (b: unknown) => {
+        if (((b as { from?: string | null }).from ?? null) !== current) refuse(409, 'decision.stale-from', `The decision changed to ${current} since you looked.`)();
+        return isDry(b) ? plan() : filed(['ticket.decided'], 1, { from: current, to: 'No' });
+      };
+      const stale = build({ detail: decisionDetail({ outcome: 'Yes' }), posts: guarded('Maybe') });
       await expect(run(stale, { outcome: null })).rejects.toThrow('refused by decision.stale-from: The decision changed to Maybe since you looked.');
       expect(bodies(stale)).toHaveLength(1); // only the dry run; the write never followed
-      const staleKeep = build({ detail: decisionDetail({ outcome: 'Yes' }), posts: refuse(409, 'decision.stale-from', 'The decision changed to No since you looked.') });
+      const staleKeep = build({ detail: decisionDetail({ outcome: 'Yes' }), posts: guarded('No') });
       await expect(run(staleKeep, { outcome: 'Maybe', close: false })).rejects.toThrow('refused by decision.stale-from: The decision changed to No since you looked.');
       const unknown = build({ posts: refuse(422, 'decision.unknown-outcome', 'Choose one of: Yes, No.') });
       await expect(run(unknown, { outcome: 'Perhaps' })).rejects.toThrow('refused by decision.unknown-outcome: Choose one of: Yes, No.');
@@ -2012,8 +2125,9 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       await expect(run(same, { outcome: 'Yes' })).rejects.toThrow('refused by decision.same-outcome: That is already the outcome.');
       const notDecision = build({ detail: detail({ key: 'GN-2', typeId: 'task', stateId: 'doing', stateCategory: 'active' }), posts: refuse(422, 'decision.not-a-decision', 'Only a decision can be given an outcome.') });
       await expect(run(notDecision, {})).rejects.toThrow('refused by decision.not-a-decision: Only a decision can be given an outcome.');
-      const control = build({ detail: decisionDetail({ stateId: 'done', stateCategory: 'terminal', outcome: 'Yes' }), posts: (b) => (isDry(b) ? plan() : filed(['ticket.decided'], 1, { from: 'Yes', to: 'No' })) });
-      await expect(run(control, { outcome: 'No' })).resolves.toMatchObject({ filed: ['ticket.decided'] }); // control: the right from is accepted
+      const control = build({ detail: decisionDetail({ stateId: 'done', stateCategory: 'terminal', outcome: 'Yes' }), posts: guarded('Yes') });
+      await expect(run(control, { outcome: 'No' })).resolves.toMatchObject({ filed: ['ticket.decided'] }); // control: the right from (the outcome read) passes the same guard
+      expect(bodies(control)).toHaveLength(2);
     });
 
     it('29.385 a 404 on the Decision or on its door is the one-sentence not-found', async () => {
@@ -2046,8 +2160,13 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       });
       expect(out['wouldChange']).toContain('reopens GN-143');
       expect(out['wouldChange']).toContain('closes GN-147 as Not taken');
+      // the whole sentence: the lead follows from === null ("Choosing", not "Changing"), and one started step is singular
+      expect(out['wouldChange']).toBe('Choosing "Yes" reopens GN-143 and closes GN-147 as Not taken. 1 started step on the branch being left keeps going unless you name it in closeStarted.');
       expect(bodies(f).map((b) => b['dryRun'])).toEqual([true]); // the recorded requests: the preview sent no write
       expect(f.batches).toEqual([]);
+      const exact = withEffects();
+      await run(exact, { confirm_name: 'GN-145' });
+      expect(bodies(exact).map((b) => b['dryRun'])).toEqual([true, undefined]); // control: the same matcher sees the write when the exact key is given
       const lower = withEffects();
       expect((await run(lower, { confirm_name: 'gn-145' }))['preview']).toBe(true);
       expect(bodies(lower).map((b) => b['dryRun'])).toEqual([true]);
@@ -2092,6 +2211,20 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     });
   });
   ```
+  **Kills:**
+  - 29.384 close default / close false: (a) `...({ finishStateId: null })` unconditionally in `body` → the `!('finishStateId' in b)` leg; (b) drop the `...(close ? {} : { finishStateId: null })` spread → the `[[true, null], [undefined, null]]` leg; (c) send the write with `dryRun: true` (`postDecide(session, door, { ...body, dryRun: true })` twice) → the `[true, undefined]` leg.
+  - 29.384 none / several (planner ruling 2026-10-04): (a) `finishAnswer` returns `{ closed: true }` without reading `filed` → `why: 'no-terminal-state-reachable'` leg; (b) `finishStateId = candidates[0]?.id ?? null` (send the first of several) → the `two` case's `[null, null]` leg; (c) drop the `t.from === here` test in `terminalCandidates` (any declared edge into a terminal state) → the `todo` case sends `'done'`; (d) `why` always `'no-terminal-state-reachable'` → the `several-terminal-states` leg.
+  - 29.384 clear / already finished: (a) drop the `ask.outcome === null` arm of `finishAnswer` → `outcome-cleared` leg (answers `no-terminal-state-reachable`); (b) drop the `stateCategory === 'terminal'` arm → `already-finished` leg; (c) `from = null` → the `[[null, 'Yes'], [null, 'Yes']]` leg.
+  - 29.384 draft: (a) delete the `isDraftDetail(ticket)` guard → the rejection leg (the dry run is sent and `posts` is not empty).
+  - 29.385 from / pass / revised: (a) send `from: null` on the write (`postDecide(session, door, { ...body, from: null })`) → the `[['No', 'Yes'], ['No', 'Yes']]` leg; (b) answer `revised: from !== null ? { from, to: a.outcome } : null` → the re-run leg (`revised: null`, pass 2); (c) re-read the Decision after the write (`await readDecision(...)` before `return`) → `detailReads` is 2.
+  - 29.385 write without pass: (a) `pass: z.number().int().min(1).optional()` in `decideFiledSchema` (and `revised` `.optional()`) → the call resolves instead of rejecting.
+  - 29.385 refusals verbatim: (a) `const from = null` → the guarded control is refused `decision.stale-from` (the fake checks `from`); (b) drop `409` from `[400, 409, 422]` in `postDecide` → the stale legs answer `gisik-nokma answered 409`; (c) drop `422` → the unknown / same / not-a-decision legs answer `gisik-nokma answered 422`.
+  - 29.385 404: (a) read the Decision with `session.get` instead of `readOrNotFound` → first leg answers `gisik-nokma answered 404`; (b) drop the `error.status === 404` arm in `postDecide` → the `gone` leg.
+  - 29.386 toDecidePlan: (a) `reopened: of('not-taken'), closedNotTaken: of('reopen')` → first leg; (b) `named` returns `{ id, key: null, title: id }` always → first leg (key and title); (c) `startedTickets: []` → first leg.
+  - 29.386 preview, lower-cased key: (a) compare `confirm_name` case-insensitively → the `gn-145` leg; (b) skip the dry run (write first) → the `[true]` leg; (c) `revised: true` in the `previewSentence` call (or `from === null`) → the exact-sentence leg ("Changing the decision to").
+  - 29.386 exact key writes: (a) send `closeStarted` only on the write → `[[true, [S1]], [undefined, [S1]]]`; (b) `hasEffects` returns `true` always → `quiet` is a preview; (c) drop `|| plan.hiddenMoves` from `hasEffects` → `hidden` writes at once (`preview` undefined).
+  - 29.386 blocked: (a) delete the `dry.blocked !== null` refusal → the write is sent (`bodies` length 2) and the error is `parseWire`'s, not the sentence; (b) word it `${dry.blocked.ticketId} cannot move (${dry.blocked.reason})` → both exact-sentence regexes; (c) drop `422` in `postDecide` → `raced` / `badStarted` legs.
+  - 29.386 previewSentence and planTickets: (a) `keep${n === 1 ? '' : 's'}` → third leg (n = 2 reads "keeps"); (b) swap the reopened and back-to-Backlog spreads in `planTickets` → fourth leg; (c) `joinAnd` joins with `', '` only → first leg.
   Run (LOCAL): `…/slot-run.sh wtg5-t4-red -- pnpm --filter @gisik-nokma/mcp-server exec vitest run test/decision-tools.test.ts --maxWorkers=2 > /tmp/wtg5-t4-red.log 2>&1; tail -40 /tmp/wtg5-t4-red.log`. Expected: FAIL (`decision.ts` does not exist).
 
 - [ ] **Step 3: Implement**
@@ -2197,7 +2330,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
         name: 'resolve_decision',
         description:
           'Record which way a Decision goes. outcome is one of the labels on the arrows leaving it, or null to clear the choice. A first choice is a new pass; a different choice later is a REVISION of the current pass ' +
-          '(it is recorded as one); clearing returns the steps the Decision had marked "Not taken" to Backlog. By default (close: true) the Decision is also finished in the same step, into the workflow\'s first finished status when one can be reached; ' +
+          '(it is recorded as one); clearing returns the steps the Decision had marked "Not taken" to Backlog. By default (close: true) the Decision is also finished in the same step when exactly ONE finished status can be reached from where it is; with none or several it records the outcome only and finish.candidates lists them; ' +
           'close: false records the outcome only. When the Decision is not finished, `finish.why` says why; use transition_ticket to finish it. Choosing can move OTHER tickets: reopen a loop, send its steps back to Backlog, close the branch not taken. ' +
           'When it would, confirm_name must be the Decision\'s KEY (e.g. GN-145); without it you get a preview of exactly what would move and nothing changes. closeStarted lists started steps on the branch being left to close as "Not taken" ' +
           '(default: they keep going; the preview lists them). The moves are made by the flow a moment after this call and show in get_flow. Revise it, or clear it with outcome null, to undo.',
@@ -2209,9 +2342,13 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
           const from = ticket.ticketState.outcome ?? null;
           const close = a.close ?? true;
           const door = DECIDE_PATH(a.workspaceId, a.ticketId);
-          // Spec §14 `close` (ruling P1): close (the default) omits finishStateId, so the door finishes into the first-declared terminal state
-          // when one is reachable; close: false sends null, which records the outcome only. The same body rides both requests.
-          const body = { outcome: a.outcome, from, closeStarted: a.closeStarted ?? [], ...(close ? {} : { finishStateId: null }) };
+          // Spec §14 :795 `close` (ruling P1; (planner ruling 2026-10-04)): with close and an outcome, an unfinished Decision finishes only when EXACTLY ONE
+          // terminal state is reachable from its current state by one declared edge; that id rides both requests. None or several: null (record
+          // the outcome only) and the candidates in the answer. close: false sends null. A clear or a finished Decision omits it, as before.
+          const finishing = close && a.outcome !== null && ticket.ticketState.stateCategory !== 'terminal';
+          const candidates = finishing ? await terminalCandidates(session, a.workspaceId, ticket) : [];
+          const finishStateId = finishing && candidates.length === 1 ? candidates[0]!.id : null;
+          const body = { outcome: a.outcome, from, closeStarted: a.closeStarted ?? [], ...(finishing || !close ? { finishStateId } : {}) };
           // The server's own plan, with the steps the caller cannot see counted: nothing is written by this request.
           const dry = parseWire(decideDoorPlanSchema, await postDecide(session, door, { ...body, dryRun: true }), 'decide plan').plan;
           // The engine's own sentence, verbatim (ruling P3): nothing has been written.
@@ -2227,7 +2364,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
           }
           const written = parseWire(decideFiledSchema, await postDecide(session, door, body), 'decide');
           // pass and revised are the door's own answer (ruling P2): no re-read.
-          return { filed: written.filed, pass: written.pass, revised: written.revised, cascade: hasEffects(plan) ? 'pending' : 'none', finish: finishAnswer(ticket, { outcome: a.outcome, close }, written.filed) };
+          return { filed: written.filed, pass: written.pass, revised: written.revised, cascade: hasEffects(plan) ? 'pending' : 'none', finish: finishAnswer(ticket, { outcome: a.outcome, close }, written.filed, candidates) };
         },
       },
   ```
@@ -2238,7 +2375,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     key: z.string().nullable(),
     ticketState: z.object({
       draft: z.unknown().optional(), // Drafts T4 G7: present on a draft (isDraftDetail)
-      stateId: z.string(), stateCategory: z.string(),
+      stateId: z.string(), stateCategory: z.string(), workflowId: z.string(),
       outcome: z.string().nullable().optional(), // Part 2: absent when there is none
     }),
   });
@@ -2246,15 +2383,31 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
   const readDecision = async (session: Session, workspaceId: string, ticketId: string): Promise<DecisionTicket> =>
     parseWire(decisionTicketSchema, await readOrNotFound(session, TICKET_PATH(workspaceId, ticketId), 'ticket'), 'ticket');
 
-  /** What happened to the Decision itself, from the request and the door's own `filed` list (no re-read). */
-  function finishAnswer(ticket: DecisionTicket, ask: { outcome: string | null; close: boolean }, filed: readonly string[]): Record<string, unknown> {
+  const WORKFLOW_PATH = (workspaceId: string, workflowId: string): string => `/v1/workspaces/${encodeURIComponent(workspaceId)}/workflows/${encodeURIComponent(workflowId)}`;
+  const workflowReadSchema = z.object({ workflow: z.object({
+    states: z.array(z.object({ id: z.string(), name: z.string(), category: z.string() })),
+    transitions: z.array(z.object({ from: z.string(), to: z.string() })),
+  }) });
+  type Candidate = { id: string; name: string };
+  /** Spec §14 :795 (planner ruling 2026-10-04): the terminal states reachable from the Decision's current state by ONE declared edge (`from` the state or `*`), in declared order. */
+  async function terminalCandidates(session: Session, workspaceId: string, ticket: DecisionTicket): Promise<Candidate[]> {
+    const { workflow } = parseWire(workflowReadSchema, await readOrNotFound(session, WORKFLOW_PATH(workspaceId, ticket.ticketState.workflowId), 'workflow'), 'workflow');
+    const here = ticket.ticketState.stateId;
+    return workflow.states
+      .filter((st) => st.category === 'terminal' && workflow.transitions.some((t) => (t.from === here || t.from === '*') && t.to === st.id))
+      .map(({ id, name }) => ({ id, name }));
+  }
+
+  /** What happened to the Decision itself, from the request, the door's own `filed` list (no re-read) and the candidates read before the request. */
+  function finishAnswer(ticket: DecisionTicket, ask: { outcome: string | null; close: boolean }, filed: readonly string[], candidates: readonly Candidate[]): Record<string, unknown> {
     if (ask.outcome === null) return { closed: false, why: 'outcome-cleared' };
     if (ticket.ticketState.stateCategory === 'terminal') return { closed: false, why: 'already-finished' };
     if (!ask.close) return { closed: false, why: 'close-not-requested' };
-    return filed.includes('ticket.transitioned') ? { closed: true } : { closed: false, why: 'no-terminal-state-reachable' };
+    if (filed.includes('ticket.transitioned')) return { closed: true };
+    return { closed: false, why: candidates.length > 1 ? 'several-terminal-states' : 'no-terminal-state-reachable', candidates: candidates.map(({ id, name }) => ({ id, name })) };
   }
   ```
-  Notes: the Decision's `ticketState.outcome` is Part 2's member (S10), read once to send as `from`; `parseWire` fails by naming a missing member if Part 2 spelled it differently, and fails the same way on a write answer without `pass` or `revised` (Part 3 T11). `closeStarted` is sent on BOTH door requests and is not checked client-side: the server owns `decision.bad-close-started` (PS-9) and answers in its own words. A `ticket` read of a task (not a Decision) passes `decisionTicketSchema`, and the door's dry run is what refuses it (`decision.not-a-decision`, verbatim). The door's write is sent WITHOUT `dryRun` (Part 3's own client does the same, 29.279).
+  Notes: the Decision's `ticketState.outcome` is Part 2's member (S10), read once to send as `from`; `parseWire` fails by naming a missing member if Part 2 spelled it differently, and fails the same way on a write answer without `pass` or `revised` (Part 3 T11). `closeStarted` is sent on BOTH door requests and is not checked client-side: the server owns `decision.bad-close-started` (PS-9) and answers in its own words. A `ticket` read of a task (not a Decision) passes `decisionTicketSchema`, and the door's dry run is what refuses it (`decision.not-a-decision`, verbatim). The door's write is sent WITHOUT `dryRun` (Part 3's own client does the same, 29.279). The workflow is read without `?version` (the latest, which is what the door's fold checks against); if the two ever disagree the door answers `422 decision.bad-finish-state` and that passes through verbatim (planner ruling 2026-10-04).
 
   **Pins:** `tool-names.ts`: `'resolve_decision',` after `'get_timeline',`; `tool-sweep.ts`:
   ```ts
@@ -2294,6 +2447,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       const { w, decision, yes, no } = await world('3791');
       await ok(w, w.owner, 'transition_ticket', { workspaceId: w.workspaceId, ticketId: decision, to: 'todo' });
       await ok(w, w.owner, 'transition_ticket', { workspaceId: w.workspaceId, ticketId: decision, to: 'doing' });
+      expect(await reachableTerminals(w, decision), '29.384 needs one reachable terminal state in the Decision workflow (DC-3 seed)').toEqual(['done']); // precondition (planner ruling 2026-10-04)
       const key = (await state(w, decision)).key;
       const preview = (await ok(w, w.owner, 'resolve_decision', { workspaceId: w.workspaceId, ticketId: decision, outcome: 'Yes' })) as { preview?: boolean; tickets: Array<{ key: string | null; move: string }> };
       expect(preview.preview).toBe(true);
@@ -2305,6 +2459,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       expect(written).toMatchObject({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null, cascade: 'pending', finish: { closed: true } });
       const after = await state(w, decision);
       expect(after.ticketState.stateId).toBe('done');
+      expect(after.ticketState.outcome).toBe('Yes'); // control for the `?? null` leg above: the member is read where Part 2 folds it
       expect(after.passes?.map((p) => [p.pass, p.outcome])).toEqual([[1, 'Yes']]);
       const notTaken = await until('the flow closing the other branch', async () => {
         const t = await state(w, no);
@@ -2340,11 +2495,31 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     });
   });
   ```
-  (import `until` from `./helpers/flow-world.js`.) The first test needs the Decision type bound to the default workflow (DC-3, bootstrap seed), `doing → done` declared with `done` its first terminal state, and the flow's cascade (Part 3 AP-5): `until` waits for it, never a sleep.
+  **Kills:**
+  - 29.384 29.386 a branch (hosted): (a) compare `confirm_name` case-insensitively → `lower.preview` leg (it writes); (b) skip the dry run → `preview.preview` leg; (c) send `finishStateId: null` whatever `close` says → `finish: { closed: true }` and `stateId 'done'` legs. The `reachableTerminals` precondition kills nothing: it guards the seed (DC-3, spec :299) (planner ruling 2026-10-04).
+  - 29.385 revision and clear (hosted): (a) send `from: null` on the write → the second call is refused `decision.stale-from` (`ok` fails); (b) drop the `!ask.close` arm of `finishAnswer` → `why: 'close-not-requested'` leg (answers `no-terminal-state-reachable`); (c) send `outcome: a.outcome ?? ''` → the clear is refused (`ok` fails).
+  - 29.386 door rows (hosted): (a) read the Decision with `session.get` instead of `readOrNotFound` → the stranger row's text; (b) drop the write (`return { ...plan }` after the dry run) → the member row finds no `ticket.decided`.
+  (import `until` and `reachableTerminals` from `./helpers/flow-world.js`; add `reachableTerminals` there first and export it, T5 reuses it (planner ruling 2026-10-04):
+  ```ts
+  /** The terminal states one declared edge from the ticket's current state (spec §14 :795), read through the tools: a seed that differs fails here with a message, not as a timeout in `until`. */
+  export const reachableTerminals = async (w: DoorWorld, ticketId: string): Promise<string[]> => {
+    const t = (await ok(w, w.owner, 'get_ticket', { workspaceId: w.workspaceId, ticketId })) as { ticketState: { stateId: string; workflowId: string } };
+    const { workflow } = (await ok(w, w.owner, 'list_workflows', { workspaceId: w.workspaceId, workflowId: t.ticketState.workflowId })) as { workflow: { states: Array<{ id: string; category: string }>; transitions: Array<{ from: string; to: string }> } };
+    return workflow.states.filter((st) => st.category === 'terminal' && workflow.transitions.some((e) => (e.from === t.ticketState.stateId || e.from === '*') && e.to === st.id)).map((st) => st.id);
+  };
+  ```
+  ) The first test needs the Decision type bound to the default workflow (DC-3, bootstrap seed), `doing → done` declared with `done` its ONLY terminal state reachable from `doing` (the precondition leg says so by name), and the flow's cascade (Part 3 AP-5): `until` waits for it, never a sleep.
   Run (LOCAL): `…/slot-run.sh wtg5-t4-hosted -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp --maxWorkers=2 > /tmp/wtg5-t4-hosted.log 2>&1; tail -40 /tmp/wtg5-t4-hosted.log`. Expected: PASS.
 
+**Prose to sweep:** (each registry-count line is re-derived from the tip at execution, Global Constraints; the T4 name adds one)
+- `Features.md:3454` — "Sixty-three tools in both doors." (already named in Global Constraints; false once `resolve_decision` registers).
+- `test-cases/14-mcp-server.md:938` — 14.555 "the final registry is the 63 tools in the plan's order" (and its test title, `packages/mcp-server/test/register.test.ts:87` "the 63 tools of the plan").
+- `Features.md:3405` — "sixty-three tools since MCP-everything" (a present-tense count not named in Global Constraints).
+- `Features.md:3407` — "nine registered tools (sixteen since MCP CRUD Task 6, sixty-three since MCP-everything)" (same, not named in Global Constraints).
+- Otherwise none found (searched on the ref: `resolve_decision`, `/decide`, `finishStateId`, `closeStarted`, `decision`/`decide` in `docs/manual.md` and `packages/mcp-server/README.md`; `confirmOrPreview`'s docblock `preview.ts:11-16` stays true: the comparison is still exact).
+
 - [ ] **Step 5: Features, sweeps, mutations, DONE**
-  - **Features:** replace `<!-- wtg-part5-mcp T4 bullet -->` with `- ✅ **MCP: decide a Decision** (Graph Part 5 T4; `packages/mcp-server/src/tools/decision.ts`, `flow-tools.ts`) — `resolve_decision` records an outcome as a new pass, a revision or a clear (reading the current outcome and sending it as `from`) through the Decide door, which finishes the Decision into the workflow's first finished status when one can be reached, or records the outcome only with `close: false`; it answers the pass and the revision the door filed; previews what the choice would reopen, send back to Backlog or close as Not taken (from the door's own plan, hidden steps included) and writes nothing without the Decision's key; a blocked plan is refused in the engine's own words; `closeStarted` closes started steps on the branch being left. Cases 29.384–29.386.`
+  - **Features:** replace `<!-- wtg-part5-mcp T4 bullet -->` with `- ✅ **MCP: decide a Decision** (Graph Part 5 T4; `packages/mcp-server/src/tools/decision.ts`, `flow-tools.ts`) — `resolve_decision` records an outcome as a new pass, a revision or a clear (reading the current outcome and sending it as `from`) through the Decide door, finishing the Decision when exactly one finished status can be reached from its current status, or recording the outcome only (with `close: false`, or when none or several can be reached, naming the candidates) (planner ruling 2026-10-04); it answers the pass and the revision the door filed; previews what the choice would reopen, send back to Backlog or close as Not taken (from the door's own plan, hidden steps included) and writes nothing without the Decision's key; a blocked plan is refused in the engine's own words; `closeStarted` closes started steps on the branch being left. Cases 29.384–29.386.`
   - **Checks:** `node scripts/check-case-ids.mjs`, `pnpm check:citations`, `pnpm check:tasks`.
   - **Sweeps (LOCAL):** mcp-server WHOLE; server `test/mcp` WHOLE; the ui-copy scan (the new strings carry no spaced em dash).
   - **Mutations:**
@@ -2354,6 +2529,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     | 29.384 | send `finishStateId: null` whatever `close` says → the default-close case reddens (and the hosted branch case stays unfinished) |
     | 29.384 | never send `finishStateId` → the `close: false` case reddens (both-requests `null` assertion) |
     | 29.384 | answer `finish: {closed: true}` without reading `filed` → the no-terminal-state case reddens |
+    | 29.384 | send the first of several reachable terminal states → the several-candidates case reddens (planner ruling 2026-10-04) |
     | 29.385 | send `from: null` on the write → the revision hosted case reddens (`revised` null) and the unit `from` assertion reddens |
     | 29.385 | answer `revised` from the request (`from !== null`) instead of the door's answer → the re-run case (pass 2, `revised: null`) reddens |
     | 29.385 | re-read the Decision after the write → the `detailReads` assertion reddens |
@@ -2416,6 +2592,9 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       expect(typeof domain.SYSTEM_ACTOR_FLOW, 'SYSTEM_ACTOR_FLOW').toBe('string');
     });
   ```
+  **Kills:**
+  - SEAM S6: none of this task's code, guards the Drafts publish route (R48-R53: 409 shape, ordered keys, origin from the body).
+  - SEAM SYSTEM_ACTOR_FLOW: none of this task's code, guards Graph Part 2's export.
   Run (LOCAL): `…/slot-run.sh wtg5-t5-probe -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp/flow-seams.test.ts --maxWorkers=2 > /tmp/wtg5-t5-probe.log 2>&1; tail -40 /tmp/wtg5-t5-probe.log`. Expected: PASS. A red probe is a STOP naming the Drafts plan (S6) or Part 2.
   Commit: `wtg-part5 T5: seam probe S6`.
 
@@ -2516,13 +2695,21 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       const unknown = fakeFlow({ [FLOW]: wire() }, { posts: { [PUB]: () => { throw new HttpError(404, { error: 'not_found' }); } } });
       await expect(run(unknown, { confirm: true })).rejects.toThrow('ticket not found or not visible to you (nothing was published).');
       const odd = fakeFlow({ [FLOW]: wire() }, { posts: { [PUB]: () => { throw new HttpError(409, { surprise: true }); } } });
-      await expect(run(odd, { confirm: true })).rejects.toThrow('gisik-nokma answered 409');
+      await expect(run(odd, { confirm: true })).rejects.toThrow('gisik-nokma answered 409: {"surprise":true}'); // the body rides the message (a bare HttpError says only "answered 409")
       const wrong = fakeFlow({ [FLOW]: wire() }, { posts: { [PUB]: keys([L]) } }); // the server published a different set
       await expect(run(wrong, { confirm: true })).rejects.toThrow('a different set of drafts');
       await expect(run(fakeFlow({}), { confirm: true })).rejects.toThrow('ticket not found or not visible to you'); // the flow is not readable
     });
   });
   ```
+  **Kills:**
+  - 29.387 publishOrder: (a) `return [...drafts]` (node order) → the first leg; (b) visit children before the parent (`out.push(d)` before `visit(parent, trail)`) → the first leg; (c) drop the `trail.has(d.id)` guard → the cycle leg overflows the stack.
+  - 29.387 preview then one request: (a) `a.confirm !== false` → the no-`confirm` call posts (`f.posts` `[]`); (b) `drafts` without `publishOrder` → `posted(f)` `[C, P, L]` and the preview's positions; (c) `parentTitle: null` always → `parentTitle: 'Parent'`.
+  - 29.387 retry: (a) cache the first `readFlow` answer across calls → the second post is `[P, C, L]`; (b) `flow.nodes.map(...)` without the `n.draft` filter → the second post includes `N` and `P`.
+  - 29.387 no drafts: (a) drop the `drafts.length === 0` return → `none.posts` holds a `{ ticketIds: [] }` post (and `nothingToPublish` is missing).
+  - 29.387 over 200: (a) drop the `MAX_PUBLISH_SET` guard → `big.posts` is not empty; (b) `>=` → the 200 control throws; (c) guard only inside `a.confirm === true` → the preview leg resolves.
+  - 29.387 refusals: (a) `(draft "${ticketId}", …)` instead of the title → the 409 leg; (b) drop the `throw new Error(\`gisik-nokma answered 409: …\`)` (rethrow the raw `HttpError`) → the `{"surprise":true}` leg; (c) drop the `results.length !== asked.size` check → the `wrong` leg resolves.
+  - 29.387 404: (a) drop the 404 arm of `publishAll` → `(nothing was published).` is missing.
   `packages/mcp-server/test/flow-registry.test.ts`:
   ```ts
   import { describe, expect, it } from 'vitest';
@@ -2556,6 +2743,8 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     });
   });
   ```
+  **Kills:**
+  - 29.389 registry: (a) drop `publish_flow` from `tool-sweep.ts` → the sweep-entry leg; (b) swap `get_flow` and `get_timeline` in `flowTools`' array → the contiguous-order leg; (c) drop "Publishing a flow cannot be undone" from `publish_flow`'s description → the undo leg.
   Run (LOCAL): `…/slot-run.sh wtg5-t5-red -- pnpm --filter @gisik-nokma/mcp-server exec vitest run test/publish-flow.test.ts test/flow-registry.test.ts --maxWorkers=2 > /tmp/wtg5-t5-red.log 2>&1; tail -40 /tmp/wtg5-t5-red.log`. Expected: FAIL (`publish-order.ts` and `publish_flow` do not exist).
 
 - [ ] **Step 3: Implement**
@@ -2683,7 +2872,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
 
 - [ ] **Step 4: The hosted cases (publish, rule D2, door rows)**
 
-  Append to `apps/server/test/mcp/mcp-flow.test.ts` (add `import * as domain from '@gisik-nokma/domain';` and `until` to the imports):
+  Append to `apps/server/test/mcp/mcp-flow.test.ts` (add `import * as domain from '@gisik-nokma/domain';`, `until` and `reachableTerminals` (T4 Step 4) to the imports):
   ```ts
   describe('29.387 29.388 29.389 publish_flow and rule D2 through the hosted door', () => {
     const ticketOf = async (w: Awaited<ReturnType<typeof buildDoorWorld>>, ticketId: string) =>
@@ -2745,6 +2934,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       const key = (await ticketOf(w, decision)).key!;
       await ok(w, w.owner, 'transition_ticket', { workspaceId: w.workspaceId, ticketId: decision, to: 'todo' });
       await ok(w, w.owner, 'transition_ticket', { workspaceId: w.workspaceId, ticketId: decision, to: 'doing' });
+      expect(await reachableTerminals(w, decision), '29.388 needs one reachable terminal state in the Decision workflow (DC-3 seed)').toEqual(['done']); // precondition (planner ruling 2026-10-04)
       // finished through the Decide door (one move to Done): only a finished Decision settles its branches (Part 2)
       await ok(w, w.owner, 'resolve_decision', { workspaceId: w.workspaceId, ticketId: decision, outcome: 'Yes', confirm_name: key });
       await until('the flow closing the branch not taken', async () => ((await ticketOf(w, no)).resolution?.kind === 'not-taken' ? true : null));
@@ -2764,6 +2954,10 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
       expect(mine.rows.map((r) => r.origin)).toEqual(['mcp']);
       const history = (await ok(w, w.owner, 'get_ticket_history', { ticketId: decision })) as { events: Array<{ type: string; origin: string }> };
       expect(history.events.filter((e) => e.type === 'ticket.decided').map((e) => e.origin)).toEqual(['mcp', 'mcp']); // the choice and its clear are both still there
+      // the wait-for-all and estimate undos: each act AND its undo are in the History (off files null, a clear files null)
+      const yesHistory = (await ok(w, w.owner, 'get_ticket_history', { ticketId: yes })) as { events: Array<{ type: string; payload: { fieldId?: string; value?: unknown } }> };
+      const sets = yesHistory.events.filter((e) => e.type === 'ticket.field_set').map((e) => [e.payload.fieldId, e.payload.value]);
+      expect(sets).toEqual(expect.arrayContaining([['waitForAll', true], ['estimate', 3], ['waitForAll', null], ['estimate', null]]));
     });
 
     it('29.389 door rows: one uniform sentence for a stranger on each read, a member may', async () => {
@@ -2776,7 +2970,17 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     });
   });
   ```
+  **Kills:**
+  - 29.387 hosted publish: (a) `a.confirm !== false` → the preview publishes (`draft` `toBe(true)` reddens); (b) `origin: 'web'` in `publishAll`'s body → the `ticket.published` row's origin; (c) `publishOrder` reversed → `[first, second]` and the consecutive-key leg.
+  - 29.387 hosted parent outside the flow: (a) `(draft "${ticketId}", …)` → the `draft "Child"` leg; (b) silently drop a draft whose draft parent is outside the list (`drafts.filter((d) => d.parentId === null || byId.has(d.parentId))`) → `nothingToPublish`, no refusal (decision 11).
+  - 29.388 D2: (a) `outcome: 'null'` on the clear → `ok` fails (the server refuses an unknown outcome); (b) `set_wait_for_all` files `value: a.value` → the `['waitForAll', null]` leg; (c) `update_ticket` skips a `null` estimate → the `['estimate', null]` leg.
+  - 29.389 door rows: (a) `readFlow` uses `session.get` instead of `readOrNotFound` → the `get_flow` / `publish_flow` stranger text; (b) the timeline index read names `'ticket'` → the `get_timeline` stranger text.
   Run (LOCAL): `…/slot-run.sh wtg5-t5-hosted -- pnpm --filter @gisik-nokma/server exec vitest run test/mcp --maxWorkers=2 > /tmp/wtg5-t5-hosted.log 2>&1; tail -40 /tmp/wtg5-t5-hosted.log`. Expected: PASS, including 14.262 (the hosted list equals `allTools`). If a stranger sentence differs from the one written (the door may answer another first), copy the observed sentence into the row and say so in the handoff; the rule is "uniform and not an oracle".
+
+**Prose to sweep:**
+- Registry counts: `Features.md:3405`, `:3407`, `:3454`, `test-cases/14-mcp-server.md:938`, `packages/mcp-server/test/register.test.ts:87` (the final audit in Step 5 closes them).
+- `docs/manual.md:2043-2069` (§16 "What your assistant can do"): no line made false; Step 5 adds the flows bullet. The "Admin, with a check first" bullet (`:2066-2069`) describes the exact-name check for admin acts only, so `publish_flow`'s boolean `confirm` does not contradict it.
+- Otherwise none found (searched on the ref: `publish_flow`, `drafts/publish`, `publish` in `docs/manual.md` §16 and `packages/mcp-server/README.md`).
 
 - [ ] **Step 5: The manual, Features, final audit, sweeps, mutations, DONE**
   - **Manual:** in `docs/manual.md` §16, under "What your assistant can do" (grep `-n '^### What your assistant can do'`), add one bullet after **Tickets.**: `- **Flows and timelines.** Connect tickets with "leads to" arrows (with a label such as "Yes" or "No"), mark a step to wait for all of the steps before it, give a step an estimate, read a whole flow (what happened on each pass, what was not taken) and the timeline for a stretch of weeks, record which way a Decision goes, and publish a flow of drafts together. Choosing a Decision's way can move other tickets, so the assistant first shows you which and waits for the Decision's key; publishing a flow cannot be undone.` Then `pnpm help:generate` and `pnpm check:help` (LOCAL), and commit the regenerated help content in the same commit.
@@ -2789,14 +2993,14 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
     | Case | Mutation |
     |---|---|
     | 29.387 | `publishOrder` returns node order → the child-first case reddens |
-    | 29.387 | post `confirm !== false` instead of `=== true` → the `confirm: false` control reddens |
+    | 29.387 | post `confirm !== false` instead of `=== true` → the first (no-`confirm`) preview's `f.posts` `[]` leg reddens; `confirm !== undefined` → the `confirm: false` control reddens |
     | 29.387 | do not re-read the flow on a call (cache it) → the retry case reddens |
     | 29.387 | word the 409 without the draft title → the refusal case reddens |
     | 29.387 | drop the `MAX_PUBLISH_SET` guard → the 241-draft case posts and reddens |
     | 29.387 | compare `>=` instead of `>` → the 200-draft control reddens |
     | 29.387 | guard only the confirmed call → the preview half of the 241-draft case reddens |
     | 29.388 | `outcome: 'null'` string on clear → the Backlog return never happens (hosted) |
-    | 29.388 | file `set_wait_for_all` false as `false` → the History assertion in T1 and the off state disagree |
+    | 29.388 | file `set_wait_for_all` false as `false` → the `['waitForAll', null]` leg of the D2 History assertion reddens (and T1's 29.377) |
     | 29.389 | drop `publish_flow` from `tool-sweep.ts` → 14.88 and the registry case redden |
 
   Push. DONE: report the local runs, named LOCAL, with the counts you re-derived.
@@ -2817,7 +3021,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
 | `get_flow`: passes, periods, resolution (Not taken), alternates, taken, only visible ends and the caller's drafts | T2 (29.379, 29.380) |
 | `get_ticket`: passes, round, periods, resolution, no hidden Decision id | T2 (29.381) |
 | `get_timeline` and its limits | T3 (29.382, 29.383) |
-| `resolve_decision`: `close` (`finishStateId` omitted or `null`), the door's first-declared finish, `from` and revision (the door's `pass`/`revised`), clear, preview, `closeStarted`, blocked in the engine's words | T4 (29.384–29.386) |
+| `resolve_decision`: `close` (`finishStateId` the one reachable terminal state, or `null` with the candidates when none or several (planner ruling 2026-10-04)), `from` and revision (the door's `pass`/`revised`), clear, preview, `closeStarted`, blocked in the engine's words | T4 (29.384–29.386) |
 | `publish_flow` preview, atomic publish, the refusal naming the draft (§15 D-4), more than 200 drafts refused up front (planner ruling P4) | T5 (29.387) |
 | Rule D2: visible, attributed, removable | T5 (29.388) |
 | registry, sweep, door rows, manual | T5 (29.389) |
@@ -2832,7 +3036,7 @@ Not in this plan, by design: the notification, History-copy and `redactedPayload
 
 **Spec gaps and contradictions found (for the planner):**
 - **No client-callable atomic Decide door in the spec.** §14 says the tool records the outcome and finishes the Decision "in the same atomic batch", but only the in-server `ingestAtomic` (D-10) is named; `POST /v1/events` commits each event on its own (`apps/server/src/ingest/ingest-service.ts:432-445`). Part 3 T11 adds `POST …/tickets/:id/decide` with a dry run (probe S5), which this plan consumes for every choice.
-- **Settled by planner rulings P1 to P3 (reconcile, 2026-10-03):** the door takes `finishStateId?: string | null` (`close: false` sends `null`, `close: true` omits it), its write answers `{filed, pass, revised}`, and its dry run's `blocked` carries the engine's `sentence`. T4 uses the door for every choice; no event-door path remains.
+- **Settled by planner rulings P1 to P3 (reconcile, 2026-10-03):** the door takes `finishStateId?: string | null` (`close: false` sends `null`; `close: true` omitted it, replaced (planner ruling 2026-10-04): the tool sends the one reachable terminal id, or `null` with the candidates), its write answers `{filed, pass, revised}`, and its dry run's `blocked` carries the engine's `sentence`. T4 uses the door for every choice; no event-door path remains.
 - **`pin` in the timeline index:** PR-0 (spec line 174) says `pin` is "true when…"; TG-11 (line 714) says "the counts ride the index entry"; §14 says `pin: {notes, attachments}`. The plan follows TG-11 and §14 (probe S7).
 - **`publish_flow` and the route's 200-id limit:** settled by planner ruling P4: a flow of more than 200 drafts is refused up front (the publish is atomic and never batched); the spec's §14 `publish_flow` line carries it (the parent's spec edit).
 - **`publish_flow` preview "the keys they would take"** (§14) cannot be shown: no route reads a project's next key and the Drafts spec assigns keys at commit (R50). The preview shows order and titles (Decision 3).

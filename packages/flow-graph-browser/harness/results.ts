@@ -1,7 +1,7 @@
 /**
  * The record a stress run leaves behind. A phone cannot be driven by a test runner, so a run on it (`stress.html?auto=1`)
  * shows its numbers on screen AND posts them to the dev server (`/__results`, see vite.config.ts), which appends one JSON line
- * per run to `results/stress.jsonl`. `parseResult` is the one gate on that file: a body that is not a run record is refused,
+ * per run to `test-results/stress.jsonl`. `parseResult` is the one gate on that file: a body that is not a run record is refused,
  * so a stray request cannot put a line in it.
  */
 import type { FrameStats } from './sampler.js';
