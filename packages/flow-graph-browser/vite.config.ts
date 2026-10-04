@@ -6,7 +6,7 @@ import { parseResult } from './harness/results.js';
 // The harness serves the REAL built `@gisik-nokma/app-core` so a browser measures the view the product ships. Port 3192, never
 // 3190 (G-9's harness), 3191 (the Knowledge Graph's) or 3001 (the dev stack).
 // `--host` (vite CLI) serves it on the LAN: that is how a real phone opens `stress.html?auto=1`. A run posts its record to
-// /__results and this plugin appends one line per accepted run to results/stress.jsonl (gitignored).
+// /__results and this plugin appends one line per accepted run to test-results/stress.jsonl (the root .gitignore ignores test-results/ on every branch).
 function results(): Plugin {
   return {
     name: 'stress-results',
@@ -32,8 +32,8 @@ function results(): Plugin {
             res.end(verdict.reason);
             return;
           }
-          mkdirSync(resolve(__dirname, 'results'), { recursive: true });
-          appendFileSync(resolve(__dirname, 'results/stress.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...verdict.record })}\n`);
+          mkdirSync(resolve(__dirname, 'test-results'), { recursive: true });
+          appendFileSync(resolve(__dirname, 'test-results/stress.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...verdict.record })}\n`);
           res.statusCode = 204;
           res.end();
         });
