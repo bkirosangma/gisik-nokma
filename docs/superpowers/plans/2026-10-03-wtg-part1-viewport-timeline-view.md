@@ -3129,7 +3129,7 @@ export * from './driver.js';
 - **Used by:** T8 (`layoutLanes` packs each epic lane), Part 3 and Part 4 (every lane of the Timeline graph and Home).
 
 **Design notes:**
-- Items are sorted by (first segment start, natural key, id) and each goes into the FIRST row where none of its segments shares a day with one already there. For ONE interval per item this greedy first fit is optimal: the row count equals the greatest number of footprints overlapping on a day (PK-2), and `maxOverlap` is the independent check of that claim. With several segments per item it is a heuristic, so the same items are also packed by their hulls and the smaller packing wins; a tie keeps the segment packing, which leaves the gaps usable.
+- Items are sorted by (first segment start, natural key, id) and each goes into the FIRST row where none of its segments shares a day with one already there. For ONE interval per item this greedy first fit is optimal: the row count equals the greatest number of footprints overlapping on a day (PK-2), and `maxOverlap` is the independent check of that claim. With several segments per item it is a heuristic; the same items are also packed by their hulls, kept as PK-2's guard; segment packing is never worse (planner, 2026-10-04), and a tie keeps the segment packing, which leaves the gaps usable.
 - Two bars on adjacent days (one ends on the 14th, the next starts on the 15th) share a row; a shared day does not.
 - **The label is part of the footprint** (PK-4): a bar shorter than its label reserves the label's width along the time axis, so the key shown just outside its end never sits on top of the next bar. The label width is INJECTED (`labelPx`), cached by the caller; the pack module never measures text. The caller passes `ppd = packScale(ppd)` (T2) so rows re-pack only when the zoom crosses a power-of-two edge, not every frame of a pinch.
 - Deterministic: the result is a function of the items and `ppd` only (input order does not matter); an item with no segment throws a `RangeError` rather than vanishing.
@@ -3548,7 +3548,7 @@ export * from './driver.js';
   - `firstEndingAtOrAfter`: `.end < day` to `<=` → 29.050 / 29.051.
   - `footprintOf`: `Math.ceil` to `Math.floor`; drop the `- 1` → 29.053.
   - `keyPartsOf`: stop converting digit runs to numbers (`GN-10` sorts before `GN-9`); swap the keyed-before-unkeyed branches → 29.052.
-  - `packLane`: `byHull.rows < bySegments.rows` to `<=` (a tie goes to the hull): SURVIVES — the row count is unchanged and the cases pin counts, not which packing won a tie. Record as a survivor with that reason (the segment packing's gaps stay usable only by convention). `normalise`: `s.start <= last.end` to `<` is an EQUIVALENT mutant (touching segments occupy the same days merged or not); record it.
+  - `packLane`: `byHull.rows < bySegments.rows` to `<=` (a tie goes to the hull) → 29.051's tie leg (`strategy: 'segments'`). Deleting the hull comparison is EQUIVALENT: segment packing is never worse (planner, 2026-10-04). `normalise`: `s.start <= last.end` to `<` is an EQUIVALENT mutant (touching segments occupy the same days merged or not); record it.
   - the `footprints(...).length > 1` guard in `packLane` removed (hull always packed): equivalent for the rows, slower; record.
 
 - [ ] **Step 6: Flip, bullet, gate**
