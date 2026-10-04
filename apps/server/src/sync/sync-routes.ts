@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { LedgerEvent, TicketState, WorkspaceRole } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
-import { canSee } from '../visibility/can-see.js';
+import { canOpen } from '../visibility/can-open.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
 import { readStreamSeq } from './stream-seq.js';
@@ -12,6 +12,7 @@ import type { ServerAppend } from '../routes/invites.js';
 import { MAX_BATCH_SIZE } from '../routes/events.js';
 import { toEventView, type LedgerEventView, type LedgerRow } from '../routes/tickets.js';
 import { listNotes } from '../read/notes.js';
+import { listMyDrafts } from '../read/drafts.js';
 import { createSyncService } from './sync-service.js';
 import { registerReconcileRoute } from './reconcile-route.js';
 
@@ -295,9 +296,11 @@ export type SyncRouteDeps = {
  * the rig call one function, and there is nothing to drift.
  *
  * **The admission checks are NOT in here, deliberately**, and the split is not
- * arbitrary: `resolveEffectiveRole`'s 403 and `canSee`'s 404 are HTTP answers
+ * arbitrary: `resolveEffectiveRole`'s 403 and `canOpen`'s 404 are HTTP answers
  * with reply bodies, and a caller that is not a route has no reply to send. The
- * rig asks `canSee` itself, on the same pool, so the harness does not become a
+ * rig asks `canSee` itself, on the same pool (the route's gate is `canOpen` since drafts T4, which also
+ * admits the caller's own draft; the rig seeds no drafts, so on every world it builds the two agree, and a
+ * narrower gate cannot admit what the product refuses), so the harness does not become a
  * door with a weaker gate than the product's — which is the failure mode
  * `ingestBatch` versus `ingestClientBatch` already cost this rig one finding.
  */
@@ -366,7 +369,7 @@ export function registerSyncRoutes(
    * The membership 403 stays, and is not an exception: `resolveEffectiveRole`
    * answers about the CALLER, not about the ticket, so a stranger learns only
    * that they are a stranger — the same answer `/v1/sync/bootstrap` and
-   * `/v1/sync/reconcile` give, and they give it before `canSee` is ever asked.
+   * `/v1/sync/reconcile` give, and they give it before `canOpen` is ever asked.
    *
    * ## Definitions are shipped WHOLE, deliberately, and it is not laziness
    *
@@ -431,7 +434,9 @@ export function registerSyncRoutes(
           await client.query('ROLLBACK');
           return await reply.code(403).send({ error: 'not_a_member' });
         }
-        if (!(await canSee(client, userId, ticketId))) {
+        // `canOpen` (drafts G3): the author's other devices pull their own draft here; for everyone else a
+        // draft is the not-found answer below, byte-identical to an id that never existed.
+        if (!(await canOpen(client, userId, ticketId))) {
           await client.query('ROLLBACK');
           // See the docblock: this is the answer for "never existed" too.
           return await reply.code(404).send({ error: 'not_found' });
@@ -498,6 +503,12 @@ export function registerSyncRoutes(
         const tickets: BootstrapTicket[] = [];
         for (const row of visible) {
           tickets.push(await bootstrapTicket(client, row.ticket_id as string));
+        }
+        // The author's own drafts ride on the same snapshot (drafts spec G4): `listVisibleTickets` cannot name them (the
+        // predicate is closed for the author too), so the author's other devices get them here. They are the caller's
+        // alone, so nothing here can name another person's draft.
+        for (const draft of await listMyDrafts(client, userId, workspaceId)) {
+          tickets.push(await bootstrapTicket(client, draft.ticketId));
         }
         // The notes this caller may read, in ONE query rather than a per-note
         // pull: `listNotes` answers the readable (non-deleted) set through

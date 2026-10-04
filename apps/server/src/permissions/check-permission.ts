@@ -14,6 +14,8 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   visibilitySetPayload,
+  draftAllows,
+  draftNotAllowedReason,
   type EventEnvelope,
 } from '@gisik-nokma/domain';
 import { REFUSAL_RULES, type Refusal } from '@gisik-nokma/rule-engine';
@@ -22,6 +24,7 @@ import { projectExists } from '../projections/proj-projects.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
+import { ticketAccess } from '../visibility/can-open.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkCommentAuthority } from './check-comment-authority.js';
 import { checkLifecycle } from './check-lifecycle.js';
@@ -52,6 +55,13 @@ export const PERMISSION_ROLE_RULE = 'permission.role';
  * report `permission.role`. See `checkVisibilityPermission`.
  */
 export const PERMISSION_VISIBILITY_RULE = 'permission.visibility';
+
+/**
+ * The rule id for an author's event on their OWN draft that the draft allowlist does not admit (drafts spec
+ * §3.3, R7). Its own id, not `permission.role`: the sentence names the way out ("Publish it first, or
+ * discard it."). `packages/rule-engine`'s `REFUSALS['draft.not-allowed']` (T5) must be this same string.
+ */
+export const DRAFT_NOT_ALLOWED_RULE = 'draft.not-allowed';
 
 /**
  * The rule id for "the project this event names was never founded" (Task 9
@@ -192,7 +202,8 @@ export const VISIBILITY_CLAIM_MISMATCH_REASON = 'This claim does not name the ti
 /**
  * Task 9 check 4, and the ONE sentence answering both "you may not see it" and
  * "there is no such ticket" — `canSee` cannot tell them apart by design
- * (`../visibility/can-see.ts`), and giving them different sentences here would
+ * (`../visibility/can-see.ts`; `ticketAccess` answers `none` for another person's draft in the same
+ * sentence, drafts T4), and giving them different sentences here would
  * rebuild the existence oracle Task 8's 404s removed one layer up.
  */
 export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
@@ -528,9 +539,11 @@ const PURGE_TYPES: ReadonlySet<string> = new Set(['purge.marked', 'purge.unmarke
  *   pure function cannot run after a database read.
  * - **5c — project-admin rights or creatorship on `visibility.set`.** Closed in
  *   `checkVisibilityPermission`, still reporting `permission.role`. It must run
- *   after `canSee` or it is an existence oracle — see that function's docblock.
- * - **Visibility.** Closed: `checkVisibilityPermission` calls `canSee` for
- *   every ticket-entity event, and `permission.visibility` now exists.
+ *   after the visibility door (`ticketAccess`) or it is an existence oracle —
+ *   see that function's docblock.
+ * - **Visibility.** Closed: `checkVisibilityPermission` calls `ticketAccess`
+ *   (`canSee`, or the author's own draft, drafts T4) for every ticket-entity
+ *   event, and `permission.visibility` now exists.
  *
  * The register's underlying rule is intact and is worth restating in the form
  * that survived: a `permission.role` refusal must be made by code that OWNS
@@ -599,7 +612,8 @@ const PURGE_TYPES: ReadonlySet<string> = new Set(['purge.marked', 'purge.unmarke
  *   *Owner: Plan 4 Task 14's successor, or Plan 6 at the invite-mint screen,
  *   which is where a bad project id would be caught before it was promised.*
  * - **The read paths and sync-down.** This module is the INGEST door. Task 8
- *   enforces `canSee` on the three ticket read routes; sync-down filtering IS
+ *   enforces `canSee` on the three ticket read routes (the detail read asks
+ *   `canOpen` since drafts T4, so a draft's author reads it); sync-down filtering IS
  *   built (`../visibility/visible-events-for.ts`, Task 11 — this entry said
  *   "is not built" until Task 14 corrected it, and a stale absence is worse
  *   than none because it sends the next reader to build a thing that exists).
@@ -1342,7 +1356,8 @@ async function siblingNameRefusal(
  * picker.
  *
  * **The two doors are in different branches of `checkVisibilityPermission`, and
- * they have to be.** The existing block runs after `canSee` — deliberately, so
+ * they have to be.** The existing block runs after the visibility door
+ * (`ticketAccess`, which asks `canSee` first) — deliberately, so
  * an actor with no standing on the ticket is never told whether the person they
  * named is a member — and `ticket.created` RETURNS before reaching it, because
  * a ticket that does not exist yet cannot be seen. So a birth assignee would
@@ -1421,7 +1436,9 @@ async function getTicketCreator(db: Queryable, ticketId: string): Promise<string
  *    without this refusal one ticket's stream authors another ticket's audience.
  * 4. **Everything else about a ticket** — transition, assign, comment, field
  *    set, reparent, `ticket.deleted`/`ticket.restored`, and `visibility.set`
- *    itself — requires `canSee`. This is also exactly the guest constraint: a
+ *    itself — requires `canSee` (through the door `ticketAccess`, which also
+ *    admits the author of an openable draft and then holds them to the draft
+ *    allowlist, drafts T4). This is also exactly the guest constraint: a
  *    guest's `canSee` is true only for tickets an explicit list names them in,
  *    so "guests may only act on tickets explicitly visible to them" falls out of
  *    the same line rather than needing a guest branch of its own.
@@ -1614,7 +1631,7 @@ export async function checkVisibilityPermission(
      * is — checked HERE rather than in the block below because this branch
      * returns before that one is reachable.
      *
-     * Ordering, and it is the same ordering argument the `canSee` block makes
+     * Ordering, and it is the same ordering argument the visibility door makes
      * from the other side: the project check runs FIRST, so an actor creating a
      * ticket in a project they are not on is told THAT, rather than being handed
      * a sentence about the person they named. A claim that fails for two reasons
@@ -1636,8 +1653,20 @@ export async function checkVisibilityPermission(
     }
   }
 
-  if (!(await canSee(ctx.db, ctx.sessionUserId, env.entity.id))) {
+  // THE DOOR (drafts spec G1). `canSee` is false for a draft, for its author too (T3), so the question is
+  // three-way: an ordinary reader (`visible`), the author of an openable draft (`own-draft`), or nobody.
+  // `none` is the unknown-ticket answer for EVERYONE else, the owner and the admins included (R9): this
+  // refusal is byte-identical to the one an id that never existed gets.
+  const access = await ticketAccess(ctx.db, ctx.sessionUserId, env.entity.id);
+  if (access === 'none') {
     return refuseWith(PERMISSION_VISIBILITY_RULE, TICKET_NOT_VISIBLE_REASON);
+  }
+  // The allowlist (R6, R7) is judged BEFORE every authority check below on purpose: a member's
+  // `ticket.deleted` on their own draft must read "A draft cannot be deleted. Discard it instead." and not
+  // the project-admin sentence the delete block gives. The engine twin (`checkTicketDraft`, T5) judges the
+  // same list for the client precheck and the replica.
+  if (access === 'own-draft' && !draftAllows(env.type)) {
+    return refuseWith(DRAFT_NOT_ALLOWED_RULE, draftNotAllowedReason(env.type));
   }
 
   /**
@@ -1665,7 +1694,7 @@ export async function checkVisibilityPermission(
    * passed through to the engine's `malformed-payload`, as the membership
    * pass does, so a shape problem is not reported as a role problem.
    *
-   * AFTER the `canSee` check, on purpose: an actor who cannot see the ticket
+   * AFTER the visibility door (`ticketAccess`), on purpose: an actor who cannot see the ticket
    * gets that sentence and nothing else, so the named person's membership is
    * never disclosed to someone with no standing on the ticket.
    */
