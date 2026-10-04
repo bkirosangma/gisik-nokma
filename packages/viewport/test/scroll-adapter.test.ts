@@ -25,7 +25,7 @@ function mount(opts: { ppd?: number; extentDays?: number; reduced?: boolean; wid
 afterEach(() => void (document.body.innerHTML = ''));
 
 describe('29.030 the driver reads the scroll position as a day', () => {
-  it('29.030 offset = firstDay + scroll / ppd; visibleRange spans the viewport inclusive; scale writes --tl-ppd; control: a scroll of 240 px at 24 px/day is 10 days', () => {
+  it('29.030 offset = firstDay + scroll / ppd; visibleRange spans the viewport inclusive; scale writes --tl-ppd; control: a scroll of 240 px at 24 px/day is 10 days | scrollByPx moves by px; axis y reads scrollTop and the height', () => {
     const { el, adapter } = mount();
     expect(adapter.offset()).toBe(FIRST);
     expect(el.style.getPropertyValue('--tl-ppd')).toBe('24');
@@ -33,13 +33,23 @@ describe('29.030 the driver reads the scroll position as a day', () => {
     expect(adapter.offset()).toBe(FIRST + 10);
     expect(adapter.visibleRange()).toEqual({ start: FIRST + 10, end: FIRST + 10 + Math.ceil(1000 / 24) - 1 });
     expect(adapter.viewportDays()).toBeCloseTo(41.67, 1);
+    adapter.scrollByPx(48);
+    expect(adapter.offset()).toBe(FIRST + 12);
+    // axis y (portrait): time runs down, read from scrollTop and the height
+    const v = document.createElement('div');
+    document.body.append(v);
+    sizeOf(v, { clientWidth: 300, scrollWidth: 300, clientHeight: 480, scrollHeight: 9600 });
+    const vy = new ScrollAdapter({ element: v, axis: 'y', firstDay: FIRST, scale: 24, extentDays: () => 400 });
+    v.scrollTop = 240;
+    expect(vy.offset()).toBe(FIRST + 10);
+    expect(vy.viewportDays()).toBe(20);
   });
 });
 
 describe('29.031 Ctrl + wheel zooms about the pointer, nothing else is taken', () => {
   const sweep = (i: number) => (i < 40 ? 6 : -9);
 
-  it('29.031 the day under the pointer keeps its x within 0.5 px over a 60-event sweep, the event is cancelled, and --tl-ppd follows; control: the same sweep zoomed about the centre moves the pointer\'s day past 0.5 px', () => {
+  it('29.031 the day under the pointer keeps its x within 0.5 px over a 60-event sweep, the event is cancelled, and --tl-ppd follows; control: the same sweep zoomed about the centre moves the pointer\'s day past 0.5 px; the pointer is measured from the container\'s own left edge', () => {
     const { el, adapter, resize } = mount();
     el.scrollLeft = 2400;
     const anchorPx = 300;
@@ -66,6 +76,37 @@ describe('29.031 Ctrl + wheel zooms about the pointer, nothing else is taken', (
       centreWorst = Math.max(centreWorst, Math.abs((cDay - c.adapter.offset()) * c.adapter.scale() - anchorPx));
     }
     expect(centreWorst).toBeGreaterThan(0.5);
+    // the pointer is measured from the container's own left edge, not the window's
+    const o = mount();
+    o.el.scrollLeft = 2400;
+    const rect = o.el.getBoundingClientRect();
+    o.el.getBoundingClientRect = () => ({ ...rect, left: 200, x: 200, right: 1200 });
+    const oDay = dayAt({ offsetDay: o.adapter.offset(), ppd: o.adapter.scale() }, anchorPx);
+    o.el.dispatchEvent(wheel({ x: 200 + anchorPx, dy: 6, ctrl: true }));
+    expect(o.adapter.scale()).toBeLessThan(24);
+    expect(Math.abs((oDay - o.adapter.offset()) * o.adapter.scale() - anchorPx)).toBeLessThan(0.5);
+  });
+
+  it('29.031 a zoom out at the first day, which the platform clamps, leaves the offset on the first day, not before it; a Ctrl + wheel during a glide ends the glide', () => {
+    const { el, adapter, resize } = mount();
+    let stored = 0;
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, get: () => stored, set: (v: number) => void (stored = Math.max(0, v)) });
+    resize();
+    el.dispatchEvent(wheel({ x: 300, dy: 50, ctrl: true })); // asks for scroll -135 px
+    expect(adapter.scale()).toBeLessThan(24);
+    expect(stored).toBe(0);
+    expect(adapter.offset()).toBe(FIRST);
+    // a glide in progress, then a Ctrl + wheel: the day under the pointer stays put, the glide does not resume
+    const g = mount();
+    g.el.scrollLeft = 2400;
+    g.adapter.animateTo({ offset: FIRST + 300 });
+    g.fc.advance(32);
+    const day = dayAt({ offsetDay: g.adapter.offset(), ppd: g.adapter.scale() }, 300);
+    g.resize();
+    g.el.dispatchEvent(wheel({ x: 300, dy: 6, ctrl: true }));
+    g.fc.advance(600);
+    expect(Math.abs((day - g.adapter.offset()) * g.adapter.scale() - 300)).toBeLessThan(0.5);
+    expect(g.fc.pending()).toBe(0);
   });
 
   it('29.031 on a platform that rounds scroll positions to whole pixels the anchor still holds within 0.5 px of the ideal on every event; control: re-reading the rounded position each event (the naive loop) drifts past 0.5 px on the same sweep', () => {
@@ -140,7 +181,7 @@ describe('29.032 glides', () => {
     expect(r.frames[r.frames.length - 1]).toMatchObject({ moving: false, offset: FIRST + 100 });
   });
 
-  it('29.039 a glide aimed past the scrollable end stops at the end and settles: a last frame reports moving: false and the loop goes idle; control: a target inside the extent lands exactly on it', () => {
+  it('29.039 a glide aimed past either scrollable end stops at that end and settles: a last frame reports moving: false and the loop goes idle; control: a target inside the extent lands exactly on it', () => {
     const { el, adapter, fc, frames } = mount();
     // a real scroller clamps scrollLeft to [0, scrollWidth - clientWidth]; jsdom does not, so say so
     let stored = 0;
@@ -149,6 +190,11 @@ describe('29.032 glides', () => {
     fc.advance(1500);
     expect(stored).toBeCloseTo(8600, 0);
     expect(frames[frames.length - 1]).toMatchObject({ moving: false });
+    expect(fc.pending()).toBe(0);
+    adapter.animateTo({ offset: FIRST - 50 }); // and before the first day
+    fc.advance(1500);
+    expect(stored).toBe(0);
+    expect(frames[frames.length - 1]).toMatchObject({ moving: false, offset: FIRST });
     expect(fc.pending()).toBe(0);
     const inside = mount();
     let held = 0;
@@ -160,7 +206,7 @@ describe('29.032 glides', () => {
     expect(inside.fc.pending()).toBe(0);
   });
 
-  it('29.032 zoom glides geometrically about the viewport centre, and the centre day does not move', () => {
+  it('29.032 zoom glides geometrically about the viewport centre, inside 450 ms, and the centre day does not move', () => {
     const { el, adapter, fc, resize } = mount();
     el.scrollLeft = 2400;
     const centreDay = dayAt({ offsetDay: adapter.offset(), ppd: adapter.scale() }, 500);
@@ -169,8 +215,25 @@ describe('29.032 glides', () => {
       resize();
       fc.advance(16);
       expect(Math.abs((centreDay - adapter.offset()) * adapter.scale() - 500)).toBeLessThan(0.5);
+      if (i === 28) expect(adapter.scale(), 'landed by 464 ms').toBeCloseTo(8, 2);
     }
     expect(adapter.scale()).toBeCloseTo(8, 2);
+  });
+
+  it('29.032 a glide started during a fling replaces the fling and lands exactly on its target', () => {
+    const { el, adapter, fc } = mount();
+    el.scrollLeft = 4000;
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+    for (let i = 1; i <= 4; i += 1) {
+      fc.advance(16);
+      el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
+    }
+    el.dispatchEvent(pointer('pointerup', { x: 580, y: 50 }));
+    fc.advance(32);
+    expect(el.scrollLeft).toBeLessThan(4000 - 80 - 10); // the fling is under way
+    adapter.animateTo({ offset: FIRST + 100 });
+    fc.advance(2000);
+    expect(adapter.offset()).toBeCloseTo(FIRST + 100, 6);
   });
 });
 
@@ -181,7 +244,7 @@ describe('29.033 keys', () => {
     return e;
   };
 
-  it('29.033 Left / Right glide 7 days, with Shift 28, PageUp / PageDown 90% of a viewport, Home or T centres today, + and - zoom 1.25x; each is cancelled so the page does not also scroll', () => {
+  it('29.033 Left / Right glide 7 days, with Shift 28, PageUp / PageDown 90% of a viewport, Home or T centres today, + (or =) and - (or _) zoom 1.25x; each is cancelled so the page does not also scroll', () => {
     const { el, adapter, fc, todayDay } = mount();
     el.scrollLeft = 24 * 100;
     const start = adapter.offset();
@@ -213,9 +276,15 @@ describe('29.033 keys', () => {
     expect(press(el, '-').defaultPrevented).toBe(true);
     fc.advance(700);
     expect(adapter.scale()).toBeCloseTo(24, 2);
+    expect(press(el, '=').defaultPrevented).toBe(true);
+    fc.advance(700);
+    expect(adapter.scale()).toBeCloseTo(24 * 1.25, 2);
+    expect(press(el, '_').defaultPrevented).toBe(true);
+    fc.advance(700);
+    expect(adapter.scale()).toBeCloseTo(24, 2);
   });
 
-  it('29.033 two quick presses add up (the second starts from the first target); a key with Ctrl, or typed into an input, is left alone', () => {
+  it('29.033 two quick presses add up (the second starts from the first target); a key with Ctrl, Meta or Alt, one already handled, or one typed into an input, is left alone', () => {
     const { el, adapter, fc } = mount();
     el.scrollLeft = 24 * 100;
     const start = adapter.offset();
@@ -224,9 +293,18 @@ describe('29.033 keys', () => {
     press(el, 'ArrowRight');
     fc.advance(900);
     expect(adapter.offset()).toBeCloseTo(start + 14, 1);
-    const ctrl = new KeyboardEvent('keydown', { key: 'ArrowRight', ctrlKey: true, bubbles: true, cancelable: true });
-    el.dispatchEvent(ctrl);
-    expect(ctrl.defaultPrevented).toBe(false);
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey'] as const) {
+      const e = new KeyboardEvent('keydown', { key: 'ArrowRight', [mod]: true, bubbles: true, cancelable: true });
+      el.dispatchEvent(e);
+      expect(e.defaultPrevented, mod).toBe(false);
+    }
+    // a key something inside already handled
+    const bar = el.querySelector('button') as HTMLButtonElement;
+    bar.addEventListener('keydown', (e) => e.preventDefault(), { once: true });
+    const at = adapter.offset();
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    fc.advance(700);
+    expect(adapter.offset()).toBe(at);
     const input = document.createElement('input');
     el.append(input);
     const typed = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
@@ -238,18 +316,22 @@ describe('29.033 keys', () => {
 describe('29.034 a mouse drag pans, with momentum', () => {
   const click = () => new MouseEvent('click', { bubbles: true, cancelable: true });
 
-  it('29.034 dragging 100 px right scrolls 100 px left; releasing at speed keeps going and stops below 2 px/s; the click that ends the drag is swallowed; control: a press that did not move clicks as usual, and a drag begun on a bar, or by touch, does nothing', () => {
-    const { el, adapter, fc } = mount();
+  it('29.034 dragging 100 px right scrolls 100 px left; releasing at speed keeps going and stops below 2 px/s; the click that ends the drag is swallowed; frames report moving throughout the drag; control: a press that did not move clicks as usual, and a drag begun on a bar, by touch, with another button or by a second pointer does nothing', () => {
+    const { el, adapter, fc, frames } = mount();
     el.scrollLeft = 2000;
     let clicks = 0;
     el.addEventListener('click', () => (clicks += 1));
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
     expect(el.classList.contains('gn-dragging')).toBe(true);
+    el.dispatchEvent(pointer('pointermove', { x: 900, y: 50, id: 2 })); // a second pointer is not the drag
+    expect(el.scrollLeft).toBe(2000);
     for (let i = 1; i <= 6; i += 1) {
       fc.advance(16);
       el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
     }
     expect(el.scrollLeft).toBeCloseTo(2000 - 120, 5);
+    expect(frames.length).toBeGreaterThanOrEqual(6);
+    expect(frames.every((f) => f.moving)).toBe(true); // frames keep coming while the pointer drags
     el.dispatchEvent(pointer('pointerup', { x: 620, y: 50 }));
     expect(el.classList.contains('gn-dragging')).toBe(false);
     const released = el.scrollLeft;
@@ -259,8 +341,10 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     const rest = el.scrollLeft;
     fc.advance(500);
     expect(el.scrollLeft).toBe(rest);
-    el.querySelector('button')?.dispatchEvent(click());
+    const swallowed = click();
+    el.querySelector('button')?.dispatchEvent(swallowed);
     expect(clicks).toBe(0); // swallowed
+    expect(swallowed.defaultPrevented).toBe(true);
     el.querySelector('button')?.dispatchEvent(click());
     expect(clicks).toBe(1); // only the one
     // control: a press on empty canvas that did not move is no drag, so its click goes through
@@ -268,8 +352,10 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     el.dispatchEvent(pointer('pointerup', { x: 400, y: 50 }));
     el.querySelector('button')?.dispatchEvent(click());
     expect(clicks).toBe(2);
-    // controls: a drag begun on a bar, or by touch
+    // controls: a drag begun on a bar, by touch, or with another button
     const at = el.scrollLeft;
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50, button: 2 }));
+    el.dispatchEvent(pointer('pointermove', { x: 650, y: 50 }));
     el.querySelector('button')?.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
     el.dispatchEvent(pointer('pointermove', { x: 600, y: 50 }));
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50, id: 9, kind: 'touch' }));
@@ -278,7 +364,21 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     expect(adapter.offset()).toBeGreaterThan(FIRST);
   });
 
-  it('29.034 a pointer that rested 300 ms before release has no momentum', () => {
+  it('29.034 a fling toward the first day stops there: the scroll rests at 0 and the loop goes idle', () => {
+    const { el, fc } = mount();
+    el.scrollLeft = 100;
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+    for (let i = 1; i <= 3; i += 1) {
+      fc.advance(16);
+      el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
+    }
+    el.dispatchEvent(pointer('pointerup', { x: 560, y: 50 })); // 1,250 px/s toward 0 from 40 px
+    fc.advance(400);
+    expect(el.scrollLeft).toBe(0);
+    expect(fc.pending()).toBe(0);
+  });
+
+  it('29.034 a pointer that rested 300 ms before release, or any release under reduced motion, has no momentum', () => {
     const { el, fc } = mount();
     el.scrollLeft = 2000;
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
@@ -289,6 +389,17 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     const rest = el.scrollLeft;
     fc.advance(500);
     expect(el.scrollLeft).toBe(rest);
+    const r = mount({ reduced: true });
+    r.el.scrollLeft = 2000;
+    r.el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+    for (let i = 1; i <= 4; i += 1) {
+      r.fc.advance(16);
+      r.el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
+    }
+    r.el.dispatchEvent(pointer('pointerup', { x: 580, y: 50 }));
+    const flung = r.el.scrollLeft;
+    r.fc.advance(500);
+    expect(r.el.scrollLeft).toBe(flung);
   });
 });
 
@@ -334,12 +445,20 @@ describe('29.036 the frame stream', () => {
     expect(el.scrollLeft).toBeCloseTo((day - (FIRST - 30)) * 24, 6);
   });
 
-  it('29.036 destroy removes every listener and stops the loop; control: before destroy the same wheel zoomed', () => {
-    const { el, adapter, fc } = mount();
+  it('29.036 a Ctrl + wheel zoom streams moving frames with the new scale | destroy removes every listener, the overshoot property and stops the loop; control: before destroy the same wheel zoomed', () => {
+    const { el, adapter, fc, frames } = mount();
     el.dispatchEvent(wheel({ dy: 5, ctrl: true, x: 100 }));
     const zoomed = adapter.scale();
     expect(zoomed).not.toBe(24);
+    fc.advance(16);
+    expect(frames[frames.length - 1]).toMatchObject({ moving: true, scale: zoomed }); // a wheel zoom streams frames
+    el.scrollLeft = 2000; // a drag inside the limits writes the overshoot property (0px)
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+    el.dispatchEvent(pointer('pointermove', { x: 520, y: 50 }));
+    el.dispatchEvent(pointer('pointerup', { x: 520, y: 50 }));
+    expect(el.style.getPropertyValue('--tl-overshoot')).toBe('0px');
     adapter.destroy();
+    expect(el.style.getPropertyValue('--tl-overshoot')).toBe('');
     const e = wheel({ dy: 50, ctrl: true, x: 100 });
     el.dispatchEvent(e);
     expect(adapter.scale()).toBe(zoomed);
