@@ -58,6 +58,10 @@ describe('get_notification_preferences / set_notification_preferences (package)'
     // "What was stored" is the server's answer, not what was sent: a server that answers another document is believed.
     const other = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: [] }, [`PUT ${PREFS}`]: { mutedKinds: ['stale-ticket', 'mention'] } } });
     expect(await set(other.session, { mute: ['mention'] })).toEqual({ mutedKinds: ['stale-ticket', 'mention'], changed: true });
+    // An answer to the PUT that is not a preferences document is an error, never a success with no kinds.
+    const broken = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: [] }, [`PUT ${PREFS}`]: { nope: 1 } } });
+    await expect(set(broken.session, { mute: ['mention'] })).rejects.toThrow();
+    expect(puts(broken.requests)).toHaveLength(1);
     // The stdio door: createSession over a REAL client against a stub server (`Session.put` for real, NP-8).
     let doc = { mutedKinds: [] as string[] };
     const methods: string[] = [];
@@ -176,9 +180,15 @@ describe('list_saved_filters (package)', () => {
     expect(await list(empty.session)).toEqual({ workspaceId: 'W1', savedFilters: [] });
     expect(JSON.stringify(await list(s.session))).not.toContain('listColumns');
     // A document that is not a list of saved filters is an error in its own words, never an empty list.
-    for (const bad of [{ savedFilters: 'x' }, { savedFilters: [{ id: 'f9', filterSpec: {} }] }]) {
+    // One leg per guard: not a list, no id, no name, a filter that is not an object.
+    for (const [label, bad] of [
+      ['not a list', { savedFilters: 'x' }],
+      ['no id', { savedFilters: [{ name: 'n', filterSpec: {} }] }],
+      ['no name', { savedFilters: [{ id: 'f9', filterSpec: {} }] }],
+      ['a filter that is not an object', { savedFilters: [{ id: 'f9', name: 'n', filterSpec: 'x' }] }],
+    ] as const) {
       const odd = recordingSession({ routes: { 'GET /v1/me/preferences': bad } });
-      await expect(list(odd.session)).rejects.toThrow(/^your saved filters could not be read$/);
+      await expect(list(odd.session), label).rejects.toThrow(/^your saved filters could not be read$/);
     }
     expect(find(s.session, 'list_saved_filters').description).toBe(
       'Your saved filters in one workspace (the named views on the project page): id, name and filter. Pass a filter to list_tickets or search exactly as it is. ' +
