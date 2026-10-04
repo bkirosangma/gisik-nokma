@@ -297,6 +297,7 @@ export {
 // the component reads it, and its own test measures the shift by the columns
 // that move rather than by re-stating the constant.
 export { TimelineView, type TimelineViewProps } from './timeline/timeline-view.js';
+export { dayNumberOf, isoDayOf } from './timeline/timeline-days.js';
 // Plan 9 Task 12 — the inbox. Named exports with the `.js` extension, matching
 // every block above; `export *` (which the plan's draft writes five times)
 // would re-export this module's internals — `PATHS`, `sinceDay`, `CAP` — as
