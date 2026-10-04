@@ -34,8 +34,11 @@ export const SWEEP: Record<string, SweepEntry> = {
   search: { args: { workspaceId: 'w', query: 'q' } },
   search_tickets: { args: { workspaceId: 'w', query: 'q' } },
   list_tickets: { args: { projectId: 'p' } },
-  // Typed links T4: get_ticket also reads the links route, which answers `{ links }`.
-  get_ticket: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async (path) => (path.endsWith('/links') ? { links: [] } : TICKET_DETAIL) } },
+  // Typed links T4: get_ticket also reads the links route, which answers `{ links }`; MCP sweep 2 T3: and the notes route, `{ notes }`.
+  get_ticket: {
+    args: { workspaceId: 'w', ticketId: 't' },
+    session: { get: async (path) => (path.endsWith('/links') ? { links: [] } : path.endsWith('/notes') ? { notes: [] } : TICKET_DETAIL) },
+  },
   list_members: { args: { workspaceId: 'w' } },
   // read end
   create_ticket: { args: { workspaceId: 'w', projectId: 'p', typeId: 'ty', title: 'A ticket' } },
