@@ -47,6 +47,8 @@ describe('29.008 the critically damped spring', () => {
     expect(stepLinear(0, 9, 16).settled).toBe(false);
     const k = 1 - Math.exp(-16 / SPRING_TAU_MS);
     expect(stepGeometric(64, 4, 16).value).toBeCloseTo(64 * Math.pow(4 / 64, k), 12);
+    // within the ratio epsilon (0.005 / 64 < 1e-4) it lands EXACTLY on the target; an absolute 0.005 would not settle
+    expect(stepGeometric(64.005, 64, 0)).toEqual({ value: 64, settled: true });
   });
 });
 
@@ -60,6 +62,7 @@ describe('29.009 momentum', () => {
     expect(releaseVelocity(old, 180)).toBeCloseTo(1000, 6); // only t >= 100 counts: 1 px/ms
     expect(releaseVelocity([...moving, { t: 120, x: 0 }], 80)).toBeCloseTo(2000, 6); // a sample after `now` is not in the window
     expect(releaseVelocity([{ t: 5, x: 3 }], 5)).toBe(0);
+    expect(releaseVelocity([{ t: 80, x: 0 }, { t: 80, x: 5 }], 80)).toBe(0); // coalesced samples at one t: 0, not NaN
   });
 
   it('29.009 v(t) = v0 e^(-t/240): travel is v0 * tau, one long step equals many short ones, and it stops below 2 px/s; control: 2,000 px/s travels 480 px', () => {
@@ -74,6 +77,7 @@ describe('29.009 momentum', () => {
     expect(one.offset).toBeCloseTo(many.offset, 3);
     expect(momentumStep(0, 3, 16).stopped).toBe(false);
     expect(momentumStep(0, 2.02, 100).stopped).toBe(true);
+    expect(momentumStep(0, 2.02, 100).offset).toBeCloseTo(2.02 * 0.24 * (1 - Math.exp(-100 / 240)), 12); // the stopping frame still travels
   });
 });
 
@@ -102,6 +106,8 @@ describe('29.008 a long glide is faster, never cut off', () => {
   it('29.008 tauFor keeps 85 ms for a short distance and shortens it so any distance arrives inside maxMs; control: with the fixed 85 ms a 1,000,000 px glide is still moving at 450 ms', () => {
     expect(tauFor(10, 0.5, 450)).toBe(85);
     expect(tauFor(100, 0.5, 450)).toBeLessThanOrEqual(85);
+    expect(tauFor(0, 0.5, 450)).toBe(85); // at or under epsilon: no negative tau
+    expect(tauFor(0.1, 0.5, 450)).toBe(85);
     const arrive = (distance: number, tau: number) => {
       let value = 0;
       let t = 0;

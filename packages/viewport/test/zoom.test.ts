@@ -61,8 +61,13 @@ describe('29.013 the wheel', () => {
     expect(wheelIntent(w({ deltaY: 40 }))).toEqual({ kind: 'zoom', factor: Math.exp(-40 * 0.0022) }); // 40 px is a notch
     expect(wheelIntent(w({ deltaY: 40.5 }))).toEqual({ kind: 'pan', dx: 0, dy: 40.5 }); // a fractional delta is a trackpad
     expect(wheelIntent(w({ deltaMode: 1, deltaY: 3 }))).toEqual({ kind: 'zoom', factor: Math.exp(-48 * 0.0022) });
+    expect(wheelIntent(w({ deltaX: 3, deltaY: 100 }))).toEqual({ kind: 'pan', dx: 3, dy: 100 }); // a sideways component is a trackpad
+    expect(wheelIntent(w({ deltaY: -100 }))).toEqual({ kind: 'zoom', factor: Math.exp(100 * 0.0022) }); // a notch UP zooms out
+    expect(wheelIntent(w({ deltaMode: 1, deltaY: 1 }))).toEqual({ kind: 'zoom', factor: Math.exp(-16 * 0.0022) }); // any line-mode wheel is a mouse, even under 40 px
+    expect(wheelIntent(w({ deltaMode: 2, deltaY: 1 }))).toEqual({ kind: 'zoom', factor: Math.exp(-400 * 0.0022) }); // a page is 400 px
     expect(wheelZoomFactor(w({ ctrlKey: true, deltaY: 10 }))).toBe(Math.exp(-10 * 0.012));
     expect(wheelZoomFactor(w({ ctrlKey: true, deltaMode: 1, deltaY: 1 }))).toBe(Math.exp(-16 * 0.012));
+    expect(wheelZoomFactor(w({ ctrlKey: true, deltaMode: 2, deltaY: 1 }))).toBe(Math.exp(-400 * 0.012)); // a page is 400 px
     expect(wheelZoomFactor(w({ deltaY: 100 }))).toBeNull();
     expect(wheelZoomFactor(w({ deltaX: 40 }))).toBeNull();
   });
