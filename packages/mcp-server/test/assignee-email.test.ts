@@ -337,6 +337,10 @@ describe('create_ticket by email (package)', () => {
     // A project the directory does not list is named by its id, and a workspace it does not list by its id (`?? a.projectId`, `?? a.workspaceId`).
     const unlisted = recordingSession({ routes: { [`POST ${LOOKUP}`]: { user: ASHA }, 'GET /v1/me/workspaces': DIRECTORY } });
     expect(((await createWith({ ...stub(), ...unlisted }, { projectId: 'P9' })) as Preview).wouldChange).toBe(`Creates "Fix login" in P9 (Corner Shop) and assigns it to Asha Rao (asha@example.com). Asha Rao is already in this workspace.`);
+    // The directory lists ANOTHER workspace first, with a project of the same id: the names come from the workspace asked about.
+    const other = { workspaceId: 'W0', name: 'Other Shop', prefix: 'OTH', role: 'owner', archived: false, projects: [{ projectId: P, name: 'Wrong room', description: null, prefix: 'WR', archived: false }] };
+    const crowded = recordingSession({ routes: { [`POST ${LOOKUP}`]: { user: ASHA }, 'GET /v1/me/workspaces': { workspaces: [other, ...DIRECTORY.workspaces] } } });
+    expect(((await createWith({ ...stub(), ...crowded })) as Preview).wouldChange).toBe(`${CREATE().headline(ASHA)} Asha Rao is already in this workspace.`);
     const nowhere = recordingSession({ routes: { [`POST ${LOOKUP}`]: { user: ASHA }, 'GET /v1/me/workspaces': { workspaces: [] } } });
     expect(((await createWith({ ...stub(), ...nowhere })) as Preview).wouldChange).toBe(`Creates "Fix login" in ${P} (${WS}) and assigns it to Asha Rao (asha@example.com). Asha Rao is already in this workspace.`);
     // CONTROL, same `it`: call 2 with the userId creates.
