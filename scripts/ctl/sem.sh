@@ -3,14 +3,15 @@
 # State lives in CTL_SEM_DIR (default ~/.cache/gisik-ctl/sem): MACHINE-wide, not ctl_marker_dir (that one is per checkout).
 #   slot-<n>/holder   one directory per held slot, made by an atomic `mkdir`; holder = `pid|lstart|label|epoch`, lstart = `ps -o lstart=` (LC_ALL=C TZ=UTC0) of
 #                     the pid, so a REUSED pid cannot impersonate the holder (stale = pid dead, or alive with another start time)
-#   gate-<pid>        a running `ctl gate` (same fields). While any live one exists no NEW slot is granted; running slots finish.
+#   gate-<pid>        a running `ctl gate` (same fields). While any live one exists a new slot is granted only while FEWER than CTL_SEM_GATE_SLOTS
+#                     slots are held (default 1; 0 = none is granted); running slots finish.
 #   slots             optional: the slot count (read before CTL_TEST_SLOTS so two callers cannot disagree on N)
 #   waits.tsv         one row per run: time, label, queue wait seconds, reason, slot count — the history the count is tuned from
 # macOS has no flock(1): mkdir is the lock. Bash 3.2-safe (no wait -n, mapfile, declare -A, EPOCHREALTIME; no empty array under set -u).
 # Test seams (env): CTL_SEM_CLOCK_FILE (fake clock: ctl_sem_sleep advances it and runs CTL_SEM_SLEEP_HOOK with CTL_SEM_NOW / CTL_SEM_SLEEP_SECS),
 # CTL_SEM_CLAIM_HOOK (runs right after a slot was claimed), CTL_SEM_POLL_SECS, CTL_SEM_SAMPLE_SECS.
 # Knobs: CTL_TEST_SLOTS (2), CTL_SEM_MIN_FREE_PCT (15), CTL_SEM_MAX_SWAPIN_MBS (8), CTL_SEM_SAMPLE_SECS (3), CTL_SEM_POLL_SECS (5),
-# CTL_SEM_MAX_WAIT (1800), CTL_SEM_GRACE_SECS (10).
+# CTL_SEM_MAX_WAIT (1800), CTL_SEM_GRACE_SECS (10), CTL_SEM_GATE_SLOTS (1).
 
 ctl_sem_dir() { local d="${CTL_SEM_DIR:-$HOME/.cache/gisik-ctl/sem}"; mkdir -p "$d"; echo "$d"; }
 ctl_sem_now() { if [ -n "${CTL_SEM_CLOCK_FILE:-}" ]; then cat "$CTL_SEM_CLOCK_FILE"; else date +%s; fi; }
@@ -59,6 +60,15 @@ ctl_sem_reclaim() {
   for d in "$sem"/gate-*; do [ -f "$d" ] || continue; ctl_sem_holder_live "$d" || rm -f "$d"; done
   return 0
 }
+# The slots a live gate leaves the lanes: CTL_SEM_GATE_SLOTS, 1 when unset or not a number. 0 is valid (no grant while a gate runs).
+ctl_sem_gate_slots() { local c="${CTL_SEM_GATE_SLOTS:-1}"; case "$c" in ''|*[!0-9]*) c=1;; esac; echo "$c"; }
+# Slots held now: every slot-<n>/holder file, PRESENT, not re-checked for life — the caller runs ctl_sem_reclaim first, which is what keeps a stale
+# holder out of the count. A dir moved aside by a reclaimer (slot-<n>.stale.<pid>) is not a slot.
+ctl_sem_held() {
+  local d sem n=0; sem="$(ctl_sem_dir)"
+  for d in "$sem"/slot-*; do case "$d" in *.stale.*) continue;; esac; [ -f "$d/holder" ] && n=$((n+1)); done
+  echo "$n"
+}
 ctl_sem_gate_live() { local g sem; sem="$(ctl_sem_dir)"; for g in "$sem"/gate-*; do [ -f "$g" ] && ctl_sem_holder_live "$g" && return 0; done; return 1; }
 
 # The gate's priority marker. begin before the REAL gate run, end by an EXIT trap (green, red, ^C). Written by verbs/gate.sh only.
@@ -96,8 +106,9 @@ ctl_sem_swap_why() {
   echo "swap-in at least ${CTL_SEM_MAX_SWAPIN_MBS:-8} MB/s over two ${CTL_SEM_SAMPLE_SECS:-3} s windows"; return 1
 }
 
-# ctl_sem_acquire LABEL — wait for a slot. Order per poll: reclaim stale → a gate runs? → a slot free? → pressure → swap-in → claim → re-check
-# the gate (one that began between the probe and the claim gets the slot back). Sets CTL_SEM_SLOT, CTL_SEM_SLOTS, CTL_SEM_WAITED (seconds from
+# ctl_sem_acquire LABEL — wait for a slot. Order per poll: reclaim stale → a gate runs with CTL_SEM_GATE_SLOTS already held? → a slot free? →
+# pressure → swap-in → claim → re-check the gate (one that began between the probe and the claim gets the slot back when, counting the claim,
+# more than CTL_SEM_GATE_SLOTS are held). Sets CTL_SEM_SLOT, CTL_SEM_SLOTS, CTL_SEM_WAITED (seconds from
 # entering the queue to the grant, minus the final probe's own sampling window: a measurement, not a wait) and CTL_SEM_REASONS (a+b, "-" none).
 # Returns 75 when CTL_SEM_MAX_WAIT elapses first (nothing claimed).
 ctl_sem_acquire() {
@@ -106,7 +117,7 @@ ctl_sem_acquire() {
   while :; do
     CTL_SEM_PROBE_SECS=0; why=""; N="$(ctl_sem_slots)"; CTL_SEM_SLOTS="$N"
     ctl_sem_reclaim
-    if ctl_sem_gate_live; then why=gate
+    if ctl_sem_gate_live && [ "$(ctl_sem_held)" -ge "$(ctl_sem_gate_slots)" ]; then why=gate
     else
       free=""; n=1; while [ "$n" -le "$N" ]; do [ -d "$sem/slot-$n" ] || { free="$n"; break; }; n=$((n+1)); done
       if [ -z "$free" ]; then why=slots
@@ -120,7 +131,7 @@ ctl_sem_acquire() {
         else
           printf '%s|%s|%s|%s\n' "$$" "$(ctl_sem_lstart $$)" "$label" "$(ctl_sem_now)" > "$sem/slot-$got/holder.tmp" && mv "$sem/slot-$got/holder.tmp" "$sem/slot-$got/holder"
           if [ -n "${CTL_SEM_CLAIM_HOOK:-}" ]; then "$CTL_SEM_CLAIM_HOOK"; fi
-          if ctl_sem_gate_live; then rm -rf "$sem/slot-$got"; why=gate
+          if ctl_sem_gate_live && [ "$(ctl_sem_held)" -gt "$(ctl_sem_gate_slots)" ]; then rm -rf "$sem/slot-$got"; why=gate
           else CTL_SEM_SLOT="$got"; break; fi
         fi
       fi

@@ -22,6 +22,7 @@ step "mutate refuses an unknown argument (exit 2)" "out=\$('$HERE/ctl' mutate --
 # The postman suite builds a scratch tmux session with fake panes and a scratch ledger (never a live seat; ~3.5 min).
 step "postman suite (ledger, ack, watcher, bridge, state machine, pane safety)" "bash '$HERE/test/postman.test.sh'"
 step "post/ack/postman --dry-run write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' post exec3 --kind fix --text x --from main --dry-run && CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --dry-run && [ ! -e \$d/LEDGER.jsonl ]"
+step "postman --shadow --dry-run and an unknown flag write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --shadow --dry-run && ! CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --shadw && [ ! -e \$d/postman ] && [ ! -e \$d/LEDGER.jsonl ]"
 step "ack refuses an unknown id" "d=\$(mktemp -d); ! CTL_POSTMAN_ROOT=\$d '$HERE/ctl' ack 99 --seat exec3"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
@@ -47,4 +48,6 @@ step "archive suite (exclusions with controls, notes roll, landing guard, dry-ru
 step "prune-gate-locks suite (age lines, newest/live-pid/in-ps guards with controls, dry-run default, mutants)" "bash '$HERE/test/prune-gate-locks.test.sh'"
 step "autopilot suite (guards with controls, pull order, needs/stacks/FIX, shadow writes nothing + its mutant, make-lane-ptr)" "bash '$HERE/test/autopilot.test.sh'"
 step "archive refuses an unknown argument" "out=\$('$HERE/ctl' archive --nope 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
+step "check-base suite (WRONG-BASE vs stale vs tie, main as a candidate, bad input)" "bash '$HERE/test/check-base.test.sh'"
+step "check-base refuses a missing stated base" "out=\$('$HERE/ctl' check-base task/x --repo '$repo' 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q usage"
 [ "$fails" -eq 0 ] && ctl_ok selftest "$n steps" || ctl_fail selftest "$fails steps red"

@@ -20,6 +20,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   reconcile                       ledger vs report headings by membership + plan coverage
   lanes [--watch]                 one line per gisik: window
   seats [--json] [--flag]         one line per seat: busy/idle, shells+monitors, input box, Ctx, branch, last DONE/CHECKPOINT (read-only; --flag = only seats needing action)
+  check-base <branch> <stated-base>  WRONG-BASE (exit 1) when another origin/release/* or main reaches the branch's first-parent line nearer the tip than the base a REVIEW line states
   restart <window> <worktree> <brief> [--override FILE] [--model M] [--effort E]
   close <window>                  close an idle lane whose worktree is clean and pushed
   archive [--apply] [--list]      move stale lanes-dir working files to archive/<date>/ + roll the notes (dry-run by default; refuses while a landing is in flight)
