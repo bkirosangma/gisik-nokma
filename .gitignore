@@ -55,3 +55,6 @@ gisik-nokma-lanes/
 
 # Claude Code agent worktrees (a committed gitlink here broke CI checkout post-job: no .gitmodules entry)
 .claude/worktrees/
+
+# flow-graph-browser: stress records the harness appends through its /__results endpoint (a real-phone run writes here too)
+packages/flow-graph-browser/results/
