@@ -795,7 +795,7 @@ export function registerTicketRoutes(
    * `canSee` first, then admits the author of a draft) and `ticketIsOpenable`
    * (`ticketIsLive` without the draft clause); the events door above keeps
    * `canSee`. That is deliberate rather than convenient — "may this caller see
-   * this ticket" is asked in exactly one place (`../visibility/can-see.ts:227`),
+   * this ticket" is asked in exactly one place (`../visibility/can-see.ts:298`),
    * and a second, weaker answer to it is this project's signature failure;
    * "may this caller open this draft" is likewise one place
    * (`../visibility/can-open.ts`). The deletion question is a DIFFERENT one and
@@ -894,7 +894,7 @@ export function registerTicketRoutes(
     async (request, reply) => {
       const { workspaceId, ticketId } = request.params;
       // The same two guards, in the same order, answering the same body.
-      // G10 (drafts spec R56): canOpen, then ticketIsOpenable; the events (:749) and comments (:985) doors keep canSee
+      // G10 (drafts spec R56): canOpen, then ticketIsOpenable; the events (:750) and comments (:991) doors keep canSee
       // and ticketIsLive, a draft's history and comments are closed even to its author.
       if ((await loadTicketRow(deps.pool, workspaceId, ticketId)) === undefined) {
         return reply.code(404).send(NOT_FOUND_BODY);
