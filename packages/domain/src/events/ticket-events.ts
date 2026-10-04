@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString, type EventEnvelope } from '../envelope.js';
+import { linkLabelSchema } from '../link-label.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
 import { dueDateValueSchema, estimateValueSchema, prioritySchema } from '../ticket-types.js';
 
@@ -247,8 +248,13 @@ export const ticketReparentedPayload = z
  * source is a published ticket S and whose target is a draft D is never written on S's stream (that stream is
  * public and would name a private ticket); it is written on D's stream as `{ kind, targetId: D, from: S }` and
  * re-filed on S's stream, plain, when D is published. A payload without `from` is exactly what it always was.
+ *
+ * `leads_to` and `label` (workflow-timeline-graphs LK-1, LK-2): "A leads to B" is a step in a flow. Its optional
+ * `label` names the branch ("Yes"), on `ticket.link_added` only and on `leads_to` only (the second refine);
+ * `ticket.link_removed` names a link by kind and ends and stays `{kind, targetId, from?}`. A relabel is a removal
+ * then an add (LK-4). An absent label is no label: no stored event changes meaning.
  */
-export const TICKET_LINK_KINDS = ['blocks', 'relates', 'duplicates'] as const;
+export const TICKET_LINK_KINDS = ['blocks', 'relates', 'duplicates', 'leads_to'] as const;
 export type TicketLinkKind = (typeof TICKET_LINK_KINDS)[number];
 const linkPayloadShape = {
   kind: z.enum(TICKET_LINK_KINDS),
@@ -257,7 +263,11 @@ const linkPayloadShape = {
 };
 const fromDiffersFromTarget = (p: { targetId: string; from?: string | undefined }): boolean => p.from !== p.targetId;
 const FROM_MESSAGE = 'a link\'s "from" must be a different ticket from its target';
-export const ticketLinkAddedPayload = z.object(linkPayloadShape).strict().refine(fromDiffersFromTarget, { message: FROM_MESSAGE });
+export const ticketLinkAddedPayload = z
+  .object({ ...linkPayloadShape, label: linkLabelSchema.optional() })
+  .strict()
+  .refine(fromDiffersFromTarget, { message: FROM_MESSAGE })
+  .refine((p) => p.label === undefined || p.kind === 'leads_to', { message: 'a label belongs to a leads_to link only', path: ['label'] });
 export const ticketLinkRemovedPayload = z.object(linkPayloadShape).strict().refine(fromDiffersFromTarget, { message: FROM_MESSAGE });
 export const TICKET_LINK_EVENT_TYPES = ['ticket.link_added', 'ticket.link_removed'] as const;
 export function isTicketLinkEvent(type: string): boolean {
@@ -308,6 +318,7 @@ const READINGS: Record<TicketLinkKind, { out: string; in: string }> = {
   blocks: { out: 'blocks', in: 'is blocked by' },
   relates: { out: 'relates to', in: 'relates to' },
   duplicates: { out: 'duplicates', in: 'is duplicated by' },
+  leads_to: { out: 'leads to', in: 'comes after' },
 };
 /** How a link reads from one end (spec §2.1). One table for the engine's reasons, History, the app and MCP. */
 export function linkReading(kind: TicketLinkKind, direction: 'out' | 'in'): string {
