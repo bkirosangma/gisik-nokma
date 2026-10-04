@@ -271,6 +271,15 @@ describe('29.099 there are no pages: no Earlier / Later, a Today button, a zoom 
     expect(dayAt(mon + 5)?.getAttribute('data-weekend')).toBe('true');
     expect(dayAt(mon + 6)?.getAttribute('data-weekend')).toBe('true');
     expect(dayAt(mon + 7)?.textContent).toBe('31');
+    // The 1st of a month carries the month and year, EXACTLY (planner P20 class 2d): Tue 1 Sep is eight days after Mon 24
+    // Aug, and its label reads "Sep 2026", never "Sep", "September" or "2026 Sep". Control: Wed 2 Sep carries no period label.
+    const periodAt = (d0: number) =>
+      [...(axis?.querySelectorAll<HTMLElement>('.gn-timeline__axis-label') ?? [])].find((n) => n.style.getPropertyValue('--d0') === String(d0));
+    expect(periodAt(mon + 8)?.textContent).toBe('Sep 2026');
+    expect(periodAt(mon + 8)).toHaveClass('gn-timeline__axis-label--month');
+    expect(periodAt(mon + 9)).toBeUndefined();
+    // The chart itself is one focusable group named EXACTLY "Timeline" (the name a screen reader announces on entering it).
+    expect(screen.getByRole('group', { name: 'Timeline' })).toHaveClass('gn-timeline__canvas');
   });
 });
 
