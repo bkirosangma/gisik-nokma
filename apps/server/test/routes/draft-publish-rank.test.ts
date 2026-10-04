@@ -141,10 +141,21 @@ describe('28.189 rows the publisher cannot see (R65, Q15)', () => {
     expect(
       await door(read, 'owner', 'ticket', hidden, 'visibility.set', { ticketId: hidden, mode: 'explicit', userIds: [read.userIds.owner] }),
     ).toMatchObject({ status: 'committed' });
+    // Rows the backfill must not touch, whoever publishes: one outside the Backlog (`rank-requires-backlog` would refuse
+    // its `ticket.ranked`) and a soft-deleted Backlog row (the engine would accept a rank on it).
+    const todo = newUlid();
+    expect(
+      await door(read, 'member', 'ticket', todo, 'ticket.created', { typeId: 'task', projectId: p, parentId: null, title: `Todo ${todo.slice(-6)}` }),
+    ).toMatchObject({ status: 'committed' });
+    const gone = await backlog(p);
+    expect(await door(read, 'owner', 'ticket', gone, 'ticket.deleted', {})).toMatchObject({ status: 'committed' });
+    const rankOf = async (id: string): Promise<string | null | undefined> =>
+      (await db.pool.query<{ rank: string | null }>('SELECT rank FROM proj_tickets WHERE ticket_id = $1', [id])).rows[0]?.rank;
     const d = await draft(p);
 
     const res = await publishSet('member', [d]);
     expect(res.statusCode, res.body).toBe(200);
+    expect([await rankOf(todo), await rankOf(gone)]).toEqual([null, null]);
     const rows = await rowsOf(p);
     expect(rows.find((row) => row.ticketId === hidden)?.rank).toBeNull();
     expect(rows.find((row) => row.ticketId === seen)?.rank).not.toBeNull();
@@ -153,6 +164,64 @@ describe('28.189 rows the publisher cannot see (R65, Q15)', () => {
     const od = await draft(p, 'owner');
     expect((await publishSet('owner', [od])).statusCode).toBe(200);
     expect((await rowsOf(p)).find((row) => row.ticketId === hidden)?.rank).not.toBeNull(); // CONTROL: the owner sees it, so it is ranked
+    expect([await rankOf(todo), await rankOf(gone)]).toEqual([null, null]); // the owner's backfill skips them too
     expect((await drawn(p)).slice(-1)).toEqual([od]);
+  });
+});
+
+describe('28.188 a rank refused at commit (R64, decision 6)', () => {
+  // The rank rows are read BEFORE the transaction, with the staleness a drag has. This world's ingest runs a hook right
+  // before the atomic call, so the race a concurrent move makes (the unranked row leaves the Backlog between the read
+  // and the commit) is held still.
+  let db2: TestDatabase;
+  let read2: ReadWorld;
+  let beforeAtomic: (() => Promise<void>) | null = null;
+  beforeAll(async () => {
+    db2 = await createTestDatabase();
+    read2 = await buildReadTestApp(db2, {
+      observeIngest: (ingest) => {
+        const atomic = ingest.ingestClientAtomic.bind(ingest);
+        ingest.ingestClientAtomic = async (...args: Parameters<typeof atomic>) => {
+          const hook = beforeAtomic;
+          beforeAtomic = null;
+          if (hook !== null) await hook();
+          return atomic(...args);
+        };
+      },
+    });
+  }, 120_000);
+  afterAll(async () => {
+    await read2.app.close();
+    await db2.drop();
+  });
+
+  it('rolls the publishes back and the 409 names the RANKED ticket with the engine\'s rule; CONTROL: the same set then publishes', async () => {
+    const ws = read2.world.workspaceId;
+    const send = (role: ReadRole, kind: 'project' | 'ticket', id: string, type: string, payload: unknown) => door(read2, role, kind, id, type, payload);
+    const p = newUlid();
+    expect(await send('owner', 'project', p, 'project.created', { name: `Race ${p.slice(-6)}` })).toMatchObject({ status: 'committed' });
+    const [u, d] = [newUlid(), newUlid()];
+    expect(await send('member', 'ticket', u, 'ticket.created', { typeId: 'task', projectId: p, parentId: null, title: 'Row u', start: 'backlog' })).toMatchObject({ status: 'committed' });
+    expect(
+      await send('member', 'ticket', d, 'ticket.created', { typeId: 'task', projectId: p, parentId: null, title: 'Draft d', start: 'backlog', draft: true }),
+    ).toMatchObject({ status: 'committed' });
+    const publish = () => read2.app.inject({ method: 'POST', url: `/v1/workspaces/${ws}/drafts/publish`, headers: read2.authOf('member'), payload: { ticketIds: [d] } });
+    const head2 = async (id: string) =>
+      (await db2.pool.query<{ draft_author_id: string | null; rank: string | null }>('SELECT draft_author_id, rank FROM proj_tickets WHERE ticket_id = $1', [id])).rows[0];
+
+    beforeAtomic = async () => {
+      expect(await send('member', 'ticket', u, 'ticket.transitioned', { to: 'todo' })).toMatchObject({ status: 'committed' });
+    };
+    const refused = await publish();
+    expect(refused.statusCode, refused.body).toBe(409);
+    // The set is [publish d, rank u (the backfill), rank d]: the refusal is at index 1, past the end of ticketIds.
+    expect(refused.json()).toMatchObject({ rule: 'draft.publish-refused', ticketId: u, cause: { rule: 'rank-requires-backlog' } });
+    expect(await head2(d)).toEqual({ draft_author_id: read2.userIds.member, rank: null }); // nothing published, nothing ranked
+
+    const ok = await publish(); // CONTROL: u is out of the Backlog now, so it is not read and the set commits
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(await head2(d)).toMatchObject({ draft_author_id: null });
+    expect((await head2(d))?.rank).not.toBeNull();
+    expect((await head2(u))?.rank).toBeNull();
   });
 });
