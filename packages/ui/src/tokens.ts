@@ -1810,6 +1810,16 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'categoryOpen', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'categoryActive', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'categoryTerminal', bg: 'surfaceRaised', minimum: 3 },
+  /**
+   * WTG Part 4 T2 (29.303): the Timeline graph fills its bars and Decision diamonds with the three category roles (the
+   * state chips' colour language: done terminal, in progress active, not started open) and writes the key, the title, the
+   * chip and the ✓ / ▶ mark on them in `textInverted`. Read text, so 4.5. Measured before declaring, the least across hig,
+   * minimal and neo in both themes: 5.07 on categoryTerminal, 5.81 on categoryActive, 4.90 on categoryOpen. The fills
+   * against the canvas are the category rows just above (3:1 on surface and surfaceRaised).
+   */
+  { fg: 'textInverted', bg: 'categoryTerminal', minimum: 4.5 },
+  { fg: 'textInverted', bg: 'categoryActive', minimum: 4.5 },
+  { fg: 'textInverted', bg: 'categoryOpen', minimum: 4.5 },
   { fg: 'blocked', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'pending', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'restricted', bg: 'surfaceRaised', minimum: 3 },

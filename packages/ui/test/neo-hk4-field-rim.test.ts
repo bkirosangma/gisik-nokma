@@ -24,9 +24,9 @@ describe('24.120 the fieldRim role, its variable and its three primitives are go
 });
 
 describe('24.121 the four fieldRim contrast rows are gone and every other row stays', () => {
-  it('24.121 no CONTRAST_PAIRS row names fieldRim; the roster is 52 (56 minus the four)', () => {
+  it('24.121 no CONTRAST_PAIRS row names fieldRim; the roster is 55 (56 minus the four, plus three for the Timeline graph bar text, 29.303)', () => {
     expect(CONTRAST_PAIRS.filter((p) => (p.fg as string) === 'fieldRim' || (p.bg as string) === 'fieldRim')).toEqual([]);
-    expect(CONTRAST_PAIRS.length).toBe(52);
+    expect(CONTRAST_PAIRS.length).toBe(55);
     // CONTROL: the rows beside them are untouched.
     expect(CONTRAST_PAIRS.some((p) => p.fg === 'border' && p.bg === 'surfaceWell' && p.minimum === 3)).toBe(true);
     expect(CONTRAST_PAIRS.some((p) => p.fg === 'textAccent' && p.bg === 'surfaceTrack' && p.minimum === 4.5)).toBe(true);
