@@ -78,13 +78,14 @@ describe('fieldChoicesFor', () => {
 
   /**
    * 3.972 — the picker offers the built-ins a `require-field` rule can GATE ON,
-   * and `priority` is deliberately not one of them (spec 2026-09-22).
+   * and `priority` (spec 2026-09-22) and `waitForAll` (wtg2 T4, spec ES-2,
+   * case 29.162) are deliberately not among them.
    *
    * **Asserted as a SET DIFFERENCE against `BUILTIN_FIELD_IDS`, not as a fixed
    * list**, and the difference is the whole case. A hard-coded four would pass
    * for the wrong reason and would say nothing about the relationship; this
-   * says the two lists differ by EXACTLY `priority`, so:
-   *   - adding a sixth built-in without asking whether it can ever be unset
+   * says the two lists differ by EXACTLY `priority` and `waitForAll`, so:
+   *   - adding another built-in without asking whether it can ever be unset
    *     reddens here, and
    *   - a well-meaning "fix" that puts `priority` into the picker reddens too,
    *     which is the outcome this case exists to force into a conversation.
@@ -97,17 +98,19 @@ describe('fieldChoicesFor', () => {
    * the picker does not offer it, and the control proves the list is otherwise
    * exactly the built-ins.
    */
-  it('3.972 the choices are BUILTIN_FIELD_IDS MINUS priority — and priority IS a built-in', () => {
+  it('3.972 29.162 the choices are BUILTIN_FIELD_IDS MINUS priority and waitForAll — and both ARE built-ins', () => {
     const chosen = fieldChoicesFor([]).map((choice) => choice.id);
-    // The whole difference, as a set: one id, and it is `priority`.
-    expect([...BUILTIN_FIELD_IDS].filter((id) => !chosen.includes(id))).toEqual(['priority']);
+    // The whole difference, as a set: two ids, `priority` and `waitForAll`.
+    expect([...BUILTIN_FIELD_IDS].filter((id) => !chosen.includes(id))).toEqual(['priority', 'waitForAll']);
     // The negative said positively, so a `BUILTIN_FIELD_IDS` that had ALSO lost
     // `priority` could not satisfy the line above by making both sides empty.
     expect([...BUILTIN_FIELD_IDS]).toContain('priority');
     expect(chosen).not.toContain('priority');
-    // Control: the difference is ONE id and not a shrunken list — the picker
-    // still carries every other built-in.
-    expect(chosen).toEqual(['title', 'description', 'dueDate', 'startDate']);
+    expect([...BUILTIN_FIELD_IDS]).toContain('waitForAll');
+    expect(chosen).not.toContain('waitForAll');
+    // Control: the difference is TWO ids and not a shrunken list — the picker
+    // still carries every other built-in, Estimate and Rework estimate included.
+    expect(chosen).toEqual(['title', 'description', 'dueDate', 'startDate', 'estimate', 'reworkEstimate']);
   });
 
   it('appends the bound types custom fields, first definition winning duplicates', () => {

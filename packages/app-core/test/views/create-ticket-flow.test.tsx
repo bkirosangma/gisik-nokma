@@ -102,6 +102,18 @@ describe('13.1444 the birth start/due date reach ticket.created as {date} object
  * genuinely holds workflow defs this precheck can disagree with
  * `workflowStates` about — this is not a path that only a test can reach.
  */
+describe('29.165 the birth estimate reaches ticket.created as a bare number', () => {
+  it('29.165 the flow sends estimate as a bare number', async () => {
+    const source = createFakeDataSource();
+    renderFlow(source);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Create ticket' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    fireEvent.change(screen.getByLabelText('Estimate (days)'), { target: { value: '5' } });
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
+    expect(ticketCreatedPayload(source)['estimate']).toBe(5);
+  });
+});
+
 describe('13.1441a the inline stateRefusal precheck — a cache that disagrees with workflowStates', () => {
   it('refuses locally, submits NOTHING, and renders the reason under the select', async () => {
     const user = userEvent.setup();

@@ -3,7 +3,9 @@ import { PRIORITIES, newUlid } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
 import { MARKDOWN_SYNTAX_HELP, markdownBody, parentOf } from './markdown-io.js';
+import { EMAIL_FIELDS, resolveAssignee, submitForAssignee } from './assignee-email.js';
 import { envelopeFor, submitOne } from './submit.js';
+import { readTicket } from './ticket-tools.js';
 
 /** One ticket-entity envelope (the four write tools here all act on a ticket). */
 const envelope = (session: Session, workspaceId: string, ticketId: string, type: string, payload: unknown) =>
@@ -133,24 +135,36 @@ export function writeTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'assign_ticket',
-      description: 'Assign a ticket to somebody, or pass null to leave it unassigned.',
+      description:
+        'Assign a ticket to somebody, or pass assigneeId null to leave it unassigned. To assign someone by their email address instead, pass assignee_email (and no assigneeId): ' +
+        'the first call looks the address up and answers a PREVIEW naming the person and saying whether they are already in the workspace or WILL BE ADDED AS A GUEST (who would then see only this ticket); ' +
+        'nothing changes. Repeat the call with confirm_assignee set to that person\'s userId from the preview to assign. The address must belong to a person with a verified account.',
       inputSchema: {
         workspaceId: z.string().min(1),
         ticketId: z.string().min(1),
-        assigneeId: z.string().min(1).nullable(),
+        assigneeId: z.string().min(1).nullable().optional(),
+        ...EMAIL_FIELDS,
       },
       handler: async (args) => {
         const a = z
-          .object({
-            workspaceId: z.string().min(1),
-            ticketId: z.string().min(1),
-            assigneeId: z.string().min(1).nullable(),
-          })
+          .object({ workspaceId: z.string().min(1), ticketId: z.string().min(1), assigneeId: z.string().min(1).nullable().optional(), ...EMAIL_FIELDS })
           .parse(args);
-        return submitOne(
-          session,
-          envelope(session, a.workspaceId, a.ticketId, 'ticket.assigned', { assigneeId: a.assigneeId }),
-        );
+        if ((a.assigneeId !== undefined) === (a.assignee_email !== undefined)) {
+          throw new Error('assign_ticket takes exactly one of assigneeId (a person\'s id, or null to unassign) and assignee_email (an address, confirmed in a second call)');
+        }
+        if (a.confirm_assignee !== undefined && a.assignee_email === undefined) throw new Error('confirm_assignee only goes with assignee_email');
+        if (a.assignee_email === undefined) {
+          return submitOne(session, envelope(session, a.workspaceId, a.ticketId, 'ticket.assigned', { assigneeId: a.assigneeId ?? null }));
+        }
+        // Call 1 reads the ticket FIRST, so a ticket the caller cannot see is answered before any lookup (AE-11). Call 2 reads it only to
+        // name it in a fresh preview: the server's own refusal then covers a ticket that went away between the calls.
+        let ticket = a.confirm_assignee === undefined ? await readTicket(session, a.workspaceId, a.ticketId) : undefined;
+        const resolved = await resolveAssignee(session, a.workspaceId, a.assignee_email, a.confirm_assignee, async (person) => {
+          ticket ??= await readTicket(session, a.workspaceId, a.ticketId);
+          return `Assigns ${ticket.key ?? a.ticketId} "${ticket.title}" to ${person.name} (${person.email}).`;
+        });
+        if ('preview' in resolved) return resolved.preview;
+        return submitForAssignee(session, a.workspaceId, resolved.person, envelope(session, a.workspaceId, a.ticketId, 'ticket.assigned', { assigneeId: resolved.person.userId }));
       },
     },
   ];

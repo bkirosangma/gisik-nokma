@@ -232,6 +232,8 @@ export function applyTicketEvent(
         // either, so absent writes NO KEY rather than a null clearing claim.
         ...(p.startDate === undefined ? {} : { startDate: claim(p.startDate, env) }),
         ...(p.dueDate === undefined ? {} : { dueDate: claim(p.dueDate, env) }),
+        // The birth estimate (wtg2 T4, spec ES-1): absent writes NO KEY, the start/due rule directly above.
+        ...(p.estimate === undefined ? {} : { estimate: claim(p.estimate, env) }),
       },
       transitions: [],
       closed: null,

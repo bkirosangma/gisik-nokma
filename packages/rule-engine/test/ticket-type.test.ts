@@ -152,6 +152,13 @@ describe('checkTicketTypeDefined', () => {
     const subTask = BUILTIN_TICKET_TYPE_SEEDS.find((seed) => seed.id === 'sub-task');
     expect(subTask?.rank).toBe(DEEPEST_RANK);
   });
+
+  it('29.159 a custom field that shadows a flow built-in is refused at the door', async () => {
+    const refused = await checkTicketTypeDefined(typeDefined(def({ id: 'invoice', name: 'Invoice', rank: 3, fields: [{ id: 'estimate', name: 'Estimate', type: 'number' }] })), ctx());
+    expect(refused).toMatchObject({ refused: true, rule: 'malformed-payload' });
+    expect((refused as { reason: string }).reason).toContain('shadows a built-in field');
+    expect(await checkTicketTypeDefined(typeDefined(def({ id: 'invoice', name: 'Invoice', rank: 3, fields: [{ id: 'estimates', name: 'E', type: 'number' }] })), ctx())).toEqual({ refused: false }); // control
+  });
 });
 
 /**
