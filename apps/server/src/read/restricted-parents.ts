@@ -77,8 +77,9 @@ export async function restrictedParentsFor(
     project_id: string;
     resolved_mode: 'workspace' | 'project' | 'explicit';
     resolved_user_ids: string[];
+    draft_author_id: string | null;
   }>(
-    `SELECT ticket_id, workspace_id, project_id, resolved_mode, resolved_user_ids
+    `SELECT ticket_id, workspace_id, project_id, resolved_mode, resolved_user_ids, draft_author_id
        FROM proj_visibility
       WHERE ticket_id = ANY ($1::text[])`,
     [parentIds],
@@ -102,10 +103,12 @@ export async function restrictedParentsFor(
         projectId: parent.project_id,
         resolvedMode: parent.resolved_mode,
         resolvedUserIds: parent.resolved_user_ids,
+        draftAuthorId: parent.draft_author_id,
       })
     ) {
       visibleParents.add(parent.ticket_id);
-    } else if (eff.workspaceRole !== null) {
+    } else if (eff.workspaceRole !== null && parent.draft_author_id === null) {
+      // A draft parent is never offered to the assignee arm (drafts R17): it stays restricted.
       armCandidates.push(parent.ticket_id);
     }
   }

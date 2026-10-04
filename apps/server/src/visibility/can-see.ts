@@ -17,6 +17,13 @@ export interface ResolvedVisibility {
   projectId: string;
   resolvedMode: 'workspace' | 'project' | 'explicit';
   resolvedUserIds: string[];
+  /**
+   * Drafts spec R17-R19. Set when the ticket is a DRAFT: its author's id. A draft is closed for EVERY viewer
+   * here, the author included; the author reaches it only through the named doors (`visibility/can-open.ts`,
+   * T4). Required, not optional, so a hand-built literal that forgets it stops compiling instead of
+   * answering "visible".
+   */
+  draftAuthorId: string | null;
 }
 
 /**
@@ -118,6 +125,11 @@ export interface ResolvedVisibility {
  * by construction.
  */
 export function canSeeResolved(eff: EffectiveRole, userId: string, v: ResolvedVisibility): boolean {
+  // A draft is private to its author through the doors alone (R17). First, so no role, no mode and no
+  // explicit list can reopen it: the owner's bypass and the guest's list included.
+  if (v.draftAuthorId !== null) {
+    return false;
+  }
   if (eff.workspaceRole === null) {
     return false;
   }
@@ -158,8 +170,9 @@ export async function getResolvedVisibility(
     project_id: string;
     resolved_mode: ResolvedVisibility['resolvedMode'];
     resolved_user_ids: string[];
+    draft_author_id: string | null;
   }>(
-    `SELECT workspace_id, project_id, resolved_mode, resolved_user_ids
+    `SELECT workspace_id, project_id, resolved_mode, resolved_user_ids, draft_author_id
      FROM proj_visibility WHERE ticket_id = $1`,
     [ticketId],
   );
@@ -172,6 +185,7 @@ export async function getResolvedVisibility(
     projectId: row.project_id,
     resolvedMode: row.resolved_mode,
     resolvedUserIds: row.resolved_user_ids,
+    draftAuthorId: row.draft_author_id,
   };
 }
 
@@ -278,13 +292,17 @@ export function assigneeSees(eff: EffectiveRole, userId: string, assigneeId: str
  *
  * `canSeeResolved` OR the assignee arm (R1): the ticket, or an ancestor on its inheritance chain, is
  * CURRENTLY assigned to this user. Read fresh from the head rows, so reassigning takes the whole
- * inherited subtree away at once. The workspace role is ANDed here — the arm itself has none.
+ * inherited subtree away at once. The workspace role is ANDed here — the arm itself has none. The arm
+ * never reaches a DRAFT: `canSee` returns false for one before the role read (drafts spec R17).
  */
 export async function canSee(db: Queryable, userId: string, ticketId: string): Promise<boolean> {
   const v = await getResolvedVisibility(db, ticketId);
   if (v === null) {
     return false;
   }
+  // A draft is closed for everyone, and before the role read and the assignee arm below: a draft the viewer
+  // is ASSIGNED has no audience to widen (R17, spec §4.1).
+  if (v.draftAuthorId !== null) return false;
   const eff = await resolveEffectiveRole(db, userId, v.workspaceId);
   if (canSeeResolved(eff, userId, v)) return true;
   // Only when the audience says no — the common answer costs no second read.

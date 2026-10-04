@@ -81,7 +81,8 @@ function vis(
   resolvedUserIds: string[] = [],
   projectId: string = PRJ,
 ): ResolvedVisibility {
-  return { workspaceId: 'ws', projectId, resolvedMode, resolvedUserIds };
+  // `draftAuthorId: null` (drafts T3): this file's worlds hold no draft; 28.046 covers a set one.
+  return { workspaceId: 'ws', projectId, resolvedMode, resolvedUserIds, draftAuthorId: null };
 }
 
 /**

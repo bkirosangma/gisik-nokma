@@ -351,17 +351,22 @@ async function nowInvisibleTicketsInScope(
 ): Promise<string[]> {
   const result =
     scope === 'workspace'
-      ? await db.query<{ ticket_id: string }>(
-          'SELECT ticket_id FROM proj_visibility WHERE workspace_id = $1 ORDER BY ticket_id',
+      ? await db.query<{ ticket_id: string; draft_author_id: string | null }>(
+          'SELECT ticket_id, draft_author_id FROM proj_visibility WHERE workspace_id = $1 ORDER BY ticket_id',
           [workspaceId],
         )
-      : await db.query<{ ticket_id: string }>(
-          `SELECT ticket_id FROM proj_visibility
+      : await db.query<{ ticket_id: string; draft_author_id: string | null }>(
+          `SELECT ticket_id, draft_author_id FROM proj_visibility
            WHERE workspace_id = $1 AND project_id = $2 ORDER BY ticket_id`,
           [workspaceId, scope.projectId],
         );
   const out: string[] = [];
   for (const row of result.rows) {
+    // Another person's draft is "an id for an entity the recipient stands in no relationship to" (the
+    // docblock at the head of this file bans exactly that): never named (drafts T3, C4). The recipient's OWN
+    // drafts fall through to `canSee`, which is false for a draft, so they are named; T4 refines that to
+    // "named unless still openable".
+    if (row.draft_author_id !== null && row.draft_author_id !== userId) continue;
     if (!(await canSee(db, userId, row.ticket_id))) {
       out.push(row.ticket_id);
     }

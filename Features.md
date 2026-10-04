@@ -3453,6 +3453,16 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ✅ **The assistant can define workflows and types, migrate a type, set who sees a ticket and change workspace settings — behind a confirmation** (MCP-everything T12; `packages/mcp-server/src/tools/definition-admin-tools.ts`) — `define_workflow` and `define_ticket_type` are validated with the product's own schemas before anything is sent; `migrate_ticket_type` uses the app's migration route (all-or-nothing pre-flight); `set_visibility` (workspace / project / inherit / explicit people); `update_workspace_settings`. Each previews what would change (tickets in the workflow, of the type, that move) until `confirm_name` is exact. Cases 14.530–14.536.
 - ✅ **One `search` for tickets and notes, Deleted items, and member help for everything the assistant can now do** (MCP-everything T13; `packages/mcp-server/src/tools/read-tools.ts`, `trash-tools.ts`, `project-tools.ts`, `docs/manual.md` §16) — `search` (tickets and/or notes, by words or, for notes, by meaning; `search_tickets` kept one release as its old name), `list_deleted` (with the tool that restores each item), `update_project` files a project in a group, the stale "prefix cannot be changed" texts are gone, and manual §16 lists notes, comments, files, every ticket action, your inbox and the admin acts with their check-first rule. The hosted round trip walks notes → comments → files → ticket acts → trash → an admin preview → search with every event `origin: mcp`. Sixty-three tools in both doors. Cases 14.550–14.555.
 
+<!-- mcp-sweep-2 bullets: append below, one per task, each when its task lands -->
+<!-- ms2 T2 bullet -->
+<!-- ms2 T3 bullet -->
+<!-- ms2 T4 bullet -->
+<!-- ms2 T5 bullet -->
+<!-- ms2 T6 bullet -->
+<!-- ms2 T7 bullet -->
+<!-- ms2 T8 bullet -->
+<!-- ms2 T9 bullet -->
+
 ## 15. Notes
 
 - ⚙️ **A note is an entity in the ledger** — nine `note.*` events (`packages/domain/src/events/note-events.ts`), folded by `applyNoteEvent` (`packages/domain/src/note-state.ts`); `comment.added` is filed against notes as well as tickets. Spec: `docs/superpowers/specs/2026-09-23-notes-design.md` §3.
@@ -3797,6 +3807,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- drafts T2 bullet -->
 - ⚙️ **Drafts: keys and purge** (drafts T2; `apps/server/src/read/ticket-numbers.ts`, `apps/server/migrations/1791600000000_drafts.sql`, `packages/domain/src/purge.ts`) — a ticket's number is its position among its project's numbering rows (`NUMBERING_ROWS_SQL`): a `ticket.created` that is not a draft, and every `ticket.published`. A draft consumes no number and a discard leaves no gap. `purge_ledger` keeps both kinds of row, redacted (`draft: true` kept on a purged draft's creation; `ticket.published` kept as `{projectId, purged: true}`), and the append-only trigger admits exactly those three redactions; every replay reader skips a redacted publish (`isRedactedTicketPublished`, `foldTicketEvent`). The migration adds `proj_tickets.draft_author_id/draft_at/draft_discarded` and `proj_visibility.draft_author_id` with partial indexes (written by T3). Cases 28.020–28.028.
 <!-- drafts T3 bullet -->
+- ⚙️ **Drafts: privacy** (drafts T3; `apps/server/src/visibility/can-see.ts`, `apps/server/src/read/visible-where.ts`, `apps/server/src/projections/tickets.ts`, `apps/server/src/projections/proj-visibility.ts`, `apps/server/src/projections/references.ts`) — a draft is a ticket whose `proj_tickets.draft_author_id` and `proj_visibility.draft_author_id` are set; `canSeeResolved` and `canSee` answer false for EVERYONE (the author, the owner and the assignee included) before the owner case and the assignee arm, and `visibleTicketsWhere` and `LIVE_TICKET_WHERE` (now `LIVE_BASE_WHERE` plus the draft clause) exclude it from every view. The readers that bypass both predicates are edited: the stored and the viewer rollups, the delete-confirm counts, the scope-lost purge list, `migrate_ticket_type`, and the "in Backlog since" reads. The reference index (`proj_references`) never indexes a draft's bodies, so a ticket it mentions gains no "Linked from" row; `ticket.published` indexes the then-current description, live, on rebuild and in the boot backfill alike (errata E1). A census test (`apps/server/test/census/draft-census.test.ts`) fails on any `proj_tickets` / `proj_visibility` SQL or `canSee` call in no group. The author reaches a draft only through the doors of T4. Cases 28.045–28.069.
 <!-- drafts T4 bullet -->
 <!-- drafts T5 bullet -->
 <!-- drafts T5b bullet -->

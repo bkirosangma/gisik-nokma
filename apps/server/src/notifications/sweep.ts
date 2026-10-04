@@ -256,7 +256,7 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
                SELECT e.server_time, e.actor_id
                  FROM events e
                 WHERE e.entity_kind = 'ticket' AND e.entity_id = t.ticket_id
-                  AND e.type IN ('ticket.created', 'ticket.transitioned')
+                  AND e.type IN ('ticket.created', 'ticket.transitioned', 'ticket.published')
                 ORDER BY e.seq DESC
                 LIMIT 1
              ) entered ON true
