@@ -42,7 +42,7 @@ describe('checkTicketTypeDefined', () => {
    * move. The reason interpolates the seed's own id and rank, so a wrong-seed
    * comparison shows up in the sentence as well as in the verdict.
    */
-  it('planted defect: every one of the four built-ins is locked, each named by its own seed', async () => {
+  it('planted defect: every one of the original four built-ins is locked, each named by its own seed (the Decision: 29.134 below)', async () => {
     expect(await checkTicketTypeDefined(typeDefined(def({ id: 'epic', name: 'Epic', rank: 2 })), ctx())).toEqual({
       refused: true,
       rule: 'type.builtin-rank',

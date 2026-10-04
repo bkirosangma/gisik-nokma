@@ -154,7 +154,7 @@ export async function getTicketTypeFromDb(
  * that pre-selects one id answers `undefined` for any other, at which point the
  * reducer throws `unknown ticket type "…" — the engine must refuse
  * ticket.created before it reaches a projection`, blaming the door for the
- * loader's omission. A ladder is four built-ins plus a workspace's custom
+ * loader's omission. A ladder is the built-ins plus a workspace's custom
  * types; handing the reducer all of it removes the question.
  *
  * Parsing is LAZY and memoized: only the types actually asked for pay

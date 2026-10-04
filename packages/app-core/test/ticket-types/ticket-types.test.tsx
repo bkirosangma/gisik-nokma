@@ -134,7 +134,7 @@ describe('TicketTypeListScreen', () => {
    * a workspace whose icon vocabulary has moved on, can name a glyph this build
    * has never heard of. The row must still render. This is the one guarantee in
    * icons.tsx that is written here rather than transcribed from the plan (the
-   * sixteen glyphs are stroke data, not lucide components), so it gets its own
+   * seventeen glyphs are stroke data, not lucide components), so it gets its own
    * test rather than riding on the fixtures, all of which use known names.
    */
   it('an icon name this build has never heard of renders the row anyway — data never crashes the UI', async () => {

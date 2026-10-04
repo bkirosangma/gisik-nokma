@@ -10,7 +10,7 @@
  * stands: `lucide-react` appears in no package.json in the workspace and
  * `node_modules/lucide-react` does not exist, so the plan's import would not
  * resolve. Adding a runtime dependency to a workspace that carries no icon
- * library at all — for sixteen glyphs rendered at 16px — costs more than it
+ * library at all — for seventeen glyphs rendered at 16px — costs more than it
  * buys, so the vocabulary is stroke-path data and `TypeIcon` renders it. The
  * exported contract is unchanged: `TYPE_ICONS`, `TYPE_ICON_NAMES`,
  * `TypeIcon({ name, size? })`, unknown names falling back to the folder.

@@ -89,7 +89,7 @@ const VISUALLY_HIDDEN = {
  *
  *   **(AMENDED 2026-10-02, 23.171: a built-in now carries NO control at all, and a custom type's move that would
  *   cross one is the DISABLED menu item.) The arrow that would move a built-in is DISABLED, not refused after the
- *   fact.** For the same per-event reason: the four built-ins are rank-locked
+ *   fact.** For the same per-event reason: the built-ins are rank-locked
  *   server-side (`packages/rule-engine/src/checks/ticket-type.ts:60-62` refunds
  *   `type.builtin-rank`), so a swap across one would HALF commit — the neighbour's
  *   re-rank landing while the built-in's is refused — and leave the two tied. The
