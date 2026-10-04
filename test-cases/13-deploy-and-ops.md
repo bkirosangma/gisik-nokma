@@ -831,6 +831,16 @@ Block `13.2230`–`13.2239` for `task/ctl-sem-gate-slot` (planner 2026-10-04, pr
 - 13.2234 🧪 Under the cap the probes still bind during a gate: low free memory waits (reason `pressure`) and a sustained swap-in waits (reason `swap`), never reason `gate`.
 - 13.2235 🧪 `ctl run-tests --dry-run` names the cap: `at least N slot(s) are held (CTL_SEM_GATE_SLOTS)` with 1 by default, the set value for 0 and 3, and 1 for a value that is not a number.
 
+Block `13.2270`–`13.2279` for `task/ctl-sem-gate-slots-file` (planner 2026-10-04, P31: the gate cap from a file so the owner can retune it without restarting the lanes; measured 2026-10-04: `13.2270`–`13.2279` unused across the KG / WG release tips; `13.2277`–`13.2279` are unused). 🧪 as above: arms in `scripts/ctl/test/run-tests.test.sh`, each check's name starting with its id.
+
+- 13.2270 🧪 The `gate-slots` file in the semaphore dir sets the gate cap when `CTL_SEM_GATE_SLOTS` is unset: file `2` (or `  2  `, whitespace trimmed) with one slot held and a live gate is granted at once; CONTROL — the same state with file `1` waits (reason `gate`) until the holder exits. The marker globs are `gate-[0-9]*`, so the file is never reclaimed as a stale gate marker.
+- 13.2271 🧪 The env wins over the file: `CTL_SEM_GATE_SLOTS=0` with file `3` and a live gate grants nothing; a non-numeric env (`abc`) falls through to the file (abc with file `0` and none held waits like 0).
+- 13.2272 🧪 A file that is not a number (`abc`) or is empty behaves as 1, never 0: none held and a live gate is granted, one held waits (reason `gate`).
+- 13.2273 🧪 File `0` is a valid cap: nothing is granted while the gate is live; CONTROL — file `1` with the same state is granted at once.
+- 13.2274 🧪 The file is re-read on every poll: rewritten from 1 to 2 while a run waits behind one held slot and a live gate, that run is granted at the next poll with no restart.
+- 13.2275 🧪 `ctl run-tests --dry-run` names the cap from the file: file `3` names 3, env `0` over file `3` names 0, file `abc` names 1.
+- 13.2276 🧪 No `gate-slots` file (the normal state) prints no read error: with `CTL_SEM_GATE_SLOTS` unset, one slot held and a live gate, the run waits (reason `gate`) until the holder exits and its `2>&1` output holds no `No such file` line on any poll; `--dry-run` holds none either. CONTROL — the same output carries the `queue wait: 20s (waited for: gate)` line (and the dry-run names cap 1), so an empty capture cannot pass.
+
 ## Playwright ports: the gate on 3291 / 3292, every other browser run on a free port (`task/ctl-pw-ports`, planner P35 2026-10-05: gates #1 and #2 went RED on "localhost:3191 already used")
 
 - 13.2280 🧪 `ctl gate` exports `KG_PW_PORT=3291` and `FG_PW_PORT=3292`: its `--dry-run` line names both, the REAL gate run's environment (what `gate.sh`, and so turbo, starts with) carries them, and a port the caller exported (3191 / 3192) does not leak in
