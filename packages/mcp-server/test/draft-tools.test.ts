@@ -112,11 +112,14 @@ describe('28.130 create_ticket {draft: true}', () => {
 });
 
 describe('28.131 a draft cannot be born in focus', () => {
-  it('28.131 stateId and start focus are refused in the domain sentence before anything is sent; the sentence is the domain\'s', async () => {
+  it('28.131 stateId and start focus are refused in the domain sentence before anything is sent (a stateId with start backlog too: the draft refusal comes first); the sentence is the domain\'s', async () => {
     const refused = fake();
     const create = pick(writeTools(refused.session), 'create_ticket');
     await expect(create.handler({ ...BIRTH, draft: true, stateId: 'doing' })).rejects.toThrow(DRAFT_IN_BACKLOG);
     await expect(create.handler({ ...BIRTH, draft: true, start: 'focus' })).rejects.toThrow(DRAFT_IN_BACKLOG);
+    // Decision 6: the draft refusal runs BEFORE the older stateId + backlog check, so the one input both checks refuse
+    // gets the draft sentence.
+    await expect(create.handler({ ...BIRTH, draft: true, stateId: 'doing', start: 'backlog' })).rejects.toThrow(DRAFT_IN_BACKLOG);
     expect(refused.sent).toEqual([]);
 
     // CONTROL: the two inputs that stay legal are sent.
@@ -247,10 +250,12 @@ describe('28.135 publish_draft refusals', () => {
     // CONTROL: a 500 and a 409 that is not this refusal are the HttpError they are. The other 409 carries a `cause`, so
     // only the `rule === 'draft.publish-refused'` test (not the `cause !== undefined` guard) keeps it from being rewritten.
     // Each clause of the 409 arm has its own control (P11): a publish-refused 409 with no `cause` (the `cause` clause),
-    // and the same body under a 422 (the `status === 409` clause).
+    // and the same body under a 422 (the `status === 409` clause). An empty body reaches the tool as `null` (`readBody`):
+    // a 409 and a 500 with no body are rethrown too, not a TypeError.
     const causeless = new HttpError(409, { rule: 'draft.publish-refused', ticketId: ROOT });
     const not409 = new HttpError(422, refusal.body);
-    for (const other of [new HttpError(500, {}), new HttpError(409, { rule: 'something.else', cause: { rule: 'x.y', reason: 'z' } }), causeless, not409]) {
+    const bodiless = [new HttpError(409, null), new HttpError(500, null)];
+    for (const other of [new HttpError(500, {}), new HttpError(409, { rule: 'something.else', cause: { rule: 'x.y', reason: 'z' } }), causeless, not409, ...bodiless]) {
       await expect(raising(other).handler(call)).rejects.toBe(other);
     }
   });
