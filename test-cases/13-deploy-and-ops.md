@@ -809,7 +809,7 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1761 🧪 Low free memory holds the slot back until it recovers, reason `pressure`.
 - 13.1762 🧪 The kernel pressure level gates too (2 and 4 wait, 1 does not), and the probe never passes a simulate flag to `memory_pressure`.
 - 13.1763 🧪 A sustained swap-in rate at or over the threshold holds the slot back, reason `swap`; one high window is a blip and does not; a rate under the threshold does not.
-- 13.1764 🧪 A running gate has priority: no slot is granted while its marker is live, held slots are untouched, a gate that starts between the claim and the run makes the verb give the slot back and wait.
+- 13.1764 🧪 A running gate has priority: while its marker is live at most `CTL_SEM_GATE_SLOTS` (default 1) slots are held and with 0 none is granted, held slots are untouched, and a gate that starts between the claim and the run makes the verb give the slot back and wait when, counting the claim, more than `CTL_SEM_GATE_SLOTS` slots are held.
 - 13.1765 🧪 A stale gate marker (dead pid, or a live pid with another start time) is ignored and removed; a LIVE gate's marker is never reclaimed because the waiter runs under another `TZ` (the start time is read as `LC_ALL=C TZ=UTC0`).
 - 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed; a dead pid whose recorded start time is empty is stale too. A live pid with another start time is the ONLY stale slot in one arm (slot-1 genuinely live: the run starts at once, slot-2 becomes the verb's, slot-1 is untouched; control: both live → waits), and a LIVE holder is never reclaimed because the waiter's `TZ` / locale renders its start time differently.
 - 13.1767 🧪 Two real processes racing for one slot, with a stale slot to reclaim, never overlap.
@@ -821,6 +821,15 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1773 🧪 `ctl help` lists `run-tests`, and `ctl selftest` runs the suite and a `run-tests --dry-run` step.
 - 13.1774 🧪 The real thing: two parallel runs overlap and a third waits at least 2 s for one of them to finish and logs that wait.
 - 13.1850 🧪 The wrapped command runs in the caller's directory — from a subdirectory with no `--repo`, `pwd -P` is that subdirectory; with `--repo W` it is `W` — and the summary's first line, the log header and the `--dry-run` line name it. (Minted 2026-10-03 for FIX 1 outside the full `13.1750`–`13.1774` block and tipmerge's `13.1775`–`13.1799`: the §13 high-water was `13.1843` (`release/smoothness`), across every `origin/*` head and local branch updated in the last 4 days. 🧪 for the same reason as the block.)
+
+Block `13.2230`–`13.2239` for `task/ctl-sem-gate-slot` (planner 2026-10-04, process log P25: one slot during a gate, `CTL_SEM_GATE_SLOTS`; measured 2026-10-04: the §13 high-water was `13.2229` (`task/ctl-mutate`) across the KG / WG release tips, every `origin/task/ctl-*`, `kg-*`, `wg-*` head and the local task branches; `13.2236`–`13.2239` are unused). 🧪 for the same reason as the block above: arms in `scripts/ctl/test/run-tests.test.sh`, each check's name starting with its id.
+
+- 13.2230 🧪 A gate is live and no slot is held: one new run is granted at once (the marker present while it ran); a SECOND run started while the first holds its slot waits, reason `gate`, until the gate ends — the second decides. A stale (dead-pid) holder is not a held slot: one stale holder plus a live gate is granted at 0 s, because the count runs after the reclaim; a dir a reclaimer moved aside (`slot-<n>.stale.<pid>`) and a fresh holder-less dir (a claim in progress) are not held slots either.
+- 13.2231 🧪 A gate is live with one slot held: a new run waits (reason `gate`) though another slot is free; when that holder exits it is granted while the gate is still live.
+- 13.2232 🧪 `CTL_SEM_GATE_SLOTS=0` is the old rule: with no slot held nothing is granted while the gate is live (reason `gate`); CONTROL — the same fixture at the default is granted at 0 s.
+- 13.2233 🧪 A gate that starts between the probe and the claim: with one slot already held the claimed slot is given back and the run waits (reason `gate`); with none held the claim is kept and the run starts while the gate is live.
+- 13.2234 🧪 Under the cap the probes still bind during a gate: low free memory waits (reason `pressure`) and a sustained swap-in waits (reason `swap`), never reason `gate`.
+- 13.2235 🧪 `ctl run-tests --dry-run` names the cap: `at least N slot(s) are held (CTL_SEM_GATE_SLOTS)` with 1 by default, the set value for 0 and 3, and 1 for a value that is not a number.
 
 ## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
 

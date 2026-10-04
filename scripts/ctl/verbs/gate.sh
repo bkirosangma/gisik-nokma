@@ -39,7 +39,7 @@ log="$(ctl_log gate)"; console="$log.console"
 base="$(basename "$log" .log)"; work="$(dirname "$log")/gate-lock-${base#gate-}"
 if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_MODE=$mode GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
 mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
-# Priority over `ctl run-tests`: while this marker is live no NEW test slot is granted (running ones finish). Removed on every exit path.
+# Priority over `ctl run-tests`: while this marker is live a new test slot is granted only while fewer than CTL_SEM_GATE_SLOTS (default 1; 0 = none) are held (running ones finish; sem.sh ctl_sem_acquire). Removed on every exit path.
 ctl_sem_gate_begin; trap ctl_sem_gate_end EXIT
 GATE_MODE="$mode" GATE_REPO="$CTL_REPO" bash "$work/gate.sh" "$log" > "$console" 2>&1; echo "GATE_WRAPPER_EXIT=$?" >> "$console"
 # The mode that RAN is what gate.sh printed, not what this verb asked for: a copy of gate.sh that ignored GATE_MODE must fail here, not pass under the wrong name.
