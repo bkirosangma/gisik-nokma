@@ -7,3 +7,4 @@ export * from './calendar-days.js';
 export * from './driver.js';
 export * from './dom/clock.js';
 export * from './dom/scroll-adapter.js';
+export * from './dom/camera-adapter.js';
