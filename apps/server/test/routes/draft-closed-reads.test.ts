@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type LedgerEvent, type SearchResponse } from '@gisik-nokma/domain';
+import { membershipId, newUlid, type HomeResponse, type LedgerEvent, type SearchResponse } from '@gisik-nokma/domain';
 import { MIGRATION_RULES } from '../../src/routes/builder-reads.js';
 import { workspaceIdentityFromLedger } from '../../src/workspaces/workspace-name.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -10,7 +10,7 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
 /**
  * Drafts T3 (spec §4.2 groups B and C): every read a viewer reaches through a route answers as if a draft
  * did not exist, for everyone, its author included (the author's doors are T4). Cases 28.051-28.057, 28.060,
- * 28.061, 28.063, 28.066, 28.067. Each closed answer is paired, in the same `it`, with the SAME request after
+ * 28.061, 28.063, 28.066, 28.067, 28.069. Each closed answer is paired, in the same `it`, with the SAME request after
  * `withDraftsOpened` cleared the flag: the haystack holds the needle.
  *
  * One database and one read world; 28.061, 28.063, 28.066 and 28.067 change the world, so they run last.
@@ -190,9 +190,11 @@ describe('28.057 the single-ticket reads', () => {
       for (const [index, url] of real.entries()) {
         const answer = await get(role, url);
         const unknown = await get(role, ghost[index] as string);
-        // The notes-of-a-ticket read answers 200 `{ notes: [] }` for ANY id, an unknown one included (it lists
-        // the viewer's own visible notes attached to that id and has no ticket gate), so for it "not found" is
-        // that answer; every other read is a 404.
+        // The notes-of-a-ticket read answers 200 `{ notes: [] }` for ANY id, an unknown one included: it has no
+        // ticket gate. No note is attached to the draft here, so this leg compares two empty lists and shows
+        // nothing. The read is NOT closed: a readable note attached to a draft IS listed (reviewer probe P1).
+        // G11 refuses `note.attached` naming a draft until T9, whose `isClosedDraft` closes the read. Every other
+        // read is a 404.
         expect(answer.statusCode, `${role} ${url}`).toBe(url.endsWith('/notes') ? 200 : 404);
         expect(answer.json(), `${role} ${url}: not the unknown-id answer`).toEqual(unknown.json());
       }
@@ -240,6 +242,28 @@ describe('28.060 the builder reads', () => {
   });
 });
 
+describe('28.069 Home', () => {
+  it('neither counts nor lists a draft for any role; cleared, each count exceeds by exactly the drafts the viewer could otherwise see', async () => {
+    const url = `/v1/workspaces/${WS()}/home`;
+    // The haystack: the published twin in `doing`, due DUE, is in every closed answer (Tickets, Open, Due soon).
+    for (const role of PEOPLE) expect(await body(role, url), role).toContain(world.twinActiveId);
+    await expectClosed(eachPerson(url, world.draftActiveId));
+    // The owner reads all four drafts and the others miss the guest-only one (28.056's split). Only draftActive
+    // carries a due date (DUE, inside the window at SCENARIO_NOW), and no draft is terminal or closed.
+    const counts = async (role: ReadRole): Promise<HomeResponse['counts']> => (JSON.parse(await body(role, url)) as HomeResponse).counts;
+    const extra = (drafts: number) => ({ tickets: drafts, open: drafts, pastDue: 0, dueSoon: 1, members: 0, notes: 0 });
+    const expected: Record<string, ReturnType<typeof extra>> = { owner: extra(4), admin: extra(3), member: extra(3), outsider: extra(3) };
+    for (const role of PEOPLE) {
+      const closed = await counts(role);
+      const opened = await withDraftsOpened(db.pool, world.draftIds, () => counts(role));
+      const delta = Object.fromEntries(
+        Object.entries(closed).map(([key, value]) => [key, (opened[key as keyof typeof opened] ?? Number.NaN) - (value ?? Number.NaN)]),
+      );
+      expect(delta, role).toEqual(expected[role]);
+    }
+  });
+});
+
 describe('28.067 notes attached to a draft', () => {
   it('list only the published ticket; control: opened, both', async () => {
     const note = newUlid();
@@ -276,6 +300,38 @@ describe('28.061 the delete-confirm counts', () => {
     };
     expect(await contained()).toBe(1);
     expect(await withDraftsOpened(db.pool, [draft], contained)).toBe(2);
+  });
+
+  it('a deleted workspace counts its project and its published ticket only; cleared, the draft counts too', async () => {
+    // Its own workspace: the read world's must stay live for 28.063 and 28.066. Its own workflow and type ids,
+    // because `proj_workflows` and `proj_ticket_types` are keyed by those ids (the neighbour's are taken).
+    const { owner, member } = read.world;
+    const [workspaceId, projectId, pub, draft] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    const [workflowId, typeId] = ['wf-doomed-ws', 'doomed-ws-task'];
+    const ws = { workspaceId, actorId: owner };
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'Doomed workspace' } }),
+      makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(workspaceId, owner) }, type: 'membership.granted', payload: { userId: owner, role: 'owner' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name: 'Doomed', prefix: 'DW' } }),
+      makeCommitted({
+        ...ws, entity: { kind: 'workflow', id: workflowId }, type: 'workflow.defined',
+        payload: {
+          id: workflowId, version: 1, name: 'Doomed flow', initialStateId: 'todo',
+          states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }],
+          transitions: [{ from: '*', to: 'todo', rules: [] }, { from: '*', to: 'done', rules: [] }],
+        },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: typeId }, type: 'ticket-type.defined', payload: { id: typeId, name: 'Task', icon: 'check', rank: 3, workflowId, fields: [] } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: pub }, type: 'ticket.created', payload: { typeId, projectId, parentId: null, title: 'kept' } }),
+      makeCommitted({ ...ws, actorId: member, entity: { kind: 'ticket', id: draft }, type: 'ticket.created', payload: { typeId, projectId, parentId: null, title: 'private', start: 'backlog', draft: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.deleted', payload: {} }),
+    ]);
+    const contained = async (): Promise<number> => {
+      const items = (JSON.parse(await body('owner', '/v1/me/deleted-items')) as { items: Array<{ kind: string; id: string; containedCount: number }> }).items;
+      return items.find((item) => item.kind === 'workspace' && item.id === workspaceId)!.containedCount;
+    };
+    expect(await contained()).toBe(2); // the project and the published ticket
+    expect(await withDraftsOpened(db.pool, [draft], contained)).toBe(3);
   });
 });
 

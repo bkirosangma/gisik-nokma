@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
+import { runAutoCloseSweep } from '../../src/auto-close/sweep.js';
+import { runNotificationSweep } from '../../src/notifications/sweep.js';
 import { stateProvenanceFor } from '../../src/read/state-provenance.js';
 import { buildLedgerDeps } from '../../src/sync/ledger-deps.js';
 import { foldTicketHead } from '../../src/sync/snapshot-writer.js';
@@ -7,9 +9,10 @@ import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
- * Drafts T3, C7 (spec §7.2): a draft-born ticket is "in Backlog since" its PUBLISH, not its drafting, in the
- * state-provenance read and in the snapshot fold's state claim alike (28.065). The head (one workflow, one
- * type) is `tickets-closed.test.ts`'s.
+ * Drafts T3, C7 (spec §7.2): a draft-born ticket is "in its state since" its PUBLISH, not its drafting, in the
+ * state-provenance read, in the snapshot fold's state claim, and in the entered-state reads of the stale
+ * notification sweep and the auto-close sweep alike (28.065). The head (one workflow, one type) is
+ * `tickets-closed.test.ts`'s.
  */
 
 let db: TestDatabase;
@@ -84,4 +87,63 @@ it('28.065 a draft-born ticket is in Backlog since its publish; control: a plain
   } finally {
     client.release();
   }
+});
+
+/** 7 IST days after 2026-08-05: T0 is on the far side of a 7-day cut-off, T1 is not. */
+const NOW = '2026-08-12T12:00:00.000Z';
+it('28.065 the stale and auto-close sweeps read the same instant: a draft-born ticket published on day 10 is neither stale nor auto-closed; control: a never-drafted twin that entered on day 1 is both', async () => {
+  // PLANTED, as the draft world plants its `doing` drafts: no door moves a draft out of Backlog (T5 refuses
+  // `ticket.transitioned` on a draft), and Backlog is `open`, which neither sweep reads. So each draft is moved
+  // into `doing` / `done` on day 1, BEFORE its publish, and the publish on day 10 is its last state-entering
+  // event. Under a ledger the doors can write, these two reads cannot tell the publish apart until a draft can
+  // leave Backlog; this pins them anyway.
+  const author = newUlid();
+  const [draftDoing, twinDoing, draftDone, twinDone] = [newUlid(), newUlid(), newUlid(), newUlid()];
+  const at = (clientTime: string) => ({ clientTime, serverTime: clientTime });
+  const ticket = { workspaceId: WS, actorId: author };
+  const created = (id: string, draft: boolean) => makeCommitted({ ...ticket, entity: { kind: 'ticket', id }, type: 'ticket.created',
+    payload: { typeId: TYPE_ID, projectId: PRJ, parentId: null, title: id.slice(-4), assigneeId: author, ...(draft ? { start: 'backlog', draft: true } : {}) }, ...at(T0) });
+  const moved = (id: string, to: string) => makeCommitted({ ...ticket, entity: { kind: 'ticket', id }, type: 'ticket.transitioned',
+    payload: { to }, ...at('2026-08-02T09:05:00.000Z') });
+  const published = (id: string) => makeCommitted({ ...ticket, entity: { kind: 'ticket', id }, type: 'ticket.published',
+    payload: { projectId: PRJ }, ...at(T1) });
+  await applyCommitted(db.pool, [
+    makeCommitted({ workspaceId: WS, actorId: author, entity: { kind: 'workspace', id: WS }, type: 'workspace.settings_set', payload: { autoCloseAfterDays: 7 } }),
+    created(draftDoing, true), moved(draftDoing, 'doing'), published(draftDoing),
+    created(twinDoing, false), moved(twinDoing, 'doing'),
+    created(draftDone, true), moved(draftDone, 'done'), published(draftDone),
+    created(twinDone, false), moved(twinDone, 'done'),
+  ]);
+  const mine = [draftDoing, twinDoing, draftDone, twinDone];
+  // Each published draft sits, published, in the category its sweep reads, so a "not a candidate" below can only
+  // come from the instant, never from the category or a leftover draft flag.
+  const { rows } = await db.pool.query<{ ticket_id: string; state_category: string; draft_author_id: string | null }>(
+    'SELECT ticket_id, state_category, draft_author_id FROM proj_tickets WHERE ticket_id = ANY($1::text[])', [mine],
+  );
+  expect(Object.fromEntries(rows.map((row) => [row.ticket_id, [row.state_category, row.draft_author_id]]))).toEqual({
+    [draftDoing]: ['active', null], [twinDoing]: ['active', null], [draftDone]: ['terminal', null], [twinDone]: ['terminal', null],
+  });
+
+  const stale: string[] = [];
+  await runNotificationSweep({
+    pool: db.pool, canSeeTicket: async () => true, now: () => new Date(NOW), log: () => undefined,
+    transports: [{
+      name: 'record',
+      deliver: async (_userId, notification) => {
+        const { ticketId } = notification.payload as { ticketId: string };
+        if (notification.kind === 'stale-ticket' && mine.includes(ticketId)) stale.push(ticketId);
+      },
+    }],
+  });
+  expect(stale).toEqual([twinDoing]);
+
+  const closing: string[] = [];
+  const ingest = {
+    ingestBatch: async (events: Array<{ entity: { id: string } }>) => {
+      for (const event of events) if (mine.includes(event.entity.id)) closing.push(event.entity.id);
+      return events.map(() => ({ status: 'committed' }));
+    },
+  };
+  await runAutoCloseSweep({ pool: db.pool, ingest: ingest as never, now: () => new Date(NOW), log: () => undefined });
+  expect(closing).toEqual([twinDone]);
 });
