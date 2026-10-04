@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059, 13.2070–13.2086 and 13.2240–13.2246. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059, 13.2070–13.2086 and 13.2240–13.2249. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -525,6 +525,26 @@ check "13.2245 ONE ref rule for both pairings (kill c): the dispatcher pair read
 
 check "13.2246 ctl help states the parity audit's format boundary (planner 18:57, addition 1): its 'postman audit --parity|--since T|--window N' entry says dispatcher lines before 2026-10-03 name the task after the verb and audit as no-ref, so condition A runs on windows from 10-03 on — the same sentence as the audit's NOTE; CONTROL in the same check: the postman run|once|… entry above it is still listed" \
   'h="$("$HERE/ctl" help)"; printf "%s" "$h" | grep -q "^  postman run|once|status|audit|restarted <seat> " && printf "%s" "$h" | grep -A1 "^  postman audit --parity|--since T|--window N " | tr -s " \n" " " | grep -q "dispatcher lines before 2026-10-03 name the task after the verb and audit as no-ref: run condition A on windows from 10-03 on"'
+
+# ── parity-ref FIX 1 (reviewer A, BRIEF-ctl-postman-parity-ref-fix-1.md): X1 (reviewer C) name_cut takes pairs from the brief too; Y2 the dispatcher pairing
+# window; Y3 the UNPAIRED candidate cap ──
+hw_reason() { # [HOLD-LINE] → a FIX lane1 record for BRIEF-held-work-tidy-fix-1.md whose branch task/hw-tidy lacks the pair held-work (600 s ago), the real 20:19 'TOOK … short pointer sent' shape naming the brief in QUEUE-dispatch (300 s ago), plus (if given) a DISPATCH-log line 240 s ago; prints the one EXTRA's reason word
+  au_reset; au_q FIX 1 600 s1 "" BRIEF-held-work-tidy-fix-1.md task/hw-tidy; au_qd 300 "TOOK 19:38 FIX lane1 BRIEF-held-work-tidy-fix-1.md: short pointer sent"; [ -z "${1:-}" ] || au_d 240 "$1"
+  au --parity | sed -n 's/^EXTRA .*reason=//p'; }
+check "13.2247 name_cut blanks the chunks holding a pair of the BRIEF stem, not only of the branch (X1): a FIX lane1 record for BRIEF-held-work-tidy-fix-1.md on task/hw-tidy (the branch lacks the pair held-work) with a plain 'TOOK 19:38 FIX lane1 BRIEF-held-work-tidy-fix-1.md: short pointer sent' line (no HOLD, no not-delivered phrase; held only inside the brief chunk) → EXTRA reason=? (its own name is no reason); CONTROL in the same check: plus 'HOLD held-work-tidy FIX 1 (not delivered; orchestrator to restart a lane)' (the real 07:00 HOLD's shape) → held" \
+  '[ "$(hw_reason)" = "?" ] && [ "$(hw_reason "HOLD held-work-tidy FIX 1 (not delivered; orchestrator to restart a lane)")" = held ]'
+# The line is written at HH:MM: NOW is :20 past the minute and the line sits 600 s before NOW, so its time is floored by exactly 20 s (t = NOW - 620).
+# The record's epoch is exact, so the four probes clear their bounds by 40 / 80 / 80 / 40 s: 2760 → 2740 > 2700, 2640 → 2620 <= 2700, 180 → 200 > 120,
+# 60 → 80 <= 120. Never set CTL_POSTMAN_AUDIT_TOL here: a x10 of its 2700 default must turn this check red.
+pw_round() { # REC-SECS-AGO → one FIX lane2 record for BRIEF-x-fix-1.md (its ref agrees with the line) and the 10-03 shape delivery 600 s ago; prints the parity audit
+  au_reset; au_q FIX 2 "$1" w1 "" BRIEF-x-fix-1.md; au_d 600 "dispatcher: delivered x FIX 1 pointer to lane2"; au --parity; }
+check "13.2248 the dispatcher pairing window (Y2): a ref-agreeing FIX lane2 record 2760 s BEFORE 'dispatcher: delivered x FIX 1 pointer to lane2' is outside CTL_POSTMAN_AUDIT_TOL (2700 s) → MISSED, exit 1, matched=0 unpaired=0; and one 180 s AFTER the line (later than 120 s) → MISSED, exit 1; CONTROL in the same check: the record 2640 s before, and 60 s after → MATCHED, exit 2, matched=1 unpaired=0 (each probe at least 40 s clear of its bound after the HH:MM floor)" \
+  '{ o="$(pw_round 3360)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    FIX 2: the dispatcher delivered it, no shadow delivery to pair with — " && printf "%s" "$o" | tail -1 | grep -q "^FAIL postman audit parity .*matched=0 missed=1 .* unpaired=0$" && { o="$(pw_round 420)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    FIX 2: the dispatcher delivered it, no shadow delivery to pair with — " && printf "%s" "$o" | tail -1 | grep -q "^FAIL postman audit parity .*matched=0 missed=1 .* unpaired=0$" && { o="$(pw_round 3240)"; [ $? = 2 ]; } && printf "%s" "$o" | grep -q "^MATCHED   FIX 2 .* ref=x ~ BRIEF-x-fix-1.md = " && printf "%s" "$o" | tail -1 | grep -q "matched=1 missed=0 .* unpaired=0;" && { o="$(pw_round 540)"; [ $? = 2 ]; } && printf "%s" "$o" | grep -q "^MATCHED   FIX 2 .* ref=x ~ BRIEF-x-fix-1.md = " && printf "%s" "$o" | tail -1 | grep -q "matched=1 missed=0 .* unpaired=0;"'
+cap_round() { # N → N FIX lane1 records BRIEF-t1..tN-fix-1.md (distinct srcs, t1 earliest, 10 s apart) and the real 20:39 HK-3b delivery after them, which agrees with none; prints the UNPAIRED line
+  au_reset; local k; for k in $(seq 1 "$1"); do au_q FIX 1 $((700-k*10)) "c$k" "" "BRIEF-t$k-fix-1.md"; done; au_d 600 "$HK_DL"; au --parity | grep "^UNPAIRED"; }
+CAP5='none agreeing: 00:00 BRIEF-t1-fix-1.md, 00:00 BRIEF-t2-fix-1.md, 00:00 BRIEF-t3-fix-1.md, 00:00 BRIEF-t4-fix-1.md, 00:00 BRIEF-t5-fix-1.md'
+check "13.2249 the UNPAIRED line lists at most 5 candidates (Y3): the real 20:39 HK-3b delivery whose ref agrees with none of SIX FIX lane1 records in its window → one 'UNPAIRED  FIX lane 1 ref=hk-3b reason=ref-mismatch' line naming exactly the 5 earliest (t1..t5, in time order) and ending its list with ' +1 more' (t6 not named); CONTROL in the same check: with FIVE records the same 5 names, then the line, and no 'more'" \
+  'o="$(cap_round 6)"; [ "$(printf "%s\n" "$o" | grep -c .)" = 1 ] && printf "%s" "$o" | grep -q "^UNPAIRED  FIX lane 1 ref=hk-3b reason=ref-mismatch; same verb + lane in the window, " && printf "%s" "$o" | grep -qF "$CAP5 +1 more — " && ! printf "%s" "$o" | grep -q "t6-fix" && o="$(cap_round 5)" && printf "%s" "$o" | grep -qF "$CAP5 — " && ! printf "%s" "$o" | grep -q "more"'
 
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────
 # A refusal is "nothing typed AND the message still open"; the control is an idle pane that IS pasted into.
