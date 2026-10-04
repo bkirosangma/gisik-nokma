@@ -3,6 +3,8 @@ import type {
   GroupRow,
   IngestResult,
   LedgerEvent,
+  LinkedFromPage,
+  LinkedFromTarget,
   PurgedRef,
   ServerStreamFrame,
   SubmittedEvent,
@@ -386,6 +388,14 @@ export type DataSourceQuery = {
   getDeletedNotes(workspaceId: string): Promise<NoteSummary[]>;
   getNote(workspaceId: string, noteId: string): Promise<NoteDetail | null>;
   getNotesForTicket(workspaceId: string, ticketId: string): Promise<NoteSummary[]>;
+  /**
+   * "Linked from" (Knowledge Graph spec B §3): the sources that reference a
+   * ticket or note and that this viewer may see, twenty per page, newest first.
+   * An invisible target answers the EMPTY page (the route's 404), the
+   * `getNotesForTicket` treatment: "nothing links here" and "you may not ask"
+   * are one answer on purpose.
+   */
+  getLinkedFrom(workspaceId: string, target: LinkedFromTarget, cursor?: string): Promise<LinkedFromPage>;
   /**
    * One ticket's typed links, both directions, only those whose other end this
    * viewer can see and is live (typed-links T4; spec A §2.4). No count of the

@@ -134,6 +134,10 @@ export function stubServices(
     // was purged" is exactly what every page saw before the read existed, so a
     // case that does not care is not made to stub it. A case that does, stubs it.
     purgedAmong: async () => [],
+    // "Linked from" (Knowledge Graph B), on the same argument: every ticket sheet and
+    // note document asks it in the background, and "nothing links here" is what every
+    // page showed before the read existed. A case that cares, stubs it.
+    getLinkedFrom: async () => ({ total: 0, items: [], nextCursor: null }),
     getMembers: unstubbed('getMembers'),
     // A label join must not fail a read, so `[]` (no name known) rather than `unstubbed`.
     getActorNames: async () => [],

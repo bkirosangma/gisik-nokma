@@ -2,16 +2,17 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { searchTermSchema } from '@gisik-nokma/domain';
 import { createElement } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Editor } from '@tiptap/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DELETE_TRIGGER_LABEL } from '@gisik-nokma/app-core';
 import type { Actor, DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
-import type { IngestResult, NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
+import type { IngestResult, LinkedFromRow, NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { noteDraftKey } from '../src/notes/use-note-autosave.js';
 import { stubServices } from './helpers/stub-services.js';
+import { ticketRefHrefIn } from '../src/ticket-ref-callbacks.js';
 
 /**
  * Cases 18.199–18.204 — the note document (Plan 5 of 6, spec §9.2, §9.6, §8.5).
@@ -119,6 +120,7 @@ function world(
     getTickets?: DataSourceQuery['getTickets'];
     getNote?: DataSourceQuery['getNote'];
     getNoteComments?: DataSourceQuery['getNoteComments'];
+    getLinkedFrom?: DataSourceQuery['getLinkedFrom'];
     actorNames?: Actor[];
   } = {},
 ) {
@@ -127,6 +129,7 @@ function world(
     ...(opts.search === undefined ? {} : { search: opts.search }),
     ...(opts.getTickets === undefined ? {} : { getTickets: opts.getTickets }),
     ...(opts.getNoteComments === undefined ? {} : { getNoteComments: opts.getNoteComments }),
+    ...(opts.getLinkedFrom === undefined ? {} : { getLinkedFrom: opts.getLinkedFrom }),
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
@@ -169,7 +172,13 @@ beforeEach(() => {
 });
 
 function renderDocument(
-  opts: { note?: NoteDetail; role?: string; actorNames?: Actor[]; getNoteComments?: DataSourceQuery['getNoteComments'] } = {},
+  opts: {
+    note?: NoteDetail;
+    role?: string;
+    actorNames?: Actor[];
+    getNoteComments?: DataSourceQuery['getNoteComments'];
+    getLinkedFrom?: DataSourceQuery['getLinkedFrom'];
+  } = {},
 ) {
   return render(
     <Providers services={world(opts)}>
@@ -305,6 +314,70 @@ describe('26.112 the note page passes the viewer\'s role to its comments', () =>
     renderDocument({ role: 'member', getNoteComments: async () => [kiroComment] });
     const row = (await screen.findByText('walrus')).closest('li')!;
     expect(within(row).queryByRole('button', { name: /More actions/ })).toBeNull();
+  });
+});
+
+describe('27.152-27.153 the note document draws Linked from between its body and its comments', () => {
+  const LINKED: LinkedFromRow[] = [
+    {
+      sourceKind: 'comment', sourceId: 'C7', authorId: 'u_kiro', snippet: 'see [[Compressor log]]', updatedAt: '2026-10-03T10:00:00.000Z',
+      parent: { kind: 'note', noteId: OTHER_NOTE, title: 'Cold room audit' },
+    },
+    {
+      sourceKind: 'ticket', sourceId: 'S1', authorId: 'u_kiro', snippet: 'per [[Compressor log]]', updatedAt: '2026-10-03T09:00:00.000Z',
+      parent: { kind: 'ticket', ticketId: 'S1', projectId: P_COLD, key: 'CCSO-1', title: 'Chiller', stateCategory: 'active' },
+    },
+  ];
+
+  it('27.152 the read asks { kind: note, id } and the section sits after note-editor and before the comment thread; the empty page draws none (control)', async () => {
+    const getLinkedFrom = vi.fn(async () => ({ total: 2, items: LINKED, nextCursor: null }));
+    renderDocument({ getLinkedFrom, getNoteComments: async () => [] });
+    const section = await screen.findByTestId('linked-from');
+    expect(getLinkedFrom).toHaveBeenCalledWith(WS_A, { kind: 'note', id: NOTE });
+    const editor = screen.getByTestId('note-editor');
+    const thread = document.querySelector('.gn-comments');
+    expect(thread).not.toBeNull();
+    expect(editor.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(section.compareDocumentPosition(thread!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    cleanup();
+
+    // CONTROL: the empty page, after the read has answered, draws no section.
+    const empty = vi.fn(async () => ({ total: 0, items: [], nextCursor: null }));
+    renderDocument({ getLinkedFrom: empty, getNoteComments: async () => [] });
+    await screen.findByTestId('note-editor');
+    await waitFor(() => expect(empty).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByTestId('linked-from')).toBeNull();
+    cleanup();
+
+    // "Show all" on the note asks the same read for this note, with the cursor.
+    // Only the FIRST call answers the first page (see 27.151): a call without the cursor then ends the walk at once.
+    let calls = 0;
+    const paged = vi.fn(async (_ws: string, _target: unknown, cursor?: string) => {
+      calls += 1;
+      if (calls === 1) return { total: 2, items: [LINKED[0]!], nextCursor: '9' };
+      return cursor === '9' ? { total: 2, items: [LINKED[1]!], nextCursor: null } : { total: 2, items: [], nextCursor: null };
+    });
+    renderDocument({ getLinkedFrom: paged, getNoteComments: async () => [] });
+    const more = await screen.findByTestId('linked-from');
+    await userEvent.setup().click(within(more).getByRole('button', { name: 'Show all 2' }));
+    await waitFor(() => expect(within(more).getAllByRole('listitem')).toHaveLength(2));
+    expect(paged).toHaveBeenLastCalledWith(WS_A, { kind: 'note', id: NOTE }, '9');
+  });
+
+  it('27.153 a note-comment row pushes /notes/<id>#comment-<cid>; a ticket row pushes the path ticketRefHrefIn gives', async () => {
+    const ticketHref = ticketRefHrefIn(WS_A)({ ticketId: 'S1', projectId: P_COLD });
+    // A null href renders no link, and the click loop below would visit nothing.
+    expect(ticketHref).not.toBeNull();
+    renderDocument({ getLinkedFrom: async () => ({ total: 2, items: LINKED, nextCursor: null }), getNoteComments: async () => [] });
+    const section = await screen.findByTestId('linked-from');
+    const links = within(section).getAllByRole('link');
+    expect(links).toHaveLength(2);
+    const user = userEvent.setup();
+    for (const link of links) await user.click(link);
+    expect(routerPush.mock.calls.map((call) => call[0])).toEqual([`/notes/${OTHER_NOTE}#comment-C7`, ticketHref]);
   });
 });
 
