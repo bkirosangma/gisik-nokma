@@ -1643,3 +1643,23 @@ describe("28.196 offline History reads a published draft's from-form links from 
     expect(others.filter((e) => 'linkDirection' in e)).toEqual([]);
   });
 });
+
+describe("29.126 offline History of a served leads_to copy: a hidden source's label is withheld (planner ruling 2026-10-05 00:13)", () => {
+  it("29.126 a from entry whose source was withheld reads \"Linked: comes after a ticket you can't see\" with no label key; CONTROL: a withheld target keeps (Yes), and a visible source's entry keeps it too", async () => {
+    const { ds, replica, taskId: D, epicId: S } = await fixture();
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', { kind: 'leads_to', targetId: D, from: S, label: 'Yes' }));
+    // Served copies, never submitted claims (27.090's escape hatch), built by the one helper the server's doors use.
+    (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', withheldLinkPayload('leads_to', 'in', 'Yes')));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', withheldLinkPayload('leads_to', 'out', 'Yes')));
+    delete (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads;
+    const lines = (await ds.query.getTicketHistory(D)).filter((e) => e.type === 'ticket.link_added');
+    expect(lines.map((e) => describeEvent(e))).toEqual([
+      'Linked: comes after another ticket (Yes)', // CONTROL: the source visible, its label shown
+      "Linked: comes after a ticket you can't see",
+      "Linked: leads to a ticket you can't see (Yes)", // CONTROL: a hidden TARGET keeps the label (LK-6)
+    ]);
+    expect(JSON.stringify(lines[1]!.payload)).toBe('{"kind":"leads_to","targetId":null,"from":null}');
+    expect(lines.map((e) => e.linkDirection)).toEqual(['in', 'in', 'out']);
+  });
+});

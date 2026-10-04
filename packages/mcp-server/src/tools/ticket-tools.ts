@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS } from '@gisik-nokma/domain';
+import { linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS, withheldLinkPayload, type TicketLinkKind } from '@gisik-nokma/domain';
 import { spliceDoc, type BodyEdit } from '@gisik-nokma/editor/markdown-doc';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
@@ -56,11 +56,15 @@ export function redactedPayload(type: string, eventId: string, payload: Record<s
   if (type === 'ticket.link_added' || type === 'ticket.link_removed') {
     if (payload['targetId'] !== null) return payload;
     // Withheld (typed-links T4b). A draft-side `from` entry hides its SOURCE: its target is this ticket (drafts T6 FIX 1).
-    // A `leads_to` label is kept (workflow-timeline-graphs LK-6): it names the source's branch, not the hidden end.
-    const label = payload['label'] === undefined ? {} : { label: payload['label'] };
-    return linkPayloadDirection(payload) === 'in'
-      ? { kind: payload['kind'], from: HIDDEN_END, ...label }
-      : { kind: payload['kind'], target: HIDDEN_END, ...label };
+    // A `leads_to` label is kept on 'out', the visible source's branch (workflow-timeline-graphs LK-6, planner ruling
+    // 2026-10-04 13:01), and dropped on 'in', where the hidden end IS the source (planner ruling 2026-10-05 00:13). The
+    // domain's `withheldLinkPayload` decides it, here as at the server's doors: no second copy of the rule (29.126).
+    const direction = linkPayloadDirection(payload);
+    const { label } = withheldLinkPayload(payload['kind'] as TicketLinkKind, direction, payload['label'] as string | undefined);
+    const kept = label === undefined ? {} : { label };
+    return direction === 'in'
+      ? { kind: payload['kind'], from: HIDDEN_END, ...kept }
+      : { kind: payload['kind'], target: HIDDEN_END, ...kept };
   }
   if (type === 'comment.added') return { commentId: eventId };
   if (type === 'comment.edited' || type === 'comment.deleted') return { commentId: payload['commentId'] };
