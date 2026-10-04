@@ -5,3 +5,5 @@ export * from './anchored-zoom.js';
 export * from './wheel.js';
 export * from './calendar-days.js';
 export * from './driver.js';
+export * from './dom/clock.js';
+export * from './dom/scroll-adapter.js';
