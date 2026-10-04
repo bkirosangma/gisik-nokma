@@ -328,7 +328,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     // `18.241`), its LINKED FROM section (Knowledge Graph B, `27.149`), and its
     // LINKS section (typed links, `27.074`) — and each opens its own subscription.
     //
-    // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add a tenth: it
+    // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add an eleventh: it
     // fetches the workspace's note list ONCE on mount (`useEffect`, case
     // 18.288 — a final review caught that a `useLiveQuery` version here
     // would refetch on every unrelated workspace stream frame for as long
@@ -5967,14 +5967,14 @@ describe('TicketSheet: the Links section', () => {
   }
   const editor = (() => null) as unknown as EditorSlotComponent;
 
-  it('27.074 sits between the fields and the subtasks, Subtasks + Notes + Comments stay adjacent; control: two links read "Links (2)"', async () => {
+  it('27.074 sits between the fields and the subtasks, Subtasks + Notes + Comments stay adjacent, and without an editor slot offers no Add link or Remove; control: two links read "Links (2)", and with an editor slot both show', async () => {
     const read = ticketRead();
     const source = createFakeDataSource({
       getTicket: async () => read,
       getWorkflowDef: async () => WF_ERRAND,
       getTicketLinks: async () => [link('GN-1', 'a'), link('GN-2', 'b')],
     });
-    const { container } = render(
+    const { container, rerender } = render(
       <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} />,
     );
     const links = await screen.findByTestId('ticket-links');
@@ -5984,6 +5984,16 @@ describe('TicketSheet: the Links section', () => {
     expect(fields.compareDocumentPosition(links) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(links.compareDocumentPosition(subtasks) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(container.querySelector('.gn-ticket-sheet__subtasks + .gn-ticket-sheet__notes + .gn-comments')).not.toBeNull();
+    // the sheet's edit rights reach the section: no editor slot, no Add link and no Remove
+    await within(links).findByText('Title GN-1');
+    expect(within(links).queryByRole('button', { name: 'Add link' })).toBeNull();
+    expect(within(links).queryByRole('button', { name: /^Remove: / })).toBeNull();
+    rerender(
+      <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} onClose={vi.fn()} />,
+    );
+    const editable = within(screen.getByTestId('ticket-links'));
+    expect(await editable.findByRole('button', { name: 'Add link' })).toBeInTheDocument(); // control: an editor slot gives both
+    expect(editable.getByRole('button', { name: 'Remove: blocks GN-1' })).toBeInTheDocument();
   });
 
   it('27.075 on the phone sheet the section is present and Add link opens the bottom sheet; control: desktop is the Popover', async () => {

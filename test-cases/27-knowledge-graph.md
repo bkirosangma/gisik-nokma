@@ -91,7 +91,6 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 - ✅ **27.088 — the replica applies a withheld `link_added` and a withheld `link_removed` from the stream without stalling: both are stored at their seqs, the ticket's confirmed state has no `links` key, and the cursor advances past both;** control: a visible `link_added` in the same run folds into `links`.
 - ✅ **27.089 — the dual-client rig, a target hidden from client A: after the admin links T1 blocks H and T1 relates T2, A's confirmed T1 equals A's served detail state (`withholdLinks(projTicket(T1), sight(A))`: `links: [relates T2]`), and no row A holds (events, snapshots, contests, tickets) contains H; the same after a snapshot pass and a FRESH client's bootstrap;** control: the admin's client holds H and equals `projTicket(T1)` whole; 27.062 is unchanged.
 - ✅ **27.090 — offline History labels a withheld link event `linkTarget: null`, so `describeEvent` reads "a ticket you can't see";** control: a link event with a real target carries no `linkTarget` key.
-<!-- A T5 -->
 
 ## 27.2 Reference index and "Linked from" (spec B, 27.100–27.179)
 
