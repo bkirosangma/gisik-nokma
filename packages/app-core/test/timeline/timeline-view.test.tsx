@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
-import { KEY_GAP_PX } from '@gisik-nokma/viewport';
+import { BAR_PAD_PX, KEY_GAP_PX, MIN_BAR_PX } from '@gisik-nokma/viewport';
 import {
   TIMELINE_EMPTY_COPY,
   TIMELINE_SIDE_LIST_COPY,
@@ -776,7 +776,7 @@ describe('29.102 only the bars near the view are mounted', () => {
 
 /**
  * 29.055 (the view's half; the packing half is `packages/viewport/test/pack.test.ts`): the packer reserves an outside key
- * from the bar's END, `KEY_GAP_PX` after it, so the view must decide "outside" with the SAME predicate and draw the key at
+ * from the bar's drawn END (E11, 29.056), `KEY_GAP_PX` after it, so the view must decide "outside" with the SAME predicate and draw the key at
  * the SAME gap. A second copy of the comparison here would let the two drift apart while every test of each stays green.
  */
 describe('29.055 the view decides an outside key with the packer\'s one predicate and draws it at the packer\'s gap', () => {
@@ -791,7 +791,7 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     }
     expect(total).toBe(1);
     expect(comparisons(readFileSync(join(REPO_ROOT, 'packages/viewport/src/pack.ts'), 'utf8'))).toBe(1);
-    expect(readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-view.tsx'), 'utf8')).toMatch(/\bkeyOutside\(barPx, measure\(row\.key\)\)/);
+    expect(readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-view.tsx'), 'utf8')).toMatch(/\bkeyOutside\(drawnPx, measure\(row\.key\)\)/);
     expect(comparisons('const outside = row.key !== null && barPx < measure(row.key);')).toBe(1);
     expect(comparisons('const outside = measure(row.key) > barPx;')).toBe(1);
   });
@@ -822,13 +822,58 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     expect(container.querySelector('.gn-timeline__key--outside')).toBeNull();
   });
 
-  it('29.055 ui.css draws the outside key KEY_GAP_PX (4 px) after the bar\'s end; the literal is pinned too, so a gap scaled on both sides still reddens', () => {
+  it('29.055 ui.css draws the outside key KEY_GAP_PX (4 px) after the bar\'s drawn end (E11: the floored width, 29.056); the literal is pinned too, so a gap scaled on both sides still reddens', () => {
     const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
     const body = /^\.gn-timeline__key--outside \{([^}]*)\}/m.exec(css)?.[1] ?? '';
     const left = /(?:^|;)\s*left:\s*([^;]+);/.exec(body)?.[1]?.trim();
-    expect(left).toBe(`calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + ${KEY_GAP_PX}px)`);
+    expect(left).toBe(`calc(var(--d0) * var(--tl-ppd) * 1px + max(calc(var(--dn) * var(--tl-ppd) * 1px), ${MIN_BAR_PX}px) + ${KEY_GAP_PX}px)`);
     expect(KEY_GAP_PX).toBe(4);
-    expect(left).toBe('calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + 4px)');
+    expect(left).toBe('calc(var(--d0) * var(--tl-ppd) * 1px + max(calc(var(--dn) * var(--tl-ppd) * 1px), 12px) + 4px)');
+  });
+});
+
+/**
+ * 29.056 (the view's half; the packing half is `packages/viewport/test/pack.test.ts`): a bar is never drawn narrower than its
+ * two side paddings, so ui.css floors its width at `MIN_BAR_PX` and the view decides an outside key on `barPx`, the width the
+ * packer reserved (ERRATA E11). The floor is the padding: pinned to the constants AND to the literals, so a value scaled on
+ * both sides still reddens. In jsdom the floor cannot flip an outside decision (every measured key is its text plus 12 px, so
+ * at least 13 px), so the view's call is guarded by the structural legs here and measured in the browser (29.089).
+ */
+describe('29.056 the view draws and decides a bar at its floored width, written once', () => {
+  it('29.056 ui.css: the bar pads 6 px a side (BAR_PAD_PX = MIN_BAR_PX / 2) and its width floors at 12 px (MIN_BAR_PX); the outside key starts from that same width expression', () => {
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const bar = /^\.gn-timeline__bar \{([^}]*)\}/m.exec(css)?.[1] ?? '';
+    const value = (body: string, name: string) => new RegExp(`(?:^|;)\\s*${name}:\\s*([^;]+);`).exec(body)?.[1]?.trim();
+    expect(value(bar, 'padding')).toBe(`2px ${BAR_PAD_PX}px`);
+    expect(value(bar, 'padding')).toBe('2px 6px');
+    expect(BAR_PAD_PX).toBe(MIN_BAR_PX / 2);
+    const width = value(bar, 'width');
+    expect(width).toBe(`max(calc(var(--dn) * var(--tl-ppd) * 1px), ${MIN_BAR_PX}px)`);
+    expect(width).toBe('max(calc(var(--dn) * var(--tl-ppd) * 1px), 12px)');
+    const outside = /^\.gn-timeline__key--outside \{([^}]*)\}/m.exec(css)?.[1] ?? '';
+    expect(value(outside, 'left')).toContain(` + ${width as string} + `);
+  });
+
+  it('29.056 MIN_BAR_PX and barPx are defined once, in pack.ts; the view decides on barPx and re-types no 12; control: the scans count planted copies', () => {
+    const roots = [join(REPO_ROOT, 'packages/viewport/src'), join(REPO_ROOT, 'packages/app-core/src')];
+    const definitions = (text: string) => (text.match(/\bMIN_BAR_PX\s*=(?!=)|\bfunction barPx\b|\bbarPx\s*=\s*\(/g) ?? []).length;
+    let total = 0;
+    for (const root of roots) {
+      for (const file of readdirSync(root, { recursive: true }) as string[]) {
+        if (/\.tsx?$/.test(file)) total += definitions(readFileSync(join(root, file), 'utf8'));
+      }
+    }
+    expect(total).toBe(2);
+    expect(definitions(readFileSync(join(REPO_ROOT, 'packages/viewport/src/pack.ts'), 'utf8'))).toBe(2);
+    const view = readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-view.tsx'), 'utf8');
+    expect(view).toMatch(/\bconst drawnPx = barPx\(row\.endDay - row\.startDay \+ 1, ppd\);/);
+    expect(view).toMatch(/\bconst KEY_PADDING_PX = MIN_BAR_PX;/);
+    const twelves = (text: string) => (text.match(/(?<![\w.])12(?![\w.])/g) ?? []).length;
+    expect(twelves(view)).toBe(0);
+    // CONTROLS: each scan finds the copy it guards against.
+    expect(definitions('const MIN_BAR_PX = 12;')).toBe(1);
+    expect(definitions('const barPx = (days: number, ppd: number) => Math.max(days * ppd, 12);')).toBe(1);
+    expect(twelves('const KEY_PADDING_PX = 12;')).toBe(1);
   });
 });
 
