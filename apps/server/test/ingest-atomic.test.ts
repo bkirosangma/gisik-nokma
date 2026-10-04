@@ -56,6 +56,10 @@ async function headsOf(events: readonly SubmittedEvent[]): Promise<number> {
 /** Clients that log BEGIN, COMMIT and ROLLBACK the moment each round-trip RESOLVES (the shape `ingest.test.ts` uses for COMMIT alone). */
 function poolRecordingTransactions(real: Pool, log: string[]): Pool {
   return {
+    // A pool-level read (outside any transaction) passes straight through, so a seam that reads off
+    // the pool rather than the transaction's client reaches the database instead of failing on a
+    // missing method.
+    query: real.query.bind(real),
     async connect() {
       const client = await real.connect();
       return new Proxy(client, {
