@@ -449,6 +449,15 @@ beforeAll(async () => {
   });
   await post({ workspaceId, entity: { kind: 'note', id: deletedNoteId }, type: 'note.deleted', payload: {} });
 
+  // ⚠ A COMMENT ON THE CHILD THAT LINKS THE LIVE NOTE, carrying the marker (Knowledge Graph B, 27.142):
+  // without it the `getLinkedFrom` row below would be a `carries: true` row that construes nothing.
+  await post({
+    workspaceId,
+    entity: { kind: 'ticket', id: childId },
+    type: 'comment.added',
+    payload: { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Linked ${MARKER} ` }, { type: 'wikiLink', attrs: { noteId, title: 'Boundary note live' } }] }] } },
+  });
+
   TOMBSTONES.push(childId, sharedDeadId, dead2Id);
   baselineProjectTicketCount = await directoryTicketCount();
   baselineParentRollup = await parentRollup();
@@ -465,7 +474,7 @@ afterAll(async () => {
 });
 
 /**
- * THE SIXTEEN MEMBERS OF `DataSourceQuery`, spelled once.
+ * THE MEMBERS OF `DataSourceQuery`, spelled once (the count is pinned below, with its history).
  *
  * This union is not documentation — it is the tripwire's other half. See the
  * file docblock: `absenceTripwire` cannot return a `keyof DataSourceQuery` that
@@ -513,7 +522,10 @@ type AbsenceDecision =
   // job is to name what was deleted — see its own row below for why its
   // verdict is the exception to every other row's `'excluded'`.
   | 'getDeletedItems'
-  | 'purgedAmong';
+  | 'purgedAmong'
+  // Knowledge Graph B (27.142). A carrier: a comment on the child links the live
+  // note and its snippet quotes the marker.
+  | 'getLinkedFrom';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -719,6 +731,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getNoteComments: { verdict: 'excluded', carries: false },
   getNoteHistory: { verdict: 'excluded', carries: false },
   getNoteVersion: { verdict: 'excluded', carries: false },
+  getLinkedFrom: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'Knowledge Graph B: the live note is linked from a comment on the child, and the snippet quotes the marker. The read hides a source whose parent ticket is tombstoned (`LIVE_TICKET_WHERE` in `read/linked-from.ts`’s ticket arm), so after the delete the row, its snippet and its count are gone.',
+  },
 };
 
 /**
@@ -792,6 +809,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     // membership, not one workspace.
     getDeletedItems: () => ds.getDeletedItems(),
     purgedAmong: () => ds.purgedAmong([childId]),
+    getLinkedFrom: () => ds.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }),
   };
 }
 
@@ -853,7 +871,7 @@ const CARRIERS = MEMBERS.filter((key) => DECIDED[key].carries);
 
 it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses', () => {
   // The calls are what make the guard live in the test file rather than only in
-  // the type. If `DataSourceQuery` grew a seventeenth member, the return of
+  // the type. If `DataSourceQuery` grew a member this union lacks, the return of
   // `absenceTripwire` would stop being assignable to `AbsenceDecision` and the
   // three `Record`s below would stop being total.
   expect(absenceTripwire('getBoard')).toBe('getBoard');
@@ -863,8 +881,8 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `getDeletedItems`; 25 until trash Plan 3 added `purgedAmong`; 26 until
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
   // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
-  // `getTicketLinks`.
-  expect(MEMBERS).toHaveLength(29);
+  // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`.
+  expect(MEMBERS).toHaveLength(30);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

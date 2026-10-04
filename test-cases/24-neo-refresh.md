@@ -73,6 +73,6 @@
 ## 24.9 Retiring the dead fieldRim role (HK-4)
 
 - ✅ **24.120 — the `fieldRim` role, `--gn-field-rim` and the `neoFieldRim*` primitives are gone; the neighbouring roles are still emitted (HK-4, 2026-10-02).** Control, same `it`: `surfaceWell`, `--gn-surface-well:` and `--gn-border:` remain. Mutation: re-add `fieldRim` to `TOKEN_ROLES` → red.
-- ✅ **24.121 — no `CONTRAST_PAIRS` row names `fieldRim`; the roster is 52 (56 minus four).** Control: the `border`/`surfaceWell` (3:1) and `textAccent`/`surfaceTrack` (4.5:1) rows stay. Mutation: restore one `fieldRim` row → red.
+- ✅ **24.121 — no `CONTRAST_PAIRS` row names `fieldRim`; the roster is 70 (56 minus four, plus the 18 Knowledge Graph rows of 27.257).** Control: the `border`/`surfaceWell` (3:1) and `textAccent`/`surfaceTrack` (4.5:1) rows stay. Mutation: restore one `fieldRim` row → red.
 - ✅ **24.122 — neither `ui.css` nor `globals.css` contains `field-rim`, not even in a comment.** Control: the sources still carry `var(--gn-border)` and `.gn-field__input`. Mutation: a `--gn-field-rim` mention in `ui.css` → red.
 - ✅ **24.123 — zero drift: `border` under `hig` and `minimal` is `#6c6c70` (light) and `#98989d` (dark), what `fieldRim` mapped to; neo `border` is the same hex.** Control: the two themes differ. Mutation: change the hig `border` mapping → red. (24.002's `hig-minimal-shadows.before.json` lost its four `fieldRim` surface keys: a fixture-only change, the role it recorded no longer exists; 24.009 is untouched.)

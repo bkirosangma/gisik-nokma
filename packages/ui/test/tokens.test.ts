@@ -1536,8 +1536,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
     // No two rows share a pair: a duplicate is a row that guards nothing new but inflates the count below (UX fixes T1
     // fix 1). Asserted BEFORE the count so a re-added copy fails here, by name, and not only as a number that moved.
     expect(new Set(CONTRAST_PAIRS.map((pair) => `${pair.fg}|${pair.bg}`)).size, 'duplicate fg|bg rows').toBe(CONTRAST_PAIRS.length);
-    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows.
-    expect(CONTRAST_PAIRS.length).toBe(52);
+    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows = 52; the Knowledge Graph adds 18 (27.257: eight edge roles on two surfaces, text on two concept fills).
+    expect(CONTRAST_PAIRS.length).toBe(70);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
@@ -2455,5 +2455,67 @@ describe('13.1146 (second arm) the advisories title inherits a declared ink', ()
 
   it('13.1146 the warning tone survives on the panel\'s edge, not its text', () => {
     expect(bodyOf('.advisories-panel')).toMatch(/border-left:\s*3px dashed var\(--gn-warning\)/);
+  });
+});
+
+/** 27.255–27.260 — the Knowledge Graph's colours (spec C §3.7). Values are the mockup's (knowledge-graph-sigma.html:6-28) except where a measured contrast failure forced a derived value (27.258). */
+describe('the Knowledge Graph colours', () => {
+  const GRAPH_ROLES = ['edgeStructure', 'edgeBlocks', 'edgeRelates', 'edgeDuplicates', 'edgeAttached', 'edgeReference', 'edgePeople', 'edgeConcept', 'conceptFill', 'conceptSoft', 'fogDot', 'graphCardLine'] as const;
+
+  it('27.255 twelve roles exist and emit --gn-* variables; control: the spec\'s --e-* names are not emitted', () => {
+    for (const role of GRAPH_ROLES) expect(TOKEN_ROLES).toContain(role);
+    expect(cssVariableName('edgeDuplicates')).toBe('--gn-edge-duplicates');
+    expect(cssVariableName('graphCardLine')).toBe('--gn-graph-card-line');
+    const sheet = themeStylesheet();
+    expect(sheet).toContain('--gn-edge-blocks: #d70015;');
+    // The spec's --e-* names: no code path could ever emit them, so `not.toContain('--e-blocks')` was no evidence. The
+    // evidence is that every graph role IS emitted under --gn-*, with a real hex, in all NINE colour blocks
+    // (hig, minimal, neo × light, dark media, dark attribute): a role missing from one theme map emits `undefined` there.
+    for (const role of GRAPH_ROLES) {
+      expect(sheet.match(new RegExp(`${cssVariableName(role)}: #[0-9a-f]{6};`, 'g')), role).toHaveLength(9);
+    }
+  });
+
+  it('27.256 the mockup values, light and dark, where they pass; control: a value that differs from the mockup is only edgePeople', () => {
+    const want: Record<string, [string, string]> = {
+      edgeStructure: ['#5e5e62', '#a0a0a5'], edgeBlocks: ['#d70015', '#ff6961'], edgeRelates: ['#8944ab', '#da8fff'], edgeDuplicates: ['#b25000', '#ffb340'],
+      edgeAttached: ['#33629f', '#7fa9e4'], edgeReference: ['#d30f45', '#ff6482'], edgeConcept: ['#0b7285', '#5ccfe0'],
+      conceptFill: ['#d6e7e5', '#1e4350'], conceptSoft: ['#e8f0ee', '#1c3040'], fogDot: ['#b9b2a6', '#4a5578'], graphCardLine: ['#d9d6cf', '#3a3833'],
+    };
+    for (const [role, [light, dark]] of Object.entries(want)) {
+      expect(colorOf('light', role as TokenRole), role).toBe(light);
+      expect(colorOf('dark', role as TokenRole), role).toBe(dark);
+    }
+    expect(colorOf('light', 'edgePeople')).not.toBe('#a8a49a'); // the mockup's, which is `lineStrong`
+    expect(colorOf('dark', 'edgePeople')).not.toBe('#57544c'); // the mockup's, which is `seamStrong`
+    // `not.toBe` alone passes on `undefined` (a role with no mapping): pin the derived primitives too
+    expect(colorOf('light', 'edgePeople')).toBe(primitives.peopleEdgeLight);
+    expect(colorOf('dark', 'edgePeople')).toBe(primitives.peopleEdgeDark);
+  });
+
+  it('27.257 the declared pairs: every edge role on surface and surfaceRaised at 3, text on conceptFill and conceptSoft at 4.5 (the loop above measures them); control: a role absent from the array is reported missing', () => {
+    const has = (fg: string, bg: string, min: number) => CONTRAST_PAIRS.some((p) => p.fg === fg && p.bg === bg && p.minimum === min);
+    for (const role of GRAPH_ROLES.filter((r) => r.startsWith('edge'))) for (const bg of ['surface', 'surfaceRaised']) expect(has(role, bg, 3), `${role} on ${bg}`).toBe(true);
+    for (const bg of ['conceptFill', 'conceptSoft']) expect(has('text', bg, 4.5), `text on ${bg}`).toBe(true);
+    expect(has('fogDot', 'surface', 3)).toBe(false);
+  });
+
+  it('27.258 edgePeople: the mockup\'s grey measured below 3:1 and the derived value clears it, every style and theme; control: the mockup\'s value really fails', () => {
+    for (const style of STYLE_NAMES) for (const theme of THEME_NAMES) for (const bg of ['surface', 'surfaceRaised'] as const) {
+      expect(contrastRatio(colorOf(theme, 'edgePeople', style), colorOf(theme, bg, style)), `${style}/${theme}/${bg}`).toBeGreaterThanOrEqual(3);
+    }
+    expect(contrastRatio('#a8a49a', colorOf('light', 'surfaceRaised'))).toBeLessThan(3);
+    expect(contrastRatio('#57544c', colorOf('dark', 'surfaceRaised'))).toBeLessThan(3);
+  });
+
+  it('27.259 the pairless exemptions: fogDot and graphCardLine are decorative (fog is never interactive, §3.1; a card is told by its fill and text), measured below 3:1, and no CONTRAST_PAIRS row hides them; control: the fog dot is still distinguishable (≥ 1.5:1)', () => {
+    const fog = contrastRatio(colorOf('light', 'fogDot'), colorOf('light', 'surface'));
+    expect(fog).toBeLessThan(3);
+    expect(fog).toBeGreaterThanOrEqual(1.5);
+    expect(contrastRatio(colorOf('dark', 'fogDot'), colorOf('dark', 'surface'))).toBeGreaterThanOrEqual(1.5);
+    // the hairline is the other exemption the title names: measured below 3:1 too (1.19 light, 1.47 dark while planning)
+    expect(contrastRatio(colorOf('light', 'graphCardLine'), colorOf('light', 'surface'))).toBeLessThan(3);
+    expect(contrastRatio(colorOf('dark', 'graphCardLine'), colorOf('dark', 'surface'))).toBeLessThan(3);
+    expect(CONTRAST_PAIRS.some((p) => p.fg === 'fogDot' || p.bg === 'fogDot' || p.fg === 'graphCardLine' || p.bg === 'graphCardLine')).toBe(false);
   });
 });
