@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTEST_EVENT_TYPES, TICKET_EVENT_TYPES } from '@gisik-nokma/domain';
+import { CONTEST_EVENT_TYPES, TICKET_EVENT_TYPES, TICKET_LINK_KINDS, withheldLinkPayload } from '@gisik-nokma/domain';
 import type { TicketHistoryEvent } from '../../src/view-types.js';
 import { describeEvent } from '../../src/views/history-copy.js';
 
@@ -322,6 +322,50 @@ describe('27.005 history copy — link sentences', () => {
     expect(describeEvent(linkEvent('ticket.link_added', 'parent', { key: 'GN-1' }))).toBe('ticket.link_added');
     // control: an unknown type still falls back
     expect(describeEvent({ ...eventOf('ticket.closed'), type: 'ticket.never_seen' })).toBe('ticket.never_seen');
+  });
+
+  /**
+   * 29.126 (wtg2 T2) — a `leads_to` reads "leads to" / "comes after" and carries its branch label, except on a copy whose
+   * hidden end is the SOURCE: `withheldLinkPayload` drops it there (planner ruling 2026-10-05 00:13), so the line has no
+   * "(Yes)". The withheld legs are built from the helper itself; `describeEvent` prints whatever label the payload holds.
+   */
+  describe('29.126 history copy — leads_to and its label', () => {
+    const leadEvent = (
+      type: string,
+      linkTarget: { key: string | null } | null,
+      label?: string,
+      linkDirection?: 'out' | 'in',
+    ): TicketHistoryEvent => {
+      const base = linkEvent(type, 'leads_to', linkTarget);
+      return {
+        ...base,
+        payload: { ...(base.payload as Record<string, unknown>), ...(label === undefined ? {} : { label }) },
+        ...(linkDirection === undefined ? {} : { linkDirection }),
+      };
+    };
+
+    const withheldLead = (direction: 'out' | 'in'): TicketHistoryEvent => ({
+      ...eventOf('ticket.link_added'),
+      payload: withheldLinkPayload('leads_to', direction, 'Yes'),
+      linkTarget: null,
+      linkDirection: direction,
+    });
+
+    it("29.126 Linked: leads to GN-147 (Yes); a withheld target keeps (Yes), a withheld source drops it; no label reads as before; 29.127 every kind has a sentence", () => {
+      expect(describeEvent(leadEvent('ticket.link_added', { key: 'GN-147' }, 'Yes'))).toBe('Linked: leads to GN-147 (Yes)');
+      // the LK-6 control: a hidden TARGET keeps the visible source's branch label
+      expect(describeEvent(withheldLead('out'))).toBe("Linked: leads to a ticket you can't see (Yes)");
+      expect(describeEvent(leadEvent('ticket.link_added', { key: 'GN-147' }))).toBe('Linked: leads to GN-147'); // control: no label, no suffix
+      expect(describeEvent(leadEvent('ticket.link_removed', { key: 'GN-147' }))).toBe('Removed link: leads to GN-147');
+      // From the end it points into (a draft-side entry), its source hidden: "comes after", and NO label (the source's branch text)
+      expect(describeEvent(withheldLead('in'))).toBe("Linked: comes after a ticket you can't see");
+      // ... and with the source visible, the same reading keeps its label
+      expect(describeEvent(leadEvent('ticket.link_added', { key: 'GN-144' }, 'Yes', 'in'))).toBe('Linked: comes after GN-144 (Yes)');
+      // 29.127: every kind in the list has a sentence, never the wire name
+      for (const kind of TICKET_LINK_KINDS) {
+        expect(describeEvent(linkEvent('ticket.link_added', kind, { key: 'GN-1' }))).not.toBe('ticket.link_added');
+      }
+    });
   });
 });
 

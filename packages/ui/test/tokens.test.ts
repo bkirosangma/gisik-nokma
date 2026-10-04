@@ -1532,12 +1532,12 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       }
     }
     expect(checked).toBe(CONTRAST_PAIRS.length * 6);
-    // The roster only GROWS, except HK-4 (2026-10-02, 24.121), which retired the four fieldRim rows (56 -> 52): 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows, then 44 until UX fixes T1 (owner U5/U8, 2026-10-02) added 8 (the field ring on four grounds, and textAccent and the accent fill on the stepped track/well; 23.001/23.007; two candidate rows, textAccent and textSubtle on surfaceRaised, were already present). then 52 until prefixes and groups T7 (ruling R5, 2026-10-02) added 4 (level1–level4 on surfaceRaised, 22.143). A floor removed is a guarantee removed, and it would show here first.
+    // The roster only GROWS, except HK-4 (2026-10-02, 24.121), which retired the four fieldRim rows (56 -> 52): 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows, then 44 until UX fixes T1 (owner U5/U8, 2026-10-02) added 8 (the field ring on four grounds, and textAccent and the accent fill on the stepped track/well; 23.001/23.007; two candidate rows, textAccent and textSubtle on surfaceRaised, were already present). then 52 until prefixes and groups T7 (ruling R5, 2026-10-02) added 4 (level1–level4 on surfaceRaised, 22.143), then 52 until Workflow and Timeline graphs Part 1 T9 (29.104) added 1 (textMuted on timelineWeekend), then 53 until WTG Part 4 T2 (29.303) added 3 (textInverted on the three category fills the Timeline graph's bars use). A floor removed is a guarantee removed, and it would show here first.
     // No two rows share a pair: a duplicate is a row that guards nothing new but inflates the count below (UX fixes T1
     // fix 1). Asserted BEFORE the count so a re-added copy fails here, by name, and not only as a number that moved.
     expect(new Set(CONTRAST_PAIRS.map((pair) => `${pair.fg}|${pair.bg}`)).size, 'duplicate fg|bg rows').toBe(CONTRAST_PAIRS.length);
-    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows, plus one: textMuted on timelineWeekend (Workflow and Timeline graphs Part 1 T9, 29.104).
-    expect(CONTRAST_PAIRS.length).toBe(53);
+    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows, plus one: textMuted on timelineWeekend (Workflow and Timeline graphs Part 1 T9, 29.104), plus WTG Part 4 T2's three (29.303).
+    expect(CONTRAST_PAIRS.length).toBe(56);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);

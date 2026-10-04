@@ -37,9 +37,12 @@ export function linkWorld(read: ReadWorld, db: TestDatabase) {
       await send(role, 'ticket.created', id, { typeId: 'task', projectId: PROJECT(), parentId: null, title: `Real ${id.slice(-4)}` }),
     ).toMatchObject(committed);
   }
-  /** "source `kind` draft", filed on the DRAFT's stream. */
-  const fromLink = (draftId: string, sourceId: string, kind = 'blocks', role: ReadRole = 'member') =>
-    send(role, 'ticket.link_added', draftId, { kind, targetId: draftId, from: sourceId });
+  /**
+   * "source `kind` draft", filed on the DRAFT's stream. `label` (a `leads_to` branch, wtg2 T2) is sent only when
+   * given, so every existing call files exactly the payload it filed before.
+   */
+  const fromLink = (draftId: string, sourceId: string, kind = 'blocks', role: ReadRole = 'member', label?: string) =>
+    send(role, 'ticket.link_added', draftId, { kind, targetId: draftId, from: sourceId, ...(label === undefined ? {} : { label }) });
   const publishSet = (role: ReadRole, ticketIds: string[]) =>
     read.app.inject({ method: 'POST', url: `/v1/workspaces/${WS()}/drafts/publish`, headers: read.authOf(role), payload: { ticketIds } });
   const get = (role: ReadRole, path: string) =>

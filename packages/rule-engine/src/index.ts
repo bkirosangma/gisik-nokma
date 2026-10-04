@@ -61,6 +61,7 @@ export {
   builtinRankRefusal,
   deepestRankParentRefusal,
   fieldKindRefusal,
+  labelDuplicateRefusal,
   parentTerminalRefusal,
   rankRefusal,
   reboundSameWorkflowRefusal,

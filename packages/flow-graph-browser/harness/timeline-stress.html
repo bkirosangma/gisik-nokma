@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>timeline graph stress</title>
+<style>
+  /* The page chrome only. The stage is the product's own scroller (`.gn-tlg-scroller`) and painter, styled by ui.css. Below the
+     stage: a 120 px control strip (`#tlg-outside`, where a wheel DOES scroll the page: 29.301's control) and 2,000 px of page,
+     so a wheel or a drag that leaked out of the stage would move the page. */
+  :root { --fg-ink: #1c2733; --fg-panel: #eef2f6; --fg-run: #2f5f9e; --fg-focus: #e0a100; }
+  body { margin: 0; font-family: system-ui, sans-serif; color: var(--fg-ink); background: #fff; }
+  #tlg-outside { box-sizing: border-box; height: 120px; display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--fg-panel); }
+  #tlg-below { height: 2000px; }
+  #run { min-height: 48px; padding: 12px 28px; border: 0; border-radius: 10px; background: var(--fg-run); color: #fff; font: 600 20px/1 system-ui, sans-serif; cursor: pointer; }
+  #run:focus-visible { outline: 3px solid var(--fg-focus); outline-offset: 3px; }
+  #tlg-hint { font-size: 15px; line-height: 1.4; }
+  /* The result sits over the stage once a run is over, large enough to read off a phone held at arm's length. */
+  #out { position: fixed; inset: 12px 12px auto; margin: 0; padding: 16px 20px; border-left: 6px solid var(--fg-run); background: var(--fg-panel); font: 600 24px/1.45 system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #out:empty { display: none; }
+</style></head>
+<body><div id="tlg-stage-host"></div>
+<div id="tlg-outside"><button id="run" type="button">Run</button><span id="tlg-hint">Pans ten screens at one screen a second, then shows the numbers.</span></div>
+<div id="tlg-below"></div>
+<pre id="out" aria-live="polite"></pre>
+<script type="module" src="./timeline-stress.tsx"></script></body></html>

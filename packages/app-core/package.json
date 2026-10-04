@@ -25,6 +25,10 @@
     "./online": {
       "types": "./dist/online/index.d.ts",
       "default": "./dist/online/index.js"
+    },
+    "./timeline-graph": {
+      "types": "./dist/timeline-graph/index.d.ts",
+      "default": "./dist/timeline-graph/index.js"
     }
   },
   "sideEffects": [
