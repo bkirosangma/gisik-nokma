@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 /**
  * Drafts T3, case 28.050 (spec §4.2): every `proj_tickets` / `proj_visibility` SQL literal and every `canSee(`,
  * `canSeeResolved(`, `getResolvedVisibility(` call in `apps/server/src` is accounted for, per file and per kind,
- * in groups A (the predicates), B (closed by A, no edit), C (edited: bypasses both), D (doors, T4) and E (no
+ * in groups A (the predicates), B (closed by A, no edit), C (edited: bypasses both), D (doors, T4; their door CALLS are
+ * also counted by 28.084, `draft-doors-census.test.ts`) and E (no
  * viewer in scope). A new file, a moved count or a deleted site fails and prints the line to paste.
  */
 
@@ -84,7 +85,7 @@ const CENSUS: Record<string, Site> = {
   'notifications/fanout.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "every recipient is gated by canSeeTicket (:85), so no draft notice leaves the author's hands; the publish arm is T5" },
   'notifications/sweep.ts': { tickets: 3, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: "the due and stale queries AND LIVE_TICKET_WHERE; C7 adds 'ticket.published' to the entered-state read (:259)" },
   'permissions/check-lifecycle.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'engine: the project id of the ticket a lifecycle mark names; no viewer' },
-  'permissions/check-permission.ts': { tickets: 0, visibility: 0, canSee: 3, resolved: 0, getResolved: 1, groups: ['B', 'D', 'E'], why: 'canSee at :1556 (note create-with-ticket, closed by A); G1 at :1639 and G11 at :1585 become doors in T4; getResolvedVisibility at :1689 is the visibility.set authority read, behind G1' },
+  'permissions/check-permission.ts': { tickets: 0, visibility: 0, canSee: 2, resolved: 0, getResolved: 1, groups: ['B', 'D', 'E'], why: 'canSee at :1573 (note create-with-ticket, closed by A) and :1602 (the note.attached gate, G11 in T9); G1 is ticketAccess now (28.084 counts it); getResolvedVisibility at :1718 is the visibility.set authority read, behind G1' },
   'projections/note-search.ts': { tickets: 2, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B', 'E'], why: 'ticketTextOf ANDs LIVE_TICKET_WHERE (:259); the project reindex (:218) selects note ids only' },
   'projections/proj-visibility.ts': { tickets: 0, visibility: 7, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the projection itself; T3 writes draft_author_id here' },
   'projections/rollups.ts': { tickets: 7, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['C'], why: 'C1: recomputeParent and recomputeProject count children' },
@@ -94,6 +95,7 @@ const CENSUS: Record<string, Site> = {
   'purge/sweep.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the scheduled purge; T5 adds the draft arm' },
   'read/ancestry.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'ancestor chain through visibleTicketsWhere and LIVE_TICKET_WHERE; no legal ledger holds a published ticket under a draft (R4)' },
   'read/deleted-items.ts': { tickets: 3, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: 'C3: containedCount; the listing at :178 reads soft-deleted rows, which a draft never is' },
+  'read/drafts.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['D'], why: 'G8: listMyDrafts reads the caller\'s own drafts by draft_author_id = viewer; no other reader may call it with another id (28.084 lists its callers)' },
   'read/graph-neighbours.ts': { tickets: 4, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "the KG ring: every edge end passes createGraphVisibility.resolve (LIVE_TICKET_WHERE and visibleTicketsWhere) before it is shown or walked, and no hidden-link count exists (27.293); the raw proj_tickets edge reads only propose ends" },
   'read/item-visibility.ts': { tickets: 2, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'hiddenItems: the live set and the visible set both AND LIVE_TICKET_WHERE, so a draft is neither live nor hidden (a concept is not refused over it)' },
   'read/live-ticket.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'ticketIsLive asks LIVE_TICKET_WHERE; T9 adds the openable twin' },
@@ -109,19 +111,18 @@ const CENSUS: Record<string, Site> = {
   'routes/list.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates are ANDed into the read' },
   'routes/my-work.ts': { tickets: 3, visibility: 2, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'assigned, shared and titles use both predicates; the contest roster (:333) is gated by canSee (:367)' },
   'routes/search.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates; proj_search rows exist for drafts and are read only through this join' },
-  'routes/ticket-history.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "canSee (:281); the author's History is T4" },
-  'routes/tickets.ts': { tickets: 0, visibility: 1, canSee: 6, resolved: 0, getResolved: 0, groups: ['B', 'D'], why: 'canSee at :372 (G7) and :864 (G10); :426 :674 :725 :952 stay closed for the author' },
-  'sync/contests-route.ts': { tickets: 1, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['D'], why: 'G6: the contests roster, canOpen in T4' },
-  'sync/reconcile-route.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['D'], why: 'G5: reconcile, canOpen in T4' },
+  'routes/ticket-history.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "canSee (:281): closed for the author too, a draft's History is not shown until publish (spec §4.3, ruling 5)" },
+  'routes/tickets.ts': { tickets: 0, visibility: 1, canSee: 3, resolved: 0, getResolved: 0, groups: ['B', 'D'], why: 'G7: the detail read and its two crumbs are canOpen (T4, 28.084); canSee at :733 (events), :872 (attachments list, G10 in T9) and :960 (comments) stay closed for the author' },
+  'sync/contests-route.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['D'], why: 'G6: the roster joins proj_tickets for titles and gates each row by canOpen (28.084)' },
   'sync/snapshot-refresh.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the workflow-publish refresh folds every ticket forward, drafts included (R40, 28.066)' },
-  'sync/sync-routes.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['D'], why: "G3 single bootstrap (:434); G4 appends the author's drafts to listVisibleTickets (T4)" },
   'visibility/assignee-arm.ts': { tickets: 2, visibility: 2, canSee: 0, resolved: 0, getResolved: 0, groups: ['A'], why: 'the arm; canSee returns before it for a draft and visibleTicketsWhere ANDs the draft clause around it' },
+  'visibility/can-open.ts': { tickets: 1, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['D'], why: 'the door predicate: canSee, then the draft head read for the author (isOpenableDraft, R18 through holdsDraftRights)' },
   'visibility/can-read-note.ts': { tickets: 0, visibility: 0, canSee: 0, resolved: 1, getResolved: 1, groups: ['B'], why: 'spreads getResolvedVisibility, so the flag arrives with no edit; attached tickets pass ticketIsLive first' },
   'visibility/can-see.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 1, getResolved: 1, groups: ['A'], why: 'A1 canSeeResolved and A2 canSee, edited in this task' },
   'visibility/grant-backfill.ts': { tickets: 0, visibility: 1, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'every id in a reach notice passes canSee (:363)' },
   'visibility/rollup.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 1, getResolved: 0, groups: ['C'], why: "C2: the viewer's child tally and restrictedCount" },
-  'visibility/visible-events-for.ts': { tickets: 0, visibility: 2, canSee: 2, resolved: 0, getResolved: 0, groups: ['C', 'D'], why: 'C4 nowInvisibleTicketsInScope (:355 and :359, skip at :369); G2 the stream (:498)' },
-  'visibility/visible-tickets.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "listVisibleTickets is visibleTicketsWhere; G4 appends the author's drafts in T4" },
+  'visibility/visible-events-for.ts': { tickets: 0, visibility: 2, canSee: 0, resolved: 0, getResolved: 0, groups: ['C', 'D'], why: 'C4 nowInvisibleTicketsInScope (:356, :360) names an own draft only when ticketAccess is none (:371); G2 the stream is canOpen (:503)' },
+  'visibility/visible-tickets.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "listVisibleTickets is visibleTicketsWhere; G4 (sync/sync-routes.ts) appends the author's own drafts through listMyDrafts (T4, 28.075)" },
 };
 
 describe('28.050 the draft census', () => {

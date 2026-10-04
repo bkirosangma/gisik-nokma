@@ -159,7 +159,7 @@ it('28.073 the author receives their draft\'s events, nobody else does, and a dr
 });
 
 it('28.080 an author keeps their own draft off the purge list while they can still open it, and is told to drop it once they cannot; another person\'s draft is never named', async () => {
-  async function scenario(regrantAs: 'member' | 'guest'): Promise<{ ids: string[]; own: string; explicit: string; theirs: string }> {
+  async function scenario(regrantAs: 'member' | 'guest', ownDiscarded = false): Promise<{ ids: string[]; ws: string; own: string; explicit: string; theirs: string }> {
     const ws = newUlid();
     const project = newUlid();
     const viewer = newUlid();
@@ -179,14 +179,26 @@ it('28.080 an author keeps their own draft off the purge list while they can sti
       workspaceId: ws, entity: { kind: 'membership', id: membershipId(ws, viewer) },
       type: 'membership.granted', payload: { userId: viewer, role: regrantAs }, actorId: newUlid(),
     }));
-    return { ids: idsOf(await collect(viewer, ws, opener.workspaceSeq - 1)), own, explicit: explicitElsewhere, theirs };
+    if (ownDiscarded) await db.pool.query('UPDATE proj_tickets SET draft_discarded = true WHERE ticket_id = $1', [own]);
+    return { ids: idsOf(await collect(viewer, ws, opener.workspaceSeq - 1)), ws, own, explicit: explicitElsewhere, theirs };
   }
+  // Re-granted as a member: the author still holds R18 (rule A puts every project in a member's reach), so the draft
+  // is still theirs to open and their device keeps it.
   const asMember = await scenario('member');
   expect(asMember.ids).toContain(`purge:${asMember.explicit}`); // CONTROL: the list is real and itemised
   expect(asMember.ids).not.toContain(`purge:${asMember.own}`); // still openable
   expect(asMember.ids).not.toContain(`purge:${asMember.theirs}`);
+  // The same re-grant with the own draft flagged discarded: no longer openable (`ticketAccess` is `none`), so it is
+  // named. Only the flag differs from the leg above.
+  const discarded = await scenario('member', true);
+  expect(discarded.ids).toContain(`purge:${discarded.explicit}`);
+  expect(discarded.ids).toContain(`purge:${discarded.own}`);
+  expect(discarded.ids).not.toContain(`purge:${discarded.theirs}`);
+  // Re-granted as a guest: a guest cannot create in the project, so the draft is no longer theirs to open. A guest's
+  // revocation is not itemised (`scope-revoked`: the device drops its whole copy of the workspace, the draft with
+  // it), and still no item names either draft.
   const asGuest = await scenario('guest');
-  expect(asGuest.ids).toContain(`purge:${asGuest.explicit}`);
-  expect(asGuest.ids).toContain(`purge:${asGuest.own}`); // a guest cannot create in the project: no longer theirs to open
-  expect(asGuest.ids).not.toContain(`purge:${asGuest.theirs}`);
+  expect(asGuest.ids).toContain(`scope-revoked:${asGuest.ws}`);
+  expect(asGuest.ids.join('|')).not.toContain(asGuest.theirs);
+  expect(asGuest.ids.filter((id) => id.startsWith('purge:'))).toEqual([]);
 });

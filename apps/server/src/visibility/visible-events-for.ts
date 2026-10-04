@@ -8,8 +8,7 @@ import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
-import { canSee } from './can-see.js';
-import { canOpen } from './can-open.js';
+import { canOpen, ticketAccess } from './can-open.js';
 import {
   grantNoticeFor,
   isGrantBackfillTrigger,
@@ -344,7 +343,7 @@ function isRevocationOf(row: EventRow, userId: string): boolean {
  */
 type LostScope = 'workspace' | { projectId: string };
 
-/** Every ticket in the lost scope this user cannot see now. */
+/** Every ticket in the lost scope this user cannot see now (their own draft: cannot open now, R18). */
 async function nowInvisibleTicketsInScope(
   db: Queryable,
   userId: string,
@@ -365,11 +364,11 @@ async function nowInvisibleTicketsInScope(
   const out: string[] = [];
   for (const row of result.rows) {
     // Another person's draft is "an id for an entity the recipient stands in no relationship to" (the
-    // docblock at the head of this file bans exactly that): never named (drafts T3, C4). The recipient's OWN
-    // drafts fall through to `canSee`, which is false for a draft, so they are named; T4 refines that to
-    // "named unless still openable".
+    // docblock at the head of this file bans exactly that): never named (drafts T3, C4).
     if (row.draft_author_id !== null && row.draft_author_id !== userId) continue;
-    if (!(await canSee(db, userId, row.ticket_id))) {
+    // `ticketAccess`, not `canSee`: the recipient's OWN draft is `none` only when they can no longer open it
+    // (R18), and only then does their device drop it. Another person's draft was skipped above.
+    if ((await ticketAccess(db, userId, row.ticket_id)) === 'none') {
       out.push(row.ticket_id);
     }
   }
