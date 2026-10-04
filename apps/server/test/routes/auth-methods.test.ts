@@ -34,6 +34,8 @@ function fakeIngest(): IngestService {
   return {
     ingestBatch: async () => [],
     ingestClientBatch: async () => [],
+    ingestAtomic: async () => ({ status: 'committed', results: [] }),
+    ingestClientAtomic: async () => ({ status: 'committed', results: [] }),
     onEventCommitted: () => () => {},
   };
 }

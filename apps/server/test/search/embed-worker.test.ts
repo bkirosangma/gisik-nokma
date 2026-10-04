@@ -340,6 +340,8 @@ describe('18.140 — buildApp registers the note-body commit listener', () => {
     const recordingIngest: IngestService = {
       ingestBatch: async () => [],
       ingestClientBatch: async () => [],
+      ingestAtomic: async () => ({ status: 'committed', results: [] }),
+      ingestClientAtomic: async () => ({ status: 'committed', results: [] }),
       onEventCommitted: (listener) => {
         listeners.push(listener);
         return () => {

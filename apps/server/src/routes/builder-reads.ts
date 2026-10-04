@@ -988,8 +988,10 @@ export function registerBuilderReadRoutes(
    * mirror (a soft-deleted ticket of the type, if the ingest door comes to
    * refuse writes against one, is the next candidate — the SELECT below does
    * not filter `deleted_at`). Recorded against the plan's Task 9b text:
-   * closing the window for good needs a batch-scoped ingest transaction,
-   * which is a change to the ingest service and not to this route.
+   * closing the window for good needs a batch-scoped ingest transaction. The
+   * ingest service has one since drafts T5b (`ingestClientAtomic`, the gated
+   * door of `ingestAtomic`); moving this route onto it is the change still
+   * open, kept out of the drafts plan because it alters a shipped admin route.
    */
   app.post<{ Params: { workspaceId: string; typeId: string } }>(
     '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate',
