@@ -5829,7 +5829,7 @@ input, textarea, select { font-family: inherit; }
 .gn-group-picker__option--create { font-style: italic; }
 .gn-group-picker__notice { margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); }
 /* The header's title and its Edit sit on one line; the heading keeps its own metrics. */
-.gn-project__title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.gn-project__title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; min-height: 2.75rem; }
 /* The title's Edit on a phone (neo follow-up F-2, case 23.331, audit BRD-06): a 44px outlined circle with the pencil glyph in the
    title's own row. The row stops wrapping so Edit can never drop onto a line of its own (it cost a 44px row), and the title, which
    already ellipsises at <=40rem (`ui.css`), takes what is left. Above 40rem the word shows and the glyph does not. AFTER the base
@@ -5903,7 +5903,6 @@ input, textarea, select { font-family: inherit; }
    column and card) filled with placeholder parts, so these rules only LAY OUT: none names a fill, a border, a shadow or a style. */
 .gn-nav--skeleton { min-height: var(--app-nav-offset); }
 .gn-shell--skeleton .gn-skeleton-region { display: contents; }
-.gn-project__tabs-skeleton { display: flex; gap: var(--gn-space-2); }
 /* inline-flex + min-width: 0, not inline-block: the link is an inline-flex row whose `.gn-nav__label` child truncates with an ellipsis, and a
    block-level wrapper in between stops the label shrinking (the workspace and project names then overlap their neighbours). */
 .gn-nav__pending { display: inline-flex; min-width: 0; max-width: 100%; }
@@ -5916,6 +5915,60 @@ input, textarea, select { font-family: inherit; }
    box of its own: the shape inside it is the real view's container (`.gn-board__rail`, `.gn-list`), and a wrapper that took a box of its
    own would move it relative to the page's other children. Layout only. */
 .gn-project__tab-skeleton, .gn-project__tab-skeleton-body { display: contents; }
+
+/* ── ONE-STEP SWAPS (smoothness-2 G1, 2026-10-03; cases 25.240-25.253) ──
+   A page title's placeholder takes the title's own line box. The eight sites used to pass `height="var(--gn-title-page-size)"`, a
+   variable no stylesheet declares: the height fell back to 1em (16px) where the title is 41px (28px on a phone), and a skeleton that
+   outlives a resize above it carried the whole board down by the difference (board 1440: CLS 0.2115). The two numbers are the
+   `.gn-page-title` / `.gn-project__title` line heights above (2.5625rem; 1.75rem at <=40rem), kept beside each other on purpose.
+   The project title row reserves the Edit button's 2.75rem for every role, so a viewer's row is the same height as an editor's. */
+.gn-skeleton--title { --gn-skeleton-h: 2.5625rem; }
+@media (max-width: 40rem) {
+  .gn-skeleton--title { --gn-skeleton-h: 1.75rem; }
+}
+/* The workflow select's placeholder is hidden where the select is: on a phone the picker lives in the Filters sheet (`ui.css`
+   hides `.gn-project__workflow-select` the same way), and the first frame there is the desktop arm. */
+@media (max-width: 40rem) {
+  .gn-project__header > .gn-project__workflow-slot { display: none; }
+}
+/* The route fallback's control places (`ProjectPageSkeleton`): the real search box's and Create ticket's order, flex and push in the
+   tablet arm of `ui.css` (`.gn-project__search`, `.gn-project__header > .gn-button--primary`), spelled for the placeholders, which
+   must not wear the real controls' fills (the neo search is the sunken field, never a placeholder). The Filters hook is `ui.css`'s own. */
+@media (max-width: 64rem) {
+  .gn-project__search-slot { order: 3; flex: 1 1 0; }
+  .gn-project__header > .gn-project__create-slot { order: 1; margin-left: auto; }
+}
+
+/* ── NOTES AT PHONE WIDTH: ONE LAYOUT FROM THE FIRST FRAME (smoothness-2 G1, 2026-10-03; cases 25.245-25.248; notes 390 CLS 1.05) ──
+   (1) The first paint is the desktop arm (`useNotesPhone` is false until script): the in-flow tree, open on landing, and the drawer
+   toggle. At the phone breakpoint (/help's own, `HELP_PHONE_QUERY`) neither is ever drawn by the phone arm, so CSS removes them from
+   the pre-script frame and nothing leaves the flow when script swaps the arm in (0.17). AFTER the `max-width: 60rem` arm above. */
+@media (max-width: 47.9375rem) {
+  .gn-notes__tree--drawer,
+  .gn-notes__tree--drawer[data-open='true'],
+  .gn-notes__tree-toggle { display: none; }
+}
+/* (2) The bar holds Create note's 2.75rem from the first frame (it appears once the workspaces read answers; 0 -> 44 pushed the body). */
+.gn-notes__bar--reserved { min-height: 2.75rem; }
+/* (2b) The phone panel's head holds the search header's height (the input and the Author / Scope row, two 2.75rem rows and a 0.5rem gap,
+   the same `.gn-notes__search` rules) before the header arrives with the workspaces read: the list below it sat 96px higher until then.
+   At 48rem and up the header is in the page's own header row, which holds the 2.75rem input's height (the h1 line is 41px: 3px). */
+.gn-notes__panel-head--reserved { min-height: 6rem; }
+@media (min-width: 48rem) {
+  .gn-notes__header { min-height: 2.75rem; }
+}
+/* (3) The lists of every workspace arrive together, inside this wrapper: it adds no box of its own. */
+.gn-notes__sections { display: contents; }
+.gn-notes__sections[hidden] { display: none; }
+/* (4) The phone panel has ONE height while open (owner, 2026-10-03: a fixed panel height, not content-sized): the height /help's panel
+   is capped at (`.gn-help__sidebar`, `ui.css`, same two lines), so its top edge never moves as its head, then its lists, arrive. The
+   list is already the panel's one scroller (`.gn-help__nav`). A short list sits in a tall panel with room under it. */
+@media (max-width: 47.9375rem) {
+  .gn-help__sidebar--notes {
+    height: calc(100vh - var(--app-nav-offset, 0px) - max(1rem, env(safe-area-inset-bottom, 0px)) - var(--gn-bar-lift, 0px) - 5.5rem);
+    height: calc(100dvh - var(--app-nav-offset, 0px) - max(1rem, env(safe-area-inset-bottom, 0px)) - var(--gn-bar-lift, 0px) - 5.5rem);
+  }
+}
 
 /* ── SECONDARY SCREEN SKELETONS (smoothness T8; spec S1, §4.3; amendment S-R1). Appended after every earlier rule. Like the route-shell
    block above, these only LAY OUT: none names a fill, a border, a shadow, a colour or a style, so the skeletons stay style-neutral. */

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HELP_PHONE_QUERY } from '@gisik-nokma/app-core';
 import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail, NoteSummary, SubmittedEvent } from '@gisik-nokma/domain';
 import { clearReadCaches } from '../src/clear-read-caches.js';
@@ -156,7 +157,10 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
     // AMENDED 2026-10-01 (mobile-web Task 9, 21.130–21.131): the middle entry is the phone arm — the
     // product's one 40rem phone breakpoint (FD1), which every screen shares — holding the toggle's,
     // document's, title's and toolbar's phone rules. It adds no layout breakpoint of the notes page's own.
-    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'max-width: 40rem', 'width > 60rem']);
+    // AMENDED 2026-10-03 (smoothness-2 G1, 25.245): two blocks follow, in file order, each a first-frame reservation and no layout breakpoint
+    // of the page's own: the phone breakpoint /help already owns (the pre-script frame hides the tree and toggle the phone arm never draws)
+    // and 48rem (the page header holds the search input's height).
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'max-width: 40rem', 'width > 60rem', 'max-width: 47.9375rem', 'min-width: 48rem']);
     // …and the phone arm is no LAYOUT breakpoint: it sets no grid of its own (the notes page's one split stays at 60rem).
     expect(blocks[1]!.body).not.toMatch(/grid-template/);
 
@@ -709,6 +713,23 @@ describe('18.226 every class the Notes page renders is a class globals.css style
     snap(loadingRender.container); // loading
     loadingRender.unmount();
 
+    // The phone: the panel's head holds the search header's place while the workspaces read is open (smoothness-2 G1, 25.245).
+    clearReadCaches();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({ matches: query === HELP_PHONE_QUERY, media: query, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false, onchange: null }),
+    });
+    const phoneRender = render(
+      <Providers services={stubServices({ getMyWorkspaces: () => new Promise(() => {}) })}>
+        <NotesPage />
+      </Providers>,
+    );
+    await screen.findByTestId('notes-panel');
+    snap(phoneRender.container); // panel-head--reserved
+    phoneRender.unmount();
+    Reflect.deleteProperty(window, 'matchMedia');
+
     // Signed out.
     mockSessionUser = null;
     const signedOutRender = render(
@@ -843,7 +864,10 @@ describe('18.483 at and below 60rem NOTHING changes', () => {
     // AMENDED 2026-10-01 (mobile-web Task 9): the middle entry is the shared 40rem phone arm; it reads only
     // `blocks[0]` below, so the phone arm's no-scroll / no-height rule is held by 21.130's `phoneBodies` loop
     // (`phone-screens-b.test.ts`) instead.
-    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'max-width: 40rem', 'width > 60rem']);
+    // AMENDED 2026-10-03 (smoothness-2 G1, 25.245): two blocks follow, in file order, each a first-frame reservation and no layout breakpoint
+    // of the page's own: the phone breakpoint /help already owns (the pre-script frame hides the tree and toggle the phone arm never draws)
+    // and 48rem (the page header holds the search input's height).
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'max-width: 40rem', 'width > 60rem', 'max-width: 47.9375rem', 'min-width: 48rem']);
     const narrow = blocks[0]!.body;
     expect(narrow).toMatch(/\.gn-notes__tree--drawer\s*\{[^}]*display:\s*none;/); // CONTROL: this is the block that matters
     expect(narrow).not.toMatch(/overflow|overscroll|100dvh|min-height|grid-template-rows|flex:|scroll-margin/);
