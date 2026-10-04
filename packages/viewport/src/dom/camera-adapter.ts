@@ -256,6 +256,9 @@ export class CameraAdapter implements ViewportDriver {
     if (!this.pointers.delete(e.pointerId)) return;
     this.el.releasePointerCapture?.(e.pointerId);
     this.pinch = null;
+    // A velocity is one pointer's track: the pointer left down starts a fresh one, so no lifted finger's sample stays in it.
+    const [rest] = [...this.pointers.values()];
+    if (this.pointers.size === 1 && rest !== undefined) this.samples = [{ t: this.clock.now(), ...rest }];
     if (this.pointers.size === 0 && e.type === 'pointerup' && !(this.options.reducedMotion ?? prefersReducedMotion)()) {
       const t = this.clock.now();
       const vx = releaseVelocity(this.samples.map((s): PanSample => ({ t: s.t, x: s.x })), t);
