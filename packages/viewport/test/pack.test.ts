@@ -91,6 +91,24 @@ describe('29.051 multi-segment items', () => {
     const tie = packLane([twin('1'), twin('2')], { ppd: 16 });
     expect([tie.rows, tie.strategy]).toEqual([2, 'segments']);
   });
+
+  it("29.051 an item's segments may come in any order (its first day is its earliest), and its own label footprints merge so no other item slips inside them; control: the same items with sorted segments, and without the label", () => {
+    // u starts on day 0 whichever order its segments come in, so it packs before w (day 1) and keeps row 0; v fits u's gap.
+    const uSorted: PackItem = { id: 'u', key: 'GN-1', segments: [{ start: 0, end: 2 }, { start: 10, end: 12 }] };
+    const u: PackItem = { ...uSorted, segments: [{ start: 10, end: 12 }, { start: 0, end: 2 }] };
+    const w: PackItem = { id: 'w', key: 'GN-2', segments: [{ start: 1, end: 1 }] };
+    const v: PackItem = { id: 'v', key: 'GN-3', segments: [{ start: 5, end: 6 }] };
+    const sorted = packLane([uSorted, w, v], { ppd: 16 });
+    expect([sorted.rowOf.get('u'), sorted.rowOf.get('w'), sorted.rowOf.get('v')]).toEqual([0, 1, 0]);
+    const unsorted = packLane([u, w, v], { ppd: 16 });
+    expect([unsorted.rowOf.get('u'), unsorted.rowOf.get('w'), unsorted.rowOf.get('v')]).toEqual([0, 1, 0]);
+    // a's first segment swells to days 0-9 with a 160 px label and swallows its own second segment (days 2-3); b on day 5
+    // collides with the swollen footprint. Left unmerged, the row's end-sorted search skips past it and b slips in.
+    const a: PackItem = { id: 'a', key: 'GN-4', segments: [{ start: 0, end: 0 }, { start: 2, end: 3 }] };
+    const b: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 5, end: 5 }] };
+    expect(packLane([a, b], { ppd: 16 }).rows).toBe(1);
+    expect(packLane([a, b], { ppd: 16, labelPx: (item, i) => (item.id === 'a' && i === 0 ? 160 : 0) }).rows).toBe(2);
+  });
 });
 
 describe('29.052 adjacency, ties and stability', () => {
@@ -119,6 +137,23 @@ describe('29.052 adjacency, ties and stability', () => {
     expect([...back.rowOf].sort()).toEqual([...forward.rowOf].sort());
     for (const it of items) expect(back.rowOf.get(it.id)).toBe(forward.rowOf.get(it.id));
     expect([forward.rowOf.get('x'), forward.rowOf.get('y'), forward.rowOf.get('w'), forward.rowOf.get('z')]).toEqual([0, 1, 2, 3]);
+  });
+
+  it('29.052 the input order does not matter on 200 seeds: reversed and rotated input give every item the forward row; control: the seeds hold items that start on the same day', () => {
+    let sameStart = 0;
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const items = single(seed);
+      const starts = items.map((item) => (item.segments[0] as Seg).start);
+      if (new Set(starts).size < starts.length) sameStart += 1;
+      const forward = packLane(items, { ppd: 16 });
+      const back = packLane([...items].reverse(), { ppd: 16 });
+      const rotated = packLane([...items.slice(17), ...items.slice(0, 17)], { ppd: 16 });
+      for (const item of items) {
+        expect(back.rowOf.get(item.id), `seed ${seed} ${item.id}`).toBe(forward.rowOf.get(item.id));
+        expect(rotated.rowOf.get(item.id), `seed ${seed} ${item.id}`).toBe(forward.rowOf.get(item.id));
+      }
+    }
+    expect(sameStart).toBeGreaterThan(0);
   });
 
   it('29.052 adding an item that starts after everything changes no existing row; control: adding one that starts first can', () => {
@@ -151,6 +186,13 @@ describe('29.053 the label is part of the footprint', () => {
     expect(footprintOf({ start: 0, end: 9 }, 70, 16)).toEqual({ start: 0, end: 9 });
     expect(packLane([a, b], { ppd: 16, labelPx: () => 70 }).rows).toBe(2);
     expect(packLane([a, b], { ppd: 16 }).rows).toBe(1);
+  });
+
+  it("29.053 each segment's label is measured for that item and that segment: a second label of 70 px reserves days 10-14, so a bar on days 12-13 goes to a second row; control: the same 70 px on the first label leaves the second segment its own width", () => {
+    const g: PackItem = { id: 'g', key: 'GN-7', segments: [{ start: 0, end: 0 }, { start: 10, end: 10 }] };
+    const c: PackItem = { id: 'c', key: 'GN-8', segments: [{ start: 12, end: 13 }] };
+    expect(packLane([g, c], { ppd: 16, labelPx: (item, i) => (item.id === 'g' && i === 1 ? 70 : 0) }).rows).toBe(2);
+    expect(packLane([g, c], { ppd: 16, labelPx: (item, i) => (item.id === 'g' && i === 0 ? 70 : 0) }).rows).toBe(1);
   });
 
   it('29.053 the packing scale is injected: at 8 px/day the same label is 9 days, so the footprint is wider (the bucket rule is applied by the caller via packScale)', () => {
