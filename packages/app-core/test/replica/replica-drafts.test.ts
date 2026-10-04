@@ -213,5 +213,11 @@ describe('28.083 listDrafts', () => {
     ]);
     await publish(w2);
     expect(await w2.ds.query.listDrafts(WS)).toEqual([]);
+
+    // a CONFIRMED discard (the replica holds it until the erasure reaches the device) is not listed either
+    const w3 = await world();
+    expect((await w3.ds.query.listDrafts(WS)).map((d) => d.ticketId)).toEqual([w3.draft]);
+    await w3.apply(w3.draft, 'ticket.discarded', {});
+    expect(await w3.ds.query.listDrafts(WS)).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import { canOpen, isOpenableDraft, ticketAccess } from '../../src/visibility/can
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedDraftWorld, withDraftsOpened, type DraftWorld } from '../helpers/draft-world.js';
 import { buildReadTestApp, type ReadWorld } from '../helpers/read-app.js';
-import { seedMember, seedTicket } from '../helpers/seed.js';
+import { seedMember, seedProject, seedTicket } from '../helpers/seed.js';
 
 /**
  * Drafts T4, case 28.070 (spec §4.2, group D): the door predicate. `canSee` is closed for every draft (T3), the
@@ -62,7 +62,7 @@ describe('28.070 ticketAccess, canOpen and isOpenableDraft', () => {
     });
   });
 
-  it('R18: demoted to guest, revoked or discarded, the author no longer opens it; restored, they do', async () => {
+  it('R18: demoted to guest, revoked, discarded or with the project in the trash, the author no longer opens it; restored, they do', async () => {
     const { workspaceId, projectId } = read.world;
     const author = newUlid();
     const ticketId = newUlid();
@@ -86,6 +86,18 @@ describe('28.070 ticketAccess, canOpen and isOpenableDraft', () => {
     expect(await access()).toBe('none');
     await db.pool.query('UPDATE proj_tickets SET draft_discarded = NULL WHERE ticket_id = $1', [ticketId]);
     expect(await access()).toBe('own-draft');
+
+    // R18's project half: rule A puts only LIVE projects in a member's reach, so a draft whose project is in the
+    // trash is closed to its author; restored, it opens again
+    const trashed = newUlid();
+    const inTrash = newUlid();
+    await seedProject(db.pool, workspaceId, trashed);
+    await seedTicket(db.pool, { workspaceId, projectId: trashed, ticketId: inTrash, draftBy: author });
+    expect(await ticketAccess(db.pool, author, inTrash)).toBe('own-draft');
+    await db.pool.query('UPDATE proj_projects SET deleted_at = now() WHERE project_id = $1', [trashed]);
+    expect(await ticketAccess(db.pool, author, inTrash)).toBe('none');
+    await db.pool.query('UPDATE proj_projects SET deleted_at = NULL WHERE project_id = $1', [trashed]);
+    expect(await ticketAccess(db.pool, author, inTrash)).toBe('own-draft');
 
     await db.pool.query('DELETE FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2', [workspaceId, author]);
     expect(await access()).toBe('none');
