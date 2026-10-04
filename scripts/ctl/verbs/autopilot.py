@@ -14,12 +14,12 @@ A pass, in this order (each seat gets at most one action, each queue item and ea
       has no such line (FIX-WAIT); else the first row of its pool's order file whose Needs are all on the release tip; else the
       first row it can STACK on (at most 2 unlanded levels, ONE unlanded branch). The PTR comes from scripts/ctl/make-lane-ptr.py.
   (a) a FREE REVIEWER (idle, box empty, 0 shells, holding no open TOOK) takes the open REVIEW item the pull rule ranks first:
-      FIX re-checks, the critical path, the oldest; A/B their own pool first, C either (KG wins a tie).
+      FIX re-checks, the critical path, the oldest by (day, clock); A/B their own pool first, C either (KG wins a tie).
   (c) a free lane with nothing startable becomes a reviewer (fluid rule B) for an item that passes the independence rules.
 Every pass also logs `WARN hold >10 min with waiters` when a `ctl run-tests` slot is held past 10 min while another run waits
 (slot_watch; read-only), and, live only, runs `ctl prune-gate-locks --apply` once an hour.
 Every item skips: needs-tip, an item addressed to another reviewer, a stale sha (origin/<branch> moved: a preflight or a tipmerge is
-in flight), a lane busy/dirty/unpushed on that branch (preflight in flight), and for a lane-reviewer its own work, a branch stacked on
+in flight), a lane busy/dirty/unpushed/with box text on that branch (preflight in flight), and for a lane-reviewer its own work, a branch stacked on
 its own work and a branch its own work stacks on.
 
 The DOOR (class Door) is the ONLY code that writes a file, appends a queue line, runs make-reviewer-boot.py / make-lane-ptr.py
@@ -88,14 +88,12 @@ def minutes(hhmm):
     h, m = hhmm.split(":"); return int(h) * 60 + int(m)
 
 
-def age_min(now_hhmm, then_hhmm):
-    return (minutes(now_hhmm) - minutes(then_hhmm)) % 1440
-
-
 # ---------------------------------------------------------------- parsers (pure)
 def parse_review_queue(text):
     """roles/QUEUE-review.md → (items, takes, dones, fix_verdicts, fix_takes), each with its line position. TOOK/DONE lines cite the
-    REVIEW line's TIME (several REVIEW lines can share one), so closing an item needs its branch AND (its sha8 or its time)."""
+    REVIEW line's TIME (several REVIEW lines can share one), so closing an item needs its branch AND (its sha8 or its time).
+    A FIX verdict / FIX start is the word right after the cited time: `DONE 13:12 FIX task/…`, the controller's `TOOK 08:20 FIX task/…`;
+    `DONE 11:41 READY task/… (reviewer A; FIX 2 delta)` and `TOOK 11:41 task/… (reviewer A, FIX 2 delta)` are a READY and a review."""
     items, takes, dones, fixes, fix_takes = [], [], [], [], []
     day, prev = 0, None   # the lines carry HH:MM and no date: a time more than 6 h BELOW the previous line's is the next day
     for pos, line in enumerate(text.split("\n")):
@@ -119,16 +117,17 @@ def parse_review_queue(text):
             h = re.search(r"\((?:[^)]*?[ ,;:])?(reviewer [A-Z]|lane \d+ as reviewer)\b", rest)
             rec["holder"] = h.group(1) if h else None
             (takes if kind == "TOOK" else dones).append(rec)
-            if kind == "TOOK" and re.search(r"\bFIX\b", rest) and br: fix_takes.append(rec)
-            if kind == "DONE" and re.search(r"\bFIX\b", rest) and br:
+            fix = rest.split()[1:2] == ["FIX"]
+            if kind == "TOOK" and fix and br: fix_takes.append(rec)
+            if kind == "DONE" and fix and br:
                 b = re.search(r"\b(BRIEF-\S+?\.md)\b", rest)
-                fixes.append({"pos": pos, "time": t, "branch": br.group(1), "brief": b.group(1) if b else None})
+                fixes.append({"pos": pos, "time": t, "branch": br.group(1), "brief": b.group(1) if b else None, "day": day})
     return items, takes, dones, fixes, fix_takes
 
 
 def item_age_min(items_text_last, it, now_hhmm):
-    """Minutes since the item's REVIEW line: its day index against the queue's last day (one more if now's clock is > 6 h below the
-    last line's, i.e. midnight passed since)."""
+    """Minutes since the line (a REVIEW item, a FIX verdict): its day index against the queue's last day (one more if now's clock is
+    > 6 h below the last line's, i.e. midnight passed since)."""
     last_day, last_t = items_text_last
     cur = last_day + (1 if last_t is not None and minutes(now_hhmm) < last_t - 360 else 0)
     return (cur - it["day"]) * 1440 + minutes(now_hhmm) - minutes(it["time"])
@@ -415,14 +414,15 @@ def candidates(w, pool, log):
 
 
 def fix_waiting(w, pool):
-    """A reviewer FIX verdict of this pool younger than the grace, not yet taken and with no QUEUE-autopilot FIX line: the lane waits."""
+    """A reviewer FIX verdict of this pool younger than the grace (aged across days, like items), not yet taken and with no
+    QUEUE-autopilot FIX line: the lane waits."""
     for f in w.fix_verdicts:
         its = [it for it in w.items if it["branch"] == f["branch"]]
         if not its or item_pool(its[-1]) != pool: continue
         if any(t["pos"] > f["pos"] and t["branch"] == f["branch"] for t in w.fix_takes): continue
         if any(it["pos"] > f["pos"] for it in its): continue
         if any(x["branch"] == f["branch"] for x in w.fixq): continue
-        if age_min(w.hhmm, f["time"]) < FIX_GRACE_MIN: return f
+        if item_age_min(w.last, f, w.hhmm) < FIX_GRACE_MIN: return f
     return None
 
 
@@ -433,11 +433,13 @@ def critical(w, it):
     return any(fnmatch.fnmatch(it["branch"], g) for g in globs)
 
 
-def rank(w, it, own_pool, times):
+def rank(w, it, own_pool):
+    """Own pool first, then FIX re-checks, the critical path, the OLDEST by (day, clock) — the queue spans days and has no dates —,
+    KG on a same-minute tie, the line position last."""
     cls = 0 if (re.search(r"\bFIX\b", it["rest"]) or "fix" in it["brief"].lower()) else (1 if critical(w, it) else 2)
     pool = item_pool(it)
     other = 0 if own_pool is None else (0 if pool == own_pool else 1)
-    return (other, cls, times.index(it["time"]), 0 if pool == "KG" else 1, it["pos"])
+    return (other, cls, it["day"], minutes(it["time"]), 0 if pool == "KG" else 1, it["pos"])
 
 
 def own_branches(w, lane):
@@ -461,7 +463,7 @@ def item_skip(w, it, who, lane=None):
     if on: return f"already landed (on origin/{on})"
     for n, s in w.seats.items():
         if s.get("role") == "lane" and s.get("branch") == it["branch"] and (s.get("state") != "idle" or s.get("dirty") or s.get("unpushed") or s.get("box") != "empty"):
-            return f"preflight in flight: lane {n} is {s.get('state')} dirty {s.get('dirty')} unpushed {s.get('unpushed')} on it"
+            return f"preflight in flight: lane {n} is {s.get('state')} dirty {s.get('dirty')} unpushed {s.get('unpushed')} box {s.get('box')} on it"
     if lane is not None:
         own = own_branches(w, lane)
         if it["lane"] == lane or it["branch"] in own: return "self-review (own work)"
@@ -477,11 +479,8 @@ def item_skip(w, it, who, lane=None):
 
 
 def pick_item(w, who, own_pool, used, log, lane=None):
-    times = []
-    for it in w.items:
-        if it["time"] not in times: times.append(it["time"])
     best = None
-    for it in sorted(w.open, key=lambda i: rank(w, i, own_pool, times)):
+    for it in sorted(w.open, key=lambda i: rank(w, i, own_pool)):
         if it["branch"] in used: continue
         why = item_skip(w, it, who, lane)
         if why: log(f"SKIP {'lane ' + str(lane) if lane else 'reviewer ' + who} x {it['branch']} {it['sha'][:8]}: {why}"); continue
@@ -523,7 +522,7 @@ def decide(w, log):
             else:
                 acts.append({"do": "fix", "lane": n, "wt": lane_wt(n), "fix": fx, "rung": rung}); used_rows.add(fx["branch"]); continue
         fw = fix_waiting(w, pool)
-        if fw: log(f"WAIT lane {n}: FIX verdict {fw['time']} {fw['branch']} ({age_min(w.hhmm, fw['time'])} min old) has no QUEUE-autopilot FIX line yet"); continue
+        if fw: log(f"WAIT lane {n}: FIX verdict {fw['time']} {fw['branch']} ({item_age_min(w.last, fw, w.hhmm)} min old) has no QUEUE-autopilot FIX line yet"); continue
         pick = None
         for row, stack in cands[pool]:
             if row["branch"] in used_rows: continue
