@@ -1,6 +1,7 @@
 import { maxOverlap, type PackItem } from '@gisik-nokma/viewport';
 import { describe, expect, it } from 'vitest';
 import {
+  BAR_HEIGHT,
   COLUMN_WIDTH,
   LANE_HEADING,
   PIN_PX,
@@ -20,16 +21,23 @@ const rng = (seed: number) => () => {
 };
 
 describe('29.081 lanes pack on their own and stack', () => {
-  it('29.081 each lane is its own packing; landscape lanes stack by 34 px heading + 40 px per row; portrait lanes sit side by side at 112 px per column; control: two lanes with the same items get the same rows', () => {
+  it('29.081 each lane is its own packing, under its own id; bars that start on one day take rows in natural key order; landscape lanes stack by 34 px heading + 40 px per row (a 28 px bar); portrait lanes sit side by side at 112 px per column; control: two lanes with the same items get the same rows', () => {
     const a: LayoutLane = { laneId: 'a', items: [item('a1', 0, 9), item('a2', 3, 12), item('a3', 5, 6)] }; // 3 overlap on days 5-6
     const b: LayoutLane = { laneId: 'b', items: [item('b1', 0, 4), item('b2', 10, 14)] }; // 1 row
     const land = layoutLanes([a, b], { ppd: 24, measure: fixed(0) });
     expect(land.lanes.map((l) => l.rows)).toEqual([3, 1]);
     // The rows each bar was given, not only the count: a1, a2, a3 all overlap on days 5-6.
     expect(land.lanes[0]?.bars.map((bar) => [bar.id, bar.row])).toEqual([['a1', 0], ['a2', 1], ['a3', 2]]);
+    expect(land.lanes.map((l) => l.laneId)).toEqual(['a', 'b']);
+    // Bars that start on one day take rows in natural key order (T4): GN-2 before GN-10, the reverse of id order and of
+    // plain string order, so the leg reads the key the layout hands to the packer.
+    const tie = layoutLanes([{ laneId: 't', items: [item('a', 0, 3, 'GN-10'), item('b', 0, 3, 'GN-2')] }], { ppd: 24, measure: fixed(0) });
+    expect(tie.lanes[0]?.bars.map((bar) => [bar.id, bar.row])).toEqual([['a', 1], ['b', 0]]);
     // The spec's pixels as literals (34 heading, 40 pitch, 112 column): a test that re-reads the exported constants stays
     // green when a constant changes.
     expect([LANE_HEADING, ROW_PITCH, COLUMN_WIDTH]).toEqual([34, 40, 112]);
+    // The bar's height in that pitch (spec TG-13: 28 px, 12 px of gap); nothing in the layout reads it, so it is pinned here.
+    expect(BAR_HEIGHT).toBe(28);
     expect(land.lanes[0]).toMatchObject({ offset: 0, extent: 34 + 3 * 40 });
     expect(land.lanes[1]).toMatchObject({ offset: 34 + 3 * 40, extent: 34 + 40 });
     expect(land.extent).toBe(34 * 2 + 4 * 40);
@@ -67,9 +75,13 @@ describe('29.082 the fewest rows', () => {
 describe('29.083 the key label is part of the footprint, at the bucketed scale', () => {
   const lane = (): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-123'), item('b', 3, 6, 'GN-124')] });
 
-  it('29.083 a one-day bar whose key needs 70 px reserves 5 days at 16 px/day, so a bar on day 3 goes to a second row; at 32 px/day the label needs 3 days and they share one row', () => {
+  it('29.083 a one-day bar whose key needs 70 px reserves 5 days at 16 px/day, so a bar on day 3 goes to a second row; at 32 px/day the label needs 3 days and they share one row; the key of each bar is measured', () => {
     expect(layoutLanes([lane()], { ppd: 16, measure: fixed(70) }).lanes[0]?.rows).toBe(2);
     expect(layoutLanes([lane()], { ppd: 32, measure: fixed(70) }).lanes[0]?.rows).toBe(1);
+    // Each bar's own key is measured: only GN-123 (the one-day bar) needs 70 px. Control: when only GN-124 needs it, the
+    // one-day bar takes no extra room and they share one row.
+    expect(layoutLanes([lane()], { ppd: 16, measure: (key) => (key === 'GN-123' ? 70 : 0) }).lanes[0]?.rows).toBe(2);
+    expect(layoutLanes([lane()], { ppd: 16, measure: (key) => (key === 'GN-124' ? 70 : 0) }).lanes[0]?.rows).toBe(1);
   });
 
   it('29.083 rows are the same for every ppd inside one bucket and change only across its edge; control: 31.99 and 32 differ', () => {
@@ -81,7 +93,7 @@ describe('29.083 the key label is part of the footprint, at the bucketed scale',
 });
 
 describe('29.084 the paper pin', () => {
-  it('29.084 a pinned bar adds 14 px to its label footprint: 60 px of key at 16 px/day is 4 days, 74 px is 5; control: the unpinned neighbour on day 4 shares a row, the pinned one does not', () => {
+  it('29.084 a pinned bar adds 14 px to its label footprint: 60 px of key at 16 px/day is 4 days, 74 px is 5; control: the unpinned neighbour on day 4 shares a row, the pinned one does not; the pin is read per bar, and a bar with no pinned flag is unpinned', () => {
     expect(PIN_PX).toBe(14);
     const make = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1', pinned), item('b', 4, 6, 'GN-2')] });
     expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
@@ -91,6 +103,14 @@ describe('29.084 the paper pin', () => {
     expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(50) }).lanes[0]?.rows).toBe(1);
     expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(51) }).lanes[0]?.rows).toBe(2);
     expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(51) }).lanes[0]?.rows).toBe(1);
+    // The pin is read per bar: pinning the SECOND bar (day 4, 60 + 14 = 74 px is 5 days, 4-8) widens its own footprint
+    // into c on day 8. Control: unpinned it ends on day 7 and all three share one row.
+    const second = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1'), item('b', 4, 4, 'GN-2', pinned), item('c', 8, 9, 'GN-3')] });
+    expect(layoutLanes([second(true)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(2);
+    expect(layoutLanes([second(false)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
+    // A bar with no pinned flag at all (the field is optional) is unpinned: it shares a row with its day-4 neighbour.
+    const bare: LayoutLane = { laneId: 'l', items: [{ id: 'a', key: 'GN-1', startDay: 0, endDay: 0 }, item('b', 4, 6, 'GN-2')] };
+    expect(layoutLanes([bare], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
   });
 });
 
