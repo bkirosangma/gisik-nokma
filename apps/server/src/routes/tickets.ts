@@ -2,7 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { ticketKey, type TicketRollup, type TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
-import { ticketIsLive } from '../read/live-ticket.js';
+import { ticketIsLive, ticketIsOpenable } from '../read/live-ticket.js';
 import { stateProvenanceFor } from '../read/state-provenance.js';
 import { assignedProvenanceFor } from '../read/assigned-provenance.js';
 import { listTicketAttachments } from '../attachments/attachment-repo.js';
@@ -327,11 +327,11 @@ export function toEventView(row: LedgerRow): LedgerEventView {
  * outsider gets `200 { tickets: [] }`, because "you may not see this" and
  * "there is nothing here" must not be tellable apart on a collection either.
  *
- * ## The visibility decision is `canOpen`'s on the detail route and `canSee`'s on every other read here
+ * ## The visibility decision is `canOpen`'s on the detail route and the attachments list, and `canSee`'s on every other read here
  *
  * No SQL here re-states who may see what. `canOpen` (drafts T4) is `canSee` or the viewer's own openable
- * draft (`../visibility/can-open.ts`), so the author reads their draft and its crumbs on the detail route and
- * nowhere else in this file. `canSee` resolves the viewer's
+ * draft (`../visibility/can-open.ts`), so the author reads their draft and its crumbs on the detail route, and
+ * their draft's attachments on the attachments list (drafts T9, G10), and nowhere else in this file. `canSee` resolves the viewer's
  * `EffectiveRole` itself (never a direct `proj_memberships` read, whose
  * project-scope rows survive a revocation by design) and answers `false` alike
  * for an invisible ticket and one with no row. This route adds exactly one
@@ -888,26 +888,29 @@ export function registerTicketRoutes(
     async (request, reply) => {
       const { workspaceId, ticketId } = request.params;
       // The same two guards, in the same order, answering the same body.
+      // G10 (drafts spec R56): canOpen, then ticketIsOpenable; the events (:749) and comments (:985) doors keep canSee
+      // and ticketIsLive, a draft's history and comments are closed even to its author.
       if ((await loadTicketRow(deps.pool, workspaceId, ticketId)) === undefined) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
-      if (!(await canSee(deps.pool, request.currentUserId, ticketId))) {
+      if (!(await canOpen(deps.pool, request.currentUserId, ticketId))) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
       // …and the THIRD, which the DETAIL route above carries and this pair did
-      // not. `canSee` is the visibility predicate and does not mean "not
-      // deleted" — `read/visible-where.ts` says so in its own words — so until
+      // not. `canOpen` (and the `canSee` it asks first) is the visibility
+      // predicate and does not mean "not deleted" — `read/visible-where.ts` says so in its own words — so until
       // this landed a tombstoned ticket kept serving its file list while the
       // ticket itself answered 404: a ticket absent from every view and
       // reachable at its URL, which is the half-state the detail route's
       // docblock refuses by name.
       //
-      // `ticketIsLive` is `LIVE_TICKET_WHERE` asked at a route, and NOT a
-      // widened `canSee`: folding deletion into the visibility predicate breaks
+      // `ticketIsOpenable` is `LIVE_BASE_WHERE` asked at a route (`ticketIsLive`
+      // without the draft clause: `canOpen` above has already decided who may
+      // open a draft, drafts T9 G10), and NOT a widened `canSee`: folding deletion into the visibility predicate breaks
       // the `canSeeResolved` cross-check AND makes `listVisibleTickets` — whose
       // SELECT has no `proj_tickets` in its FROM — a runtime "missing FROM-clause
       // entry". `read/live-ticket.ts` carries both reasons.
-      if (!(await ticketIsLive(deps.pool, workspaceId, ticketId))) {
+      if (!(await ticketIsOpenable(deps.pool, workspaceId, ticketId))) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 

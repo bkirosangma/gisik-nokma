@@ -1930,7 +1930,8 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   prop since Plan 6 and the product's single mount never passed it. `GET
   /v1/workspaces/:workspaceId/tickets/:ticketId/attachments` is registered beside the events door and rides
   **its same two VISIBILITY guards, in the same order, answering the same body** — `loadTicketRow` → 404, then
-  `canSee` → 404 — so "may this caller see this ticket" is still asked in exactly one function; the case holds
+  `canSee` → 404 (drafts T9 made this door's second guard `canOpen`, G10: a draft's author lists its files; the
+  events door keeps `canSee`) — so "may this caller see this ticket" is still asked in exactly one function; the case holds
   the two doors to identical bytes for an unseen ticket and a nonexistent one rather than asserting the
   sameness in prose. ⚠ **It carries a THIRD guard the events door deliberately does not** (added 2026-09-20,
   below): a soft-deleted ticket's files are not served either — see *the tombstone* row further down. Each row is `{attachmentId, filename, mime, size, sha256}` with the filename re-sanitized here as it
@@ -1958,7 +1959,8 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   MEASURED through the real doors at the base: detail 404 while the list answered 200 with the row, the
   download 200 with the file, and the upload **201** — content accreting on a ticket nobody can see. All four
   doors now carry a THIRD guard (`ticketIsLive`, `apps/server/src/read/live-ticket.ts`) asked AFTER `canSee`
-  and answering the same 404 body, so existence stays indistinguishable from invisibility AND from deletion.
+  and answering the same 404 body (drafts T9, G10: the upload, download and list doors ask `ticketIsOpenable`,
+  `LIVE_BASE_WHERE`, after `canOpen`, so a draft's author reaches its files; the tombstone rule is unchanged), so existence stays indistinguishable from invisibility AND from deletion.
   **It is `LIVE_TICKET_WHERE` asked at a route, never a widened `canSee`**: folding deletion into the
   visibility predicate breaks the `canSeeResolved` cross-check and makes `listVisibleTickets`, whose SELECT has
   no `proj_tickets` in its FROM, a runtime "missing FROM-clause entry". **The two HISTORY doors still serve a
