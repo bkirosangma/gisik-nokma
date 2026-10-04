@@ -114,7 +114,7 @@ it('28.065 the stale and auto-close sweeps read the same instant: a draft-born t
     created(draftDone, true), moved(draftDone, 'done'), published(draftDone),
     created(twinDone, false), moved(twinDone, 'done'),
   ]);
-  const mine = [draftDoing, twinDoing, draftDone, twinDone];
+  const mine: string[] = [draftDoing, twinDoing, draftDone, twinDone];
   // Each published draft sits, published, in the category its sweep reads, so a "not a candidate" below can only
   // come from the instant, never from the category or a leftover draft flag.
   const { rows } = await db.pool.query<{ ticket_id: string; state_category: string; draft_author_id: string | null }>(
