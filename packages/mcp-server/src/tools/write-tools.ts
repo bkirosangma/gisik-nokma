@@ -81,7 +81,7 @@ export function writeTools(session: Session): ToolDefinition[] {
             const workspace = (await readDirectory(session)).find((w) => w.workspaceId === a.workspaceId);
             const project = workspace?.projects.find((p) => p.projectId === a.projectId);
             return `Creates "${a.title}" in ${project?.name ?? a.projectId} (${workspace?.name ?? a.workspaceId}) and assigns it to ${found.name} (${found.email}).`;
-          });
+          }, a.draft === true);
           if ('preview' in resolved) return resolved.preview;
           person = resolved.person;
         }

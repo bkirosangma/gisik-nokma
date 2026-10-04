@@ -1,5 +1,8 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ULID_REGEX, domainRegistry, parseEvent } from '@gisik-nokma/domain';
+import { DRAFT_NO_OUTSIDERS_REASON, ULID_REGEX, domainRegistry, parseEvent } from '@gisik-nokma/domain';
 import { HttpError } from '../src/http-client.js';
 import type { Session } from '../src/session.js';
 import { draftTools, eraseSetOf } from '../src/tools/draft-tools.js';
@@ -354,5 +357,66 @@ describe('28.141 the registry', () => {
         'Only a draft can be discarded: use delete_ticket for a published ticket.',
     ]);
     expect(allTools(session).map((t) => t.name).slice(-4)).toEqual(['list_deleted', 'list_my_drafts', 'publish_draft', 'discard_draft']);
+  });
+});
+
+describe('28.146 create_ticket {draft} by email: an outsider is refused in the preview, in the server\'s words', () => {
+  const ASHA = { userId: '01J0ASHA0000000000000000AA', name: 'Asha Rao', email: 'asha@example.com', inWorkspace: true };
+  const RAVI = { userId: '01J0RAV10000000000000000AA', name: 'Ravi Menon', email: 'ravi@example.com', inWorkspace: false };
+  const DIRECTORY = { workspaces: [{ workspaceId: WS, name: 'Corner Shop', prefix: 'CS', role: 'owner', archived: false, projects: [{ projectId: PRJ, name: 'Counter', description: null, prefix: 'CC', archived: false }] }] };
+  const R8 = 'refused by draft.no-outsiders: Publish the ticket before inviting someone from outside';
+  const GUEST = 'Ravi Menon is not in this workspace and WILL BE ADDED AS A GUEST. They will join this workspace as a guest and see only this ticket.';
+  const call1 = async (person: typeof ASHA, extra: Record<string, unknown>) => {
+    const f = fake({
+      get: (path) => { if (path === '/v1/me/workspaces') return DIRECTORY; throw new Error(`unexpected GET ${path}`); },
+      post: (path) => { if (path === `/v1/workspaces/${WS}/people-lookup`) return { user: person }; throw new Error(`unexpected POST ${path}`); },
+    });
+    const out = (await pick(writeTools(f.session), 'create_ticket').handler({ ...BIRTH, assignee_email: person.email, ...extra })) as {
+      preview: boolean; wouldChange: string; joinsAsGuest: boolean;
+    };
+    expect(f.sent, 'call 1 creates nothing').toEqual([]);
+    return out;
+  };
+  const head = (p: typeof ASHA) => `Creates "Plan the stock count" in Counter (Corner Shop) and assigns it to ${p.name} (${p.email}).`;
+
+  it('28.146 a draft for an outsider previews the R8 refusal, not a guest; a member and a non-draft are unchanged; the sentence has one definition', async () => {
+    // (1) draft + outsider: the server's own refusal, word for word, and no promise of a guest.
+    const refused = await call1(RAVI, { draft: true });
+    expect(refused.wouldChange).toBe(`${head(RAVI)} ${R8}`);
+    expect(refused.wouldChange).not.toContain('WILL BE ADDED AS A GUEST');
+    expect(refused.joinsAsGuest).toBe(false);
+
+    // (2) CONTROL: draft + a member names the member and carries no R8 text.
+    const member = await call1(ASHA, { draft: true });
+    expect(member.wouldChange).toBe(`${head(ASHA)} Asha Rao is already in this workspace.`);
+    expect(member.joinsAsGuest).toBe(false);
+
+    // (3) CONTROL: not a draft + an outsider is the guest preview MCP sweep 2 T8 shipped, unchanged.
+    for (const extra of [{}, { draft: false }]) {
+      const guest = await call1(RAVI, extra);
+      expect(guest.wouldChange, JSON.stringify(extra)).toBe(`${head(RAVI)} ${GUEST}`);
+      expect(guest.joinsAsGuest).toBe(true);
+    }
+
+    // (4) ONE definition: the sentence is spelled once in the product's source, in the domain, and the server reads it there.
+    const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+    const spelled: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue;
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(entry.name) && readFileSync(path, 'utf8').includes(DRAFT_NO_OUTSIDERS_REASON)) spelled.push(relative(root, path));
+      }
+    };
+    for (const top of ['apps', 'packages']) {
+      for (const pkg of readdirSync(join(root, top))) {
+        for (const src of ['src', 'app']) {
+          try { walk(join(root, top, pkg, src)); } catch { /* a package without that folder */ }
+        }
+      }
+    }
+    expect(spelled).toEqual(['packages/domain/src/draft.ts']);
+    expect(readFileSync(join(root, 'apps/server/src/routes/people.ts'), 'utf8')).toMatch(/DRAFT_NO_OUTSIDERS_REASON,\n[^]*from '@gisik-nokma\/domain'/); // CONTROL: the server reads it
   });
 });
