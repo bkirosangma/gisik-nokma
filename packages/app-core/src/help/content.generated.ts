@@ -678,6 +678,24 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
+                  "text": "Gisik Nokma"
+                },
+                {
+                  "kind": "text",
+                  "text": " — the logo at the far left. It takes you to "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Home"
+                },
+                {
+                  "kind": "text",
+                  "text": ": your workspace's numbers and its Knowledge Graph."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
                   "text": "Workspaces"
                 },
                 {

@@ -335,6 +335,13 @@ input, textarea, select { font-family: inherit; }
   .gn-workspaces__head { grid-template-columns: minmax(0, 1fr); }
   .gn-workspaces__head > .gn-button { grid-column: 1; grid-row: auto; margin-top: 0.5rem; }
 }
+/* Home (Knowledge Graph spec E). The frame copies `.gn-workspaces` (same cap, same top spacing). T3 and T4 add
+   their rules inside the two marked blocks below; nothing is appended at EOF. */
+.gn-home { max-width: 73.75rem; margin: 0 auto; padding-top: 1.625rem; display: grid; gap: 1rem; }
+.gn-home > .gn-page-title { margin: 0; }
+.gn-home__empty, .gn-home__refusal { display: grid; gap: 0.75rem; justify-items: start; }
+/* KG-E T3: numbers */
+/* KG-E T4: graph */
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 
    Both page-specific radius bumps below (`.gn-workspace-list .gn-card`,
@@ -2397,8 +2404,8 @@ input, textarea, select { font-family: inherit; }
    packages/ui/src/ui.css:5810) scaled down, same tokens: `--gn-brand` fill,
    `--gn-text-inverted` glyph, `--gn-radius-card` scaled to the tile's own
    size rather than reused literally (a 20px/14px card radius on a 1.75rem
-   tile reads as a circle, not a tile). Not a link, not a button —
-   decorative furniture this rule's own `aria-hidden` (on the JSX) covers.
+   tile reads as a circle, not a tile). The tile is `aria-hidden` inside the
+   brand LINK (spec E); the link's name comes from its visually-hidden label.
    `LegalNav`'s tile used to be `--gn-accent`-tinted at 30px, its own rule
    further down this file — moved to this ONE tile, `--gn-brand`, a
    deliberate change (owner ruling 2026-09-24, "one component ... used by
@@ -2421,6 +2428,19 @@ input, textarea, select { font-family: inherit; }
    values (17px/22px, already measured legible there) rather than an
    invented new number now that this rule reaches both bars. */
 .gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 800; }
+/* The brand is a LINK to `/` since Knowledge Graph spec E (27.620–27.622). `.gn-nav a` (0,1,1) would give it the
+   muted resting ink, the link padding and a 0.4rem gap; this (0,2,1) rule keeps the brand's own look. The tap
+   floor (`min-height`/`min-width: 2.75rem`) still comes from `.gn-nav a` — on a phone the tile alone is 1.75rem
+   wide, and the floor is what keeps it a 44px target. No `aria-current` arm: the brand never draws the lit-tab
+   look (decision D-E6). */
+.gn-nav a.gn-nav__brand {
+  color: var(--gn-text);
+  padding-inline: 0.25rem;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  font-weight: inherit;
+}
+.gn-nav a.gn-nav__brand:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* THE WORKSPACE LINKS' WRAPPER (E4-11; the disclosure itself was retired by UX fixes Task 4, case 23.042).
 

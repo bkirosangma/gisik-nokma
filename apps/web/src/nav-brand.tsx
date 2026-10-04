@@ -1,3 +1,6 @@
+'use client';
+import Link from 'next/link';
+import { useId } from 'react';
 import { BrandMark } from './brand-mark.js';
 
 /**
@@ -17,18 +20,29 @@ import { BrandMark } from './brand-mark.js';
  * and one glyph. `LegalNav`'s tile moves from `--gn-accent` to the same
  * `--gn-brand` tile `AppNav` already used — one brand, a deliberate change.
  *
- * The tile stays `aria-hidden` — decorative, not a control: no link, no
- * button, no tabindex (13.1475's standing rule, unchanged). The wordmark is
- * plain VISIBLE text, not `aria-hidden` — it is the bar's one legible
- * spelling of the product's name, not a second copy of a hidden glyph.
+ * SINCE 2026-10-03 IT IS A LINK TO `/` (Knowledge Graph spec E §2.1, owner: "yes to the logo link"), which
+ * REVERSES 13.1475's "not a control" (that case is 🚫; 27.620 pins the link). The name "Gisik Nokma, Home" comes
+ * from `aria-labelledby` on a visually-hidden span, never `aria-label` (13.1476 forbids the ratchet's four
+ * attributes on this subtree) and never the wordmark alone (it is `display:none` below 40rem, 13.1494, so a phone
+ * would get a link with no name). The tile stays `aria-hidden`; the wordmark stays plain visible text (13.1491).
+ *
+ * `link={false}` is the skeleton's brand: a hop in flight offers nothing to press (25.057).
  */
-export function NavBrand() {
-  return (
-    <span className="gn-nav__brand">
+export function NavBrand({ link = true }: { link?: boolean } = {}) {
+  const nameId = useId();
+  const parts = (
+    <>
       <span className="gn-nav__brand-tile" aria-hidden="true">
         <BrandMark size={18} />
       </span>
       <span className="gn-nav__wordmark">Gisik Nokma</span>
-    </span>
+    </>
+  );
+  if (!link) return <span className="gn-nav__brand">{parts}</span>;
+  return (
+    <Link href="/" className="gn-nav__brand" aria-labelledby={nameId}>
+      {parts}
+      <span id={nameId} className="gn-visually-hidden">Gisik Nokma, Home</span>
+    </Link>
   );
 }

@@ -12,7 +12,7 @@ export function AppNavSkeleton() {
   return (
     <nav className="gn-nav gn-nav--skeleton" aria-busy="true" aria-label="Main, loading">
       <div className="gn-nav__inner">
-        <NavBrand />
+        <NavBrand link={false} />
         <div className="gn-nav__links gn-nav__links--member">
           <div className="gn-nav__more">
             <Skeleton width="5.5rem" height="1rem" />

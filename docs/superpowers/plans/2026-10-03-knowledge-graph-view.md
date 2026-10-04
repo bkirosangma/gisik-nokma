@@ -2279,6 +2279,7 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       expect(TAU_MS).toBe(85);
       const a = { x: 0, y: 0, ratio: 1 }, b = { x: 1, y: 0, ratio: 1 };
       expect(run(a, b, 300).s.x).toBeGreaterThan(0.95);
+      expect(run(a, b, 150).s.x).toBeLessThan(0.95); // "ABOUT 300 ms": 160 ms of 85 ms τ is 0.85; a faster τ (40 ms → 0.98) fails here
       const done = run(a, b, 5000);
       expect(done.settled).toBe(true);
       expect(done.s).toEqual(b);
@@ -2303,6 +2304,8 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       const a = { x: 0, y: 0, ratio: 4 }, b = { x: 0, y: 0, ratio: 1 };
       const k = 1 - Math.exp(-16 / TAU_MS);
       expect(springStep(a, b, 16, false).state.ratio).toBeCloseTo(4 * Math.pow(1 / 4, k), 12);
+      // the control the title names: at a = 1/2 (dt = τ·ln 2) the ratio is the geometric mean 2, not the arithmetic 2.5
+      expect(springStep(a, b, TAU_MS * Math.LN2, false).state.ratio).toBeCloseTo(2, 9);
     });
 
     it('27.244 limits 0.5×–4× of the fit; past one, a soft zoom rubber-bands with power 0.3; control: inside the range nothing changes', () => {
@@ -2311,7 +2314,11 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       expect(clampRatio(0.1, fit, false)).toBe(0.25); // fit / 4
       expect(clampRatio(5, fit, false)).toBe(2); // fit / 0.5
       expect(clampRatio(0.1, fit, true)).toBeCloseTo(0.25 * Math.pow(0.1 / 0.25, 0.3), 12);
+      expect(clampRatio(5, fit, true)).toBeCloseTo(2 * Math.pow(5 / 2, 0.3), 12); // the zoomed-OUT rubber band
       expect(clampRatio(0.7, fit, true)).toBe(0.7);
+      // "of the fit": with fit = 1 a limit that ignored fitRatio would pass every leg above
+      expect(clampRatio(0.1, 2, false)).toBe(0.5);
+      expect(clampRatio(5, 2, false)).toBe(4);
     });
 
     it('27.245 zoom keeps the anchor fixed: the anchor\'s offset from the camera scales with the ratio; control: zooming about the camera centre leaves x,y alone', () => {
@@ -2322,15 +2329,27 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       expect((anchor.y - t.y) / t.ratio).toBeCloseTo((anchor.y - base.y) / base.ratio, 12);
       const c = zoomTarget(base, 2, { x: 0.5, y: 0.5 }, 1, false);
       expect([c.x, c.y]).toEqual([0.5, 0.5]);
+      // the target is clamped, hard or soft as asked: 8× from ratio 1 is past the 4× limit (fit/4 = 0.25)
+      expect(zoomTarget(base, 8, anchor, 1, false).ratio).toBe(0.25);
+      expect(zoomTarget(base, 8, anchor, 1, true).ratio).toBeCloseTo(0.25 * Math.pow(0.125 / 0.25, 0.3), 12);
     });
 
     it('27.246 settling after an over-zoom: the factor back to the limit; control: a target inside the limits needs none, and a pan only moves x,y', () => {
       expect(settleFactor({ x: 0, y: 0, ratio: 0.2 }, 1)).toBeCloseTo(0.2 / 0.25, 12);
+      expect(settleFactor({ x: 0, y: 0, ratio: 3 }, 1)).toBeCloseTo(3 / 2, 12); // over-zoomed OUT: back to fit/0.5
       expect(settleFactor({ x: 0, y: 0, ratio: 0.6 }, 1)).toBeNull();
       expect(panTarget({ x: 0.5, y: 0.5, ratio: 0.6 }, { x: 0.1, y: -0.2 })).toEqual({ x: 0.6, y: 0.3, ratio: 0.6 });
     });
   });
   ```
+  Kills:
+  - 27.240: (a) `/ TAU_MS` → `/ 40` in `springStep` (the 150 ms leg) (b) delete the settle snap (`if (Math.abs(n.x - t.x) < 1e-5 …) return { state: { ...t }, settled: true }`): `done.settled` stays false (c) `(t.x - c.x) * a` → `(t.x - c.x) * a * 8` (overshoot leg).
+  - 27.241: (a) `Math.min(DT_MAX_MS, …)` → the raw dt (b) `DT_MAX_MS = 100` → `50` (the 50 ms < 100 ms leg).
+  - 27.242: (a) delete `if (reduce) return { state: { ...t }, settled: true };`.
+  - 27.243: (a) `ratio: c.ratio * Math.pow(t.ratio / c.ratio, a)` → `c.ratio + (t.ratio - c.ratio) * a` (both legs; the τ·ln 2 leg alone reads 2.5).
+  - 27.244: (a) `RUBBER_POWER` 0.3 → 1 (b) in the `r > hi` arm, `hi * Math.pow(r / hi, …)` → `hi` (soft ignored on the zoomed-out side) (c) `fitRatio / MAX_ZOOM` → `1 / MAX_ZOOM` (the fit = 2 legs).
+  - 27.245: (a) `(base.x - anchor.x) * k` → `* (1 / k)` (b) `const r = clampRatio(base.ratio / factor, fitRatio, soft)` → `base.ratio / factor` (the 8× legs) (c) pass `false` for `soft` inside `zoomTarget` (the soft 8× leg).
+  - 27.246: (a) `Math.min(fitRatio / MIN_ZOOM, target.ratio)` → `target.ratio` (the ratio 3 leg) (b) `return r === target.ratio ? null : …` → `… : r / target.ratio` (c) `panTarget` returns `y: base.y - d.y`.
   `src/engine/camera.ts`:
   ```ts
   export type CameraState = { x: number; y: number; ratio: number };
@@ -2391,14 +2410,23 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       expect(wheelIntent(w({ deltaY: 100 }))).toEqual({ kind: 'zoom', factor: Math.exp(-100 * 0.0022) });
       expect(wheelIntent(w({ deltaX: 3, deltaY: 12 }))).toEqual({ kind: 'pan', dx: 3, dy: 12 });
       expect(wheelIntent(w({ deltaY: 39.5 }))).toEqual({ kind: 'pan', dx: 0, dy: 39.5 });
+      // 39.5 is refused by BOTH the ≥ 40 and the integer test; each needs its own leg
+      expect(wheelIntent(w({ deltaY: 40.5 }))).toEqual({ kind: 'pan', dx: 0, dy: 40.5 }); // big but fractional: a trackpad
+      expect(wheelIntent(w({ deltaX: 1, deltaY: 100 }))).toEqual({ kind: 'pan', dx: 1, dy: 100 }); // any sideways component: a trackpad
+      expect(wheelIntent(w({ deltaY: -100 }))).toEqual({ kind: 'zoom', factor: Math.exp(100 * 0.0022) }); // a notch the other way
     });
     it('27.248 line and page delta modes scale by 16 and 400 and count as a mouse wheel; control: pixel mode is unscaled', () => {
       expect(wheelIntent(w({ deltaMode: 1, deltaY: 3 }))).toEqual({ kind: 'zoom', factor: Math.exp(-48 * 0.0022) });
       expect(wheelIntent(w({ deltaMode: 2, deltaY: 1 }))).toEqual({ kind: 'zoom', factor: Math.exp(-400 * 0.0022) });
+      // 48 and 400 would pass the pixel rule anyway; one line (16 px) does not, so only "a line mode IS a wheel" zooms it
+      expect(wheelIntent(w({ deltaMode: 1, deltaY: 1 }))).toEqual({ kind: 'zoom', factor: Math.exp(-16 * 0.0022) });
       expect(wheelIntent(w({ deltaY: 5 }))).toEqual({ kind: 'pan', dx: 0, dy: 5 });
     });
   });
   ```
+  Kills:
+  - 27.247: (a) drop `&& Number.isInteger(dy)` (the 40.5 leg) (b) drop `dx === 0 &&` (the `deltaX: 1, deltaY: 100` leg) (c) `Math.abs(dy) >= 40` → `dy >= 40` (the −100 leg) (d) swap `0.012` and `0.0022`.
+  - 27.248: (a) drop `e.deltaMode !== 0 ||` (the one-line leg) (b) `deltaMode === 1 ? 16` → `? 1` (c) the pixel default `: 1` → `: 16` (the `deltaY: 5` leg turns into an 80 px notch).
   `src/engine/wheel.ts`:
   ```ts
   export type WheelIntent = { kind: 'zoom'; factor: number } | { kind: 'pan'; dx: number; dy: number };
@@ -2424,15 +2452,24 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
     it('27.249 the solved camera frames every item including its label inside the viewport less 8 px a side, under the top bar; control: one item moved far out widens the ratio', () => {
       const items = [{ x: -300, y: 0, l: 16, r: 120, t: 14, b: 14 }, { x: 300, y: 0, l: 16, r: 220, t: 14, b: 14 }, { x: 0, y: -185, l: 16, r: 90, t: 18, b: 36 }];
       const vp = { width: 800, height: 500 };
-      const f = solveFit(items, 1, vp, TOP_PX.desktop);
-      const k = 1 / f.ratio;
-      for (const o of items) {
-        const sx = (o.x - f.cx) * k + vp.width / 2, sy = (o.y - f.cy) * k + vp.height / 2;
-        expect(sx - o.l).toBeGreaterThanOrEqual(8 - 0.5);
-        expect(sx + o.r).toBeLessThanOrEqual(vp.width - 8 + 0.5);
-        expect(sy - o.t).toBeGreaterThanOrEqual(8 + TOP_PX.desktop - 0.5);
-        expect(sy + o.b).toBeLessThanOrEqual(vp.height - 8 + 0.5);
+      // 800 × 500 is WIDTH-bound (the top edge has ~120 px spare, so it cannot see the top bar); 1600 × 300 is HEIGHT-bound
+      for (const v of [vp, { width: 1600, height: 300 }]) {
+        const f = solveFit(items, 1, v, TOP_PX.desktop);
+        const k = 1 / f.ratio;
+        const box = items.map((o) => {
+          const sx = (o.x - f.cx) * k + v.width / 2, sy = (o.y - f.cy) * k + v.height / 2;
+          return { L: sx - o.l, R: sx + o.r, T: sy - o.t, B: sy + o.b };
+        });
+        const L = Math.min(...box.map((q) => q.L)), R = Math.max(...box.map((q) => q.R));
+        const T = Math.min(...box.map((q) => q.T)), B = Math.max(...box.map((q) => q.B));
+        expect(L, `${v.width}`).toBeGreaterThanOrEqual(8 - 0.5);
+        expect(R, `${v.width}`).toBeLessThanOrEqual(v.width - 8 + 0.5);
+        expect(T, `${v.width}`).toBeGreaterThanOrEqual(8 + TOP_PX.desktop - 0.5);
+        expect(B, `${v.width}`).toBeLessThanOrEqual(v.height - 8 + 0.5);
+        // tight on the bounding axis: the fit does not zoom out further than it must (measured slack: 0.03 px, 0.03 px)
+        expect(Math.min(L - 8, v.width - 8 - R, T - 8 - TOP_PX.desktop, v.height - 8 - B), `${v.width}`).toBeLessThan(0.5);
       }
+      const f = solveFit(items, 1, vp, TOP_PX.desktop);
       const wider = solveFit([...items, { x: 900, y: 0, l: 16, r: 60, t: 14, b: 14 }], 1, vp, TOP_PX.desktop);
       expect(wider.ratio).toBeGreaterThan(f.ratio);
     });
@@ -2446,13 +2483,21 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       const withFog = fitItemsFor(clear, { fogRadius: [440, 290], phone: false });
       expect(withFog).toHaveLength(7);
       expect(withFog[3]).toEqual({ x: 440 * 0.9, y: 0, l: 4, r: 4, t: 4, b: 4 });
+      expect(withFog[5]).toEqual({ x: 0, y: 290 * 0.9, l: 4, r: 4, t: 4, b: 4 }); // the VERTICAL radius is the second one
       expect(withFog[1]!.b).toBe(42); // a labelled person: label below
       expect(withFog[2]).toEqual({ x: 0, y: 185, l: 16, r: 6 * 7 + 34, t: 14, b: 14 });
+      // the centre's label is OVER it: centred, as wide as its longer line (27 chars × 6.9 + 34), half each side + 8
+      expect(withFog[0]).toMatchObject({ x: 0, y: 0, t: 30, b: 30 });
+      expect(withFog[0]!.l).toBeCloseTo((27 * 6.9 + 34) / 2 + 8, 9);
+      expect(withFog[0]!.r).toBeCloseTo((27 * 6.9 + 34) / 2 + 8, 9);
       expect(fitItemsFor(clear, { fogRadius: [240, 262], phone: true })[3]!.x).toBeCloseTo(240 * 0.82, 9);
       expect(fitItemsFor(clear, { fogRadius: null, phone: false })).toHaveLength(3);
     });
   });
   ```
+  Kills:
+  - 27.249: (a) delete `T -= topPx;` (the 1600 × 300 run's top edge lands at 8, not 48) (b) `r = r * Math.max(…)` → `r = 2 * r * Math.max(…)` (the tightness leg) (c) `viewport.width - 16` → `viewport.width` (the right-edge leg).
+  - 27.250: (a) `b: o.label ? 42 : 18` → `b: 18` (b) `y: b * opts.fogRadius[1] * k` → `* opts.fogRadius[0]` (the `withFog[5]` leg) (c) the centre arm returns the off-centre box `{ l: 16, r: w, … }` (the `withFog[0]` legs) (d) `opts.phone ? 0.82 : 0.9` → `0.9`.
   `src/engine/fit.ts`:
   ```ts
   import type { GraphItemKind } from '@gisik-nokma/domain';
@@ -2517,10 +2562,13 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
   describe('glide and coast', () => {
     it('27.251 the glide eases out over 320 ms and ends exactly on the new layout; an item that did not move does not tween; control: reduced motion lands at once', () => {
       expect(GLIDE_MS).toBe(320);
-      const from = new Map([['a', { x: 0, y: 0 }], ['s', { x: 5, y: 5 }]]), to = new Map([['a', { x: 100, y: 0 }], ['s', { x: 5, y: 5 }]]);
+      expect(easeOutCubic(0.5)).toBe(0.875);
+      // 'n' is NEW (in `to` only): it must start at its target, not fly in
+      const from = new Map([['a', { x: 0, y: 0 }], ['s', { x: 5, y: 5 }]]), to = new Map([['a', { x: 100, y: 0 }], ['s', { x: 5, y: 5 }], ['n', { x: 50, y: 50 }]]);
       const half = glideFrame(from, to, 160, false);
-      expect(half.positions.get('a')!.x).toBeCloseTo(100 * easeOutCubic(0.5), 9);
-      expect(half.positions.get('s')).toEqual({ x: 5, y: 5 });
+      expect(half.positions.get('a')!.x).toBeCloseTo(87.5, 9); // a literal: 100 × (1 − 0.5³), so a linear easeOutCubic fails too
+      expect(half.positions.get('s')).toBe(to.get('s')); // the unmoved item is the target ITSELF: the shortcut, not a recomputed copy
+      expect(half.positions.get('n')).toEqual({ x: 50, y: 50 });
       expect(half.done).toBe(false);
       expect(glideFrame(from, to, 320, false)).toEqual({ positions: to, done: true });
       expect(glideFrame(from, to, 0, true)).toEqual({ positions: to, done: true });
@@ -2531,9 +2579,14 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
       const moving = [{ t: 0, x: 0, y: 0 }, { t: 50, x: 50, y: 0 }, { t: 100, x: 100, y: 0 }];
       expect(coastOffset(moving, 100)).toEqual({ x: 300, y: 0 }); // 1 px/ms × 300 ms
       expect(coastOffset([...moving, { t: 200, x: 100, y: 0 }], 200)).toEqual({ x: 0, y: 0 });
+      // the OTHER "stopped" arm: no new sample, but the pointer rested 50 ms before release
+      expect(coastOffset(moving, 150)).toEqual({ x: 0, y: 0 });
     });
   });
   ```
+  Kills:
+  - 27.251: (a) `from.get(id) ?? t` → `from.get(id) ?? { x: 0, y: 0 }` (the `n` leg) (b) drop the `f.x === t.x && f.y === t.y ? t :` shortcut (the `toBe` leg; it is otherwise invisible) (c) `elapsedMs >= GLIDE_MS` → `elapsedMs > GLIDE_MS` (the 320 ms leg) (d) `easeOutCubic` → `(k) => k`.
+  - 27.252: (a) delete `now - last.t >= 50 ||` (the `now = 150` leg) (b) `last.t - s.t <= 100` → `<= 1000` (the `t = 200` leg reads 150) (c) `y: ((last.y - first.y) …` → `((last.x - first.x) …`.
   `src/engine/glide.ts`:
   ```ts
   export const GLIDE_MS = 320;
@@ -2581,6 +2634,11 @@ All of this is pure. The Sigma adapter (Task 5) owns `requestAnimationFrame` and
   - In `zoomTarget`, `(base.x - anchor.x) * k` → `* (1 / k)`. 27.245 goes RED.
   - Delete the `T -= topPx` line. 27.249 goes RED.
   - In `glideFrame`, drop the unchanged-position shortcut AND start a new item at (0,0). 27.251 goes RED.
+
+  (Test-strength pass, 2026-10-04: before that pass two of these could not go RED. 27.249's only viewport was width-bound, with ~120 px spare at the top, so deleting `T -= topPx` stayed green; it now also runs a height-bound 1600 × 300 viewport. 27.251 had no NEW item and its unmoved item was compared by value, so both halves of the glide mutant stayed green; it now has the new item `n` and compares `s` by identity. Run every `Kills:` line above, not only this list.)
+
+  **Prose to sweep:**
+  - `Features.md:3767` — the KG-C ⚙️ bullet ends "Cases 27.200–27.211." and names only Task 1's foundations; extending it with the motion engine must also extend the case range (27.240–27.252).
 
   **Sweeps:** build, the whole package, `check:citations`. Push, then DONE.
 
@@ -2632,7 +2690,12 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
       expect(cssVariableName('graphCardLine')).toBe('--gn-graph-card-line');
       const sheet = themeStylesheet();
       expect(sheet).toContain('--gn-edge-blocks: #d70015;');
-      expect(sheet).not.toContain('--e-blocks');
+      // The spec's --e-* names: no code path could ever emit them, so `not.toContain('--e-blocks')` was no evidence. The
+      // evidence is that every graph role IS emitted under --gn-*, with a real hex, in all NINE colour blocks
+      // (hig, minimal, neo × light, dark media, dark attribute): a role missing from one theme map emits `undefined` there.
+      for (const role of GRAPH_ROLES) {
+        expect(sheet.match(new RegExp(`${cssVariableName(role)}: #[0-9a-f]{6};`, 'g')), role).toHaveLength(9);
+      }
     });
 
     it('27.256 the mockup values, light and dark, where they pass; control: a value that differs from the mockup is only edgePeople', () => {
@@ -2645,8 +2708,11 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
         expect(colorOf('light', role as TokenRole), role).toBe(light);
         expect(colorOf('dark', role as TokenRole), role).toBe(dark);
       }
-      expect(colorOf('light', 'edgePeople')).not.toBe('#a8a49a');
-      expect(colorOf('dark', 'edgePeople')).not.toBe('#57544c');
+      expect(colorOf('light', 'edgePeople')).not.toBe('#a8a49a'); // the mockup's, which is `lineStrong`
+      expect(colorOf('dark', 'edgePeople')).not.toBe('#57544c'); // the mockup's, which is `seamStrong`
+      // `not.toBe` alone passes on `undefined` (a role with no mapping): pin the derived primitives too
+      expect(colorOf('light', 'edgePeople')).toBe(primitives.peopleEdgeLight);
+      expect(colorOf('dark', 'edgePeople')).toBe(primitives.peopleEdgeDark);
     });
 
     it('27.257 the declared pairs: every edge role on surface and surfaceRaised at 3, text on conceptFill and conceptSoft at 4.5 (the loop above measures them); control: a role absent from the array is reported missing', () => {
@@ -2669,10 +2735,19 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
       expect(fog).toBeLessThan(3);
       expect(fog).toBeGreaterThanOrEqual(1.5);
       expect(contrastRatio(colorOf('dark', 'fogDot'), colorOf('dark', 'surface'))).toBeGreaterThanOrEqual(1.5);
+      // the hairline is the other exemption the title names: measured below 3:1 too (1.19 light, 1.47 dark while planning)
+      expect(contrastRatio(colorOf('light', 'graphCardLine'), colorOf('light', 'surface'))).toBeLessThan(3);
+      expect(contrastRatio(colorOf('dark', 'graphCardLine'), colorOf('dark', 'surface'))).toBeLessThan(3);
       expect(CONTRAST_PAIRS.some((p) => p.fg === 'fogDot' || p.bg === 'fogDot' || p.fg === 'graphCardLine' || p.bg === 'graphCardLine')).toBe(false);
     });
   });
   ```
+  Kills:
+  - 27.255: (a) leave `graphCardLine` out of `TOKEN_ROLES` (b) leave `fogDot` out of `themes.dark` (that role emits `undefined` in the six dark blocks: the count reads 3) (c) `edgeBlocks: 'red600'` → `'red300'` in `themes.light`.
+  - 27.256: (a) `edgeConcept: 'teal700'` → `'blue600'` (b) `edgePeople: 'peopleEdgeLight'` → `'lineStrong'` (the mockup's own grey) (c) drop the `edgePeople` row from `themes.dark` (the `primitives.peopleEdgeDark` leg; `not.toBe` alone stayed green).
+  - 27.257: (a) drop the `edgeConcept` on `surfaceRaised` row (b) drop the `text` on `conceptSoft` row (c) declare the `edge*` rows at `minimum: 4.5`.
+  - 27.258: (a) `peopleEdgeLight` → `'#a8a49a'` (2.03 on `surface`) (b) `peopleEdgeDark` → `'#57544c'`.
+  - 27.259: (a) add `{ fg: 'fogDot', bg: 'surface', minimum: 3 }` (b) `fogDot: 'fogDotLight'` → `'grayAccessible'` (≥ 3: the "below 3" leg) (c) `graphCardLine: 'line'` → `'border'`'s `grayAccessible` (the hairline leg).
   27.257 asserts the rows are declared; the existing loop over `CONTRAST_PAIRS` (`tokens.test.ts:103-114`) measures them in every style and theme once Step 2 adds them.
 
   Run: `pnpm --filter @gisik-nokma/ui exec vitest run test/tokens.test.ts --maxWorkers=2 > /tmp/kg-t4.log 2>&1; tail -15 /tmp/kg-t4.log`. Expected: FAIL (the roles do not exist).
@@ -2741,6 +2816,10 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
   - 27.260–27.262 stay unallocated (no lines).
 
   Add "twelve colour roles (`packages/ui/src/tokens.ts`)" to the bullet.
+
+  **Prose to sweep:**
+  - `packages/knowledge-graph/src/render/palette.ts:4` — "Task 4 adds the twelve graph roles." (future tense; after this task they exist, so say they are `packages/ui` roles, 27.255).
+  - `Features.md:3767` — the KG-C ⚙️ bullet's "Cases 27.200–27.211." range (add 27.255–27.259 with the roles clause).
 
   **Sweeps:**
   - `ui` whole, then `pnpm turbo run build --filter=@gisik-nokma/web...`, then the web and app-core suites. A new role can change an emitted stylesheet a snapshot reads: `grep -rn "themeStylesheet" apps/web/test packages/app-core/test` first, and run those files.
@@ -2818,7 +2897,8 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
     viewportOf(ref: string): { x: number; y: number } | null;
     graphAt(x: number, y: number): { x: number; y: number };
     normalise(p: { x: number; y: number }): { x: number; y: number };
-    nodeDisplay(ref: string): { size: number; opacity: number; image: string; attachment: string | null; color: string; backdropColor: string } | null;
+    /** `backdropBorderColor` added by the planner ruling 2026-10-04, so 27.280 can pin the selection ring. */
+    nodeDisplay(ref: string): { size: number; opacity: number; image: string; attachment: string | null; color: string; backdropColor: string; backdropBorderColor: string } | null;
     edgeDisplay(id: string): { size: number; opacity: number } | null;
     frames(): number;
     inkLog(): number[];
@@ -2852,18 +2932,38 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
       root.style.setProperty('color-scheme', 'dark');
       const p = readThemePalette(root);
       expect(p.edgeBlocks).toBe('#d70015');
+      expect(p.fogDot).toBe('#010203'); // every OTHER role reads its own variable too (a reader keyed on one name fails here or above)
       expect(p.dark).toBe(true);
+      root.style.setProperty('color-scheme', 'light');
+      expect(readThemePalette(root).dark).toBe(false); // `dark` is READ, not a constant
       let calls = 0;
       const stop = watchTheme(() => (calls += 1));
       root.setAttribute('data-theme', 'dark');
       await new Promise((r) => setTimeout(r, 0));
       expect(calls).toBe(1);
+      root.setAttribute('data-style', 'neo'); // the docblock's other attribute
+      await new Promise((r) => setTimeout(r, 0));
+      expect(calls).toBe(2);
       stop();
+      root.setAttribute('data-theme', 'light');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(calls).toBe(2); // stopped means stopped
+      root.removeAttribute('data-theme');
+      root.removeAttribute('data-style');
       root.style.removeProperty(cssVariableName('fogDot'));
       expect(readThemePalette(root).fogDot).toBe('');
     });
   });
   ```
+  Kills:
+  - 27.263: (a) `dark: cs.colorScheme === 'dark' || …` → `dark: true` (the `light` leg) (b) `attributeFilter: ['data-theme', 'data-style']` → `['data-theme']` (the `calls` = 2 leg) (c) the returned stop drops `mo.disconnect()` (the stopped leg) (d) `.trim()` → `.trim() || '#000000'` (the unset leg).
+
+  Before writing the case, confirm jsdom's `CSSStyleDeclaration` keeps an inline `color-scheme` (it drops properties it does not know). (Planner ruling 2026-10-04, replacing the injected-`<style>` fallback.) Probe once, in the test file, after `root.style.setProperty('color-scheme', 'dark')`:
+  - `getComputedStyle(root).getPropertyValue('color-scheme')` reads `dark`: the case stays as written.
+  - It reads `''`, but `root.getAttribute('style')` contains `color-scheme: dark`: the jsdom legs assert on that inline `style` attribute string (`toContain('color-scheme: dark')`, then `toContain('color-scheme: light')`), and the two `p.dark` / `readThemePalette(root).dark` legs move to the browser check (below). Rename the `it` so its title says "dark: browser (27.263b)" instead of "dark is read from color-scheme".
+  - The inline attribute does not contain it either (jsdom dropped the property on set): the `color-scheme` legs leave jsdom entirely and move to the browser check; the case line says so.
+
+  The browser check (`knowledge-graph-browser`, `tests/traps.spec.ts`, next to 27.287): `page.evaluate` sets `document.documentElement.style.colorScheme = 'dark'`, then `window.__kg.readPalette().dark` is `true`; set `'light'`: `false`. Kills (a) above moves with it.
   Check that `@gisik-nokma/ui/tokens` is an existing subpath: G-9's harness imports `themeStylesheet` from it. If `cssVariableName` is not exported there, import it from `@gisik-nokma/ui`.
 
   `src/theme/read-palette.ts`:
@@ -3273,12 +3373,43 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
   - `viewportOf(ref)` is `sigma.framedGraphToViewport(sigma.getNodeDisplayData(ref))` (as `sigtest.cjs` did).
   - `graphAt` is `sigma.viewportToGraph`.
   - `normalise` is `sigma.getNormalizationFunction()`.
-  - `nodeDisplay` and `edgeDisplay` read `getNodeDisplayData` / `getEdgeDisplayData`. Display data keeps every style key the styles set (trap 4), so `opacity`, `image`, `labelAttachment` and `backdropColor` are there; if the beta names one differently, map it here and say so in a comment.
+  - `nodeDisplay` and `edgeDisplay` read `getNodeDisplayData` / `getEdgeDisplayData`. Display data keeps every style key the styles set (trap 4), so `opacity`, `image`, `labelAttachment`, `backdropColor` and `backdropBorderColor` are there (the last one by the planner ruling 2026-10-04, for 27.280); if the beta names one differently, map it here and say so in a comment.
   - `inkLog` and `alphaAt` come from an `afterRender` hook that copies `sigma.getStageCanvas()` into a 2D canvas: quarter scale for the ink count (`flick3.cjs`'s method), full scale only for the frame after `alphaAt` is armed.
   - `invalidated()` returns the attachment-cache log.
   - `positions()` returns the graph's x/y per node.
 
-  It runs ONLY when the mount element has `data-kg-probe`, which only the harness sets. A `test/probe.test.ts` (jsdom, 27.289) asserts that `inspect()` returns null without the attribute; the control is that the same renderer object exposes `inspect`.
+  It runs ONLY when the mount element has `data-kg-probe`, which only the harness sets. A `test/probe.test.ts` (jsdom, 27.289) asserts that `inspect()` returns null without the attribute, and its control mounts WITH the attribute and gets the probe back.
+
+  (Test-strength pass: the first draft's control, "the same renderer object exposes `inspect`", is true of every `GraphRenderer` by its type, and an UNMOUNTED renderer's `inspect()` is null whatever the attribute says, so that case could not fail. jsdom has no WebGL, so the case mounts the real adapter with Sigma's three collaborators stubbed; graphology is plain JS and runs.)
+  ```ts
+  // test/probe.test.ts
+  import { describe, expect, it, vi } from 'vitest';
+  import { RING_CONFIGS } from '../src/engine/layout.js';
+  import type { ThemePalette } from '../src/render/palette.js';
+
+  const { probeSentinel } = vi.hoisted(() => ({ probeSentinel: { sentinel: 'probe' } }));
+  vi.mock('../src/render/sigma/program.js', () => ({ createSigma: () => ({ on: () => undefined, setCustomBBox: () => undefined, kill: () => undefined }) }));
+  vi.mock('../src/render/sigma/attachment-cache.js', () => ({ keepAttachmentCache: () => () => undefined }));
+  vi.mock('../src/render/sigma/camera-driver.js', () => ({ createCameraDriver: () => ({ goTo: () => undefined, zoomCentre: () => undefined, panBy: () => undefined, destroy: () => undefined }) }));
+  vi.mock('../src/render/sigma/probe.js', () => ({ createProbe: () => probeSentinel }));
+  const { createSigmaRenderer } = await import('../src/render/sigma/adapter.js');
+
+  describe('the probe is a test hook only', () => {
+    it('27.289 inspect() is null unless the mount element carries data-kg-probe; control: the same mount WITH the attribute returns the probe', () => {
+      const opts = { phone: false, config: RING_CONFIGS.desktop, reduceMotion: () => true };
+      const plain = createSigmaRenderer();
+      plain.mount(document.createElement('div'), {} as ThemePalette, opts);
+      expect(plain.inspect()).toBeNull();
+      const el = document.createElement('div');
+      el.setAttribute('data-kg-probe', '');
+      const probed = createSigmaRenderer();
+      probed.mount(el, {} as ThemePalette, opts);
+      expect(probed.inspect()).toBe(probeSentinel);
+    });
+  });
+  ```
+  Kills:
+  - 27.289: (a) `if (el.hasAttribute('data-kg-probe')) probe = createProbe(…)` → unconditional (b) `inspect: () => probe` → `inspect: () => null` (the control).
 
   **Exports.**
   - `package.json` `exports`: `"./sigma": { "types": "./dist/render/sigma/adapter.d.ts", "default": "./dist/render/sigma/adapter.js" }`.
@@ -3361,7 +3492,7 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
   `harness/adapter.html` + `harness/adapter.ts` mount the adapter directly:
   - the fixture centred on `ticket:t142`, desktop config, 2 clear hops, laid out through the engine (`zones` → `layoutRings` → `levelOf` / `nodeLabel` / `nodeSub` → `DrawNode`s, icons as in the mockup's `iconOf`, `:813-816`);
   - the palette from `readThemePalette(document.documentElement)` after `themeStylesheet()` is injected, as G-9's harness does;
-  - `data-kg-probe` set; `window.__kg = { renderer, probe: renderer.inspect(), setCenter, setTheme }`;
+  - `data-kg-probe` set; `window.__kg = { renderer, probe: renderer.inspect(), setCenter, setTheme, readPalette: () => readThemePalette(document.documentElement) }` (`readPalette` by the planner ruling 2026-10-04, for 27.263's browser leg);
   - the page body is `200vh` tall, so a wheel that leaked would scroll it.
 
   The `iconOf` port belongs in the VIEW (Task 7) as `iconFor(item, lv, center): IconSpec | null` in `src/react/draw-model.ts`. Write it there now and import it into the harness, so the harness and the view share one function:
@@ -3382,17 +3513,25 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
 
 - [ ] **Step 4: The trap cases.** `tests/traps.spec.ts`. Every case first waits for the harness (`await page.goto('/adapter.html'); await page.waitForFunction(() => (window as any).__kg?.probe)`), then calls `waitStill(page, () => page.evaluate(() => __kg.probe.camera()))`. Each case is one `test()` with its control inside it.
 
-  - **27.264 (trap 1, still):** `probe.clearInk()`, then call `__kg.renderer.setStates(sameStates)` 10 times (each one a `refresh`) with 30 ms between, then read `inkLog()`. All ten counts are identical (`flick3.cjs` STATIC). **Control:** one `setStates` that selects another item changes the count.
-  - **27.265 (trap 1, hover):** hover a hop-1 chip, then leave. `probe.invalidated()` is still `[]`, and the first ink count after leaving equals the count before hovering. **Control:** `setGraph` with that chip's `sub` changed adds exactly its ref to `invalidated()`.
-  - **27.266 (trap 2):** sample `alphaAt` at 9 evenly spaced points along the middle 60% of the `parent` edge `ticket:t118 → ticket:t142`. All nine are > 0 (no notch). **Control:** the same sampling along the `relates` edge `t142 → t160` (dash 7 / gap 5) finds at least one 0.
+  - **27.264 (trap 1, still):** `probe.clearInk()`, then call `__kg.renderer.setStates(sameStates)` 10 times (each one a `refresh`) with 30 ms between, then read `inkLog()`. It holds at least 10 counts, each > 0 (an empty log makes "all identical" true of nothing), and all of them are identical (`flick3.cjs` STATIC). **Control:** one `setStates` that selects another item changes the count.
+    - Kills: (a) delete `am.invalidateNode = () => undefined; am.clear = () => undefined;` in `keepAttachmentCache` (b) `applyStates` calls `dropSub(ref)` for every node before `refresh()`.
+  - **27.265 (trap 1, hover):** hover a hop-1 chip, then leave. `probe.invalidated()` is still `[]`, and the first ink count after leaving (the log is non-empty) equals the count before hovering. **Control:** `setGraph` with that chip's `sub` changed adds exactly its ref to `invalidated()`.
+    - Kills: (a) keep the real `am.clear` (delete `am.clear = () => undefined`): the ink leg (b) delete `if (g.getNodeAttribute(n.ref, 'sub') !== n.sub) dropSub(n.ref);` (the control) (c) call `dropSub(n.ref)` unconditionally in that merge branch (the control's "exactly", and the hover leg is untouched: hover never calls `setGraph`).
+  - **27.266 (trap 2):** sample `alphaAt` at 9 evenly spaced points along the middle 60% of the `parent` edge `ticket:t118 → ticket:t142`. It returns 9 values and all nine are > 0 (no notch). **Control:** the same sampling along the `relates` edge `t142 → t160` (dash 7 / gap 5) finds at least one 0.
+    - Kills: (a) `SOLID` → `[10000, 0]` in `program.ts` (Task 1's constant; this case is its guard) (b) the adapter's `addEdgeWithKey(…, { grp: e.grp, … })` → `grp: 'relates'` (every edge dashed).
   - **27.267 (trap 3):** `nodeDisplay('ticket:t133').attachment === 'subL'` in light. After `__kg.setTheme('dark')` it is `'subD'`. **Control:** a dot-level item's attachment is `null`.
+    - Kills: (a) in `refreshTheme`, drop `palette = pal;` (the attachment name stays `subL`) (b) in `setGraph`'s `attrs`, `sub: n.sub` → `sub: null` (every attachment `null`: the first leg).
   - **27.268 (trap 4):** `nodeDisplay('note:n1').image` starts with `data:image/svg+xml`, and so does `nodeDisplay('person:pA').image`. **Control:** a ticket's is `''`.
-  - **27.269 (trap 5):** read `nodeDisplay('note:n1').size`, zoom by 2 with `renderer.zoomBy(2)`, `waitStill`, and read it again: the same size. **Control:** the camera ratio did halve.
+    - Kills: (a) `imageOf` → `() => ''` (b) `imageOf` ignores `n.icon === null` and calls `iconUri` for every node (the control).
+  - **27.269 (trap 5):** `nodeDisplay(..).size` is the style's output (9.5 for `note:n1`), which Sigma scales only when it draws, so "the same size after a zoom" holds with trap 5 unfixed too. Trap 5 is about what reaches the screen. So measure pixels. Pick the fog dot with the smallest `viewportOf().y` (the top of the fog ring, where its radial edges run vertically) and scan `alphaAt` horizontally through its centre, 0.5 px steps out to 12 px each side. Its drawn half-width is the last non-zero offset; it is ≥ 2 px (the dot was found). `renderer.zoomBy(2)`, `waitStill`, re-read its `viewportOf`, and scan again: the half-width is the same within 0.5 px. **Control:** the camera ratio did halve.
+    - Kills: (a) delete `zoomToSizeRatioFunction: () => 1` in `program.ts` (Sigma's default √ratio grows a 3 px dot to 4.2 px) (b) `itemSizesReference: 'screen'` → `'positions'`. Both are Task 1's settings; this case is their only guard.
   - **27.270 (trap 6 + label):**
     - Click 30 px right of `viewportOf('ticket:t133')` (on its label). The harness records the pick: `window.__kg.picks` gets `{ kind: 'node', ref: 'ticket:t133' }` (`kgtest.cjs`, "click on a label selects").
-    - Then click a fog dot (`positions()` with `nodeDisplay(..).size === 3`). No pick is recorded.
+    - Then click a fog dot (`positions()` with `nodeDisplay(..).size === 3`; assert one was found). No pick is recorded.
     - **Control:** the fog dot did fire Sigma's own `clickNode`. The harness counts raw `clickNode`s in `__kg.rawClicks`, and that count grew.
+    - Kills: (a) drop `if (!isFog(node))` from the `clickNode` handler (b) `nodeLabelEvents: 'extend'` → removed in `program.ts` (the label leg; Task 1's setting).
   - **27.271 (click on the dot):** clicking exactly at `viewportOf('ticket:t160')` picks it. **Control:** clicking 200 px away in empty space picks `{ kind: 'stage' }`.
+    - Kills: (a) the `clickNode` handler emits `{ kind: 'stage' }` (b) delete the `clickStage` handler (the control).
   - **27.272 (trap 7):** `scrollY` before the wheel (the page is 200vh, scrolled to 0).
     - Three `mouse.wheel(0, -100)` at 30%/35% of the canvas, with 16 ms between, then `waitStill`.
     - `scrollY` is unchanged.
@@ -3400,34 +3539,48 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
     - The graph point under the cursor drifted < 2 graph units (`graphAt` before and after).
     - `probe.frames()` grew by ≥ 8 during the zoom (`sigtest.cjs`, "wheel").
     - **Control:** the same three wheels over the page OUTSIDE the canvas DO scroll it.
-  - **27.273 (two-finger pan):** six `mouse.wheel(14, 9)`. The ratio changes by < 1%, and the centre moves > .01 (`sigtest.cjs`, "pan"). **Control:** `mouse.wheel(0, -100)` at the same spot changes the ratio.
+    - Kills: (a) delete the `belt` listener (see Step 5's caveat) (b) delete `event.preventSigmaDefault();` in `onWheel` (Sigma's fixed-step zoom then moves the camera too: the drift leg) (c) `zoomAt`'s anchor read without `{ cameraState: … }` (trap 8's stale-camera anchor: the drift leg).
+  - **27.273 (two-finger pan):** six `mouse.wheel(14, 9)`. The ratio changes by < 1%, and the centre moves > .01 (`sigtest.cjs`, "pan"). The content moves the way a page scrolls: `viewportOf('ticket:t142')` has a SMALLER x and a SMALLER y afterwards (a distance alone cannot tell a reversed pan). **Control:** `mouse.wheel(0, -100)` at the same spot changes the ratio.
+    - Kills: (a) `onWheel`'s `else panBy(…)` → `zoomAt(1, …)` (no pan) (b) `panBy` builds `panTarget(b, { x: a.x - c.x, y: a.y - c.y })` (reversed: the direction leg).
   - **27.274 (pinch and spring-back):**
     - Hold `Control` and five `mouse.wheel(0, -8)`: the ratio shrinks.
     - Then 25 × `wheel(0, -100)`: the peak is below fit/4.
     - After `waitStill`, the ratio is within 1% of `fitRatio()/4` (`sigtest.cjs`, "pinch").
     - **Control:** the peak was really past the limit (the rubber band let it go there).
+    - Kills: (a) `onWheel`'s zoom passes `soft: false` (the peak stops AT fit/4) (b) delete `idle = setTimeout(settle, SETTLE_MS)` (no spring-back: the 1% leg) (c) `settle()` passes the factor inverted (`1 / f`).
   - **27.275 (touch pinch):** a CDP `Input.dispatchTouchEvent` spread from 60 → 220 px about the canvas centre (`sigtest.cjs`, "touch"). The ratio is < 0.7 × r0. **Control:** a one-finger drag of the same length does not change the ratio.
-  - **27.276 (trap 8):** straight after load (`waitStill`), every clear item's `viewportOf` is inside `[0, width] × [0, height]` of the stage. `fitRatio()` is not 1. **Control:** `__kg.mountWithoutFirstFrameFit()`, a harness variant that fits in `mount` before any frame, puts at least one item outside. (It proves the trap is real; the variant lives in the harness only.)
-  - **27.277 (trap 9):** hover `ticket:t142`. A non-neighbour's `nodeDisplay().opacity` is `0.32`, a non-incident edge's opacity is `0.08`, and a neighbour's is `1`. Then hover the midpoint of `blocks t133 → t142`: every node's opacity is `1`, and that edge's size is `3.4`. **Control:** after the mouse leaves, all are back to 1.
-  - **27.278 (trap 10):** `alphaAt` a point 8 px before the centre along `blocks t133 → t142` is > 0: the arrowhead into the centre card is drawn. **Control:** the centre's `nodeDisplay().size` is `1`.
+    - Kills: none, guards existing behaviour (Sigma v4's own touch captor; no driver code runs on a touch pinch). It is still non-vacuous: a driver that fought Sigma, e.g. the `cam.on('updated')` listener calling `goTo(target!)` when `!ours`, turns it RED.
+  - **27.276 (trap 8):** straight after load (`waitStill`), every clear item's `viewportOf` is inside `[0, width] × [0, height]` of the stage; the list checked is every non-fog node of the fixture's 2-hop view (assert its length first, > 0). `fitRatio()` is not 1. **Control:** `__kg.mountWithoutFirstFrameFit()`, a harness variant that fits in `mount` before any frame, puts at least one item outside. (It proves the trap is real; the variant lives in the harness only.)
+    - Kills: (a) compute the fit in `mount` (`fitPending = false` + `computeFit` there) (b) `computeFit` solves for a fixed `{ width: 2000, height: 2000 }` instead of `stage.clientWidth` / `clientHeight` (a wrong viewport, which is what trap 8 is).
+  - **27.277 (trap 9):** hover `ticket:t142`. A non-neighbour's `nodeDisplay().opacity` is `0.32`, a non-incident edge's opacity is `0.08`, and a neighbour's is `1`. Then hover the midpoint of `blocks t133 → t142`: every NON-FOG node's opacity is `1` (fog nodes are `0.9` by `program.ts:92` in every state), and that edge's size is `3.4`. **Control:** after the mouse leaves, every non-fog node is back to 1.
+    - Kills: (a) dim on Sigma's `hasHovered` instead of `nodeHovered` (the edge-hover arm) (b) delete `sigma!.setNodesState(graph!.neighbors(node), { isNb: true })` (the neighbour leg) (c) `leaveNode` leaves `nodeHovered = true` (the control).
+  - **27.278 (trap 10):** the arrowhead into the centre card is drawn. A sample ON the line cannot show it (the 2.2 px line itself is there), so sample `alphaAt` 2.5 px to the side of the `blocks t133 → t142` line at 3, 4, … 8 px before the centre: at least one is > 0, where only the arrowhead is wider than the line. **Control:** the same side samples at the edge's midpoint are all 0 (the line alone does not reach 2.5 px). Keep the precondition that the centre's `nodeDisplay().size` is `1`.
+    - Kills: (a) `head:` → `'none'` for `blocks` in `program.ts` (b) the centre's size `1` → `16` in `program.ts` (the precondition). Both are Task 1's; this case is their guard.
   - **27.279 (trap 11):** a hover on the midpoint of `blocks t133 → t142` emits `{ kind: 'edge', id: 'blocks|ticket:t133|ticket:t142' }` with x/y within 3 px of the pointer. No text pixel is drawn along the edge: Sigma draws no edge label, and `renderEdgeLabels` is false. Check `alphaAt` 10 px off the line at its midpoint, which is 0. **Control:** the edge's size grew to 3.4.
+    - Kills: (a) delete the `enterEdge` handler's `hovers.forEach(…)` (b) emit `x: event.x + 20` (c) `labelVisibility: 'hidden'` → `'visible'` with `label: (a) => a.id` in `program.ts` (the no-text leg; Task 1's).
   - **27.280 (selection and zoom):**
     - Zoom in by 2.
     - `setGraph` the same graph with `selected: 'ticket:t160'` and `keepView: true`. The ratio is unchanged.
-    - Then `zoomBy(0.5)`. `nodeDisplay('ticket:t160')` still shows the selection (`backdropBorderColor` = `palette.text`).
+    - Then `zoomBy(0.5)`. `nodeDisplay('ticket:t160')!.backdropBorderColor` is `palette.text`, and `nodeDisplay('ticket:t160')!.backdropBorderColor` was `palette.graphCardLine` before the `selected` `setGraph` (the probe field is added by the planner ruling 2026-10-04; the "before" read stops the leg passing on a constant).
     - **Control:** with `keepView: false`, the camera returns to the fit.
+    - Kills: (a) `if (!view.keepView) driver.goTo(…)` → unconditional (b) `applyStates` drops the `setNodeState(states.selected, { isSel: true })` arm.
   - **27.281 (glide):**
     - Note `normalise({x:100,y:100})`.
     - Call `__kg.setCenter('ticket:t133')`, and count rAF frames for 340 ms in the page.
     - The normalisation is unchanged (< 1e-9), and frames ≥ 10 (`sigtest.cjs`, "glide").
-    - An item whose layout did not change has identical `positions()` in every sampled frame.
+    - An item whose layout did not change has identical `positions()` in every sampled frame (find one first: assert it exists).
     - **Control:** an item that moved had an intermediate position strictly between its start and end in some frame.
+    - Kills: (a) delete `sigma.setCustomBBox(…)` in `mount` (the normalisation leg) (b) `to.set(n.ref, { x: p.x, y: -p.y })` → `y: p.y` (the unmoved item flips: the identical leg) (c) `glideFrame(from, to, now - t0, opts.reduceMotion())` → `…, true)` (the control).
   - **27.282 (long names, Review Focus 4):**
     - `__kg.setFixtureTitle('ticket:t142', 'x'.repeat(200))` re-lays out the view.
-    - After `waitStill`, the centre card's label right edge (`viewportOf.x` + the fit item's `r`) is ≤ the stage width, and its left edge is ≥ 0.
-    - **Control:** the fit ratio grew compared with the short title.
-  - **27.283 (setGraph at the stress size, printed):** `__kg.stressGraph()` sets 500 clear + 2,000 fog + 3,000 edges. The time `setGraph` takes is printed `kg-setgraph (LOCAL): <ms>`. The case asserts only that all 2,500 nodes are drawn.
+    - After `waitStill`, the REAL rendered label box is inside the stage (planner ruling 2026-10-04: geometry measured with the code's own assumed box proves nothing). The stage box is `.gn-kg__mount canvas`'s `getBoundingClientRect()`. Sigma paints labels into the canvas, so there is no label element to measure: the label's real left and right are found by an `alphaAt` scan along the centre card's label row (from `viewportOf('ticket:t142')`, stepping 1 px outwards until the alpha drops to the background's for 3 px). Both ink edges lie within `[rect.left, rect.right]` in page coordinates, with at least 1 px to spare. A precondition asserts the scan found ink (width > 40 px), or the leg holds of an empty row.
+    - Structural check only (labelled so in the test): `viewportOf.x` ± the fit item's `r` is inside the stage. It uses the code's own assumed box (`fitItemsFor`), so it can only catch a fit that ignores its own numbers.
+    - **Control:** the fit ratio is UNCHANGED from the fixture's own title. Both titles truncate to the same 34-character second line (t142's title, "Move sheet loses its scroll position on phone", is 45 characters, `knowledge-graph-sigma.html:489`), so the card is no wider; a ratio that GREW would mean the second line did not truncate. (The first draft said "the fit ratio grew", which only an untruncated line can do.)
+    - Kills: (a) `nodeSub` without `truncate` (Task 2's; the control) (b) `computeFit` builds the fit from `view.fit` minus the centre item (c) `fitItemsFor`'s width estimate for the centre halved (`* 6.9` → `* 3.45`): the real ink overruns the stage while the structural check still passes (planner ruling 2026-10-04: the measured leg is the one that can see it).
+  - **27.283 (setGraph at the stress size, printed):** `__kg.stressGraph()` sets 500 clear + 2,000 fog + 3,000 edges. The time `setGraph` takes is printed `kg-setgraph (LOCAL): <ms>`. The case asserts only that all 2,500 nodes are drawn (`Object.keys(positions()).length === 2500`).
+    - Kills: (a) the `addEdgeWithKey` loop runs before the nodes exist (edges dropped; assert the 3,000 edges too, through `edgeDisplay` on a sample of 10 ids) (b) `g.forEachNode(… dropNode …)` drops every node not in the PREVIOUS graph.
   - **27.284 (reduced motion):** `page.emulateMedia({ reducedMotion: 'reduce' })`. `zoomBy(2)` lands in ONE frame (`frames()` +1 or +2 at most), and `setCenter` lands without intermediate positions. **Control:** without the emulation, the same zoom takes ≥ 8 frames.
+    - Kills: (a) the driver's `loop` calls `springStep(…, false)` (b) `setGraph`'s glide passes `false` for `reduce` (the `setCenter` leg).
   - **27.285 (momentum):**
     - A mouse drag of 200 px over 120 ms, released while still moving.
     - Note the camera at release, then `waitStill`.
@@ -3435,7 +3588,9 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
     - **Control:** the same drag with a 100 ms pause before release does not move after release.
     - **If Sigma v4's own drag coasts,** the case passes with no adapter code: record "Sigma's inertia" in DONE and do not use `coastOffset`.
     - **If it does not,** add pointer sampling to the camera driver (`pointerdown` / `pointermove` / `pointerup` on `stage`). On `pointerup`, `panBy(-coast.x, -coast.y)` with `coastOffset(samples, now)`. Then make the case pass.
-  - **27.286 (dropped node, trap 1's other half):** `setCenter('ticket:t133')` drops at least one item that had a subtitle. Its ref is in `invalidated()`. **Control:** an item kept with an unchanged `sub` is NOT in it.
+    - Kills (adapter path only): (a) delete the `pointerup` `panBy` (b) `panBy(coast.x, coast.y)` (the direction leg). On "Sigma's inertia" it guards existing behaviour.
+  - **27.286 (dropped node, trap 1's other half):** `setCenter('ticket:t133')` drops at least one item that had a subtitle (assert the dropped-with-subtitle set is non-empty). Its ref is in `invalidated()`. **Control:** an item kept with an unchanged `sub` (find one; assert it exists) is NOT in it.
+    - Kills: (a) delete `dropSub(ref)` from the `forEachNode(… dropNode …)` line (b) `dropSub(n.ref)` unconditionally in the merge branch (the control).
   - **27.287 (Review Focus 3, OS theme flip):**
     - The harness has no `data-theme` and listens with `watchTheme` → `renderer.refreshTheme(readThemePalette(...))`.
     - `page.emulateMedia({ colorScheme: 'dark' })`, then `waitStill`.
@@ -3443,7 +3598,9 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
     - The decoded SVG of the new URI contains the dark `surfaceSunken` value (read through `readThemePalette` in the page).
     - `nodeDisplay('ticket:t133').backdropColor` equals the dark `surfaceRaised`.
     - **Control:** flipping back to light restores the first URI exactly (the cache is keyed by palette).
-  - **27.288 (destroy):** `renderer.destroy()`. No canvas is left in the mount element, and a wheel over where the canvas was now scrolls the page (the belt listener is gone). **Control:** before destroy, the same wheel did not scroll.
+    - Kills: (a) `refreshTheme` keeps `a.image` (b) `watchTheme` without the `matchMedia` listener (c) `refreshTheme` without `palette = pal` (the `backdropColor` leg).
+  - **27.288 (destroy):** `renderer.destroy()`. No canvas is left in the mount element, and a wheel over where the canvas was now scrolls the page. **Control:** before destroy, the same wheel did not scroll.
+    - Kills: (a) delete `host?.replaceChildren()`. NOT killable here: dropping `el.removeEventListener('wheel', belt)`, because `replaceChildren` detaches the stage the belt sits on, so the page scrolls either way. The first draft's "(the belt listener is gone)" claimed that; it is an equivalent mutant at this level.
 
   Run: `pnpm turbo run build --filter=@gisik-nokma/knowledge-graph... && pnpm --filter @gisik-nokma/knowledge-graph-browser test > /tmp/kg-t5.log 2>&1; tail -40 /tmp/kg-t5.log`. Expected: all PASS under SwiftShader, LOCAL. Quote the passing count and the 27.283 line.
 
@@ -3466,6 +3623,10 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
 
   Bullet: "Sigma v4 adapter behind `GraphRenderer` (`render/sigma/adapter.ts`), every §4.2 trap pinned by a browser case".
 
+  **Prose to sweep:**
+  - `packages/knowledge-graph/src/render/palette.ts:3-4` — "the reader is `cssVariableName(role)` (Task 7)": this task writes that reader, `readThemePalette` in `src/theme/read-palette.ts` (27.263).
+  - `Features.md:3767` — the KG-C ⚙️ bullet: "`@gisik-nokma/knowledge-graph-browser` is the Playwright stress probe" (it now also carries the adapter's trap suite, `tests/{traps,camera,theme}.spec.ts`) and the "Cases 27.200–27.211." range.
+
   **Sweeps:**
   - Build; then the `knowledge-graph` suite, whole (the seam check included);
   - the browser package, whole;
@@ -3484,12 +3645,27 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
 
 Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|CREATE TABLE proj_references" origin/release/knowledge-graph -- apps/server/migrations` prints two lines. If it does not, the task waits. This task is parallel with Tasks 2–5.
 
+**Needs (planner ruling 2026-10-04):** typed-links T2, the `proj_ticket_links` migration (`apps/server/migrations/1791400000000_proj-ticket-links.sql`, typed-links plan `:557`, `:622`). It is NOT on `origin/release/knowledge-graph` as of `5414385a0`; only B's `1791500000000_proj-references.sql` is.
+
+- [ ] **Step 0: The migration is there, or STOP (planner ruling 2026-10-04).**
+  ```bash
+  git ls-tree --name-only origin/release/knowledge-graph apps/server/migrations/ | grep -F -e 1791400000000_proj-ticket-links.sql -e 1791500000000_proj-references.sql
+  ```
+  Two lines, or STOP: report DONE-blocked with `NEEDS: typed-links T2 (proj_ticket_links migration)` (or `reference-index` for the second file) and write nothing. A renamed migration still counts if `git grep -n "CREATE TABLE proj_ticket_links" origin/release/knowledge-graph -- apps/server/migrations` finds it; say which file in DONE.
+
+**The tests run on the REAL tables (planner ruling, 2026-10-04).** Every Task 6 case, and Task 1's 27.208–27.211 once this task lands, reads `proj_ticket_links` and `proj_references` as A's and B's migrations create them, never as `apps/server/test/graph/shim.ts` creates them. So:
+- `neighbours.test.ts` never imports `./shim.js`;
+- the shim is DELETED in Step 1, before the cases are written, not after they pass. A missing or renamed table is then a red `relation "proj_ticket_links" does not exist`, never a silent `CREATE TABLE IF NOT EXISTS` with the spec's DDL;
+- the column lists in `link()` and in the `proj_references` INSERTs are copied from the migration files, with their `file:line` cited in a comment.
+
+On the ref at planning time (`5414385a0`), only `apps/server/migrations/1791500000000_proj-references.sql:15` exists; `proj_ticket_links` has no migration yet, so the check above prints one line and this task waits for plan A's migration task.
+
 **Files:**
 - Create:
   - `apps/server/src/routes/graph.ts`
   - `apps/server/test/graph/neighbours.test.ts`
 - Modify:
-  - `apps/server/src/app.ts`: register beside `registerMyWorkRoutes` (`app.ts:1030`)
+  - `apps/server/src/app.ts`: register beside `registerMyWorkRoutes` (`app.ts:1031`)
   - `apps/server/test/graph/perf.test.ts`: drop the shim
   - `apps/server/src/read/graph-neighbours.ts`: re-read A's and B's migrations, and adjust the column names in `expand` if they differ from the spec DDL that Task 1 copied
   - the catalogue (`<!-- KG-C T6 -->`) and the Features bullet
@@ -3508,7 +3684,11 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 
 **Hops.** `hops` goes to **8** (`GRAPH_MAX_HOPS`), not the spec's `1..4` (§2.2). The client asks for hops 1…n and then "one more ring for the fog" (§2.2), so 4 clear hops already need ring 5. "Everything" (§3.1) walks until a ring comes back empty. The cap of 8 keeps "Everything" bounded: 7 clear rings and a fog ring. This is reported in the reply as a spec contradiction.
 
-- [ ] **Step 1: The cases, RED first.** `apps/server/test/graph/neighbours.test.ts` is shaped like `test/routes/my-work.test.ts` (imports at `:1-9`). The world is `buildReadTestApp(db)`. Typed links and references are written STRAIGHT into A's and B's projection tables, because the projections' writers are A's and B's tested concern. The column lists are copied from their migration files: re-read them and cite the file:line in a comment.
+- [ ] **Step 1: The shim goes, then the cases, RED first.**
+  1. Delete `apps/server/test/graph/shim.ts`, and its import (`perf.test.ts:11`) and call (`perf.test.ts:16`). Run 27.208, 27.209 and 27.211 on the migrated tables: expected PASS. If a column name differs from the shim's, fix `expand` in `read/graph-neighbours.ts` now (this step's commit), and say which.
+  2. Then write the cases below.
+
+  `apps/server/test/graph/neighbours.test.ts` is shaped like `test/routes/my-work.test.ts` (imports at `:1-9`). The world is `buildReadTestApp(db)`. Typed links and references are written STRAIGHT into A's and B's projection tables, because the projections' writers are A's and B's tested concern. The column lists are copied from their migration files: re-read them and cite the file:line in a comment. `beforeAll` asserts, right after `createTestDatabase()`, that `SELECT to_regclass('public.proj_ticket_links') IS NOT NULL AND to_regclass('public.proj_references') IS NOT NULL` is true: the migrations made them, since nothing else in this file can.
   ```ts
   import { afterAll, beforeAll, describe, expect, it } from 'vitest';
   import { GRAPH_GROUPS, graphRef, newUlid, type GraphRingResponse, type LedgerEvent } from '@gisik-nokma/domain';
@@ -3523,6 +3703,9 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   let read: ReadWorld;
   beforeAll(async () => {
     db = await createTestDatabase();
+    // the planner ruling: A's and B's MIGRATIONS made these, not test/graph/shim.ts (deleted in this step)
+    const { rows } = await db.pool.query<{ ok: boolean }>(`SELECT to_regclass('public.proj_ticket_links') IS NOT NULL AND to_regclass('public.proj_references') IS NOT NULL AS ok`);
+    expect(rows[0]?.ok).toBe(true);
     read = await buildReadTestApp(db);
   }, 600_000);
   afterAll(async () => {
@@ -3556,45 +3739,65 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   ```
   Check `makeCommitted`'s parameter names against `test/helpers/apply.ts` before writing; the read scenario's calls (`read-scenario.ts:135-180`) show them. Copy that spread shape (`{ ...ws, entity, type, payload }`) exactly; the `base` above is the stand-in for it.
 
-  The cases (each `it` named with its id, its control inside):
+  The cases (each `it` named with its id, its control inside). **Groups:** every request below passes `groups: NO_PROJECTS` unless it names its groups. With the default groups the `projects` group's `in` edges join every ticket of the project at hop 2, which would put B in 27.293's ring 2 without H, a project item in 27.296's order, and so on.
   - **27.290** `ring('member', { center: graphRef('ticket', world.epicId), hops: '1', ws: ws(), groups: NO_PROJECTS })` is 200. Its items contain `ticket:<taskInEpicId>`, and its edges contain `parent|ticket:<epicId>|ticket:<taskInEpicId>`. **Control:** the same request with no `authorization` header is 401 with `UNAUTHENTICATED_BODY`.
-  - **27.291** Each of these is 400 `{ error: 'invalid_query' }`: `center=widget:1`, `center=ticket:`, `hops=0`, `hops=9`, `hops=1.5`, `ws` missing, `groups=blocks,colours`, `cursor=-1`. **Control:** the 27.290 request with `cursor=0` is 200.
+  - **27.291** Each of these is 400 `{ error: 'invalid_query' }`, each being the 27.290 query with ONE parameter replaced (so each 400 is that parameter's own): `center=widget:1`, `center=ticket:`, `hops=0`, `hops=9`, `hops=1.5`, `ws` missing, `ws=` 21 comma-separated ids, `groups=blocks,colours`, `cursor=-1`. **Control:** the 27.290 request with `cursor=0` is 200.
   - **27.292** A member asking with `ws=<the neighbour workspace id>` (`read.neighbour`) is 404 `READ_NOT_FOUND_BODY`. So is a member asking for `center=ticket:<hiddenTaskId>`, and so is a member asking for `center=ticket:<newUlid()>`. All three bodies are deep-equal. **Control:** the owner's request for the hidden ticket is 200.
-  - **27.293** (Review Focus 1) Seed `A = ticket('A')`, `H = ticket('H', { explicit: [owner] })` and `B = ticket('B')`, then `link('relates', A, H)` and `link('relates', H, B)`.
-    - The member's ring 1 of A has no `H`, and no edge naming `H`.
+  - **27.293** (Review Focus 1) Seed `A = ticket('A')`, `H = ticket('H', { explicit: [owner] })`, `B = ticket('B')` and `V = ticket('V')`, then `link('relates', A, H)`, `link('relates', H, B)` and `link('relates', A, V)`.
+    - The member's ring 1 of A is exactly `[ticket:V]`: no `H`, and no edge naming `H`. (V is the member-side control: the member's walk works and reaches A's visible neighbour, so an empty answer below is about H.)
     - The member's ring 2 of A is EMPTY: B is reachable only through H.
-    - **Control:** the owner's ring 1 holds H, and their ring 2 holds B.
-  - **27.294** `link('blocks', sharedTaskId, hiddenTaskId)`. The member's ring 1 of the shared ticket has no edge whose `to` or `from` names the hidden ticket. **Control:** the owner's does.
+    - **Control:** the owner's ring 1 holds H and V, and their ring 2 holds B.
+  - **27.294** `link('blocks', sharedTaskId, hiddenTaskId)` and `link('relates', sharedTaskId, V2)` with a fresh visible `V2`. The member's ring 1 of the shared ticket holds `ticket:V2` (non-empty) and has no edge whose `to` or `from` names the hidden ticket. **Control:** the owner's does.
   - **27.295** Out of scope. Use the sibling project (`read.sibling`, `test/helpers/read-app.ts:103`). `link('relates', sharedTaskId, siblingTicket)`, then link the sibling ticket on to a third ticket `S2` in the sibling project.
     - With `proj=<world.projectId>`, ring 1 holds the sibling ticket with `out: true`, and `frontier` excludes it.
     - Ring 2 does NOT contain S2.
     - **Control:** with no `proj`, the sibling ticket is `out: false` and ring 2 holds S2.
-  - **27.296** Ring order (§2.2). A fresh centre C gets a child (parent), a `blocks` target, a note that references it (an INSERT into `proj_references`, source note → target C), and an assignee (`ticket.assigned`). Ring 1's item order is: the blocks target, the child, the note, the person. Two `relates` targets made in order T1 then T2 come T2 first (newest first). **Control:** `groups=structure` returns only the child.
-  - **27.297** The page cut. Use `readGraphRing` directly with `pageSize: 2` on a centre with five `relates` neighbours.
+  - **27.296** Ring order (§2.2). A fresh centre C gets a child (parent), a `blocks` target, a note that references it (an INSERT into `proj_references`, source note → target C), and an assignee (`ticket.assigned`). Ring 1's item order is exactly: the blocks target, the child, the note, the person. (Before the sort, `expand` emits the child FIRST, so this order is the sort's work.) Newest first: make two `relates` targets, let `[older, newer] = [T1, T2].sort()` BY ID (`newUlid()` is not monotonic within a millisecond, `packages/domain/src/ids.ts:31-33`, so creation order does not decide it), and insert the link to `older` FIRST, then `newer`. Their ring order is `newer` before `older`, the reverse of the insertion order. **Control:** `groups=structure` returns only the child.
+  - **27.297** The page cut. Use `readGraphRing` directly with `groups: new Set(['relates'])` and `pageSize: 2` on a centre with five `relates` neighbours.
     - Page 1 has 2 items, `truncated: true` and `cursor: '2'`.
-    - Page 2 (`offset: 2`) has the next 2.
-    - Page 3 has 1, with `truncated: false` and `cursor: null`.
-    - The union is all five, with no repeats.
+    - Page 2 (`offset: 2`) has the next 2, with `truncated: true` and `cursor: '4'`.
+    - Page 3 (`offset: 4`) has 1, with `truncated: false` and `cursor: null`.
+    - Pages 1 + 2 + 3, concatenated, EQUAL the refs of the same read with no `pageSize`, in order (all five, no repeats, and the cut follows the ring order).
     - **Control:** a ring of exactly 2 with `pageSize: 2` is not truncated.
-  - **27.298** People. The member's ring 1 of `taskInEpicId` holds `person:<member's userId>`, labelled with the member's display name, and an edge `assignee|person:<id>|ticket:<id>`. A GUEST asking about `guestTaskId` sees only the people on tickets they can see, because the names come from `readActorNamesForGuest` (`routes/builder-reads.ts:359`). An assignee on a ticket the guest cannot see is not resolvable for them, so it is absent. **Control:** the member sees that same person.
-  - **27.299** References (B). INSERT a `proj_references` row: source `comment` with `source_ticket = sharedTaskId`, target `ticket` `taskInEpicId`, snippet `'see [[GN-2]]'` and `updated_by = member`.
-    - The member's ring 1 of `taskInEpicId` holds `ticket:<sharedTaskId>`, with an edge `ref|ticket:<shared>|ticket:<taskInEpic>`.
+  - **27.298** People. The member's ring 1 of `taskInEpicId` holds `person:<member's userId>`, labelled with the member's display name (read from `readActorNames(db.pool, ws())`, not typed), and an edge `assignee|person:<id>|ticket:<id>`. The guest arm, made concrete: INSERT two `proj_references` mention rows on `guestTaskId` (`source_kind` `'ticket'`, `source_id` and `source_parent_id` `guestTaskId`, `source_parent_kind` `'ticket'`, `target_kind` `'person'`), one naming the OWNER (an actor on `guestTaskId`, so the guest may be told the name, `routes/builder-reads.ts:359-377`) and one naming the MEMBER (on no ticket the guest can see). The guest's ring 1 of `guestTaskId` with `groups=people` holds `person:<owner>` and NOT `person:<member>`, and no edge names the member. **Control:** the owner's same ring holds both people.
+  - **27.299** References (B). INSERT a `proj_references` row with B's columns (`apps/server/migrations/1791500000000_proj-references.sql:15-29`; the spec's `source_ticket` is `source_parent_kind` + `source_parent_id`, Planner rulings below): `source_kind` `'comment'`, `source_id` a fresh ULID, `source_parent_kind` `'ticket'`, `source_parent_id` `sharedTaskId`, `target_kind` `'ticket'`, `target_id` `taskInEpicId`, `ordinal` 0, snippet `'see [[GN-2]]'` and `updated_by = member`.
+    - The member's ring 1 of `taskInEpicId` holds `ticket:<sharedTaskId>`, with an edge `ref|ticket:<shared>|ticket:<taskInEpic>` (the edge starts at the comment's PARENT, not at the comment).
     - Its `snippet` is `'see [[GN-2]]'`, and `addedBy` is the member's display name, not an id.
-    - **Control:** a reference whose SOURCE is the hidden ticket yields nothing to the member.
+    - **Control:** a reference whose SOURCE parent is the hidden ticket yields nothing to the member.
   - **27.300** Typed-link provenance. `link('relates', a, b, member, 'mcp')`. The edge's `addedBy` is the member's display name, `addedAt` is `'2026-10-01T05:00:00.000Z'`, and `origin` is `'mcp'`. **Control:** `link(..., owner, 'web')` gives `origin: 'web'`.
   - **27.301** Attached notes. A `note.created` with `attachTicketId: sharedTaskId`, `scope: { mode: 'workspace' }`, and a second note with `scope: { mode: 'private' }` by the OWNER, also attached.
-    - The member's ring 1 of the shared ticket holds the first note, with an `attached` edge whose `addedAt` is set and `addedBy` is null (the table has no actor; spec gap 8).
+    - The member's ring 1 of the shared ticket holds the first note, with an `attached` edge whose `addedAt` EQUALS that row's `proj_note_attachments.attached_at` as ISO (read it back; "is set" passes for any date) and whose `addedBy` is null (the table has no actor; spec gap 8).
     - The private note is absent.
     - **Control:** the owner sees both.
-  - **27.302** The projects group. `groups=projects` on `taskInEpicId` gives ring 1 = `project:<projectId>` (an `in` edge from it). Ring 2 holds `workspace:<ws>` and the project's other visible tickets. A workspace-level note (`homeProjectId: ''`) is NOT in ring 1 of a project. **Control:** with `workspace:<ws>` as the centre, ring 1 holds the project and not the note (the mockup draws `in` edges only for items with a project, `:550-551`).
+  - **27.302** The projects group. `groups=projects` on `taskInEpicId` gives ring 1 = `project:<projectId>` (an `in` edge from it). Ring 2 holds `workspace:<ws>` and the project's other visible tickets. A workspace-level note (`homeProjectId: ''`) is NOT in ring 1 of a project. **Control:** a project-homed note (`homeProjectId: <projectId>`) IS in ring 2 of `taskInEpicId`, so notes do travel this group and the workspace-level one's absence is its own; and with `workspace:<ws>` as the centre, ring 1 holds the project and not the workspace-level note (the mockup draws `in` edges only for items with a project, `:550-551`).
   - **27.303** Multi-workspace. The member is also a member of a second workspace: seed with `seedNeighbourWorkspace` if it makes the member a member; otherwise seed a fresh workspace with `membership.granted` for the member. A person assigned in both workspaces connects them.
     - With `ws=<w1>,<w2>`, ring 2 of a w1 ticket holds the w2 ticket, `out: false`.
     - With `ws=<w1>` only, it is `out: true`. The PERSON is never out.
     - **Control:** `ws=<w1>,<a workspace the member is not in>` is 404.
   - **27.304** A deleted ticket (`ticket.deleted`) linked to the centre is absent. **Control:** after `ticket.restored`, it is back.
-  - **27.305** The perf case re-runs on the migrated tables. Its `it` is Task 1's, already named `27.210 / 27.305`. `KG_PERF=1` only; quote its three lines.
-  - **27.306** `groups=blocks` gives no `parent` edges, even though the centre has a child. **Control:** `groups=structure` has it.
-  - **27.307** `hops=8` on a two-ring world returns `{ items: [], edges: [], frontier: [], truncated: false, cursor: null }`. **Control:** `hops=2` has items.
+  - **27.305** The perf case re-runs on the migrated tables. Its `it` is Task 1's 27.210 (`perf.test.ts:161`, named `27.210 p95 ≤ 150 ms …` on the ref); rename it `27.210 / 27.305 …` in this task so the id greps to its test. `KG_PERF=1` only; quote its three lines.
+  - **27.306** The centre has a child AND a `blocks` target. `groups=blocks` gives ring 1 = the blocks target only (non-empty) and no `parent` edge. **Control:** `groups=structure` has the child and the `parent` edge.
+  - **27.307** A fresh chain C → D → E (`relates`), so with `NO_PROJECTS` it is exactly two rings. `hops=8` returns `{ items: [], edges: [], frontier: [], truncated: false, cursor: null }` (`toEqual`), and so does `hops=3`. **Control:** `hops=2` has exactly `[ticket:E]`.
+
+  Kills (this task's own code is the route and `parseRingQuery`; most cases also guard Task 1's `readGraphRing`, named "T1"):
+  - 27.290: (a) do not register the route in `app.ts` (b) `{ preHandler: requireSession }` dropped (the 401 control).
+  - 27.291: (a) delete `if (hops > GRAPH_MAX_HOPS) return null;` (`hops=9`) (b) `workspaceIds.length > 20` → `> 200` (the 21-id leg) (c) the cursor pattern → `/^-?(0|[1-9]\d{0,6})$/` (the `-1` leg) (d) `/^(0|[1-9]\d{0,6})$/` → `/^[1-9]\d{0,6}$/` (the `cursor=0` control).
+  - 27.292: (a) the route answers `403` for a non-member workspace (b) T1: delete `if (!known.has(centerRef)) return null;` (the hidden and the unknown centre answer an empty 200).
+  - 27.293: T1 (a) drop `if (!known.has(edge.from) || !known.has(edge.to)) continue;` (b) the ticket resolve drops `AND ${visibleTicketsWhere(eff, viewerId, params)}` (H resolves for the member).
+  - 27.294: T1 (a) the same both-ends check dropped (the unresolved end then crashes the page build: a 500) (b) the same `visibleTicketsWhere` drop.
+  - 27.295: (a) the route passes `projectIds: []` to `readGraphRing` (b) T1: `frontier = next.filter(…)` → `frontier = next`.
+  - 27.296: T1 (a) delete `.sort(compareRingEntries)` (the child leads) (b) swap `ia < ib ? 1 : -1` (the newer/older leg).
+  - 27.297: T1 (a) `page = ordered.slice(req.offset, …)` → `ordered.slice(0, size)` (b) `truncated = ordered.length > …` → `>=` (the control) (c) `cursor: String(req.offset + size)` → `String(size)` (page 2's `'4'`).
+  - 27.298: T1 (a) in `namesIn`, always call `readActorNames` (the member mention appears for the guest) (b) delete `if (name === null) continue; // a person no workspace of the viewer's names is not drawn`.
+  - 27.299: T1 (a) `sourceRef` → `graphRef(r.source_kind, r.source_id)` (an unresolvable `comment:` ref: the edge is dropped) (b) `addedBy: … await vis.nameOf(…)` → `edge.addedById`.
+  - 27.300: T1 (a) `origin: edge.origin` → `null` (b) `addedAt: edge.addedAt.toISOString()` → `String(edge.addedAt)`.
+  - 27.301: T1 (a) `addedAt: r.attached_at` dropped from the `attached` add (b) the notes resolve without `visibleNotesWhere` (the private note appears).
+  - 27.302: T1 (a) delete the `proj_projects` `in` query (no `workspace:` in ring 2) (b) delete the `proj_notes` `in` query (the project-homed note control). The `home_project_id <> ''` clause is EQUIVALENT here: a workspace-level note's `in` edge would come from `project:` (empty id), which never resolves.
+  - 27.303: T1 (a) `out: !inGraphScope(item, req)` → `out: false` (b) delete `for (const workspaceId of req.workspaceIds) if ((await vis.roleIn(workspaceId)) === null) return null;` (the 404 control).
+  - 27.304: T1 (a) the ticket resolve drops `AND ${LIVE_TICKET_WHERE}`.
+  - 27.305: none, guards existing behaviour (Task 1's p95 bar, now on the real indexes).
+  - 27.306: (a) `parseRingQuery` ignores `groups` (`DEFAULT_GROUPS` always) (b) T1: `groups.has('structure')` → `true`.
+  - 27.307: (a) `parseRingQuery` clamps `hops` to 2 (`const hops = Math.min(Number(raw.hops), 2)`) (b) T1: the loop bound `hop <= req.hops` → `hop < req.hops` (the control). T1's three empty-answer guards (`ring = []` on an empty frontier, `ring.length === 0`, `includes(req.hops)`) cover for each other on this world: deleting any ONE is equivalent here, so no case claims them.
 
   Run: `pnpm --filter @gisik-nokma/server exec vitest run test/graph/neighbours.test.ts --maxWorkers=2 > /tmp/kg-t6.log 2>&1; tail -25 /tmp/kg-t6.log`. Expected: FAIL (404 from Fastify: no route).
 
@@ -3643,18 +3846,17 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   ```
   The `^[1-9]$` check plus the `> GRAPH_MAX_HOPS` check together refuse `9`, `0`, `1.5` and `10`.
 
-  In `app.ts`, directly after `registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);` (`:1030`), add a comment and the registration:
+  In `app.ts`, directly after `registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);` (`:1031`), add a comment and the registration:
   ```ts
   // The Knowledge Graph's ring read (spec C §2.2): one ring per call, the viewer from the session, visibility per workspace.
   registerGraphRoutes(app, { pool: deps.pool }, requireSession);
   ```
 
-- [ ] **Step 3: Green, then the shim goes.**
+- [ ] **Step 3: Green on the real tables.** (The shim went in Step 1; `git grep -n "shim" apps/server/test/graph` prints nothing.)
   1. Run the file. Expected: PASS.
-  2. Delete `test/graph/shim.ts`, and its import and call in `perf.test.ts`.
-  3. Run 27.208, 27.209 and the perf block. Expected: the same.
-  4. Run `KG_PERF=1` and quote the three lines (27.305).
-  5. If any ring's p95 is now over 150 ms on the migrated tables (A's and B's real indexes), STOP AND REPORT, as in Task 1 Step 14.
+  2. Run 27.208, 27.209, 27.211 and the perf block. Expected: PASS, on the migrated tables.
+  3. Run `KG_PERF=1` and quote the three lines (27.305).
+  4. If any ring's p95 is now over 150 ms on the migrated tables (A's and B's real indexes), STOP AND REPORT, as in Task 1 Step 14.
 
   **Mutations:**
   - In `readGraphRing`, drop the "both ends resolved" check (`if (!known.has(edge.from) || !known.has(edge.to)) continue;`). 27.293 and 27.294 go RED.
@@ -3669,6 +3871,13 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   - 27.308–27.309 stay unallocated (no lines).
 
   Bullet: "`GET /v1/graph/neighbours` (`apps/server/src/routes/graph.ts`), one ring per call, visibility per workspace, hops 1–8".
+
+  **Prose to sweep:**
+  - `apps/server/test/graph/perf.test.ts:3` — "The link and reference tables come from `./shim.ts` until plan A's and plan B's migrations are on the branch."
+  - `apps/server/test/graph/perf.test.ts:204-205` — "plus plain INSERTs into the shimmed link and reference tables".
+  - `test-cases/27-knowledge-graph.md:89` (27.211) — "(a `proj_ticket_links` shim insert)".
+  - `test-cases/27-knowledge-graph.md:87` (27.209) — "Survivors handed to the endpoint task (the smoke world cannot reach them): walking past an out-of-scope item, keeping an edge back to an earlier ring, note visibility dropped." This task kills the first (27.295) and the third (27.301); say so there. The second (`if (dist.get(far) !== hop) continue;`) is still unclaimed: such an edge joins `intoRing` but neither end is on the page, so the `onPage` filter drops it. Record it as equivalent or name the case that kills it; do not leave "handed to the endpoint task".
+  - `Features.md:3767` — the KG-C ⚙️ bullet's "Cases 27.200–27.211." range.
 
   **Sweeps:**
   - the server's `test/graph/`;
@@ -3831,14 +4040,17 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   ```
   The tests:
   - **27.310** (`draw-model.test.ts`, node). The engine fixture (copy `test/engine/fixture.ts`'s helpers) gets a centre, 3 chips and 2 fog.
-    - Fog nodes have no label, no sub, no icon, and `lv: 'fog'`.
+    - Fog nodes (exactly 2: assert the count before looping) have no label, no sub, no icon, and `lv: 'fog'`.
     - A note at hop 1 has a `note` icon.
-    - The centre has no icon (a ticket).
-    - An edge touching fog is `fog: true` and not counted.
-    - The selected item's edges are `on: true`.
+    - The centre has no icon. A ticket NEVER has an icon (`iconFor`'s last line), so a ticket centre cannot show this: build a second model centred on a NOTE, whose `icon` is `null` there while the same note at hop 1 has `{ kind: 'note' }`.
+    - An edge touching fog is `fog: true` and not counted: `counts` for its group equals the literal number of that group's CLEAR edges in the fixture (not "not more than").
+    - The selected item's edges are `on: true`, and an edge that does NOT touch the selected item is `on: false`.
     - **Control:** with `selectedEdge` set, no edge is `on`.
-  - **27.311** (`tooltip.test.ts`, node). At `x = canvasWidth - 20`, `left + tip.width ≤ canvasWidth - 8`. At `y = 5`, `top` is 8. **Control:** in mid-canvas, `{ left: x + 14, top: y - h - 10 }`.
+    - Kills: (a) `on: !fog && o.selectedEdge === null && (…)` → `on: !fog && o.selectedEdge === null` (the not-touching leg) (b) `if (!fog) counts[grp] = …` → unconditional (c) `levelOf(cfg, res.dist.get(ref) ?? 0, fog)` → `levelOf(cfg, res.dist.get(ref) ?? 0, false)` (fog nodes get a ring level) (d) delete `|| (center && item.kind !== 'person')` from `iconFor` (the note-centre leg). (`lbl: fog ? '' : …` → `nodeLabel(…)` is EQUIVALENT: `nodeLabel` already answers `''` at `'fog'`, 27.227.)
+  - **27.311** (`tooltip.test.ts`, node). At `x = canvasWidth - 20`, `left + tip.width ≤ canvasWidth - 8`. At `y = 5`, `top` is 8. A tip WIDER than the canvas still starts at `left` 8 (`tooltipPosition(5, 100, { width: 2000, height: 28 }, 300).left === 8`). **Control:** in mid-canvas, `{ left: x + 14, top: y - h - 10 }`.
+    - Kills: (a) `canvasWidth - tip.width - 8` → `canvasWidth - 8` (b) drop the `Math.max(8, …)` on `top` (c) drop the `Math.max(8, …)` on `left` (the wide-tip leg).
   - **27.312** (`semantic-pref.test.ts`, jsdom). Unset → `true`; `'off'` → `false`; `writeSemantic(false)` then read → `false`. **Control:** a stubbed `localStorage` whose `getItem` and `setItem` THROW gives `true`, and `writeSemantic` does not throw. (This is the unit half of 27.324.)
+    - Kills: (a) `!== 'off'` → `=== 'on'` (the unset leg) (b) `on ? 'on' : 'off'` → `String(on)` (the write-then-read leg) (c) `readSemantic` without its `try` (the control).
 
   Run, then commit.
 
@@ -3853,6 +4065,7 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 
   type Entry = { store: GraphStore; loaded: number };
   export type RingState = { store: GraphStore; loading: boolean; failedHop: number | null; retry: () => void; key: string };
+  // Task 8 adds `forget(edgeId: string): void` and `restore(edge: GraphEdgeView): void` (planner ruling 2026-10-04, Undo restores the edge).
 
   /**
    * Rings 1…`rings` for one (centre, scope, groups), fetched one at a time (§2.2) and cached for the session per that key
@@ -3912,6 +4125,8 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   `cancelled` stops the LOOP for an old key. An answer already in flight still resolves, is cached, and is not drawn, because `bump` is guarded by `current.current === key`. If the repo's eslint config has no `react-hooks` plugin, drop the disable comment. Grep `react-hooks/exhaustive-deps` in `packages/app-core/src` first.
 
   Mutation (Step 7): remove the `current.current === key` guard on `bump`. 27.318 goes RED.
+
+  (Test-strength pass: that mutant is EQUIVALENT for `setGraph`. A stale `bump` only re-renders; the hook still returns `cache.current.get(key)` for the CURRENT key, so `rings.store`, the memoised `model` and the `setGraph` effect's deps are unchanged and nothing of t118 is drawn. What actually keeps a late answer off the canvas is that it is cached under ITS OWN key. 27.318's `Kills:` names mutants that break that: a key without `q.centre`, or `cache.current.set(current.current, entry)`.)
 
 - [ ] **Step 3: The component.** `src/react/knowledge-graph.tsx`. It is the mockup's `makeGraph` view half (`:709-1080`): state, the bar, `render`'s chrome (`:950-965`), the trail (`:969-975`), `pick` (`:1036`), `centre` (`:1040`), `goTrail` (`:1041`), and the click and key handlers (`:1043-1080`). The inspector and the list come in Task 8; this task renders their two regions empty.
   ```tsx
@@ -4161,32 +4376,46 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 
   The cases (React Testing Library, `userEvent`, `await screen.findBy…`):
   - **27.313** With hops 2 (desktop), the source receives hops 1, 2 and 3, in order, with `groups` = every chip but `projects`. **Control:** `hops={1}` receives 1 and 2 only.
+    - Kills: (a) `rings: … reach + 1` → `reach` (no fog ring) (b) `DEFAULT_GROUPS` keeps `projects` (c) the loop's `hop = entry.loaded + 1` → `entry.loaded + 2`.
   - **27.314** Double-click a hop-1 item (`fake.pick({ kind: 'node', ref, double: true })`): rings for the new centre are fetched. Then Back: NO new request, and the last `setGraph`'s nodes equal the first centre's. **Control:** a third, new centre fetches.
-  - **27.315** `hops="all"` fetches until a ring comes back empty, and never past 8. **Control:** the request count equals the fixture's depth + 1.
-  - **27.316** Toggling the Blocks chip makes no request. The next `setGraph` has no `blocks` edges, and the chip's `aria-pressed` is `false`. **Control:** toggling it back restores the same edges, with no request.
+    - Kills: (a) `let entry = cache.current.get(key) ?? …` → always a fresh `{ store: emptyStore(), loaded: 0 }` (Back refetches) (b) the key built without `q.centre` (the new centre is never fetched: the first leg).
+  - **27.315** `hops="all"` fetches until a ring comes back empty. **Control:** the request count equals the fixture's depth + 1. "Never past 8" cannot fail on the fixture (it is shallower than 8), so it gets its own source: a ten-line wrapper whose every ring holds one NEW item never seen before (an endless chain) receives exactly 8 requests, the last with `hops: 8`.
+    - Kills: (a) `!entry.store.exhausted` dropped from the loop (fetches past the empty ring) (b) `reach === Number.POSITIVE_INFINITY ? GRAPH_MAX_HOPS` → `? 100` with `Math.min(q.rings, GRAPH_MAX_HOPS)` → `q.rings` (the endless-chain leg).
+  - **27.316** Toggling the Blocks chip makes no request. The `setGraph` BEFORE the toggle has at least one `blocks` edge (`blocks|ticket:t133|ticket:t142`); the next `setGraph` has none, and the chip's `aria-pressed` is `false`. **Control:** toggling it back restores the same edges, with no request.
+    - Kills: (a) `buildDrawModel` ignores `o.on` (`|| !o.on.has(grp)` dropped) (b) `fetchGroups` follows `on` (the chip toggles refetch: the no-request leg) (c) `aria-pressed` bound to `true`.
   - **27.317** Choosing a project in "Projects" re-requests with `projectIds`. With the centre itself outside the chosen project, the scope note reads `GN-142 is outside the projects you picked. It stays in the middle, and its links follow your scope.` **Control:** clearing the projects removes the note.
+    - Kills: (a) `useGraphRings(… projectIds …)` → `projectIds: []` (b) `scopeNote` condition `!inGraphScope(…)` → `inGraphScope(…)`.
   - **27.318** (Review Focus 2) The source delays answers for `ticket:t118` by 300 ms and answers `ticket:t133` at once. Centre t118, then centre t133 within 50 ms. Wait 600 ms.
     - The last `setGraph` holds t133's ring-1 items.
-    - No `setGraph` AFTER the t133 one contains an item only t118's rings have.
+    - No `setGraph` AFTER the t133 one contains an item only t118's rings have. That set is computed from the two fixture walks and asserted NON-EMPTY first (an empty set makes the leg true of anything).
+    - Then toggle the Blocks chip off and on (no request, 27.316) to force two more renders from the CURRENT cache: the last `setGraph` still holds t133's ring-1 items and none of the t118-only set. Without this leg a corrupted cache entry is never re-read, because the late answer itself never re-renders.
     - **Control:** with no delay, the t118 → t133 sequence draws t118's rings first.
+    - Kills: (a) `const key` built without `q.centre` (t118 and t133 share an entry, and the late answer bumps it) (b) in the loop, `cache.current.set(current.current, entry)` instead of `key` (the late t118 ring overwrites t133's entry; the toggle leg reads it). Removing the `current.current === key` guard on `bump` is EQUIVALENT (Step 2's note).
   - **27.319** The source fails hop 2. Ring 1 stays drawn (the last `setGraph` has ring 1's items). `role="alert"` reads `Couldn't load the next hop. Retry`, and Retry re-requests hop 2. **Control:** after a successful retry, the alert is gone.
+    - Kills: (a) the `catch` resets `cache.current.set(key, { store: emptyStore(), loaded: 0 })` (ring 1 vanishes) (b) `retry` without `setAttempt` (no new request).
   - **27.320** Before ring 1 answers, the skeleton region (`role="status"` or the label `Loading the Knowledge Graph`; read `SkeletonRegion` for which) is present, and `.gn-kg__canvas` is in the DOM. **Control:** after the answer, the skeleton is gone. (The browser half, no layout shift, is in Step 6.)
-  - **27.321** A centre with no links shows `Nothing is linked to GN-9 yet.` and an `Add link` button that calls `onAddLink`. **Control:** a NOTE centre with no links shows the sentence and no button.
+    - Kills: (a) `const firstLoad = rings.loading && rings.store.items.size === 0` → `false` (b) render `.gn-kg__canvas` only when `!firstLoad`.
+  - **27.321** A centre with no links shows `Nothing is linked to GN-9 yet.` and an `Add link` button that calls `onAddLink` WITH the centre item (`expect.objectContaining({ ref: <that ticket's ref> })`). **Control:** a NOTE centre with no links shows the sentence and no button.
+    - Kills: (a) `centreItem?.kind === 'ticket' &&` dropped (the control) (b) `onClick={() => props.onAddLink!(centreItem)}` → `props.onAddLink!(undefined!)`.
   - **27.322**
     - Pressing `3` on the view sets 3 hops (the source receives ring 4).
     - `c` with a selected hop-1 item centres it.
-    - `Escape` calls `onEscape` first: returning `true` stops Back; returning `false` lets Back run.
+    - `Escape` calls `onEscape` first: returning `true` stops Back; returning `false` lets Back run. Both arms start with a non-empty trail (centre once first), or "stops Back" holds with no Back to stop.
     - Zoom in / Zoom out / Fit to view call `zoomBy(1.5)`, `zoomBy(1/1.5)` and `setCamera('fit')`.
     - The canvas has `role="img"` named `Knowledge Graph of items linked to GN-142`.
     - **Control:** pressing `3` while focus is in the Workspaces combobox changes nothing.
+    - Kills: (a) `if (props.onEscape?.() === true) return;` → `props.onEscape?.();` (b) delete the `closest('input, [role="combobox"], …')` guard (the control) (c) `zoomBy(1 / 1.5)` → `zoomBy(1.5)` on Zoom out.
   - **27.323** The trail. Centre t142 → t133 → t131 shows `‹ Back`, then `GN-142`, `GN-133`, `GN-131`. Clicking `GN-142` goes back two steps and empties the trail. **Control:** a new `centre` PROP resets the trail.
+    - Kills: (a) `goTrail`'s `next.length <= 1 ? [] : next` → `next` (b) the props effect without `setTrail([])` (the control) (c) the mount effect's `onPick` calls the FIRST render's `centreOn` (no `pickRef`): the third centre extends a stale trail.
   - **27.324** (Review Focus 5) `localStorage` stubbed to THROW on every access. The view mounts with Semantic layer `On` checked, switching to `Off` hides the Concepts chip, switching back shows it, and no error is thrown (spy on `console.error`: none). **Control:** with a working store, `Off` is written as `gn-kg-semantic` = `off`.
-  - **27.326** The count line:
+    - Kills: (a) `readSemantic` without its `try` (b) `writeSemantic` without its `try` (c) `setSemantic` skips `writeSemantic` (the control).
+  - **27.326** The count line. Every N, M and K below is a LITERAL read off the fixture by hand (or off the mockup's own bar at the same settings), never computed with `zones`, which is the code under test:
     - hops 2 reads `N items within 2 hops, M more in the fog`;
     - with a project chosen, ` (K outside the scope)` is appended;
     - a capped world (`cap` lowered through the fixture's size: a 600-child star) reads `The 500 nearest are clear, …, N further out`, and shows `+N further out`;
     - `config="phone"` reads `N linked…`.
     - **Control:** hops 1 reads `1 hop`, singular.
+    - Kills: (a) `hop${reach > 1 ? 's' : ''}` → `hops` (b) `n = Math.max(0, z.clear.length - 1)` → `z.clear.length` (the centre counted) (c) `outTxt` without its `z.outN > 0` test.
 
   Run: `pnpm --filter @gisik-nokma/knowledge-graph exec vitest run test/react --maxWorkers=2 > /tmp/kg-t7.log 2>&1; tail -30 /tmp/kg-t7.log`.
 
@@ -4197,19 +4426,22 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   - It exposes `window.__kg = { probe }` once the renderer mounts. Read it through a `ref` callback on `.gn-kg__mount`: the adapter's `inspect()` is reachable through a module-level hook the harness passes in `createRenderer`.
 
   `tests/view.spec.ts`:
-  - **27.320** (browser) The `.gn-kg__canvas` bounding box is the same before ring 1 resolves (the fixture is delayed 500 ms through `fixtureDelay`) and after `waitStill`: no layout shift (§6.1).
-  - **27.325** (`semtest.cjs`) Click `Off`.
+  - **27.320** (browser) The `.gn-kg__canvas` bounding box is the same before ring 1 resolves (the fixture is delayed 500 ms through `fixtureDelay`) and after `waitStill`: no layout shift (§6.1). The "before" box is read while the skeleton is still in the DOM (assert it), or both reads can land after the answer.
+    - Kills: (a) render `.gn-kg__canvas` only when `!firstLoad` (b) drop `height: clamp(26rem, 62vh, 46rem)` from `.gn-kg__canvas` in the T7 CSS block.
+  - **27.325** (`semtest.cjs`) Before the click, at least one `concept:` node and one `tag` edge are drawn (assert both counts > 0, or "gone" holds of nothing). Click `Off`.
     - Every `nodeDisplay` of a `concept:` ref is gone, and every `tag` edge is gone.
     - The Concepts chip is hidden.
     - `localStorage['gn-kg-semantic'] === 'off'`.
     - Reload: still Off.
     - Click `On`: the concepts are back.
     - **Control:** after `On`, `concept:c1` is drawn again.
+    - Kills: (a) `fetchGroups` ignores `semantic` (`semantic ? offered : …` → `offered`) (b) `useEffect(() => setSemanticState(readSemantic()), [])` dropped (the reload leg) (c) `setSemanticState(next); writeSemantic(next);` without `writeSemantic` (the storage leg).
   - **27.327** (Home's highlight) `?hl=ticket:t142,ticket:t160`.
     - Those two have opacity 1, another item has 0.25, and an edge has 0.12.
     - Hover a third item: the highlight still wins (its non-neighbours stay at 0.25, not 0.32).
     - `onZones` was called with a `clear` set containing `ticket:t142`. The harness records it on `window.__kg.zones`.
     - **Control:** with no `hl`, the same hover gives 0.32.
+    - Kills: (a) `highlight` after hover in `program.ts`'s opacity chain (Step 7's mutant) (b) `highlight: props.highlight ?? null` → `highlight: null` in the `setGraph` call (c) the `props.onZones?.(…)` call dropped (the `window.__kg.zones` leg).
   - **27.328** (§5, `kgtest.cjs`, "phone") Use `devices['Pixel 7']` and `?config=phone`.
     - `document.documentElement.scrollWidth <= innerWidth` (no horizontal scroll).
     - There is no Hops control.
@@ -4218,19 +4450,22 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
     - Every clear item is at hop ≤ 1.
     - The canvas computed style has `touch-action: none` and `overscroll-behavior: contain`.
     - A hop-1 item's label backdrop is ≥ 32 px tall. Measure: `alphaAt` scan across the label vertically.
+    - "Every clear item is at hop ≤ 1" first asserts at least one clear hop-1 item, or it holds of an empty canvas.
     - **Control:** the desktop page shows the Hops control.
+    - Kills: (a) remove `touch-action: none` (Step 7's mutant) (b) `const hops: HopChoice = phone ? 1 : …` → `props.hops ?? ownHops` (hop-2 items clear) (c) `hops={props.showHops === false || phone ? null : hops}` without `|| phone` (d) `backdropPadding`'s `a.lv === 'tap' ? 10` → `7` (26.5 px: the 32 px leg).
   - **27.329** (`kgtest.cjs`, "edge tooltip") Hover the midpoint of `blocks t133 → t142`.
     - `[role="tooltip"]` reads `GN-133 blocks GN-142`, and its box is inside the canvas box.
     - Then hover an edge within 30 px of the canvas's right edge (pan first): the tooltip's right edge is ≤ the canvas right − 8.
     - Leaving hides it.
     - **Control:** the tooltip moved with the pointer between two hover points on the same edge.
+    - Kills: (a) `tooltipPosition(…, mountRef.current.clientWidth)` → `Number.POSITIVE_INFINITY` (no right clamp) (b) `if (e.kind === 'edge-leave') setTip(null);` deleted (the leaving leg) (c) `edgeSentence` reads the edge backwards (the text leg).
 
   Run the browser package. Expected: PASS, LOCAL.
 
 - [ ] **Step 7: Mutations, catalogue, sweeps.**
 
   **Mutations:**
-  - Drop the stale-key guard in `useGraphRings`. 27.318 goes RED.
+  - Drop the stale-key guard in `useGraphRings`. 27.318 goes RED. (Test-strength pass: EQUIVALENT, see Step 2's note. Run instead: build `key` without `q.centre`, and separately `cache.current.set(current.current, entry)`. 27.318 goes RED on each.)
   - Make `readSemantic` read without `try`. 27.324 goes RED.
   - Fetch `reach` rings instead of `reach + 1`. 27.313 goes RED (no fog ring).
   - Put `highlight` after hover in `program.ts`'s opacity chain. 27.327 goes RED.
@@ -4247,6 +4482,11 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   - the browser package (whole);
   - `ui#test` (the colour scan and the new CSS block);
   - `check:citations`.
+
+  **Prose to sweep:**
+  - `Features.md:3767` — the KG-C ⚙️ bullet; T7's ✅ bullet must not repeat it (the Features step says so).
+  - `packages/knowledge-graph/src/render/palette.ts:3-4` — "the reader is `cssVariableName(role)` (Task 7)": the reader is Task 5's `readThemePalette`, and Task 5's sweep rewords it. If that sweep was skipped, this task does it: T7 writes no palette reader.
+  - Nothing else on the ref names `KnowledgeGraph`, `useGraphRings`, `gn-kg-semantic` or `tooltipPosition` (searched: `git grep` for each on the ref).
 
   Push, then DONE, with `NEEDS: browser`.
 
@@ -4343,12 +4583,16 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   ```
   The tests (node; engine fixture):
   - **27.330** With the centre `ticket:t118`, `pathTo` for `ticket:t151` (hop 2) returns two steps. Rendered with `relation`, they read `GN-118 has subtask GN-142`, then `GN-142 has subtask GN-151`. The centre's own path is `[]`. **Control:** an item with no parent (not walked) returns `[]`.
-  - **27.331**
-    - `directLinks` is in ring order (typed link before structure).
-    - `linkedFrom` keeps only `ref` edges with snippets.
-    - `outsideScope` groups an out-of-workspace neighbour under `{ workspaceId }`, and an out-of-project one under `{ projectId, workspaceId }`.
-    - `fogNext` counts only in-scope, unclear neighbours.
+    - Kills: (a) `steps.unshift(…)` → `steps.push(…)` (the order leg) (b) `while (w.dist.get(cur) !== 0)` → `while ((w.dist.get(cur) ?? 0) > 1)` (one step, not two). `if (p === undefined) return [];` → `break;` is EQUIVALENT on a consistent walk (an unwalked item has no steps either way), so the control guards existing behaviour.
+  - **27.331** (literals from the mockup's `E`, `knowledge-graph-sigma.html:527-545`; `on` = `{ blocks, relates, dup, structure }` unless named)
+    - `directLinks(store, 'ticket:t142', on, all)` maps to EXACTLY `['ticket:t133', 'ticket:t160', 'ticket:t139', 'ticket:t151', 'ticket:t149', 'ticket:t118']`. That is NOT `store.adj`'s order (`t118` comes first there), so the sort is observable. "Typed link before structure" alone holds of many wrong orders.
+    - `linkedFrom(store, 'note:n1', all)`: the test first adds to its store a `ref` edge `note:n4 → note:n1` with `snippet: null` and a `mention` edge `note:n2 → note:n1` with a snippet. The result is EXACTLY the `t125 → n1` and `n7 → n1` edges (the fixture alone has no edge for `snippet !== null` or `kind === 'ref'` to drop).
+    - `outsideScope`, concrete:
+      - centre `ticket:t142`, scope = workspace gn + project Mobile web, `chosenWorkspaces` = [gn]: EXACTLY one group, `{ projectId: <Workflows>, workspaceId: <gn> }` with `['ticket:t133']` (people and the concept are in scope by `inGraphScope`);
+      - centre `ticket:s15`, scope = workspace gn only, `chosenWorkspaces` = [gn]: EXACTLY `{ workspaceId: <st> }` with `['ticket:s12']`, and no group for `person:pT` (`workspaceId` null).
+    - `fogNext(store, 'ticket:t133', DEFAULT_GROUPS, clear, all)`, where `clear` = t142 plus its eleven hop-1 neighbours, is `2` (`t131`, `person:pB`; `t142` is clear). With `people` off it is `1`.
     - **Control:** turning off the item's only group empties `directLinks` and `fogNext`.
+    - Kills: (a) `.sort(compareRingEntries)` deleted (the exact-order leg; Step 5's sort-by-label mutant too) (b) `e.snippet !== null` dropped (c) `e.kind === 'ref'` dropped (d) `outsideScope`'s ternary inverted (`!chosenWorkspaces.includes` → `chosenWorkspaces.includes`) (e) `it.workspaceId === null` skip dropped (pT's group appears) (f) `!clearSet.has(x.to)` dropped from `fogNext` (3, not 2) (g) `on.has(…)` dropped from `fogNext` (the people-off leg).
 
 - [ ] **Step 2: The three components.**
 
@@ -4391,6 +4635,36 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 
   The ring cache holds the REMOVED edge until a refetch. So after success, the view drops the edge from its CURRENT store copy: `useGraphRings` gains a `forget(edgeId)` that removes it from the cached entry and bumps. A test covers it (27.335).
 
+  **Undo restores the edge (planner ruling 2026-10-04).** Nothing refetches a fully loaded entry, so Undo must put the edge back itself, through the SAME door the edge first came in by: `mergeRing`. `RingState` gains `forget` and `restore`, and the view wraps `onRemoveLink` once:
+  ```ts
+  // use-graph-rings.ts, added to the returned RingState
+  forget: (edgeId: string) => {
+    const e = cache.current.get(key);
+    const gone = e?.store.edges.get(edgeId);
+    if (e === undefined || gone === undefined) return;
+    const edges = new Map(e.store.edges); edges.delete(edgeId);
+    const adj = new Map([...e.store.adj].map(([k, v]) => [k, v.filter((x) => x.edge.id !== edgeId)]));
+    cache.current.set(key, { ...e, store: { ...e.store, edges, adj } });
+    bump((n) => n + 1);
+  },
+  restore: (edge: GraphEdgeView) => {
+    const e = cache.current.get(key);
+    if (e === undefined) return;
+    // the add's own door; `exhausted` is kept, because an items-less ring would otherwise read as "the walk ended"
+    const merged = mergeRing(e.store, { hop: e.store.rings, items: [], edges: [edge], frontier: [], truncated: false, cursor: null });
+    cache.current.set(key, { ...e, store: { ...merged, exhausted: e.store.exhausted } });
+    bump((n) => n + 1);
+  },
+
+  // knowledge-graph.tsx: what the edge inspector receives as `onRemoveLink`
+  const removeLink = props.onRemoveLink === undefined ? undefined : async (edge: GraphEdgeView) => {
+    const done = await props.onRemoveLink!(edge);
+    rings.forget(edge.id);
+    return { undo: async () => { await done.undo(); rings.restore(edge); } };
+  };
+  ```
+  `forget` and `restore` are keyed by the CURRENT `key`; an Undo after the centre changed restores into the current entry only if that entry still holds both ends (`mergeRing` adds the edge, and `buildDrawModel` skips an edge whose ends are not shown).
+
   **`react/graph-list.tsx`** (`renderList`, `:1029-1035`):
   - `<section aria-labelledby>` headed `Linked to {label(centre)}` with a count badge.
   - A `<ul>` of rows, one per clear item except the centre, in ring order. Each row is a button: `<Glyph/>`, the long label (ticket: key + title), and `{relation(parentEdge, item)} {label(parent)}`. Selected rows carry `aria-current`, and a click calls `onPick`.
@@ -4408,29 +4682,38 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
     - Clicking `Open ticket` calls `onOpen` with the item.
     - `How it connects to GN-142` lists `GN-133 blocks GN-142`.
     - **Control:** selecting the centre shows no `Center on` button and no path.
+    - Kills: (a) the "unless the item is the centre" condition on `Center on` dropped (the control) (b) `onOpen(item)` → `onOpen(centreItem)` (assert the argument's `ref` is `ticket:t133`) (c) the path `<ol>` built from `pathTo(walk, centre)`.
   - **27.333** Select `note:n1` (desktop). `Linked from` shows the snippet from `n7` with `Phone pass rulings` inside a `<mark>`, and no raw `[[`. **Control:** `config="phone"` shows neither `Linked from` nor `Direct links`.
+    - Kills: (a) the snippet rendered as plain text (no `<mark>`, raw `[[` present) (b) the `if (phone) return` arm dropped (the control) (c) Step 5's `dangerouslySetInnerHTML` mutant (the `img` leg).
   - **27.334** `fake.pick({ kind: 'edge', id: 'relates|ticket:t142|ticket:t160' })`.
     - The heading reads `GN-142 relates to GN-160`.
     - The provenance reads `Added by Ama Rangsa on 2 Oct 2026, via Claude. A typed link.`
     - `From` / `To` buttons select their ends.
     - **Control:** the `parent` edge `t118 → t142` has no `Added by` and reads `Set from the subtask's Parent field.`
+    - Kills: (a) `From` / `To` buttons wired to the same end (assert `From` selects `ticket:t142` and `To` selects `ticket:t160`, not just "their ends") (b) `{provenanceLine(edge)} {howText(edge)}` without `howText` (c) the heading built with `relation` reversed.
   - **27.335** Remove link. With `onRemoveLink` resolving `{ undo }`:
+    - first, the last `setGraph` HAS `relates|ticket:t142|ticket:t160` (or "no such edge" holds of a canvas that never drew it);
     - clicking `Remove link` calls it with the edge;
     - the status reads `Link removed.`;
     - the next `setGraph` has no such edge;
-    - `Undo` calls `undo`, the status reads `Link restored.`, and after the source answers again (the test re-serves the edge) the edge is back.
+    - `Undo` calls `undo`, and the status reads `Link restored.`.
+    - (Planner ruling 2026-10-04.) The edge is ABSENT from the `setGraph` after the remove and PRESENT again in the `setGraph` after Undo, with the source's request count unchanged across the Undo (the restore is local, through `mergeRing`, not a refetch). Then switch hops 2 → 3: ring 4 IS requested (the restore did not mark the entry exhausted). The fixture is deep enough for that leg to mean something: ring 3 is not empty (`n3 → n5`, then `n5 → n6` at ring 4, `knowledge-graph-sigma.html:537-538`).
 
     With `onRemoveLink` rejecting `new Error('refused by may-edit: …')`, the status shows that text and the edge stays. **Control:** a `parent` edge has no `Remove link`.
-  - **27.336** The list.
-    - Its heading is `Linked to GN-142` with a badge equal to the clear count − 1.
+    - Kills: (a) `forget` dropped after a removal (Step 5's mutant) (b) the `catch` sets a fixed `Couldn't remove the link.` instead of the error's message (c) the kind filter `blocks` / `relates` / `duplicates` dropped (the control) (d) `undo()` not awaited before `Link restored.` (assert `undo` was called BEFORE the status changed, with a deferred `undo`) (e) Undo that skips the restore: `undo: async () => { await done.undo(); }` (the edge stays absent; planner ruling 2026-10-04) (f) `restore` keeps `mergeRing`'s own `exhausted` (drop `exhausted: e.store.exhausted`): no ring-4 request.
+  - **27.336** The list. Mounted with `hops={1}` so every count is a hand-checked LITERAL from the mockup's `E` (default groups, workspace gn), never computed with `zones`:
+    - Its heading is `Linked to GN-142` with a badge of `11` (t118, t151, t149, t133, t160, t139, n1, n2, pT, pA, c1), and 11 rows.
     - Tabbing reaches every row.
-    - Pressing Enter on a row selects it (`aria-current="true"`).
-    - The fog line counts the fog items that are not out of scope.
+    - Pressing Enter on a row selects it (`aria-current="true"`), and the row selected before loses it.
+    - The fog line reads `10 more are one step further, in the fog. …` (t120, t125, t131, pB, n4, c2, n3, n7, pR, t157), and the scope line `2 are outside the scope. …` (s15 through pT, s12 through pA). If the mockup's own list at `?hops=1` disagrees, the mockup wins and the numbers here are corrected.
     - **Control:** with hops 4 and no fog, there is no fog line.
+    - Kills: (a) the badge counts the centre (12) (b) the rows include the centre (c) the fog line counts out-of-scope fog items too (12) (d) `aria-current` set on click only, not Enter.
 
 - [ ] **Step 4: Browser cases (27.337, 27.338).** In `tests/inspector.spec.ts`:
   - **27.337** (`kgtest.cjs` / `sigtest.cjs`, "eclick") Click the midpoint of `blocks t133 → t142` on the canvas. The inspector reads `Added by Bolsrang Momin`. **Control:** clicking a fog dot leaves the inspector heading unchanged.
+    - Kills: (a) `if (e.kind === 'edge') { setSelectedEdge(e.id); … }` deleted from `onPick` (b) the edge inspector rendered without `provenanceLine` (c) `selectedEdge` not passed to the region (the item inspector stays).
   - **27.338** (`kgtest.cjs`, "double-click centres") Double-click `ticket:t133` on the canvas. The trail shows `‹ Back`, and the inspector heading is GN-133's title. Press `Escape`: the centre is back to GN-142. **Control:** a single click does not change the centre.
+    - Kills: (a) `if (e.double) centreOn(e.ref); else pick(e.ref);` → `pick(e.ref)` always (b) the inspector reads `props.centre`, not the state `centre` (heading stays GN-142's).
 
   27.339 stays unallocated (no line).
 
@@ -4439,6 +4722,7 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   **Mutations:**
   - Render the snippet with `dangerouslySetInnerHTML` replacing `[[x]]` with `<mark>`. Add a snippet `<img src=x onerror=alert(1)>[[A]]` to the fixture: 27.333's escaping assertion (no `img` element in the DOM) goes RED. Keep that assertion permanently in 27.333.
   - Drop `forget` after a removal. 27.335 goes RED.
+  - Undo without `rings.restore(edge)`. 27.335 goes RED (planner ruling 2026-10-04).
   - Sort `directLinks` by label. 27.331 goes RED.
 
   **Catalogue:** ✅ 27.330–27.338, one id line each.
@@ -4449,6 +4733,10 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   - The package (whole), the browser package (whole), and `ui#test`.
   - Confirm no event or census changed: `git diff --stat origin/release/knowledge-graph -- packages/domain/src` shows nothing from this task.
   - `check:citations`.
+
+  **Prose to sweep:**
+  - `Features.md:3767` — the KG-C ⚙️ bullet; the new ✅ bullet must not repeat it.
+  - None found beyond it (searched on the ref: `git grep -n` for `inspect-model`, `graph-list`, `edge-inspector`, `Linked from`, `Remove link`, `Direct links`; the hits are spec B's note panel, `Features.md:3760`, `docs/runbook.md:51`, and the editor's link popover, `LinkEditorPopover.tsx:307`, none of them about this view).
 
   Push, then DONE.
 
@@ -4469,11 +4757,11 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 - Modify:
   - `packages/app-core/src/online/index.ts` (beside `:44`)
   - `packages/app-core/src/views/ticket-sheet.tsx`: the prop near `editorSlot` (`:214`); the tab state (`:732`); the `SegmentedControl` (`:3756-3760`); a branch before the attachments branch (`:4538`)
-  - `packages/app-core/test/views/ticket-sheet.test.tsx`: amend 16.81 (`:2895-2911`)
-  - `apps/web/src/providers.tsx`: `AppServices` (`:73-89`) and `constructed` (`:179`)
+  - `packages/app-core/test/views/ticket-sheet.test.tsx`: amend 16.81 (`:2895-2924`)
+  - `apps/web/src/providers.tsx`: `AppServices` (`:73-89`) and `constructed` (`:120`, members at `:180`)
   - every test that builds an `AppServices` literal: `grep -rln "notificationPreferences:" apps/web/test`
-  - the three `<TicketSheet>` hosts: `apps/web/app/w/[workspaceId]/my-work/page.tsx:377`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3703`, `apps/web/src/notes/note-document.tsx:832`
-  - `apps/web/src/notes/note-byline.tsx` (`:87`, `:137`, `:147`) and `apps/web/src/notes/note-document.tsx` (`:582`, `:730`, `:797`)
+  - the three `<TicketSheet>` hosts: `apps/web/app/w/[workspaceId]/my-work/page.tsx:396`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3710`, `apps/web/src/notes/note-document.tsx:866`
+  - `apps/web/src/notes/note-byline.tsx` (`:87`, `:137`, `:147`) and `apps/web/src/notes/note-document.tsx` (`:602`, `:734`, `:831`)
   - `apps/web/package.json`: add `"@gisik-nokma/knowledge-graph": "workspace:*"`
   - `docs/manual.md`
   - `packages/ui/src/ui.css` (`/* KG: T9 tab+panel */`)
@@ -4517,14 +4805,16 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 
   `test/online/graph.test.ts` uses a recording `HttpClient` fake. Copy the fake that `test/online/people.test.ts` uses, if it has one; otherwise write a 6-line object.
   - **27.340** `ring({ center: 'ticket:01A', hops: 2, workspaceIds: ['w1', 'w2'], projectIds: [], groups: ['blocks', 'structure'] })` GETs `/v1/graph/neighbours?center=ticket%3A01A&hops=2&ws=w1%2Cw2&groups=blocks%2Cstructure`, with no `proj`, and resolves the body. **Control:** with `projectIds: ['p1']`, `proj=p1` is present.
+    - Kills: (a) `if (q.projectIds.length > 0)` dropped (an empty `proj=` appears: the URL is compared EXACTLY, as a string) (b) `ws: q.workspaceIds.join(',')` → `q.workspaceIds[0]` (c) `return … as GraphRingResponse` → `return { …(await http.get(…)), cursor: null }`-style reshaping (assert the resolved value `toBe` the fake's body object).
 
   **House rule.** An app-core `online/` change means running the server integration files too: `pnpm --filter @gisik-nokma/server exec vitest run test/graph test/routes --maxWorkers=2`. Run it, and quote the result as LOCAL.
 
 - [ ] **Step 2: The ticket sheet's fourth tab, test first (27.341; 16.81 amended).**
 
-  In `ticket-sheet.test.tsx`, amend 16.81 (`:2895-2911`). Its existing assertion (exactly three tabs) stays as written for a sheet with no slot. Add, in the SAME `it`, a second mount WITH `knowledgeGraphSlot={() => <p>graph here</p>}`, which shows four tabs: `Details`, `History`, `Attachments`, `Knowledge Graph`. Rename the `it` to `16.81 / 27.341 …`. Edit 16.81's prose in its `test-cases/16-*.md` file in the same commit: "three tabs; a fourth, Knowledge Graph, when the host mounts the graph slot (27.341)".
+  In `ticket-sheet.test.tsx`, amend 16.81 (`:2895-2924`). Its existing assertion (exactly three tabs) stays as written for a sheet with no slot. Add, in the SAME `it`, a second mount WITH `knowledgeGraphSlot={() => <p>graph here</p>}`, which shows four tabs: `Details`, `History`, `Attachments`, `Knowledge Graph`. Rename the `it` to `16.81 / 27.341 …`. Edit 16.81's prose in its `test-cases/16-*.md` file in the same commit: "three tabs; a fourth, Knowledge Graph, when the host mounts the graph slot (27.341)".
 
-  Then **27.341** proper (a new `it`): clicking `Knowledge Graph` renders the slot with `{ workspaceId, ticketId }`, and the slot's `onShowLinks()` returns the sheet to `Details`. **Control:** with no slot, `Knowledge Graph` is absent, and the tab state cannot reach `'graph'`.
+  Then **27.341** proper (a new `it`): clicking `Knowledge Graph` renders the slot with `{ workspaceId, ticketId }`, and the slot's `onShowLinks()` returns the sheet to `Details`. **Control:** with no slot, the tablist's options are EXACTLY `['Details', 'History', 'Attachments']` and no element anywhere reads `Knowledge Graph`. ("The tab state cannot reach `'graph'`" is internal state a test cannot observe; the options list and the absent branch are what it can.)
+    - Kills: (a) the `...(knowledgeGraphSlot !== undefined ? […] : [])` spread made unconditional (the control) (b) `onShowLinks: () => setTab('details')` → `setTab('history')` (c) `createElement(knowledgeGraphSlot, { workspaceId, ticketId, … })` with `ticketId` dropped (assert the slot's props `toEqual(expect.objectContaining({ workspaceId: <w>, ticketId: <t> }))`).
 
   The implementation, in `ticket-sheet.tsx`:
   - **Props (`:214`).** Beside `editorSlot?: EditorSlotComponent;`, add `knowledgeGraphSlot?: KnowledgeGraphSlotComponent;`, with a docblock saying:
@@ -4648,9 +4938,9 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   );
   ```
   Pass `knowledgeGraphSlot={TicketGraphTab}` at all THREE hosts, beside each `editorSlot={TicketEditorSlot}`:
-  - `my-work/page.tsx` (after `:394`);
-  - `p/[projectId]/page.tsx` (its `<TicketSheet` at `:3703`);
-  - `note-document.tsx` (after `:843`).
+  - `my-work/page.tsx` (after `:413`);
+  - `p/[projectId]/page.tsx` (its `<TicketSheet` at `:3710`);
+  - `note-document.tsx` (after `:877`).
 
   Each gets a one-line comment: "spec C §1: the fourth tab".
 
@@ -4658,31 +4948,38 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
 
   The tests (`apps/web/test/knowledge-graph/*.test.tsx`; mock `next/dynamic` the way existing web tests do: `grep -rn "next/dynamic" apps/web/test`):
   - **27.342** `GraphPanel` passes `defaultWorkspaceIds=[workspaceId]`, `config='phone'` under the phone query, and `source === services.graph`. **Control:** on desktop, `config='desktop'`.
+    - Kills: (a) `config={phone ? 'phone' : 'desktop'}` → `'desktop'` (b) `defaultWorkspaceIds={[props.workspaceId]}` → `[]` (c) `source={graph}` → `source={{ ring: graph.ring }}` (the `toBe` identity leg).
   - **27.343** `onRemoveLink` ingests ONE `ticket.link_removed` on the SOURCE ticket's stream, with `{ kind, targetId }` (A §2.2), and `undo()` ingests `ticket.link_added` with the same payload. A refused ingest throws its reason, so the inspector shows it (27.335). **Control:** removing a link viewed from its TARGET still writes on the source stream.
+    - "ONE" is `expect(ingest).toHaveBeenCalledTimes(1)` with a one-event array, and the payload is `toEqual({ kind: 'blocks', targetId: <target id> })` (exact, so an extra field fails).
+    - Kills: (a) `entity: { kind: 'ticket', id: target.id }` (Step 6's mutant) (b) `return { undo: () => submit('ticket.link_removed') }` (the undo leg) (c) the refused arm throws `result.reason` alone (assert the full `refused by <rule>: <reason>`) (d) `payload: { kind, targetId: source.id }`.
   - **27.344** All three hosts mount `TicketSheet` with `knowledgeGraphSlot`. Render each host's existing test harness, or grep-assert the prop in each file the way the repo's existing "every host passes X" tests do: `grep -rn "editorSlot" apps/web/test` shows the pattern. **Control:** the assertion fails if one host drops it (prove it by mutation).
+    - Kills: drop `knowledgeGraphSlot={TicketGraphTab}` at (a) `my-work/page.tsx` (b) `p/[projectId]/page.tsx` (c) `note-document.tsx` (Step 6's mutant), one at a time. A grep-assert must be scoped to the `<TicketSheet` element's own props, or a comment naming the prop satisfies it.
 
 - [ ] **Step 4: The note's Knowledge Graph panel (27.345, 27.346).**
 
-  The note document has NO tabbed side panel. `notes-page.tsx:447` is the `On this page` table of contents, and History is a `Sheet` opened from the byline (`note-byline.tsx:137`, `:147`; `note-document.tsx:797`). So the note's "Knowledge Graph tab in its side panel" (spec §1) is built as the History pattern: a byline action that opens a `Sheet`. This is reported in the reply as a spec gap.
+  The note document has NO tabbed side panel. `notes-page.tsx:465` is the `On this page` table of contents, and History is a `Sheet` opened from the byline (`note-byline.tsx:137`, `:147`; `note-document.tsx:831`). So the note's "Knowledge Graph tab in its side panel" (spec §1) is built as the History pattern: a byline action that opens a `Sheet`. This is reported in the reply as a spec gap.
   - **`note-byline.tsx`.** Add a prop `onOpenGraph: () => void` (`:87`), a `GRAPH_LABEL = 'Knowledge Graph'` constant next to `HISTORY_LABEL` (`:12`), a phone overflow item after History (`:137`), and a desktop `<Button variant="ghost" onClick={onOpenGraph}>{GRAPH_LABEL}</Button>` after the History button (`:147-149`).
   - **`note-document.tsx`.**
-    - `const [graphOpen, setGraphOpen] = useState(false);` next to `historyOpen` (`:582`).
-    - `onOpenGraph={() => setGraphOpen(true)}` on `<NoteByline` (`:730`).
-    - Next to `<HistoryPanel` (`:797`):
+    - `const [graphOpen, setGraphOpen] = useState(false);` next to `historyOpen` (`:602`).
+    - `onOpenGraph={() => setGraphOpen(true)}` on `<NoteByline` (`:734`).
+    - Next to `<HistoryPanel` (`:831`):
       ```tsx
       <Sheet open={graphOpen} title="Knowledge Graph" onClose={() => setGraphOpen(false)}>
         {graphOpen && <GraphPanel centre={kgNodeId('note', note.noteId)} workspaceId={note.workspaceId} onOpenTicket={(id) => { setGraphOpen(false); openTicket(id); }} />}
       </Sheet>
       ```
-      `openTicket` is the document's existing open-ticket handler (`:290`, `router.push(\`/notes/${noteId}?ticket=${ticketId}\`)`): read its name there. The note's own field for its workspace: read `NoteDetail`.
+      `openTicket` is the document's existing open-ticket handler (`:328-329`, `router.push(\`/notes/${noteId}?ticket=${ticketId}\`)`): read its name there. The note's own field for its workspace: read `NoteDetail`.
 
   The tests:
   - **27.345** Clicking `Knowledge Graph` in the byline opens a dialog titled `Knowledge Graph` that mounts `GraphPanel` with `centre = 'note:<id>'`. Closing it unmounts the graph. **Control:** before the click, no `GraphPanel` is mounted (the graph costs nothing until asked for).
+    - Kills: (a) `{graphOpen && <GraphPanel …/>}` → `<GraphPanel …/>` (Step 6's mutant; the control) (b) `kgNodeId('note', note.noteId)` → `kgNodeId('ticket', …)` (c) `onClose={() => setGraphOpen(false)}` → `onClose={() => {}}` (the unmount leg).
   - **27.346** In the ticket tab, an empty ticket's `Add link` returns the sheet to `Details`, where spec A's Links section is. If A's UI task is not merged, `onShowLinks` is still passed and lands on Details; the case asserts the tab switch only. **Control:** a note centre shows no `Add link`.
+    - A second leg: a TICKET centre mounted through `GraphPanel` WITHOUT `onShowLinks` (the note panel's shape) shows no `Add link`. The note control alone cannot fail on `onAddLink`'s wiring, because `KnowledgeGraph` already hides the button for any non-ticket centre (T7, 27.321).
+    - Kills: (a) `onAddLink={props.onShowLinks ? … : undefined}` → `onAddLink={() => props.onShowLinks?.()}` (the second leg) (b) `TicketGraphTab` drops `onShowLinks` (the tab never switches).
 
 - [ ] **Step 5: The browser end-to-end check on the real stack (27.347), the manual (27.348), the Features close (27.349).**
 
-  **27.347** is MANUAL on the dev stack, recorded 🟡 with the date.
+  **27.347** is MANUAL on the dev stack, recorded 🟡 with the date. Kills: none, a manual check (no automated leg to fail).
   1. `ctl rebuild` the release branch.
   2. Sign in, open a ticket with links, then open `Knowledge Graph`.
   3. Hover an edge: the tooltip shows its sentence.
@@ -4701,14 +4998,14 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   - the semantic-layer switch (a view switch only);
   - Remove link.
 
-  If a manual-coverage test exists (`grep -rn "manual.md" apps/web/test scripts`), add the section to it; that is the case's test. Otherwise 27.348 is 🟡 "manual prose, reviewed".
+  If a manual-coverage test exists (`grep -rn "manual.md" apps/web/test scripts`), add the section to it; that is the case's test. Otherwise 27.348 is 🟡 "manual prose, reviewed". Kills: none unless the coverage test exists; then deleting the section's heading from `docs/manual.md` turns it RED.
 
   **27.349: the Features close.**
   1. Re-read the whole `### Knowledge Graph view (spec C)` sub-section and replace the `<!-- KG-C … -->` anchors.
   2. Confirm every bullet still describes reality: the ✅ view bullet, the inspector bullet, the ticket tab and note panel bullet (add it now: "✅ Knowledge Graph tab on the ticket sheet and a Knowledge Graph panel from a note's byline"), and the ⚙️ engine/adapter/endpoint/gate bullets.
   3. Remove every `?` this plan introduced.
 
-  27.349 is ✅ with the test `scripts/check-case-ids.mjs`'s own run cited, or 🚫 "documentation close: no test" if the catalogue checker rejects a ✅ without a test. Run `pnpm check:citations` and choose by its answer.
+  27.349 is ✅ with the test `scripts/check-case-ids.mjs`'s own run cited, or 🚫 "documentation close: no test" if the catalogue checker rejects a ✅ without a test. Run `pnpm check:citations` and choose by its answer. Kills: none, a documentation close (it guards the catalogue's existing checks).
 
 - [ ] **Step 6: Mutations, sweeps, DONE.**
 
@@ -4724,6 +5021,14 @@ Before cutting the branch, check: `git grep -n "CREATE TABLE proj_ticket_links\|
   - the knowledge-graph package and the browser package;
   - `ui#test`;
   - `check:citations`, `node scripts/check-case-ids.mjs`, `pnpm check:tasks`, `pnpm check:env`.
+
+  **Prose to sweep:**
+  - `docs/manual.md:536` — "a panel with three tabs: **Details**, **History** and **Attachments**": four with the graph slot; then regenerate `packages/app-core/src/help/content.generated.ts:3223`, which carries the same sentence.
+  - `Features.md:86` — "the authority draws `Details | History | Attachments` as a single segmented control": add the fourth tab when the host passes the slot.
+  - `test-cases/16-remaining-doors.md:931` — 16.81's prose (Step 2 already edits it).
+  - `packages/app-core/test/views/ticket-sheet.test.tsx:2905-2908` — the comment "⚠ THREE since 2026-09-22 …": still true for the no-slot mount; add a line for the second mount.
+  - `packages/app-core/src/views/ticket-sheet.tsx:3750-3755` — "16.81's count moved 2 → 3" (Step 2 already extends it).
+  - `Features.md:3767` — the KG-C ⚙️ bullet (the close, 27.349).
 
   Push, then DONE, with `NEEDS: browser, manual on the dev stack`.
 
