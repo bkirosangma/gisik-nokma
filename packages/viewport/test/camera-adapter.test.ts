@@ -117,7 +117,7 @@ describe('29.037 the camera', () => {
     expect(cam.getCamera().x).toBe(20);
   });
 
-  it('29.038 drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | frames say moving while pressed | a right-button press and a hover do not pan (control: a pen barrel press does) | a middle button does not pan | a hover from an unpressed pointer is ignored during a drag | the pointer is captured and released | at zoom 2 a drag and a flick move half as far, on both axes | a vertical flick | a cancelled flick leaves no momentum | the release velocity is the newest 12 samples | a second finger\'s tap leaves no sample in the first finger\'s flick | a stray pointerup leaves a pinch alone; the pinch clamps; two fingers on one point move nothing | a press, a wheel and camera() each stop a flick; a press stops a glide', () => {
+  it('29.038 drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | frames say moving while pressed | a right-button press and a hover do not pan (control: a pen barrel press does) | a middle button does not pan | a hover from an unpressed pointer is ignored during a drag | the pointer is captured and released | at zoom 2 a drag and a flick move half as far, on both axes | a vertical flick | a cancelled flick leaves no momentum | the release velocity is the newest 12 samples | a second finger\'s tap, lifted or cancelled, leaves no sample in the first finger\'s flick | a stray pointerup leaves a pinch alone; the pinch clamps; two fingers on one point move nothing | a press, a wheel and camera() each stop a flick; a press stops a glide', () => {
     const { el, cam, fc, frames } = mount();
     el.dispatchEvent(pointer('pointerdown', { x: 400, y: 300, id: 1, kind: 'touch' }));
     el.dispatchEvent(pointer('pointermove', { x: 350, y: 280, id: 1, kind: 'touch' }));
@@ -275,6 +275,24 @@ describe('29.037 the camera', () => {
     expect(tapped).toBe(-2);
     fc.advance(3000);
     expect(Math.abs(cam.getCamera().x - tapped)).toBeLessThan(20);
+    // the same tap ended by pointercancel (palm rejection, a system gesture) leaves no sample either: a cancel reaches the
+    // same reset as a pointerup (control: the pointerup leg above, and the 360 px flick)
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    el.dispatchEvent(pointer('pointerdown', { x: 300, y: 300, id: 1, kind: 'touch' }));
+    fc.advance(16);
+    el.dispatchEvent(pointer('pointermove', { x: 300, y: 300, id: 1, kind: 'touch' }));
+    el.dispatchEvent(pointer('pointerdown', { x: 600, y: 300, id: 2, kind: 'touch' }));
+    fc.advance(16);
+    el.dispatchEvent(pointer('pointercancel', { x: 600, y: 300, id: 2, kind: 'touch' }));
+    for (const x of [301, 302]) {
+      fc.advance(16);
+      el.dispatchEvent(pointer('pointermove', { x, y: 300, id: 1, kind: 'touch' }));
+    }
+    el.dispatchEvent(pointer('pointerup', { x: 302, y: 300, id: 1, kind: 'touch' }));
+    const cancelled = cam.getCamera().x;
+    expect(cancelled).toBe(-2);
+    fc.advance(3000);
+    expect(Math.abs(cam.getCamera().x - cancelled)).toBeLessThan(20);
     // a pointerup from a pointer that never pressed leaves a pinch going
     cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
     el.dispatchEvent(pointer('pointerdown', { x: 300, y: 300, id: 4, kind: 'touch' }));
