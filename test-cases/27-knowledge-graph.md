@@ -138,6 +138,9 @@ Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpow
 - ✅ **27.146 — a click opens the source: the ticket path, `/notes/<id>`, and a comment's parent at `#comment-<id>`; a comment whose ticket has no href is no link (`linkedFromHref` returns null).** (`packages/app-core/test/views/linked-from-section.test.tsx`)
 - ✅ **27.147 — past 20, `Show all N` (N the TOTAL, not the rows drawn) pages the rest from the same read, following every cursor, and then goes away.** (`packages/app-core/test/views/linked-from-section.test.tsx`)
 - ✅ **27.148 — a failed read is the heading plus one exact sentence ("What links here could not be read: … it may answer on a retry."); a failed `Show all` is "The rest could not be read: …." under the rows already drawn;** control: a good read has no alert. (`packages/app-core/test/views/linked-from-section.test.tsx`)
+- ✅ **27.149 — the ticket sheet asks `getLinkedFrom(ws, { kind: 'ticket', id })` once and draws the section after the Notes section and before the comment thread;** control: a total of 0 draws none; the sheet's live-read ratchet is nine (`ticket-sheet.test.tsx`). (`packages/app-core/test/views/linked-from-section.test.tsx`)
+- ✅ **27.150 — opened at `#comment-<id>`, the sheet scrolls that comment into view once the thread arrives, and a later reload of the thread does not scroll again;** control: a hash naming a real element that is not a comment is never scrolled. (`packages/app-core/test/views/linked-from-section.test.tsx`)
+- ✅ **27.151 — a Linked from row on the sheet navigates through the sheet's own `resolveTicketHref` and `onNavigate`: a comment on ticket S3 calls `onNavigate('/t/S3#comment-C9')`.** (`packages/app-core/test/views/linked-from-section.test.tsx`)
 <!-- KG-B T4 -->
 
 ## 27.3 Knowledge Graph view (spec C, 27.200–27.349)

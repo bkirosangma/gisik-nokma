@@ -1,7 +1,12 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
+import type { LinkedFromPage, LinkedFromRow, ServerStreamFrame } from '@gisik-nokma/domain';
+import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { TICKET, WS, ticketStateSeed } from '../helpers/seed.js';
+import { TicketSheet } from '../../src/views/ticket-sheet.js';
+import type { TicketComment } from '../../src/views/comments-thread.js';
+import type { TicketRead } from '../../src/view-types.js';
 import { LinkedFromSection, linkedFromHref } from '../../src/views/linked-from-section.js';
 import type { LiveQueryResult } from '../../src/views/use-live-query.js';
 
@@ -122,5 +127,126 @@ describe('27.148 a failed read says so, in one line', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show all 2' }));
     expect((await screen.findByRole('alert')).textContent).toBe('The rest could not be read: answered 502.');
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * The section on the ticket sheet (27.149–27.151). `MINIMAL_READ` and the
+ * sheet's props are copied from `ticket-notes-section.test.tsx`.
+ * ------------------------------------------------------------------ */
+const MINIMAL_READ: TicketRead = {
+  ticket: ticketStateSeed(),
+  title: 'File the GST return',
+  stateProvenance: { actorId: 'user_anselma', actorName: 'Anselma Marak', clientTime: '2026-08-19T09:58:12.000Z', serverTime: '2026-08-19T10:00:00.000Z' },
+  assignedProvenance: null,
+  visibility: null,
+  parent: null,
+  rollup: null,
+  key: null,
+  epic: null,
+};
+const commentRow = row(3, {
+  sourceKind: 'comment', sourceId: 'C9',
+  parent: { kind: 'ticket', ticketId: 'S3', projectId: 'P', key: 'GN-160', title: 'x', stateCategory: 'open' },
+});
+function comment(commentId: string): TicketComment {
+  return {
+    commentId, authorId: 'user_kiro', recordedAt: '2026-09-20T16:23:57.306Z', files: [],
+    body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `body of ${commentId}` }] }] },
+  };
+}
+const EVENT_FRAME: ServerStreamFrame = {
+  type: 'event',
+  envelope: {
+    id: '01J9GEVT000000000000000099', workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.field_set', version: 1,
+    payload: {}, actorId: 'user_anselma', origin: 'web', clientTime: '2026-08-20T08:59:00.000Z', serverTime: '2026-08-20T09:00:00.000Z', seq: 4, workspaceSeq: 9,
+  },
+} as ServerStreamFrame;
+const sheet = (source: ReturnType<typeof createFakeDataSource>, over: Partial<Parameters<typeof TicketSheet>[0]> = {}) => (
+  <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} {...over} />
+);
+
+describe('27.149 the ticket sheet asks for its Linked from and draws it between Notes and the thread', () => {
+  it('27.149 one call for { kind: ticket, id }; the section follows ticket-notes and precedes the comment thread; total 0 draws none (control)', async () => {
+    const getLinkedFrom = vi.fn(async () => ({ total: 1, items: [row(1)], nextCursor: null }));
+    const { container, unmount } = render(sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getLinkedFrom })));
+    const section = await screen.findByTestId('linked-from');
+    expect(getLinkedFrom).toHaveBeenCalledTimes(1);
+    expect(getLinkedFrom).toHaveBeenCalledWith(WS, { kind: 'ticket', id: TICKET });
+    const notes = screen.getByTestId('ticket-notes');
+    const thread = container.querySelector('.gn-comments');
+    expect(thread).not.toBeNull();
+    expect(notes.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(section.compareDocumentPosition(thread!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    unmount();
+
+    // CONTROL: the same sheet whose read answers total 0 draws no section, after the read has answered.
+    const empty = vi.fn(async () => ({ total: 0, items: [], nextCursor: null }));
+    render(sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getLinkedFrom: empty })));
+    await screen.findByTestId('ticket-notes');
+    await waitFor(() => expect(empty).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByTestId('linked-from')).toBeNull();
+  });
+});
+
+describe('27.150 the sheet scrolls to #comment-<id> once the thread arrives, once per hash', () => {
+  afterEach(() => {
+    window.location.hash = '';
+    document.getElementById('heading-x')?.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('27.150 #comment-c1 scrolls that comment into view once, and a reload does not scroll again; #heading-x is never scrolled (control)', async () => {
+    if (!('scrollIntoView' in Element.prototype)) {
+      Object.defineProperty(Element.prototype, 'scrollIntoView', { value: () => undefined, configurable: true, writable: true });
+    }
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => undefined);
+    window.location.hash = '#comment-c1';
+    // A NEW array on every call: a same-reference answer would not re-run the effect, and the guard mutant would survive.
+    const getTicketComments = vi.fn(async () => [comment('c1')]);
+    const source = createFakeDataSource({ getTicket: async () => MINIMAL_READ, getTicketComments });
+    const { unmount } = render(sheet(source));
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById('comment-c1'));
+    act(() => source.pushStreamItem(EVENT_FRAME));
+    // Precondition: the thread was read TWICE, so the effect has had its second chance.
+    await waitFor(() => expect(getTicketComments).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(scroll).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // CONTROL, fresh render: a hash naming a REAL element that is not a comment is left alone.
+    scroll.mockClear();
+    const heading = document.createElement('div');
+    heading.id = 'heading-x';
+    document.body.appendChild(heading);
+    window.location.hash = '#heading-x';
+    render(sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getTicketComments: vi.fn(async () => [comment('c1')]) })));
+    await screen.findByTestId('comment-c1');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(scroll).not.toHaveBeenCalled();
+  });
+});
+
+describe('27.151 a Linked from row on the sheet navigates through the sheet’s own href and onNavigate', () => {
+  it('27.151 a comment row on ticket S3 calls onNavigate with exactly /t/S3#comment-C9', async () => {
+    const onNavigate = vi.fn();
+    const getLinkedFrom = vi.fn(async () => ({ total: 1, items: [commentRow], nextCursor: null }));
+    render(
+      sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getLinkedFrom }), {
+        resolveTicketHref: (ref) => `/t/${ref.ticketId}`,
+        onNavigate,
+      }),
+    );
+    const section = await screen.findByTestId('linked-from');
+    await userEvent.click(within(section).getByRole('link'));
+    expect(onNavigate.mock.calls).toEqual([['/t/S3#comment-C9']]);
   });
 });

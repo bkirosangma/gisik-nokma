@@ -48,6 +48,7 @@ import {
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
 import { TicketNotesSection } from './ticket-notes-section.js';
+import { LinkedFromSection, linkedFromHref } from './linked-from-section.js';
 import { ReopenDialog } from './reopen-dialog.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
@@ -1015,6 +1016,19 @@ export function TicketSheet({
   const comments = useLiveQuery(dataSource, workspaceId, `${ticketId}:comments`, () =>
     dataSource.query.getTicketComments(workspaceId, ticketId),
   );
+  // A "Linked from" row (or a notification) opens `<sheet>#comment-<id>`. The thread
+  // is fetched after the sheet paints, so once it is here bring the named comment
+  // into view — once per hash, so a later reload does not pull the reader back.
+  const scrolledCommentHash = useRef<string | null>(null);
+  useEffect(() => {
+    if (comments.data == null || typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#comment-') || scrolledCommentHash.current === hash) return;
+    const target = document.getElementById(hash.slice(1));
+    if (target === null) return;
+    scrolledCommentHash.current = hash;
+    target.scrollIntoView?.({ block: 'center' });
+  }, [comments.data]);
   /**
    * The ticket's attached notes (Plan 7 Task 5, spec §14.3) — LIFTED here from
    * `TicketNotesSection`, which used to own this query itself (Plan 6). The
@@ -1025,6 +1039,10 @@ export function TicketSheet({
    */
   const notes = useLiveQuery(dataSource, workspaceId, `${ticketId}:notes`, () =>
     dataSource.query.getNotesForTicket(workspaceId, ticketId),
+  );
+  /** "Linked from" (Knowledge Graph B): the first page; "Show all" pages the rest through the same read. */
+  const linkedFrom = useLiveQuery(dataSource, workspaceId, `${ticketId}:linked-from`, () =>
+    dataSource.query.getLinkedFrom(workspaceId, { kind: 'ticket', id: ticketId }),
   );
   /**
    * `queryNotes` for the shared editor's `:note`/`[[` picker (spec §14, D26),
@@ -4432,6 +4450,21 @@ export function TicketSheet({
             onNavigate={onNavigate}
             onRefusal={(r) => setServerRefusal(r)}
             notes={notes}
+          />
+
+          {/*
+            "LINKED FROM" (Knowledge Graph spec B §3.1) — after the ticket's own
+            content (fields, spec A's Links, Notes) and before the conversation.
+            The spec's "end of Details, below Links" cannot hold both ways: Links
+            sits above Notes and the thread is the tab's last block, so this is
+            the last block that is ABOUT the ticket.
+          */}
+          <LinkedFromSection
+            page={linkedFrom}
+            loadMore={(cursor) => dataSource.query.getLinkedFrom(workspaceId, { kind: 'ticket', id: ticketId }, cursor)}
+            hrefOf={(row) => linkedFromHref(row, (ref) => resolveTicketHref?.(ref) ?? null)}
+            nameOf={nameOf}
+            {...(onNavigate === undefined ? {} : { onNavigate })}
           />
 
           {/*

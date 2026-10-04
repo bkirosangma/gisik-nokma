@@ -319,13 +319,14 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: eight live reads means eight stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: nine live reads means nine stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. EIGHT reads ride this sheet — ticket, workflow,
+    // REFETCH on the query key. NINE reads ride this sheet — ticket, workflow,
     // members, history, the project's rows from which the SUBTASKS are derived
     // (door F, 2026-09-19), the ticket's TYPE LADDER (door G), the comment
-    // THREAD, and the ticket's NOTES section (notes series, Plan 6 of 7,
-    // `18.241`) — and each opens its own subscription.
+    // THREAD, the ticket's NOTES section (notes series, Plan 6 of 7,
+    // `18.241`), and its LINKED FROM section (Knowledge Graph B, `27.149`) —
+    // and each opens its own subscription.
     //
     // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add a ninth: it
     // fetches the workspace's note list ONCE on mount (`useEffect`, case
@@ -335,16 +336,18 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     // the same one-time shape `note-document.tsx`'s own `queryNotes` uses.
     //
     // **The count was four until door F, five until door G, six until the
-    // comment thread, seven until the notes section, and each change is
+    // comment thread, seven until the notes section, eight until Knowledge
+    // Graph B's Linked from, and each change is
     // deliberate.** This assertion is a planted defect: it exists so that
     // adding a read is a decision somebody makes rather than a side effect.
     // The eighth read is a real cost — a subscription per open sheet — and
     // it is paid because a note attached elsewhere must appear on this sheet
-    // without a reload (spec §10.4).
+    // without a reload (spec §10.4); the ninth, because a new reference to
+    // this ticket must appear the same way.
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(8);
+    expect(source.subscriptions).toHaveLength(9);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
