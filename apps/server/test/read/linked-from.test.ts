@@ -83,16 +83,26 @@ describe('27.126 visibility follows the SOURCE: no row and no count from a sourc
     expect(guest.items[0]!.snippet).toBe('see [[X-1 July invoices]]'); // the explicit note's own snippet, nothing of the shared ticket's ('needs …')
   });
 
-  it('27.126 a source in ANOTHER workspace that chips the target is never listed, though its row is in the index', async () => {
-    // The owner's predicate is `TRUE`, so only the workspace pins (`firsts`' `r.workspace_id` and each
-    // arm's parent `workspace_id`) keep the neighbour's ticket out.
+  it('27.126 a source in ANOTHER workspace (a ticket, and a note) that chips the target is never listed, though its row is in the index', async () => {
+    // The owner's predicate is `TRUE`, so only the workspace pins keep the neighbour's sources out: the
+    // ticket by `firsts`' `r.workspace_id` and the ticket arm's `t.workspace_id`, the note by `firsts`'
+    // and the note arm's `n.workspace_id` (`visibleNotesWhere` carries no workspace pin of its own).
     const N = world.neighbour;
+    const neighbourNote = newUlid();
+    const onN = (entity: { kind: 'ticket' | 'note'; id: string }, type: string, payload: unknown) =>
+      makeCommitted({ workspaceId: N.workspaceId, actorId: world.userIds.neighbour, entity, type, payload });
     await applyCommitted(db.pool, [
-      makeCommitted({ workspaceId: N.workspaceId, actorId: world.userIds.neighbour, entity: { kind: 'ticket', id: N.ticketId }, type: 'ticket.field_set', payload: { fieldId: 'description', value: body(chip(TARGET)) } }),
+      onN({ kind: 'ticket', id: N.ticketId }, 'ticket.field_set', { fieldId: 'description', value: body(chip(TARGET)) }),
+      onN({ kind: 'note', id: neighbourNote }, 'note.created', { title: 'Next door', homeProjectId: N.projectId, scope: { mode: 'workspace' } }),
+      onN({ kind: 'note', id: neighbourNote }, 'note.body_set', { body: body(chip(TARGET)) }),
     ]);
-    const raw = await db.pool.query('SELECT 1 FROM proj_references WHERE source_id = $1 AND target_id = $2', [N.ticketId, TARGET]);
-    expect(raw.rowCount).toBe(1); // the haystack holds its subject
+    const indexed = async (kind: 'ticket' | 'note', id: string) =>
+      (await db.pool.query('SELECT 1 FROM proj_references WHERE source_kind = $1 AND source_id = $2 AND target_id = $3', [kind, id, TARGET])).rowCount;
+    expect([await indexed('ticket', N.ticketId), await indexed('note', neighbourNote)]).toEqual([1, 1]); // the haystack holds its subjects
     const owner = await readAs('owner');
+    const five = [`ticket:${world.world.sharedTaskId}`, `note:${notes.NOTES.nPrivate}`, `note:${notes.NOTES.nExplicit}`, `comment:${commentOnShared}`, `comment:${commentOnPrivate}`];
+    expect(ids(owner)).toEqual(expect.arrayContaining(five)); // control: the owner's own five are listed
+    expect(ids(owner)).not.toContain(`note:${neighbourNote}`);
     expect(ids(owner)).not.toContain(`ticket:${N.ticketId}`);
     expect(owner.total).toBe(5);
   });

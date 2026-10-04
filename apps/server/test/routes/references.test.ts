@@ -72,6 +72,32 @@ describe('27.133 an invisible, foreign or unknown target is the same 404', () =>
     expect(bodies[0]!.json()).toEqual({ error: 'not_found' }); // the shared NOT_FOUND_BODY, exactly
     expect((await get('member', `?target=ticket:${world.world.taskInEpicId}`)).statusCode).toBe(200);
   });
+
+  it('27.133 a trashed target ticket, and one whose project is deleted, are the same 404; restored and undeleted, 200 (control)', async () => {
+    // sharedTaskId (explicit to [owner, member]): no other case here reads it. `canSee` reads only
+    // `proj_visibility`, which neither a trash nor a project delete touches, so `ticketIsLive`
+    // (`read/live-ticket.ts`) is the one refusal: its `deleted_at` clause, then its container clause.
+    const T = world.world.sharedTaskId;
+    const ev = (entity: { kind: 'ticket' | 'project'; id: string }, type: string) =>
+      makeCommitted({ workspaceId: world.world.workspaceId, actorId: world.userIds.owner, entity, type, payload: {} });
+    const read = () => get('member', `?target=ticket:${T}`);
+    const unknown = await get('member', `?target=ticket:${newUlid()}`);
+    const live = await read();
+    await applyCommitted(db.pool, [ev({ kind: 'ticket', id: T }, 'ticket.deleted')]);
+    const trashed = await read();
+    await applyCommitted(db.pool, [ev({ kind: 'ticket', id: T }, 'ticket.restored')]);
+    const restored = await read();
+    await applyCommitted(db.pool, [ev({ kind: 'project', id: world.world.projectId }, 'project.deleted')]);
+    const inDeletedProject = await read();
+    await applyCommitted(db.pool, [ev({ kind: 'project', id: world.world.projectId }, 'project.undeleted')]);
+    const undeleted = await read();
+    // Asserted once the world is put back, so a red here never leaves 27.134 a deleted project.
+    expect(live.statusCode).toBe(200); // control: the member sees the live ticket
+    expect(unknown.statusCode).toBe(404);
+    expect([trashed.statusCode, trashed.body]).toEqual([404, unknown.body]); // byte-identical to the unknown id's 404
+    expect([inDeletedProject.statusCode, inDeletedProject.body]).toEqual([404, unknown.body]);
+    expect([restored.statusCode, undeleted.statusCode]).toEqual([200, 200]); // control: the same read, back
+  });
 });
 
 describe('27.134 malformed input is a 400 that names nothing back', () => {
