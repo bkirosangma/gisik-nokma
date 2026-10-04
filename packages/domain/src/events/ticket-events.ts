@@ -225,14 +225,27 @@ export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullab
 
 /**
  * Typed ticket links (Knowledge Graph spec A §2.2). Both events go on the
- * SOURCE ticket's stream, whoever writes them, so a link has one history.
+ * SOURCE ticket's stream, whoever writes them, so a link has one history,
+ * with ONE exception: a link whose target is a DRAFT (below).
  * `relates` is stored as written; its "either direction" rule is the engine's
  * (`rule-engine/src/checks/links.ts`), not this schema's.
+ *
+ * `from` (drafts spec R42): the SOURCE of a link filed on the stream of a DRAFT it points at. A link whose
+ * source is a published ticket S and whose target is a draft D is never written on S's stream (that stream is
+ * public and would name a private ticket); it is written on D's stream as `{ kind, targetId: D, from: S }` and
+ * re-filed on S's stream, plain, when D is published. A payload without `from` is exactly what it always was.
  */
 export const TICKET_LINK_KINDS = ['blocks', 'relates', 'duplicates'] as const;
 export type TicketLinkKind = (typeof TICKET_LINK_KINDS)[number];
-export const ticketLinkAddedPayload = z.object({ kind: z.enum(TICKET_LINK_KINDS), targetId: ulidString }).strict();
-export const ticketLinkRemovedPayload = z.object({ kind: z.enum(TICKET_LINK_KINDS), targetId: ulidString }).strict();
+const linkPayloadShape = {
+  kind: z.enum(TICKET_LINK_KINDS),
+  targetId: ulidString,
+  from: ulidString.optional(),
+};
+const fromDiffersFromTarget = (p: { targetId: string; from?: string | undefined }): boolean => p.from !== p.targetId;
+const FROM_MESSAGE = 'a link\'s "from" must be a different ticket from its target';
+export const ticketLinkAddedPayload = z.object(linkPayloadShape).strict().refine(fromDiffersFromTarget, { message: FROM_MESSAGE });
+export const ticketLinkRemovedPayload = z.object(linkPayloadShape).strict().refine(fromDiffersFromTarget, { message: FROM_MESSAGE });
 export const TICKET_LINK_EVENT_TYPES = ['ticket.link_added', 'ticket.link_removed'] as const;
 export function isTicketLinkEvent(type: string): boolean {
   return (TICKET_LINK_EVENT_TYPES as readonly string[]).includes(type);

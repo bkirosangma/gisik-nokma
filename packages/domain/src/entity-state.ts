@@ -119,7 +119,9 @@ export type TicketState = {
    */
   deleted?: { actorId: string; at: string } | null;
   /**
-   * Outbound typed links, in the order added. ABSENT when there are none, on
+   * Typed links held on this ticket's stream, in the order added: its outbound
+   * links, plus, on a DRAFT only, the inbound links filed from the other end
+   * (entries with `from`, drafts spec R42). ABSENT when there are none, on
    * the reducer and on `rowToTicketState` alike (typed-links plan T1/T2): the
    * reducer drops the key with the last link, so the two shapes agree.
    */
@@ -134,8 +136,12 @@ export type TicketState = {
   draft?: TicketDraft;
 };
 
-/** One OUTBOUND typed link (spec A §2.2). Inbound links live on the other ticket's state. */
-export type TicketLink = { kind: TicketLinkKind; targetId: string };
+/**
+ * One typed link held on a ticket's state (spec A §2.2). `from` is set only on a DRAFT's entries for links filed
+ * from the other end (drafts spec R42): `{ kind, targetId: <the draft>, from: <the source> }` means "source kind
+ * draft". Every entry without `from` is outbound.
+ */
+export type TicketLink = { kind: TicketLinkKind; targetId: string; from?: string };
 
 /** A draft's head state: who drafted it, when, and whether they have discarded it. */
 export type TicketDraft = { authorId: string; at: string; discarded?: true };
