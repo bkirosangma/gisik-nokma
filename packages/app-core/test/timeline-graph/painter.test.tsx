@@ -91,11 +91,11 @@ describe('29.303 TimelinePainter', () => {
   it('29.303 what each primitive shows, exactly: key or "Draft", title only on a long bar, chip, pin counts, ✓ / ▶, "revised"; placed at its bounds; every edge in ONE svg; control: no edge in view, no svg', () => {
     const scene: Draw[] = [
       { ...bar(0, 0), key: 'GN-7', mark: 'done', long: true, title: 'Ship the thing', chip: 'Not taken (pass 2)', pin: { notes: 2, attachments: 1 }, pinAt: 'inside' },
-      { ...bar(1, 200), b: { x0: 200, x1: 248, y0: 40, y1: 68 }, style: 'active', draft: true, key: null, mark: 'active', keyOutside: true },
+      { ...bar(1, 200), b: { x0: 200, x1: 248, y0: 40, y1: 68 }, style: 'active', draft: true, key: null, mark: 'active', keyOutside: true, dim: true, passRank: 2, pin: { notes: 0, attachments: 3 }, pinAt: 'after-key' },
       { ...bar(2, 400), style: 'planned', mark: null, title: 'Short one' },
       { kind: 'diamond', id: 'd3', ticketId: 't3', z: 1, b: { x0: 600, x1: 628, y0: 0, y1: 28 }, style: 'done', key: 'GN-3', title: 'Decide', mark: 'done', revised: true, pin: null, draft: false, ariaLabel: 'GN-3 Decide' },
       { kind: 'diamond', id: 'd4', ticketId: 't4', z: 1, b: { x0: 700, x1: 728, y0: 0, y1: 28 }, style: 'planned', key: 'GN-4', title: 'Decide again', mark: 'active', revised: false, pin: null, draft: false, ariaLabel: 'GN-4 Decide again' },
-      { kind: 'edge', id: 'e1', z: 0, b: { x0: 96, x1: 200, y0: 0, y1: 68 }, from: 't0', to: 't1', d: 'M96 14 H150 V54 H200', label: { x: 150, y: 10, text: 'Needs rework' }, edgeKind: 'leads_to', loop: false, taken: null },
+      { kind: 'edge', id: 'e1', z: 0, b: { x0: 96, x1: 200, y0: 0, y1: 68 }, from: 't0', to: 't1', d: 'M96 14 H150 V54 H200', label: { x: 150, y: 10, text: 'Needs rework' }, edgeKind: 'leads_to', loop: false, taken: null, dim: true },
       { kind: 'edge', id: 'e2', z: 0, b: { x0: 248, x1: 400, y0: 0, y1: 68 }, from: 't1', to: 't2', d: 'M248 54 C300 0, 350 0, 400 14', label: null, edgeKind: 'blocks', loop: true, taken: true },
       { kind: 'heading', id: 'h1', z: 0, b: { x0: 0, x1: 900, y0: 80, y1: 114 }, text: 'Project One', sticky: true },
       { kind: 'strip', id: 's1', z: 0, b: { x0: 0, x1: 900, y0: 120, y1: 140 }, text: 'Pruned' },
@@ -103,12 +103,18 @@ describe('29.303 TimelinePainter', () => {
       { kind: 'weekend', id: 'w1', z: 0, b: { x0: 480, x1: 528, y0: 0, y1: 140 } },
       { kind: 'connector', id: 'c1', ticketId: 't0', z: 0, b: { x0: 96, x1: 120, y0: 14, y1: 15 }, dashed: true },
     ];
-    const { container, rerender } = render(<TimelinePainter draws={scene} index={new DrawIndex(scene)} overscan={0} width={2_000} height={200} view={{ x0: 0, x1: 900, y0: 0, y1: 200 }} />);
+    const { container, rerender } = render(<TimelinePainter draws={scene} index={new DrawIndex(scene)} overscan={0} width={2_000} height={200} view={{ x0: 0, x1: 900, y0: 0, y1: 200 }} className="gn-home-tl" />);
     const el = (id: string) => container.querySelector(`[data-draw-id="${id}"]`) as HTMLElement;
+    const canvas = container.querySelector('.gn-tlg-canvas') as HTMLElement;
+    expect([[...canvas.classList], canvas.style.width, canvas.style.height]).toEqual([['gn-tlg-canvas', 'gn-home-tl'], '2000px', '200px']); // the canvas is the scroll extent
     const text = (id: string, cls: string) => el(id).querySelector(`.${cls}`)?.textContent ?? null;
     expect([text('b0', 'gn-tlg-key'), text('b0', 'gn-tlg-title'), text('b0', 'gn-tlg-chip'), text('b0', 'gn-tlg-mark')]).toEqual(['GN-7', 'Ship the thing', 'Not taken (pass 2)', '✓']);
     const pin = el('b0').querySelector('.gn-tlg-pin');
     expect([pin?.getAttribute('data-notes'), pin?.getAttribute('data-attachments'), pin?.getAttribute('data-at')]).toEqual(['2', '1', 'inside']);
+    const pin1 = el('b1').querySelector('.gn-tlg-pin');
+    expect([pin1?.getAttribute('data-notes'), pin1?.getAttribute('data-attachments'), pin1?.getAttribute('data-at')]).toEqual(['0', '3', 'after-key']);
+    // the lit set and the pass rank are written for the tasks that style them (T5 to T7): one of each value
+    expect([el('b0').dataset['dim'], el('b1').dataset['dim'], el('b0').dataset['passRank'], el('b1').dataset['passRank']]).toEqual(['false', 'true', '0', '2']);
     expect([el('b0').style.left, el('b0').style.top, el('b0').style.width, el('b0').style.height]).toEqual(['0px', '0px', '96px', '28px']);
     expect([el('b1').style.left, el('b1').style.top, el('b1').style.width]).toEqual(['200px', '40px', '48px']);
     expect([el('b0').dataset['style'], el('b1').dataset['style'], el('b2').dataset['style']]).toEqual(['done', 'active', 'planned']);
@@ -120,6 +126,7 @@ describe('29.303 TimelinePainter', () => {
     expect(container.querySelectorAll('svg.gn-tlg-edges')).toHaveLength(1);
     expect([...container.querySelectorAll('svg.gn-tlg-edges > g')].map((g) => g.getAttribute('data-draw-id'))).toEqual(['e1', 'e2']);
     expect([el('e1').querySelector('path')?.getAttribute('d'), el('e1').querySelector('text')?.textContent, el('e2').querySelector('text'), el('e2').dataset['loop'], el('e2').dataset['kind']]).toEqual(['M96 14 H150 V54 H200', 'Needs rework', null, 'true', 'blocks']);
+    expect([el('e1').querySelector('text')?.getAttribute('x'), el('e1').querySelector('text')?.getAttribute('y'), el('e1').dataset['dim'], el('e2').dataset['dim']]).toEqual(['150', '10', 'true', 'false']);
     rerender(<TimelinePainter draws={scene} index={new DrawIndex(scene)} overscan={0} width={2_000} height={200} view={{ x0: 560, x1: 900, y0: 0, y1: 40 }} />);
     expect(el('d3')).not.toBeNull(); // control: the view still mounts something
     expect(container.querySelector('svg')).toBeNull();
