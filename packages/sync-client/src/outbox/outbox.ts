@@ -208,8 +208,13 @@ export type Outbox = {
   dismissNotice(noticeId: string): Promise<void>;
   /** The outbox overlay over confirmed state, or `null` when nothing is queued for this ticket. */
   pendingFor(ticketId: string): Promise<PendingTicket | null>;
-  /** Tickets that exist ONLY as queued claims — never in any settled listing. */
+  /** Tickets that exist ONLY as queued claims — never in any settled listing, and never a draft. */
   pendingCreatedTickets(workspaceId: string): Promise<PendingTicket[]>;
+  /**
+   * Drafts that exist ONLY as queued claims (drafts spec R22). `pendingCreatedTickets` leaves them out so an
+   * offline-born draft cannot flash on a board; the Drafts page asks here. A discarded one is gone.
+   */
+  pendingCreatedDrafts(workspaceId: string): Promise<PendingTicket[]>;
 };
 
 function rowToItem(row: SqlRow): OutboxItem {
@@ -325,6 +330,26 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
     // the overlay claiming to have applied something it did not.
     if (pending === undefined || overlay.unfoldable.has(ticketId)) return null;
     return { pending, pendingEventIds };
+  }
+
+  /** Every ticket that exists ONLY as queued claims, drafts included; the two listings below split it. */
+  async function pendingCreated(workspaceId: string): Promise<PendingTicket[]> {
+    const overlay = await buildPendingOverlay(contextDeps);
+    const out: PendingTicket[] = [];
+    // Ordered by ticket id so the answer is stable across calls; position
+    // order would be a different, equally defensible order, but an UNSTABLE
+    // one is what makes a list flicker.
+    for (const ticketId of [...overlay.queuedEventIds.keys()].sort()) {
+      // Confirmed already: the board lists it in its settled place, with a
+      // badge for the claims still in the air. This method is only for
+      // tickets that exist NOWHERE else.
+      if (overlay.confirmed.has(ticketId)) continue;
+      if (overlay.unfoldable.has(ticketId)) continue;
+      const pending = overlay.states.get(ticketId);
+      if (pending === undefined || pending.workspaceId !== workspaceId) continue;
+      out.push({ pending, pendingEventIds: overlay.queuedEventIds.get(ticketId) ?? [] });
+    }
+    return out;
   }
 
   return {
@@ -525,22 +550,14 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
     pendingFor: overlayFor,
 
     async pendingCreatedTickets(workspaceId) {
-      const overlay = await buildPendingOverlay(contextDeps);
-      const out: PendingTicket[] = [];
-      // Ordered by ticket id so the answer is stable across calls; position
-      // order would be a different, equally defensible order, but an UNSTABLE
-      // one is what makes a list flicker.
-      for (const ticketId of [...overlay.queuedEventIds.keys()].sort()) {
-        // Confirmed already: the board lists it in its settled place, with a
-        // badge for the claims still in the air. This method is only for
-        // tickets that exist NOWHERE else.
-        if (overlay.confirmed.has(ticketId)) continue;
-        if (overlay.unfoldable.has(ticketId)) continue;
-        const pending = overlay.states.get(ticketId);
-        if (pending === undefined || pending.workspaceId !== workspaceId) continue;
-        out.push({ pending, pendingEventIds: overlay.queuedEventIds.get(ticketId) ?? [] });
-      }
-      return out;
+      // A draft never reaches a view (R22): it is listed by `pendingCreatedDrafts` for the Drafts page alone.
+      return (await pendingCreated(workspaceId)).filter((t) => t.pending.draft === undefined);
+    },
+
+    async pendingCreatedDrafts(workspaceId) {
+      return (await pendingCreated(workspaceId)).filter(
+        (t) => t.pending.draft !== undefined && t.pending.draft.discarded !== true,
+      );
     },
   };
 }

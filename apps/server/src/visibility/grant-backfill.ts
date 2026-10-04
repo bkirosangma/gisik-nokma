@@ -128,6 +128,14 @@ import { listVisibleTickets } from './visible-tickets.js';
  *
  * **`ticket.assigned` (W3, 2026-09-29)** widens the ticket to its new assignee, and only to them. It reaches this module only for readers `canSee` admits now, so it self-selects exactly as a widening `visibility.set` does. Since R1 (2026-09-30) "the ticket" is the reach: its inheriting children and their `inherit` notes come with it (`grantNoticeFor` and `noteGrantNoticeFor` ask the same `canSee`/`canReadNote`, arm included). The former assignee is narrowed, never reaches this line, and loses the ticket and that subtree at their next reconcile.
  *
+ * **`ticket.published` (drafts spec R21)** widens the ticket from its author alone to its whole audience, and the
+ * widening is exactly the one a `visibility.set` to a wider mode makes: every event of the ticket sits below the
+ * cursor of a reader who was online while it was a draft, and `canSee` refused all of it until now. It reaches this
+ * module only for readers `canSee` admits now, so it self-selects as the others do. The notice names the ticket and
+ * its inheriting descendants that the reader can open; a child that is STILL a draft is not named, because `canSee`
+ * is closed to everyone but its author. A reader whose cursor is below the whole drafting needs no notice: the
+ * ordinary stream carries the events in order.
+ *
  * This module never asks "who could see this before". It cannot: `proj_visibility`
  * keeps no history and neither payload carries a before-image, and re-deriving
  * the pre-event audience here would be a second definition of visibility that
@@ -150,7 +158,7 @@ import { listVisibleTickets } from './visible-tickets.js';
  *   that is the whole reason this shape is legal under 6.82/6.94.
  */
 
-export const GRANT_BACKFILL_TRIGGERS = ['visibility.set', 'ticket.reparented', 'ticket.assigned'] as const;
+export const GRANT_BACKFILL_TRIGGERS = ['visibility.set', 'ticket.reparented', 'ticket.assigned', 'ticket.published'] as const;
 
 /**
  * The most tickets one trigger will name in one notice.

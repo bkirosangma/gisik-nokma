@@ -305,6 +305,27 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     }
   }
 
+  /**
+   * `ticket.published` (drafts spec R31): the moment a draft becomes a ticket is the moment the people it already
+   * names are told. While it was a draft `canSeeTicket` answered false for everyone, so the birth assignee, every
+   * `ticket.assigned` and every description mention were silent; publish is the single event that settles them, and it
+   * sends exactly what the ticket's head state says NOW (the assignee it holds, the mentions its description holds).
+   *
+   * It reuses the two handlers rather than copying them, so the guards are the same ones: nobody is told of their own
+   * act (the publisher), an unassigned ticket addresses nobody, and `canSeeTicket` is asked per recipient. The dedupe
+   * keys are the ones those handlers derive from the event, so the PUBLISH event id is the key and a redelivery is one
+   * row: `assignment:${env.id}` and `mention:${env.id}:${userId}`.
+   */
+  async function handlePublished(env: EventEnvelope): Promise<void> {
+    const state = await getTicketStateFromDb(deps.pool, env.workspaceId, env.entity.id);
+    if (state === null) return;
+    if (state.assigneeId !== null && state.assigneeId !== undefined) {
+      await handleAssigned({ ...env, payload: { assigneeId: state.assigneeId } });
+    }
+    const description = state.fields['description']?.value;
+    if (description !== undefined && description !== null) await handleMentions(env, description, 'description');
+  }
+
   async function handleContested(env: EventEnvelope): Promise<void> {
     const parsed = contestedPayloadSchema.safeParse(env.payload);
     if (!parsed.success) {
@@ -389,6 +410,8 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           }
         } else if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
           // Spec A §7: links notify nobody. An explicit arm writes the decision where the next reader of this chain looks; case 27.007 pins that nobody is notified.
+        } else if (env.type === 'ticket.published') {
+          await handlePublished(env);
         } else if (env.type === 'ticket.discarded') {
           // Drafts: a discard erases a private draft, so it notifies nobody. An explicit arm writes the
           // decision where the next reader of this chain looks; case 28.005 pins that no row appears.

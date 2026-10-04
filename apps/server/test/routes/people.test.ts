@@ -3,9 +3,13 @@ import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
 import type { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
-import { NAMED_PERSON_NOT_IN_WORKSPACE_REASON, TICKET_NOT_VISIBLE_REASON } from '../../src/permissions/check-permission.js';
+import {
+  NAMED_PERSON_NOT_IN_WORKSPACE_REASON,
+  PERMISSION_VISIBILITY_RULE,
+  TICKET_NOT_VISIBLE_REASON,
+} from '../../src/permissions/check-permission.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
-import { NO_ACCOUNT_REASON } from '../../src/routes/people.js';
+import { DRAFT_NO_OUTSIDERS_REASON, DRAFT_NO_OUTSIDERS_RULE, NO_ACCOUNT_REASON } from '../../src/routes/people.js';
 import { canSee } from '../../src/visibility/can-see.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -344,5 +348,78 @@ describe('6.240–6.241 R2 — no role, no guests', () => {
       expect(Object.keys(user).sort()).toEqual(['email', 'inWorkspace', 'name', 'userId']);
       expect(user['inWorkspace']).toBe(inWorkspace);
     }
+  });
+});
+
+describe('28.097 the outsider door refuses a draft (drafts spec R8)', () => {
+  async function scene() {
+    const owner = await byPhone();
+    const ws = await found(owner);
+    const member = await byPhone();
+    await join(owner, ws, member, 'member');
+    const prj = await project(owner, ws);
+    const out = await byEmail(`out-${newUlid().toLowerCase()}@example.test`);
+    return { owner, ws, member, prj, out };
+  }
+  const born = (s: Awaited<ReturnType<typeof scene>>, ticketId: string, draft: boolean) =>
+    ev(s.ws, s.member.userId, { kind: 'ticket', id: ticketId }, 'ticket.created', {
+      typeId: 'task',
+      projectId: s.prj,
+      parentId: null,
+      title: 'Collect the rent',
+      assigneeId: s.out.userId,
+      ...(draft ? { start: 'backlog', draft: true } : {}),
+    });
+  const assign = (s: Awaited<ReturnType<typeof scene>>, actor: Caller, ticketId: string) =>
+    ev(s.ws, actor.userId, { kind: 'ticket', id: ticketId }, 'ticket.assigned', { assigneeId: s.out.userId });
+  const refusal = (res: Awaited<ReturnType<typeof outsider>>) => {
+    expect(res.statusCode, res.body).toBe(422);
+    return (res.json() as { result: Record<string, unknown> }).result;
+  };
+
+  it('a draft-born ticket.created naming an outsider is refused: no guest, no membership event, no ticket; CONTROL: the same event without draft goes through', async () => {
+    const s = await scene();
+    const id = newUlid();
+    const result = refusal(await outsider(s.member, s.ws, s.out.userId, born(s, id, true)));
+    expect(result).toEqual({
+      status: 'refused', eventId: expect.any(String), rule: DRAFT_NO_OUTSIDERS_RULE, reason: DRAFT_NO_OUTSIDERS_REASON,
+    });
+    expect(DRAFT_NO_OUTSIDERS_RULE).toBe('draft.no-outsiders');
+    expect(DRAFT_NO_OUTSIDERS_REASON).toBe('Publish the ticket before inviting someone from outside');
+    expect(await roleOf(s.ws, s.out.userId)).toBeNull();
+    expect(await membershipEvents(s.ws, s.out.userId)).toEqual([]);
+    const { rows } = await db.pool.query('SELECT 1 FROM proj_tickets WHERE ticket_id = $1', [id]);
+    expect(rows).toEqual([]);
+
+    const ok = await outsider(s.member, s.ws, s.out.userId, born(s, newUlid(), false));
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(await roleOf(s.ws, s.out.userId)).toBe('guest');
+  });
+
+  it('an assignment on an existing draft is refused for its author and answered as for an unknown ticket for anyone else; CONTROL: the published ticket is assigned', async () => {
+    const s = await scene();
+    const draftId = newUlid();
+    const [created] = await submit(s.member, [
+      ev(s.ws, s.member.userId, { kind: 'ticket', id: draftId }, 'ticket.created', {
+        typeId: 'task', projectId: s.prj, parentId: null, title: 'Draft rent', start: 'backlog', draft: true,
+      }),
+    ]);
+    expect(created?.status).toBe('committed');
+    const published = await ticket(s.member, s.ws, s.prj, 'Real rent');
+
+    expect(refusal(await outsider(s.member, s.ws, s.out.userId, assign(s, s.member, draftId)))).toMatchObject({
+      status: 'refused', rule: DRAFT_NO_OUTSIDERS_RULE, reason: DRAFT_NO_OUTSIDERS_REASON,
+    });
+    expect(refusal(await outsider(s.owner, s.ws, s.out.userId, assign(s, s.owner, draftId)))).toMatchObject({
+      status: 'refused', rule: PERMISSION_VISIBILITY_RULE, reason: TICKET_NOT_VISIBLE_REASON,
+    });
+    expect(await roleOf(s.ws, s.out.userId)).toBeNull();
+    expect(await membershipEvents(s.ws, s.out.userId)).toEqual([]);
+    const { rows } = await db.pool.query('SELECT assignee_id FROM proj_tickets WHERE ticket_id = $1', [draftId]);
+    expect(rows).toEqual([{ assignee_id: null }]);
+
+    const ok = await outsider(s.member, s.ws, s.out.userId, assign(s, s.member, published));
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(await roleOf(s.ws, s.out.userId)).toBe('guest');
   });
 });

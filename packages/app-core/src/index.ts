@@ -376,6 +376,7 @@ export {
   type ReplicaDataSource,
   type ReplicaDataSourceDeps,
   type ReplicaOnlyQuery,
+  type ReplicaDraft,
   type OfflineListEntry,
   type TicketSummary,
 } from './replica/replica-data-source.js';
