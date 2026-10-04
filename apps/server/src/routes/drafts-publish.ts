@@ -3,6 +3,7 @@ import { newUlid, ORIGINS, ULID_REGEX, type Origin, type SubmittedEvent } from '
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import { PERMISSION_VISIBILITY_RULE, TICKET_NOT_VISIBLE_REASON } from '../permissions/check-permission.js';
+import { planPublishRanks } from '../read/publish-ranks.js';
 import { composeCardKey } from '../read/ticket-cards.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { ticketNumbers } from '../read/ticket-numbers.js';
@@ -26,6 +27,9 @@ const DOORS = ORIGINS.filter((origin): origin is Exclude<Origin, 'server'> => or
  * The order is the caller's and the route never sorts: a parent listed after its child is refused
  * `draft.parent-unpublished` (R51). The refusal names the FIRST ticket that stopped the set and its underlying
  * rule, and nothing is committed (R49).
+ *
+ * The rank events (R64) follow the publishes in the same transaction, so a refused rank answers 409 naming the ranked
+ * ticket and nothing is published.
  *
  * **No oracle (R54; planner ruling on the T5b amendment's Q1, 2026-10-04).** Before any event is built, the ids
  * are walked in the caller's order and the FIRST one that has no row in THIS workspace, or that the caller cannot
@@ -67,7 +71,8 @@ export function registerDraftPublishRoutes(
     async (request, reply) => {
       const { workspaceId } = request.params;
       const userId = request.currentUserId;
-      if ((await requireMember(deps.pool, userId, workspaceId)) === null) {
+      const eff = await requireMember(deps.pool, userId, workspaceId);
+      if (eff === null) {
         return reply.code(404).send(READ_NOT_FOUND_BODY);
       }
       const { ticketIds, origin = 'web' } = request.body;
@@ -100,7 +105,29 @@ export function registerDraftPublishRoutes(
         });
       }
 
-      const outcome = await deps.ingest.ingestClientAtomic(events, userId);
+      // R64, R65: after ALL the publishes (so their ledger rows stay consecutive), per project in order of first
+      // appearance, the backfill of the rows the publisher can see and then the set in the given order. Same
+      // transaction: a rank the gate refuses rolls the publishes back too.
+      const setByProject = new Map<string, string[]>();
+      for (const ticketId of ticketIds) {
+        const projectId = projectOf.get(ticketId);
+        if (projectId !== undefined) setByProject.set(projectId, [...(setByProject.get(projectId) ?? []), ticketId]);
+      }
+      const ranks = await planPublishRanks(deps.pool, eff, userId, workspaceId, setByProject);
+      const rankEvents: SubmittedEvent[] = ranks.map((assignment) => ({
+        id: newUlid(),
+        workspaceId,
+        entity: { kind: 'ticket', id: assignment.ticketId },
+        type: 'ticket.ranked',
+        version: 1,
+        payload: { rank: assignment.rank },
+        actorId: userId,
+        origin,
+        clientTime,
+      }));
+      const submitted = [...events, ...rankEvents];
+
+      const outcome = await deps.ingest.ingestClientAtomic(submitted, userId);
       if (outcome.status === 'rolled-back') {
         const result = outcome.result;
         const cause =
@@ -111,7 +138,7 @@ export function registerDraftPublishRoutes(
               : { rule: 'unexpected', reason: 'The publish did not commit.' };
         return reply.code(409).send({
           rule: DRAFT_PUBLISH_REFUSED_RULE,
-          ticketId: ticketIds[outcome.index],
+          ticketId: submitted[outcome.index]?.entity.id,
           cause,
         });
       }

@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { newUlid, ticketKey, type LedgerEvent, type TicketLinkKind } from '@gisik-nokma/domain';
+import { describeEvent } from '@gisik-nokma/app-core';
+import { mapHistory } from '@gisik-nokma/app-core/online';
+import { linkWorld } from '../helpers/draft-link-world.js';
 import { ticketNumbers } from '../../src/read/ticket-numbers.js';
 import { NOT_FOUND_BODY } from '../../src/routes/tickets.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -152,3 +155,107 @@ describe('typed links, the server reads (27.050–27.054)', () => {
     expect(shHistory.filter((e) => e.type.startsWith('ticket.link_'))).toEqual([]);
   });
 });
+
+/**
+ * 29.126 (wtg2 T2): the `leads_to` label on the server's doors. Runs after 27.054 (file order), on the same world:
+ * S leads to SH ("Yes", both visible to the member) and S leads to H ("Maybe", H hidden from the member).
+ */
+describe('29.126 the leads_to label on the server reads', () => {
+  const lead = (source: string, targetId: string, label: string): LedgerEvent =>
+    makeCommitted({ workspaceId: WS, actorId: owner, entity: { kind: 'ticket', id: source }, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId, label } });
+
+  it('29.126 GET …/links carries the label both ways and no key when none; History and /events keep it on a withheld copy whose hidden end is the TARGET, with no target id or key', async () => {
+    await applyCommitted(db.pool, [lead(S, SH, 'Yes'), lead(S, H, 'Maybe')]);
+    const sh = { id: SH, projectId: world.world.projectId, key: await keyOf(SH) };
+    const memberS = (await linksOf('member')).links;
+    expect(memberS.filter((l) => l.kind === 'leads_to')).toEqual([
+      { kind: 'leads_to', direction: 'out', ticket: { ...sh, title: expect.any(String), stateCategory: expect.any(String) }, label: 'Yes' },
+    ]); // the hidden H's row is not listed
+    expect((await linksOf('member', SH)).links.filter((l) => l.kind === 'leads_to').map((l) => [l.direction, l.ticket.id, (l as { label?: string }).label])).toEqual([['in', S, 'Yes']]);
+    // control: the owner's label-free rows carry no `label` key at all; both leads_to rows carry theirs
+    const ownerS = (await linksOf('owner')).links;
+    expect(ownerS.filter((l) => l.kind !== 'leads_to').length).toBeGreaterThan(0); // precondition
+    for (const l of ownerS) expect('label' in l, l.kind).toBe(l.kind === 'leads_to');
+    expect(ownerS.filter((l) => l.kind === 'leads_to').map((l) => [l.ticket.id, (l as { label?: string }).label])).toEqual([[SH, 'Yes'], [H, 'Maybe']]);
+
+    // History (planner ruling 13:01, spec LK-6): a withheld copy whose hidden end is the TARGET keeps the label, and no
+    // target id or key. A hidden SOURCE's label is dropped (planner ruling 2026-10-05 00:13): `draft-link-reads.test.ts`, 29.126.
+    const hKey = await keyOf(H);
+    const toH = (events: HistoryBody['events']) => events.find((e) => e.type === 'ticket.link_added' && e.payload['kind'] === 'leads_to' && e.payload['label'] === 'Maybe')!;
+    const memberEvent = toH(await historyOf('member'));
+    expect(memberEvent, "the member's withheld copy still carries the label 'Maybe'").toBeDefined();
+    expect(JSON.stringify(memberEvent.payload)).toBe('{"kind":"leads_to","targetId":null,"label":"Maybe"}');
+    expect(memberEvent.linkTarget).toBeNull();
+    expect(JSON.stringify(memberEvent)).not.toContain(H);
+    expect(JSON.stringify(memberEvent)).not.toContain(hKey);
+    const historyRes = await app.inject({ method: 'GET', url: `/v1/tickets/${S}/history`, headers: world.authOf('member') });
+    const lines = mapHistory(historyRes.json()).filter((e) => e.type === 'ticket.link_added' && (e.payload as Record<string, unknown>)['kind'] === 'leads_to');
+    expect(lines.map((e) => describeEvent(e))).toEqual([`Linked: leads to ${sh.key} (Yes)`, "Linked: leads to a ticket you can't see (Maybe)"]);
+    // control: the owner sees the target, label and all
+    expect(toH(await historyOf('owner')).payload).toEqual({ kind: 'leads_to', targetId: H, label: 'Maybe' });
+
+    // The /events door serves the same withheld copy.
+    const eventsRes = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${S}/events`, headers: world.authOf('member') });
+    expect(eventsRes.statusCode).toBe(200);
+    const served = JSON.stringify(eventsRes.json());
+    expect(served).toContain('{"kind":"leads_to","targetId":null,"label":"Maybe"}');
+    expect(served).not.toContain(H);
+  });
+
+  it("29.126 a stranger never sees a leads_to edge to someone else's draft; the author does", async () => {
+    const w = linkWorld(world, db);
+    const strangers: ReadRole[] = ['owner', 'admin'];
+    const named = (body: unknown, id: string) => JSON.stringify(body).includes(id);
+    // S2 published, the member's draft D, a from-form "S2 leads to D" ("Yes") on D's stream.
+    const [s2, d] = [newUlid(), newUlid()];
+    await w.published(s2);
+    const before = new Map<ReadRole, { links: number; history: number }>();
+    for (const role of strangers) before.set(role, { links: (await linksOf(role, s2)).links.length, history: (await historyOf(role, s2)).length });
+    await w.draft(d);
+    expect(await w.fromLink(d, s2, 'leads_to', 'member', 'Yes')).toMatchObject({ status: 'committed' });
+    for (const role of strangers) {
+      const links = (await linksOf(role, s2)).links;
+      expect(named(links, d), role).toBe(false);
+      expect(links.length, role).toBe(before.get(role)!.links);
+      expect(named((await w.stateOf(role, s2)).ticketState.links ?? [], d), role).toBe(false);
+      const history = await historyOf(role, s2);
+      expect(named(history, d) || JSON.stringify(history).includes('Yes'), role).toBe(false);
+      expect(history.length, role).toBe(before.get(role)!.history);
+    }
+    // CONTROL in the same it(): the author, on the draft's own sheet, sees the edge with its label.
+    const authorD = ((await w.links('member', d)).json() as LinksBody).links;
+    expect(authorD.map((l) => [l.kind, l.direction, l.ticket.id, (l as { label?: string }).label])).toEqual([['leads_to', 'in', s2, 'Yes']]);
+    // Publish D: the re-file (R44) carries the label onto S2's stream.
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    expect((await linksOf('owner', s2)).links.map((l) => [l.kind, l.direction, l.ticket.id, (l as { label?: string }).label])).toEqual([['leads_to', 'out', d, 'Yes']]);
+
+    // A Decision's branch to a draft (planner ruling 2026-10-04, Q3): the re-file must carry the label, or the
+    // engine refuses it link.label-required and the publish with it.
+    // The sends above went through the HTTP door, so `makeCommitted`'s own counter is behind: take the next seq from the
+    // ledger (`builder-reads.test.ts`'s pattern). wtg2 T5 seeds the real Decision type; the rules read only its id.
+    const { rows: [last] } = await db.pool.query<{ seq: number }>('SELECT max(workspace_seq)::int AS seq FROM events WHERE workspace_id = $1', [WS]);
+    await applyCommitted(db.pool, [makeCommitted({
+      workspaceId: WS, actorId: owner, entity: { kind: 'ticket-type', id: 'decision' }, type: 'ticket-type.defined', workspaceSeq: last!.seq + 1,
+      payload: { id: 'decision', name: 'Decision', icon: 'flag', rank: 3, workflowId: world.world.workflowId, fields: [] },
+    })]);
+    const [p, d2, d3, y] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    expect(await w.send('owner', 'ticket.created', p, { typeId: 'decision', projectId: w.PROJECT(), parentId: null, title: 'Go ahead?' })).toMatchObject({ status: 'committed' });
+    await w.draft(d2);
+    expect(await w.fromLink(d2, p, 'leads_to', 'member', 'Yes')).toMatchObject({ status: 'committed' });
+    expect(await w.send('member', 'ticket.published', d2, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    const pBranches = async () => (await linksOf('owner', p)).links.map((l) => [l.direction, l.ticket.id, (l as { label?: string }).label]);
+    expect(await pBranches()).toEqual([['out', d2, 'Yes']]);
+    // A duplicate made while private (D-7): D3's "No" is private, so a plain P -> Y "No" is accepted; D3's publish is refused.
+    await w.draft(d3);
+    expect(await w.fromLink(d3, p, 'leads_to', 'member', 'No')).toMatchObject({ status: 'committed' });
+    await w.published(y);
+    expect(await w.send('owner', 'ticket.link_added', p, { kind: 'leads_to', targetId: y, label: 'No' })).toMatchObject({ status: 'committed' });
+    expect(await w.send('member', 'ticket.published', d3, { projectId: w.PROJECT() })).toEqual({
+      status: 'refused', eventId: expect.any(String), rule: 'draft.link-refile-refused',
+      reason: 'The link from "Go ahead?" to this draft could not be filed there: This Decision already has a branch labelled "No".',
+    });
+    expect(await w.stillDrafts([d3])).toBe(1);
+    expect(await pBranches()).toEqual([['out', d2, 'Yes'], ['out', y, 'No']]); // control: P's branches are unchanged
+  });
+});
+

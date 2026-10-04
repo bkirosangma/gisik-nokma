@@ -364,6 +364,8 @@ function mapTicketStateLinks(value: unknown, path: string): { links?: TicketLink
       targetId: asString(link['targetId'], `${at}.targetId`),
       // Drafts R42: a draft-side entry names its source; a plain entry has no key at all (absent, never undefined).
       ...(link['from'] === undefined ? {} : { from: asString(link['from'], `${at}.from`) }),
+      // A `leads_to` branch name (wtg2 T2), absent the same way.
+      ...(link['label'] === undefined ? {} : { label: asString(link['label'], `${at}.label`) }),
     };
   });
   return links.length > 0 ? { links } : {};
@@ -2912,6 +2914,8 @@ export function mapTicketLinks(raw: unknown): TicketLinkView[] {
         title: asString(ticket['title'], `${path}.ticket.title`),
         stateCategory: asStateCategory(ticket['stateCategory'], `${path}.ticket.stateCategory`),
       },
+      // A `leads_to` branch name (wtg2 T2): absent on the wire when none, and absent here too.
+      ...(row['label'] === undefined ? {} : { label: asString(row['label'], `${path}.label`) }),
     };
   });
 }

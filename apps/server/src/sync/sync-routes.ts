@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { LedgerEvent, TicketState, WorkspaceRole } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
-import { canOpen } from '../visibility/can-open.js';
+import { canOpen, noteEventVisibleTo } from '../visibility/can-open.js';
 import { targetSight, withholdEvent, withholdLinks, type TargetSight } from '../visibility/withhold-link-targets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
@@ -537,7 +537,7 @@ export function registerSyncRoutes(
         const readableNotes = await listNotes(client, eff, userId, workspaceId);
         const deletedNotes = await listNotes(client, eff, userId, workspaceId, { deleted: true });
         const noteIds = [...readableNotes, ...deletedNotes].map((n) => n.noteId);
-        const noteRows =
+        const noteLedger =
           noteIds.length === 0
             ? []
             : (
@@ -550,6 +550,12 @@ export function registerSyncRoutes(
                   [noteIds],
                 )
               ).rows;
+        // The notes tail drops a `note.attached` / `note.detached` naming another person's draft (drafts R66)
+        // or an erased draft (planner ruling 2026-10-04, follow-up).
+        const noteRows: LedgerRow[] = [];
+        for (const row of noteLedger) {
+          if (await noteEventVisibleTo(client, userId, row)) noteRows.push(row);
+        }
         const notes = { events: noteRows.map(toEventView) };
         await client.query('COMMIT');
         const me: BootstrapMe = {

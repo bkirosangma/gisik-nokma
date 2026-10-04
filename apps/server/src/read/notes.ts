@@ -9,7 +9,8 @@ import {
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { scopeOf } from '../projections/notes.js';
-import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './visible-where.js';
+import { LIVE_BASE_WHERE, LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './visible-where.js';
+import { holdsDraftRights } from '../visibility/can-open.js';
 import { SqlParams } from './sql-params.js';
 import { ticketNumbers } from './ticket-numbers.js';
 import { projectPrefixesInWorkspace } from './visible-projects.js';
@@ -45,7 +46,10 @@ export const NOTE_PROJECT_LIVE_WHERE =
  * A note's summary carries the ticket keys it is attached to, and a reader of
  * the note who cannot see one of those tickets does not learn its key (spec
  * §6.4). That filter is `visibleTicketsWhere`, the same predicate the ticket
- * reads use — not a second one written here.
+ * reads use — not a second one written here. The note DETAIL read alone
+ * (`getNoteDetail`, `ownDrafts`) also lists the viewer's OWN openable drafts,
+ * with key `''` (drafts T9, planner ruling 2026-10-04 T9-Q2): a draft is visible
+ * to no one else, so no other reader learns it.
  */
 
 /**
@@ -90,7 +94,8 @@ function summaryOf(row: NoteRow, attachedTickets: AttachedTicket[]): NoteSummary
 }
 
 /**
- * The `key` and `title` of each attached, VISIBLE, live ticket, grouped by note.
+ * The `key` and `title` of each attached, VISIBLE, live ticket, grouped by note; with `ownDrafts`, also the
+ * viewer's own openable drafts (key `''`).
  *
  * ## Why the key is composed here and three reads go with it
  *
@@ -115,25 +120,36 @@ export async function attachedTicketsByNote(
   userId: string,
   workspaceId: string,
   noteIds: readonly string[],
+  // Drafts T9 (planner ruling 2026-10-04): also list the VIEWER's own drafts, for the note detail read only. A draft
+  // has no number, so its `key` is ''. Every other caller leaves this off: a draft is in no one else's view.
+  opts: { ownDrafts?: boolean } = {},
 ): Promise<Map<string, AttachedTicket[]>> {
   const grouped = new Map<string, AttachedTicket[]>();
   if (noteIds.length === 0) return grouped;
   const params = new SqlParams();
   const ids = params.add(noteIds);
-  const { rows } = await db.query<{
+  const me = opts.ownDrafts === true ? params.add(userId) : null;
+  const reach =
+    me === null
+      ? `${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, userId, params)}`
+      : `${LIVE_BASE_WHERE} AND (${visibleTicketsWhere(eff, userId, params)} OR (t.draft_author_id = ${me} AND t.draft_discarded IS NOT TRUE))`;
+  const { rows: matched } = await db.query<{
     note_id: string;
     ticket_id: string;
     project_id: string;
     title: string | null;
+    draft_author_id: string | null;
   }>(
-    `SELECT na.note_id, t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title
+    `SELECT na.note_id, t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title, t.draft_author_id
        FROM proj_note_attachments na
        JOIN proj_tickets t ON t.ticket_id = na.ticket_id
        JOIN proj_visibility v ON v.ticket_id = na.ticket_id
-      WHERE na.note_id = ANY (${ids}::text[]) AND ${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, userId, params)}
+      WHERE na.note_id = ANY (${ids}::text[]) AND ${reach}
       ORDER BY na.note_id, t.ticket_id`,
     params.toArray(),
   );
+  // R18: an own draft is listed only while its author could still create in its project (`isOpenableDraft`'s rule).
+  const rows = matched.filter((row) => row.draft_author_id === null || holdsDraftRights(eff, row.project_id));
   const identity = await workspaceIdentityFromLedger(db, workspaceId);
   const prefixes = await projectPrefixesInWorkspace(db, workspaceId);
   const numbers = await ticketNumbers(
@@ -231,7 +247,7 @@ export async function getNoteDetail(
   );
   const row = rows[0];
   if (row === undefined) return null;
-  const attached = await attachedTicketsByNote(db, eff, userId, row.workspace_id, [row.note_id]);
+  const attached = await attachedTicketsByNote(db, eff, userId, row.workspace_id, [row.note_id], { ownDrafts: true });
   return {
     ...summaryOf(row, attached.get(row.note_id) ?? []),
     body: row.body,

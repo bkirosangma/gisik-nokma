@@ -146,9 +146,10 @@ export type TicketState = {
 /**
  * One typed link held on a ticket's state (spec A §2.2). `from` is set only on a DRAFT's entries for links filed
  * from the other end (drafts spec R42): `{ kind, targetId: <the draft>, from: <the source> }` means "source kind
- * draft". Every entry without `from` is outbound.
+ * draft". Every entry without `from` is outbound. `label`: a `leads_to` branch name (workflow-timeline-graphs LK-2),
+ * ABSENT when none, on a plain entry and a `from` entry alike.
  */
-export type TicketLink = { kind: TicketLinkKind; targetId: string; from?: string };
+export type TicketLink = { kind: TicketLinkKind; targetId: string; from?: string; label?: string };
 
 /** A draft's head state: who drafted it, when, and whether they have discarded it. */
 export type TicketDraft = { authorId: string; at: string; discarded?: true };

@@ -10,6 +10,8 @@ export type TicketLinkWire = {
   kind: TicketLinkKind;
   direction: 'out' | 'in';
   ticket: { id: string; projectId: string; key: string | null; title: string; stateCategory: StateCategory };
+  /** A `leads_to` branch name (workflow-timeline-graphs LK-5), in both directions; ABSENT when none. */
+  label?: string;
 };
 
 /**
@@ -19,7 +21,8 @@ export type TicketLinkWire = {
  * is `'own-draft'`.
  * The visibility predicate is the one every list uses (`visibleTicketsWhere`,
  * over `proj_visibility v` and `proj_tickets t`), so this read and the board
- * cannot disagree about what this person sees.
+ * cannot disagree about what this person sees. The label rides in the SAME statement, behind the same `ends`
+ * filter (planner ruling B, case 29.126): no read lists or counts an edge the filter drops.
  */
 export async function listTicketLinks(
   db: Queryable,
@@ -47,8 +50,9 @@ export async function listTicketLinks(
     project_id: string;
     title: string | null;
     state_category: StateCategory;
+    label: string | null;
   }>(
-    `SELECT l.kind,
+    `SELECT l.kind, l.label,
             CASE WHEN l.source_id = ${me} THEN 'out' ELSE 'in' END AS direction,
             t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title, t.state_category
        FROM proj_ticket_links l
@@ -74,5 +78,6 @@ export async function listTicketLinks(
       title: r.title ?? '',
       stateCategory: r.state_category,
     },
+    ...(r.label === null ? {} : { label: r.label }),
   }));
 }

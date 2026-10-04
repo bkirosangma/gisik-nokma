@@ -249,9 +249,9 @@ export const LIVE_BASE_WHERE =
  *
  * A draft is excluded here for the same reason a deleted ticket is: it is in no
  * view. `LIVE_TICKET_WHERE` is `LIVE_BASE_WHERE` (the soft-delete and container
- * halves) plus `t.draft_author_id IS NULL`. A new VIEW must use this constant,
- * never the base; only a DOOR that admits an author to their own draft asks the
- * base (T4's `canOpen`, T9's `ticketIsOpenable`).
+ * halves) plus `t.draft_author_id IS NULL`. A new VIEW must use this constant, never the base; only a DOOR that
+ * admits an author to their own draft asks the base (T4's `canOpen`, T9's `ticketIsOpenable`). Two views ask it, and
+ * only to admit the viewer's OWN drafts: `read/ticket-links.ts:42` (drafts T6), `read/notes.ts:135` (T9 `ownDrafts`).
  */
 export const LIVE_TICKET_WHERE = `${LIVE_BASE_WHERE} AND t.draft_author_id IS NULL`;
 

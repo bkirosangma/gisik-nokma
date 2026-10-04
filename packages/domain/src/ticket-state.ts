@@ -117,11 +117,19 @@ function claim(value: unknown, env: EventEnvelope): FieldClaim {
   return { value, actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
 }
 
-/** Entries are the same link only when kind, target AND `from` agree: a from entry never swallows a plain one. */
+/**
+ * Entries are the same link only when kind, target AND `from` agree: a from entry never swallows a plain one. The
+ * label is not part of a link's identity: a second add of the same pair with another label is a no-op (LK-5).
+ */
 const sameLink = (l: TicketLink, p: { kind: string; targetId: string; from?: string | undefined }): boolean =>
   l.kind === p.kind && l.targetId === p.targetId && l.from === p.from;
-const entryOf = (p: { kind: TicketLinkKind; targetId: string; from?: string | undefined }): TicketLink =>
-  p.from === undefined ? { kind: p.kind, targetId: p.targetId } : { kind: p.kind, targetId: p.targetId, from: p.from };
+/** `from` and `label` are written only when present: absent, never `undefined` (the shape `rowToTicketState` reads back). */
+const entryOf = (p: { kind: TicketLinkKind; targetId: string; from?: string | undefined; label?: string | undefined }): TicketLink => ({
+  kind: p.kind,
+  targetId: p.targetId,
+  ...(p.from === undefined ? {} : { from: p.from }),
+  ...(p.label === undefined ? {} : { label: p.label }),
+});
 
 /**
  * Pure fold of one ACCEPTED ticket event into head state. Both the proj_tickets

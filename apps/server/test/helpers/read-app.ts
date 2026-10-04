@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
-import { buildTestApp } from './app.js';
+import { buildTestApp, type BuildTestAppOverrides } from './app.js';
 import type { TestDatabase } from './db.js';
 import { applyCommitted, makeCommitted } from './apply.js';
 import { SCENARIO_NOW, seedReadScenario, type ReadScenario } from './read-scenario.js';
@@ -206,13 +206,13 @@ const ROLES: ReadRole[] = [
   'projectLead',
 ];
 
-export async function buildReadTestApp(db: TestDatabase): Promise<ReadWorld> {
+export async function buildReadTestApp(db: TestDatabase, overrides: BuildTestAppOverrides = {}): Promise<ReadWorld> {
   // The clock is FROZEN at `SCENARIO_NOW`, which is the instant this world's
   // fixtures are measured from: `taskInEpic` entered `doing` nineteen Indian
   // days before it and carries a due date five days after it. Only the attention
   // strip (Task 12) reads it — every other route in Tasks 8–15 reads no clock at
   // all — so this pins that one route's answer and changes nothing else.
-  const { app, otp } = buildTestApp(db, { now: () => SCENARIO_NOW });
+  const { app, otp } = buildTestApp(db, { now: () => SCENARIO_NOW, ...overrides });
   await app.ready();
 
   const userIds = {} as Record<ReadRole, string>;
