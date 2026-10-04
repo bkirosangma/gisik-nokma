@@ -68,7 +68,7 @@ function scan(): Record<string, Partial<Calls>> {
   return found;
 }
 
-describe('28.084 the doors census', () => {
+describe('28.084 the doors census, and 28.193 its G10, G11 and note-event rows', () => {
   it('counts calls, not prose, and every door call in apps/server/src is in the table', () => {
     // CONTROL: the machinery can fail. A string that only names a door is not a call; a planted call is.
     expect(countDoorCalls("const note = 'canOpen(db, u, id) is a door'; await canOpen(db, u, id); ticketAccess(a, b, c); // isOpenableDraft(x)")).toEqual({
