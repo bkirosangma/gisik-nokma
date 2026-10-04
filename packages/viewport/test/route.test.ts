@@ -173,7 +173,8 @@ describe('29.065 edge routing on packed rows', () => {
       }
     }
     // the fixture reaches a channel in the gap below each row (34 under row 0, 74 under row 1), so the check is not vacuous
-    expect([...channels].sort((a, b) => a - b)).toEqual([34, 74]);
+    // (a containment, not an equality: a channel moved ONTO an edge must fail the edge leg above, not this one)
+    expect([...channels]).toEqual(expect.arrayContaining([34, 74]));
   });
 
   it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above; a bar in the way is transposed with it and a crossing is reported', () => {
