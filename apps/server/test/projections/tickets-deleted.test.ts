@@ -197,6 +197,7 @@ describe('proj_tickets carries deleted_at / deleted_by, and restore clears them'
       reopened_at: null,
       deleted_at: new Date('2026-09-20T06:00:00.000Z'),
       deleted_by: null,
+      links: [],
     };
     expect(rowToTicketState(shaped).deleted).toBeNull();
     // The positive control through the same call: set the second column and the

@@ -80,6 +80,8 @@ export async function eraseRows(db: PoolClient, set: ErasureSet): Promise<void> 
     ['DELETE FROM proj_rollups WHERE parent_ticket_id = ANY($1::text[])', [T]],
     ['DELETE FROM proj_search WHERE ticket_id = ANY($1::text[])', [T]],
     ['DELETE FROM proj_ticket_comments WHERE ticket_id = ANY($1::text[])', [T]],
+    // Typed links (spec A §2.5): a row naming an erased ticket as source OR target.
+    ['DELETE FROM proj_ticket_links WHERE source_id = ANY($1::text[]) OR target_id = ANY($1::text[])', [T]],
     ['DELETE FROM proj_contested WHERE ticket_id = ANY($1::text[])', [T]],
     [`DELETE FROM notifications WHERE payload->>'ticketId' = ANY($1::text[])`, [T]],
     ['DELETE FROM attachments WHERE ticket_id = ANY($1::text[]) OR note_id = ANY($2::text[])', [T, N]],
