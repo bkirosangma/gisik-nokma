@@ -77,6 +77,7 @@ async function stdioLike(who: Person): Promise<Session> {
     userId: () => who.userId,
     get: (path) => client.get(path, issued.token),
     post: (path, body) => client.post(path, body, issued.token),
+    put: (path, body) => client.put(path, body, issued.token),
     postEvents: (events) => client.post('/v1/events', { events }, issued.token),
     getBytes: (path) => client.getBytes(path, issued.token),
     postMultipart: (path, fields, file) => client.postMultipart(path, fields, file, issued.token),
