@@ -2056,7 +2056,7 @@ async function workspaceHasLedger(db: Queryable, workspaceId: string): Promise<b
  * copy them).
  *
  * `SubmissionContext.db` is the ingest transaction's own client, passed down
- * from `commitOne`, and that is load-bearing rather than tidy: the membership
+ * from `commitInTx` (for an atomic set, the set's one transaction), and that is load-bearing rather than tidy: the membership
  * read must see the world the workspace lock has already settled. Rewriting the
  * call site to hand it `deps.pool` would compile, pass every test, and open a
  * window in which a concurrently-committed `membership.revoked` is invisible to

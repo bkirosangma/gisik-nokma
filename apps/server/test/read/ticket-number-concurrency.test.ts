@@ -17,7 +17,7 @@ import { submittedWorkspaceCreated } from '../helpers/events.js';
  * ## Why this file drives the REAL ingest rather than a fixture
  *
  * A number allocated by a helper the test itself called is not evidence about
- * the server. Every part of the property that matters lives in `commitOne`:
+ * the server. Every part of the property that matters lives in `commitInTx`:
  * the per-workspace advisory lock, `nextWorkspaceSeq`'s `max + 1`, and the
  * `events_workspace_seq_unique` constraint behind them. A fixture that wrote
  * `workspace_seq` values directly would be asserting that the test can count.
@@ -30,7 +30,7 @@ import { submittedWorkspaceCreated } from '../helpers/events.js';
  *
  * The numbers are DERIVED from `workspace_seq`, so two creations sharing a
  * number would require them to share a `workspace_seq` — which the unique
- * constraint forbids. A mutation that removed `lockWorkspace` from `commitOne`
+ * constraint forbids. A mutation that removed `lockWorkspace` from `commitInTx`
  * lets two transactions read the same `max(workspace_seq)` under READ
  * COMMITTED; the second INSERT then violates the constraint and that creation
  * does not commit. Either outcome reddens a line below: a missing commit

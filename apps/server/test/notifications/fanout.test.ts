@@ -873,6 +873,8 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
     const recordingIngest: IngestService = {
       ingestBatch: async () => [],
       ingestClientBatch: async () => [],
+      ingestAtomic: async () => ({ status: 'committed', results: [] }),
+      ingestClientAtomic: async () => ({ status: 'committed', results: [] }),
       // The returned function REMOVES the listener, where this fake used to
       // return `() => {}`. A no-op unsubscribe makes the `onClose` hook in
       // `app.ts` untestable by construction: whether or not the hook exists,
