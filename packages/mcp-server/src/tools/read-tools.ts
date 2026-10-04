@@ -45,8 +45,9 @@ type AttachedNote = { noteId: string; title: string; authorId: string; updatedAt
 
 /**
  * The notes attached to a ticket that THIS caller may read, as the Notes section of the ticket sheet reads them
- * (`GET …/tickets/:id/notes`, `apps/server/src/routes/notes.ts:87-96`). The route has no ticket check of its own, so the
- * caller reads the ticket first. Any failure here fails the call (GT-5).
+ * (`GET …/tickets/:id/notes`, `apps/server/src/routes/notes.ts:88-98`). The route has no visibility check of its own (it
+ * answers an empty list for another person's draft or an erased one, drafts T9, and nothing more), so the caller reads
+ * the ticket first. Any failure here fails the call (GT-5).
  */
 async function attachedNotes(session: Session, path: string): Promise<AttachedNote[]> {
   let body: unknown;
@@ -192,7 +193,7 @@ export function readTools(session: Session): ToolDefinition[] {
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/links`,
           'ticket',
-        )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string } }> };
+        )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string }; label?: string }> };
         // AFTER the ticket read: the notes route does not check the ticket (GT-1).
         const notes = await attachedNotes(
           session,
@@ -209,7 +210,13 @@ export function readTools(session: Session): ToolDefinition[] {
           // The author's own draft says so at the top level, next to `key: null`; a published ticket has no such member.
           ...(detail.ticketState?.draft === undefined ? {} : { draft: true }),
           description: bodyAsMarkdown(description?.value ?? null),
-          links: linked.links.map((l) => ({ kind: l.kind, direction: l.direction, ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title } })),
+          // A `leads_to` branch label rides along when there is one (wtg2 T2, 29.126); no key otherwise.
+          links: linked.links.map((l) => ({
+            kind: l.kind,
+            direction: l.direction,
+            ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title },
+            ...(l.label === undefined ? {} : { label: l.label }),
+          })),
           notes: notes.slice(0, MAX_TICKET_NOTES),
           notesTotal: notes.length,
         };

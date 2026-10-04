@@ -91,3 +91,63 @@ export function compareByRank(
   if (a.rank === null && b.rank !== null) return 1;
   return a.ticketId < b.ticketId ? -1 : a.ticketId > b.ticketId ? 1 : 0;
 }
+
+/** The two fields rank planning reads from a Backlog row. */
+export type RankedRow = { ticketId: string; rank: string | null };
+
+/** One `ticket.ranked` to write: the key `ticketId` takes. */
+export type RankAssignment = { ticketId: string; rank: string };
+
+/**
+ * What "place these tickets last" must ingest: keys for the rows that had none, in their drawn order, then the keys of
+ * the placed tickets in the order they must draw. Backfill first, because `compareByRank` draws every ranked row above
+ * every unranked one, so a key can never sit AFTER a row that has none.
+ */
+export type TailRankPlan = { backfill: RankAssignment[]; tail: RankAssignment[] };
+
+/**
+ * Keys for the rows of `sorted` that have none. `sorted` is in drawn order (`compareByRank`), so the unranked rows are
+ * a contiguous tail; they take strictly ascending keys, all above the last existing key, and the drawn order does not
+ * change. This is the one implementation of the backfill: `planRankMove` (a drag) and `planTailRank` (a publish) both
+ * call it, because a second spelling of "where do unranked rows go" is the drift `backlog-rank.ts` warns about.
+ */
+export function backfillUnranked(sorted: readonly RankedRow[]): RankAssignment[] {
+  let cursor: string | null = null;
+  for (const row of sorted) {
+    if (row.rank !== null) cursor = row.rank;
+  }
+  const out: RankAssignment[] = [];
+  for (const row of sorted) {
+    if (row.rank !== null) continue;
+    const key = rankBetween(cursor, null);
+    out.push({ ticketId: row.ticketId, rank: key });
+    cursor = key;
+  }
+  return out;
+}
+
+/**
+ * The events that place `tailIds` at the END of a Backlog (drafts spec R64, R65). `rows` is the Backlog as the planner
+ * can see it, in any order; rows named in `tailIds` are ignored there (a client's list already holds the ticket it has
+ * just published, unranked). The server's atomic publish and the app's single publish both call this, so the two
+ * paths cannot disagree about where a published ticket goes.
+ *
+ * Apply `backfill` first, then `tail`; every assignment is one `ticket.ranked`. Nothing is backfilled when every other
+ * row already has a key, so the ordinary case is one event per placed ticket.
+ */
+export function planTailRank(rows: readonly RankedRow[], tailIds: readonly string[]): TailRankPlan {
+  const placed = [...new Set(tailIds)];
+  const skip = new Set(placed);
+  const others = rows.filter((row) => !skip.has(row.ticketId)).sort(compareByRank);
+  const backfill = backfillUnranked(others);
+  // After the backfill every row has a key, and the last one drawn holds the greatest.
+  let cursor: string | null =
+    backfill.length > 0 ? (backfill[backfill.length - 1]?.rank ?? null) : (others[others.length - 1]?.rank ?? null);
+  const tail: RankAssignment[] = [];
+  for (const ticketId of placed) {
+    const rank = rankBetween(cursor, null);
+    tail.push({ ticketId, rank });
+    cursor = rank;
+  }
+  return { backfill, tail };
+}

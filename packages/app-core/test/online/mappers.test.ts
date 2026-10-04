@@ -2798,6 +2798,28 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     };
     expect(mapTicketLinks(two)).toEqual(two.links);
   });
+  it('29.126 mapTicketState and mapTicketLinks carry a leads_to label and write no label key when there is none; a non-string label is refused by its path', () => {
+    const X = '01J9GTKX000000000000000000';
+    const Y = '01J9GTKY000000000000000000';
+    const stateWith = (links: unknown) => {
+      const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+      (body['ticketState'] as Record<string, unknown>)['links'] = links;
+      return mapTicketRead(body).ticket;
+    };
+    const st = stateWith([{ kind: 'leads_to', targetId: X, label: 'Yes' }, { kind: 'blocks', targetId: Y }]);
+    expect(st.links).toEqual([{ kind: 'leads_to', targetId: X, label: 'Yes' }, { kind: 'blocks', targetId: Y }]);
+    expect(Object.keys(st.links![1]!).sort()).toEqual(['kind', 'targetId']); // control: no `label` key at all
+    expect(() => stateWith([{ kind: 'leads_to', targetId: X, label: 7 }])).toThrow(/ticket\.ticketState\.links\[0\]\.label/);
+    const views = mapTicketLinks({ links: [
+      { kind: 'leads_to', direction: 'out', ticket: { id: X, projectId: 'p1', key: 'GN-1', title: 't', stateCategory: 'active' }, label: 'Yes' },
+      { kind: 'blocks', direction: 'in', ticket: { id: Y, projectId: 'p1', key: 'GN-2', title: 'u', stateCategory: 'active' } },
+    ] });
+    expect(views[0]!.label).toBe('Yes');
+    expect('label' in views[1]!).toBe(false); // control
+    expect(() => mapTicketLinks({ links: [
+      { kind: 'leads_to', direction: 'out', ticket: { id: X, projectId: 'p1', key: 'GN-1', title: 't', stateCategory: 'active' }, label: null },
+    ] })).toThrow(/links\.links\[0\]\.label/);
+  });
 
   it("28.196 mapHistory carries linkDirection 'in' and 'out', keeps an absent one absent, and refuses any other value by its path", () => {
     const historyEvent = (extra: Record<string, unknown>) =>

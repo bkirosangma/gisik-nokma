@@ -122,6 +122,9 @@ export type TicketTypeDef = z.infer<typeof ticketTypeDefSchema>;
 
 export const SUB_TASK_TYPE_ID = 'sub-task';
 
+/** The built-in Decision type's id (spec DC-1). T5 of the wtg-part2-model plan adds the seed; the label rules (LK-3) read the id from here. */
+export const DECISION_TYPE_ID = 'decision';
+
 /**
  * The floor of the hierarchy — the built-in sub-task's rank. A ticket whose
  * TYPE sits at this rank OR BELOW it (`rank >= DEEPEST_RANK`) requires a parent

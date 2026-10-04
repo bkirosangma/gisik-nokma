@@ -50,5 +50,5 @@ export default defineConfig({
   optimizeDeps: { include: ['react/jsx-dev-runtime'] },
   plugins: [results()],
   server: { port: 3192, strictPort: true },
-  build: { rollupOptions: { input: [resolve(__dirname, 'harness/stress.html'), resolve(__dirname, 'harness/timeline.html')] } },
+  build: { rollupOptions: { input: [resolve(__dirname, 'harness/stress.html'), resolve(__dirname, 'harness/timeline.html'), resolve(__dirname, 'harness/timeline-stress.html')] } },
 });

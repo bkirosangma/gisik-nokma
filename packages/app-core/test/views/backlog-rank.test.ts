@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rankBetween } from '@gisik-nokma/domain';
+import { planTailRank, rankBetween } from '@gisik-nokma/domain';
 import { moveTarget, neighboursFor, planRankMove, sortByRank, type RankRow } from '../../src/views/backlog-rank.js';
 
 /**
@@ -287,5 +287,18 @@ describe('13.711 planRankMove — the unranked rows are ranked first, then the m
     const plan = planRankMove(FRESH, 't1', null);
     expect(plan.backfill.map((b) => b.ticketId)).toEqual(['t2', 't3', 't4']);
     expect(applyPlan(FRESH, 't1', plan)).toEqual(['t2', 't3', 't4', 't1']);
+  });
+});
+
+describe('28.192 planTailRank and planRankMove share one backfill', () => {
+  it('draws the same backfill keys for the same rows, and the placed ticket gets the key the drag to the tail gets', () => {
+    const rows: RankRow[] = sortByRank([
+      { ticketId: 'A', rank: 'g' }, { ticketId: 'B', rank: null }, { ticketId: 'C', rank: null }, { ticketId: 'D', rank: 'p' }, { ticketId: 'X', rank: null },
+    ]);
+    const drag = planRankMove(rows, 'X', null);
+    const tail = planTailRank(rows, ['X']);
+    expect(tail.backfill).toEqual(drag.backfill);
+    expect(tail.tail).toEqual([{ ticketId: 'X', rank: drag.rank }]);
+    expect(drag.backfill.length).toBeGreaterThan(0); // CONTROL: the comparison is over a non-empty backfill
   });
 });

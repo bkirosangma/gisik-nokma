@@ -110,14 +110,15 @@ type NoteSourceRow = {
 type AttachedTicketRow = { ticket_id: string; project_id: string; title: string | null };
 
 /**
- * The ticket events that can change a `ticket_text` line.
+ * The ticket events that can change a `ticket_text` line. `ticket.published` is one: a note linked to a draft has no
+ * line for it (`ticketTextOf` asks `LIVE_TICKET_WHERE`), and the ticket enters that set the moment it is published.
  *
  * `ticket.field_set` is here for ONE field, filtered in `apply` rather than
  * here: a ticket has many fields and only its TITLE is part of the line, so a
  * projection that re-derived on every field claim would do a workspace-wide
  * scan of the ledger every time somebody set a priority.
  */
-const TICKET_TEXT_EVENTS = new Set(['ticket.field_set', 'ticket.deleted', 'ticket.restored']);
+const TICKET_TEXT_EVENTS = new Set(['ticket.field_set', 'ticket.deleted', 'ticket.restored', 'ticket.published']);
 
 /** The three-or-more-letter word rule (spec §7.3). */
 const MIN_LEXEME_LENGTH = 3;

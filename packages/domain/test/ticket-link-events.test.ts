@@ -114,13 +114,14 @@ describe('27.003 the reducer folds links', () => {
 });
 
 describe('27.008 how a link reads, and the link-event predicate', () => {
-  it('27.008 all six readings, as linkReading(kind, direction) states them, and the predicate names exactly the two link events', () => {
+  it('27.008 all eight readings, as linkReading(kind, direction) states them, and the predicate names exactly the two link events', () => {
     // The wire names are not the readings: `blocks.in` is "is blocked by", and a mutation that returns the kind itself must fail here.
     const readings = TICKET_LINK_KINDS.map((kind) => [kind, linkReading(kind, 'out'), linkReading(kind, 'in')]);
     expect(readings).toEqual([
       ['blocks', 'blocks', 'is blocked by'],
       ['relates', 'relates to', 'relates to'],
       ['duplicates', 'duplicates', 'is duplicated by'],
+      ['leads_to', 'leads to', 'comes after'],
     ]);
     expect(isTicketLinkEvent('ticket.link_added')).toBe(true);
     expect(isTicketLinkEvent('ticket.link_removed')).toBe(true);
