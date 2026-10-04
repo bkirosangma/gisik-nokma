@@ -1911,7 +1911,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   built from the server's own sniffed and hashed truth (never the client's claim about its file), refuses
   a session-less request 401, a malformed one 400, an oversize one 413 (the shipped ceiling is exactly
   26,214,400 bytes — 25 MiB), a mime the sniff refuses 415, and a guest without ticket visibility a 404
-  BYTE-IDENTICAL to a nonexistent ticket; download streams the exact stored bytes under `canSee`, inline
+  BYTE-IDENTICAL to a nonexistent ticket; download streams the exact stored bytes under `canOpen` (`canSee`, or a draft's author: drafts T9, G10), inline
   for images and as a sanitized-filename attachment otherwise, and answers that SAME 404 for an unshared
   guest, a nonexistent id, and metadata recorded with no bytes behind it — three different truths, one
   frozen body, so nothing about which of the three happened leaks. `apps/server/src/app.ts` registers
@@ -1961,7 +1961,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   doors now carry a THIRD guard (`ticketIsLive`, `apps/server/src/read/live-ticket.ts`) asked AFTER `canSee`
   and answering the same 404 body (drafts T9, G10: the upload, download and list doors ask `ticketIsOpenable`,
   `LIVE_BASE_WHERE`, after `canOpen`, so a draft's author reaches its files; the tombstone rule is unchanged), so existence stays indistinguishable from invisibility AND from deletion.
-  **It is `LIVE_TICKET_WHERE` asked at a route, never a widened `canSee`**: folding deletion into the
+  **It is `LIVE_TICKET_WHERE` (at the three file doors `LIVE_BASE_WHERE`, its draft clause left to `canOpen`) asked at a route, never a widened `canSee`**: folding deletion into the
   visibility predicate breaks the `canSeeResolved` cross-check and makes `listVisibleTickets`, whose SELECT has
   no `proj_tickets` in its FROM, a runtime "missing FROM-clause entry". **The two HISTORY doors still serve a
   tombstone, deliberately** — *"Its history is retained, because other events cite it"* — and the asymmetry is
@@ -3482,9 +3482,9 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ⚙️ **Files uploaded into a note are owned by the note** — upload needs author/admin-reader/owner, download needs a reader (spec §4.4).
 - ⚙️ **A note cannot be filed under a project nobody founded** — spec §3.3's existence precondition, asked in `checkProjectExists` (existence) before `checkNotePermission` (membership), so the refusal names the actual fault. The archived half is deliberately NOT enforced, for notes or for tickets.
 - ⚙️ **Note events stream to readers only** — a new `note` audience class; widening announces `reach-granted` with a `notes` arm, so a device whose cursor ran past a note while it was invisible is told the id and head position to pull (spec §5.1; narrowing is client-driven — never a server purge, ruling P23).
-- ⚙️ **A ticket becoming visible brings its inherit-scoped notes with it** — a ticket grant trigger also names the `inherit` notes attached to it and to its inheriting descendants, filtered to the notes the reader can actually read; a note that does not depend on the ticket (project, workspace, explicit) is not announced (spec §5.2).
+- ⚙️ **A ticket becoming visible brings its inherit-scoped notes with it** — a ticket grant trigger also names the `inherit` notes attached to it and to its inheriting descendants, filtered to the notes the reader can actually read; a note that does not depend on the ticket (project, workspace, explicit) is not announced (spec §5.2), except by a `ticket.published`, which names the notes of every scope linked to the draft it publishes (their `note.attached` was withheld until then; drafts T9, 28.194).
 - ⚙️ **Narrowing reaches devices through reconcile** — the client presents the note ids it holds as `heldNoteIds` and drops the ones the server now refuses (`restrictedNotes`); an unknown id answers exactly as a genuine loss, so the reply carries no existence oracle (ruling P23; spec §5.1's server-side purge is deliberately not built).
-- ⚙️ **A device can pull one note's history** (`GET /v1/notes/:id/events`, the same row shape the ticket events route serves) and receives every readable note's ledger at bootstrap, so a fresh device and a new member need no notice (spec §5.1).
+- ⚙️ **A device can pull one note's history** (`GET /v1/notes/:id/events`, the same row shape the ticket events route serves) and receives every readable note's ledger at bootstrap, so a fresh device and a new member need no notice (spec §5.1). Both, like the stream, leave out a `note.attached` / `note.detached` naming a draft the reader cannot open or an erased draft (`noteEventVisibleTo`, drafts T9, 28.186).
 - ⚙️ **Notes live in the local replica** (`notes`, `note_comments`, local schema version 2) — folded by the same `applyNoteEvent` the server's projection uses, removed by `purgeEntity` and workspace-scoped by `revokeScope`; `getDeletedNotes` applies the deleted-note gate (author, admin or owner), which is narrower than the read rule (spec §5.3).
 - ✅ **Notes work offline on the web app and are ready for desktop and mobile** — every note read is answered from the local replica, and a note that arrives by pull emits a `refresh` frame so an open screen re-reads it (spec §5.3).
 - ⚙️ **The client seam has a witness** — the engine, the SHIPPED HTTP transport and the REAL routes are wired to each other (`apps/server/test/sync/notes-client-seam.test.ts`), which is the one place a frame ladder, a body schema and an engine request are measured together rather than each against a fake of the next.

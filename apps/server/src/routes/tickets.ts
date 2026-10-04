@@ -789,13 +789,18 @@ export function registerTicketRoutes(
    *
    * Same guards, same order, same body: `loadTicketRow` → 404, then `canSee`
    * → 404, and — since the soft-delete change — `ticketIsLive` → 404, which is
-   * the THIRD guard the DETAIL route carries and this pair did not. That is
-   * deliberate rather than convenient — "may this caller see this ticket" is
-   * asked in exactly one place (`../visibility/can-see.ts:227`), and a second,
-   * weaker answer to it is this project's signature failure. The deletion
-   * question is a DIFFERENT one and is asked in its own one place
-   * (`../read/live-ticket.ts`), because folding it into `canSee` would break
-   * that predicate's cross-check and its callers — see `visible-where.ts`.
+   * the THIRD guard the DETAIL route carries and this pair did not. Drafts T9
+   * (G10) made this door's second and third guards `canOpen` (which asks
+   * `canSee` first, then admits the author of a draft) and `ticketIsOpenable`
+   * (`ticketIsLive` without the draft clause); the events door above keeps
+   * `canSee`. That is deliberate rather than convenient — "may this caller see
+   * this ticket" is asked in exactly one place (`../visibility/can-see.ts:227`),
+   * and a second, weaker answer to it is this project's signature failure;
+   * "may this caller open this draft" is likewise one place
+   * (`../visibility/can-open.ts`). The deletion question is a DIFFERENT one and
+   * is asked in its own one place (`../read/live-ticket.ts`), because folding it
+   * into `canSee` would break that predicate's cross-check and its callers — see
+   * `visible-where.ts`.
    *
    * ⚠ **The ORDER of the first two is a copy, not a measurement** — recorded
    * because a reader would otherwise take "in the same order" for a witnessed

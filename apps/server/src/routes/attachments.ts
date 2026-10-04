@@ -182,8 +182,8 @@ function discardUnreadFile(file: Readable): void {
  *
  * ⚠ **Step 6 is a SECOND, DISTINCT 404 reason and was missing from this list
  * until 2026-09-20** — the tombstone guard, added after step 5 rather than
- * folded into it because it is a different question (`canSee` is visibility and
- * does not mean "not deleted"). It sits BELOW step 5 on purpose: a caller who
+ * folded into it because it is a different question (`canOpen`, like the
+ * `canSee` it asks first, is visibility and does not mean "not deleted"). It sits BELOW step 5 on purpose: a caller who
  * may not see the ticket must get step 5's answer whether or not the ticket is
  * also deleted, or the deleted-ness would be an inference they were never owed.
  * It is above steps 7 and 8 for the same reason step 5 is: a deleted ticket

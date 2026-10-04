@@ -46,7 +46,9 @@ import { LIVE_BASE_WHERE, LIVE_TICKET_WHERE } from './visible-where.js';
  *
  * This answers a question. What a `false` becomes — a 404 in the route's shared
  * body, an empty list, a filtered row — is the caller's decision, and it has to
- * be: the same predicate is a refusal at a file door and a filter in a view.
+ * be: the same predicate is a refusal at a door (the comments door) and a filter
+ * in a view. The three file doors ask `ticketIsOpenable` below instead (drafts
+ * T9, G10), after `canOpen`.
  */
 export async function ticketIsLive(
   db: Queryable,
