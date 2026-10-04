@@ -336,7 +336,7 @@ describe('the gate seam', () => {
 describe('the gate seam at the CLIENT door', () => {
   /**
    * Gates are unconditional across doors, and this is the half that could
-   * silently not be: `commitOne` is shared, but a future edit moving the loop
+   * silently not be: `commitInTx` is shared, but a future edit moving the loop
    * into the internal-door branch would leave every test above green while
    * ungating `POST /v1/events` and Plan 10's `POST /v1/sync` — the only two
    * doors a real client can reach.

@@ -56,7 +56,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * The world below is seeded with `applyCommitted` — ledger plus projections,
  * no permission gate and no rule engine, exactly as `./snapshot-writer.test.ts`
  * seeds its own. The `workflow.defined` under test is submitted through
- * `createIngestService(...).ingestBatch`, which is `commitOne`, which is where
+ * `createIngestService(...).ingestBatch`, which is `commitOne` and so `commitInTx`, which is where
  * the refresh is wired. Seeding the publish instead would have tested the
  * module and not the wiring; a call site nothing reaches is the defect this
  * task exists to close, one layer up.

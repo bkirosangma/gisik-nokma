@@ -46,6 +46,7 @@ import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerDraftRoutes } from './routes/drafts.js';
+import { registerDraftPublishRoutes } from './routes/drafts-publish.js';
 import { registerNoteRoutes } from './routes/notes.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerPurgedLookupRoute } from './purge/lookup-route.js';
@@ -940,6 +941,8 @@ export function buildApp(
   registerTicketRoutes(app, { pool: deps.pool }, requireSession);
   // The viewer's own drafts (drafts spec G8): the Drafts page and MCP's list_my_drafts. Session-subject only.
   registerDraftRoutes(app, { pool: deps.pool }, requireSession);
+  // Publish an ordered set of the caller's drafts atomically (drafts spec R48): the gated client door, never the internal one.
+  registerDraftPublishRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
   // The note read surface (notes series, Plan 1 of 6) — list, one note, a
   // ticket's notes, comments, history and one version. Same preHandler by
   // parameter, same reason: every handler reads `request.currentUserId`, and the
