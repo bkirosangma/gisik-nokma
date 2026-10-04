@@ -126,9 +126,12 @@ describe('29.052 adjacency, ties and stability', () => {
     expect(packLane([a, gappedShared], { ppd: 16 }).rows).toBe(2);
   });
 
-  it('29.052 equal starts order by natural key (GN-9 before GN-10), keyed before unkeyed, then by id; the input order does not matter', () => {
+  it('29.052 equal starts order by natural key (GN-9 before GN-10, GN before GN1), keyed before unkeyed, then by id; the input order does not matter', () => {
     expect(naturalKeyCompare('GN-9', 'GN-10')).toBeLessThan(0);
     expect(naturalKeyCompare('GN-10', 'GN-9')).toBeGreaterThan(0);
+    // A key whose parts are a prefix of another's sorts first (the part-list length tiebreak).
+    expect(naturalKeyCompare('GN', 'GN1')).toBeLessThan(0);
+    expect(naturalKeyCompare('GN1', 'GN')).toBeGreaterThan(0);
     const mk = (id: string, key: string | null): PackItem => ({ id, key, segments: [{ start: 5, end: 9 }] });
     // `w` before `z` here, so a sort that drops the id tie-break keeps `forward` right and only `back` ([z, x, y, w]) goes wrong.
     const items = [mk('w', null), mk('y', 'GN-10'), mk('x', 'GN-9'), mk('z', null)];
