@@ -255,8 +255,8 @@ describe('28.119 the bootstrap and the doors that serve a stored link (KG->WG sy
       expect(JSON.stringify(entry), door).not.toContain(t);
     }
     // CONTROL: the owner, who still sees T, is served T's own entry, and never D
-    const [[, ownerT]] = await bootEntries('owner', t);
-    expect(ownerT?.ticketId).toBe(t);
+    const ownerT = (await bootEntries('owner', t)).map(([, e]) => e?.ticketId);
+    expect(ownerT).toEqual([t, t]);
     expect((await bootEntries('owner', d)).map(([, e]) => e)).toEqual([undefined, undefined]);
   });
 
