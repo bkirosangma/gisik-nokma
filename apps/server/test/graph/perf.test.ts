@@ -1,6 +1,8 @@
 /**
  * Knowledge Graph spec C, ring read (`read/graph-neighbours.ts`): 27.208-27.209 smoke on every run, 27.210 the p95 per ring
- * (`KG_PERF=1`), 27.211 the within-ring edge and the page's card keys. The link and reference tables come from `./shim.ts` until plan A's and plan B's migrations are on the branch.
+ * (`KG_PERF=1`), 27.211 the within-ring edge and the page's card keys. 27.027 (typed-links T2): the ring's link edge is the row
+ * TL2's projection wrote. `proj_ticket_links` and `proj_references` are the REAL migrated tables (`1791700000000_proj-ticket-links.sql`,
+ * `1791500000000_proj-references.sql`); the test-only shim that created them is gone, and `./real-tables.test.ts` (27.028) keeps it gone.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { graphRef, membershipId, newUlid, ticketKey, type LedgerEvent } from '@gisik-nokma/domain';
@@ -8,12 +10,10 @@ import { readGraphRing } from '../../src/read/graph-neighbours.js';
 import { ticketNumbers } from '../../src/read/ticket-numbers.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { ensureLinkAndReferenceTables } from './shim.js';
 
 let db: TestDatabase;
 beforeAll(async () => {
   db = await createTestDatabase();
-  await ensureLinkAndReferenceTables(db.pool);
 }, 600_000);
 afterAll(async () => {
   await db.drop();
@@ -72,7 +72,11 @@ async function seedSmall(database: TestDatabase) {
   return { ws: ids.ws, owner: ids.owner, member: ids.member, parent, child, grandchild, hidden };
 }
 
-/** A parent with two children and a `relates` link BETWEEN the children, in a workspace and project with ENTERED prefixes (`GK` / `PL`). */
+/**
+ * A parent with two children and a `relates` link BETWEEN the children, in a workspace and project with ENTERED prefixes (`GK` / `PL`).
+ * The link is FILED as a `ticket.link_added` (by the member, via MCP: neither is the seed's default), so its row is the one
+ * `ticketLinksProjection` writes into the migrated table (27.027), never a hand insert.
+ */
 async function seedSiblings(database: TestDatabase) {
   const ids = freshIds();
   await insertUser(ids.owner, 'Olive Owner');
@@ -87,11 +91,9 @@ async function seedSiblings(database: TestDatabase) {
     create(left, parent, 'Left sibling'),
     create(right, parent, 'Right sibling'),
   ]);
-  await database.pool.query(
-    `INSERT INTO proj_ticket_links (workspace_id, source_id, target_id, kind, created_by, created_at, origin, seq) VALUES ($1, $2, $3, 'relates', $4, now(), 'test', 1)`,
-    [ids.ws, left, right, ids.owner],
-  );
-  return { ws: ids.ws, member: ids.member, parent, left, right };
+  const link = makeCommitted({ workspaceId: ids.ws, actorId: ids.member, origin: 'mcp', entity: { kind: 'ticket', id: left }, type: 'ticket.link_added', payload: { kind: 'relates', targetId: right } });
+  await applyCommitted(database.pool, [link]);
+  return { ws: ids.ws, owner: ids.owner, member: ids.member, parent, left, right, link };
 }
 
 /** Every group: what the perf case reads. */
@@ -128,6 +130,23 @@ describe('27.208–27.209, 27.211 the ring read, smoke', () => {
     expect(left?.label).toBe(ticketKey('GK', 'PL', numbers.get(world.left)!));
     expect(left?.label).toMatch(/^GKPL-\d+$/);
     expect(left?.title).toBe('Left sibling');
+  });
+
+  it('27.027 the ring link edge is the row the TL2 projection wrote (the filer name, the event server time and origin); control: after link_removed the edge is gone', async () => {
+    const world = await seedSiblings(db);
+    const read = () =>
+      readGraphRing(db.pool, world.owner, { center: { kind: 'ticket', id: world.parent }, hops: 1, workspaceIds: [world.ws], projectIds: [], groups: new Set(['structure', 'relates'] as const), offset: 0 });
+    const relatesId = `relates|${graphRef('ticket', world.left)}|${graphRef('ticket', world.right)}`;
+    const edge = (await read())?.edges.find((e) => e.id === relatesId);
+    // The columns graph-neighbours.ts selects (created_by, created_at, origin) carry the EVENT's actor, serverTime and origin.
+    expect(edge).toEqual({
+      id: relatesId, kind: 'relates', from: graphRef('ticket', world.left), to: graphRef('ticket', world.right),
+      snippet: null, addedBy: 'Mira Member', addedAt: world.link.serverTime, origin: 'mcp', suggested: false,
+    });
+    // CONTROL: the read follows the projection's delete, so the edge above came from the projected row.
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: world.ws, actorId: world.owner, entity: { kind: 'ticket', id: world.left }, type: 'ticket.link_removed', payload: { kind: 'relates', targetId: world.right } })]);
+    const after = await read();
+    expect(after?.edges.map((e) => e.kind)).toEqual(['parent', 'parent']);
   });
 
   it('27.209 a centre the viewer cannot see answers null (the route turns it into 404); control: the owner reads it', async () => {
@@ -201,8 +220,8 @@ describe('27.210 p95 per ring (spec §2.2, §7)', () => {
 type CorpusSize = { tickets: number; notes: number; people: number; links: number; references: number };
 
 /**
- * A deterministic corpus (fixed-seed LCG) seeded through the ledger, so every projection runs, plus plain INSERTs into the shimmed
- * link and reference tables. The hub is ticket 0: 24 extra subtasks on top of the tree's 8, 8 attached notes, 6 typed links and
+ * A deterministic corpus (fixed-seed LCG) seeded through the ledger, so every projection runs, plus plain bulk INSERTs into the
+ * migrated link and reference tables. The hub is ticket 0: 24 extra subtasks on top of the tree's 8, 8 attached notes, 6 typed links and
  * 4 references, and each of those neighbours gets 16 more neighbours, so ring 2 holds more than the 500 items the bar is about.
  */
 async function seedGraphCorpus(database: TestDatabase, size: CorpusSize) {

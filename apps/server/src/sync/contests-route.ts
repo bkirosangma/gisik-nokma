@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { FieldClaim } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { canSee } from '../visibility/can-see.js';
+import { targetSight, withholdContest } from '../visibility/withhold-link-targets.js';
 
 export type ContestView = {
   contestedEventId: string;
@@ -275,7 +276,10 @@ export function registerContestsRoute(
         // still renders."*). The reason is the FAQ's: a contest is an event
         // that CITES the ticket — *"Its history is retained, because other
         // events cite it"* — and this roster is gated per row by `canSee`,
-        // which is the whole audience decision here. The consequence is named
+        // which is the whole audience decision here (one rewrite rides on it:
+        // a contested LINK claim whose target this viewer cannot see is served
+        // with that target withheld and the gate's cause, typed-links T4b,
+        // `withholdContest` below). The consequence is named
         // rather than left to be found: the deleted ticket's TITLE travels with
         // the contest, because the title is joined from `proj_tickets.fields`
         // and `canSee` knows nothing about deletion.
@@ -289,11 +293,14 @@ export function registerContestsRoute(
       );
 
       const contests: ContestView[] = [];
+      const sees = targetSight(deps.pool, request.currentUserId);
       for (const row of rows) {
         if (!(await canSee(deps.pool, request.currentUserId, row.ticket_id))) {
           continue;
         }
-        contests.push(toView(row));
+        // A contested link claim whose target this viewer cannot see: the
+        // embedded payload withheld and the gate's cause (typed-links T4b).
+        contests.push(await withholdContest(toView(row), sees));
       }
       return { contests };
     },

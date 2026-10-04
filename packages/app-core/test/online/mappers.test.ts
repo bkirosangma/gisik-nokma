@@ -35,6 +35,7 @@ import {
   mapPreferences,
   mapRollup,
   mapSearchHits,
+  mapTicketLinks,
   mapTicketRead,
   mapWorkflowDef,
   mapWorkspaceRefs,
@@ -2755,6 +2756,47 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // The error NAMES the field: a bare `toThrow(MappingError)` would accept any
     // of this mapper's many other reasons to throw.
     expect(() => mapListPage(absent)).toThrow(/\.key/);
+  });
+  it('27.063 mapTicketState carries links, mapHistory carries linkTarget, mapTicketLinks refuses an unknown kind or direction by name; control: a wire with no links maps to no key', () => {
+    const X = '01J9GTKX000000000000000000';
+    const stateWith = (links: unknown) => {
+      const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+      if (links !== undefined) (body['ticketState'] as Record<string, unknown>)['links'] = links;
+      return mapTicketRead(body).ticket;
+    };
+    expect(stateWith([{ kind: 'blocks', targetId: X }]).links).toEqual([{ kind: 'blocks', targetId: X }]);
+    expect('links' in stateWith([])).toBe(false); // the domain's absent-not-empty rule
+    expect('links' in stateWith(undefined)).toBe(false); // control: no links on the wire
+    expect(() => stateWith([{ kind: 'parent', targetId: X }])).toThrow(/ticket\.ticketState\.links\[0\]\.kind: expected one of blocks\/relates\/duplicates/);
+
+    const historyEvent = (extra: Record<string, unknown>) =>
+      mapHistory({
+        ticketId: 't',
+        events: [
+          { id: 'e1', type: 'ticket.link_added', version: 1, payload: { kind: 'blocks', targetId: null }, actorId: ANSELMA, origin: 'web', clientTime: 'c', serverTime: 's', seq: 1, ...extra },
+        ],
+      })[0]!;
+    expect(historyEvent({ linkTarget: null }).linkTarget).toBeNull();
+    expect(historyEvent({ linkTarget: { key: 'GN-1' } }).linkTarget).toEqual({ key: 'GN-1' });
+    expect('linkTarget' in historyEvent({})).toBe(false);
+
+    const row = (over: Record<string, unknown>) => ({
+      kind: 'blocks',
+      direction: 'out',
+      ticket: { id: X, projectId: 'p1', key: 'GN-1', title: 'One', stateCategory: 'open' },
+      ...over,
+    });
+    expect(() => mapTicketLinks({ links: [row({ kind: 'parent' })] })).toThrow(MappingError);
+    expect(() => mapTicketLinks({ links: [row({ kind: 'parent' })] })).toThrow(/links\.links\[0\]\.kind/);
+    expect(() => mapTicketLinks({ links: [row({ direction: 'sideways' })] })).toThrow(/links\.links\[0\]\.direction/);
+    // N5 (AMEND p11): each member of the direction allow-list has a passing row.
+    const two = {
+      links: [
+        row({}),
+        { kind: 'relates', direction: 'in', ticket: { id: 'T2', projectId: 'p1', key: null, title: 'Two', stateCategory: 'active' } },
+      ],
+    };
+    expect(mapTicketLinks(two)).toEqual(two.links);
   });
 });
 

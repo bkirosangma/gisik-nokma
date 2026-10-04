@@ -6,6 +6,7 @@ import type {
   PublishedWorkflowDef,
   StateCategory,
   SubmittedEvent,
+  TicketLinkKind,
   TicketState,
   TicketTypeDef,
   WorkflowDef,
@@ -16,6 +17,7 @@ import {
   PRIORITIES,
   PURGED_OUTBOX_NOTICE,
   isCreatableState,
+  isWithheldLinkEvent,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -58,6 +60,7 @@ import type {
   ParentRef,
   PriorityView,
   TicketHistoryEvent,
+  TicketLinkView,
   TicketListView,
   TicketRead,
   TransitionCause,
@@ -1292,6 +1295,32 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const notes = await replica.listNotesForTicket(workspaceId, ticketId);
       return summariesOf(notes, await attachedTicketsOf(notes));
     },
+    /**
+     * Typed links offline (spec A): computed from confirmed state, both
+     * directions. A ticket the server never sent this device is not in the
+     * replica, which is this device's visibility; a trashed end is skipped
+     * like the online read's `LIVE_TICKET_WHERE`. Keys are null offline, as
+     * every replica-built key here is.
+     */
+    getTicketLinks: async (workspaceId, ticketId) => {
+      const byId = await confirmedById(workspaceId);
+      const me = byId.get(ticketId);
+      if (me === undefined) return [];
+      const view = (other: TicketState, kind: TicketLinkKind, direction: 'out' | 'in'): TicketLinkView => ({
+        kind,
+        direction,
+        ticket: { id: other.id, projectId: other.projectId, key: null, title: titleOf(other), stateCategory: other.stateCategory },
+      });
+      const live = (t: TicketState | undefined): t is TicketState => t !== undefined && (t.deleted ?? null) === null;
+      const out = (me.links ?? []).flatMap((l) => {
+        const o = byId.get(l.targetId);
+        return live(o) ? [view(o, l.kind, 'out')] : [];
+      });
+      const incoming = [...byId.values()].flatMap((o) =>
+        o.id === ticketId || !live(o) ? [] : (o.links ?? []).filter((l) => l.targetId === ticketId).map((l) => view(o, l.kind, 'in')),
+      );
+      return [...out, ...incoming];
+    },
     getNoteComments: async (workspaceId, noteId) => {
       const note = await replica.getNote(noteId);
       if (note === null || note.workspaceId !== workspaceId) return [];
@@ -1684,6 +1713,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           clientTime: event.clientTime,
           serverTime: event.serverTime,
           seq: event.seq,
+          // Typed-links T4b: the server served this link with its target withheld
+          // (`targetId: null`), so History reads "a ticket you can't see". A real
+          // target carries no label offline: this device holds no key for it.
+          ...(isWithheldLinkEvent(event) ? { linkTarget: null } : {}),
         }));
       return limit === undefined ? kept : kept.slice(0, limit);
     },

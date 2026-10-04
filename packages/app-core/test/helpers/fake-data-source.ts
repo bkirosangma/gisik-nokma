@@ -65,6 +65,7 @@ export function createFakeDataSource(
     getDeletedNotes: async () => [],
     getNote: async () => null,
     getNotesForTicket: async () => [],
+    getTicketLinks: async () => [],
     getNoteComments: async () => [],
     getNoteHistory: async () => [],
     getNoteVersion: async () => null,
