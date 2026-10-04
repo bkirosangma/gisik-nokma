@@ -771,8 +771,8 @@ It is showing you the contradiction rather than quietly fixing it — two separa
 connecting them. That is your cue to go and fix the dates.
 
 **What's the difference between the Calendar and the Timeline?**
-The Calendar is a month grid; the Timeline is the same idea stretched sideways over weeks, moving four
-weeks at a time. Both draw a bar only when a ticket has **both** a start and a needed-by claim. On the
+The Calendar is a month grid; the Timeline is the same idea stretched sideways as one continuous chart you
+scroll and zoom, with no pages. Both draw a bar only when a ticket has **both** a start and a needed-by claim. On the
 Timeline, anything with only one date, no dates, or a contradiction goes into a list headed *"Not on
 the timeline yet"* with a count, saying what is missing for each ticket. Its **Add dates** button opens the
 ticket so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day.

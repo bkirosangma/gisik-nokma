@@ -35,7 +35,9 @@ const IN_TRANSIT_SELECTORS = [
  * The declarations of the rule whose selector list is exactly `selector`.
  * Anchored at a line start and requiring the selector to be followed only by
  * whitespace and `{`, so `.gn-timeline__bar[data-pending]` never matches
- * inside `.gn-timeline__bar[data-clipped-start][data-clipped-end]`.
+ * inside a longer compound selector that merely starts with it (the
+ * `[data-clipped-start][data-clipped-end]` rule it was written against went
+ * with the window in Workflow and Timeline graphs Part 1 T9).
  */
 function declarationsFor(css: string, selector: string): string | null {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

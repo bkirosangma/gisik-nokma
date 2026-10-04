@@ -780,6 +780,14 @@ export const TOKEN_ROLES = [
    */
   'surfaceTrack',
   'surfaceWell',
+  /**
+   * The weekend column tint of the continuous Timeline and the graphs' day axis (Workflow and Timeline graphs, VP-11) --
+   * `--gn-timeline-weekend`. It is a RECESSED ground, so `hig` and `minimal` map it to the primitive `surfaceTrack` uses and `neo`
+   * to the well (as `surfaceSunken` is there). OPAQUE on purpose: an alpha role cannot carry a `CONTRAST_PAIRS` row, and the day
+   * numbers in the axis header sit on this tint. Measured: `textMuted` on it is 8.25 light, 15.25 dark (hig), and in `neo` it is
+   * the already-declared `textMuted` on `surfaceSunken` pair.
+   */
+  'timelineWeekend',
   'text',
   'textMuted',
   /**
@@ -966,6 +974,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfacePlaceholder: 'trackWarm',
     surfaceTrack: 'trackWarm',
     surfaceWell: 'wellWarm',
+    timelineWeekend: 'trackWarm',
     text: 'labelWarmLight',
     textMuted: 'inkMuted',
     textSubtle: 'textSubtleLight',
@@ -1011,6 +1020,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfacePlaceholder: 'trackNavy',
     surfaceTrack: 'trackNavy',
     surfaceWell: 'wellNavy',
+    timelineWeekend: 'trackNavy',
     text: 'labelWarmDark',
     textMuted: 'fogMuted',
     textSubtle: 'textSubtleDark',
@@ -1098,6 +1108,7 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfacePlaceholder: 'neoPlaceholderLight', // S-R1: flat, never the well
       surfaceTrack: 'neoWellLight',
       surfaceWell: 'neoWellLight',
+      timelineWeekend: 'neoWellLight',
       fillTertiary: 'fillWarmNeo3',
       fillQuaternary: 'fillWarmNeo4',
       danger: 'neoLightDanger',
@@ -1115,6 +1126,7 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfacePlaceholder: 'neoPlaceholderDark', // S-R1: flat, never the well
       surfaceTrack: 'neoWellDark',
       surfaceWell: 'neoWellDark',
+      timelineWeekend: 'neoWellDark',
       textSubtle: 'neoTextSubtleDark',
       fillTertiary: 'fillNavyNeo3',
       fillQuaternary: 'fillNavyNeo4',
@@ -1866,6 +1878,8 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    */
   { fg: 'text', bg: 'surfaceTrack', minimum: 4.5 },
   { fg: 'textMuted', bg: 'surfaceTrack', minimum: 4.5 },
+  // Added 2026-10-03 with `timelineWeekend`: the axis day numbers (`textMuted`) sit on the weekend tint.
+  { fg: 'textMuted', bg: 'timelineWeekend', minimum: 4.5 },
   { fg: 'textSubtle', bg: 'surfaceTrack', minimum: 4.5 },
   { fg: 'text', bg: 'surfaceWell', minimum: 4.5 },
   { fg: 'textMuted', bg: 'surfaceWell', minimum: 4.5 },
