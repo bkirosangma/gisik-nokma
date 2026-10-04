@@ -95,6 +95,10 @@ Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpow
 - ✅ **27.129 — a trashed source ticket hides its row and its comment's row (total drops); restore brings back the same sources.** (`apps/server/test/read/linked-from.test.ts`)
 - ✅ **27.130 — agreement: for owner, member, outsider and guest the read equals the owner's rows filtered by `canSee` / `canReadNoteById` on each row's parent; the sets differ per role (5 / 2 / 0 / 1), so the agreement is not vacuous.** (`apps/server/test/read/linked-from.test.ts`)
 - ✅ **27.131 — paging: 20 sources are one page with no cursor; a 21st gives a cursor and a second page of exactly one; newest first; no source twice.** (`apps/server/test/read/linked-from.test.ts`)
+- ✅ **27.132 — `GET /v1/workspaces/:id/references` answers a visible target with the page `{ total, items, nextCursor }`, for a ticket target and for a note target (each with a row).** (`apps/server/test/routes/references.test.ts`)
+- ✅ **27.133 — an invisible target (a guest on a project-mode ticket, a member on a private note), an unknown ticket or note id, and another workspace's id (the owner's own items through the neighbour's path) are one identical 404 `{ error: 'not_found' }`;** control: the member on the visible ticket is 200. (`apps/server/test/routes/references.test.ts`)
+- ✅ **27.134 — malformed input is a 400 that names nothing back: a missing or `person:` target is `invalid_target`; a non-numeric, empty or 19-digit cursor is `invalid_cursor`;** control: an 18-digit and a short cursor are 200. (`apps/server/test/routes/references.test.ts`)
+- 27.135–27.139 reserved, unused (T2).
 <!-- KG-B T3 -->
 <!-- KG-B T4 -->
 
