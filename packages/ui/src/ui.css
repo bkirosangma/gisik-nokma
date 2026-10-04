@@ -5996,6 +5996,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-timeline__surface {
   position: relative;
   min-width: 100%;
+  /* Short lanes still fill the canvas, so the weekend tint and the today line run to the chart's bottom edge. */
+  min-height: 100%;
   /* The rubber band: the adapter writes the resisted overshoot here while the pointer pulls past the first or last day. */
   transform: translateX(var(--tl-overshoot, 0px));
 }
