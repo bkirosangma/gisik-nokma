@@ -13,11 +13,12 @@ import { NO_TRANSFER } from './fixtures/fake-session.js';
 /**
  * Plan: MCP server, Task 8. Cases 14.60–14.66.
  */
-function sessionRecording(answer: unknown): { session: Session; paths: string[] } {
+/** `byPath` answers named paths differently (the links read beside a ticket detail); every other path gets `answer`. */
+function sessionRecording(answer: unknown, byPath: Record<string, unknown> = {}): { session: Session; paths: string[] } {
   const paths: string[] = [];
   const session: Session = {
     userId: () => '01J0USER0000000000000000AA',
-    get: async (path) => { paths.push(path); return answer; },
+    get: async (path) => { paths.push(path); return path in byPath ? byPath[path] : answer; },
     post: async () => { throw new Error('not a read'); },
     ...NO_TRANSFER,
     postEvents: async () => { throw new Error('not a read'); },
@@ -128,10 +129,10 @@ describe('the read tools', () => {
       ticketState: { kind: 'ticket', id: 't1', assigneeId: null, collaboratorIds: [] },
       title: 'A ticket', stateProvenance: null, parent: null, rollup: null,
     };
-    const { session, paths } = sessionRecording(body);
-    // T9 adds ONE key (`description`, as Markdown); everything else is the server's, untouched.
-    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] } });
-    expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1']);
+    const { session, paths } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
+    // T9 adds ONE key (`description`, as Markdown) and typed links T4 one more (`links`); everything else is the server's, untouched.
+    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] }, links: [] });
+    expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', '/v1/workspaces/w1/tickets/t1/links']);
     // The mixed casing is the SERVER's contract. Normalising it here would be
     // this package inventing a shape, which is exactly what the spec forbids.
   });
@@ -142,7 +143,7 @@ describe('the read tools', () => {
       key: 'CCSO-4', title: 'Chiller', rollup: null,
       ticketState: { kind: 'ticket', id: 't1', assigneeId: 'u1', fields: { description: { value: doc }, priority: { value: 'P2' } } },
     };
-    const { session } = sessionRecording(body);
+    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
     const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & {
       ticketState: { fields: Record<string, unknown>; assigneeId: string };
     };
@@ -151,6 +152,35 @@ describe('the read tools', () => {
     expect(out.ticketState.assigneeId).toBe('u1');
     expect(out['key']).toBe('CCSO-4');
     expect(JSON.stringify(out)).not.toContain('"type":"doc"');
+  });
+
+  it('27.058 get_ticket adds links from the links route (kind, direction, ticket {id, key, title}) and drops ticketState.links; a links-read 404 is the uniform sentence; control: no links answers links: []', async () => {
+    const body = {
+      key: 'CCSO-4', title: 'Chiller', rollup: null,
+      ticketState: { kind: 'ticket', id: 't1', fields: {}, links: [{ kind: 'blocks', targetId: 'b1' }] },
+    };
+    const row = { kind: 'blocks', direction: 'out', ticket: { id: 'b1', projectId: 'p1', key: 'CCSO-5', title: 'Ice maker', stateCategory: 'open' } };
+    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [row] } });
+    const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & { ticketState: Record<string, unknown> };
+    expect(out['links']).toEqual([{ kind: 'blocks', direction: 'out', ticket: { id: 'b1', key: 'CCSO-5', title: 'Ice maker' } }]);
+    expect('links' in out.ticketState).toBe(false); // one representation
+    expect(out.ticketState['id']).toBe('t1'); // control: the rest of the state is served
+    const none = sessionRecording({ ...body, ticketState: { kind: 'ticket', id: 't1', fields: {} } }, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
+    expect(((await tool('get_ticket', none.session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown>)['links']).toEqual([]);
+    // The detail answers and the links read 404s (visibility changed between the two reads): the uniform sentence, never the raw HTTP error.
+    // The detail must answer here: 14.458 404s every path, so its detail read throws first and the links read is never reached.
+    const linksPath = '/v1/workspaces/w1/tickets/t1/links';
+    const raced = sessionRecording(body);
+    const linksGone: Session = {
+      ...raced.session,
+      get: async (path) => {
+        const answer = await raced.session.get(path); // records the path
+        if (path === linksPath) throw new HttpError(404, { error: 'not_found' });
+        return answer;
+      },
+    };
+    await expect(tool('get_ticket', linksGone).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow(/^ticket not found or not visible to you$/);
+    expect(raced.paths).toEqual(['/v1/workspaces/w1/tickets/t1', linksPath]); // the detail answered; the 404 is the links read's
   });
 
   it('14.458 get_ticket maps a 404 to the uniform sentence', async () => {

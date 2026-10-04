@@ -262,7 +262,8 @@ describe('AppNav — the mounts, not the components', () => {
       // oversight: an `<a role="menuitem">` has the menuitem role, not `link`,
       // so `getAllByRole('link')` cannot see them by design. Their reachability
       // is asserted where it now lives — the account-menu block below.
-      expect(hrefs).toEqual(['/workspaces', '/notes', '/inbox']);
+      // 27.620: the brand is a link to Home since spec E
+      expect(hrefs).toEqual(['/', '/workspaces', '/notes', '/inbox']);
     });
 
     it('WITH a workspace, no project: the served name, My work and Members join, Board does not', async () => {
@@ -274,7 +275,9 @@ describe('AppNav — the mounts, not the components', () => {
       );
       await screen.findByRole('link', { name: 'Convenience Corner' });
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+      // 27.620: the brand is a link to Home since spec E
       expect(hrefs).toEqual([
+        '/',
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
@@ -332,7 +335,9 @@ describe('AppNav — the mounts, not the components', () => {
       // is the only form of this case that can tell that from anywhere else in
       // the bar. `/w/ws_1` is the workspace-name link; `/w/ws_1/p/p_beta` is
       // the remembered-or-first project, and nothing sits between them.
+      // 27.620: the brand is a link to Home since spec E
       expect(hrefs).toEqual([
+        '/',
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/p/p_beta',
@@ -355,7 +360,9 @@ describe('AppNav — the mounts, not the components', () => {
       );
       await screen.findByRole('link', { name: 'Convenience Corner' });
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+      // 27.620: the brand is a link to Home since spec E
       expect(hrefs).toEqual([
+        '/',
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
@@ -1163,6 +1170,8 @@ describe('Round 24 the inbox indicator', () => {
  */
 describe('13.392 every nav target resolves to a real page.tsx', () => {
   const ROUTES: Array<[string, string]> = [
+    // 27.620: the brand is a link to Home since spec E
+    ['/', 'app/page.tsx'],
     ['/workspaces', 'app/workspaces/page.tsx'],
     ['/w/ws_1', 'app/w/[workspaceId]/page.tsx'],
     // `/w/ws_1/p/p_1` left this table in Round 23 with the Board item. This
@@ -1469,11 +1478,13 @@ describe('E4-11 — the workspace links are in the document with no Menu toggle 
  * it on the nav bar of the far left as well. not clickable."; widened
  * 2026-09-24 to a tile + wordmark, `NavBrand`, shared with `LegalNav` — see
  * 13.1491–13.1494 in `nav-brand.test.tsx`). `BrandMark` (13.1471), not a
- * second copy of the glyph — a non-interactive `<span aria-hidden="true">`
- * TILE inside `.gn-nav__brand`, the FIRST child of `.gn-nav__inner`, before
- * the links, rendered whether or not a session exists. `.gn-nav__brand`
- * itself is no longer `aria-hidden` — only the tile is — since the wordmark
- * beside it is plain visible text now, not a second copy of a hidden glyph.
+ * second copy of the glyph — an `aria-hidden="true"` `<span>` TILE inside
+ * `.gn-nav__brand`, the FIRST child of `.gn-nav__inner`, before the links,
+ * rendered whether or not a session exists. Since spec E (2026-10-03)
+ * `.gn-nav__brand` is itself a link to `/` (27.620 below; 13.1475 is 🚫).
+ * `.gn-nav__brand` itself is no longer `aria-hidden` — only the tile is —
+ * since the wordmark beside it is plain visible text now, not a second copy
+ * of a hidden glyph.
  */
 describe('the nav brand group', () => {
   function renderNav() {
@@ -1507,23 +1518,23 @@ describe('the nav brand group', () => {
   });
 
   /**
-   * NOT a link, NOT a button, no tabindex — DOM checks rather than role
-   * queries. The TILE alone carries `aria-hidden="true"` (the wordmark beside
-   * it is plain visible text, widened 2026-09-24 — see `nav-brand.test.tsx`),
-   * so `within(brand).queryByRole('link')` is no longer blind here the way it
-   * was when the whole group was hidden; the DOM checks below are kept
-   * anyway, since they prove the same thing without depending on which piece
-   * is or is not in the accessibility tree. MUTATION TARGET: wrap the tile in
-   * `<Link href="/workspaces">`.
+   * 27.620 (spec E §2.1) — REVERSES 13.1475 (owner 2026-10-03, "yes to the logo link"; 13.1475 is 🚫 in
+   * test-cases/13). The brand is ONE real link to `/`, named "Gisik Nokma, Home" by `aria-labelledby` (13.1476
+   * still forbids `aria-label` on the subtree), first in the Tab order. MUTATION TARGET: `href="/workspaces"`.
    */
-  it('13.1475 is not focusable and is not a link or a button', () => {
+  it('27.620 the brand is a link to / named "Gisik Nokma, Home", first in the Tab order; control: the bar\'s other links keep their own names', async () => {
     currentPath = '/workspaces';
     const { container } = renderNav();
-    const brand = container.querySelector('.gn-nav__brand');
-    expect(brand).not.toBeNull();
-    expect(brand?.closest('a, button, [tabindex]')).toBeNull();
-    expect(brand?.querySelector('a, button, [tabindex]')).toBeNull();
-    expect(brand?.hasAttribute('tabindex')).toBe(false);
+    const brand = container.querySelector('.gn-nav__inner > .gn-nav__brand');
+    expect(brand?.tagName).toBe('A');
+    const link = screen.getByRole('link', { name: 'Gisik Nokma, Home' });
+    expect(link).toBe(brand);
+    expect(link).toHaveAttribute('href', '/');
+    expect(link).not.toHaveAttribute('aria-current');
+    await userEvent.tab();
+    expect(document.activeElement).toBe(link);
+    // control, same it: Workspaces is still its own link with its own name
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toHaveAttribute('href', '/workspaces');
   });
 
   /**
