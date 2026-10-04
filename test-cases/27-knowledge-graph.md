@@ -211,6 +211,7 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 - ✅ **27.259 — the pairless roles:** `fogDot` (never interactive) and `graphCardLine` (a hairline; a card is told by its fill and text) measure under 3:1 and no `CONTRAST_PAIRS` row names them; control: the fog dot still reads at 1.5:1 or more (`packages/ui/test/tokens.test.ts`)
 <!-- KG-C T5 -->
 - ✅ **27.263 — the palette reader:** every palette role is read from its own `--gn-*` variable and `dark` from the painted card fill's luminance (below 0.5; `#bbbbbb` is dark, `#bcbcbc` light; an inline `color-scheme` decides nothing); a `data-theme` or `data-style` flip on `<html>` notifies until stopped; control: an unset variable reads as empty, not a fallback colour (`packages/knowledge-graph/test/theme.test.ts`)
+- ✅ **27.289 — the probe is a test hook only:** `inspect()` is null unless the mount element carries `data-kg-probe` (the real adapter mounted with Sigma's collaborators stubbed); control: the same mount WITH the attribute returns the probe (`packages/knowledge-graph/test/probe.test.ts`)
 <!-- KG-C T6 -->
 <!-- KG-C T7 -->
 <!-- KG-C T8 -->

@@ -5,6 +5,7 @@ export * from './engine/glide.js';
 export * from './engine/coast.js';
 export { PALETTE_ROLES, type PaletteRole, type ThemePalette } from './render/palette.js';
 export { readThemePalette, watchTheme } from './theme/read-palette.js';
+export type { CreateRenderer, DrawEdge, DrawNode, DrawStates, DrawView, GraphRenderer, HoverEvent, MountOptions, PickEvent, RendererProbe } from './render/renderer.js';
 export type { EdgeAttributes, IconSpec, Level, NodeAttributes } from './render/node-attributes.js';
 export { initialsOf } from './render/initials.js';
 export * from './engine/model.js';
