@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import { PRIORITIES, rankBetween } from '@gisik-nokma/domain';
+import { PRIORITIES, rankBetween, TICKET_LINK_KINDS } from '@gisik-nokma/domain';
 import { spliceDoc, type BodyEdit } from '@gisik-nokma/editor/markdown-doc';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import { markdownBody, MARKDOWN_SYNTAX_HELP } from './markdown-io.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
-import { envelopeFor, submitBatch } from './submit.js';
+import { readOrNotFound } from './reads.js';
+import { envelopeFor, submitBatch, submitOne } from './submit.js';
 
 export type TicketDetailWire = {
   key: string | null;
@@ -62,8 +63,12 @@ export function redactedPayload(type: string, eventId: string, payload: Record<s
   return payload;
 }
 
-function historyLine(e: { id: string; type: string; payload: Record<string, unknown>; actorId: string; origin: string; serverTime: string }) {
-  return { eventId: e.id, type: e.type, actorId: e.actorId, origin: e.origin, serverTime: e.serverTime, payload: redactedPayload(e.type, e.id, e.payload) };
+/** One `get_ticket_history` line. A link event keeps the server's `linkTarget` label (`{ key }`, or `null` for a target this caller cannot see; typed-links T4). */
+function historyLine(e: { id: string; type: string; payload: Record<string, unknown>; actorId: string; origin: string; serverTime: string; linkTarget?: { key: string | null } | null }) {
+  return {
+    eventId: e.id, type: e.type, actorId: e.actorId, origin: e.origin, serverTime: e.serverTime, payload: redactedPayload(e.type, e.id, e.payload),
+    ...(e.linkTarget === undefined ? {} : { linkTarget: e.linkTarget }),
+  };
 }
 
 export function ticketTools(session: Session): ToolDefinition[] {
@@ -178,6 +183,27 @@ export function ticketTools(session: Session): ToolDefinition[] {
         };
         const rank = rankBetween(await rankOf(a.before), await rankOf(a.after));
         return { results: await submitBatch(session, [envelopeFor(session, a.workspaceId, { kind: 'ticket', id: a.ticketId }, 'ticket.ranked', { rank })]) };
+      },
+    },
+    {
+      name: 'link_tickets',
+      description:
+        'Add or remove a typed link between two tickets: kind "blocks" (ticketId blocks targetId), "relates" (either way) or "duplicates" ' +
+        '(ticketId duplicates the original, targetId). action "add" or "remove". Removing works from either end. Every rule is the product\'s.',
+      inputSchema: { workspaceId: id, ticketId: id, targetId: id, kind: z.enum(TICKET_LINK_KINDS), action: z.enum(['add', 'remove']) },
+      handler: async (args) => {
+        const a = z.object({ workspaceId: id, ticketId: id, targetId: id, kind: z.enum(TICKET_LINK_KINDS), action: z.enum(['add', 'remove']) }).parse(args);
+        if (a.action === 'add') {
+          return { result: await submitOne(session, envelopeFor(session, a.workspaceId, { kind: 'ticket', id: a.ticketId }, 'ticket.link_added', { kind: a.kind, targetId: a.targetId })) };
+        }
+        // The stored source decides the stream (spec A §2.2): find the link as the app shows it.
+        const out = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/tickets/${enc(a.ticketId)}/links`, 'ticket')) as {
+          links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string } }>;
+        };
+        const found = out.links.find((l) => l.kind === a.kind && l.ticket.id === a.targetId);
+        if (found === undefined) throw new Error(`no "${a.kind}" link between ${a.ticketId} and ${a.targetId} that you can see`);
+        const [source, target] = found.direction === 'out' ? [a.ticketId, a.targetId] : [a.targetId, a.ticketId];
+        return { result: await submitOne(session, envelopeFor(session, a.workspaceId, { kind: 'ticket', id: source }, 'ticket.link_removed', { kind: a.kind, targetId: target })) };
       },
     },
   ];

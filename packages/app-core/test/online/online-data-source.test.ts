@@ -395,6 +395,19 @@ describe('3.40 the four answerable reads, at the paths the server registers', ()
     expect(await source.query.getTicket(WORKSPACE, 'nope')).toBeNull();
     expect(await source.query.getMembers(WORKSPACE)).toEqual([]);
   });
+
+  it('27.061 control: online getTicketLinks maps the wire whole, key included; a 404 is []', async () => {
+    const T = newUlid();
+    const OTHER = newUlid();
+    const row = { kind: 'blocks', direction: 'in', ticket: { id: OTHER, projectId: 'p1', key: 'GN-142', title: 'Ice maker', stateCategory: 'active' } };
+    const { fetchImpl } = recordingFetch({ [`/v1/workspaces/${WORKSPACE}/tickets/${T}/links`]: { links: [row] } });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    expect(await source.query.getTicketLinks(WORKSPACE, T)).toEqual([row]);
+    // N3 (AMEND p11): a read 404 is an answer (http.ts: a GET 404 resolves null).
+    const { fetchImpl: none } = recordingFetch({});
+    const gone = createOnlineDataSource({ baseUrl: '', fetchImpl: none });
+    expect(await gone.query.getTicketLinks(WORKSPACE, 'nope')).toEqual([]);
+  });
 });
 
 /**
