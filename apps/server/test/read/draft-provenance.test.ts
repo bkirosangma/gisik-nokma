@@ -92,9 +92,10 @@ it('28.065 a draft-born ticket is in Backlog since its publish; control: a plain
 /** 7 IST days after 2026-08-05: T0 is on the far side of a 7-day cut-off, T1 is not. */
 const NOW = '2026-08-12T12:00:00.000Z';
 it('28.065 the stale and auto-close sweeps read the same instant: a draft-born ticket published on day 10 is neither stale nor auto-closed; control: a never-drafted twin that entered on day 1 is both', async () => {
-  // PLANTED, as the draft world plants its `doing` drafts: no door moves a draft out of Backlog (T5 refuses
-  // `ticket.transitioned` on a draft), and Backlog is `open`, which neither sweep reads. So each draft is moved
-  // into `doing` / `done` on day 1, BEFORE its publish, and the publish on day 10 is its last state-entering
+  // PLANTED, as the draft world plants its `doing` drafts: no door moves a draft out of Backlog (the permission
+  // gate G1 refuses `ticket.transitioned` on a draft: `draft.not-allowed` for its author, `permission.visibility`
+  // for everyone else, 28.071; T5 adds the engine twin), and Backlog is `open`, which neither sweep reads. So each
+  // draft is moved into `doing` / `done` on day 1, BEFORE its publish, and the publish on day 10 is its last state-entering
   // event. Under a ledger the doors can write, these two reads cannot tell the publish apart until a draft can
   // leave Backlog; this pins them anyway.
   const author = newUlid();
