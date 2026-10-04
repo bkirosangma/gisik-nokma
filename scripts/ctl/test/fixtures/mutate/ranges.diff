@@ -1,0 +1,39 @@
+diff --git a/src/a.ts b/src/a.ts
+index 1111111..2222222 100644
+--- a/src/a.ts
++++ b/src/a.ts
+@@ -4,0 +5,3 @@ export const x = 1;
++export const a = 1;
++export const b = 2;
++export const c = 3;
+@@ -10,2 +11,2 @@ function f() {
+-  return 1;
+-  return 2;
++  return 10;
++  return 20;
+@@ -20,3 +22,0 @@ function g() {
+-  gone();
+-  gone();
+-  gone();
+@@ -29 +30 @@ function h() {
+-  old();
++  neu();
+diff --git a/src/a.test.ts b/src/a.test.ts
+--- a/src/a.test.ts
++++ b/src/a.test.ts
+@@ -0,0 +1,2 @@
++it('x', () => {});
++it('y', () => {});
+diff --git a/src/x.generated.ts b/src/x.generated.ts
+--- a/src/x.generated.ts
++++ b/src/x.generated.ts
+@@ -1 +1 @@
+-export const v = 1;
++export const v = 2;
+diff --git a/src/gone.ts b/src/gone.ts
+deleted file mode 100644
+--- a/src/gone.ts
++++ /dev/null
+@@ -1,2 +0,0 @@
+-export const gone = 1;
+-export const gone2 = 2;

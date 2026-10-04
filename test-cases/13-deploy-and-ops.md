@@ -652,36 +652,36 @@ The ledger export shares that pool and failed the same way; `pg_dump` goes throu
 
 Block `13.2200`–`13.2229`, reserved by the planner after grepping every live tip and the ctl task branches (the highest in use was `13.2147`). Cases 13.2200–13.2223, 13.2228 and 13.2229 are run by `scripts/ctl/test/mutate.test.sh`, 13.2224–13.2227 by `scripts/ctl/test/harness.test.sh`; both are `pnpm check:ctl` steps. Scratch git repos only; the three real-Stryker legs link the checkout's `@stryker-mutator`, `vitest` and `typescript` into the scratch repo and use a private semaphore dir.
 
-- 13.2200 ❌ ranges: `git diff --unified=0` gives the ADDED lines in new-file numbering: `+5,3` is 5–7 (not 5–8, not 5–6), `+11,2` is 11–12, a one-line `+30` is 30–30, a pure deletion `+22,0` adds no range and a deleted file is absent.
-- 13.2201 ❌ The file filter: `*.ts`/`*.tsx` are mutated; `*.test.*`, `*.spec.*`, a `test/`, `tests/` or `__tests__/` directory, `*.generated.ts`, `*.d.ts` and non-TS files are excluded, each clause on its own path; CONTROL — `src/latest.ts` (a name holding `test`) is mutated.
-- 13.2202 ❌ The custom pre-step on a fixture: exactly ×10 and ÷10 on `200` and `0.05` (and `1.1`, `0x10`, `1e3` without float noise), none on `0`, none in a type, an enum initialiser or a property name (counted by reason), `Math.ceil` → `Math.floor` and → `Math.round`, and the one `as number` cast found.
-- 13.2203 ❌ The injection keeps every line (planner ruling 16:40 (2)): the switch sits on the literal's own line with no newline added, each counted token is a `false` on that line, the cast is blanked to spaces, and the cast-only copy (the fallback's) carries no switch.
-- 13.2204 ❌ The reconcile on a synthetic report (ruling (1)): one counted mutant per custom alternative — a duplicate selecting flip and a flip re-selecting the original are dropped (injected 2 == counted 2); a Stryker mutant spanning a switch reads with the switch put back (`LIMIT + 200 → LIMIT - 200`); a missing flip is a problem naming `200 → 20`.
-- 13.2205 ❌ `--dry-run` prints the ranges and the planned runs and runs nothing: the run-tests shim and `stryker`/`vitest`/`pnpm`/`npx` PATH shims record no call; the tree is untouched.
-- 13.2206 ❌ End to end with real Stryker in one slot: the WEAK fixture test reports exactly two survivors, `calc.ts:5 n > LIMIT → n >= LIMIT` (inside an `as boolean` cast: found only because the cast is stripped) and `calc.ts:3 200 → 2000` (the literal's own line), exit 1, the tree clean.
-- 13.2207 ❌ End to end: the STRONG fixture test reports 0 survivors, exit 0.
-- 13.2208 ❌ The dry-run control with real Stryker (ruling (4)): a module whose INJECTED copy throws at import (its test registers 1 test, not 3) is exit 2.
-- 13.2209 ❌ Skips: a package without vitest and `apps/server` with the test Postgres unreachable are listed as SKIPPED; the test and generated files as excluded.
-- 13.2210 ❌ CONTROL for 13.2209: with something listening on the Postgres port, `apps/server` is planned.
-- 13.2211 ❌ A tool failure (run-tests exit 3) is exit 2, never a pass, and the tree is clean after it.
-- 13.2212 ❌ Every selecting flip reported twice: the dedupe keeps `custom injected 2 == counted 2`; both custom survivors on line 3; exit 1.
-- 13.2213 ❌ A custom alternative with no selecting flip in the report is exit 2 (`custom injected 2 != counted 1`), never a silent pass.
-- 13.2214 ❌ The control: fewer tests on the injected copy than `vitest list` finds on the unmutated tree is exit 2.
-- 13.2215 ❌ SIGINT mid-run, the injected file in place (precondition checked): exit 130, the file restored, no Stryker temp dir and no new `stryker-setup-<n>.js`, `git status` unchanged, the running run-tests got TERM.
-- 13.2216 ❌ SIGTERM mid-run: exit 143, the same restore.
-- 13.2217 ❌ A slot-run over `CTL_MUTATE_MAX_SECS` is stopped (TERM to run-tests) and is exit 2, the tree clean.
-- 13.2218 ❌ CONTROL for 13.2217: a run under the cap completes; the defaults are pinned (600 s per slot-run, 300 mutants per run).
-- 13.2219 ❌ The split: a file above 300 mutants runs in chunks of at most 300, a file between 30 and 300 is one run; CONTROL — with the cap at 3000 the big file is one run.
-- 13.2220 ❌ The split boundary: a cap EQUAL to the file's count is one run, one below it splits.
-- 13.2221 ❌ Exit 2 on an unknown argument, and when Stryker is not installed in the `--repo` root.
-- 13.2222 ❌ An injected copy that fails to parse falls back to (A) for that file only and says so (ruling (3)): Stryker on the cast-only copy, then each custom mutant as one vitest run.
-- 13.2223 ❌ `--json` prints one JSON object (files, survivors with line and replacement, skipped, failures) before the summary line.
-- 13.2224 ❌ `CTL_TEST_ONLY` matching 1 case runs exactly that case and reports `1 of 3 cases ran`, exit 0.
-- 13.2225 ❌ `CTL_TEST_ONLY` matching no case exits non-zero with `0 cases matched` and runs nothing (never a silent green).
-- 13.2226 ❌ No filter runs every case and prints nothing of the harness's own (the old output); CONTROL — a red case inside a slice still fails the file.
-- 13.2227 ❌ Every `scripts/ctl/test/*.test.sh` sources `harness.sh`, defines no `check()` of its own and calls `ctl_test_only_end` before its verdict.
-- 13.2228 ❌ One file's tool failure does not drop the other files' results: the failed file is listed as TOOL-FAILURE, the others' rows and survivors are reported, and the sweep exits 2.
-- 13.2229 ❌ Wiring: `ctl help` lists `mutate`; `selftest.sh` runs the mutate and harness suites as live steps; Stryker is resolved from the `--repo` root.
+- 13.2200 ✅ ranges: `git diff --unified=0` gives the ADDED lines in new-file numbering: `+5,3` is 5–7 (not 5–8, not 5–6), `+11,2` is 11–12, a one-line `+30` is 30–30, a pure deletion `+22,0` adds no range and a deleted file is absent.
+- 13.2201 ✅ The file filter: `*.ts`/`*.tsx` are mutated; `*.test.*`, `*.spec.*`, a `test/`, `tests/` or `__tests__/` directory, `*.generated.ts`, `*.d.ts` and non-TS files are excluded, each clause on its own path; CONTROL — `src/latest.ts` (a name holding `test`) is mutated.
+- 13.2202 ✅ The custom pre-step on a fixture: exactly ×10 and ÷10 on `200` and `0.05` (and `1.1`, `0x10`, `1e3` without float noise), none on `0`, none in a type, an enum initialiser or a property name (counted by reason), `Math.ceil` → `Math.floor` and → `Math.round`, and the one `as number` cast found.
+- 13.2203 ✅ The injection keeps every line (planner ruling 16:40 (2)): the switch sits on the literal's own line with no newline added, each counted token is a `false` on that line, the cast is blanked to spaces, and the cast-only copy (the fallback's) carries no switch.
+- 13.2204 ✅ The reconcile on a synthetic report (ruling (1)): one counted mutant per custom alternative — a duplicate selecting flip and a flip re-selecting the original are dropped (injected 2 == counted 2); a Stryker mutant spanning a switch reads with the switch put back (`LIMIT + 200 → LIMIT - 200`); a missing flip is a problem naming `200 → 20`.
+- 13.2205 ✅ `--dry-run` prints the ranges and the planned runs and runs nothing: the run-tests shim and `stryker`/`vitest`/`pnpm`/`npx` PATH shims record no call; the tree is untouched.
+- 13.2206 ✅ End to end with real Stryker in one slot: the WEAK fixture test reports exactly two survivors, `calc.ts:5 n > LIMIT → n >= LIMIT` (inside an `as boolean` cast: found only because the cast is stripped) and `calc.ts:3 200 → 2000` (the literal's own line), exit 1, the tree clean. The same test file's TZ leg (a `process.env.TZ` a test sets takes effect) passes Stryker's dry run only because the verb wraps the package's vitest config onto the forks pool (Stryker's runner forces threads, where TZ changes do nothing).
+- 13.2207 ✅ End to end: the STRONG fixture test reports 0 survivors, exit 0.
+- 13.2208 ✅ The dry-run control with real Stryker (ruling (4)): a module whose INJECTED copy throws at import (its test registers 1 test, not 3) is exit 2.
+- 13.2209 ✅ Skips: a package without vitest and `apps/server` with the test Postgres unreachable are listed as SKIPPED; the test and generated files as excluded.
+- 13.2210 ✅ CONTROL for 13.2209: with something listening on the Postgres port, `apps/server` is planned.
+- 13.2211 ✅ A tool failure (run-tests exit 3) is exit 2, never a pass, and the tree is clean after it.
+- 13.2212 ✅ Every selecting flip reported twice: the dedupe keeps `custom injected 2 == counted 2`; both custom survivors on line 3; exit 1.
+- 13.2213 ✅ A custom alternative with no selecting flip in the report is exit 2 (`custom injected 2 != counted 1`), never a silent pass.
+- 13.2214 ✅ The control: fewer tests on the injected copy than `vitest list` finds on the unmutated tree is exit 2.
+- 13.2215 ✅ SIGINT mid-run, the injected file in place (precondition checked): exit 130, the file restored, no Stryker temp dir and no new `stryker-setup-<n>.js`, `git status` unchanged, the running run-tests got TERM.
+- 13.2216 ✅ SIGTERM mid-run: exit 143, the same restore.
+- 13.2217 ✅ A slot-run over `CTL_MUTATE_MAX_SECS` is stopped (TERM to run-tests) and is exit 2, the tree clean.
+- 13.2218 ✅ CONTROL for 13.2217: a run under the cap completes; the defaults are pinned (600 s per slot-run, 300 mutants per run).
+- 13.2219 ✅ The split: a file above 300 mutants runs in chunks of at most 300, a file between 30 and 300 is one run; CONTROL — with the cap at 3000 the big file is one run.
+- 13.2220 ✅ The split boundary: a cap EQUAL to the file's count is one run, one below it splits.
+- 13.2221 ✅ Exit 2 on an unknown argument, and when Stryker is not installed in the `--repo` root.
+- 13.2222 ✅ An injected copy that fails to parse falls back to (A) for that file only and says so (ruling (3)): Stryker on the cast-only copy, then each custom mutant as one vitest run.
+- 13.2223 ✅ `--json` prints one JSON object (files, survivors with line and replacement, skipped, failures) before the summary line.
+- 13.2224 ✅ `CTL_TEST_ONLY` matching 1 case runs exactly that case and reports `1 of 3 cases ran`, exit 0.
+- 13.2225 ✅ `CTL_TEST_ONLY` matching no case exits non-zero with `0 cases matched` and runs nothing (never a silent green).
+- 13.2226 ✅ No filter runs every case and prints nothing of the harness's own (the old output); CONTROL — a red case inside a slice still fails the file.
+- 13.2227 ✅ Every `scripts/ctl/test/*.test.sh` sources `harness.sh`, defines no `check()` of its own and calls `ctl_test_only_end` before its verdict.
+- 13.2228 ✅ One file's tool failure does not drop the other files' results: the failed file is listed as TOOL-FAILURE, the others' rows and survivors are reported, and the sweep exits 2.
+- 13.2229 ✅ Wiring: `ctl help` lists `mutate`; `selftest.sh` runs the mutate and harness suites as live steps; Stryker is resolved from the `--repo` root.
 
 ## Live-update socket routing (`hotfix/stream-same-origin`, 2026-09-23)
 

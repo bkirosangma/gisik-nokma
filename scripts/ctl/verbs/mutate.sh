@@ -30,6 +30,7 @@ restore() {
       case "$kind" in
         restore) [ -f "$b" ] && ! cmp -s "$b" "$a" && cp -p "$b" "$a";;
         rmdir) case "$(basename "$a")" in .stryker-tmp-ctlmutate-*) rm -rf "$a";; esac;;
+        rmsetup) for f in "$a"/stryker-setup-*.js; do [ -f "$f" ] && case ",$b," in *",$(basename "$f"),"*) ;; *) rm -f "$f";; esac; done;;
       esac
     done < "$tmp/manifest"
   fi
