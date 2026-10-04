@@ -207,13 +207,16 @@ describe('28.103 the atomic route', () => {
 });
 
 describe('28.098 the set door\'s answers', () => {
-  it('answers a non-member with the not-found body and malformed bodies with 400; CONTROL: a one-id set from the author succeeds', async () => {
+  it('answers a non-member with the not-found body and malformed bodies, more than 200 ids among them, with 400; exactly 200 ids pass the schema and reach the walk (a 409, not a 400); CONTROL: a one-id set from the author succeeds', async () => {
     const mine = newUlid();
     await draft(mine);
     const stranger = await publishSet('stranger', [mine]);
     expect(stranger.statusCode).toBe(404);
     expect(stranger.json()).toEqual(READ_NOT_FOUND_BODY);
 
+    // The cap is R48's literal. The two cap legs below size their bodies from the import, so without this pin a cap
+    // moved x10 or /10 would move them with it.
+    expect(MAX_PUBLISH_SET).toBe(200); // R48
     const dup = newUlid();
     for (const [name, body] of [
       ['no ids', { ticketIds: [] }],
@@ -231,6 +234,17 @@ describe('28.098 the set door\'s answers', () => {
       expect(res.statusCode, name).toBe(400);
     }
     expect(await publishedRows([mine])).toBe(0);
+
+    // CONTROL for 'more than the cap': exactly the cap passes the schema, so the walk answers it at index 0 (no id has
+    // a row here) with a 409, not a 400. With `maxItems` one lower this is the 400.
+    const atCap = Array.from({ length: MAX_PUBLISH_SET }, () => newUlid());
+    const full = await publishSet('member', atCap);
+    expect(full.statusCode, full.body).toBe(409);
+    expect(full.json()).toEqual({
+      rule: DRAFT_PUBLISH_REFUSED_RULE,
+      ticketId: atCap[0],
+      cause: { rule: PERMISSION_VISIBILITY_RULE, reason: TICKET_NOT_VISIBLE_REASON },
+    });
 
     const ok = await publishSet('member', [mine]);
     expect(ok.statusCode, ok.body).toBe(200);

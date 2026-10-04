@@ -8,7 +8,7 @@ import {
   ATOMIC_SINGLE_WORKSPACE_RULE,
   createIngestService,
 } from '../src/ingest/ingest-service.js';
-import { PERMISSION_ROLE_RULE } from '../src/permissions/check-permission.js';
+import { NOT_A_MEMBER_REASON, PERMISSION_ROLE_RULE } from '../src/permissions/check-permission.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';
@@ -288,16 +288,16 @@ describe('28.099 ingestAtomic', () => {
     expect(rows).toEqual([a, b, c, rival].map((event, i) => ({ id: event.id, workspace_seq: i + 1 })));
   });
 
-  it('the CLIENT door puts every event through the permission gate: a non-member\'s set rolls back at index 0; CONTROL: the same events through the internal door commit', async () => {
+  it('the CLIENT door puts every event through the permission gate: a non-member\'s set rolls back at index 0 with the not-a-member refusal; CONTROL: the same events through the internal door commit', async () => {
     const ws = newUlid();
     const events = three(ws);
     // The session IS the first event's actor, so the identity check passes and the refusal is the role's: nobody
     // holds a role in a workspace that was never founded.
     const gated = await service().ingestClientAtomic(events, events[0].actorId);
-    expect(gated).toMatchObject({
+    expect(gated).toEqual({
       status: 'rolled-back',
       index: 0,
-      result: { status: 'refused', eventId: events[0].id, rule: PERMISSION_ROLE_RULE },
+      result: { status: 'refused', eventId: events[0].id, rule: PERMISSION_ROLE_RULE, reason: NOT_A_MEMBER_REASON },
     });
     expect(await inLedger(ids(events))).toBe(0);
 
