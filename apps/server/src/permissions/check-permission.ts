@@ -25,7 +25,7 @@ import { projectExists } from '../projections/proj-projects.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
-import { ticketAccess } from '../visibility/can-open.js';
+import { canOpen, ticketAccess } from '../visibility/can-open.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkCommentAuthority } from './check-comment-authority.js';
 import { checkLifecycle } from './check-lifecycle.js';
@@ -212,7 +212,8 @@ export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
 /**
  * Typed links, rules 6 and 7 (spec A §2.3): the one sentence for a target
  * this person cannot see AND for one that does not exist, so the gate is no
- * existence oracle (`canSee` answers false for both, its own docblock).
+ * existence oracle (`canSee` answers false for both, its own docblock;
+ * `canOpen` for the viewer's own drafts; another person's draft reads the same).
  */
 export const LINK_TARGET_NOT_VISIBLE_REASON = 'The other ticket does not exist in this workspace, or you cannot see it.';
 /**
@@ -1678,19 +1679,25 @@ export async function checkVisibilityPermission(
   }
 
   /**
-   * Typed links (spec A, rules 6 and 7). Adding needs the right to edit the
-   * source: for a ticket-stream event that right IS `canSee` (the line above,
-   * the same gate `ticket.field_set` meets). Both events also need the target
-   * to be visible. Rule 7's "either end" collapses to "both": a person who sees
-   * only one end is never shown the link (§2.4), so there is nothing they
-   * could be removing. A payload that does not parse passes through to the
-   * engine's `malformed-payload`, the named-person block's convention below.
+   * Typed links (spec A, rules 6 and 7) with drafts (spec R41, R43). Adding needs the right to edit the source,
+   * which for a ticket-stream event IS the entity access the door above just granted (the same gate
+   * `ticket.field_set` meets). Every OTHER end the payload names must also be openable by this person:
+   * `targetId` for the plain form, `from` for the from form (whose `targetId` is the entity itself). `canOpen`,
+   * not `canSee`: `canSee` is false for every draft, so an own draft would be refused here and `draft.link-form`
+   * could never be said to its author. Another person's draft, a discarded one and an id that does not exist stay
+   * indistinguishable: one sentence for all three. Rule 7's "either end" collapses to "both": a person who sees
+   * only one end is never shown the link (§2.4), so there is nothing they could be removing. A payload that does
+   * not parse passes through to the engine's `malformed-payload`, the named-person block's convention below.
    */
   if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
     const link = ticketLinkAddedPayload.safeParse(env.payload);
-    if (link.success && link.data.targetId !== env.entity.id
-        && !(await canSee(ctx.db, ctx.sessionUserId, link.data.targetId))) {
-      return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
+    if (link.success) {
+      const others = [link.data.targetId, link.data.from].filter((id): id is string => id !== undefined && id !== env.entity.id);
+      for (const other of others) {
+        if (!(await canOpen(ctx.db, ctx.sessionUserId, other))) {
+          return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
+        }
+      }
     }
   }
 

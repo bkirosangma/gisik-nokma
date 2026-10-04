@@ -33,7 +33,7 @@ export function countDoorCalls(text: string): Calls {
 
 /** Every door of group D, per file. T9 adds G10 (routes/attachments.ts, routes/tickets.ts) and G11 (check-permission.ts). */
 const DOORS: Record<string, Partial<Calls>> = {
-  'permissions/check-permission.ts': { ticketAccess: 1 }, // G1
+  'permissions/check-permission.ts': { ticketAccess: 1, canOpen: 1 }, // G1; the link block's other ends (drafts T6, 28.114)
   'read/drafts.ts': { holdsDraftRights: 1 }, // listMyDrafts holds each row to R18, the same function the doors use
   'routes/drafts.ts': { listMyDrafts: 2 }, // G8, both reads
   'routes/drafts-publish.ts': { ticketAccess: 1 }, // the set publish (drafts T5b): the first id the caller cannot open refuses the set before ingest (28.098)
