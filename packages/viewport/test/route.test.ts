@@ -182,7 +182,7 @@ describe('29.065 edge routing on packed rows', () => {
     // the 12 px gap below some row (40 px pitch - 28 px bar): (28,40), (68,80), (108,120). No bar middle is exempted: the old
     // channel of a span of two rows, half-way between them (54), is exactly row 1's bar middle
     const rows3 = [bar(0, 0, 4), bar(6, 0, 1), bar(10, 0, 2), bar(2, 1, 3), bar(12, 1, 3), bar(1, 2, 4), bar(9, 2, 3)];
-    const gaps = [...new Set(rows3.map((b) => b.y + b.h))].map((bottom) => [bottom, bottom + 12] as const);
+    const gaps = [0, 1, 2].map((row) => [row * 40 + 28, row * 40 + 40] as const);
     const inner = (pts: readonly Pt[]) => pts.filter((p, i) => i >= 2 && i <= pts.length - 2 && p.y === (pts[i - 1] as Pt).y);
     const outsideGap = (pts: readonly Pt[]) => inner(pts).some((p) => !gaps.some(([lo, hi]) => p.y > lo && p.y < hi));
     // CONTROL, same it: the check sees the old row 0 -> row 2 route, whose channel runs through row 1's bars at y = 54
