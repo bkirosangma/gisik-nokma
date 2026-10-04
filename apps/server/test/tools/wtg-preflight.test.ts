@@ -40,8 +40,8 @@ async function projectRaw(workspaceId: string, d: Def): Promise<void> {
     [workspaceId, d.id, d.name, d.icon, d.rank, d.workflowId, JSON.stringify(d.fields), ACTOR],
   );
 }
-async function claimRaw(workspaceId: string, fieldId: string): Promise<void> {
-  await appendTestEvent(db.pool, testEnvelope({ workspaceId, actorId: ACTOR, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.field_set', payload: { fieldId, value: '3 hours' } }));
+async function claimRaw(workspaceId: string, fieldId: string, pool = db.pool): Promise<void> {
+  await appendTestEvent(pool, testEnvelope({ workspaceId, actorId: ACTOR, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.field_set', payload: { fieldId, value: '3 hours' } }));
 }
 async function workspaceCreatedRaw(workspaceId: string): Promise<void> {
   await appendTestEvent(db.pool, testEnvelope({ workspaceId, actorId: ACTOR, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'W' } }));
@@ -62,6 +62,7 @@ describe('29.147 shadow detector', () => {
     const eventId = await defineRaw(dirty, bad);
     await projectRaw(dirty, bad);
     await claimRaw(dirty, 'estimate');
+    await claimRaw(dirty, 'estimate'); // two claims on one field: the count is a count, not a flag
     await defineRaw(superseded, def('bug', { fields: [num('waitForAll')] }));
     const fixed = def('bug');
     await defineRaw(superseded, fixed);
@@ -73,6 +74,8 @@ describe('29.147 shadow detector', () => {
     // payload) must not make the ledger query throw.
     await appendTestEvent(db.pool, testEnvelope({ workspaceId: clean, actorId: ACTOR, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.reopened', payload: { fieldId: 'estimate' } }));
     await defineRaw(clean, { ...def('legacy'), fields: 'none' as never });
+    // A fields array with an `estimate` entry on an event that is not a type definition is not a definition either.
+    await appendTestEvent(db.pool, testEnvelope({ workspaceId: clean, actorId: ACTOR, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.created', payload: { fields: [num('estimate')] } }));
     await workspaceCreatedRaw(dirty);
     await workspaceCreatedRaw(clean);
 
@@ -81,7 +84,7 @@ describe('29.147 shadow detector', () => {
     expect(database).toBe(((await db.pool.query<{ d: string }>('SELECT current_database() AS d')).rows[0] as { d: string }).d);
     expect(shadows).toContainEqual({ source: 'ledger-definition', workspaceId: dirty, typeId: 'invoice', fieldId: 'estimate', eventId });
     expect(shadows).toContainEqual({ source: 'type-projection', workspaceId: dirty, typeId: 'invoice', fieldId: 'estimate' });
-    expect(shadows).toContainEqual({ source: 'field-claim', workspaceId: dirty, fieldId: 'estimate', claims: 1 });
+    expect(shadows).toContainEqual({ source: 'field-claim', workspaceId: dirty, fieldId: 'estimate', claims: 2 });
     expect(shadows).toContainEqual(expect.objectContaining({ source: 'ledger-definition', workspaceId: superseded, typeId: 'bug', fieldId: 'waitForAll' }));
     expect(shadows.filter((s) => s.source === 'type-projection' && s.workspaceId === superseded)).toEqual([]);
     // control, same it(): nothing else is reported
@@ -180,17 +183,22 @@ describe('29.151 report, exit code, read-only', () => {
   it('29.151 the spawned CLI prints the report, exits 1 for a shadow, 0 for a clean database and 2 without DATABASE_URL', async () => {
     // A process, not an import of main: the entry-point guard, the DATABASE_URL read and the exit code only exist when it runs as a CLI.
     const run = (env: NodeJS.ProcessEnv) =>
-      spawnSync('pnpm', ['exec', 'tsx', 'src/tools/wtg-preflight.ts'], { cwd: join(dirname(fileURLToPath(import.meta.url)), '../..'), encoding: 'utf8', env });
-    const withShadow = run({ ...process.env, DATABASE_URL: db.url }); // the 29.147 fixtures left shadows in this file's database
-    expect(withShadow.status).toBe(1);
-    expect(withShadow.stdout).toMatch(/wtg-preflight: database gisik_test_\w+ \(\d+ workspaces\)/);
-    expect(withShadow.stdout).toMatch(/field-claim\s+\S+ field estimate/);
+      spawnSync('pnpm', ['exec', 'tsx', 'src/tools/wtg-preflight.ts'], { cwd: join(dirname(fileURLToPath(import.meta.url)), '../..'), encoding: 'utf8', env, timeout: 90_000 });
+    // Its own two databases, so this leg neither borrows another it()'s shadow nor leaves one behind.
+    const shadowed = await createTestDatabase();
     const fresh = await createTestDatabase();
     try {
+      await claimRaw(newUlid(), 'estimate', shadowed.pool); // exactly one finding: a claim
+      const withShadow = run({ ...process.env, DATABASE_URL: shadowed.url });
+      expect(withShadow.status).toBe(1);
+      expect(withShadow.stdout).toMatch(/wtg-preflight: database gisik_test_\w+ \(\d+ workspaces\)/);
+      expect(withShadow.stdout).toMatch(/shadowing custom fields: 1 \(BLOCKS wtg2 T4\)/);
+      expect(withShadow.stdout).toMatch(/field-claim\s+\S+ field estimate \(1 claims\)/);
       const clean = run({ ...process.env, DATABASE_URL: fresh.url }); // control: the same CLI, a database with nothing to report
       expect(clean.status).toBe(0);
       expect(clean.stdout).toContain('shadowing custom fields: none');
     } finally {
+      await shadowed.drop();
       await fresh.drop();
     }
     const env = { ...process.env };
@@ -198,5 +206,5 @@ describe('29.151 report, exit code, read-only', () => {
     const missing = run(env);
     expect(missing.status).toBe(2);
     expect(missing.stderr).toContain('DATABASE_URL is required');
-  }, 120_000);
+  }, 180_000);
 });
