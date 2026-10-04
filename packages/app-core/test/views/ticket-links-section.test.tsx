@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { IngestResult } from '@gisik-nokma/domain';
+import type { IngestResult, ServerStreamFrame } from '@gisik-nokma/domain';
 import type { PrecheckResult } from '../../src/precheck.js';
 import { makeSubmittedFactory } from '../../src/submit.js';
 import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
@@ -35,6 +35,15 @@ const make = makeSubmittedFactory({ actorId: 'user_kiro', origin: 'web' });
 const COMMIT: IngestScript = (events) =>
   events.map((e) => ({ status: 'committed', eventId: e.id, seq: 1, serverTime: '2026-10-03T10:00:00.000Z' }));
 const CHILLER = async () => [{ ticketId: OTHER, projectId: 'p', key: 'GN-133', title: 'Chiller' }];
+/** `linked-from-section.test.tsx`'s frame: any `event` on the workspace stream reloads every live query (debounced). */
+const EVENT_FRAME: ServerStreamFrame = {
+  type: 'event',
+  envelope: {
+    id: '01J9GEVT000000000000000099', workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.field_set', version: 1,
+    payload: {}, actorId: 'user_anselma', origin: 'web', clientTime: '2026-08-20T08:59:00.000Z', serverTime: '2026-08-20T09:00:00.000Z', seq: 4, workspaceSeq: 9,
+  },
+} as ServerStreamFrame;
+const h3 = (): string | null => screen.getByRole('heading', { level: 3 }).textContent;
 
 /** `board-phone.test.tsx`'s matchMedia stub, reduced to the phone query. */
 function viewport(options: { phone: boolean }): void {
@@ -300,7 +309,7 @@ describe('Links section', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('27.066 after the commit the busy row stays drawn until the reload answers; control: the answer turns it into the saved row, one row, not busy', async () => {
+  it('27.066 after the commit the busy row stays drawn until the reload answers, and the heading counts LOADED links only ("Links (0)"); Add closes the picker; control: the answer turns it into the saved row, one row, not busy, "Links (1)"', async () => {
     let stored: TicketLinkView[] = [];
     let hold = false;
     const reload = heldRead<TicketLinkView[]>();
@@ -313,11 +322,17 @@ describe('Links section', () => {
     const { container } = render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
     await screen.findByText('No links yet.');
     await openPicker(user);
+    const addLink = screen.getByRole('button', { name: 'Add link' });
+    expect(addLink).toHaveAttribute('aria-expanded', 'true'); // control: the picker is open before a ticket is chosen
     await chooseKind(user, 'Is blocked by');
     await findTicket(user);
+    expect(addLink).toHaveAttribute('aria-expanded', 'false'); // Add closes the picker (plan:2175)
+    expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(1); // the ingest is still out
+    expect(h3()).toBe('Links (0)'); // the busy row is not counted: the heading counts loaded links
     await ingest.releaseAll();
     await screen.findByText('Linked: is blocked by GN-133'); // committed
     expect(reload.waiting()).toBeGreaterThan(0); // the reload is out and held
+    expect(h3()).toBe('Links (0)'); // still the loaded count while the reload is held
     const held = container.querySelectorAll('.gn-ticket-sheet__link-row');
     expect(held).toHaveLength(1);
     expect(held[0]).toHaveAttribute('aria-busy', 'true');
@@ -327,6 +342,42 @@ describe('Links section', () => {
     expect(saved).toHaveLength(1);
     expect(saved[0]).toHaveAttribute('aria-busy', 'false');
     expect(within(screen.getByRole('region', { name: 'Is blocked by' })).getByText('Title GN-133')).toBeInTheDocument();
+    expect(h3()).toBe('Links (1)'); // control: the loaded link is counted
+  });
+
+  it('27.066 a reload that lands while the Add is still out keeps the busy row; control: the Add\'s own reload hands it over', async () => {
+    let stored: TicketLinkView[] = [];
+    const ingest = deferredIngest(() => {
+      stored = [row('relates', 'out', 'GN-9'), row('blocks', 'in', 'GN-133', OTHER)];
+    });
+    let calls = 0;
+    const getTicketLinks = async () => {
+      calls += 1;
+      return [...stored]; // a new array each read: the hand-over effect is keyed on the data's identity
+    };
+    const source = createFakeDataSource({ getTicketLinks }, ingest.script);
+    const user = userEvent.setup();
+    const { container } = render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
+    await screen.findByText('No links yet.');
+    await openPicker(user);
+    await chooseKind(user, 'Is blocked by');
+    await findTicket(user);
+    expect(within(screen.getByRole('region', { name: 'Is blocked by' })).getByText('Chiller')).toBeInTheDocument(); // the busy row is up
+    const before = calls;
+    stored = [row('relates', 'out', 'GN-9')]; // someone else's link lands while the Add is out
+    act(() => source.pushStreamItem(EVENT_FRAME));
+    await waitFor(() => expect(calls).toBeGreaterThan(before)); // the reload happened...
+    await screen.findByText('Title GN-9'); // ...and its DIFFERENT answer is drawn
+    await act(async () => {});
+    const busy = container.querySelectorAll('[aria-busy="true"]');
+    expect(busy).toHaveLength(1); // the busy row stays until THIS add's answer
+    expect(screen.getByRole('region', { name: 'Is blocked by' }).contains(busy[0]!)).toBe(true);
+
+    await ingest.releaseAll(); // control: the commit's own reload answers with both and the busy row hands over
+    await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeNull());
+    expect(container.querySelectorAll('.gn-ticket-sheet__link-row')).toHaveLength(2);
+    expect(within(screen.getByRole('region', { name: 'Is blocked by' })).getByText('Title GN-133')).toBeInTheDocument();
+    expect(h3()).toBe('Links (2)');
   });
 
   it('27.068 one remove per double click; Undo re-adds once and takes its toast down; control: the row is gone from the reloaded list', async () => {
@@ -425,6 +476,25 @@ describe('Links section', () => {
     render(<Harness dataSource={createFakeDataSource({ getTicketLinks: async () => [] })} workspaceId={WS} ticketId={TICKET} canEdit make={make} />);
     expect(await screen.findByText('No links yet.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('27.072 a failed RELOAD reads "Links", not the last count, beside its alert; control: the first read reads "Links (1)"', async () => {
+    let fail = false;
+    let calls = 0;
+    const getTicketLinks = async () => {
+      calls += 1;
+      if (fail) throw new Error('boom');
+      return [row('blocks', 'out', 'GN-142')];
+    };
+    const source = createFakeDataSource({ getTicketLinks });
+    render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} />);
+    await screen.findByText('Title GN-142');
+    expect(h3()).toBe('Links (1)'); // control: the first read answered one link
+    fail = true;
+    act(() => source.pushStreamItem(EVENT_FRAME));
+    await screen.findByRole('alert'); // the reload failed (F6: the last data is kept underneath)
+    expect(calls).toBe(2);
+    expect(h3()).toBe('Links');
   });
 
   it('27.073 the picker never offers this ticket itself; control: other results are offered', async () => {
