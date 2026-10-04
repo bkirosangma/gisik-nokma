@@ -495,7 +495,7 @@ check "13.2086 a lane named BEFORE the verb is no ref word (F2 C4): 'ACK lane 3 
 
 # ── parity-ref (planner ruling 2026-10-04 17:54, REQUIRE; 18:57, ref words from BEFORE the verb only): a dispatcher delivery pairs only a record of its
 # verb + lane whose ref agrees by the SAME ref_agrees as a BY-ORCH agreement; none agreeing → UNPAIRED ref-mismatch, no ref word with a letter → no-ref ──
-# Real lines: roles/DISPATCH-log.md:575 (20:39 on 2026-10-03) and the briefs of roles/QUEUE-dispatch.md:988, 996 (20:21, 20:39), from the 16:59 snapshot
+# Real lines: roles/DISPATCH-log.md:575 (20:39 on 2026-10-02) and the briefs of roles/QUEUE-dispatch.md:988, 996 (20:21, 20:39 on 2026-10-02), from the 16:59 snapshot
 # roles/mut-out/lane3-pm-b6eb-replay/replay/snap; 'FIX 2 toolbar-brd08 delivered, saw echoed' is roles/DISPATCH-log.md 00:23 on 2026-10-02.
 HK3=BRIEF-hk-3-domain-em-dashes-fix-1.md; HK3B=BRIEF-hk-3b-client-em-dashes-fix-1.md; HK_DL='dispatcher: delivered HK-3b FIX 1 pointer to lane1'
 hk_round() { # LATER-BRIEF|- → the real 20:21 hk-3 FIX lane1 record 1080 s before the real 20:39 delivery, plus (unless -) a FIX lane1 record for LATER-BRIEF at the delivery's time; prints the parity audit
