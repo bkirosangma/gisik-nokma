@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import {
   TIMELINE_EMPTY_COPY,
-  TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_NO_DATES_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
+import { dayNumberOf } from '../../src/timeline/timeline-days.js';
 import {
   NO_DATES_NOTE,
   NO_DAY_CLAIMS_NOTE,
@@ -67,21 +67,14 @@ function ticket(
   };
 }
 
-/**
- * Sunday. The window therefore opens on the Monday BEFORE the anchor —
- * 17 Aug — and eight columns reach the Sunday 11 Oct. Both of those days are
- * fixtures below, and so is the day either side of each.
- */
-const ANCHOR = '2026-08-23';
-const WINDOW_START = '2026-08-17';
-const WINDOW_END = '2026-10-11';
-const LAST_WEEK = 7;
+/** The injected today: a Sunday. The chart has no window, so it only places the today line. */
+const TODAY = '2026-08-23';
 
 function model(
   inputs: TicketDatesInput[],
   extra: Partial<Parameters<typeof buildTimelineModel>[1]> = {},
 ): TimelineModel {
-  return buildTimelineModel(inputs, { anchor: ANCHOR, userName, ...extra });
+  return buildTimelineModel(inputs, { today: TODAY, userName, ...extra });
 }
 
 function allRows(m: TimelineModel): TimelineRow[] {
@@ -161,7 +154,7 @@ describe('11.52 bars require BOTH claims (planted defects — invariant 4)', () 
 
   it('start EQUAL to due is a period of one day, not a contradiction', () => {
     const row = onlyRow(model([dated('2026-08-24', '2026-08-24', 'Same day')]));
-    expect(row.bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: false });
+    expect([row.startDay, row.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-08-24')]);
   });
 });
 
@@ -322,134 +315,34 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
       ]),
     );
     // The bar is untouched, and the bad day is printed verbatim beside it.
-    expect(row.bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: false });
+    expect([row.startDay, row.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-08-28')]);
     expect(row.customClaims.map((item) => item.label)).toEqual([
       "Filed on: 2026-02-30, Kiro's claim",
     ]);
   });
 
   it('a real leap day is placed, not refused — the guard is about days, not about February', () => {
-    const row = onlyRow(model([dated('2028-02-29', '2028-03-07', 'Leap')], { anchor: '2028-02-29' }));
-    expect(row.bar).toEqual({ fromWeek: 0, toWeek: 1, clippedStart: false, clippedEnd: false });
+    const row = onlyRow(model([dated('2028-02-29', '2028-03-07', 'Leap')]));
+    expect([row.startDay, row.endDay]).toEqual([dayNumberOf('2028-02-29'), dayNumberOf('2028-03-07')]);
   });
 });
 
-describe('11.55 the window, at both of its ends and one day either side', () => {
-  it('is 8 Monday-start weeks with W-labels', () => {
-    const m = model([]);
-    expect(m.weeks).toHaveLength(8);
-    expect(m.weeks[0]).toEqual({ start: WINDOW_START, label: 'W 17 Aug' });
-    expect(m.weeks[1]!.start).toBe('2026-08-24');
-    expect(m.weeks[LAST_WEEK]).toEqual({ start: '2026-10-05', label: 'W 5 Oct' });
+describe('29.093 a bar is its two claimed days, whatever they are', () => {
+  it('29.093 the row carries the claimed days as day numbers (1970-01-05 is day 4): a one-day period is startDay === endDay; a real leap day is placed', () => {
+    const one = onlyRow(model([dated('2026-08-24', '2026-08-24', 'Same day')]));
+    expect([one.startDay, one.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-08-24')]);
+    // The number itself, not only agreement with the helper: day 0 is 1970-01-01, so 1970-01-05 is day 4 and 2026-08-24 is 20689.
+    expect(one.startDay).toBe(20689);
+    const leap = onlyRow(model([dated('2028-02-29', '2028-03-07', 'Leap')]));
+    expect([leap.startDay, leap.endDay]).toEqual([dayNumberOf('2028-02-29'), dayNumberOf('2028-03-07')]);
+    expect(leap.endDay - leap.startDay).toBe(7);
+    // control: a day that is not a day is refused by the guard, not turned into a bar: it is side-listed as unplaceable
+    const bad = model([dated('2026-02-30', '2026-03-05', 'Bad day')]);
+    expect(allRows(bad)).toHaveLength(0);
+    expect(bad.sideList.map((entry) => entry.reason)).toEqual(['unplaceable-day']);
   });
 
-  it('an anchor already ON a Monday opens that same week, not the one before', () => {
-    const m = model([], { anchor: '2026-08-17' });
-    expect(m.weeks[0]!.start).toBe('2026-08-17');
-  });
-
-  it('the week boundary is Sunday|Monday, pinned on both days', () => {
-    // 23 Aug is the anchor Sunday: still week 0. 24 Aug is week 1.
-    expect(onlyRow(model([dated('2026-08-23', '2026-08-23')])).bar.fromWeek).toBe(0);
-    expect(onlyRow(model([dated('2026-08-24', '2026-08-24')])).bar.fromWeek).toBe(1);
-  });
-
-  it('a start ON the window start is not clipped; one day earlier is', () => {
-    const on = onlyRow(model([dated(WINDOW_START, '2026-08-28')]));
-    expect(on.bar.clippedStart).toBe(false);
-    expect(on.bar.fromWeek).toBe(0);
-    const before = onlyRow(model([dated('2026-08-16', '2026-08-28')]));
-    expect(before.bar.clippedStart).toBe(true);
-    expect(before.bar.fromWeek).toBe(0);
-  });
-
-  it('a due ON the window end is not clipped; one day later is', () => {
-    const on = onlyRow(model([dated('2026-09-28', WINDOW_END)]));
-    expect(on.bar.clippedEnd).toBe(false);
-    expect(on.bar.toWeek).toBe(LAST_WEEK);
-    const after = onlyRow(model([dated('2026-09-28', '2026-10-12')]));
-    expect(after.bar.clippedEnd).toBe(true);
-    expect(after.bar.toWeek).toBe(LAST_WEEK);
-  });
-
-  it('membership at the near edge: due ON the window start is in, one day earlier is nowhere', () => {
-    const inside = model([dated('2026-08-01', WINDOW_START, 'Ends on day one')]);
-    expect(onlyRow(inside).bar).toEqual({
-      fromWeek: 0,
-      toWeek: 0,
-      clippedStart: true,
-      clippedEnd: false,
-    });
-    const outside = model([dated('2026-08-01', '2026-08-16', 'Ended the day before')]);
-    expect(allRows(outside)).toHaveLength(0);
-    // Absent, not side-listed: it carries both claims, it is simply elsewhere.
-    expect(outside.sideList).toHaveLength(0);
-  });
-
-  it('membership at the far edge: start ON the window end is in, one day later is nowhere', () => {
-    const inside = model([dated(WINDOW_END, '2026-11-20', 'Starts on the last day')]);
-    expect(onlyRow(inside).bar).toEqual({
-      fromWeek: LAST_WEEK,
-      toWeek: LAST_WEEK,
-      clippedStart: false,
-      clippedEnd: true,
-    });
-    const outside = model([dated('2026-10-12', '2026-11-20', 'Next quarter')]);
-    expect(allRows(outside)).toHaveLength(0);
-    expect(outside.sideList).toHaveLength(0);
-  });
-
-  it('a bar spanning the whole window is clipped at both ends and covers every column', () => {
-    const row = onlyRow(model([dated('2026-01-01', '2026-12-31', 'All year')]));
-    expect(row.bar).toEqual({ fromWeek: 0, toWeek: LAST_WEEK, clippedStart: true, clippedEnd: true });
-  });
-
-  it('every bar ends no earlier than it starts — a backwards bar is invented geometry', () => {
-    const rows = allRows(
-      model([
-        dated(WINDOW_START, WINDOW_END, 'a'),
-        dated('2026-08-16', '2026-10-12', 'b'),
-        dated('2026-08-24', '2026-08-24', 'c'),
-        dated(WINDOW_END, '2026-11-20', 'd'),
-      ]),
-    );
-    expect(rows).toHaveLength(4);
-    for (const row of rows) {
-      expect(row.bar.toWeek).toBeGreaterThanOrEqual(row.bar.fromWeek);
-      expect(row.bar.fromWeek).toBeGreaterThanOrEqual(0);
-      expect(row.bar.toWeek).toBeLessThanOrEqual(LAST_WEEK);
-    }
-  });
-
-  it('weeksCount is honoured, and its last column is where clipping lands', () => {
-    const m = model([dated('2026-08-24', '2026-12-01')], { weeksCount: 2 });
-    expect(m.weeks.map((week) => week.start)).toEqual(['2026-08-17', '2026-08-24']);
-    expect(onlyRow(m).bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: true });
-  });
-
-  /**
-   * The MESSAGE, not just the type. Deleting the `weeksCount` guard still
-   * throws — the empty `weeks` array trips the `lastWeek === undefined`
-   * fallback one line later — so `toThrow(RangeError)` alone passes against
-   * a model with no guard at all. Measured: that is exactly what the first
-   * draft of this assertion did.
-   */
-  it('a window with no columns is refused loudly, by the guard that names the count', () => {
-    expect(() => model([], { weeksCount: 0 })).toThrow(
-      /a timeline needs at least one week column: 0/,
-    );
-    expect(() => model([], { weeksCount: -3 })).toThrow(
-      /a timeline needs at least one week column: -3/,
-    );
-    // A fractional count would otherwise build a fractional number of columns.
-    expect(() => model([], { weeksCount: 2.5 })).toThrow(
-      /a timeline needs at least one week column: 2.5/,
-    );
-  });
-});
-
-describe('11.56 bars carry exact week indices and their two authors', () => {
-  it('a both-claims ticket becomes one bar with exact week indices and provenance', () => {
+  it('29.093 both claims and their two authors still make one row with the exact provenance sentence', () => {
     const m = model([
       ticket({
         fields: {
@@ -460,26 +353,56 @@ describe('11.56 bars carry exact week indices and their two authors', () => {
       }),
     ]);
     const row = onlyRow(m);
-    // weeks: 17 Aug = 0, 24 Aug = 1, 31 Aug = 2
-    expect(row.bar).toEqual({ fromWeek: 1, toWeek: 2, clippedStart: false, clippedEnd: false });
+    expect([row.startDay, row.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-09-04')]);
     expect(row.provenance).toBe("starts 24 Aug, Anselma's claim; needed by 4 Sep, Kiro's claim");
     expect(row.startClaim.date).toBe('2026-08-24');
     expect(row.dueClaim.date).toBe('2026-09-04');
     expect(row.pending).toBe(false);
   });
+});
 
-  it('a bar reaching outside the window is clipped and says so', () => {
-    const row = onlyRow(model([dated('2026-08-01', '2026-08-26', 'Long haul')]));
-    expect(row.bar.fromWeek).toBe(0);
-    expect(row.bar.toWeek).toBe(1);
-    expect(row.bar.clippedStart).toBe(true);
-    expect(row.bar.clippedEnd).toBe(false);
+describe('29.094 the chart has no window: a dated ticket is never elsewhere', () => {
+  it('29.094 a ticket dated a year before, and one dated a year after, are both rows; none is side-listed; the extent spans them (firstDay / lastDay)', () => {
+    const m = model([
+      dated('2025-03-03', '2025-03-07', 'Long ago'),
+      dated('2027-11-01', '2027-11-05', 'Far ahead'),
+      dated('2026-08-24', '2026-08-28', 'Now'),
+    ]);
+    expect(allRows(m).map((r) => r.title).sort()).toEqual(['Far ahead', 'Long ago', 'Now']);
+    expect(m.sideList).toHaveLength(0);
+    expect(m.firstDay).toBe(dayNumberOf('2025-03-03'));
+    expect(m.lastDay).toBe(dayNumberOf('2027-11-05'));
+    // control: with nothing dated the extent is empty, not zero
+    const none = model([]);
+    expect([none.firstDay, none.lastDay]).toEqual([null, null]);
   });
 
-  it('a fully-dated ticket wholly outside the window appears nowhere', () => {
-    const m = model([dated('2026-11-02', '2026-11-20', 'Next quarter')]);
-    expect(allRows(m)).toHaveLength(0);
-    expect(m.sideList).toHaveLength(0);
+  it('29.094 a custom date claim neither extends a row nor adds one', () => {
+    const stretch = ticket(
+      {
+        fields: {
+          title: claimField('Stretchy'),
+          startDate: claimField({ date: '2026-08-24' }),
+          dueDate: claimField({ date: '2026-08-28' }),
+          'filed-on': claimField('2026-12-25'),
+        },
+      },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
+    );
+    const row = onlyRow(model([stretch]));
+    expect(row.endDay).toBe(dayNumberOf('2026-08-28'));
+    expect(row.customClaims).toHaveLength(1);
+    expect(model([stretch]).lastDay).toBe(dayNumberOf('2026-08-28'));
+  });
+});
+
+describe('29.096 todayDay is the day number of the injected today', () => {
+  it('29.096 any calendar day is a number, however far from the rows; no today (or not a calendar day) is null', () => {
+    expect(model([], { today: '2026-08-19' }).todayDay).toBe(dayNumberOf('2026-08-19'));
+    expect(model([], { today: '2031-01-01' }).todayDay).toBe(dayNumberOf('2031-01-01'));
+    expect(model([], { today: '2026-02-30' }).todayDay).toBeNull();
+    expect(buildTimelineModel([], { userName }).todayDay).toBeNull();
   });
 });
 
@@ -711,11 +634,11 @@ describe('11.58 custom date claims ride along and change no geometry (owner sign
     expect(row.customClaims[0]!.claim.fieldId).toBe('filed-on');
     // 24 Aug and 28 Aug are both in the 24-30 week: one column, untouched by
     // the 26 Aug claim.
-    expect(row.bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: false });
+    expect([row.startDay, row.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-08-28')]);
     expect(row.provenance).toBe("starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
   });
 
-  it('a custom claim far outside the window neither extends a bar nor rescues a window miss', () => {
+  it('a custom claim far away neither extends a bar nor makes a row', () => {
     const stretch = ticket(
       {
         fields: {
@@ -728,23 +651,7 @@ describe('11.58 custom date claims ride along and change no geometry (owner sign
       [],
       [{ id: 'filed-on', name: 'Filed on' }],
     );
-    expect(onlyRow(model([stretch])).bar.toWeek).toBe(1);
-
-    const gone = ticket(
-      {
-        fields: {
-          title: claimField('Elsewhere'),
-          startDate: claimField({ date: '2026-11-02' }),
-          dueDate: claimField({ date: '2026-11-20' }),
-          'filed-on': claimField('2026-08-26'),
-        },
-      },
-      [],
-      [{ id: 'filed-on', name: 'Filed on' }],
-    );
-    const m = model([gone]);
-    expect(allRows(m)).toHaveLength(0);
-    expect(m.sideList).toHaveLength(0);
+    expect(onlyRow(model([stretch])).endDay).toBe(dayNumberOf('2026-08-28'));
   });
 
   it('a custom date claim does NOT rescue a ticket from the side list — but the note stops lying', () => {
@@ -856,7 +763,7 @@ describe('11.59 filters narrow rows and side list alike', () => {
  * still distinguish. The distinct-count assertion records the collapse rather
  * than hiding it.
  */
-describe('11.61 the empty timelines, and the guard a deleted sentence left behind', () => {
+describe('11.61 the empty timelines (one sentence since the window went: 29.095)', () => {
   function assigned(assigneeId: string, title: string, start?: string, due?: string): TicketDatesInput {
     const fields: Record<string, unknown> = { title: claimField(title) };
     if (start !== undefined) fields.startDate = claimField({ date: start });
@@ -879,7 +786,6 @@ describe('11.61 the empty timelines, and the guard a deleted sentence left behin
     expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
     // The property the deleted sentence used to carry, now carried by this one.
     expect(m.emptyCopy).toContain('your filter');
-    expect(m.emptyCopy).not.toBe(TIMELINE_OUT_OF_WINDOW_COPY);
   });
 
   it('an unmatched LANE reaches the same sentence — the door outlives the copy', () => {
@@ -888,43 +794,21 @@ describe('11.61 the empty timelines, and the guard a deleted sentence left behin
     expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
   });
 
-  it('work that is fully dated and merely ELSEWHERE IN TIME says exactly that', () => {
-    const m = model([dated('2026-11-02', '2026-11-06', 'Later')]);
-    expect(m.groups).toEqual([]);
-    expect(m.sideList).toEqual([]);
-    expect(m.emptyCopy).toBe(TIMELINE_OUT_OF_WINDOW_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
-  });
-
   /**
-   * ⚠ THE MEASUREMENT THAT MADE THIS BLOCK WORTH HAVING, INVERTED BY A RULING.
-   *
-   * The reviewer's DISTINCT COUNT was 1; the block was built to make it 3. It
-   * is **2** as of 2026-09-20, because `TIMELINE_NARROWED_COPY` was deleted on
-   * the owner's ruling (*"delete the copy"* — it named "the LANE", a word no
-   * screen shows, and no app could render it), and its arm now falls through to
-   * `TIMELINE_EMPTY_COPY`. **So a filter that matched nobody and a workspace
-   * with nothing in it are ONE screen again** — the exact collapse this block
-   * was written to end, and the cost the ruling buys. Reinstating the
-   * distinction means writing a new sentence for the narrowing case.
-   *
-   * It is asserted rather than described so that the day someone writes that
-   * sentence, THIS is what tells them the count moved — and so that the loss is
-   * a re-runnable measurement rather than a memory.
+   * 29.095 THE COLLAPSE, MEASURED. With the window gone there is no "elsewhere
+   * in time" screen: a workspace with nothing in it, a filter that matched
+   * nobody and a lane that matched nothing are ONE model, and the one sentence
+   * is true of all three ("No claimed dates are here to draw ... your filter").
+   * Control: a model with a row on it is a different model.
    */
-  it('the empties are TWO distinct models, down from three — the narrowing sentence was deleted', () => {
+  it('29.095 the empties are ONE distinct model; a model with a row is another', () => {
     const serialised = [
       model([]),
       model(inWindow(), { filter: { assigneeIds: ['user_nobody'] } }),
       model(inWindow(), { laneEpicId: 'no_such_epic' }),
-      model([dated('2026-11-02', '2026-11-06', 'Later')]),
     ].map((m) => JSON.stringify(m));
-    expect(new Set(serialised).size).toBe(2);
-    // The filter, the lane and the empty workspace are one screen now.
-    expect(serialised[1]).toBe(serialised[0]);
-    expect(serialised[2]).toBe(serialised[0]);
-    // The window miss is still its own, because ITS guard survived.
-    expect(serialised[3]).not.toBe(serialised[0]);
+    expect(new Set(serialised).size).toBe(1);
+    expect(JSON.stringify(model(inWindow()))).not.toBe(serialised[0]);
   });
 
   it('a timeline with anything on it has no empty sentence at all', () => {
@@ -933,43 +817,6 @@ describe('11.61 the empty timelines, and the guard a deleted sentence left behin
     expect(
       model([ticket({ fields: { title: claimField('Undated') } })]).emptyCopy,
     ).toBeNull();
-  });
-
-  /**
-   * NARROWINGS STACK, and this is the pair that proves the precedence is a
-   * truth condition rather than an ordering someone liked.
-   */
-  it('a filter that removed work which WOULD have shown here outranks the window', () => {
-    const m = model(
-      [
-        assigned('user_anselma', 'Later', '2026-11-02', '2026-11-06'),
-        assigned('user_kiro', 'Undated, and would have been listed'),
-      ],
-      { filter: { assigneeIds: ['user_anselma'] } },
-    );
-    expect(m.groups).toEqual([]);
-    expect(m.sideList).toEqual([]);
-    // Widening the filter WOULD fill this screen, so "it is outside these
-    // weeks" would send the viewer to the wrong control. The guard that keeps
-    // that sentence away OUTLIVED the sentence it used to select, which is the
-    // whole reason this test still has a job.
-    expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_OUT_OF_WINDOW_COPY);
-  });
-
-  it('a filter that removed only work which would ALSO have missed the window is not blamed', () => {
-    const m = model(
-      [
-        assigned('user_anselma', 'Later', '2026-11-02', '2026-11-06'),
-        assigned('user_kiro', 'Earlier', '2026-08-01', '2026-08-05'),
-      ],
-      { filter: { assigneeIds: ['user_anselma'] } },
-    );
-    expect(m.groups).toEqual([]);
-    // Widening the filter would put nothing on this screen — the window is the
-    // only control that reaches either ticket.
-    expect(m.emptyCopy).toBe(TIMELINE_OUT_OF_WINDOW_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
   });
 
   /**
@@ -1041,12 +888,10 @@ describe('11.62 the undated-epic skip fires only when the epic has nothing to sa
     expect(m.groups).toHaveLength(1);
     expect(m.groups[0]!.epicId).toBe('epic_full');
     expect(m.groups[0]!.rows.map((row) => row.ticketId)).toEqual(['epic_full']);
-    expect(m.groups[0]!.rows[0]!.bar).toEqual({
-      fromWeek: 1,
-      toWeek: 1,
-      clippedStart: false,
-      clippedEnd: false,
-    });
+    expect([m.groups[0]!.rows[0]!.startDay, m.groups[0]!.rows[0]!.endDay]).toEqual([
+      dayNumberOf('2026-08-24'),
+      dayNumberOf('2026-08-28'),
+    ]);
   });
 
   it('a TRULY undated epic is a lane and nothing else — neither a row nor missing work', () => {
@@ -1159,20 +1004,5 @@ describe('13.1037 hideEpicRows also takes a HALF-dated epic out of the side list
     });
     expect(bare.sideList).toEqual([]);
     expect(bare.groups).toEqual([]);
-  });
-});
-
-describe('23.142 todayDay is an index into THIS window, and null outside it', () => {
-  it('23.142 todayDay is null for a today before the anchor or after the window end, and the right index inside (explicit anchor)', () => {
-    // The window is 17 Aug – 11 Oct (ANCHOR's Monday, eight weeks): day indices 0–55.
-    expect(model([], { today: '2026-08-19' }).todayDay).toBe(2);
-    // The edges are INSIDE: the first day and the last day.
-    expect(model([], { today: WINDOW_START }).todayDay).toBe(0);
-    expect(model([], { today: WINDOW_END }).todayDay).toBe(55);
-    // One day either side is outside — each bound is its own claim (`>= windowStart`, `<= windowEnd`).
-    expect(model([], { today: '2026-08-16' }).todayDay).toBeNull();
-    expect(model([], { today: '2026-10-12' }).todayDay).toBeNull();
-    // No `today` at all: no line.
-    expect(model([]).todayDay).toBeNull();
   });
 });

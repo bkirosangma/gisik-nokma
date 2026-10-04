@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import {
   TIMELINE_EMPTY_COPY,
-  TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
   barProvenance,
@@ -20,6 +19,7 @@ import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import type { IsEpicType } from '../../src/hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../../src/view-types.js';
 import { NO_DATES_NOTE, NO_DAY_CLAIMS_NOTE } from '../../src/timeline/timeline-model.js';
+import { dayNumberOf, isoDayOf } from '../../src/timeline/timeline-days.js';
 import { TimelineView } from '../../src/timeline/timeline-view.js';
 
 /**
@@ -106,6 +106,8 @@ function ticket(
  * inclusively on 11 Oct.
  */
 const TODAY = '2026-08-23';
+/** The state word the description leads with for the fixture's `active` state (TG-14: status is never colour alone). */
+const IN_PROGRESS = 'In progress; ';
 
 /**
  * `packages/app-core/test/timeline` -> four levels up. Deliberately NOT
@@ -118,9 +120,6 @@ const TODAY = '2026-08-23';
  */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
-/** The model's own label shape for a column, never a second spelling of it. */
-const WEEK_17_AUG = 'W 17 Aug';
-const WEEK_14_SEP = 'W 14 Sep';
 
 function renderTimeline(
   tickets: TicketDatesInput[],
@@ -130,7 +129,6 @@ function renderTimeline(
     filter?: FilterSpec;
     laneEpicId?: string | null;
     isEpicType?: IsEpicType;
-    weeksCount?: number;
   } = {},
 ) {
   const onOpenTicket = extra.onOpenTicket ?? vi.fn();
@@ -143,7 +141,6 @@ function renderTimeline(
       {...(extra.filter === undefined ? {} : { filter: extra.filter })}
       {...(extra.laneEpicId === undefined ? {} : { laneEpicId: extra.laneEpicId })}
       {...(extra.isEpicType === undefined ? {} : { isEpicType: extra.isEpicType })}
-      {...(extra.weeksCount === undefined ? {} : { weeksCount: extra.weeksCount })}
     />,
   );
   return { onOpenTicket, ...view };
@@ -177,7 +174,7 @@ describe('11.73 a bar is drawn only from a claimed pair, and the rest is beside 
     const bar = screen.getByRole('button', { name: 'Dated' });
     expect(bar).toHaveAttribute(
       'title',
-      barProvenance(
+      IN_PROGRESS + barProvenance(
         { date: '2026-08-24', actorId: 'user_kiro' },
         { date: '2026-08-28', actorId: 'user_kiro' },
         userName,
@@ -218,40 +215,57 @@ describe('11.73 a bar is drawn only from a claimed pair, and the rest is beside 
   });
 });
 
-describe('11.74 the window moves four weeks at a time, and Today follows the prop rather than the mount', () => {
-  it('Later shifts forward, Earlier comes back, and the columns that leave really leave', () => {
+describe('29.099 there are no pages: no Earlier / Later, a Today button, a zoom switch and a two-row axis', () => {
+  it('29.099 the toolbar is Today and a Day | Week | Month switch with Week marked; Earlier and Later are gone (control: Today is there)', async () => {
     renderTimeline([]);
-    expect(screen.getByText(WEEK_17_AUG)).toBeInTheDocument();
-    // 14 Sep is ALREADY on screen before the shift — the plan's own assertion
-    // would have passed without the window moving at all. What proves the move
-    // is that it becomes the FIRST column and that 17 Aug is gone.
-    expect(screen.getByText(WEEK_14_SEP)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Later' }));
-    expect(screen.queryByText(WEEK_17_AUG)).toBeNull();
-    expect(screen.getAllByText(/^W /)[0]).toHaveTextContent(WEEK_14_SEP);
-    // And a column that could not have been in the old window is now in view.
-    expect(screen.getByText('W 2 Nov')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Earlier' }));
-    expect(screen.getAllByText(/^W /)[0]).toHaveTextContent(WEEK_17_AUG);
-    expect(screen.queryByText('W 2 Nov')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Earlier' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Later' })).toBeNull();
+    const zoom = screen.getByRole('radiogroup', { name: 'Timeline zoom' }); // 29.087: VP-10 asks for a radio group
+    expect(within(zoom).getAllByRole('radio').map((t) => t.textContent)).toEqual(['Day', 'Week', 'Month']);
+    expect(within(zoom).getByRole('radio', { name: 'Week' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(zoom).getByRole('radio', { name: 'Day' })).toHaveAttribute('aria-checked', 'false');
+    // The mark follows the zoom, not a constant: choosing Day marks Day once the zoom lands. Reduced motion makes the zoom
+    // instant (the adapter reads `prefers-reduced-motion` through matchMedia, which jsdom lacks), so it lands on the next frame.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+    try {
+      fireEvent.click(within(zoom).getByRole('radio', { name: 'Day' }));
+      await waitFor(() => expect(within(zoom).getByRole('radio', { name: 'Day' })).toHaveAttribute('aria-checked', 'true'));
+      expect(within(zoom).getByRole('radio', { name: 'Week' })).toHaveAttribute('aria-checked', 'false');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
-  it('Today returns to the day the shell is handing in NOW, not the one it mounted with', () => {
-    const { rerender } = renderTimeline([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Later' }));
-    expect(screen.getAllByText(/^W /)[0]).toHaveTextContent(WEEK_14_SEP);
-
-    // Midnight passed, or the shell simply re-rendered with a fresher day.
-    rerender(
-      <TimelineView tickets={[]} today="2026-10-07" userName={userName} onOpenTicket={vi.fn()} />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
-    // 2026-10-07 is a Wednesday; its Monday is 5 Oct. A component that had
-    // captured the mounted `today` would land back on 17 Aug.
-    expect(screen.getAllByText(/^W /)[0]).toHaveTextContent('W 5 Oct');
-    expect(screen.queryByText(WEEK_17_AUG)).toBeNull();
+  it('29.099 the axis has a period row with a W label on each Monday and a day-number row; a weekend day carries the mark', () => {
+    const { container } = renderTimeline([]);
+    const axis = container.querySelector('.gn-timeline__axis');
+    expect(axis?.querySelectorAll('.gn-timeline__axis-row')).toHaveLength(2);
+    // 2026-08-24 is a Monday, 2026-08-29 a Saturday
+    expect(within(axis as HTMLElement).getByText('W 24 Aug')).toBeInTheDocument();
+    const weekendDays = [...(axis?.querySelectorAll('.gn-timeline__axis-day[data-weekend="true"]') ?? [])];
+    expect(weekendDays.length).toBeGreaterThan(10);
+    // control: no weekday carries it
+    const monday = [...(axis?.querySelectorAll('.gn-timeline__axis-day') ?? [])].filter((n) => !n.hasAttribute('data-weekend'));
+    expect(monday.length).toBeGreaterThan(weekendDays.length);
+    // The RIGHT days, not only the right share: read each day cell by its offset from the W 24 Aug label (labels and day cells
+    // share `--d0`, the day's offset from the surface's first day). Mon 24 and Fri 28 are clear, Sat 29 and Sun 30 are marked.
+    const mon = Number((within(axis as HTMLElement).getByText('W 24 Aug') as HTMLElement).style.getPropertyValue('--d0'));
+    const dayAt = (d0: number) =>
+      [...(axis?.querySelectorAll<HTMLElement>('.gn-timeline__axis-day') ?? [])].find((n) => n.style.getPropertyValue('--d0') === String(d0));
+    expect(dayAt(mon)?.textContent).toBe('24');
+    expect(dayAt(mon)?.getAttribute('data-weekend')).toBeNull();
+    expect(dayAt(mon + 4)?.getAttribute('data-weekend')).toBeNull();
+    expect(dayAt(mon + 5)?.getAttribute('data-weekend')).toBe('true');
+    expect(dayAt(mon + 6)?.getAttribute('data-weekend')).toBe('true');
+    expect(dayAt(mon + 7)?.textContent).toBe('31');
   });
 });
 
@@ -305,7 +319,7 @@ describe('11.75 the empty timelines are the model sentences, rendered verbatim',
     expect(screen.getByRole('note')).toHaveTextContent('your filter');
   });
 
-  it('dated work scheduled outside these weeks — the arm the component cannot reconstruct', () => {
+  it('29.095 dated work a year away is DRAWN, not described: no sentence, a bar', () => {
     renderTimeline([
       ticket({
         fields: {
@@ -315,7 +329,8 @@ describe('11.75 the empty timelines are the model sentences, rendered verbatim',
         },
       }),
     ]);
-    expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_OUT_OF_WINDOW_COPY);
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Next year' })).toBeInTheDocument();
   });
 
   it('and NO sentence at all when there is something to show — the over-firing half', () => {
@@ -532,96 +547,204 @@ describe('11.78 a claim still in transit says so — and a settled one does not'
   });
 });
 
-describe('11.79 a bar occupies the columns it was claimed for, and says which end the window cut', () => {
-  const INSIDE = { title: 'Inside', start: '2026-08-24', due: '2026-08-28', column: '3 / 4' };
-  const OVER_START = { title: 'Over start', start: '2026-08-10', due: '2026-08-28', column: '2 / 4' };
-  const OVER_END = { title: 'Over end', start: '2026-08-24', due: '2026-11-01', column: '3 / 10' };
-  const OVER_BOTH = { title: 'Over both', start: '2026-08-10', due: '2026-11-01', column: '2 / 10' };
+describe('29.097 a bar is placed by three numbers and one scale', () => {
+  const bar = (title: string, start: string, due: string, key?: string): TicketDatesInput => {
+    const input = ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } });
+    return key === undefined ? input : { ...input, key };
+  };
+  const barOf = (title: string) => screen.getByRole('button', { name: title });
+  const prop = (title: string, name: string) => (barOf(title).closest('.gn-timeline__row') as HTMLElement).style.getPropertyValue(name);
 
-  function spans() {
-    return [INSIDE, OVER_START, OVER_END, OVER_BOTH].map((span) =>
-      ticket({
-        fields: {
-          title: claimField(span.title),
-          startDate: claimField({ date: span.start }),
-          dueDate: claimField({ date: span.due }),
-        },
-      }),
-    );
+  it('29.097 --dn is the length in days, both ends included: Mon-Wed is 3, Mon-Fri 5, a one-day bar 1; the day numbers ride on the bar', () => {
+    renderTimeline([bar('Mon to Wed', '2026-08-24', '2026-08-26'), bar('Mon to Fri', '2026-08-24', '2026-08-28'), bar('One day', '2026-09-30', '2026-09-30')]);
+    expect(prop('Mon to Wed', '--dn')).toBe('3');
+    expect(prop('Mon to Fri', '--dn')).toBe('5');
+    expect(prop('One day', '--dn')).toBe('1');
+    expect(barOf('Mon to Wed')).toHaveAttribute('data-day-from', String(dayNumberOf('2026-08-24')));
+    expect(barOf('Mon to Wed')).toHaveAttribute('data-day-to', String(dayNumberOf('2026-08-26')));
+    // --d0 is relative to the surface's first day, so the offset BETWEEN two bars is their distance in days
+    expect(Number(prop('One day', '--d0')) - Number(prop('Mon to Wed', '--d0'))).toBe(dayNumberOf('2026-09-30') - dayNumberOf('2026-08-24'));
+    // ...and the offset itself is the axis's: a bar starting Monday 24 Aug has the --d0 of the W 24 Aug label above it (a
+    // difference alone cannot see an offset counted from the wrong origin, since both bars would carry it).
+    expect(prop('Mon to Wed', '--d0')).toBe((screen.getByText('W 24 Aug') as HTMLElement).style.getPropertyValue('--d0'));
+  });
+
+  it('29.097 there is no window: work a year before and a year after is drawn, with the surface long enough to hold it', () => {
+    const { container } = renderTimeline([bar('Long ago', '2025-08-25', '2025-08-29'), bar('Far ahead', '2027-08-23', '2027-08-27')]);
+    expect(barOf('Long ago')).toBeInTheDocument();
+    expect(barOf('Far ahead')).toBeInTheDocument();
+    expect(Number(prop('Far ahead', '--d0')) - Number(prop('Long ago', '--d0'))).toBe(dayNumberOf('2027-08-23') - dayNumberOf('2025-08-25'));
+    // control: the surface is sized from the day count, not from a week count
+    const width = (container.querySelector('.gn-timeline__surface') as HTMLElement).style.width;
+    expect(width).toMatch(/^calc\(var\(--tl-ppd\) \* \d+ \* 1px\)$/);
+    expect(Number(/\* (\d+) \*/.exec(width)?.[1])).toBeGreaterThan(730);
+  });
+
+  it('29.097 no stylesheet number leaks into the markup: the scale is one custom property on the canvas, and no inline grid template exists', () => {
+    const { container } = renderTimeline([bar('Mon to Wed', '2026-08-24', '2026-08-26')]);
+    expect((container.querySelector('.gn-timeline__canvas') as HTMLElement).style.getPropertyValue('--tl-ppd')).toBe('24');
+    expect(container.querySelectorAll('[style*="grid-template-columns"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[style*="left:"]')).toHaveLength(0);
+  });
+});
+
+describe('29.098 the bars of a lane are packed into the fewest rows', () => {
+  const bar = (title: string, start: string, due: string): TicketDatesInput =>
+    ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } });
+  const rowOf = (title: string) => Number((screen.getByRole('button', { name: title }).closest('.gn-timeline__row') as HTMLElement).style.getPropertyValue('--row'));
+
+  it('29.098 two bars that share a day take two rows, two that only touch take one, and the lane is as tall as its rows; control: a third overlap adds a row', () => {
+    const { container } = renderTimeline([
+      bar('A', '2026-08-24', '2026-08-28'),
+      bar('B', '2026-08-26', '2026-08-31'),
+      bar('C', '2026-09-01', '2026-09-03'),
+    ]);
+    expect(rowOf('A')).toBe(0);
+    expect(rowOf('B')).toBe(1);
+    // C starts the day after B ends: it fits beside A in row 0
+    expect(rowOf('C')).toBe(0);
+    const lane = container.querySelector('.gn-timeline__lane') as HTMLElement;
+    expect(lane.style.getPropertyValue('--lane-extent')).toBe(`${34 + 2 * 40}px`);
+    document.body.innerHTML = '';
+    const three = renderTimeline([bar('A', '2026-08-24', '2026-08-28'), bar('B', '2026-08-26', '2026-08-31'), bar('C', '2026-08-27', '2026-08-30')]);
+    expect((three.container.querySelector('.gn-timeline__lane') as HTMLElement).style.getPropertyValue('--lane-extent')).toBe(`${34 + 3 * 40}px`);
+  });
+});
+
+describe('29.100 the key is on the bar; the accessible name stays the title', () => {
+  const keyed = (title: string, key: string, start: string, due: string): TicketDatesInput => ({
+    ...ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } }),
+    key,
+  });
+
+  it('29.100 a wide bar shows the key inside; a one-day bar shows it just outside its end; the name is the title alone and the description has the key', () => {
+    const { container } = renderTimeline([keyed('Wide', 'GN-12', '2026-08-24', '2026-08-28'), keyed('Narrow', 'GN-13', '2026-09-08', '2026-09-08')]);
+    const wide = screen.getByRole('button', { name: 'Wide' });
+    expect(wide.querySelector('.gn-timeline__key')).toHaveTextContent('GN-12');
+    const narrow = screen.getByRole('button', { name: 'Narrow' });
+    expect(narrow.querySelector('.gn-timeline__key')).toBeNull();
+    const outside = (narrow.closest('.gn-timeline__row') as HTMLElement).querySelector('.gn-timeline__key--outside');
+    expect(outside).toHaveTextContent('GN-13');
+    expect(outside).toHaveAttribute('aria-hidden', 'true');
+    // the key is reachable by assistive technology through the description, never through the name
+    const described = document.getElementById(narrow.getAttribute('aria-describedby') as string);
+    expect(described).toHaveTextContent('GN-13');
+    expect(narrow.getAttribute('aria-label')).toBe('Narrow');
+    // exactly one key per bar: inside the wide one, outside the narrow one, never both at once
+    expect(container.querySelectorAll('.gn-timeline__key')).toHaveLength(2);
+    expect((wide.closest('.gn-timeline__row') as HTMLElement).querySelector('.gn-timeline__key--outside')).toBeNull();
+    // control: a bar with no key (a draft or a replica row) has none to show, inside or outside
+    document.body.innerHTML = '';
+    const bare = renderTimeline([ticket({ fields: { title: claimField('Bare'), startDate: claimField({ date: '2026-09-08' }), dueDate: claimField({ date: '2026-09-08' }) } })]);
+    expect(bare.container.querySelector('.gn-timeline__key')).toBeNull();
+  });
+
+  it('29.100 a finished ticket carries a check, one in progress a play mark, one not started none; the description says it in words', () => {
+    const withState = (title: string, stateCategory: TicketState['stateCategory']): TicketDatesInput =>
+      ticket({ stateCategory, fields: { title: claimField(title), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField({ date: '2026-08-28' }) } });
+    renderTimeline([withState('Done one', 'terminal'), withState('Active one', 'active'), withState('Fresh one', 'open')]);
+    const mark = (title: string) => screen.getByRole('button', { name: title }).querySelector('.gn-timeline__mark')?.textContent ?? null;
+    expect(mark('Done one')).toBe('✓');
+    expect(mark('Active one')).toBe('▶');
+    expect(mark('Fresh one')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Done one' })).toHaveAttribute('title', expect.stringMatching(/^Done; /));
+    expect(screen.getByRole('button', { name: 'Active one' })).toHaveAttribute('title', expect.stringMatching(/^In progress; /));
+    expect(screen.getByRole('button', { name: 'Fresh one' }).getAttribute('title')).not.toMatch(/Done|In progress/);
+  });
+});
+
+describe('29.101 the today line is one line, on the prop\'s day', () => {
+  it('29.101 one line, aria-hidden, at today\'s day number; a different prop moves it; an invalid day draws none', () => {
+    const { container, rerender } = renderTimeline([]);
+    const lines = () => container.querySelectorAll('.gn-timeline__today');
+    expect(lines()).toHaveLength(1);
+    expect(lines()[0]).toHaveAttribute('aria-hidden', 'true');
+    expect(lines()[0]).toHaveAttribute('data-day', String(dayNumberOf('2026-08-23')));
+    // ...and it is DRAWN on that day: Sunday 23 Aug is one day left of the W 24 Aug label (both offsets count from the
+    // surface's first day), so a line placed from the wrong origin fails here even though its data-day is right.
+    const mondayD0 = Number((screen.getByText('W 24 Aug') as HTMLElement).style.getPropertyValue('--d0'));
+    expect(Number((lines()[0] as HTMLElement).style.getPropertyValue('--d0'))).toBe(mondayD0 - 1);
+    rerender(<TimelineView tickets={[]} today="2026-10-07" userName={userName} onOpenTicket={vi.fn()} />);
+    expect(lines()[0]).toHaveAttribute('data-day', String(dayNumberOf('2026-10-07')));
+    rerender(<TimelineView tickets={[]} today="2026-02-30" userName={userName} onOpenTicket={vi.fn()} />);
+    expect(lines()).toHaveLength(0);
+  });
+});
+
+describe('29.102 only the bars near the view are mounted', () => {
+  function crowd(n: number): TicketDatesInput[] {
+    return Array.from({ length: n }, (_, i) => {
+      const start = isoDayOf(dayNumberOf('2026-01-05') + i * 3);
+      return ticket({ fields: { title: claimField(`Bar ${i}`), startDate: claimField({ date: start }), dueDate: claimField({ date: start }) } });
+    });
   }
 
-  it('places each bar on its own columns', () => {
-    renderTimeline(spans());
-    for (const span of [INSIDE, OVER_START, OVER_END, OVER_BOTH]) {
-      expect(screen.getByRole('button', { name: span.title })).toHaveStyle({
-        gridColumn: span.column,
-      });
+  it('29.102 with a measured width the mounted bars are the viewport and one viewport either side; with none (jsdom, a hidden tab) every bar is mounted', () => {
+    const all = crowd(300);
+    const bars = () => document.querySelectorAll('.gn-timeline__bar').length;
+    const stub = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960);
+    try {
+      renderTimeline(all, { today: '2026-06-01' });
+      const measured = bars();
+      expect(measured).toBeGreaterThan(0);
+      expect(measured).toBeLessThan(300);
+      // WHICH bars, not only how many. Bar i is on 2026-01-05 + 3i, so Bar 49 is on today (2026-06-01). The viewport is 40 days
+      // (960 px at 24 px/day) centred on today, so the visible days are today -20 .. +20 and one viewport either side reaches
+      // about today -61 .. +61 (Bars 29 to 69). Bars 21 and 77 are 84 days away, past any band of the view; Bars 0 and 299 are
+      // the ends of the data.
+      const mounted = (i: number) => screen.queryByRole('button', { name: `Bar ${i}` }) !== null;
+      expect([mounted(29), mounted(49), mounted(69)]).toEqual([true, true, true]);
+      expect([mounted(0), mounted(21), mounted(77), mounted(299)]).toEqual([false, false, false, false]);
+      // After the mount and its first refresh the band IS spec PR-5's [visible - V, visible + V], exactly (planner ruling
+      // 2026-10-04): visible = today -20 .. +20 (offset today - 19.5, 40 days), V = 41, band = today -61 .. +61. Bars 28 and 70
+      // (today -63 and +63) are just outside it; the 54-day guess the view starts from (today -81 .. +80) would mount both.
+      expect([mounted(28), mounted(70)]).toEqual([false, false]);
+    } finally {
+      stub.mockRestore();
     }
+    document.body.innerHTML = '';
+    renderTimeline(all, { today: '2026-06-01' });
+    expect(bars()).toBe(300);
   });
+});
 
-  it('names the ticket in the title column as well as inside the bar', () => {
-    const { container } = renderTimeline(spans());
-    // The 12rem title column exists BECAUSE a one-week bar clips its own
-    // label — that is the whole reason the row is not just a bar. Every other
-    // assertion in this file reaches a name through the bar button or through
-    // a side entry, so emptying `.gn-timeline__title-text` made every name
-    // vanish from the column with the suite at 26/26.
-    const rows = [...container.querySelectorAll('.gn-timeline__row')].map((row) => ({
-      title: row.querySelector('.gn-timeline__title-text')?.textContent,
-      bar: row.querySelector('.gn-timeline__bar')?.textContent,
-    }));
-    expect(rows).toHaveLength(4);
-    // The four names really arrived — a pairwise check alone would be
-    // satisfied by an empty column beside an equally empty bar. Sorted,
-    // because the row order is the model's business and 11.81 pins it.
-    expect(rows.map((row) => row.title).sort()).toEqual(
-      [INSIDE, OVER_START, OVER_END, OVER_BOTH].map((span) => span.title).sort(),
+describe('29.102 a view that re-renders without new data re-renders none of its bars', () => {
+  it('29.102 the bar is a React.memo component imported from react, so a moving / resting flip of the view does not re-render 2,000 bars (measured: a 33 ms stall without it, 9.4 ms with); control: the scan finds a planted un-memoised bar', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, '../../src/timeline/timeline-view.tsx'), 'utf8');
+    const memoised = (text: string) => /import \{[^}]*\bmemo\b[^}]*\} from 'react'/.test(text) && /const TimelineBar = memo\(function TimelineBar\(/.test(text);
+    expect(memoised(source)).toBe(true);
+    expect(memoised("const TimelineBar = function TimelineBar(props) { return null; };")).toBe(false);
+  });
+});
+
+describe('29.103 custom date claims stay beside the ticket (TV-2)', () => {
+  it('29.103 the claim list sits in the bar\'s row, outside the bar, with the model\'s label; a bar with none has no list', () => {
+    const withClaim = ticket(
+      { fields: { title: claimField('Filed'), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField({ date: '2026-08-28' }), 'filed-on': claimField('2026-08-26') } },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
     );
-    // And each row names its OWN ticket in both places.
-    for (const row of rows) expect(row.title).toBe(row.bar);
-    // The copy counted above is the title column's, never the bar's.
-    for (const node of container.querySelectorAll('.gn-timeline__title-text')) {
-      expect(node.closest('.gn-timeline__bar')).toBeNull();
-      expect(node.closest('.gn-timeline__title')).not.toBeNull();
-    }
+    const plain = ticket({ fields: { title: claimField('Plain'), startDate: claimField({ date: '2026-09-01' }), dueDate: claimField({ date: '2026-09-02' }) } });
+    renderTimeline([withClaim, plain]);
+    const rowOfFiled = screen.getByRole('button', { name: 'Filed' }).closest('.gn-timeline__row') as HTMLElement;
+    expect(rowOfFiled.querySelector('[data-custom-claims]')).not.toBeNull();
+    expect(rowOfFiled.querySelector('[data-custom-claims]')).toHaveTextContent(customLabel('Filed on', '2026-08-26'));
+    expect(rowOfFiled.querySelector('.gn-timeline__bar [data-custom-claims]')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Plain' }).closest('.gn-timeline__row') as HTMLElement).querySelector('[data-custom-claims]')).toBeNull();
   });
+});
 
-  it('the header reserves the title column, so week i heads the column bar i lands on', () => {
-    const { container } = renderTimeline(spans());
-    // A PROXY, and named as one. jsdom computes no layout, so nothing here can
-    // assert that a label sits over its bar. What it CAN assert is the
-    // structure that alignment rests on: the weeks grid opens with one empty
-    // spacer cell before the week cells, which is why week `i` occupies column
-    // `i + 2` — exactly what the bar's computed `grid-column` says above.
-    // Deleting the spacer slides every label one column left of the bar it
-    // labels, and no assertion in this file could see it.
-    const weeks = container.querySelector('.gn-timeline__weeks');
-    const cells = [...(weeks?.children ?? [])];
-    const weekCells = container.querySelectorAll('[data-week]');
-    expect(weekCells.length).toBeGreaterThan(0);
-    expect(cells).toHaveLength(weekCells.length + 1);
-    expect(cells[0]).toHaveClass('gn-timeline__corner');
-    expect(cells[0]?.textContent).toBe('');
-    expect(cells[0]?.hasAttribute('data-week')).toBe(false);
-    expect(cells.slice(1).every((cell) => cell.hasAttribute('data-week'))).toBe(true);
-  });
-
-  it('marks each clipped end at the end that was clipped, and nowhere else', () => {
-    renderTimeline(spans());
-    const clipping = [INSIDE, OVER_START, OVER_END, OVER_BOTH].map((span) => {
-      const bar = screen.getByRole('button', { name: span.title });
-      return {
-        title: span.title,
-        start: bar.getAttribute('data-clipped-start'),
-        end: bar.getAttribute('data-clipped-end'),
-      };
-    });
-    expect(clipping).toEqual([
-      { title: 'Inside', start: null, end: null },
-      { title: 'Over start', start: 'true', end: null },
-      { title: 'Over end', start: null, end: 'true' },
-      { title: 'Over both', start: 'true', end: 'true' },
-    ]);
+describe('29.105 the pages are gone from the source', () => {
+  it('29.105 no Earlier / Later, SHIFT_DAYS, weeksCount, anchor option or week-column grid remains in the timeline source or in ui.css; control: the scan finds a planted one', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const files = ['timeline-view.tsx', 'timeline-model.ts', 'timeline-layout.ts'].map((f) => readFileSync(join(here, '../../src/timeline', f), 'utf8'));
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const banned = /SHIFT_DAYS|weeksCount|--timeline-week-columns|--timeline-bar-lead|TimelineWeekCol|TimelineBarSpan|TIMELINE_OUT_OF_WINDOW_COPY|>\s*Earlier\s*<|>\s*Later\s*</;
+    const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const text of files) expect(banned.test(code(text))).toBe(false);
+    expect(banned.test(css.replace(/\/\*[\s\S]*?\*\//g, ''))).toBe(false);
+    expect(banned.test('const SHIFT_DAYS = 28;')).toBe(true);
   });
 });
 
@@ -647,7 +770,7 @@ describe('11.80 custom date claims sit beside the ticket, never across the weeks
     const { container } = renderTimeline([filed()]);
     const claim = screen.getByText(customLabel('Filed on', '2026-08-26', 'user_anselma'));
     expect(claim).toHaveAttribute('data-field-id', 'filed-on');
-    expect(claim.closest('.gn-timeline__title')).not.toBeNull();
+    expect(claim.closest('.gn-timeline__row')).not.toBeNull();
     // The list is beside the ticket, never a cell in the week grid: it is not
     // inside the bar, and the bar is the only thing this row puts on a column.
     expect(claim.closest('.gn-timeline__bar')).toBeNull();
@@ -658,7 +781,7 @@ describe('11.80 custom date claims sit beside the ticket, never across the weeks
     renderTimeline([filed()]);
     expect(screen.getByRole('button', { name: 'Dated' })).toHaveAttribute(
       'title',
-      [
+      IN_PROGRESS + [
         barProvenance(
           { date: '2026-08-24', actorId: 'user_kiro' },
           { date: '2026-08-28', actorId: 'user_kiro' },
@@ -724,7 +847,7 @@ describe('11.80 custom date claims sit beside the ticket, never across the weeks
     expect(container.querySelector('[data-custom-claims]')).toBeNull();
     expect(screen.getByRole('button', { name: 'Dated' })).toHaveAttribute(
       'title',
-      barProvenance(
+      IN_PROGRESS + barProvenance(
         { date: '2026-08-24', actorId: 'user_kiro' },
         { date: '2026-08-28', actorId: 'user_kiro' },
         userName,
@@ -858,124 +981,6 @@ describe('11.81 rows are grouped under the epic that owns them, and under "No ep
   });
 });
 
-describe('11.82 the window width is the model\'s, stated once', () => {
-  it('draws the default eight columns and publishes the count for the grids to read', () => {
-    const { container } = renderTimeline([]);
-    const root = container.querySelector('.gn-timeline');
-    expect(container.querySelectorAll('[data-week]')).toHaveLength(8);
-    expect(root).toBeInstanceOf(HTMLElement);
-    // The TRACK LIST, not a bare count: `14.375rem var(--timeline-week-columns)`
-    // substitutes a var as a component of the value, where
-    // `repeat(var(--n), minmax(0, 1fr))` would substitute one into a function
-    // argument — a form no test here could check, since jsdom computes no
-    // layout. `minmax(0, 1fr)` per week track (Board prototype port Task 11,
-    // spec Timeline `:506-538`) rather than a bare `1fr`: a plain `1fr` track
-    // carries an implicit automatic minimum of `auto` (min-content), so a
-    // long bar could still push a column wider than its share and defeat
-    // `.gn-timeline__bar`'s own ellipsis truncation.
-    expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe(
-      'repeat(8, minmax(0, 1fr))',
-    );
-  });
-
-  it('forwards weeksCount unchanged rather than restating the default', () => {
-    const { container } = renderTimeline([], { weeksCount: 2 });
-    const root = container.querySelector('.gn-timeline');
-    expect([...container.querySelectorAll('[data-week]')].map((n) => n.getAttribute('data-week'))).toEqual([
-      '2026-08-17',
-      '2026-08-24',
-    ]);
-    expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe(
-      'repeat(2, minmax(0, 1fr))',
-    );
-  });
-
-  it('the stylesheet that CONSUMES the track list names the property the component publishes', () => {
-    const { container } = renderTimeline([]);
-    const root = container.querySelector('.gn-timeline');
-    expect(root).toBeInstanceOf(HTMLElement);
-    const inline = (root as HTMLElement).style;
-    const published = [...Array(inline.length).keys()]
-      .map((index) => inline.item(index))
-      .filter((name) => name.startsWith('--'));
-    // The NAME is not typed here — only the count. Typing it would make this
-    // file a third spelling of the property, which is the duplication the case
-    // exists to catch; the length is what says the component publishes exactly
-    // one custom property and that `published[0]` below means something.
-    expect(published).toHaveLength(1);
-
-    // The count was de-duplicated INSIDE this component and then restated
-    // across a package boundary: the producer is here, the consumer is
-    // `packages/ui/src/ui.css`, and nothing tied the two spellings together.
-    // Typing `--timeline-week-colummns` on the ui side left ui 34/34 AND
-    // app-core 26/26 green — a `var()` naming an undefined property with no
-    // fallback is invalid at computed-value time, so `grid-template-columns`
-    // becomes `none`, every row drops onto implicit auto-placed tracks, and
-    // each bar keeps a `grid-column` indexing into them. It is outside
-    // `tokens.test.ts`'s var scan on purpose: that scan covers `--gn-` roles,
-    // and a track list is not a colour.
-    //
-    // The name comes from the RENDERED COMPONENT above, so a rename on either
-    // side of the boundary reddens here and names the other side.
-    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
-    const consumed = [...css.matchAll(/var\((--timeline-[a-z0-9-]*)\)/g)].map((hit) => hit[1]);
-    // The walk really read a stylesheet that reads the property — an empty
-    // match list would satisfy a subset check by finding nothing at all.
-    expect(consumed.length).toBeGreaterThan(0);
-    expect([...new Set(consumed)]).toEqual(published);
-
-    // And the SUBSTITUTION FORM, which a name check cannot see. `14.375rem
-    // var(--…)` substitutes the property as a plain COMPONENT of the value;
-    // `repeat(var(--…), minmax(0, 1fr))` substitutes into a function
-    // argument, fails to parse, and turns the whole declaration into `none`
-    // — the same silent collapse as the typo, behind the same green suite,
-    // because jsdom computes no layout.
-    // The leading-track width is pinned DELIBERATELY, and it couples this
-    // app-core case to a ui width: what is load-bearing is that exactly ONE
-    // track precedes the week track list, because that is where the bar's
-    // `grid-column: i + 2` gets its `+ 2`. A ui-side change to the number of
-    // leading tracks must be seen here; a change to the width alone will
-    // redden this too, and re-reading this comment is the intended cost —
-    // paid here: Board prototype port Task 11 (2026-09-16, spec Timeline
-    // `:506-538`) widens the leading track from Plan 9's 12rem to the spec's
-    // 230px (14.375rem). Still exactly one leading track, so the `+ 2` math
-    // is unaffected.
-    expect(css).toContain(`grid-template-columns: 14.375rem var(${published[0]});`);
-    expect(css).not.toMatch(/repeat\(\s*var\(--timeline-/);
-  });
-
-  it('refuses a window it cannot mean rather than restating or clamping the default', () => {
-    // `weeksCount` is forwarded, never defaulted here. `0` is the input that
-    // separates a forward from a rescue: a `|| 8`, a `Math.max(1, …)` or any
-    // clamp in this component swallows the model's refusal and silently draws
-    // a window nobody asked for.
-    //
-    // MEASURED AND REPORTED AS A SURVIVOR: `?? 8` is NOT killed by this case.
-    // `0 ?? 8` is `0`, `null` is not type-legal for this prop, and `undefined`
-    // maps to the model's own 8 — so no input discriminates the forward from
-    // that one restatement. The doc comment on `TimelineViewProps` forbids it;
-    // nothing here proves it absent.
-    expect(() => renderTimeline([], { weeksCount: 0 })).toThrow(RangeError);
-  });
-
-  it('states the column template ONCE: no inline grid-template-columns anywhere', () => {
-    const { container } = renderTimeline([
-      ticket({
-        fields: {
-          title: claimField('Dated'),
-          startDate: claimField({ date: '2026-08-24' }),
-          dueDate: claimField({ date: '2026-08-28' }),
-        },
-      }),
-    ]);
-    // The plan writes the template twice — header row and every ticket row —
-    // from one expression. Two statements that can disagree would slide every
-    // bar off the column it names, silently.
-    expect(container.querySelectorAll('[style*="grid-template-columns"]')).toHaveLength(0);
-    expect(container.querySelectorAll('.gn-timeline__row').length).toBeGreaterThan(0);
-  });
-});
-
 /**
  * E4-28 (batch B15, case `11.223`) — the timeline's own half of the same
  * finding calendar-view.test.tsx's `11.222` covers: a bar's rendered text is
@@ -1011,99 +1016,6 @@ describe("11.223 a timeline bar's date span is a linked DESCRIPTION, not folded 
     // hover-only title carried is unchanged, and the description is the SAME
     // string linked a second, AT-reachable way — not a duplicate invention.
     expect(bar).toHaveAttribute('title', description!.textContent);
-  });
-});
-
-describe('23.142 timeline bars end on their real day, and today has a line (audit PV-10)', () => {
-  const bar = (title: string, start: string, due: string) =>
-    ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } });
-  const barOf = (title: string) => screen.getByRole('button', { name: title });
-  const days = (title: string) => {
-    const node = barOf(title);
-    return { from: Number(node.getAttribute('data-day-from')), to: Number(node.getAttribute('data-day-to')) };
-  };
-  const prop = (title: string, name: string) => barOf(title).style.getPropertyValue(name);
-
-  it('23.142 a bar spans [start day, end day]: Mon–Wed is THREE day columns and Mon–Fri leaves the weekend free', () => {
-    // The window opens on Mon 17 Aug, so Mon 24 Aug is day 7.
-    renderTimeline([
-      bar('Mon to Wed', '2026-08-24', '2026-08-26'),
-      bar('Mon to Fri', '2026-08-24', '2026-08-28'),
-      bar('Across the weekend', '2026-08-26', '2026-09-01'),
-    ]);
-    expect(days('Mon to Wed')).toEqual({ from: 7, to: 9 });
-    expect(days('Mon to Wed').to - days('Mon to Wed').from + 1).toBe(3);
-    // Days inside the week the bar starts/ends in: the bar's margins are these, as a share of its own weeks.
-    expect(prop('Mon to Wed', '--timeline-bar-lead')).toBe('0');
-    expect(prop('Mon to Wed', '--timeline-bar-tail')).toBe('4');
-    expect(prop('Mon to Fri', '--timeline-bar-tail')).toBe('2');
-    expect(prop('Mon to Fri', '--timeline-bar-weeks')).toBe('1');
-    // Two weeks, starting Wednesday and ending Tuesday.
-    expect(days('Across the weekend')).toEqual({ from: 9, to: 15 });
-    expect(prop('Across the weekend', '--timeline-bar-lead')).toBe('2');
-    expect(prop('Across the weekend', '--timeline-bar-tail')).toBe('5');
-    expect(prop('Across the weekend', '--timeline-bar-weeks')).toBe('2');
-    expect(barOf('Across the weekend')).toHaveStyle({ gridColumn: '3 / 5' });
-
-    // CONTROL — a bar that fills whole weeks (Mon–Sun) has no lead and no tail: the week index and the day
-    // index agree exactly where the old whole-week answer was right, so the new one is not a different drawing.
-    document.body.innerHTML = '';
-    renderTimeline([bar('Whole week', '2026-08-24', '2026-08-30')]);
-    expect(prop('Whole week', '--timeline-bar-lead')).toBe('0');
-    expect(prop('Whole week', '--timeline-bar-tail')).toBe('0');
-    expect(days('Whole week')).toEqual({ from: 7, to: 13 });
-  });
-
-  it('23.142 a bar clipped by the window keeps its edge on the window and zero lead / tail there', () => {
-    renderTimeline([bar('Runs past the end', '2026-10-05', '2026-12-31'), bar('Starts before', '2026-08-01', '2026-08-19')], {
-      weeksCount: 8,
-    });
-    // 8 weeks from 17 Aug is 56 days (0–55).
-    expect(days('Runs past the end').to).toBe(55);
-    expect(prop('Runs past the end', '--timeline-bar-tail')).toBe('0');
-    expect(days('Starts before').from).toBe(0);
-    expect(prop('Starts before', '--timeline-bar-lead')).toBe('0');
-    expect(prop('Starts before', '--timeline-bar-tail')).toBe('4');
-  });
-
-  it('23.142 a today line sits on the prop\'s day in every row, and is absent when today is outside the window', () => {
-    const { container, unmount } = renderTimeline([bar('One', '2026-08-24', '2026-08-26'), bar('Two', '2026-08-25', '2026-08-27')], {
-      today: '2026-08-26',
-    });
-    const lines = [...container.querySelectorAll<HTMLElement>('.gn-timeline__today')];
-    // One per row — "spanning the rows" — drawn for the eye only.
-    expect(lines).toHaveLength(2);
-    for (const line of lines) {
-      expect(line).toHaveAttribute('aria-hidden', 'true');
-      // The window opens on the Monday of today's week (24 Aug), so Wed 26 Aug is day 2: the first week (column 2), two days in.
-      expect(line).toHaveStyle({ gridColumn: '2 / 3' });
-      expect(line.style.getPropertyValue('--timeline-today-lead')).toBe('2');
-    }
-    unmount();
-
-    // CONTROL — the line follows the PROP, not a device clock: a day inside the window moves it.
-    const moved = renderTimeline([bar('One', '2026-08-24', '2026-08-26')], { today: '2026-08-17' });
-    expect(moved.container.querySelector('.gn-timeline__today')?.getAttribute('style')).toContain('--timeline-today-lead: 0');
-    moved.unmount();
-  });
-
-  it('23.142 paging away from today removes the line, while the bar that spans both windows keeps its row; Today brings it back', () => {
-    // The window opens on the Monday of the `today` prop, so a different `today` would MOVE the window and no row
-    // would render for a line to sit in. The real case is the person paging away: `today` stays, the window moves.
-    const { container } = renderTimeline([bar('Spans both', '2026-08-24', '2026-10-02')], { today: '2026-08-26', weeksCount: 2 });
-    const line = () => container.querySelector('.gn-timeline__today');
-    expect(barOf('Spans both')).toBeInTheDocument();
-    expect(line()).not.toBeNull();
-
-    // Later is 28 days: the window is now 21 Sep – 4 Oct and today (26 Aug) is behind it.
-    fireEvent.click(screen.getByRole('button', { name: 'Later' }));
-    // The row is STILL there (the bar runs to 2 Oct), so a missing line is the model's answer, not an empty chart.
-    expect(barOf('Spans both')).toBeInTheDocument();
-    expect(container.querySelectorAll('.gn-timeline__row').length).toBeGreaterThan(0);
-    expect(line()).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
-    expect(line()).not.toBeNull();
   });
 });
 
