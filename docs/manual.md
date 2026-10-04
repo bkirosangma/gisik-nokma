@@ -1992,6 +1992,13 @@ because the thing it pointed at no longer exists.
 **Tagging a note in a ticket's own comment attaches that note to the ticket** — the same as pressing Attach
 note yourself. Referencing a note inside the note's own comments does not attach anything anywhere.
 
+**Linked from.** A ticket and a note each show what links to them: under the ticket's Notes, and under a
+note's text, a **Linked from** list names every ticket, note and comment that chips or links to it, with
+the sentence it sits in and the reference highlighted. Click a row to open it; a comment opens its ticket or
+note scrolled to the comment. Only what *you* can see is listed, and the number beside the heading counts
+only those. Past twenty, **Show all** loads the rest. A plain `GN-142` typed as text is not a link — only a
+chip is. Nothing to list, no list.
+
 ### Deleting a note, and getting it back
 
 A deleted note goes into a **Deleted** group on the Notes page, with a **Restore** button — you always
@@ -2017,7 +2024,6 @@ Honestly, not everything:
 - A note cannot contain another note as a sub-page.
 - Notes have no screen yet on the phone or desktop apps — only the website has one.
 - Meaning search understands English only; a Garo-tuned model is a planned follow-up, not built.
-- There is no list on a note or a ticket showing what else links to it.
 
 ## §16 — Connecting Claude or ChatGPT
 
