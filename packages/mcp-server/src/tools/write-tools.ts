@@ -3,7 +3,8 @@ import { PRIORITIES, newUlid } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
 import { MARKDOWN_SYNTAX_HELP, markdownBody, parentOf } from './markdown-io.js';
-import { EMAIL_FIELDS, resolveAssignee, submitForAssignee } from './assignee-email.js';
+import { EMAIL_FIELDS, resolveAssignee, submitForAssignee, type LookedUpPerson } from './assignee-email.js';
+import { readDirectory } from './directory.js';
 import { envelopeFor, submitOne } from './submit.js';
 import { readTicket } from './ticket-tools.js';
 
@@ -32,7 +33,8 @@ export function writeTools(session: Session): ToolDefinition[] {
         'workflow, the initial state and every rule are the product\'s, not this tool\'s. `start` ' +
         'chooses where it is born: `\'backlog\'` (the default) or `\'focus\'`. Optional: `markdown` (the description), ' +
         '`priority` (P1–P3), `assigneeId` ("me" is you), `stateId` (the status it starts in; the ticket then starts in focus, ' +
-        'so do not combine it with start "backlog"), `startDate` / `dueDate` (YYYY-MM-DD). ' + MARKDOWN_SYNTAX_HELP,
+        'so do not combine it with start "backlog"), `startDate` / `dueDate` (YYYY-MM-DD). ' +
+        'To assign someone by their email address instead, pass assignee_email (and no assigneeId): the first call looks the address up and answers a PREVIEW naming the person and saying whether they are already in the workspace or WILL BE ADDED AS A GUEST (who would then see only this ticket) - no ticket is created; repeat the call with confirm_assignee set to that person\'s userId to create it. ' + MARKDOWN_SYNTAX_HELP,
       inputSchema: {
         workspaceId: z.string().min(1),
         projectId: z.string().min(1),
@@ -41,6 +43,7 @@ export function writeTools(session: Session): ToolDefinition[] {
         parentId: z.string().min(1).nullable().optional(),
         start: z.enum(['backlog', 'focus']).optional(),
         ...birthShape,
+        ...EMAIL_FIELDS,
       },
       handler: async (args) => {
         const a = z
@@ -52,11 +55,28 @@ export function writeTools(session: Session): ToolDefinition[] {
             parentId: z.string().min(1).nullable().optional(),
             start: z.enum(['backlog', 'focus']).optional(),
             ...birthShape,
+            ...EMAIL_FIELDS,
           })
           .parse(args);
         if (a.stateId !== undefined && a.start === 'backlog') {
           throw new Error('a backlog ticket has no starting status, so pass either start: "backlog" or a stateId, not both');
         }
+        if (a.assigneeId !== undefined && a.assignee_email !== undefined) {
+          throw new Error('create_ticket takes at most one of assigneeId and assignee_email');
+        }
+        if (a.confirm_assignee !== undefined && a.assignee_email === undefined) throw new Error('confirm_assignee only goes with assignee_email');
+        let person: LookedUpPerson | undefined;
+        if (a.assignee_email !== undefined) {
+          // Nothing below is built (no id, no Markdown conversion) until the address has resolved AND been confirmed: call 1 must create nothing.
+          const resolved = await resolveAssignee(session, a.workspaceId, a.assignee_email, a.confirm_assignee, async (found) => {
+            const workspace = (await readDirectory(session)).find((w) => w.workspaceId === a.workspaceId);
+            const project = workspace?.projects.find((p) => p.projectId === a.projectId);
+            return `Creates "${a.title}" in ${project?.name ?? a.projectId} (${workspace?.name ?? a.workspaceId}) and assigns it to ${found.name} (${found.email}).`;
+          });
+          if ('preview' in resolved) return resolved.preview;
+          person = resolved.person;
+        }
+        const assignee = person !== undefined ? person.userId : a.assigneeId === 'me' ? session.userId() : a.assigneeId;
         const ticketId = newUlid();
         const event = envelope(session, a.workspaceId, ticketId, 'ticket.created', {
           typeId: a.typeId,
@@ -82,12 +102,12 @@ export function writeTools(session: Session): ToolDefinition[] {
           start: a.stateId !== undefined ? 'focus' : (a.start ?? 'backlog'),
           ...(a.markdown === undefined || a.markdown.trim() === '' ? {} : { description: await markdownBody(session, a.workspaceId, a.markdown) }),
           ...(a.priority === undefined ? {} : { priority: a.priority }),
-          ...(a.assigneeId === undefined ? {} : { assigneeId: a.assigneeId === 'me' ? session.userId() : a.assigneeId }),
+          ...(assignee === undefined ? {} : { assigneeId: assignee }),
           ...(a.stateId === undefined ? {} : { stateId: a.stateId }),
           ...(a.startDate === undefined ? {} : { startDate: { date: a.startDate } }),
           ...(a.dueDate === undefined ? {} : { dueDate: { date: a.dueDate } }),
         });
-        const committed = await submitOne(session, event);
+        const committed = person === undefined ? await submitOne(session, event) : await submitForAssignee(session, a.workspaceId, person, event);
         return { ticketId, ...(committed as object) };
       },
     },
