@@ -1,7 +1,7 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { FieldClaim } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
-import { canSee } from '../visibility/can-see.js';
+import { canOpen } from '../visibility/can-open.js';
 
 export type ContestView = {
   contestedEventId: string;
@@ -19,7 +19,7 @@ export type ContestView = {
    *
    * **Serving it discloses nothing this route was not already disclosing.** Its
    * own rule is "a contest is exactly as visible as its ticket, never more", and
-   * every row here has already passed `canSee` for the ticket the title belongs
+   * every row here has already passed `canOpen` for the ticket the title belongs
    * to. A viewer who may read the contest may read the ticket, and a viewer who
    * may not gets no row at all — so the title travels with a row whose audience
    * is the ticket's own.
@@ -32,9 +32,10 @@ export type ContestView = {
    * It closes the attention strip's `projectId`, which was previously reachable
    * only through `GET /v1/workspaces/:workspaceId/tickets` — a SECOND route that
    * resolves its set through `listVisibleTickets` while this one filters through
-   * `canSee`, with nothing anywhere asserting the two answer the same set. That
+   * `canSee`, with nothing anywhere asserting the two answer the same set (since drafts T4 the gate is
+   * `canOpen`, which also admits the caller's own draft, and listVisibleTickets never names one). That
    * made it "a second join with a caveat" (`mappers.ts`' own words). Off this
-   * row there is no caveat: same row, same tenancy, same `canSee` gate that
+   * row there is no caveat: same row, same tenancy, same `canOpen` gate that
    * already admitted the contest.
    *
    * The ID only, never the NAME. Rulings P32/P38 make a project's name the
@@ -92,7 +93,7 @@ type ContestRow = {
  *   this is reachable and loud: an INNER JOIN would have DROPPED the contest,
  *   turning a data disagreement into a silently shorter list, which is the
  *   failure this series keeps finding. It is only reachable for a row that has
- *   ALREADY passed `canSee` — a ticket with no `proj_visibility` row answers
+ *   ALREADY passed `canOpen` — a ticket with no `proj_visibility` row answers
  *   false and never gets here — so this is a visible contest whose ticket has no
  *   `proj_tickets` row, not the ordinary invisible case.
  * - **No title claim, or one whose value is not a string** → throw. Every
@@ -105,7 +106,7 @@ type ContestRow = {
 function titleOf(row: ContestRow): string {
   if (row.ticket_fields === null) {
     throw new Error(
-      `GET /v1/contests: contest ${row.contested_event_id} names ticket ${row.ticket_id}, which has no proj_tickets row — the contest passed canSee, so its ticket is visible and the two projections disagree`,
+      `GET /v1/contests: contest ${row.contested_event_id} names ticket ${row.ticket_id}, which has no proj_tickets row — the contest passed canOpen, so its ticket is visible and the two projections disagree`,
     );
   }
   const claim = row.ticket_fields['title'];
@@ -128,13 +129,13 @@ function titleOf(row: ContestRow): string {
  * Separate from `titleOf` and throwing its own message rather than sharing one:
  * a null here and a null there mean the same disagreement, but a shared throw
  * would name only one of the two fields and send a reader to the wrong column.
- * Reachable only for a contest that has ALREADY passed `canSee`, for the reason
+ * Reachable only for a contest that has ALREADY passed `canOpen`, for the reason
  * `titleOf` states.
  */
 function projectIdOf(row: ContestRow): string {
   if (row.ticket_project_id === null) {
     throw new Error(
-      `GET /v1/contests: contest ${row.contested_event_id} names ticket ${row.ticket_id}, which has no proj_tickets row — the contest passed canSee, so its ticket is visible and the two projections disagree`,
+      `GET /v1/contests: contest ${row.contested_event_id} names ticket ${row.ticket_id}, which has no proj_tickets row — the contest passed canOpen, so its ticket is visible and the two projections disagree`,
     );
   }
   return row.ticket_project_id;
@@ -170,8 +171,9 @@ function toView(row: ContestRow): ContestView {
  *
  * ## A contest is exactly as visible as its ticket, never more
  *
- * Every row is filtered through `canSee`, which is the product's ONE visibility
- * decision. Three properties of that call are load-bearing here:
+ * Every row is filtered through `canOpen` (drafts G6): `canSee`, which is the product's ONE visibility
+ * decision, or the caller's own openable draft, so a contest on a draft is listed to its author and to
+ * nobody else. Three properties of that call are load-bearing here:
  *
  * - It takes no `workspaceId`. The role is resolved in the workspace the
  *   TICKET's own `proj_visibility` row names, so a caller who is an owner of
@@ -196,7 +198,7 @@ function toView(row: ContestRow): ContestView {
  * be the same answer or the empty/non-empty distinction becomes the oracle the
  * 404 discipline exists to remove.
  *
- * The per-row `canSee` loop is deliberate rather than lazy.
+ * The per-row `canOpen` loop is deliberate rather than lazy.
  * `listVisibleTickets` answers a different question (a viewer's ticket slice)
  * and returns a different shape; reusing it would mean stating the visibility
  * decision a second way, which is the two-sources-of-truth shape this series
@@ -274,11 +276,11 @@ export function registerContestsRoute(
         // "NAMED, NOT COVERED", item 2, verbatim: *"A deleted ticket's contest
         // still renders."*). The reason is the FAQ's: a contest is an event
         // that CITES the ticket — *"Its history is retained, because other
-        // events cite it"* — and this roster is gated per row by `canSee`,
+        // events cite it"* — and this roster is gated per row by `canOpen`,
         // which is the whole audience decision here. The consequence is named
         // rather than left to be found: the deleted ticket's TITLE travels with
         // the contest, because the title is joined from `proj_tickets.fields`
-        // and `canSee` knows nothing about deletion.
+        // and `canOpen` knows nothing about deletion.
         `SELECT c.*, t.fields AS ticket_fields, t.project_id AS ticket_project_id
            FROM proj_contested c
            LEFT JOIN proj_tickets t
@@ -290,7 +292,7 @@ export function registerContestsRoute(
 
       const contests: ContestView[] = [];
       for (const row of rows) {
-        if (!(await canSee(deps.pool, request.currentUserId, row.ticket_id))) {
+        if (!(await canOpen(deps.pool, request.currentUserId, row.ticket_id))) {
           continue;
         }
         contests.push(toView(row));

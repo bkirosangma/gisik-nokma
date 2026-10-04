@@ -9,6 +9,7 @@ import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
 import { canSee } from './can-see.js';
+import { canOpen } from './can-open.js';
 import {
   grantNoticeFor,
   isGrantBackfillTrigger,
@@ -293,8 +294,9 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
       //
       // ## Why `'note'` is a class rather than `'ticket'` with a note arm
       //
-      // The ticket branch asks `canSee(db, userId, env.entity.id)` — a question
-      // about `proj_visibility`, keyed by ticket. A note has no row there, so
+      // The ticket branch asks `canOpen(db, userId, env.entity.id)` (`canSee`, or
+      // the reader's own draft, drafts G2) — a question about `proj_visibility`
+      // and `proj_tickets`, keyed by ticket. A note has no row there, so
       // `canSee` answers false for every note and for every reader: the author's
       // own copy of their own note disappears along with everyone else's. The
       // two audience questions are genuinely different functions over different
@@ -495,7 +497,11 @@ export async function* visibleEventsFor(
     const env = rowToEnvelope(row);
     switch (audienceClassOf(env.entity.kind)) {
       case 'ticket': {
-        if (await canSee(db, userId, env.entity.id)) {
+        // `canOpen` (drafts G2): the author's own devices receive their draft's events (R20); no other reader
+        // does. A draft event that is a grant trigger (`ticket.assigned`, `ticket.reparented`) names nothing:
+        // `grantNoticeFor` asks `canSee` of every candidate, the trigger ticket included, which is false for a
+        // draft, so no `reach-granted` is ever built from one (case 28.073).
+        if (await canOpen(db, userId, env.entity.id)) {
           // CLOSURE 5, THE GRANT HALF (ruling P37). An event that can change
           // this ticket's resolved audience, reaching a reader who may see it
           // NOW, hands back the pre-cursor history their cursor ran past while
@@ -541,7 +547,9 @@ export async function* visibleEventsFor(
             // **That second question is redundant on THIS path and is kept
             // anyway, which is worth stating rather than leaving to be
             // re-derived.** Every id in `dependents` came either from the
-            // trigger ticket — already `canSee`-admitted by the `if` above — or
+            // trigger ticket — already admitted by the `if` above (`canOpen`:
+            // `canSee`, or the reader's own draft, whose notes are asked
+            // below like any other) — or
             // from `grantNoticeFor`, which `canSee`s each candidate itself. And
             // an `inherit` note attached to a ticket the reader may see is
             // readable BY DEFINITION of `canReadNote`'s `inherit` arm, which
@@ -711,7 +719,7 @@ export async function* visibleEventsFor(
         // included, because a comment filed against a note is filed against the
         // note (`NOTE_EVENT_TYPES` names it for exactly this reason) and so
         // follows the note's audience rather than any ticket's. Routing note
-        // comments through the ticket branch would ask `canSee` about a note id
+        // comments through the ticket branch would ask `canOpen` about a note id
         // and withhold them from everybody, the author included.
         const loaded = await loadNoteForVisibility(db, env.entity.id);
         if (loaded === null) break;
