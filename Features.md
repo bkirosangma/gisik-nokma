@@ -3829,12 +3829,13 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 - ⚙️ **The viewport package and the real-browser stress harness** (Workflow and Timeline graphs Part 1 T1; cases 29.001–29.007, 29.014, 29.016; `packages/viewport/`, `packages/flow-graph-browser/`) — `@gisik-nokma/viewport` is the pure, clock-free home of the shared time-and-camera engine (this task: integer day numbers, Mondays and the axis levels, `calendar-days.ts`). `packages/flow-graph-browser` is a private Playwright package on port 3192 (never 3190 / 3191 / 3001): a frame sampler (`frameStats`, `samplePan`), one stress page with three scenes (`stress.html?scene=time|flow|view`), `/__results` records in `test-results/stress.jsonl` (ignored by the root `test-results/` rule on every branch; a real phone posts there too) and the section 13 pan bars as data with `judge(record)`. A headless number is a floor, never a pass; the bars are read from `FG_HEADED=1` runs and a real phone. The shipped week-column Timeline's own numbers are the baseline on case 29.016. Registered in the four Dockerfiles, `docker-compose.hot.yml` and app-core's dependencies (guard 29.004); `check-case-citations` admits `packages/flow-graph-browser/tests` (29.007). The gate graph is 46 real tasks, measured (turbo's dry run lists 49: three browser packages' `build` are `<NONEXISTENT>`); the gate verb's 46-only pin lands in T1's last commit.
 - ⚙️ **The motion core** (Workflow and Timeline graphs Part 1 T2; cases 29.008–29.013, 29.015; `packages/viewport/src/{spring,momentum,rubber-band,anchored-zoom,wheel,driver}.ts`) — a critically damped spring (τ 85 ms, dt clamped at 100 ms, `tauFor` so any glide lands inside 450 ms), flick momentum (τ 240 ms, least-squares velocity over 80 ms, stop below 2 px/s), a rubber band (power 0.3, 160 ms spring-back), zoom about an anchor (4–96 px per day; presets Day 56 / Week 24 / Month 8; `packScale` is the power-of-two bucket), `wheelIntent` (the Knowledge Graph view plan's classifier, same branches and constants; the KG engine is not on this base, so viewport owns it) and `wheelZoomFactor` (Ctrl + wheel only), and the `ViewportDriver` / `RangeSource` interfaces both adapters implement. Pure: no `Date`, `performance`, timer or DOM outside `src/dom/` (29.015 scans for it).
-<!-- wtg-part1-viewport-timeline-view T3 bullet -->
+- ⚙️ **The range planner and cache** (Workflow and Timeline graphs Part 1 T3; cases 29.020–29.025; `packages/viewport/src/{range-plan,range-cache}.ts`) — chunks of 28 days from a Monday; `planFetches` (one viewport either side when still, ahead by `max(V, 1.5 s of travel)` and half a viewport behind when moving; at most two in flight; low-priority fetches behind the travel are cancelled on a reversal), `planWiden` (idle widening alternating sides to 40 chunks or 10,000 entries), `chunksToEvict` (farthest first, never within a viewport of the view), the zoom helpers (`nextCoarserPpd`, `rangeAtPpd`, `neighbourScales`, `mountRange`, `panLimits`), and `RangeCache` / `ScopeCaches` (a live patch changes one entry without a refetch; a stale chunk stays drawn until its replacement lands; a return to a scope reuses its chunks). Pure and unused by a screen until a later Part: Part 1 builds no route.
 - ⚙️ **Row packing** (Workflow and Timeline graphs Part 1 T4; cases 29.050–29.054; `packages/viewport/src/pack.ts`) — `packLane` puts each item in the first row where none of its segments shares a day (sorted by first start, natural key, id; adjacent days share a row), so the row count equals the greatest overlap on any day for single-interval items; multi-segment items keep the segment packing, which is never worse than packing their hulls (the hull comparison stays as PK-2's guard; planner ruling 2026-10-04). A bar shorter than its label reserves the label's width (`footprintOf`, with the measure injected per item and segment), so packing is deterministic and clock-free. 10,000 items pack inside the 20 ms budget (29.054, `VP_PERF=1`, a LOCAL timing).
 - ⚙️ **Edge and loop routing** (Workflow and Timeline graphs Part 1 T5; cases 29.065–29.067; `packages/viewport/src/route.ts`) — `routeEdge` draws an axis-aligned connector between packed bars (a straight line on one row, a vertical run in the 14 px gutter before the target, the gutter after the source when a third bar is in the way, a channel when the target starts before the source ends, in the middle of the row gap next to the source row on the target's side (below it when the target is on the same row or lower, above it when higher), so no run lies on a bar's edge or inside another row's bars; portrait is the same route transposed) and puts its label on the longest segment along the time axis; `routeLoop` draws a loop as one curved return arrow (28 / 64 / 100 px lifts, the smallest that crosses no third bar), with no pill and no corners. Both are pure and deterministic; Part 4 draws them.
 - ⚙️ **`ScrollAdapter`: smooth movement on a native scroller** (Workflow and Timeline graphs Part 1 T6; cases 29.030–29.036, 29.039; `packages/viewport/src/dom/{clock,scroll-adapter}.ts`) — the time views keep the platform's own scrolling (wheel, swipe, touch, scrollbar) and add what it lacks: Ctrl + wheel and pinch zoom about the pointer (the day under it holds within 0.5 px, also where the platform rounds scroll positions), glides on the spring (a Today jump lands inside 450 ms, instantly under reduced motion, never chasing a target past either end of the scroller), keys (arrows 7 days, Shift 28, PageUp/Down 90% of a viewport, Home / T centre today, + / - zoom 1.25x), mouse-drag pan with momentum (a press catches a fling; the click that ends a drag is swallowed), a rubber band at the ends through `--tl-overshoot`, px per day in the one `--tl-ppd` custom property, and a frame stream with smoothed velocity in days per second. The zoom is capped below the browser's scroll size (`MAX_SCROLL_PX`); axis `y` serves portrait. Reads time only through an injected `Clock` (`src/dom/clock.ts` is the only file naming the browser clock).
 <!-- wtg-part1-viewport-timeline-view T7 bullet -->
 <!-- wtg-part1-viewport-timeline-view T8 bullet -->
+- ⚙️ **Timeline day numbers and lane layout** (Workflow and Timeline graphs Part 1 T8; cases 29.080–29.086; `packages/app-core/src/timeline/{timeline-days,timeline-layout}.ts`) — `dayNumberOf` / `isoDayOf` convert an IST `YYYY-MM-DD` day to the integer day number the viewport package counts in (days since 1970-01-01; a Monday is 4 mod 7) and back; a string that is not a real day throws `RangeError`, as `dateMs` does. `layoutLanes` packs each epic lane on its own at the bucketed scale `packScale(ppd)` (so rows never change mid-gesture), reserving a key's measured label width plus 14 px for a paper pin, and stacks the lanes: landscape lanes by a 34 px heading plus 40 px per row, portrait lanes side by side at 112 px per column. Pure and clock-free; `barsInRange` is what the view mounts.
 <!-- wtg-part1-viewport-timeline-view T9 bullet -->
 <!-- wtg-part1-viewport-timeline-view T10 bullet -->
 <!-- wtg-part1-viewport-timeline-view T11 bullet -->
@@ -3842,6 +3843,29 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part1-viewport-timeline-view T13 bullet -->
 
 <!-- wtg-part2-model bullets -->
+
+### Part 2: the model
+
+<!-- wtg-part2-model T1 bullet -->
+- ⚙️ **Part 2 pre-flight** (wtg2 T1; `apps/server/src/tools/wtg-preflight.ts`, `pnpm --filter @gisik-nokma/server run wtg:preflight`) — a READ ONLY report of custom fields that would shadow the new built-ins (ledger events, type rows, claims), existing `decision` types, workflows whose initial state is terminal; exit 1 on a shadow. A source-walking census (`apps/server/test/census/terminal-category-readers.test.ts`) classifies every reader of the terminal category. Cases 29.147-29.152.
+<!-- wtg-part2-model T2 bullet -->
+<!-- wtg-part2-model T3 bullet -->
+<!-- wtg-part2-model T4 bullet -->
+<!-- wtg-part2-model T5 bullet -->
+<!-- wtg-part2-model T6 bullet -->
+<!-- wtg-part2-model T7 bullet -->
+<!-- wtg-part2-model T8 bullet -->
+<!-- wtg-part2-model T9 bullet -->
+<!-- wtg-part2-model T10 bullet -->
+<!-- wtg-part2-model T11 bullet -->
+<!-- wtg-part2-model T12 bullet -->
+<!-- wtg-part2-model T13 bullet -->
+<!-- wtg-part2-model T14 bullet -->
+<!-- wtg-part2-model T15 bullet -->
+<!-- wtg-part2-model T16 bullet -->
+<!-- wtg-part2-model T17 bullet -->
+<!-- wtg-part2-model T18 bullet -->
+<!-- wtg-part2-model T19 bullet -->
 
 <!-- wtg-part3-workflow-graph bullets -->
 
