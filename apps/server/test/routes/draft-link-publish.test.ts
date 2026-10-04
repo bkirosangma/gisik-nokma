@@ -54,6 +54,19 @@ describe('28.120 the re-file on a single publish', () => {
     expect((await w.linkRows(d)).map((r) => [r.source_id, r.target_id, r.kind])).toEqual([[s, d, 'blocks'], [s, d, 'relates']]);
     expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
   });
+
+  // E7 (wtg2 T2, AMEND-wtg2-t2-p11 N11): the label leg D6 could not write before `TicketLink.label` existed.
+  it('carries a link\'s label through the re-file unchanged; CONTROL: a link without a label re-files with no label key', async () => {
+    const [s, d] = [newUlid(), newUlid()];
+    await w.published(s);
+    await w.draft(d);
+    expect(await w.fromLink(d, s, 'blocks')).toMatchObject({ status: 'committed' });
+    expect(await w.fromLink(d, s, 'leads_to', 'member', 'yes')).toMatchObject({ status: 'committed' });
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    const payloads = (await w.linkEventsOn(s)).map((e) => e.payload);
+    expect(payloads).toEqual([{ kind: 'blocks', targetId: d }, { kind: 'leads_to', targetId: d, label: 'yes' }]);
+    expect(Object.keys(payloads[0] as object).sort()).toEqual(['kind', 'targetId']); // CONTROL: no `label` key at all
+  });
 });
 
 describe('28.121 the re-file inside an atomic set', () => {

@@ -198,8 +198,11 @@ type InTxOutcome =
   | { kind: 'refused'; result: Extract<IngestResult, { status: 'refused' }> }
   | { kind: 'committed'; envelope: LedgerEvent; result: IngestResult; followers: LedgerEvent[] };
 
-/** One link another ticket filed toward a DRAFT from the draft's side (drafts spec R42): its kind and its source. */
-type IncomingLink = { kind: TicketLinkKind; sourceId: string };
+/**
+ * One link another ticket filed toward a DRAFT from the draft's side (drafts spec R42): its kind, its source and, for a
+ * `leads_to`, its branch label (E7, wtg2 T2: a Decision's branch re-filed without it would be refused `link.label-required`).
+ */
+type IncomingLink = { kind: TicketLinkKind; sourceId: string; label?: string };
 
 /**
  * The links other tickets filed toward this DRAFT (drafts spec R42): the `from` entries of its head row, minus
@@ -210,7 +213,9 @@ async function incomingDraftLinks(client: PoolClient, draftId: string): Promise<
   const { rows } = await client.query<{ links: TicketLink[] }>('SELECT links FROM proj_tickets WHERE ticket_id = $1', [draftId]);
   const held = (rows[0]?.links ?? []).filter((l): l is TicketLink & { from: string } => l.from !== undefined);
   const erased = await purgedIdsAmong(client, 'ticket', held.map((l) => l.from));
-  return held.filter((l) => !erased.has(l.from)).map((l) => ({ kind: l.kind, sourceId: l.from }));
+  return held
+    .filter((l) => !erased.has(l.from))
+    .map((l) => ({ kind: l.kind, sourceId: l.from, ...(l.label === undefined ? {} : { label: l.label }) }));
 }
 
 /**
@@ -224,7 +229,8 @@ function refileEvent(publish: LedgerEvent, link: IncomingLink): SubmittedEvent {
     entity: { kind: 'ticket', id: link.sourceId },
     type: 'ticket.link_added',
     version: 1,
-    payload: { kind: link.kind, targetId: publish.entity.id },
+    // The label rides through unchanged when present, and is absent otherwise (E7, wtg2 T2).
+    payload: { kind: link.kind, targetId: publish.entity.id, ...(link.label === undefined ? {} : { label: link.label }) },
     actorId: publish.actorId,
     origin: publish.origin,
     clientTime: publish.clientTime,

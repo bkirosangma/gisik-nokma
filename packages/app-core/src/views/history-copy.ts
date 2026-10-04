@@ -252,8 +252,10 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
         event.linkTarget === null ? "a ticket you can't see"
         : event.linkTarget?.key ?? 'another ticket';
       const verb = event.type === 'ticket.link_added' ? 'Linked' : 'Removed link';
+      // A `leads_to` branch name (workflow-timeline-graphs LK-6), kept on a withheld copy too: "Linked: leads to GN-147 (Yes)".
+      const label = str(payload, 'label');
       // From THIS ticket's end (drafts T6 FIX 1): a draft-side `from` entry reads in, "is blocked by"; an older server sends no direction, which is out.
-      return `${verb}: ${linkReading(kind as TicketLinkKind, event.linkDirection ?? 'out')} ${other}`;
+      return `${verb}: ${linkReading(kind as TicketLinkKind, event.linkDirection ?? 'out')} ${other}${label === null ? '' : ` (${label})`}`;
     }
     case 'claim.contested':
       return 'Conflicting claim recorded';

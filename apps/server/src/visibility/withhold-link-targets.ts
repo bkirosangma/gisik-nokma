@@ -15,7 +15,8 @@ import { canOpen } from './can-open.js';
  * `targetId` is the draft whose stream holds it. Withheld, such an event keeps its
  * `from` key and loses the id, `{kind, targetId: null, from: null}`, so History, the
  * replica and MCP still read it in (`linkPayloadDirection`; drafts T6 FIX 1, planner ruling 2026-10-04 21:08); a plain
- * link keeps `{kind, targetId: null}`. `parentId` is NOT withheld, and the difference
+ * link keeps `{kind, targetId: null}`. A `leads_to` label is kept on both (`withheldLinkPayload`; workflow-timeline-graphs
+ * LK-6): it names the source's branch, not the hidden end. `parentId` is NOT withheld, and the difference
  * is the read door's: the detail read serves a restricted parent's id
  * (`parent: {kind:'restricted', id}`), and it withholds a link's.
  * See `visible-events-for.ts`, "What the filter does NOT hide".
@@ -58,10 +59,10 @@ export function targetSight(db: Queryable, viewerId: string): TargetSight {
 
 async function withheldOrSame(type: string, payload: unknown, sees: TargetSight): Promise<unknown> {
   if (!isTicketLinkEvent(type) || payload === null || typeof payload !== 'object') return payload;
-  const p = payload as { kind: TicketLinkKind; targetId?: unknown; from?: unknown };
+  const p = payload as { kind: TicketLinkKind; targetId?: unknown; from?: unknown; label?: string };
   const other = p.from ?? p.targetId;
   if (typeof other !== 'string' || (await sees(other))) return payload;
-  return withheldLinkPayload(p.kind, linkPayloadDirection(payload));
+  return withheldLinkPayload(p.kind, linkPayloadDirection(payload), p.label);
 }
 
 /**

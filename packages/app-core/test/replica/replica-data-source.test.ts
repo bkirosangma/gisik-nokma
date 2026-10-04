@@ -1572,6 +1572,31 @@ describe('27.061 typed links offline: both directions from confirmed state', () 
     await replica.applyServerItem(envelope({ kind: 'ticket', id: C }, 'ticket.deleted', {}));
     expect(await ds.query.getTicketLinks(WS, A)).toEqual([]);
   });
+
+  it('29.126 getTicketLinks carries a leads_to label out and in, and writes no label key when there is none', async () => {
+    const { ds, replica } = await fixture();
+    const [A, B, C] = [newUlid(), newUlid(), newUlid()];
+    const titles: Record<string, string> = { [A]: 'Go ahead?', [B]: 'Chiller', [C]: 'Cold room' };
+    for (const id of [A, B, C]) {
+      await replica.applyServerItem(
+        envelope({ kind: 'ticket', id }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: titles[id] }),
+      );
+    }
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: A }, 'ticket.link_added', { kind: 'leads_to', targetId: B, label: 'Yes' }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: A }, 'ticket.link_added', { kind: 'blocks', targetId: C }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: C }, 'ticket.link_added', { kind: 'relates', targetId: A }));
+    const ticketOf = (id: string) => ({ id, projectId: PROJECT, key: null, title: titles[id], stateCategory: 'open' });
+    const links = await ds.query.getTicketLinks(WS, A);
+    expect(links).toEqual([
+      { kind: 'leads_to', direction: 'out', ticket: ticketOf(B), label: 'Yes' },
+      { kind: 'blocks', direction: 'out', ticket: ticketOf(C) },
+      { kind: 'relates', direction: 'in', ticket: ticketOf(C) },
+    ]);
+    // control: `toEqual` ignores a member whose value is undefined; the key list does not
+    for (const v of links.filter((l) => l.kind !== 'leads_to')) expect(Object.keys(v).sort()).toEqual(['direction', 'kind', 'ticket']);
+    // from the target's end, through the incoming arm
+    expect(await ds.query.getTicketLinks(WS, B)).toEqual([{ kind: 'leads_to', direction: 'in', ticket: ticketOf(A), label: 'Yes' }]);
+  });
 });
 
 describe('27.090 offline History labels a withheld link event', () => {

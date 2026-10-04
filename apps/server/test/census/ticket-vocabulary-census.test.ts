@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainRegistry, TICKET_EVENT_TYPES, type EventTypeRegistration } from '@gisik-nokma/domain';
+import { domainRegistry, linkReading, TICKET_EVENT_TYPES, TICKET_LINK_KINDS, type EventTypeRegistration } from '@gisik-nokma/domain';
 import { payloadIds } from '../../src/purge/check-purged.js';
 import { BOOTSTRAP_BACKFILL_TYPES } from '../../src/sync/sync-routes.js';
 
@@ -53,5 +53,19 @@ describe('28.005 the census covers the draft pair', () => {
     const planted = { type: 'ticket.planted_for_census', version: 1, entityKind: 'ticket', payloadSchema: undefined as never } as EventTypeRegistration;
     expect(unaccounted([...domainRegistry.registrations(), planted])).toEqual(['ticket.planted_for_census']);
     expect(unaccounted(domainRegistry.registrations())).toEqual([]);
+  });
+});
+
+describe('29.127 the link label census', () => {
+  it('29.127 payloadIds names only the target of a labelled link; every kind reads both ways', () => {
+    const T = '01J9GTKB000000000000000000';
+    const lookalike = '01J9GTKC000000000000000000';
+    expect(payloadIds('ticket.link_added', { kind: 'leads_to', targetId: T, label: lookalike })).toEqual([['ticket', T]]);
+    expect(payloadIds('ticket.link_added', { kind: 'leads_to', targetId: T, label: 'Yes' })).toEqual([['ticket', T]]);
+    for (const kind of TICKET_LINK_KINDS) for (const dir of ['out', 'in'] as const) expect(linkReading(kind, dir).length).toBeGreaterThan(0);
+    expect(TICKET_LINK_KINDS).toContain('leads_to');
+    // control: the 27.004 census still fires on a planted registration
+    const planted = { type: 'ticket.planted_for_census', version: 1, entityKind: 'ticket', payloadSchema: undefined as never } as EventTypeRegistration;
+    expect(unaccounted([...domainRegistry.registrations(), planted])).toEqual(['ticket.planted_for_census']);
   });
 });

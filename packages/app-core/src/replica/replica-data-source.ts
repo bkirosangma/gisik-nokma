@@ -1366,10 +1366,12 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const byId = await confirmedById(workspaceId);
       const me = byId.get(ticketId);
       if (me === undefined) return [];
-      const view = (other: TicketState, kind: TicketLinkKind, direction: 'out' | 'in'): TicketLinkView => ({
+      // A `leads_to` label rides in both directions (wtg2 T2); no key when the entry has none, as online.
+      const view = (other: TicketState, kind: TicketLinkKind, direction: 'out' | 'in', label: string | undefined): TicketLinkView => ({
         kind,
         direction,
         ticket: { id: other.id, projectId: other.projectId, key: null, title: titleOf(other), stateCategory: other.stateCategory },
+        ...(label === undefined ? {} : { label }),
       });
       const live = (t: TicketState | undefined): t is TicketState => t !== undefined && (t.deleted ?? null) === null;
       // Drafts R41: a draft end appears only on a draft's own sheet, and a discarded draft never.
@@ -1378,12 +1380,12 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const out = (me.links ?? []).flatMap((l) => {
         // A draft-side entry (`from`) is a link FROM the other ticket: it reads as incoming on the draft's sheet.
         const o = byId.get(l.from ?? l.targetId);
-        return shown(o) ? [view(o, l.kind, l.from === undefined ? 'out' : 'in')] : [];
+        return shown(o) ? [view(o, l.kind, l.from === undefined ? 'out' : 'in', l.label)] : [];
       });
       const incoming = [...byId.values()].flatMap((o) =>
         o.id === ticketId || !shown(o)
           ? []
-          : (o.links ?? []).filter((l) => l.from === undefined && l.targetId === ticketId).map((l) => view(o, l.kind, 'in')),
+          : (o.links ?? []).filter((l) => l.from === undefined && l.targetId === ticketId).map((l) => view(o, l.kind, 'in', l.label)),
       );
       return [...out, ...incoming];
     },

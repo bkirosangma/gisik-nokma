@@ -791,6 +791,8 @@ export type TicketLinkView = {
   kind: TicketLinkKind;
   direction: 'out' | 'in';
   ticket: { id: string; projectId: string; key: string | null; title: string; stateCategory: StateCategory };
+  /** A `leads_to` branch name (workflow-timeline-graphs LK-2), in both directions; ABSENT when none. */
+  label?: string;
 };
 
 export type WorkItem = {

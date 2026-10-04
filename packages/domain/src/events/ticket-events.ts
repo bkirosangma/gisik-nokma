@@ -284,14 +284,19 @@ export function isTicketLinkEvent(type: string): boolean {
  * `{kind, targetId: null}`. A draft-side `from` entry (`'in'`, drafts T6, R42)
  * keeps its `from` key with the id withheld, `{kind, targetId: null, from:
  * null}`, so every reader still reads it from the end it points into (drafts
- * T6 FIX 1, planner ruling 2026-10-04 21:08). The purge precedent is
+ * T6 FIX 1, planner ruling 2026-10-04 21:08). A `leads_to` branch `label`
+ * is KEPT, last, and absent when the link has none (workflow-timeline-graphs
+ * LK-6, planner ruling 2026-10-04 13:01): it belongs to the source the viewer
+ * sees, never to the withheld end. The purge precedent is
  * `redactedTicketCreatedPayload` (`purge.ts`).
  */
 export function withheldLinkPayload(
   kind: TicketLinkKind,
   direction: 'out' | 'in',
-): { kind: TicketLinkKind; targetId: null; from?: null } {
-  return direction === 'in' ? { kind, targetId: null, from: null } : { kind, targetId: null };
+  label?: string,
+): { kind: TicketLinkKind; targetId: null; from?: null; label?: string } {
+  const withheld = direction === 'in' ? { kind, targetId: null, from: null } : { kind, targetId: null };
+  return label === undefined ? withheld : { ...withheld, label };
 }
 
 /**
