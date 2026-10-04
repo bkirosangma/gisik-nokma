@@ -16,6 +16,7 @@ import {
   PRIORITIES,
   PURGED_OUTBOX_NOTICE,
   isCreatableState,
+  isDraft,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -238,9 +239,27 @@ export type OfflineListEntry =
  * expires**, so §12 and `test-cases/12-offline-sync-apps.md` carry it WITH the
  * command that produces it and this sentence names the authority and stops.
  */
+export type ReplicaDraft = {
+  ticketId: string;
+  projectId: string;
+  typeId: string;
+  title: string;
+  parentId: string | null;
+  /** The last confirmed event's server instant; for an offline-born draft the device clock (it is `pending`). */
+  updatedAt: string;
+  pending: boolean;
+  pendingEventIds: string[];
+};
+
 export type ReplicaOnlyQuery = {
   /** Confirmed tickets plus offline-born ones, every one badged. */
   listTicketSummaries(workspaceId: string): Promise<TicketSummary[]>;
+  /**
+   * The workspace's drafts as THIS device knows them: confirmed ones and offline-born ones, newest first. The
+   * one offline read that returns a draft, because the Drafts page is the one view that is about them. A queued
+   * discard drops a draft at once; a queued publish keeps it (with `pending`) until the server answers.
+   */
+  listDrafts(workspaceId: string): Promise<ReplicaDraft[]>;
   /**
    * The settled list PLUS the tickets born on this device, in one answer, each
    * tagged with which kind it is. `getTickets` alone omits the second kind
@@ -994,6 +1013,41 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     };
   }
 
+  async function listDrafts(workspaceId: string): Promise<ReplicaDraft[]> {
+    const out: ReplicaDraft[] = [];
+    for (const ticket of await replica.listTickets(workspaceId)) {
+      const confirmed = ticket.confirmed;
+      if (confirmed === null || confirmed.draft === undefined || confirmed.draft.discarded === true) continue;
+      const pending = await outbox.pendingFor(confirmed.id);
+      if (pending?.pending.draft?.discarded === true) continue; // a queued discard
+      const shown = pending?.pending ?? confirmed;
+      const events = await replica.listEntityEvents(confirmed.id);
+      out.push({
+        ticketId: confirmed.id,
+        projectId: shown.projectId,
+        typeId: shown.typeId,
+        title: titleOf(shown),
+        parentId: shown.parentId,
+        updatedAt: events[events.length - 1]?.serverTime ?? confirmed.draft.at,
+        pending: pending !== null,
+        pendingEventIds: pending?.pendingEventIds ?? [],
+      });
+    }
+    for (const born of await outbox.pendingCreatedDrafts(workspaceId)) {
+      out.push({
+        ticketId: born.pending.id,
+        projectId: born.pending.projectId,
+        typeId: born.pending.typeId,
+        title: titleOf(born.pending),
+        parentId: born.pending.parentId,
+        updatedAt: born.pending.draft?.at ?? '',
+        pending: true,
+        pendingEventIds: born.pendingEventIds,
+      });
+    }
+    return out.sort((a, b) => (a.updatedAt === b.updatedAt ? (a.ticketId < b.ticketId ? 1 : -1) : a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+
   async function listTicketSummaries(workspaceId: string): Promise<TicketSummary[]> {
     const out: TicketSummary[] = [];
     for (const ticket of await replica.listTickets(workspaceId)) {
@@ -1006,6 +1060,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       // `myWork` is a filter over it — so this one conjunct is what makes
       // "the ticket stops appearing in views" true on both shells (E6-24).
       if ((ticket.confirmed.deleted ?? null) !== null) continue;
+      // A draft is private to its author and belongs to no view (R22). The Drafts page reads `listDrafts`.
+      if (isDraft(ticket.confirmed)) continue;
       out.push(await summarise(ticket.confirmed, ticket.contests));
     }
     // Offline-born tickets exist ONLY as queued claims. They are summarised
@@ -1063,7 +1119,9 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     byId: ReadonlyMap<string, TicketState>,
     isEpicType: IsEpicType,
   ): { parent: BoardCard['parent']; epic: BoardCard['epic'] } {
-    const isLive = (candidate: TicketState): boolean => (candidate.deleted ?? null) === null;
+    // A draft parent draws no badge: the server never leaves a published ticket under a draft (R4), and this
+    // keeps a stale or planted pair from drawing one (R22).
+    const isLive = (candidate: TicketState): boolean => (candidate.deleted ?? null) === null && !isDraft(candidate);
 
     let parent: BoardCard['parent'] = null;
     if (state.parentId !== null) {
@@ -1384,6 +1442,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         // optional on the domain type (every fixture predating the flag) while
         // the predicate needs one answer for `undefined` and `null` alike.
         if ((state.deleted ?? null) !== null) continue;
+        // A draft is on no list (R22); the Drafts page reads `listDrafts`.
+        if (isDraft(state)) continue;
         if (!matchesFilter(state, filter)) continue;
         const pending = await outbox.pendingFor(state.id);
         rows.push(await rowOf(state, byId, types, isEpicType, stateNameOf, pending !== null));
@@ -1416,7 +1476,9 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           (state.closed ?? null) === null &&
           // `state.deleted ?? null`, the same boundary read as `closed` one
           // line up — `deleted?` is optional on the domain type.
-          (state.deleted ?? null) === null,
+          (state.deleted ?? null) === null &&
+          // A draft is on no board (R22), in whatever state it was planted.
+          !isDraft(state),
       );
       const defs = await defsFor(inProject);
       const pendingIds = new Set<string>();
@@ -1704,6 +1766,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     },
 
     listTicketSummaries,
+    listDrafts,
 
     async listProjectWithOfflineBorn(projectId, filter, grouping) {
       const settled = await query.getTickets(projectId, filter, grouping);
@@ -1806,8 +1869,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     async searchOfflineCopy(workspaceId, text) {
       const hits: Array<{ ticketId: string; title: string }> = [];
       for (const hit of await replica.searchLocal(workspaceId, text)) {
-        const owning = await replica.getTicket(hit.ticketId);
-        if ((owning?.confirmed?.deleted ?? null) !== null) continue;
+        const owner = (await replica.getTicket(hit.ticketId))?.confirmed ?? null;
+        if (owner !== null && ((owner.deleted ?? null) !== null || isDraft(owner))) continue;
         hits.push(hit);
       }
       const needle = text.toLowerCase();
