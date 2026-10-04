@@ -182,6 +182,7 @@ describe('29.126 the leads_to label on the server reads', () => {
     const hKey = await keyOf(H);
     const toH = (events: HistoryBody['events']) => events.find((e) => e.type === 'ticket.link_added' && e.payload['kind'] === 'leads_to' && e.payload['label'] === 'Maybe')!;
     const memberEvent = toH(await historyOf('member'));
+    expect(memberEvent, "the member's withheld copy still carries the label 'Maybe'").toBeDefined();
     expect(JSON.stringify(memberEvent.payload)).toBe('{"kind":"leads_to","targetId":null,"label":"Maybe"}');
     expect(memberEvent.linkTarget).toBeNull();
     expect(JSON.stringify(memberEvent)).not.toContain(H);
