@@ -10,5 +10,5 @@ export default defineConfig({
   // first page load and RELOADS the page mid-test.
   optimizeDeps: { include: ['react/jsx-dev-runtime'] },
   server: { port: 3191, strictPort: true },
-  build: { rollupOptions: { input: [resolve(__dirname, 'harness/index.html'), resolve(__dirname, 'harness/stress.html')] } },
+  build: { rollupOptions: { input: [resolve(__dirname, 'harness/index.html'), resolve(__dirname, 'harness/stress.html'), resolve(__dirname, 'harness/adapter.html')] } },
 });

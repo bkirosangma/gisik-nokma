@@ -18,7 +18,7 @@ export function createProbe(
   invalidated: readonly string[],
   fit: () => CameraState | null,
 ): RendererProbe {
-  let frames = 0;
+  let frames = 0, rawClicks = 0;
   const ink: number[] = [];
   let armed = false;
   let full: ImageData | null = null;
@@ -35,6 +35,7 @@ export function createProbe(
     ctx.drawImage(src, 0, 0, w, h);
     return ctx.getImageData(0, 0, w, h);
   };
+  sigma.on('clickNode', () => void (rawClicks += 1));
   sigma.on('afterRender', () => {
     frames += 1;
     const q = copy(0.25);
@@ -79,6 +80,7 @@ export function createProbe(
       return d === undefined ? null : { size: d.size, opacity: d.opacity };
     },
     frames: () => frames,
+    rawClicks: () => rawClicks,
     inkLog: () => [...ink],
     clearInk: () => void ink.splice(0),
     alphaAt(points) {

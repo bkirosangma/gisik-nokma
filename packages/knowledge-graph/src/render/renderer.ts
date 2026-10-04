@@ -41,6 +41,8 @@ export type RendererProbe = {
   nodeDisplay(ref: string): { size: number; opacity: number; image: string; attachment: string | null; color: string; backdropColor: string; backdropBorderColor: string } | null;
   edgeDisplay(id: string): { size: number; opacity: number } | null;
   frames(): number;
+  /** Every Sigma `clickNode`, fog included (27.270's control: the fog dot DID fire Sigma's own click, the adapter dropped it). */
+  rawClicks(): number;
   inkLog(): number[];
   clearInk(): void;
   alphaAt(points: readonly { x: number; y: number }[]): number[];

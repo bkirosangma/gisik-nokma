@@ -104,12 +104,16 @@ export const createSigmaRenderer: CreateRenderer = () => {
           nodeHovered = true;
           sigma!.setNodesState(graph!.neighbors(node), { isNb: true });
           sigma!.setEdgesState(graph!.edges(node), { isNb: true });
+          sigma!.scheduleRefresh(); // the dim is our flag, not a Sigma state: see `leaveNode`
           hovers.forEach((cb) => cb({ kind: 'node', ref: node }));
         });
         sigma.on('leaveNode', () => {
           nodeHovered = false;
           sigma!.setNodesState(graph!.nodes(), { isNb: false });
           sigma!.setEdgesState(graph!.edges(), { isNb: false });
+          // Sigma restyles only items whose state changed, or all of them when its `hasHovered` flips; an edge hover keeps
+          // `hasHovered` true (`sigma.esm.js:4044`), so node → edge would leave every non-neighbour at 0.32 (27.277)
+          sigma!.scheduleRefresh();
           hovers.forEach((cb) => cb({ kind: 'node-leave' }));
         });
       }

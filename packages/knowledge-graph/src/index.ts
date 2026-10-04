@@ -15,3 +15,4 @@ export * from './engine/layout.js';
 export * from './engine/levels.js';
 export * from './engine/sentences.js';
 export { kgNodeId, parseKgNodeId } from './ids.js';
+export { iconFor } from './react/draw-model.js';
