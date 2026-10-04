@@ -132,6 +132,9 @@ describe('29.126 the withheld copy keeps a leads_to label (planner ruling 2026-1
     expect(JSON.stringify(withheldLinkPayload('leads_to', 'in', 'Yes'))).toBe('{"kind":"leads_to","targetId":null,"from":null,"label":"Yes"}');
     expect(JSON.stringify(withheldLinkPayload('leads_to', 'out'))).toBe('{"kind":"leads_to","targetId":null}'); // control
     expect(JSON.stringify(withheldLinkPayload('leads_to', 'in'))).toBe('{"kind":"leads_to","targetId":null,"from":null}'); // control
+    // absent, never `undefined`: JSON would hide an undefined member, an in-process reader would not
+    expect('label' in withheldLinkPayload('blocks', 'out')).toBe(false);
+    expect('label' in withheldLinkPayload('blocks', 'in')).toBe(false);
   });
 });
 
