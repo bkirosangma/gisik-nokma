@@ -1,4 +1,4 @@
-import { isTicketLinkEvent, withheldLinkPayload, type TicketLinkKind, type TicketState } from '@gisik-nokma/domain';
+import { isTicketLinkEvent, linkPayloadDirection, withheldLinkPayload, type TicketLinkKind, type TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { LINK_TARGET_NOT_VISIBLE_REASON, PERMISSION_VISIBILITY_RULE } from '../permissions/check-permission.js';
 import { canOpen } from './can-open.js';
@@ -12,7 +12,10 @@ import { canOpen } from './can-open.js';
  * hidden id and another person's draft the same (`can-see.ts`, "Unknown and
  * invisible are the same answer"), so the withheld copy cannot tell them apart.
  * A draft-side entry or event (drafts R42) names its OTHER end in `from`; its
- * `targetId` is the draft whose stream holds it. `parentId` is NOT withheld, and the difference
+ * `targetId` is the draft whose stream holds it. Withheld, such an event keeps its
+ * `from` key and loses the id, `{kind, targetId: null, from: null}`, so History, the
+ * replica and MCP still read it in (`linkPayloadDirection`; drafts T6 FIX 1, planner ruling 2026-10-04 21:08); a plain
+ * link keeps `{kind, targetId: null}`. `parentId` is NOT withheld, and the difference
  * is the read door's: the detail read serves a restricted parent's id
  * (`parent: {kind:'restricted', id}`), and it withholds a link's.
  * See `visible-events-for.ts`, "What the filter does NOT hide".
@@ -58,7 +61,7 @@ async function withheldOrSame(type: string, payload: unknown, sees: TargetSight)
   const p = payload as { kind: TicketLinkKind; targetId?: unknown; from?: unknown };
   const other = p.from ?? p.targetId;
   if (typeof other !== 'string' || (await sees(other))) return payload;
-  return withheldLinkPayload(p.kind);
+  return withheldLinkPayload(p.kind, linkPayloadDirection(payload));
 }
 
 /**

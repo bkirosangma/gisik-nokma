@@ -1580,7 +1580,7 @@ describe('27.090 offline History labels a withheld link event', () => {
     // A served copy, never a submitted claim: `envelope` mints through `newSubmittedEvent`, whose
     // door guard (`test/setup.ts`) would refuse `targetId: null`. Its documented escape hatch.
     (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
-    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', withheldLinkPayload('blocks')));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', withheldLinkPayload('blocks', 'out')));
     delete (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads;
     await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', { kind: 'relates', targetId: epicId }));
     const links = (await ds.query.getTicketHistory(taskId)).filter((e) => e.type === 'ticket.link_added');

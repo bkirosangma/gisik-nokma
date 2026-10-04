@@ -2996,8 +2996,8 @@ describe('27.088 a withheld link from the stream folds to nothing and does not s
     const T = newUlid();
     const OTHER = newUlid();
     const at = (e: LedgerEvent, workspaceSeq: number): LedgerEvent => ({ ...e, workspaceSeq });
-    const add = at(envelope({ kind: 'ticket', id: T }, 'ticket.link_added', withheldLinkPayload('blocks'), { seq: 2 }), 11);
-    const remove = at(envelope({ kind: 'ticket', id: T }, 'ticket.link_removed', withheldLinkPayload('blocks'), { seq: 3 }), 12);
+    const add = at(envelope({ kind: 'ticket', id: T }, 'ticket.link_added', withheldLinkPayload('blocks', 'out'), { seq: 2 }), 11);
+    const remove = at(envelope({ kind: 'ticket', id: T }, 'ticket.link_removed', withheldLinkPayload('blocks', 'out'), { seq: 3 }), 12);
     script.handlers!.onItem(at(created(T), 10));
     script.handlers!.onItem(add);
     script.handlers!.onItem(remove);

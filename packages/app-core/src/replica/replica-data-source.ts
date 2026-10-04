@@ -18,7 +18,9 @@ import {
   PURGED_OUTBOX_NOTICE,
   isCreatableState,
   isDraft,
+  isTicketLinkEvent,
   isWithheldLinkEvent,
+  linkPayloadDirection,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -1785,6 +1787,9 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // (`targetId: null`), so History reads "a ticket you can't see". A real
           // target carries no label offline: this device holds no key for it.
           ...(isWithheldLinkEvent(event) ? { linkTarget: null } : {}),
+          // Drafts T6 FIX 1: which way it reads from this ticket, by the server's own rule on the payload as served
+          // (a withheld draft-side entry keeps its `from` key, so it still reads in).
+          ...(isTicketLinkEvent(event.type) ? { linkDirection: linkPayloadDirection(event.payload) } : {}),
         }));
       return limit === undefined ? kept : kept.slice(0, limit);
     },

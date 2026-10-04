@@ -338,6 +338,13 @@ function asTicketLinkKind(value: unknown, path: string): TicketLinkKind {
   return text as TicketLinkKind;
 }
 
+/** A typed link's direction, refused by name when it is not `out` or `in` (spec A §2.1). */
+function asLinkDirection(value: unknown, path: string): 'out' | 'in' {
+  const direction = asString(value, path);
+  if (direction !== 'out' && direction !== 'in') throw new MappingError(path, 'one of out/in');
+  return direction;
+}
+
 /**
  * `ticketState.links`: the folded links (outbound, plus on a draft the entries
  * filed from the other end, which carry `from`, drafts R42), which the detail
@@ -842,6 +849,10 @@ export function mapHistory(raw: unknown): TicketHistoryEvent[] {
                 ? null
                 : { key: asStringOrNull(asRecord(event['linkTarget'], `${path}.linkTarget`), 'key', `${path}.linkTarget.key`) },
           }),
+      // Link events only (drafts T6 FIX 1): absent stays absent, and the copy reads that as `'out'`.
+      ...(event['linkDirection'] === undefined
+        ? {}
+        : { linkDirection: asLinkDirection(event['linkDirection'], `${path}.linkDirection`) }),
     };
   });
 }
@@ -2889,8 +2900,7 @@ export function mapTicketLinks(raw: unknown): TicketLinkView[] {
   return asArray(record['links'], 'links.links').map((entry, index) => {
     const path = `links.links[${index}]`;
     const row = asRecord(entry, path);
-    const direction = asString(row['direction'], `${path}.direction`);
-    if (direction !== 'out' && direction !== 'in') throw new MappingError(`${path}.direction`, 'one of out/in');
+    const direction = asLinkDirection(row['direction'], `${path}.direction`);
     const ticket = asRecord(row['ticket'], `${path}.ticket`);
     return {
       kind: asTicketLinkKind(row['kind'], `${path}.kind`),

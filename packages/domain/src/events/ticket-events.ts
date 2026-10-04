@@ -266,15 +266,36 @@ export function isTicketLinkEvent(type: string): boolean {
 
 /**
  * The payload a link event is SERVED with when this viewer may not be told
- * its target (typed-links T4b; spec A §2.4). Never stored: the ledger holds
+ * its other end (typed-links T4b; spec A §2.4). Never stored: the ledger holds
  * the real id, and the server builds this per viewer at every door
  * (`apps/server/src/visibility/withhold-link-targets.ts`). One constructor and
- * one key order, so a hidden, a purged and a never-minted target serialise
- * byte for byte the same. The purge precedent is `redactedTicketCreatedPayload`
- * (`purge.ts`).
+ * one key order per direction, so a hidden, a purged and a never-minted end
+ * serialise byte for byte the same. A plain link (`'out'`) is
+ * `{kind, targetId: null}`. A draft-side `from` entry (`'in'`, drafts T6, R42)
+ * keeps its `from` key with the id withheld, `{kind, targetId: null, from:
+ * null}`, so every reader still reads it from the end it points into (drafts
+ * T6 FIX 1, planner ruling 2026-10-04 21:08). The purge precedent is
+ * `redactedTicketCreatedPayload` (`purge.ts`).
  */
-export function withheldLinkPayload(kind: TicketLinkKind): { kind: TicketLinkKind; targetId: null } {
-  return { kind, targetId: null };
+export function withheldLinkPayload(
+  kind: TicketLinkKind,
+  direction: 'out' | 'in',
+): { kind: TicketLinkKind; targetId: null; from?: null } {
+  return direction === 'in' ? { kind, targetId: null, from: null } : { kind, targetId: null };
+}
+
+/**
+ * Which way a link event reads from the ticket whose stream holds it (drafts
+ * T6, R42; spec A §2.1). `'in'` for a payload with a `from` key: a draft-side
+ * entry pointing INTO that ticket, whose other end is `from` (an id, or `null`
+ * when served withheld). `'out'` for every other payload, whose other end is
+ * `targetId`. It reads the KEY, never its value, so a withheld `from: null`
+ * still reads `'in'`. ONE rule, read by the server's withhold and History
+ * route, the offline replica and MCP (drafts T6 FIX 1, planner rulings
+ * 2026-10-04 20:52 and 21:08).
+ */
+export function linkPayloadDirection(payload: unknown): 'out' | 'in' {
+  return payload !== null && typeof payload === 'object' && 'from' in payload ? 'in' : 'out';
 }
 
 /** True exactly for a served-withheld link event; `=== null`, as `isRedactedTicketCreated` uses `=== true`. */

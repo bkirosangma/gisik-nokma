@@ -135,7 +135,7 @@ describe('27.080 a link event served with its target withheld', () => {
       makeEnvelope({
         type,
         entity: { kind: 'ticket', id: SOURCE },
-        payload: targetId === null ? withheldLinkPayload('blocks') : { kind: 'blocks', targetId },
+        payload: targetId === null ? withheldLinkPayload('blocks', 'out') : { kind: 'blocks', targetId },
       });
     const thrown = (fn: () => unknown): string => {
       try {
@@ -145,8 +145,8 @@ describe('27.080 a link event served with its target withheld', () => {
       }
       return 'no throw';
     };
-    expect(withheldLinkPayload('blocks')).toEqual({ kind: 'blocks', targetId: null });
-    expect(JSON.stringify(withheldLinkPayload('blocks'))).toBe('{"kind":"blocks","targetId":null}');
+    expect(withheldLinkPayload('blocks', 'out')).toEqual({ kind: 'blocks', targetId: null });
+    expect(JSON.stringify(withheldLinkPayload('blocks', 'out'))).toBe('{"kind":"blocks","targetId":null}');
     expect(foldTicketEvent(born, add(null), deps)).toBe(born);
     expect(foldTicketEvent(born, add(null, 'ticket.link_removed'), deps)).toBe(born);
     expect(() => applyTicketEvent(born, add(null), deps)).toThrow(/withheld/);
@@ -164,7 +164,7 @@ describe('27.080 a link event served with its target withheld', () => {
     expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: null })).toBe(false);
     // T2 (AMEND p11): an ABSENT targetId is not a withheld one. The control is the same event with targetId present-and-null.
     expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: { kind: 'blocks' } })).toBe(false);
-    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: withheldLinkPayload('blocks') })).toBe(true);
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: withheldLinkPayload('blocks', 'out') })).toBe(true);
     // T3 (AMEND p11): the REMOVE arm names it too, exactly. The control is a real removal of the one held link, which leaves no key.
     expect(() => applyTicketEvent(linked, add(null, 'ticket.link_removed'), deps)).toThrow(/withheld/);
     expect(thrown(() => applyTicketEvent(linked, add(null, 'ticket.link_removed'), deps))).toBe(

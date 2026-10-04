@@ -771,6 +771,13 @@ export type TicketHistoryEvent = {
    * when this event was not labelled (any other type, or an older server).
    */
   linkTarget?: { key: string | null } | null;
+  /**
+   * Link events only (drafts T6 FIX 1): which way the link reads from THIS
+   * ticket. `'in'` is a draft-side `from` entry on a published draft's stream
+   * ("is blocked by"), `'out'` every other link. Absent from an older server
+   * or on any other type, and `describeEvent` reads that as `'out'`.
+   */
+  linkDirection?: 'out' | 'in';
 };
 
 /**
