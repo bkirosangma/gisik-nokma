@@ -5,6 +5,7 @@ import {
   foldTicketEvent,
   isTicketLinkEvent,
   isWithheldLinkEvent,
+  linkPayloadDirection,
   linkReading,
   makeEnvelope,
   newUlid,
@@ -134,7 +135,7 @@ describe('27.080 a link event served with its target withheld', () => {
       makeEnvelope({
         type,
         entity: { kind: 'ticket', id: SOURCE },
-        payload: targetId === null ? withheldLinkPayload('blocks') : { kind: 'blocks', targetId },
+        payload: targetId === null ? withheldLinkPayload('blocks', 'out') : { kind: 'blocks', targetId },
       });
     const thrown = (fn: () => unknown): string => {
       try {
@@ -144,8 +145,8 @@ describe('27.080 a link event served with its target withheld', () => {
       }
       return 'no throw';
     };
-    expect(withheldLinkPayload('blocks')).toEqual({ kind: 'blocks', targetId: null });
-    expect(JSON.stringify(withheldLinkPayload('blocks'))).toBe('{"kind":"blocks","targetId":null}');
+    expect(withheldLinkPayload('blocks', 'out')).toEqual({ kind: 'blocks', targetId: null });
+    expect(JSON.stringify(withheldLinkPayload('blocks', 'out'))).toBe('{"kind":"blocks","targetId":null}');
     expect(foldTicketEvent(born, add(null), deps)).toBe(born);
     expect(foldTicketEvent(born, add(null, 'ticket.link_removed'), deps)).toBe(born);
     expect(() => applyTicketEvent(born, add(null), deps)).toThrow(/withheld/);
@@ -163,12 +164,32 @@ describe('27.080 a link event served with its target withheld', () => {
     expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: null })).toBe(false);
     // T2 (AMEND p11): an ABSENT targetId is not a withheld one. The control is the same event with targetId present-and-null.
     expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: { kind: 'blocks' } })).toBe(false);
-    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: withheldLinkPayload('blocks') })).toBe(true);
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: withheldLinkPayload('blocks', 'out') })).toBe(true);
     // T3 (AMEND p11): the REMOVE arm names it too, exactly. The control is a real removal of the one held link, which leaves no key.
     expect(() => applyTicketEvent(linked, add(null, 'ticket.link_removed'), deps)).toThrow(/withheld/);
     expect(thrown(() => applyTicketEvent(linked, add(null, 'ticket.link_removed'), deps))).toBe(
       `applyTicketEvent: ticket.link_removed on ticket ${SOURCE} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`,
     );
     expect('links' in applyTicketEvent(linked, add(TARGET, 'ticket.link_removed'), deps)).toBe(false);
+  });
+});
+
+describe('28.196 a draft-side from entry reads in, and keeps its direction when its source is withheld (drafts T6 FIX 1)', () => {
+  it("28.196 linkPayloadDirection reads in for a payload with a from key (an id, or null when withheld) and out for any other; withheldLinkPayload(kind, 'in') is {kind, targetId: null, from: null} and still folds to nothing; control: 'out' keeps TL4b's {kind, targetId: null}", () => {
+    expect(linkPayloadDirection({ kind: 'blocks', targetId: TARGET, from: SOURCE })).toBe('in');
+    expect(linkPayloadDirection(withheldLinkPayload('blocks', 'in'))).toBe('in'); // the `from` key kept, its id withheld
+    expect(linkPayloadDirection({ kind: 'blocks', targetId: TARGET })).toBe('out'); // CONTROL: a plain link
+    expect(linkPayloadDirection(withheldLinkPayload('blocks', 'out'))).toBe('out');
+    expect(linkPayloadDirection(null)).toBe('out'); // not a payload at all
+    expect(linkPayloadDirection(undefined)).toBe('out'); // nor a missing one: `'from' in undefined` would throw
+    // The served shapes, byte for byte (planner ruling 2026-10-04 21:08): the direction kept, never an id.
+    expect(JSON.stringify(withheldLinkPayload('duplicates', 'in'))).toBe('{"kind":"duplicates","targetId":null,"from":null}');
+    expect(JSON.stringify(withheldLinkPayload('duplicates', 'out'))).toBe('{"kind":"duplicates","targetId":null}'); // CONTROL: TL4b's shape
+    // Still a served-withheld copy: `isWithheldLinkEvent` names it, the fold skips it, applyTicketEvent refuses it.
+    const born = bornState();
+    const served = makeEnvelope({ type: 'ticket.link_added', entity: { kind: 'ticket', id: SOURCE }, payload: withheldLinkPayload('blocks', 'in') });
+    expect(isWithheldLinkEvent(served)).toBe(true);
+    expect(foldTicketEvent(born, served, deps)).toBe(born);
+    expect(() => applyTicketEvent(born, served, deps)).toThrow(/withheld/);
   });
 });

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newSubmittedEvent, newUlid, type TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
 import { getTicketStateFromDb } from '../../src/projections/tickets.js';
-import { canSee } from '../../src/visibility/can-see.js';
+import { canOpen } from '../../src/visibility/can-open.js';
 import { targetSight, withholdContest, withholdEvent, withholdLinks } from '../../src/visibility/withhold-link-targets.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadWorld } from '../helpers/read-app.js';
@@ -133,7 +133,8 @@ describe('typed links T4b, withhold a hidden link target (27.081–27.082)', () 
     const { links: _none, ...bare } = state;
     const noLinks = bare as TicketState;
     expect(await withholdLinks(noLinks, targetSight(db.pool, memberId))).toBe(noLinks);
-    // Memo: a counting Queryable. One sight asked about H three times costs what ONE canSee(H) costs.
+    // Memo: a counting Queryable. One sight asked about H three times costs what ONE canOpen(H) costs (the
+    // predicate since drafts T6: canSee, then the own-draft read for an id canSee says no to).
     const counting = (n: { q: number }): Queryable =>
       ({
         query: (...a: unknown[]) => {
@@ -142,11 +143,11 @@ describe('typed links T4b, withhold a hidden link target (27.081–27.082)', () 
         },
       }) as unknown as Queryable;
     const once = { q: 0 };
-    await canSee(counting(once), memberId, H);
+    await canOpen(counting(once), memberId, H);
     const thrice = { q: 0 };
     const sight = targetSight(counting(thrice), memberId);
     for (let i = 0; i < 3; i += 1) await withholdEvent(link(H), sight);
-    expect(once.q).toBeGreaterThan(0); // precondition: the counter sees canSee's queries
+    expect(once.q).toBeGreaterThan(0); // precondition: the counter sees canOpen's queries
     expect(thrice.q).toBe(once.q);
   });
 });

@@ -305,3 +305,29 @@ it('28.095 publish reaches the readers: an online reader is sent a reach-granted
   expect(awayIds.indexOf(assign.id)).toBeLessThan(awayIds.indexOf(published.id));
   expect(awayIds.join('|')).not.toContain(child);
 });
+
+it('28.119 the author\'s device receives a draft-side link, nobody else does, and S\'s own stream is unchanged; control: a published twin\'s link reaches all', async () => {
+  const ws = newUlid();
+  const project = newUlid();
+  const [author, owner, admin, third] = [newUlid(), newUlid(), newUlid(), newUlid()];
+  await seedProject(db.pool, ws, project);
+  await seedMember(db.pool, ws, owner, 'owner');
+  await seedMember(db.pool, ws, admin, 'admin');
+  await seedMember(db.pool, ws, author, 'member');
+  await seedMember(db.pool, ws, third, 'member');
+  const [s, s2, draft] = [newUlid(), newUlid(), newUlid()];
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: s, createdBy: owner });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: s2, createdBy: owner });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: draft, draftBy: author });
+  const draftSide = await record(ticketEvent(ws, 'ticket.link_added', draft, { kind: 'blocks', targetId: draft, from: s }, author));
+  const twin = await record(ticketEvent(ws, 'ticket.link_added', s2, { kind: 'blocks', targetId: s }, owner));
+
+  expect(idsOf(await collect(author, ws, 0))).toContain(draftSide.id);
+  for (const [name, viewer] of [['owner', owner], ['admin', admin], ['third', third]] as const) {
+    const items = await collect(viewer, ws, 0);
+    expect(idsOf(items), name).toContain(twin.id); // CONTROL: the stream is live for this viewer
+    expect(idsOf(items), name).not.toContain(draftSide.id);
+    expect(entityIds(items), name).not.toContain(draft);
+    expect(JSON.stringify(items), name).not.toContain(draft); // S's own events name no draft
+  }
+});

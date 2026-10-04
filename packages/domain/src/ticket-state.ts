@@ -3,7 +3,7 @@ import type { EventEnvelope } from './envelope.js';
 // (coordination doc §4): this reducer PRODUCES the type, it does not redefine
 // it. Deliberately NOT re-exported from this module — the package index already
 // star-exports entity-state, and a second export of the same names collides.
-import type { FieldClaim, TicketState } from './entity-state.js';
+import type { FieldClaim, TicketLink, TicketState } from './entity-state.js';
 import {
   ticketAssignedPayload,
   ticketClosedPayload,
@@ -22,6 +22,7 @@ import {
   ticketRestoredPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
+import type { TicketLinkKind } from './events/ticket-events.js';
 import { DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
 import { isRedactedTicketCreated, isRedactedTicketPublished } from './purge.js';
 // `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
@@ -115,6 +116,12 @@ export const TICKET_EVENT_TYPES = [
 function claim(value: unknown, env: EventEnvelope): FieldClaim {
   return { value, actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
 }
+
+/** Entries are the same link only when kind, target AND `from` agree: a from entry never swallows a plain one. */
+const sameLink = (l: TicketLink, p: { kind: string; targetId: string; from?: string | undefined }): boolean =>
+  l.kind === p.kind && l.targetId === p.targetId && l.from === p.from;
+const entryOf = (p: { kind: TicketLinkKind; targetId: string; from?: string | undefined }): TicketLink =>
+  p.from === undefined ? { kind: p.kind, targetId: p.targetId } : { kind: p.kind, targetId: p.targetId, from: p.from };
 
 /**
  * Pure fold of one ACCEPTED ticket event into head state. Both the proj_tickets
@@ -380,6 +387,14 @@ export function applyTicketEvent(
     }
     case 'ticket.reparented': {
       const p = ticketReparentedPayload.parse(env.payload);
+      if (p.childId !== undefined) {
+        // Drafts T6 (owner ruling O1): held on the DRAFT as pending; neither ticket's `parentId` moves.
+        const held = state.pendingChildren ?? [];
+        const next =
+          p.newParentId === null ? held.filter((id) => id !== p.childId) : held.includes(p.childId) ? held : [...held, p.childId];
+        const { pendingChildren: _held, ...rest } = state;
+        return { ...rest, ...(next.length > 0 ? { pendingChildren: next } : {}) };
+      }
       return { ...state, parentId: p.newParentId };
     }
     case 'ticket.workflow_rebound': {
@@ -481,13 +496,13 @@ export function applyTicketEvent(
       if (isWithheldLinkEvent(env)) throw new Error(`applyTicketEvent: ${env.type} on ticket ${env.entity.id} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`);
       const p = ticketLinkAddedPayload.parse(env.payload);
       const links = state.links ?? [];
-      if (links.some((l) => l.kind === p.kind && l.targetId === p.targetId)) return state;
-      return { ...state, links: [...links, { kind: p.kind, targetId: p.targetId }] };
+      if (links.some((l) => sameLink(l, p))) return state;
+      return { ...state, links: [...links, entryOf(p)] };
     }
     case 'ticket.link_removed': {
       if (isWithheldLinkEvent(env)) throw new Error(`applyTicketEvent: ${env.type} on ticket ${env.entity.id} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`);
       const p = ticketLinkRemovedPayload.parse(env.payload);
-      const rest = (state.links ?? []).filter((l) => !(l.kind === p.kind && l.targetId === p.targetId));
+      const rest = (state.links ?? []).filter((l) => !sameLink(l, p));
       if (rest.length > 0) return { ...state, links: rest };
       // Absent, never `[]`: the shape `rowToTicketState` reads back (T1 "Why links is absent").
       const { links: _dropped, ...without } = state;
@@ -515,8 +530,18 @@ export function applyTicketEvent(
       if (!category) {
         throw new Error(`applyTicketEvent: workflow "${workflow.id}" has no state "${state.stateId}"`);
       }
-      const { draft: _published, ...rest } = state;
-      return { ...rest, workflowId: type.workflowId, workflowVersion: workflow.version, stateCategory: category };
+      // The draft-side entries (`from`) and the pending children are re-filed on their own streams by the server
+      // in the same transaction (spec R44, owner ruling O1) and live there from now on; the draft's own outgoing
+      // links stay.
+      const { draft: _published, links: held, pendingChildren: _refiled, ...rest } = state;
+      const kept = (held ?? []).filter((l) => l.from === undefined);
+      return {
+        ...rest,
+        ...(kept.length > 0 ? { links: kept } : {}),
+        workflowId: type.workflowId,
+        workflowVersion: workflow.version,
+        stateCategory: category,
+      };
     }
     case 'ticket.discarded': {
       ticketDiscardedPayload.parse(env.payload);

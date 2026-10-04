@@ -325,6 +325,42 @@ describe('27.005 history copy — link sentences', () => {
   });
 });
 
+/**
+ * 28.196 (drafts T6 FIX 1) — a link read from the end it points INTO: a draft-side `from` entry kept on a published
+ * draft's stream. The server's History route and the replica set `linkDirection` from the domain's
+ * `linkPayloadDirection`; an omitted one reads `'out'`, so an older server's labels read as before.
+ */
+describe('28.196 history copy — a link read from the end it points into', () => {
+  const D = '01J9GTKD000000000000000000';
+  const S = '01J9GTKS000000000000000000';
+  const linkEvent = (
+    type: string,
+    kind: string,
+    linkTarget: { key: string | null } | null | undefined,
+    linkDirection: 'out' | 'in' | undefined,
+  ): TicketHistoryEvent => ({
+    ...eventOf(type),
+    payload:
+      linkDirection === 'in'
+        ? { kind, targetId: linkTarget === null ? null : D, from: linkTarget === null ? null : S }
+        : { kind, targetId: linkTarget === null ? null : S },
+    ...(linkTarget === undefined ? {} : { linkTarget }),
+    ...(linkDirection === undefined ? {} : { linkDirection }),
+  });
+
+  it("28.196 'in' reads each kind's in-word, keyed, withheld and keyless; CONTROL: 'out' and an omitted direction read the out-word", () => {
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', { key: 'GN-6' }, 'in'))).toBe('Linked: is blocked by GN-6');
+    expect(describeEvent(linkEvent('ticket.link_added', 'duplicates', { key: 'GN-6' }, 'in'))).toBe('Linked: is duplicated by GN-6');
+    expect(describeEvent(linkEvent('ticket.link_added', 'relates', { key: 'GN-6' }, 'in'))).toBe('Linked: relates to GN-6');
+    expect(describeEvent(linkEvent('ticket.link_removed', 'blocks', { key: 'GN-6' }, 'in'))).toBe('Removed link: is blocked by GN-6');
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', null, 'in'))).toBe("Linked: is blocked by a ticket you can't see");
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', undefined, 'in'))).toBe('Linked: is blocked by another ticket'); // the replica's keyless label
+    // CONTROL: the same event read out, and with no direction at all
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', { key: 'GN-6' }, 'out'))).toBe('Linked: blocks GN-6');
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', { key: 'GN-6' }, undefined))).toBe('Linked: blocks GN-6');
+  });
+});
+
 describe('28.006 draft history sentences', () => {
   it('28.006 drafted, published, discarded; control: a creation without draft reads Created', () => {
     const typeName = (id: string): string => (id === 'task' ? 'Task' : id);

@@ -3,6 +3,7 @@ import { DEEPEST_RANK, isCreatableState, label, ticketCreatedPayload, ticketRepa
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
+import { DELETED_TICKET_REASON } from './deletion.js';
 import {
   ACCEPT,
   deepestRankParentRefusal,
@@ -297,6 +298,7 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
 
   const ticket = await getTicketState(ctx, env.entity.id);
   if (!ticket) return refuse('ticket.unknown');
+  if (p.childId !== undefined) return checkPendingChild(env, ctx, ticket, p.newParentId, p.childId);
 
   const type = await getTicketTypeDef(ctx, env, ticket.typeId);
   if (!type) return refuse('ticket.unknown-type');
@@ -334,6 +336,18 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   // own stream never names a draft (`hierarchy.unknown-parent`; the draft-side `childId` form is T6's).
   const draftVerdict = draftParentVerdict(newParent, env.actorId, ticket.draft === undefined ? 'ticket' : 'draft');
   if (draftVerdict !== null) return draftVerdict;
+  return placeUnder(env, ctx, ticket, type, newParent);
+}
+
+/**
+ * The placement questions of a reparent once both tickets are known and the parent may hold the moved ticket:
+ * deleted parent, the cycle walk, project, the parent's type, rank, parent-terminal, in that order (see
+ * `checkTicketReparented`'s docblock). Shared with the draft-side `childId` form, so a pending child is judged
+ * exactly as the plain reparent of it under the draft would be.
+ */
+async function placeUnder(
+  env: EventEnvelope, ctx: EngineContext, ticket: TicketState, type: TicketTypeDef, newParent: TicketState,
+): Promise<Accept | Refusal> {
   // The reparent path taking the same live-only predicate as the create path
   // above (E6-4), in the same position: after tenancy, before the cycle walk
   // and everything about the parent's shape. A move onto a deleted parent
@@ -356,7 +370,7 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
       // is what prevents. There is no true sentence to tell the actor, and
       // `hierarchy.cycle` would name a loop that is not the one they proposed.
       throw new Error(
-        `checkTicketReparented: ancestor chain of ${p.newParentId} exceeds ${MAX_ANCESTOR_HOPS} — ledger integrity is broken`,
+        `checkTicketReparented: ancestor chain of ${newParent.id} exceeds ${MAX_ANCESTOR_HOPS} — ledger integrity is broken`,
       );
     }
     cursor = cursor.parentId === null ? null : await getTicketState(ctx, cursor.parentId);
@@ -390,4 +404,42 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   }
 
   return ACCEPT;
+}
+
+/** The structure refusal of the `childId` form (Q5): a third ticket as the parent is a malformed claim, as `checkFromForm`'s. */
+const PENDING_CHILD_STRUCTURE_DETAIL =
+  'a pending child is held by its draft: "newParentId" must be the draft itself, or null to withdraw it.';
+
+/**
+ * The draft-side `childId` form (drafts T6 Step 5a, spec R4, owner ruling O1): the entity D holds the published C
+ * as a pending child (`newParentId: D`) or lets it go (`newParentId: null`). Neither ticket moves until D is
+ * published; the server then re-files `{ newParentId: D }` on C's stream, which this file judges as a plain reparent.
+ * An add is asked the plain reparent's placement questions with C as the moved ticket and D as the new parent
+ * (`placeUnder`), so a refusal reads as it would for that reparent.
+ */
+async function checkPendingChild(
+  env: EventEnvelope, ctx: EngineContext, draft: TicketState, newParentId: string | null, childId: string,
+): Promise<Accept | Refusal> {
+  if (newParentId !== null && newParentId !== draft.id) {
+    return {
+      refused: true,
+      rule: REFUSAL_RULES.malformedPayload,
+      reason: `This ticket.reparented event's payload is malformed: ${PENDING_CHILD_STRUCTURE_DETAIL}`,
+    };
+  }
+  // Only the actor's own live draft holds one: a published ticket's stream never names a draft relation (R4), and
+  // another person's draft or a discarded one does not exist for the actor (R3, no oracle).
+  if (draft.draft === undefined) return refuse('hierarchy.unknown-parent');
+  const draftVerdict = draftParentVerdict(draft, env.actorId, 'draft');
+  if (draftVerdict !== null) return draftVerdict;
+  // The withdrawal: like a plain reparent to the parent a ticket already has, a no-op when C is not held.
+  if (newParentId === null) return ACCEPT;
+  // Only a PUBLISHED child of this workspace: a draft child moves on its own stream (R3), and another person's
+  // draft, the actor's own and an unknown id read alike.
+  const child = await getTicketState(ctx, childId);
+  if (!child || child.workspaceId !== env.workspaceId || child.draft !== undefined) return refuse('hierarchy.unknown-parent');
+  if ((child.deleted ?? null) !== null) return refuse(REFUSAL_RULES.deletedTicket, DELETED_TICKET_REASON);
+  const childType = await getTicketTypeDef(ctx, env, child.typeId);
+  if (!childType) return refuse('ticket.unknown-type');
+  return placeUnder(env, ctx, child, childType, draft);
 }

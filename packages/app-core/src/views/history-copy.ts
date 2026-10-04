@@ -252,7 +252,8 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
         event.linkTarget === null ? "a ticket you can't see"
         : event.linkTarget?.key ?? 'another ticket';
       const verb = event.type === 'ticket.link_added' ? 'Linked' : 'Removed link';
-      return `${verb}: ${linkReading(kind as TicketLinkKind, 'out')} ${other}`;
+      // From THIS ticket's end (drafts T6 FIX 1): a draft-side `from` entry reads in, "is blocked by"; an older server sends no direction, which is out.
+      return `${verb}: ${linkReading(kind as TicketLinkKind, event.linkDirection ?? 'out')} ${other}`;
     }
     case 'claim.contested':
       return 'Conflicting claim recorded';
