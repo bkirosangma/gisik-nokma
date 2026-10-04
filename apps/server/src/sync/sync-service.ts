@@ -42,7 +42,7 @@ export type SyncInvalidCode = IngestErrorCode | 'actor-mismatch' | 'reserved-typ
  * 2. The entity IS a ticket, but the refusal is about the claim's own
  *    workspace↔entity pair (`entity-workspace-mismatch`). `buildContestedClaim`
  *    copies that pair onto the contest verbatim, so the contest is the SAME
- *    mis-filing and the same guard inside `commitOne` refuses it. Recording it
+ *    mis-filing and the same guard inside `commitInTx` refuses it. Recording it
  *    would be the permanent cross-workspace ledger row the guard exists to
  *    prevent, so the honest answer is the refusal itself — the identical answer
  *    `POST /v1/events` gives for the identical claim.

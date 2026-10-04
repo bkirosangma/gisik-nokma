@@ -47,6 +47,12 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 - ✅ **29.013 — wheelIntent is the Knowledge Graph classifier exactly; the time surfaces take over only Ctrl + wheel; control: Shift + wheel and a plain vertical wheel are the platform's.** (`packages/viewport/test/zoom.test.ts`)
 - ✅ **29.015 — no Date, Math.random, performance, requestAnimationFrame, setTimeout or document in src (outside dom/); control: the scan finds a planted read.** (`packages/viewport/test/seam.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T3 -->
+- ✅ **29.020 — 28 days from a Monday; the day before a start is the previous chunk's last; control: no chunk starts on a non-Monday.** (`packages/viewport/test/range.test.ts`)
+- ✅ **29.021 — still: one viewport either side; moving: ahead by max(V, 1.5 s of travel) and half a viewport behind; exactly 1 day/s already moves; a fractional look-ahead rounds up | at most two in flight; the visible chunks first; low-priority behind-the-travel fetches are cancelled when a visible one needs the slot, and only as many as it needs; then the nearer chunk first | travelling later, the chunk BEHIND the view is low priority and starts after the visible one; control: standing still, the same chunk is high, and so is the chunk ahead | a reversal cancels every low-priority fetch; chunks outside the index bounds and loaded chunks are never fetched.** (`packages/viewport/test/range.test.ts`)
+- ✅ **29.022 — idle widening (after 200 ms still) alternates sides outward, may land on the index's first or last chunk, and stops at 40 chunks, 10,000 entries or the index extent; control: nothing loaded plans nothing | past the cap the farthest chunk goes first and nothing within a viewport of the view is ever evicted; at exactly 10,000 entries nothing goes; each eviction counts its entries off; at equal distance the later chunk goes first.** (`packages/viewport/test/range.test.ts`)
+- ✅ **29.023 — the next coarser preset (a zoom a hair above a preset counts as that preset, one more than a hair above does not), the same centre at another scale, the neighbouring packing scales, the mount range | pan limits: the drawn extent plus a viewport either side, never narrower than today +/- 56; nothing drawn is the minimum; a fractional viewport rounds outward.** (`packages/viewport/test/range.test.ts`)
+- ✅ **29.024 — a stale chunk is still returned; putChunk clears the mark; markStale on an unloaded chunk reports false; the stale chunks are listed in order | patchEntry changes the index and every chunk copy and reports how many; an unknown id reports 0; entriesIn counts one chunk; the arrays the caller handed in are never patched.** (`packages/viewport/test/range.test.ts`)
+- ✅ **29.025 — scopes: the same scope in another order is one cache; the fifth scope drops the least recently used; a get refreshes.** (`packages/viewport/test/range.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T4 -->
 - ✅ **29.050 — rows equal the greatest overlap on 200 seeds, and no two items in a row share a day; control: an UNSORTED first fit exceeds the optimum on at least one seed.** (`packages/viewport/test/pack.test.ts`)
 - ✅ **29.051 — with 1 to 3 segments per item on 200 seeds, the segment packing never needs more rows than the hull packing, and every segment of an item sits in its one row without sharing a day; control: the hull packer alone can need more rows | a tie keeps the segment packing (`strategy: 'segments'`) | an item's segments may come in any order (its first day is its earliest), and its own label footprints merge so no other item slips inside them (a bar inside a swollen label footprint, before or after the segment it swallows); control: the same items with sorted segments, and without the label.** (`packages/viewport/test/pack.test.ts`)
@@ -82,6 +88,36 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 Parts 2 to 5 each own ONE anchor below, seeded here so the sub-sections always sit in Part order. The FIRST task of each Part writes, directly below its own anchor, its `## 29.N` heading, its per-task id split and one anchor per task (its task list is its own plan's business, not this one's). Never write below another Part's anchor.
 
 <!-- wtg-part2-model -->
+
+## 29.2 Part 2: the model
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`. Ids by task: the Global Constraints "Catalogue" line. `29.171`-`29.179` stay free. Ids follow this per-task split, not the sub-block subjects in the table above (planner ruling 2026-10-04, Q1).
+
+<!-- wtg-part2-model T1 -->
+- ✅ **29.147 — the shadow detector reports a custom field whose id is estimate, waitForAll or reworkEstimate from three sources: any ticket-type.defined event (current or superseded), the proj_ticket_types row, and ticket.field_set claims;** control: near-miss ids (estimates, Estimate), another field, and a workspace with none are NOT reported, and a superseded shadowing definition has NO type-projection finding but still has a ledger-definition one. Also pinned: the workspace count and database name, two claims counted as 2, a non-array `fields` payload and a non-claim or non-definition event carrying `fieldId` or `fields` that are NOT reported. Mutation: scan only proj_ticket_types → the superseded and claim assertions fail.
+- ✅ **29.148 — an existing type with id decision is reported per workspace with its rank, workflow, the task type's workflow, rankMatchesSeed (rank 3) and sameWorkflowAsTask;** control: a workspace with no decision type is absent. Mutation: drop the rank comparison → a rank-5 decision reads rankMatchesSeed true.
+- ✅ **29.149 — a workflow whose CURRENT (highest) version has a terminal initial state is reported with its bound-type count;** control: an open initial state, and a workflow whose old version was terminal-initial but whose latest is fixed, are not. Also pinned: the initial state id reported is the workflow's own (a terminal state that is not `done`). Mutation: read every version → the superseded workflow appears.
+- ✅ **29.150 — THE TERMINAL-READER CENSUS: every non-test source file that reads the terminal state category or the rollup's terminal count is classified definition, invariant or done-meaning; a new reader fails the test;** control: a planted file is reported, a comment-only mention and a .test. file are not. Also pinned: a single-line block comment, every skipped directory (node_modules, dist, test, tests, e2e, .next), generated files, and non-source extensions are ignored while .sql and .tsx are read, each pattern alternative is reached by its own planted file, a listed directory that does not exist is skipped, and line numbers are pinned: a hit after comment lines reports its own line (`[3]`), a hit on the first line reports `[1]`. Mutation: drop the comment filter → a docblock mention reads as a reader.
+- ✅ **29.151 — the report prints every finding (workspace id, source, field) and exits 1 only for shadows (decision and terminal-initial findings are warnings, exit 0); the CLI runs inside a READ ONLY transaction;** control: the same INSERT commits on the plain pool. Also pinned: the formatter's count lines, the seed-rank and task-workflow notes, one shadow alone exits 1, the read-only client returns to the pool, and the CLI spawned as a process exits 1 for a shadow, 0 for a clean database and 2 without DATABASE_URL, and importing the module runs nothing; a type-projection line carries no event id (it ends at the field id, while a ledger-definition line names its event). Mutation: drop BEGIN READ ONLY → the write inside succeeds.
+- 🧪 **29.152 — the owner ran the script against PROD and pasted the output into HANDOFF-task-wtg2-preflight.md, showing zero ledger-definition and zero field-claim shadows (or an owner ruling per hit);** control: the dev-database run (Step 6) is recorded beside it. 🧪 when the output is pasted. Recorded: the owner ran it against PROD on 2026-10-04 at 13:25 on branch head a624403c, exit 0; TLS ca, database defaultdb, 12 workspaces; zero shadowing custom fields, zero existing decision types, zero workflows with a terminal initial state. The output is pasted at the end of the T1 handoff.
+<!-- wtg-part2-model T2 -->
+<!-- wtg-part2-model T3 -->
+<!-- wtg-part2-model T4 -->
+<!-- wtg-part2-model T5 -->
+<!-- wtg-part2-model T6 -->
+<!-- wtg-part2-model T7 -->
+<!-- wtg-part2-model T8 -->
+<!-- wtg-part2-model T9 -->
+<!-- wtg-part2-model T10 -->
+<!-- wtg-part2-model T11 -->
+<!-- wtg-part2-model T12 -->
+<!-- wtg-part2-model T13 -->
+<!-- wtg-part2-model T14 -->
+<!-- wtg-part2-model T15 -->
+<!-- wtg-part2-model T16 -->
+<!-- wtg-part2-model T17 -->
+<!-- wtg-part2-model T18 -->
+<!-- wtg-part2-model T19 -->
 
 <!-- wtg-part3-workflow-graph -->
 
