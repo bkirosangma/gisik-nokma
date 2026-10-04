@@ -176,7 +176,7 @@ describe('29.032 glides', () => {
     expect(adapter.offset()).toBe(FIRST + 125);
   });
 
-  it('29.032 a 1,000,000 px glide still lands inside 450 ms (+1 frame); control: reduced motion lands in the same call, and one frame later the loop is idle with no frames pending', () => {
+  it('29.032 a 1,000,000 px glide still lands inside 450 ms (+1 frame); control: reduced motion lands in the same call, and one frame later the loop is idle with no frames pending; so does the instant option with reduced motion off; a caller\'s maxMs of 900 still lands inside 450 ms; control: a maxMs of 100 lands inside 100 ms', () => {
     const { adapter, fc } = mount({ extentDays: 100_000 });
     adapter.animateTo({ offset: FIRST + 40_000 });
     fc.advance(450 + 16);
@@ -187,6 +187,23 @@ describe('29.032 glides', () => {
     r.fc.advance(16);
     expect(r.fc.pending()).toBe(0);
     expect(r.frames[r.frames.length - 1]).toMatchObject({ moving: false, offset: FIRST + 100 });
+    // `instant` lands at once with reduced motion off
+    const i = mount();
+    i.adapter.animateTo({ offset: FIRST + 100 }, { instant: true });
+    expect(i.adapter.offset(), 'instant').toBe(FIRST + 100);
+    i.fc.advance(16);
+    expect(i.fc.pending(), 'instant').toBe(0);
+    expect(i.frames[i.frames.length - 1]).toMatchObject({ moving: false, offset: FIRST + 100 });
+    // a caller's maxMs never raises the 450 ms cap (VP-5)
+    const slow = mount({ extentDays: 100_000 });
+    slow.adapter.animateTo({ offset: FIRST + 40_000 }, { maxMs: 900 });
+    slow.fc.advance(450 + 16);
+    expect(slow.adapter.offset(), 'maxMs 900').toBeCloseTo(FIRST + 40_000, 0);
+    // control: a shorter maxMs is honoured
+    const quick = mount({ extentDays: 100_000 });
+    quick.adapter.animateTo({ offset: FIRST + 40_000 }, { maxMs: 100 });
+    quick.fc.advance(100 + 16);
+    expect(quick.adapter.offset(), 'maxMs 100').toBeCloseTo(FIRST + 40_000, 0);
   });
 
   it('29.039 a glide aimed past either scrollable end stops at that end and settles: a last frame reports moving: false and the loop goes idle; control: a target inside the extent lands exactly on it', () => {
@@ -214,7 +231,7 @@ describe('29.032 glides', () => {
     expect(inside.fc.pending()).toBe(0);
   });
 
-  it('29.032 zoom glides geometrically about the viewport centre, inside 450 ms, and the centre day does not move', () => {
+  it('29.032 zoom glides geometrically about the viewport centre, inside 450 ms, and the centre day does not move; with anchorPx 200 the day at 200 px holds instead', () => {
     const { el, adapter, fc, resize } = mount();
     el.scrollLeft = 2400;
     const centreDay = dayAt({ offsetDay: adapter.offset(), ppd: adapter.scale() }, 500);
@@ -226,6 +243,17 @@ describe('29.032 glides', () => {
       if (i === 28) expect(adapter.scale(), 'landed by 464 ms').toBeCloseTo(8, 2);
     }
     expect(adapter.scale()).toBeCloseTo(8, 2);
+    // anchorPx: the day at 200 px holds on every frame, not the centre's
+    const a = mount();
+    a.el.scrollLeft = 2400;
+    const anchorDay = dayAt({ offsetDay: a.adapter.offset(), ppd: a.adapter.scale() }, 200);
+    a.adapter.animateTo({ scale: 8 }, { anchorPx: 200 });
+    for (let i = 0; i < 40; i += 1) {
+      a.resize();
+      a.fc.advance(16);
+      expect(Math.abs((anchorDay - a.adapter.offset()) * a.adapter.scale() - 200), `anchorPx 200, frame ${i}`).toBeLessThan(0.5);
+    }
+    expect(a.adapter.scale()).toBeCloseTo(8, 2);
   });
 
   it('29.032 a glide started during a fling replaces the fling and lands exactly on its target', () => {
@@ -297,7 +325,7 @@ describe('29.033 keys', () => {
     expect(adapter.scale()).toBeCloseTo(24, 2);
   });
 
-  it('29.033 two quick presses add up (the second starts from the first target), arrows and zoom alike; a key with Ctrl, Meta or Alt, one already handled, or one typed into an input, is left alone', () => {
+  it('29.033 two quick presses add up (the second starts from the first target), arrows and zoom alike; a key with Ctrl, Meta or Alt, one already handled, or one typed into an input, a textarea, a select or a contenteditable element, is left alone', () => {
     const { el, adapter, fc } = mount();
     el.scrollLeft = 24 * 100;
     const start = adapter.offset();
@@ -328,13 +356,23 @@ describe('29.033 keys', () => {
     const typed = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
     input.dispatchEvent(typed);
     expect(typed.defaultPrevented).toBe(false);
+    // one control per clause of the key guard
+    el.insertAdjacentHTML('beforeend', '<textarea></textarea><select></select><div contenteditable="true">x</div>');
+    const still = adapter.offset();
+    for (const selector of ['textarea', 'select', '[contenteditable="true"]']) {
+      const key = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+      (el.querySelector(selector) as Element).dispatchEvent(key);
+      expect(key.defaultPrevented, selector).toBe(false);
+      fc.advance(700);
+      expect(adapter.offset(), selector).toBe(still);
+    }
   });
 });
 
 describe('29.034 a mouse drag pans, with momentum', () => {
   const click = () => new MouseEvent('click', { bubbles: true, cancelable: true });
 
-  it('29.034 dragging 100 px right scrolls 100 px left; releasing at speed keeps going and stops below 2 px/s; the click that ends the drag is swallowed; frames report moving throughout the drag; control: a press that moved no more than 4 px clicks as usual, and a drag begun on a bar, by touch, with another button or by a second pointer does nothing', () => {
+  it('29.034 dragging 100 px right scrolls 100 px left; releasing at speed keeps going and stops below 2 px/s; the click that ends the drag is swallowed; frames report moving throughout the drag; control: a press that moved no more than 4 px clicks as usual, and a drag begun on a bar, a link, an input, a textarea, a select or a [data-no-pan] element, by touch, with another button or by a second pointer does nothing', () => {
     const { el, adapter, fc, frames } = mount();
     el.scrollLeft = 2000;
     let clicks = 0;
@@ -383,6 +421,14 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     el.dispatchEvent(pointer('pointermove', { x: 700, y: 50, id: 9, kind: 'touch' }));
     expect(el.scrollLeft).toBe(at);
     expect(adapter.offset()).toBeGreaterThan(FIRST);
+    // one control per clause of the drag guard
+    el.insertAdjacentHTML('beforeend', '<a href="#">l</a><input><textarea></textarea><select></select><div data-no-pan>x</div>');
+    for (const selector of ['a', 'input', 'textarea', 'select', '[data-no-pan]']) {
+      (el.querySelector(selector) as Element).dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+      el.dispatchEvent(pointer('pointermove', { x: 600, y: 50 }));
+      expect(el.classList.contains('gn-dragging'), selector).toBe(false);
+      expect(el.scrollLeft, selector).toBe(at);
+    }
   });
 
   it('29.034 a fling toward the first day stops there: the scroll rests at 0 and the loop goes idle; a press during a fling catches it where it is', () => {
