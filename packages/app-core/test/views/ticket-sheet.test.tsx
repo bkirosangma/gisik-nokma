@@ -3670,6 +3670,12 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(screen.getByTestId('field-start').compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(row.compareDocumentPosition(screen.getByTestId('field-type')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const input = within(row).getByLabelText('Estimate (days)');
+    // A blank on a ticket with no estimate is no change, so nothing is filed (a null claim would be a clearing nobody made).
+    fireEvent.change(input, { target: { value: '5' } });
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(source.ingested).toHaveLength(0);
     fireEvent.change(input, { target: { value: '3' } });
     fireEvent.blur(input);
     await waitFor(() => expect(source.ingested).toHaveLength(1));

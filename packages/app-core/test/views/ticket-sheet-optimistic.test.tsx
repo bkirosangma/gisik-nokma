@@ -102,6 +102,22 @@ describe('the sheet shows a write the moment it is made (spec S5)', () => {
     expect(row().textContent).not.toContain('No estimate');
   });
 
+  it('29.164 the estimate overlay retires once a read agrees, and the claim line names who set it', async () => {
+    const user = userEvent.setup();
+    const read = readOf();
+    const { writes } = await mount(WF_ERRAND, read);
+    const row = () => screen.getByTestId('field-estimate');
+    await user.type(within(row()).getByLabelText('Estimate (days)'), '3');
+    await user.tab();
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(row().textContent).toContain('Saving…'); // control: the overlay is up while the write is pending
+    // The server's read now carries the claim, so the reload after the commit agrees with the overlay.
+    read.ticket.fields['estimate'] = { value: 3, actorId: 'user_anselma', clientTime: '2026-10-02T08:59:00.000Z', serverTime: '2026-10-02T09:00:00.000Z' };
+    writes[0]!.resolve([committed]);
+    await waitFor(() => expect(within(row()).getByText('set by Anselma Marak on 2 Oct 2026')).toBeInTheDocument());
+    expect(row().textContent).not.toContain('Saving…');
+  });
+
   it('25.092 a committed title shows the new title at once and never flashes the old one back while the reload is slow', async () => {
     const user = userEvent.setup();
     const { writes } = await mount();

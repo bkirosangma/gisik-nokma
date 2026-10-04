@@ -1851,6 +1851,14 @@ describe('13.1435–13.1441 the Starting status select', () => {
     rerender(<NewTicketDialog {...baseProps()} />);
     expect(screen.getByLabelText('Estimate (days)')).toHaveValue(null);
   });
+  it('29.165 a taken-back create reopens with its estimate (restoreDraft)', () => {
+    const restoreDraft = { ticketId: '01J9GTKA000000000000000000', title: 'Order the tent', typeId: 'task', parentId: null, assigneeId: null, start: 'backlog' as const, priority: 'P2' as const };
+    const { unmount } = render(<NewTicketDialog {...baseProps({ restoreDraft: { ...restoreDraft, estimate: 7 } })} />);
+    expect(screen.getByLabelText('Estimate (days)')).toHaveValue(7);
+    unmount();
+    render(<NewTicketDialog {...baseProps({ restoreDraft })} />);
+    expect(screen.getByLabelText('Estimate (days)')).toHaveValue(null); // control: a draft without one restores none
+  });
 
   it('13.1436 is disabled with a helper sentence while "Starts in the backlog?" is ON', async () => {
     const user = userEvent.setup();
