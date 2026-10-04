@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { footprintOf, maxOverlap, naturalKeyCompare, packLane, packLaneBy, type PackItem, type Seg } from '../src/index.js';
+import { KEY_GAP_PX, footprintOf, keyOutside, maxOverlap, naturalKeyCompare, packLane, packLaneBy, type PackItem, type Seg } from '../src/index.js';
 
 /** A small seeded generator so a failing seed can be replayed. */
 const rng = (seed: number) => () => {
@@ -103,19 +103,19 @@ describe('29.051 multi-segment items', () => {
     expect([sorted.rowOf.get('u'), sorted.rowOf.get('w'), sorted.rowOf.get('v')]).toEqual([0, 1, 0]);
     const unsorted = packLane([u, w, v], { ppd: 16 });
     expect([unsorted.rowOf.get('u'), unsorted.rowOf.get('w'), unsorted.rowOf.get('v')]).toEqual([0, 1, 0]);
-    // a's first segment swells to days 0-9 with a 160 px label and swallows its own second segment (days 2-3); normalise
-    // merges the two into one footprint, days 0-9.
+    // a's first segment swells to days 0-11 with a 160 px label (drawn 4 px after its end: 164 px is 11 days at 16 px/day,
+    // 29.055) and swallows its own second segment (days 2-3); normalise merges the two into one footprint, days 0-11.
     const a: PackItem = { id: 'a', key: 'GN-4', segments: [{ start: 0, end: 0 }, { start: 2, end: 3 }] };
     const labelled = { ppd: 16, labelPx: (item: PackItem, i: number) => (item.id === 'a' && i === 0 ? 160 : 0) };
     // The SEGMENT search: b on day 1 sits inside the swollen footprint, before the swallowed segment. Left unmerged, the row
-    // holds [2-3] then [0-9] (sorted by end); the search for the first interval ending on or after day 1 stops at [2-3],
+    // holds [2-3] then [0-11] (sorted by end); the search for the first interval ending on or after day 1 stops at [2-3],
     // which starts after b, so b slips in beside a (the unmerged hull, days 0-3, still refuses b, but packLane keeps the
     // fewer rows). Control: without the label b fits a's gap on day 1.
     const early: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 1, end: 1 }] };
     expect(packLane([a, early], { ppd: 16 }).rows).toBe(1);
     expect(packLane([a, early], labelled).rows).toBe(2);
     // The HULL: b on day 5 sits inside the swollen footprint, after the swallowed segment, so the segment search reaches
-    // [0-9] and refuses b merged or not. Merged, a has one footprint and packLane never builds the hull; left unmerged, the
+    // [0-11] and refuses b merged or not. Merged, a has one footprint and packLane never builds the hull; left unmerged, the
     // hull ends where the swallowed segment ends (day 3), b fits beside it, and packLane takes the hull's 1 row. Control:
     // without the label b fits after a.
     const late: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 5, end: 5 }] };
@@ -195,24 +195,61 @@ describe('29.052 adjacency, ties and stability', () => {
 });
 
 describe('29.053 the label is part of the footprint', () => {
-  it('29.053 a one-day bar whose key needs 70 px at 16 px/day reserves 5 days, so a bar on day 3 goes to a second row; control: no label measure and they share a row', () => {
+  it('29.053 a one-day bar whose key needs 70 px at 16 px/day reserves the 5 days after it (4 + 70 px, counted from its end: days 0-5), so a bar on day 3 goes to a second row; control: no label measure and they share a row', () => {
     const a: PackItem = { id: 'a', key: 'GN-123', segments: [{ start: 0, end: 0 }] };
     const b: PackItem = { id: 'b', key: 'GN-124', segments: [{ start: 3, end: 6 }] };
-    expect(footprintOf({ start: 0, end: 0 }, 70, 16)).toEqual({ start: 0, end: 4 });
+    expect(footprintOf({ start: 0, end: 0 }, 70, 16)).toEqual({ start: 0, end: 5 });
     expect(footprintOf({ start: 0, end: 9 }, 70, 16)).toEqual({ start: 0, end: 9 });
     expect(packLane([a, b], { ppd: 16, labelPx: () => 70 }).rows).toBe(2);
     expect(packLane([a, b], { ppd: 16 }).rows).toBe(1);
   });
 
-  it("29.053 each segment's label is measured for that item and that segment: a second label of 70 px reserves days 10-14, so a bar on days 12-13 goes to a second row; control: the same 70 px on the first label leaves the second segment its own width", () => {
+  it("29.053 each segment's label is measured for that item and that segment: a second label of 70 px reserves days 10-15, so a bar on days 12-13 goes to a second row; control: the same 70 px on the first label leaves the second segment its own width", () => {
     const g: PackItem = { id: 'g', key: 'GN-7', segments: [{ start: 0, end: 0 }, { start: 10, end: 10 }] };
     const c: PackItem = { id: 'c', key: 'GN-8', segments: [{ start: 12, end: 13 }] };
     expect(packLane([g, c], { ppd: 16, labelPx: (item, i) => (item.id === 'g' && i === 1 ? 70 : 0) }).rows).toBe(2);
     expect(packLane([g, c], { ppd: 16, labelPx: (item, i) => (item.id === 'g' && i === 0 ? 70 : 0) }).rows).toBe(1);
   });
 
-  it('29.053 the packing scale is injected: at 8 px/day the same label is 9 days, so the footprint is wider (the bucket rule is applied by the caller via packScale)', () => {
-    expect(footprintOf({ start: 0, end: 0 }, 70, 8)).toEqual({ start: 0, end: 8 });
+  it('29.053 the packing scale is injected: at 8 px/day the same label and its gap are 10 days, so the footprint is wider (the bucket rule is applied by the caller via packScale)', () => {
+    expect(footprintOf({ start: 0, end: 0 }, 70, 8)).toEqual({ start: 0, end: 10 });
+  });
+});
+
+/**
+ * 29.055 — spec PK-4's prose puts an outside key "just outside its END", and the view draws it there (`KEY_GAP_PX` after
+ * the bar's last day, `ui.css` `.gn-timeline__key--outside`); the first formula counted the label from the bar's START, so
+ * at the Month preset 10 of 12 outside keys ran over the next bar in their row (LOCAL real-browser look, T1 harness, P1 T9;
+ * ERRATA E10, planner ruling (b) 2026-10-04). Every leg is two bars in one row where the SECOND bar's day decides.
+ */
+describe('29.055 an outside key is counted from the bar END, where it is drawn', () => {
+  it('29.055 one gap and one predicate: KEY_GAP_PX is 4, and a bar exactly as wide as its key holds it while one a px narrower does not', () => {
+    expect(KEY_GAP_PX).toBe(4);
+    expect(keyOutside(40, 40)).toBe(false);
+    expect(keyOutside(39, 40)).toBe(true);
+    expect(keyOutside(16, 0)).toBe(false);
+  });
+
+  it('29.055 a two-day bar at 8 px/day with a 40 px key reserves days 0-7 (1 + ceil((4 + 40) / 8)): a bar on day 5 or 7 takes a second row, one on day 8 shares the row; control: the same bars with no key share one row', () => {
+    const a: PackItem = { id: 'a', key: 'GN-1', segments: [{ start: 0, end: 1 }] };
+    const at = (day: number): PackItem => ({ id: 'b', key: 'GN-2', segments: [{ start: day, end: day + 2 }] });
+    const keyed = { ppd: 8, labelPx: (item: PackItem) => (item.id === 'a' ? 40 : 0) };
+    expect(footprintOf({ start: 0, end: 1 }, 40, 8)).toEqual({ start: 0, end: 7 });
+    // Day 5 is past a START-counted label (days 0-4) and inside the drawn key: the start-based formula would share the row.
+    expect(packLane([a, at(5)], keyed).rows).toBe(2);
+    // Day 7 is past the key without its gap (40 px is exactly 5 days: days 0-6) and inside it with the gap.
+    expect(packLane([a, at(7)], keyed).rows).toBe(2);
+    expect(packLane([a, at(8)], keyed).rows).toBe(1);
+    expect(packLane([a, at(5)], { ppd: 8 }).rows).toBe(1);
+  });
+
+  it('29.055 a bar exactly as wide as its key (5 days at 8 px/day, 40 px) holds it, so its footprint is the bar and a bar on day 5 shares the row; control: a 41 px key is outside and reserves days 0-10', () => {
+    const a: PackItem = { id: 'a', key: 'GN-1', segments: [{ start: 0, end: 4 }] };
+    const b: PackItem = { id: 'b', key: 'GN-2', segments: [{ start: 5, end: 6 }] };
+    expect(footprintOf({ start: 0, end: 4 }, 40, 8)).toEqual({ start: 0, end: 4 });
+    expect(packLane([a, b], { ppd: 8, labelPx: (item) => (item.id === 'a' ? 40 : 0) }).rows).toBe(1);
+    expect(footprintOf({ start: 0, end: 4 }, 41, 8)).toEqual({ start: 0, end: 10 });
+    expect(packLane([a, b], { ppd: 8, labelPx: (item) => (item.id === 'a' ? 41 : 0) }).rows).toBe(2);
   });
 });
 

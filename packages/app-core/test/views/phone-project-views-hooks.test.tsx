@@ -10,7 +10,7 @@ import { listRowSeed } from '../helpers/seed.js';
 
 /**
  * The web app on phones, Plan Task 8 — the CLASS HOOKS the phone rules for List / Backlog (21.111), Calendar
- * (21.112) and Timeline (21.113) key on. `apps/web/test/phone-project-views.test.ts` pins the CSS; this pins
+ * (21.112) and Timeline (29.107, which was 21.113 until the continuous Timeline) key on. `apps/web/test/phone-project-views.test.ts` pins the CSS; this pins
  * that the components CARRY the classes that CSS paints, in the structure its selectors assume (a `td` under a
  * `tr` under a `tbody` under a `.gn-list__table`; a week row holding the days and the items).
  */
@@ -81,29 +81,26 @@ describe('21.112 the Calendar carries the classes its scroller rules key on', ()
   });
 });
 
-describe('21.113 the Timeline carries the classes its scroller rules key on', () => {
-  it('21.113 .gn-timeline > header + .gn-timeline__weeks and, under a group, .gn-timeline__row grid rows', () => {
-    const ticket: TicketState = {
-      kind: 'ticket',
-      id: 't1',
-      workspaceId: 'ws_1',
-      projectId: 'p1',
-      typeId: 'task',
-      parentId: null,
-      workflowId: 'wf_basic',
-      workflowVersion: 1,
-      stateId: 'doing',
-      stateCategory: 'active',
-      assigneeId: null,
-      collaboratorIds: [],
-      fields: {
-        title: { value: 'A dated ticket', actorId: 'user_kiro', clientTime: '2026-08-19T10:00:00.000Z', serverTime: '2026-08-19T10:00:01.000Z' },
-        startDate: { value: { date: '2026-08-24' }, actorId: 'user_kiro', clientTime: '2026-08-19T10:00:00.000Z', serverTime: '2026-08-19T10:00:01.000Z' },
-        dueDate: { value: { date: '2026-08-28' }, actorId: 'user_kiro', clientTime: '2026-08-19T10:00:00.000Z', serverTime: '2026-08-19T10:00:01.000Z' },
-      },
-      transitions: [],
-    };
-    const { container } = render(
+describe('29.107 the Timeline carries the classes its scroller and its portrait rules key on', () => {
+  const claim = (value: unknown) => ({ value, actorId: 'user_kiro', clientTime: '2026-08-19T10:00:00.000Z', serverTime: '2026-08-19T10:00:01.000Z' });
+  const ticket: TicketState = {
+    kind: 'ticket',
+    id: 't1',
+    workspaceId: 'ws_1',
+    projectId: 'p1',
+    typeId: 'task',
+    parentId: null,
+    workflowId: 'wf_basic',
+    workflowVersion: 1,
+    stateId: 'doing',
+    stateCategory: 'active',
+    assigneeId: null,
+    collaboratorIds: [],
+    fields: { title: claim('A dated ticket'), startDate: claim({ date: '2026-08-24' }), dueDate: claim({ date: '2026-08-28' }) },
+    transitions: [],
+  };
+  const renderIt = () =>
+    render(
       <TimelineView
         tickets={[{ state: ticket, pendingFieldIds: [], customDateFields: [] }]}
         today="2026-08-23"
@@ -111,14 +108,18 @@ describe('21.113 the Timeline carries the classes its scroller rules key on', ()
         onOpenTicket={vi.fn()}
       />,
     );
-    const root = container.querySelector('.gn-timeline');
+
+  it('29.107 .gn-timeline > toolbar + stage > canvas > surface > axis, and under a lane the .gn-timeline__row wrappers (21.113, retitled: the week band and the column template are gone)', () => {
+    const root = renderIt().container.querySelector('.gn-timeline');
     expect(root).not.toBeNull();
-    // The scroller's direct children: the toolbar (made sticky), the week band, the groups.
-    expect(root?.querySelector(':scope > header.gn-timeline__header')).not.toBeNull();
-    expect(root?.querySelectorAll(':scope > .gn-timeline__weeks')).toHaveLength(1);
-    // The row is a grid row under a group — the element the 40rem floor is on.
-    expect(root?.querySelector(':scope > .gn-timeline__group > .gn-timeline__row')).not.toBeNull();
-    // CONTROL — the week band and the row share one column template through the component's own CSS variable.
-    expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toMatch(/^repeat\(\d+, minmax\(0, 1fr\)\)$/);
+    // The panel's direct children: the toolbar, the stage that holds the scroller, nothing else but the optional note and side list.
+    expect(root?.querySelector(':scope > header.gn-timeline__toolbar')).not.toBeNull();
+    expect(root?.querySelectorAll(':scope > .gn-timeline__stage')).toHaveLength(1);
+    // The scroller, its one surface, the sticky axis, and a lane holding the row wrappers the bars hang from.
+    expect(root?.querySelector(':scope > .gn-timeline__stage > .gn-timeline__canvas > .gn-timeline__surface > .gn-timeline__axis')).not.toBeNull();
+    expect(root?.querySelector('.gn-timeline__surface > .gn-timeline__lane > .gn-timeline__row > .gn-timeline__bar')).not.toBeNull();
+    // CONTROL: the week band and its column template do not exist any more.
+    expect(root?.querySelector('.gn-timeline__weeks')).toBeNull();
+    expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe('');
   });
 });
