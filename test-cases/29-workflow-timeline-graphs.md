@@ -154,6 +154,7 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part4-timeline-graph-home.md`; spec 
 <!-- WTG4 T1 -->
 
 <!-- WTG4 T2 -->
+- ❌ **29.303 — the painter mounts only what is near the view:** with 10,000 draws the index returns the primitives whose bounds touch `[view − overscan, view + overscan]` (a shared edge counts) and no others; an item spanning several buckets is returned once; moving the view by less than a bucket changes no mounted id (no React churn), moving it by more mounts the new ids and unmounts the old; selection and pick work on a mounted primitive; the painter's DOM carries no `aria` name Earlier, Later, Previous or Next; control: the same view with overscan 0 returns fewer. Mutation: build buckets from `x0` only → a long bar vanishes at the window's right edge and the span assertion reds.
 
 <!-- WTG4 T3 -->
 
