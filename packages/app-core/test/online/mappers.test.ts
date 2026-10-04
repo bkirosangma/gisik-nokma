@@ -2798,6 +2798,35 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     };
     expect(mapTicketLinks(two)).toEqual(two.links);
   });
+
+  it("28.196 mapHistory carries linkDirection 'in' and 'out', keeps an absent one absent, and refuses any other value by its path", () => {
+    const historyEvent = (extra: Record<string, unknown>) =>
+      mapHistory({
+        ticketId: 't',
+        events: [
+          { id: 'e1', type: 'ticket.link_added', version: 1, payload: { kind: 'blocks', targetId: null, from: null }, actorId: ANSELMA, origin: 'web', clientTime: 'c', serverTime: 's', seq: 1, ...extra },
+        ],
+      })[0]!;
+    expect(historyEvent({ linkDirection: 'in' }).linkDirection).toBe('in');
+    expect(historyEvent({ linkDirection: 'out' }).linkDirection).toBe('out');
+    expect('linkDirection' in historyEvent({})).toBe(false); // an older server: absent, and the copy reads it out
+    expect(() => historyEvent({ linkDirection: 'sideways' })).toThrow(MappingError);
+    expect(() => historyEvent({ linkDirection: 'sideways' })).toThrow(/history\.events\[0\]\.linkDirection: expected one of out\/in/);
+  });
+
+  it('28.126 mapTicketState carries a draft-side link\'s from and leaves the key off a plain one', () => {
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+    (body['ticketState'] as Record<string, unknown>)['links'] = [
+      { kind: 'blocks', targetId: 'draft-1', from: 'src-1' },
+      { kind: 'relates', targetId: 'other-1' },
+    ];
+    const links = mapTicketRead(body).ticket.links;
+    expect(links).toEqual([
+      { kind: 'blocks', targetId: 'draft-1', from: 'src-1' },
+      { kind: 'relates', targetId: 'other-1' },
+    ]);
+    expect(links?.[1]).not.toHaveProperty('from');
+  });
 });
 
 /**

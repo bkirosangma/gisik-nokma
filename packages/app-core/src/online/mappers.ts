@@ -338,9 +338,18 @@ function asTicketLinkKind(value: unknown, path: string): TicketLinkKind {
   return text as TicketLinkKind;
 }
 
+/** A typed link's direction, refused by name when it is not `out` or `in` (spec A §2.1). */
+function asLinkDirection(value: unknown, path: string): 'out' | 'in' {
+  const direction = asString(value, path);
+  if (direction !== 'out' && direction !== 'in') throw new MappingError(path, 'one of out/in');
+  return direction;
+}
+
 /**
- * `ticketState.links`: the folded OUTBOUND links, which the detail read serves
- * filtered to targets this viewer can see (typed-links T4). Absent on the wire
+ * `ticketState.links`: the folded links (outbound, plus on a draft the entries
+ * filed from the other end, which carry `from`, drafts R42), which the detail
+ * read serves filtered to the other end this viewer can open (typed-links T4,
+ * drafts T6). Absent on the wire
  * when none remain, and absent here too when the wire sends none or `[]`: the
  * domain's absent-not-empty rule (`TicketState.links?`). Present but not an
  * array is refused by name.
@@ -350,7 +359,12 @@ function mapTicketStateLinks(value: unknown, path: string): { links?: TicketLink
   const links = asArray(value, path).map((entry, index) => {
     const at = `${path}[${index}]`;
     const link = asRecord(entry, at);
-    return { kind: asTicketLinkKind(link['kind'], `${at}.kind`), targetId: asString(link['targetId'], `${at}.targetId`) };
+    return {
+      kind: asTicketLinkKind(link['kind'], `${at}.kind`),
+      targetId: asString(link['targetId'], `${at}.targetId`),
+      // Drafts R42: a draft-side entry names its source; a plain entry has no key at all (absent, never undefined).
+      ...(link['from'] === undefined ? {} : { from: asString(link['from'], `${at}.from`) }),
+    };
   });
   return links.length > 0 ? { links } : {};
 }
@@ -835,6 +849,10 @@ export function mapHistory(raw: unknown): TicketHistoryEvent[] {
                 ? null
                 : { key: asStringOrNull(asRecord(event['linkTarget'], `${path}.linkTarget`), 'key', `${path}.linkTarget.key`) },
           }),
+      // Link events only (drafts T6 FIX 1): absent stays absent, and the copy reads that as `'out'`.
+      ...(event['linkDirection'] === undefined
+        ? {}
+        : { linkDirection: asLinkDirection(event['linkDirection'], `${path}.linkDirection`) }),
     };
   });
 }
@@ -2882,8 +2900,7 @@ export function mapTicketLinks(raw: unknown): TicketLinkView[] {
   return asArray(record['links'], 'links.links').map((entry, index) => {
     const path = `links.links[${index}]`;
     const row = asRecord(entry, path);
-    const direction = asString(row['direction'], `${path}.direction`);
-    if (direction !== 'out' && direction !== 'in') throw new MappingError(`${path}.direction`, 'one of out/in');
+    const direction = asLinkDirection(row['direction'], `${path}.direction`);
     const ticket = asRecord(row['ticket'], `${path}.ticket`);
     return {
       kind: asTicketLinkKind(row['kind'], `${path}.kind`),

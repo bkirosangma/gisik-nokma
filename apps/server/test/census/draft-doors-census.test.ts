@@ -33,17 +33,20 @@ export function countDoorCalls(text: string): Calls {
 
 /** Every door of group D, per file. T9 adds G10 (routes/attachments.ts, routes/tickets.ts) and G11 (check-permission.ts). */
 const DOORS: Record<string, Partial<Calls>> = {
-  'permissions/check-permission.ts': { ticketAccess: 1 }, // G1
+  'permissions/check-permission.ts': { ticketAccess: 1, canOpen: 2 }, // G1; the link block's other ends (drafts T6, 28.114) and the pending child (28.128)
   'read/drafts.ts': { holdsDraftRights: 1 }, // listMyDrafts holds each row to R18, the same function the doors use
+  'read/ticket-links.ts': { listMyDrafts: 1 }, // the author's own drafts as ends, on a draft's own sheet only (drafts T6, 28.117)
   'routes/drafts.ts': { listMyDrafts: 2 }, // G8, both reads
   'routes/drafts-publish.ts': { ticketAccess: 1 }, // the set publish (drafts T5b): the first id the caller cannot open refuses the set before ingest (28.098)
   'routes/people.ts': { isOpenableDraft: 1 }, // R8 (drafts T5): the outsider door refuses an assignment on the caller's own draft
+  'routes/ticket-links.ts': { ticketAccess: 1 }, // the links route: a draft is the unknown-ticket body to everyone but its author (drafts T6, 28.117)
   'routes/tickets.ts': { canOpen: 3 }, // G7: the detail read, the parent crumb, the epic walk
   'sync/contests-route.ts': { canOpen: 1 }, // G6
   'sync/reconcile-route.ts': { canOpen: 1 }, // G5
   'sync/sync-routes.ts': { canOpen: 1, listMyDrafts: 1 }, // G3, G4
   'visibility/can-open.ts': { ticketAccess: 1, isOpenableDraft: 1, holdsDraftRights: 1 }, // canOpen is ticketAccess; ticketAccess is canSee then isOpenableDraft; R18
   'visibility/visible-events-for.ts': { canOpen: 1, ticketAccess: 1 }, // G2, and C4's own-draft test
+  'visibility/withhold-link-targets.ts': { canOpen: 1 }, // targetSight: every door's link-end predicate; the author's own draft end is served (drafts T6, 28.117-28.119)
 };
 
 function walk(dir: string, out: string[] = []): string[] {

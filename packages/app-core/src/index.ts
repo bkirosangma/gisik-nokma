@@ -109,6 +109,9 @@ export {
   type EditorSlotUpload,
 } from './views/editor-slot.js';
 export { HistoryList } from './views/history-list.js';
+// The History sentence `HistoryList` draws, for a reader outside this package that holds a `TicketHistoryEvent`
+// (the server's History and replica legs, 28.196): the same copy, never a second one.
+export { describeEvent } from './views/history-copy.js';
 export {
   AttachmentList,
   type AttachmentListEntry,

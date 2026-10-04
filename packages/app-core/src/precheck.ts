@@ -593,7 +593,9 @@ function precheckTicketRanked(submitted: SubmittedEvent, cache: ClientStateCache
  * the device keeps an id it already had, see that module's residuals.)
  *
  * A removal needs only the SOURCE: `link.absent` is decided from the links
- * the source holds, and the engine never reads the target on that path.
+ * the source holds, and the engine never reads the target on that path. A
+ * draft-side link (`from`, drafts R42) names a second ticket in `from`, which
+ * must be held too, on both events.
  */
 async function precheckTicketLink(submitted: SubmittedEvent, cache: ClientStateCache, deps: PrecheckDeps): Promise<PrecheckResult> {
   const parsed = ticketLinkAddedPayload.safeParse(submitted.payload);
@@ -601,6 +603,9 @@ async function precheckTicketLink(submitted: SubmittedEvent, cache: ClientStateC
   if (cache.getTicket(submitted.entity.id) === undefined) return notEvaluated();
   if (submitted.type === 'ticket.link_added' && parsed.data.targetId !== submitted.entity.id
       && cache.getTicket(parsed.data.targetId) === undefined) return notEvaluated();
+  // Drafts R42: a from-form names a second ticket; judging it with the source uncached would read "I have never
+  // heard of it" as `link.unknown-target`.
+  if (parsed.data.from !== undefined && cache.getTicket(parsed.data.from) === undefined) return notEvaluated();
   const evaluate = deps.evaluate ?? evaluateEvent;
   const verdict = await evaluate(completeForPrecheck(submitted, deps.now), contextFromCache(cache));
   return verdict.refused ? { kind: 'refused', rule: verdict.rule, reason: verdict.reason } : { kind: 'passed' };
