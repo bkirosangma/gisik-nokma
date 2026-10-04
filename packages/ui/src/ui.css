@@ -6072,8 +6072,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 
 /* A bar is 28 px tall in a 40 px row pitch (TG-13). `.gn-timeline__row` only carries the data attribute and the custom
-   properties down to its children. The key is the first line; a bar 150 px wide or more also shows the title on a second line
-   (container query on the bar itself). `top` is transitioned so a re-pack glides over 200 ms (PK-6). */
+   properties down to its children. A bar is never drawn narrower than its 6 px side paddings: `width` floors at 12 px
+   (`MIN_BAR_PX = 2 * BAR_PAD_PX` and `barPx`, packages/viewport/src/pack.ts, ERRATA E11), so the packer reserves the width
+   drawn here and the outside key starts from it (29.056 pins both literals). The key is the first line; a bar 150 px wide
+   or more also shows the title on a second line (container query on the bar itself). `top` is transitioned so a re-pack glides over 200 ms (PK-6). */
 .gn-timeline__row { display: contents; }
 .gn-timeline__bar {
   position: absolute;
@@ -6081,7 +6083,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-sizing: border-box;
   container-type: inline-size;
   left: calc(var(--d0) * var(--tl-ppd) * 1px);
-  width: calc(var(--dn) * var(--tl-ppd) * 1px);
+  width: max(calc(var(--dn) * var(--tl-ppd) * 1px), 12px);
   top: calc(34px + var(--row) * 40px + 6px);
   height: 28px;
   padding: 2px 6px;
@@ -6106,11 +6108,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 /* A bar shorter than its key shows the key just outside its end, never hidden (PK-4). It fades out while a zoom is moving
    and returns after the re-pack. The `+ 4px` is `KEY_GAP_PX` (packages/viewport/src/pack.ts): the packer reserves the key's
-   room from the bar's end at that gap, so the two move together (29.055 pins both). */
+   room from the bar's DRAWN end at that gap, so the two move together (29.055 pins both). The drawn end is the bar's `width`
+   expression above, floor included (E11, 29.056): a one-day bar at 8 px per day ends 12 px after its start, not 8. */
 .gn-timeline__key--outside {
   position: absolute;
   z-index: 1;
-  left: calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + 4px);
+  left: calc(var(--d0) * var(--tl-ppd) * 1px + max(calc(var(--dn) * var(--tl-ppd) * 1px), 12px) + 4px);
   top: calc(34px + var(--row) * 40px + 6px);
   line-height: 28px;
   font-size: 11px;
