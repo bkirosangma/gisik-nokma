@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2255).
+# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2256).
 # Scratch git repos only (mktemp; never a worktree of this repo). The four real-Stryker legs (13.2206–13.2208 and the real 13.2216) link the
 # checkout's own @stryker-mutator, vitest and typescript into the scratch repo and run through a PRIVATE semaphore dir (CTL_SEM_DIR), so the
 # suite, itself run inside one slot-run, never waits on a second machine slot; so does 13.2250's real run-tests queue. Every other leg replaces
@@ -38,6 +38,7 @@ mkrepo() {
 # the recording run-tests shim (sleep mode: DIR.fake/ready once its setup and TERM trap are in place), in DIR.fake (outside the repo: the verb checks the repo's git status): FAKE_MODE fail | sleep | queued |
 # backup-left | flips-dup | flips-missing | control-short | bad-report (fake_report.py). The verb's command is `<python> mutate.py watchdog <secs> <dir> -- <the run>`: the shim
 # keeps the watchdog (it runs INSIDE the slot) and fakes only the run. FAKE_REAL_RUN_TESTS=<ctl>: the faked run goes through the REAL run-tests (a real queue).
+# FAKE_NOREPORT_FILE=<suffix>: the Stryker run of the file ending in <suffix> exits 0 (through the watchdog) and writes NO report; other runs are untouched.
 mkfake() {
   mkdir -p "$1.fake"
   cat > "$1.fake/fake-run-tests" <<'SH'
@@ -61,6 +62,10 @@ case "${FAKE_MODE:-ok}" in
     ${wd[@]+"${wd[@]}"} bash -c 'echo $$ > "$0/inner.pid"; trap "echo \"command TERM\" >> \"\$0/signals\"; exit 143" TERM; sleep "$1" & wait $!' "$d" "${FAKE_SLEEP:-60}" & job=$!
     wait "$job"; rc=$?; echo "queue wait: 0s"; echo "log: $d/fake.log"; exit "$rc";;
 esac
+if [ -n "${FAKE_NOREPORT_FILE:-}" ] && [[ "${@: -1}" == *.conf.json ]] \
+  && python3 -c 'import json,os,sys; sys.exit(0 if json.load(open(sys.argv[1]))["mutate"][0].split(":")[0].endswith(os.environ["FAKE_NOREPORT_FILE"]) else 1)' "${@: -1}"; then
+  echo "queue wait: 0s"; echo "log: $d/fake.log"; exec ${wd[@]+"${wd[@]}"} true   # a Stryker that exits 0 without writing its report
+fi
 [ -n "${FAKE_REAL_RUN_TESTS:-}" ] && exec "$FAKE_REAL_RUN_TESTS" run-tests --label "$label" -- ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
 echo "queue wait: 0s"; echo "log: $d/fake.log"
 exec ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
@@ -262,6 +267,14 @@ lastline_ok() { local out rc; out="$(FAKE_MODE=flips-dup mut "$R7")"; rc=$?
   && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/calc.ts:3  custom:numeric  250 → 25" && ! printf '%s\n' "$out" | grep -q "BooleanLiteral" \
   && grep -q "custom injected 2 == counted 2" "$(mdof "$R7")" && clean_tree "$R7"; }
 check "13.2255 a custom literal on the LAST (and first) line of its range, a one-line hunk (3-3), is assigned to its run: reported as custom:numeric 250 → 2500 and → 25, never as a plain 'BooleanLiteral false → true' row (injected 2 == counted 2)" 'lastline_ok'
+
+# ---- FIX 2 (13.2256): Stryker exiting 0 without a report is THAT file's tool failure, not a crash of the whole sweep ----
+noreport_ok() { local out rc; out="$(FAKE_MODE=flips-dup FAKE_NOREPORT_FILE=small.ts mut "$R2")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | grep -q "^  TOOL-FAILURE packages/calc/src/small.ts: packages/calc/src/small.ts run [0-9]*: Stryker failed (rc 0" \
+  && printf '%s\n' "$out" | grep -q "^  packages/calc/src/big.ts: [1-9][0-9]* mutants" && printf '%s\n' "$out" | grep -q "^  SURVIVOR packages/calc/src/big.ts:" \
+  && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s)" && ! printf '%s\n' "$out" | grep -q "FileNotFoundError" && clean_tree "$R2" \
+  || { echo "       (rc $rc)"; printf '%s\n' "$out" | tail -3 | cut -c1-160 | sed 's/^/       /'; return 1; }; }
+check "13.2256 a Stryker run that exits 0 but writes NO report (small.ts) is that file's TOOL-FAILURE '… Stryker failed (rc 0 …', never a FileNotFoundError crash of the whole sweep: big.ts's table row and survivors are still reported, the last line is 'FAIL mutate tool failure in 1 file(s)', exit 2, and the tree is clean" 'noreport_ok'
 
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"
