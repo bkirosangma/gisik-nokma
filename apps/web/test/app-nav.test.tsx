@@ -1478,11 +1478,13 @@ describe('E4-11 — the workspace links are in the document with no Menu toggle 
  * it on the nav bar of the far left as well. not clickable."; widened
  * 2026-09-24 to a tile + wordmark, `NavBrand`, shared with `LegalNav` — see
  * 13.1491–13.1494 in `nav-brand.test.tsx`). `BrandMark` (13.1471), not a
- * second copy of the glyph — a non-interactive `<span aria-hidden="true">`
- * TILE inside `.gn-nav__brand`, the FIRST child of `.gn-nav__inner`, before
- * the links, rendered whether or not a session exists. `.gn-nav__brand`
- * itself is no longer `aria-hidden` — only the tile is — since the wordmark
- * beside it is plain visible text now, not a second copy of a hidden glyph.
+ * second copy of the glyph — an `aria-hidden="true"` `<span>` TILE inside
+ * `.gn-nav__brand`, the FIRST child of `.gn-nav__inner`, before the links,
+ * rendered whether or not a session exists. Since spec E (2026-10-03)
+ * `.gn-nav__brand` is itself a link to `/` (27.620 below; 13.1475 is 🚫).
+ * `.gn-nav__brand` itself is no longer `aria-hidden` — only the tile is —
+ * since the wordmark beside it is plain visible text now, not a second copy
+ * of a hidden glyph.
  */
 describe('the nav brand group', () => {
   function renderNav() {
