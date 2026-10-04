@@ -168,11 +168,10 @@ export function packLaneBy(items: readonly PackItem[], opts: PackOptions, strate
 
 /**
  * PK-2: the packing a lane uses. Greedy by start with first fit is optimal for ONE interval per item, so the row
- * count equals the largest number of footprints overlapping on any day. With several segments per item it is a
- * heuristic; the same items are also packed by their hulls and the hull packing would be taken only with FEWER rows
- * (a tie keeps the segment-set packing, which leaves the gaps usable). The hull comparison is kept as PK-2's guard;
- * segment packing is never worse (planner, 2026-10-04): in the shared first-start order, every row an item cannot
- * enter holds an earlier-starting item whose hull covers the new item's first day.
+ * count equals the largest number of footprints overlapping on any day. With several segments per item the
+ * segment-set packing is returned (it leaves the gaps usable); taking items in the same first-start order, it never
+ * needs more rows than packing their hulls. The hull comparison below is kept as PK-2's guard; segment packing is
+ * never worse (planner ruling 2026-10-04).
  */
 export function packLane(items: readonly PackItem[], opts: PackOptions): PackResult {
   const bySegments = packLaneBy(items, opts, 'segments');
