@@ -64,13 +64,14 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/close.ts': 'invariant',
   'packages/rule-engine/src/checks/hierarchy.ts': 'invariant',
   'packages/rule-engine/src/transition.ts': 'invariant',
-  // done-meaning (11): T17 changes these
+  // done-meaning (12): T17 changes these
   'apps/server/src/projections/rollups.ts': 'done-meaning',
   'apps/server/src/read/ticket-cards.ts': 'done-meaning',
   'apps/server/src/routes/my-work.ts': 'done-meaning',
   'apps/server/src/routes/tickets.ts': 'done-meaning',
   'apps/server/src/visibility/rollup.ts': 'done-meaning',
   'packages/app-core/src/online/mappers.ts': 'done-meaning',
+  'packages/app-core/src/timeline/timeline-view.tsx': 'done-meaning',
   'packages/app-core/src/view-types.ts': 'done-meaning',
   'packages/app-core/src/views/list-model.ts': 'done-meaning',
   'packages/app-core/src/views/rollup-text.ts': 'done-meaning',
