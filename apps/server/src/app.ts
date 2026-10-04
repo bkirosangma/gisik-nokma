@@ -44,6 +44,7 @@ import { registerMemberRoutes } from './routes/members.js';
 import { registerPeopleRoutes } from './routes/people.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
+import { registerTicketLinkRoutes } from './routes/ticket-links.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerDraftRoutes } from './routes/drafts.js';
 import { registerDraftPublishRoutes } from './routes/drafts-publish.js';
@@ -958,6 +959,9 @@ export function buildApp(
   // preHandler by parameter, same reason as its three neighbours: the handler
   // reads `request.currentUserId`.
   registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);
+  // One ticket's typed links, both directions, visible ends only (typed-links
+  // plan T4; spec A §2.4). Same preHandler by parameter, same reason.
+  registerTicketLinkRoutes(app, { pool: deps.pool }, requireSession);
   // The founding door and the workspace directory (Plan 4 Task 13). It takes
   // `deps.ingest` — the NARROWED `ClientIngest`, same as the events door — so
   // the route that creates workspaces cannot reach the internal append path

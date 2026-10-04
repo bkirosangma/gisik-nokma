@@ -33,6 +33,7 @@ import {
   mapSearchHits,
   mapTicketAttachments,
   mapTicketComments,
+  mapTicketLinks,
   mapTicketRead,
   mapTicketTypes,
   mapWorkflowDef,
@@ -463,6 +464,11 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
     getNotesForTicket: async (workspaceId, ticketId) => {
       const raw = await http.get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}/notes`);
       return raw === null ? [] : mapNoteSummaries(raw);
+    },
+    getTicketLinks: async (workspaceId, ticketId) => {
+      // A 404 (a ticket this viewer cannot see) resolves `null`: no links, like the notes read above.
+      const raw = await http.get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}/links`);
+      return raw === null ? [] : mapTicketLinks(raw);
     },
     getNoteComments: async (_workspaceId, noteId) => {
       const raw = await http.get(`/v1/notes/${noteId}/comments`);

@@ -30,7 +30,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   ticket: [
     // ticket begin (T9)
-    'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket',
+    'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket', 'link_tickets',
     // ticket end
   ],
   discovery: [

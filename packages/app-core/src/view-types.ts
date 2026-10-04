@@ -3,6 +3,7 @@ import type {
   NoteScopeMode,
   Priority,
   StateCategory,
+  TicketLinkKind,
   TicketState,
   VisibilityMode,
 } from '@gisik-nokma/domain';
@@ -770,6 +771,19 @@ export type TicketHistoryEvent = {
    * when this event was not labelled (any other type, or an older server).
    */
   linkTarget?: { key: string | null } | null;
+};
+
+/**
+ * One typed link as a ticket's Links section reads it (typed-links T4; spec A
+ * §2.4), from either end: `direction: 'out'` is stored on this ticket, `'in'`
+ * on the other. REDECLARES the server's `TicketLinkWire`
+ * (`apps/server/src/read/ticket-links.ts`), which this package cannot import.
+ * Only links whose other end the viewer can see exist; `key` is `null` offline.
+ */
+export type TicketLinkView = {
+  kind: TicketLinkKind;
+  direction: 'out' | 'in';
+  ticket: { id: string; projectId: string; key: string | null; title: string; stateCategory: StateCategory };
 };
 
 export type WorkItem = {

@@ -1557,8 +1557,8 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
   - `apps/server/test/routes/references.test.ts`
 - Modify:
   - `packages/domain/src/index.ts` (export `./linked-from.js`, beside `./doc-text.js` at `:21`)
-  - `apps/server/src/read/notes.ts` (`:25`, export `NOTE_PROJECT_LIVE_WHERE`)
-  - `apps/server/src/app.ts` (after `registerNoteRoutes(...)`, `:936`)
+  - `apps/server/src/read/notes.ts`: no change — `NOTE_PROJECT_LIVE_WHERE` is already `export const` at `:25` on `origin/release/knowledge-graph` (spec C/E exported it; `read/graph-neighbours.ts:10` and `routes/home.ts:7` import it)
+  - `apps/server/src/app.ts` (after `registerNoteRoutes(...)`, `:937`)
   - `Features.md` §24.B, `test-cases/27-knowledge-graph.md`
 
 **Interfaces:**
@@ -1586,7 +1586,7 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
   import { describe, expect, it } from 'vitest';
   import { linkedFromSourceTitle, parseLinkedFromTarget, splitSnippet, type LinkedFromRow } from '../src/index.js';
 
-  const T = '01J9TICKET00000000000000000';
+  const T = '01J9ZZZZZZ0000000000000000'; // 26 Crockford chars: `ULID_REGEX` (`ids.ts:9`) refuses I, L, O, U and any other length
   const row = (over: Partial<LinkedFromRow>): LinkedFromRow => ({
     sourceKind: 'ticket', sourceId: T, authorId: 'u1', snippet: 'a [[GN-1 One]] b', updatedAt: '2026-10-03T10:00:00.000Z',
     parent: { kind: 'ticket', ticketId: T, projectId: 'P', key: 'GN-118', title: 'Phone pass', stateCategory: 'open' }, ...over,
@@ -1599,11 +1599,14 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
       expect(linkedFromSourceTitle(row({ sourceKind: 'comment', sourceId: 'C' }))).toBe('Comment on GN-118');
       expect(linkedFromSourceTitle(row({ sourceKind: 'comment', parent: { kind: 'note', noteId: 'N', title: 'Rulings' } }))).toBe('Comment on note Rulings');
       expect(linkedFromSourceTitle(row({ parent: { kind: 'ticket', ticketId: T, projectId: 'P', key: '', title: 'Phone pass', stateCategory: 'open' } }))).toBe('Phone pass');
+      expect(linkedFromSourceTitle(row({ sourceKind: 'comment', sourceId: 'C', parent: { kind: 'ticket', ticketId: T, projectId: 'P', key: '', title: 'Phone pass', stateCategory: 'open' } }))).toBe('Comment on Phone pass');
     });
 
     it('27.125 splitSnippet finds the one marker; a snippet without one is null (control)', () => {
       expect(splitSnippet('a [[GN-1 One]] b')).toEqual({ before: 'a ', marked: 'GN-1 One', after: ' b' });
       expect(splitSnippet('no marker here')).toBeNull();
+      expect(splitSnippet('a [[ never closed')).toBeNull(); // an open with no close
+      expect(splitSnippet(']] a [[GN-1 One]] b')).toEqual({ before: ']] a ', marked: 'GN-1 One', after: ' b' }); // the close is searched AFTER the open
     });
 
     it('27.125 parseLinkedFromTarget takes ticket:/note: and a ULID; anything else is null', () => {
@@ -1613,11 +1616,15 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
     });
   });
   ```
+  Kills (27.125, per `it`):
+  - titles: (a) `parentName` drops the `parent.key === ''` arm (always `${key} ${title}`) → `' Phone pass'`; (b) the comment line's `row.parent.key === '' ? row.parent.title : row.parent.key` → `row.parent.key` → `'Comment on '`; (c) the non-comment line returns `parentName(row.parent)` for a note too → `'Phone pass rulings'` without `Note: `.
+  - splitSnippet: (a) drop `|| close < 0` → `'a [[ never closed'` returns an object; (b) `snippet.indexOf(']]', open + 2)` → `snippet.indexOf(']]')` → the leading `]]` is taken as the close; (c) `slice(open + 2, close)` → `slice(open, close)` → marked keeps `[[`.
+  - parseLinkedFromTarget: (a) drop `kind !== 'note'` from the kind test → the `note:` leg is null; (b) drop `!ULID_REGEX.test(id)` → `ticket:` and `ticket:${T}x` parse; (c) drop `typeof raw !== 'string'` → `undefined.indexOf` throws.
 
 - [ ] **Step 2: Implement `packages/domain/src/linked-from.ts`**
 
   ```ts
-  import { ULID_REGEX } from './ulid.js';
+  import { ULID_REGEX } from './ids.js';
   import type { StateCategory } from './workflow.js';
 
   /** Knowledge Graph spec B §3–§4: the "Linked from" wire shape, shared by the server read, the app and MCP. */
@@ -1669,7 +1676,7 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
     return { before: snippet.slice(0, open), marked: snippet.slice(open + 2, close), after: snippet.slice(close + 2) };
   }
   ```
-  Before writing the first import, grep where `ULID_REGEX` is defined (`git grep -n "export const ULID_REGEX" packages/domain/src`) and import from that file. Add `export * from './linked-from.js';` to `packages/domain/src/index.ts` after `:21`.
+  `ULID_REGEX` is defined in `packages/domain/src/ids.ts:9` (re-checked on `origin/release/knowledge-graph`); if it has moved, `git grep -n "export const ULID_REGEX" packages/domain/src` and import from that file. Add `export * from './linked-from.js';` to `packages/domain/src/index.ts` after `:21`.
 
   Run: `pnpm --filter @gisik-nokma/domain exec vitest run test/linked-from.test.ts --maxWorkers=2 > /tmp/kgb-t2-dom.log 2>&1; tail -10 /tmp/kgb-t2-dom.log`. Expected: PASS.
 
@@ -1680,9 +1687,10 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
   `apps/server/test/read/linked-from.test.ts`. The world is `buildReadTestApp`'s (`test/helpers/read-app.ts:209`) with the notes seeded by `seedNotesIntoReadWorld` (`test/helpers/notes-fixture.ts:261`), exactly as `test/routes/notes.test.ts:45-60` builds it. In that world, `guestTaskId` is explicit to `[owner, guest]` and `sharedTaskId` is explicit to `[owner, member]` (`test/helpers/read-scenario.ts:178`, `:189`), so the guest can see `guestTaskId` and cannot see `sharedTaskId`; `nPrivate` is the owner's private note and `nExplicit` is explicit to the guest.
   ```ts
   import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-  import { newUlid, type LinkedFromTarget } from '@gisik-nokma/domain';
+  import { newUlid, ticketKey, type LinkedFromTarget } from '@gisik-nokma/domain';
   import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
   import { listLinkedFrom } from '../../src/read/linked-from.js';
+  import { ticketNumbers } from '../../src/read/ticket-numbers.js';
   import { canSee } from '../../src/visibility/can-see.js';
   import { canReadNoteById } from '../../src/visibility/can-read-note.js';
   import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -1711,9 +1719,11 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
       workspaceId: WS, projectId: world.world.projectId, authorId: world.userIds.owner,
       guestUserId: world.userIds.guest, TP: world.world.taskInEpicId, TE: world.world.guestTaskId,
     });
-    const ev = (kind: 'ticket' | 'note', id: string, type: string, payload: unknown) =>
-      makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind, id }, type, payload });
-    const onShared = ev('ticket', world.world.sharedTaskId, 'comment.added', { body: body(text('per '), chip(TARGET)) });
+    const ev = (kind: 'ticket' | 'note', id: string, type: string, payload: unknown, actorId = world.userIds.owner) =>
+      makeCommitted({ workspaceId: WS, actorId, entity: { kind, id }, type, payload });
+    // Authored by the MEMBER (on sharedTaskId's explicit list), so 27.127's authorId leg can tell the
+    // author from the viewer: every other event here is the owner's, and the owner is the reader.
+    const onShared = ev('ticket', world.world.sharedTaskId, 'comment.added', { body: body(text('per '), chip(TARGET)) }, world.userIds.member);
     const onPrivate = ev('note', notes.NOTES.nPrivate, 'comment.added', { body: body(chip(TARGET)) });
     commentOnShared = onShared.id;
     commentOnPrivate = onPrivate.id;
@@ -1748,17 +1758,26 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
       const guest = await readAs('guest');
       expect(ids(guest)).toEqual([`note:${notes.NOTES.nExplicit}`]);
       expect(guest.total).toBe(1);
-      expect(JSON.stringify(guest)).not.toContain('needs '); // the shared ticket's text does not leak
+      expect(guest.items[0]!.snippet).toBe('see [[X-1 July invoices]]'); // the explicit note's own snippet, nothing of the shared ticket's ('needs …')
     });
   });
 
   describe('27.127 one row per source, its first reference; parents carry key, title and category', () => {
     it('27.127 the shared ticket chips the target twice and is ONE row with ordinal 0’s snippet', async () => {
       const owner = await readAs('owner');
+      expect(owner.items.filter((i) => i.sourceKind === 'ticket')).toHaveLength(1); // one row, not one per chip
       const shared = owner.items.find((i) => i.sourceKind === 'ticket')!;
       expect(shared.snippet).toBe('needs [[X-1 July invoices]] and X-1 July invoices');
-      expect(shared.parent).toMatchObject({ kind: 'ticket', ticketId: world.world.sharedTaskId, title: 'Renew the trade licence', stateCategory: expect.any(String) });
-      expect((shared.parent as { key: string }).key).not.toBe(''); // the key is composed, not left blank
+      // The world has no entered prefixes: both halves are derived, `CC` + `RE` (`test/read/ticket-cards.test.ts:687-703`).
+      const numbers = await ticketNumbers(db.pool, WS, [world.world.sharedTaskId]);
+      expect(shared.parent).toEqual({
+        kind: 'ticket', ticketId: world.world.sharedTaskId, projectId: world.world.projectId,
+        key: ticketKey('CC', 'RE', numbers.get(world.world.sharedTaskId)!), title: 'Renew the trade licence',
+        stateCategory: 'active', // sharedTaskId sits in `waiting`, category active (`read-scenario.ts:162`, `:240-247`); the fallback is 'open'
+      });
+      const onShared = owner.items.find((i) => i.sourceId === commentOnShared)!;
+      expect(onShared.parent).toEqual(shared.parent); // a comment's parent key is composed from the PARENT ticket's number
+      expect(onShared.authorId).toBe(world.userIds.member); // the comment's author, not the viewer (the owner)
       const comment = owner.items.find((i) => i.sourceId === commentOnPrivate)!;
       expect(comment.parent).toEqual({ kind: 'note', noteId: notes.NOTES.nPrivate, title: 'Private' });
       expect(comment.authorId).toBe(world.userIds.owner);
@@ -1767,26 +1786,41 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
 
   describe('27.128 the target’s own description is not "Linked from"', () => {
     it('27.128 the self-reference is absent; the other sources are present (control, 27.126)', async () => {
+      // Precondition: the self row IS in the index, so its absence below is the read's doing.
+      const raw = await db.pool.query(
+        `SELECT 1 FROM proj_references WHERE source_kind = 'ticket' AND source_id = $1 AND target_kind = 'ticket' AND target_id = $1`, [TARGET]);
+      expect(raw.rowCount).toBe(1);
       expect(ids(await readAs('owner'))).not.toContain(`ticket:${TARGET}`);
+      // A comment ON the target that chips it IS listed (plan decision: its source is the comment). Deleted again
+      // in the same it(), so 27.129–27.130's counts are unchanged.
+      const onTarget = makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind: 'ticket', id: TARGET }, type: 'comment.added', payload: { body: body(chip(TARGET)) } });
+      await applyCommitted(db.pool, [onTarget]);
+      expect(ids(await readAs('owner'))).toContain(`comment:${onTarget.id}`);
+      await applyCommitted(db.pool, [makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind: 'ticket', id: TARGET }, type: 'comment.deleted', payload: { commentId: onTarget.id } })]);
+      expect((await readAs('owner')).total).toBe(5);
     });
   });
 
   describe('27.129 a trashed source is hidden and comes back on restore', () => {
     it('27.129 delete the shared ticket: its row and its comment’s row go; restore: both back', async () => {
       const ev = (type: string) => makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind: 'ticket', id: world.world.sharedTaskId }, type, payload: {} });
+      const before = ids(await readAs('owner'));
+      expect(before).toContain(`comment:${commentOnShared}`); // precondition: both rows are listed before the trash
       await applyCommitted(db.pool, [ev('ticket.deleted')]);
       const during = await readAs('owner');
       expect(ids(during)).not.toContain(`ticket:${world.world.sharedTaskId}`);
       expect(ids(during)).not.toContain(`comment:${commentOnShared}`);
       expect(during.total).toBe(3);
       await applyCommitted(db.pool, [ev('ticket.restored')]);
-      expect((await readAs('owner')).total).toBe(5);
+      expect(ids(await readAs('owner'))).toEqual(before); // the same five sources, not merely five
     });
   });
 
   describe('27.130 agreement: every row the read returns passes canSee / canReadNoteById, per role', () => {
     it('27.130 for each role the read equals the owner’s rows filtered by the per-row predicates', async () => {
       const all = (await readAs('owner')).items;
+      expect(all).toHaveLength(5); // precondition: the loop below runs over every source
+      const sizes: Record<string, number> = {};
       for (const role of ['owner', 'member', 'outsider', 'guest'] as ReadRole[]) {
         const userId = world.userIds[role];
         const expected: string[] = [];
@@ -1794,8 +1828,12 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
           const ok = item.parent.kind === 'ticket' ? await canSee(db.pool, userId, item.parent.ticketId) : await canReadNoteById(db.pool, userId, item.parent.noteId);
           if (ok) expected.push(`${item.sourceKind}:${item.sourceId}`);
         }
+        sizes[role] = expected.length;
         expect(ids(await readAs(role)), role).toEqual(expected.sort());
       }
+      // The agreement is not vacuous: the predicates admit different sets per role (member: the shared
+      // ticket and its comment; guest: the explicit note; outsider: nothing).
+      expect(sizes).toEqual({ owner: 5, member: 2, outsider: 0, guest: 1 });
     });
   });
 
@@ -1821,14 +1859,22 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
     });
   });
   ```
+  Kills (each against Step 4's `listLinkedFrom`):
+  - 27.126: (a) the ticket arm's `${ticketArm}` → `TRUE` (guest gains `ticket:shared` + `comment:onShared`); (b) the note arm's `${noteArm}` → `TRUE` (guest gains `note:nPrivate` + `comment:onPrivate`); (c) `total` counted from `firsts` instead of `vis` (guest.total 5); (d) the mapper's `snippet: row.snippet` → `snippet: ''` (the snippet leg).
+  - 27.127: (a) `ORDER BY r.source_kind, r.source_id, r.ordinal` → `r.ordinal DESC` (snippet marks the second chip); (b) drop `DISTINCT ON (r.source_kind, r.source_id)` (two ticket rows); (c) `stateCategory: row.ticket_state_category ?? 'open'` with the ticket arm selecting `NULL::text` for it (→ `'open'`); (d) `numbers.get(row.source_parent_id)` → `numbers.get(row.source_id)` (the comment's key is `''`); (e) `authorId: row.updated_by` → `authorId: userId` (member ≠ owner viewer).
+  - 27.128: (a) drop the `AND NOT (r.source_kind = ${kind} AND r.source_id = ${id})` line (self row listed); (b) widen it to `NOT (r.source_parent_kind = ${kind} AND r.source_parent_id = ${id})` (the comment ON the target disappears).
+  - 27.129: (a) drop `${LIVE_TICKET_WHERE}` from the ticket arm (both rows stay, total 5); (b) the comment row filtered by `f.source_id` instead of `f.source_parent_id` in the ticket arm's joins (the comment never joins, `before` lacks it). The restore leg guards existing behaviour (`ticket.restored` clearing `proj_tickets.deleted_at`).
+  - 27.130: (a) `${ticketArm}` → `TRUE` (outsider gains two rows canSee refuses); (b) `${noteArm}` → `TRUE` (member gains the private note's rows).
+  - 27.131: (a) `LIMIT ${LINKED_FROM_PAGE_SIZE + 1}` → `LIMIT ${LINKED_FROM_PAGE_SIZE}` (no cursor at 21); (b) `WHERE seq < cursor` → `seq <= cursor` (page two has 2); (c) `ORDER BY seq DESC` → `ORDER BY seq` (the newest-first leg); (d) `nextCursor` from `rows[rows.length - 1]` instead of `page[page.length - 1]` (page two is empty).
+
   **Fixture counts.** `seedNotesIntoReadWorld` creates its notes with NO body (`notes-fixture.ts:279-302`, titles and scopes only) and attaches `nInherit` to `TE` (an attachment, not a chip), so before this file's own events nothing references `TARGET` or `T2`. Re-read those lines on the branch; if a body was added since, recount 27.126/27.129/27.131/27.132.
-  27.131 runs last in the file because it writes 21 comments. 27.129 must run before it and after 27.126–27.128 (vitest runs a file's `it`s in order). Read `nWorkspace`'s and `nPrivate`'s titles in `notes-fixture.ts` and put the real title in 27.127's `toEqual` (`'Private'` above is a stand-in to replace). Do the same for `sharedTaskId`'s title in `read-scenario.ts:189`.
+  27.131 runs last in the file because it writes 21 comments. 27.129 must run before it and after 27.126–27.128 (vitest runs a file's `it`s in order). `nPrivate`'s title IS `'Private'` (`notes-fixture.ts:279`) and `sharedTaskId`'s is `'Renew the trade licence'` (`read-scenario.ts:177`), both re-read on `origin/release/knowledge-graph`; re-read them on the branch.
 
   Run: `pnpm turbo run build --filter=@gisik-nokma/domain > /tmp/kgb-build.log 2>&1; pnpm --filter @gisik-nokma/server exec vitest run test/read/linked-from.test.ts --maxWorkers=2 > /tmp/kgb-t2-red.log 2>&1; tail -20 /tmp/kgb-t2-red.log`. Expected: FAIL, module `read/linked-from.js` not found.
 
 - [ ] **Step 4: Implement `listLinkedFrom`**
 
-  In `apps/server/src/read/notes.ts:25`, change `const NOTE_PROJECT_LIVE_WHERE` to `export const NOTE_PROJECT_LIVE_WHERE`.
+  `NOTE_PROJECT_LIVE_WHERE` is already exported (`apps/server/src/read/notes.ts:25`, `export const`, on `origin/release/knowledge-graph`); import it as below, no edit to `notes.ts`.
 
   `apps/server/src/read/linked-from.ts` (key composition copied from `attachedTicketsByNote`, `read/notes.ts:112-156`):
   ```ts
@@ -1979,6 +2025,11 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
         workspaceId: world.world.workspaceId, actorId: world.userIds.owner, entity: { kind: 'note', id: notes.NOTES.nWorkspace }, type: 'note.body_set',
         payload: { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'ticketRef', attrs: { ticketId: world.world.taskInEpicId, projectId: world.world.projectId, key: 'X-1', title: 'GST' } }] }] } },
       }),
+      // A NOTE target with a source, so 27.132's note leg reads a row through the note path, not an empty page.
+      makeCommitted({
+        workspaceId: world.world.workspaceId, actorId: world.userIds.owner, entity: { kind: 'note', id: notes.NOTES.nProject }, type: 'note.body_set',
+        payload: { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: notes.NOTES.nWorkspace, title: 'Workspace' } }] }] } },
+      }),
     ]);
   });
   afterAll(async () => {
@@ -1994,7 +2045,8 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
       expect(ticket.statusCode).toBe(200);
       expect(ticket.json()).toMatchObject({ total: 1, nextCursor: null, items: [{ sourceKind: 'note', sourceId: notes.NOTES.nWorkspace }] });
       const note = await get('member', `?target=note:${notes.NOTES.nWorkspace}`);
-      expect(note.json()).toEqual({ total: 0, items: [], nextCursor: null });
+      expect(note.statusCode).toBe(200);
+      expect(note.json()).toMatchObject({ total: 1, nextCursor: null, items: [{ sourceKind: 'note', sourceId: notes.NOTES.nProject, snippet: '[[Workspace]]' }] });
     });
   });
 
@@ -2005,6 +2057,10 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
         get('member', `?target=ticket:${newUlid()}`),
         get('neighbour', `?target=ticket:${world.world.taskInEpicId}`, world.neighbour.workspaceId),
         get('member', `?target=note:${notes.NOTES.nPrivate}`),
+        // The OWNER can see both items, so only the workspace pin refuses these two: ticketIsLive's
+        // `workspace_id = $1` and the note branch's `state.workspaceId !== workspaceId`.
+        get('owner', `?target=ticket:${world.world.taskInEpicId}`, world.neighbour.workspaceId),
+        get('owner', `?target=note:${notes.NOTES.nWorkspace}`, world.neighbour.workspaceId),
       ]);
       for (const res of bodies) expect(res.statusCode).toBe(404);
       expect(new Set(bodies.map((res) => res.body)).size).toBe(1);
@@ -2015,12 +2071,17 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
   describe('27.134 malformed input is a 400 that names nothing back', () => {
     it('27.134 missing target, a person target, a bad cursor', async () => {
       expect((await get('owner', '')).json()).toEqual({ error: 'invalid_target' });
-      expect((await get('owner', `?target=person:${world.userIds.owner}`)).statusCode).toBe(400);
+      // A ULID id, so the KIND is the only reason to refuse (a sign-in's user id need not be a ULID).
+      expect((await get('owner', `?target=person:${newUlid()}`)).json()).toEqual({ error: 'invalid_target' });
       expect((await get('owner', `?target=ticket:${world.world.taskInEpicId}&cursor=abc`)).json()).toEqual({ error: 'invalid_cursor' });
       expect((await get('owner', `?target=ticket:${world.world.taskInEpicId}&cursor=999999`)).statusCode).toBe(200); // control
     });
   });
   ```
+  Kills (each against this step's route or Step 4):
+  - 27.132: (a) `listLinkedFrom`'s `params.add(target.kind)` → `params.add('ticket')` (the note leg reads total 0); (b) `ticketIsLive(db, workspaceId, target.id)` → `ticketIsLive(db, target.id, workspaceId)` (the ticket leg 404s); (c) the route returns `page.items` instead of the page (`total` missing).
+  - 27.133: (a) drop `ticketIsLive(...)` from `targetVisible` (owner via the neighbour path: 200, total 0); (b) drop `state.workspaceId !== workspaceId` (owner reads `nWorkspace` via the neighbour path: 200); (c) drop `&& (await canSee(...))` (guest: 200); (d) the note branch returns `true` instead of `canReadNoteById(...)` (member on `nPrivate`: 200); (e) one branch sends `{ error: 'not_found' }` instead of `NOT_FOUND_BODY` (two distinct bodies).
+  - 27.134: (a) drop the `target === null` 400 (missing target reaches `targetVisible` with `null`); (b) `parseLinkedFromTarget` lets `person` through (the person leg 404s); (c) drop the cursor regex (`'abc'::bigint` → 500); (d) the regex `{1,18}` → `{1,5}` (the 999999 control is a 400).
   Check `world.neighbour.workspaceId`'s field name in `read-app.ts:158` (`NeighbourWorkspace`) before relying on it.
 
   `apps/server/src/routes/references.ts` (shape copied from `routes/notes.ts:40-96`):
@@ -2070,7 +2131,7 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
     );
   }
   ```
-  In `apps/server/src/app.ts`, import it beside `registerNoteRoutes` (`:47`) and register after `registerNoteRoutes(app, { pool: deps.pool }, requireSession);` (`:936`):
+  In `apps/server/src/app.ts`, import it beside `registerNoteRoutes` (`:48`) and register after `registerNoteRoutes(app, { pool: deps.pool }, requireSession);` (`:937`):
   ```ts
     // "Linked from" (Knowledge Graph spec B): the one read of proj_references.
     registerReferenceRoutes(app, { pool: deps.pool }, requireSession);
@@ -2082,6 +2143,11 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
   Commit: `KG-B T2: GET /v1/workspaces/:id/references (27.132–27.134)`.
 
 - [ ] **Step 6: Catalogue, mutations, DONE**
+
+  **Prose to sweep:** (fix in this step's commit)
+  - `packages/domain/test/doc-references.test.ts:93-95` — "Task 2 (Linked-from, linked-from.ts) owns the real splitSnippet; this is a local copy of its pinned rule": once `splitSnippet` ships in `@gisik-nokma/domain`, the local copy is a second implementation the 27.103 invariant no longer checks the shipped one against. Import the real `splitSnippet` there and delete the copy and its comment.
+  - (searched, nothing false: `linked-from`, `Linked from`, `listLinkedFrom`, `/references`, `NOTE_PROJECT_LIVE_WHERE`; `apps/server/src/projections/index.ts:203`, `projections/references.ts:41-42`, `projections/backfill-references.ts:8`, `docs/runbook.md:48-51` and the migration's `COMMENT ON TABLE` already name `read/linked-from.ts` as the reader and become TRUE with this task.)
+
   - Id lines under `<!-- KG-B T2 -->`: 27.125–27.134 ✅. 27.135–27.139 reserved, unused (plain line).
   - Features §24.B bullet above the anchor: `⚙️ **"Linked from" read and route** (KG-B T2; `apps/server/src/read/linked-from.ts`, `apps/server/src/routes/references.ts`, `packages/domain/src/linked-from.ts`) — GET /v1/workspaces/:id/references?target=ticket|note:<id>, 20 per page newest first, one row per source; a row only when the viewer can see its SOURCE (ticket, note, or a comment's parent), a trashed source hidden, the count from the same predicate; an invisible target is the uniform 404. Cases 27.125–27.134.`
   - Mutations:
@@ -2117,12 +2183,13 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
   - `packages/app-core/src/views/ticket-sheet.tsx` (a live query after `notes`, `:1026-1028`; the mount between `<TicketNotesSection … />` `:4424-4435` and the `THE COMMENT THREAD AND ITS BOX` comment `:4437`; the hash-scroll effect after `comments`, `:1015-1017`)
   - `packages/app-core/src/index.ts` (beside `TicketNotesSection`, `:125`)
   - `packages/app-core/test/helpers/fake-data-source.ts` (a default)
-  - `packages/app-core/test/replica/replica-data-source.test.ts` (12.185's list, `:489+`)
+  - `packages/app-core/test/replica/replica-data-source.test.ts` (12.185's list, `:489+`; the owner regex `:565-567` and its comment `:557-564`, planner ruling 2026-10-04)
   - `packages/app-core/test/views/ticket-notes-section.test.tsx` (no edit; it must stay green)
-  - `apps/server/test/integration/soft-delete-client-surface.test.ts` (`AbsenceDecision` `:470-505`, `DECIDED`, `callers` `:742+`, the fixture `:417+`)
-  - `apps/web/src/notes/note-document.tsx` (between the editor `</div>` `:785` and `<NoteComments` `:787`)
+  - `apps/server/test/integration/soft-delete-client-surface.test.ts` (`AbsenceDecision` `:465-504`, `DECIDED`, `callers` `:715+`, the fixture `:417+`, `MEMBERS` `toHaveLength(28)` `:848`)
+  - `packages/app-core/test/views/ticket-sheet.test.tsx` (the live-read ratchet `:322-347`, `subscriptions` `toHaveLength(8)` → 9)
+  - `apps/web/src/notes/note-document.tsx` (between the editor `</div>` `:819` and `<NoteComments` `:821`)
   - `apps/web/test/helpers/stub-services.ts` (a default), `apps/web/test/note-document.test.tsx`
-  - `packages/ui/src/ui.css` (after `.gn-ticket-sheet__note-badges`, `:3473`)
+  - `packages/ui/src/ui.css` (after `.gn-ticket-sheet__note-badges`, `:3473`; this block's LAST selector is `.gn-linked-from__glyph`, which typed-links T5 anchors directly after, planner ruling 2026-10-04)
   - `docs/manual.md` §15 (`### Linking to a ticket or another note` `:1979`, and the last bullet of `### What notes cannot do yet` `:2019`), then `pnpm help:generate`
   - `Features.md` §24.B, `test-cases/27-knowledge-graph.md`
 
@@ -2152,6 +2219,8 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     it('27.140 a page maps field by field; a malformed row is a MappingError; a 404 is EMPTY (control: 200 is not)', async () => {
       expect(mapLinkedFromPage({ total: 1, items: [ROW], nextCursor: null })).toEqual({ total: 1, items: [ROW], nextCursor: null });
       expect(() => mapLinkedFromPage({ total: 1, items: [{ ...ROW, parent: { kind: 'project' } }], nextCursor: null })).toThrow(MappingError);
+      expect(() => mapLinkedFromPage({ total: 1, items: [{ ...ROW, sourceKind: 'project' }], nextCursor: null })).toThrow(MappingError);
+      expect(() => mapLinkedFromPage({ total: 1, items: [{ ...ROW, parent: { ...ROW.parent, stateCategory: 'waiting' } }], nextCursor: null })).toThrow(MappingError);
       const calls: string[] = [];
       const fetchImpl = async (input: string) => {
         calls.push(input);
@@ -2166,17 +2235,27 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     });
   });
   ```
+  Kills (27.140): (a) drop the `sourceKind !== 'ticket' && …` throw (the `'project'` sourceKind maps); (b) `stateCategory: asStateCategory(…)` → `asString(…)` (`'waiting'` maps); (c) the parent's third arm returns `{ kind: 'note', … }` instead of throwing (`parent.kind: 'project'` maps); (d) `raw === null ? EMPTY_LINKED_FROM : …` → `mapLinkedFromPage(raw)` (the 404 leg throws); (e) drop `if (cursor !== undefined) q.set('cursor', cursor)` (the URL leg).
   In `packages/app-core/test/replica/replica-data-source.test.ts`, 12.185's `refusals` list: append as the LAST element, after `putPreferences`:
   ```ts
       // Added by Knowledge Graph B (case 27.141), LAST because REPLICA_GAPS gained the key last: the local
       // store holds no reference index, and an empty page would claim nothing links here.
       ['getLinkedFrom', () => ds.query.getLinkedFrom(WS, { kind: 'ticket', id: newUlid() })],
   ```
-  and rename the case title's count word (`ELEVEN`) to the new count you measure from the list, plus `27.141` in the title.
+  and rename the case title's count word (`ELEVEN`) to the new count you measure from the list, plus `27.141` in the title. (The list holds 13 entries on `origin/release/knowledge-graph`, so `ELEVEN` is already stale; 14 after this.)
+  **The owner rule (planner ruling 2026-10-04).** The same `it` requires every absence's `owner` to match the regex at `replica-data-source.test.ts:565-567`. Make this edit BYTE-IDENTICAL to the one in every other Knowledge Graph task that adds a replica absence (Home T3 too), so the two merge as identical hunks:
+  - the regex `/^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan): /` becomes
+    ```ts
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan|Knowledge Graph spec [A-E]): /,
+    ```
+  - the comment line ending "added the FOURTH, for `getGroups`." (`:564`) gains, appended to that same line: ` The Knowledge Graph series (specs A–E) added the FIFTH, naming the spec letter that does the work.`
+  - `LINKED_FROM_ABSENCES`' `owner` (Step 2) starts `Knowledge Graph spec B: ` (below).
+  - `getLinkedFrom` takes its slot in the order-sensitive enumeration: LAST, as above, because `REPLICA_GAPS` gains the key last.
+  Kills (27.141): (a) the replica's `getLinkedFrom` answers `EMPTY_LINKED_FROM` instead of rejecting (not a `ReplicaGapError`); (b) leave `getLinkedFrom` out of `REPLICA_GAPS` (the `names` vs `Object.keys(REPLICA_GAPS)` leg); (c) drop the `Knowledge Graph spec B: ` prefix from `LINKED_FROM_ABSENCES`' owner (the owner-regex leg) (planner ruling 2026-10-04).
 
   `apps/server/test/integration/soft-delete-client-surface.test.ts` (27.142):
   - add `| 'getLinkedFrom'` as the last member of `AbsenceDecision` (after `'purgedAmong'`);
-  - in the fixture, directly after the two notes are created and before `TOMBSTONES.push(...)` (`:441`), plant the marker's route into "Linked from":
+  - in the fixture, directly after the two notes are created and before `TOMBSTONES.push(...)` (`:443`), plant the marker's route into "Linked from":
     ```ts
     // ⚠ A COMMENT ON THE CHILD THAT LINKS THE LIVE NOTE, carrying the marker (Knowledge Graph B, 27.142):
     // without it the `getLinkedFrom` row below would be a `carries: true` row that construes nothing.
@@ -2196,6 +2275,8 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     },
     ```
   - `callers`: `getLinkedFrom: () => ds.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }),`.
+  - `expect(MEMBERS).toHaveLength(28)` (`:848`) → `29` (+1 over the tree you merge into: `30` if typed-links T4's `getTicketLinks` is already on the tip; a CLEAN tipmerge with both at 29 is wrong, so re-measure on the merged tree; planner ruling 2026-10-04), and extend the history comment above it (`:843-847`) with "28 until Knowledge Graph B Task 3 added `getLinkedFrom`".
+  - Kills (27.142): (a) drop `${LIVE_TICKET_WHERE}` from Task 2's ticket arm (the after-delete pass finds the marker); (b) the online `getLinkedFrom` returns `EMPTY_LINKED_FROM` unconditionally (the pre-delete positive pass, `:855-859`, finds no marker).
 
   Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/online/linked-from-mapper.test.ts test/replica/replica-data-source.test.ts --maxWorkers=2 > /tmp/kgb-t3-red.log 2>&1; tail -20 /tmp/kgb-t3-red.log`. Expected: FAIL (`getLinkedFrom` is not a function; `mapLinkedFromPage` not exported).
 
@@ -2260,7 +2341,7 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     };
   }
   ```
-  Read `MappingError`'s constructor in `mappers.ts` before the two `throw`s and pass its real arguments.
+  `MappingError` is `constructor(path: string, expected: string)` (`packages/app-core/src/wire-readers.ts:10-14`, re-exported by `mappers.ts:113`): pass TWO arguments — drop the third (`sourceKind`, `parentKind`) from both `throw`s above.
 
   `online-data-source.ts`, after `getNotesForTicket`:
   ```ts
@@ -2277,7 +2358,7 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     {
       field: 'LinkedFromPage (every field)',
       because: 'the device holds no reference index (proj_references is server-side) and no audience for another person’s notes; an empty page would claim nothing links here',
-      owner: 'a local reference table folded from the replicated bodies, and the note/ticket audiences to filter it',
+      owner: 'Knowledge Graph spec B: a local reference table folded from the replicated bodies, and the note/ticket audiences to filter it', // planner ruling 2026-10-04: matches 12.185's owner rule
     },
   ];
   ```
@@ -2295,7 +2376,7 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
 
   `packages/app-core/test/views/linked-from-section.test.tsx`:
   ```tsx
-  import { act, cleanup, render, screen, within } from '@testing-library/react';
+  import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
   import { userEvent } from '@testing-library/user-event';
   import { afterEach, describe, expect, it, vi } from 'vitest';
   import type { LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
@@ -2374,33 +2455,58 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
       render(<LinkedFromSection {...props(live(page), { onNavigate })} />);
       for (const link of screen.getAllByRole('link')) await userEvent.click(link);
       expect(onNavigate.mock.calls.map((c) => c[0])).toEqual(['/t/S1', `/notes/${N}`, `/notes/${N}#comment-C9`]);
-      expect(linkedFromHref(row(4), () => null)).toBeNull(); // no ticket href → not a link
+      // A COMMENT row with no ticket href: without the `base === null` guard this would be 'null#comment-C4'
+      // (a plain ticket row returns `base` either way, so it cannot tell the guard from its absence).
+      expect(linkedFromHref(row(4, { sourceKind: 'comment', sourceId: 'C4' }), () => null)).toBeNull();
     });
   });
 
   describe('27.147 "Show all N" pages the rest from the same read', () => {
-    it('27.147 21 sources: 20 drawn and a Show all 21 button; clicking loads the 21st and the button goes', async () => {
-      const first = { total: 21, nextCursor: '100', items: Array.from({ length: 20 }, (_, i) => row(i)) };
-      const loadMore = vi.fn(async (cursor: string) => (cursor === '100' ? { total: 21, nextCursor: null, items: [row(20)] } : { total: 21, nextCursor: null, items: [] }));
+    it('27.147 22 sources: 20 drawn and a Show all 22 button; clicking pages the rest (two more pages) and the button goes', async () => {
+      // TWO further pages, so "follows every cursor" is distinguishable from "follows one".
+      const first = { total: 22, nextCursor: '100', items: Array.from({ length: 20 }, (_, i) => row(i)) };
+      const loadMore = vi.fn(async (cursor: string) =>
+        cursor === '100' ? { total: 22, nextCursor: '50', items: [row(20)] }
+        : cursor === '50' ? { total: 22, nextCursor: null, items: [row(21)] }
+        : { total: 22, nextCursor: null, items: [] });
       render(<LinkedFromSection {...props(live(first), { loadMore })} />);
       expect(screen.getAllByRole('listitem')).toHaveLength(20);
-      await userEvent.click(screen.getByRole('button', { name: 'Show all 21' }));
-      expect(loadMore).toHaveBeenCalledWith('100');
-      expect(screen.getAllByRole('listitem')).toHaveLength(21);
+      expect(screen.getByRole('heading').textContent).toBe('Linked from22'); // the count is the TOTAL, not the rows drawn
+      await userEvent.click(screen.getByRole('button', { name: 'Show all 22' }));
+      // `showAll` runs un-awaited (`void showAll(first)`): wait for its last state, not the click.
+      await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(22));
+      expect(loadMore.mock.calls.map((c) => c[0])).toEqual(['100', '50']);
       expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
     });
   });
 
   describe('27.148 a failed read says so, in one line', () => {
-    it('27.148 an error renders the heading and an alert; a good read has no alert (control)', () => {
-      const { rerender } = render(<LinkedFromSection {...props(live(null, 'answered 500'))} />);
+    it('27.148 an error renders the heading and an alert; a good read has no alert (control)', async () => {
+      const { rerender, unmount } = render(<LinkedFromSection {...props(live(null, 'answered 500'))} />);
+      expect(screen.getByRole('heading').textContent).toBe('Linked from');
       expect(screen.getByRole('alert').textContent).toContain('answered 500');
       rerender(<LinkedFromSection {...props(live({ total: 1, items: [row(1)], nextCursor: null }))} />);
       expect(screen.queryByRole('alert')).toBeNull();
+      unmount();
+      // "Show all" failing is the same one line, under the rows already drawn.
+      const loadMore = vi.fn(async () => {
+        throw new Error('answered 502');
+      });
+      render(<LinkedFromSection {...props(live({ total: 2, items: [row(1)], nextCursor: '9' }), { loadMore })} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Show all 2' }));
+      expect((await screen.findByRole('alert')).textContent).toBe('The rest could not be read: answered 502.');
+      expect(screen.getAllByRole('listitem')).toHaveLength(1);
     });
   });
   ```
-  Read `LiveQueryResult`'s real fields in `use-live-query.ts` and make `live()` build exactly those (the cast only hides fields the section does not read; the ones it reads must be real).
+  Read `LiveQueryResult`'s real fields in `use-live-query.ts` and make `live()` build exactly those (the cast only hides fields the section does not read; the ones it reads must be real). On `origin/release/knowledge-graph` they are `data`, `error`, `settled`, `hasAnswered`, `reload` (`use-live-query.ts:21-48`), which `live()` already builds.
+  Kills (each against Step 4's `linked-from-section.tsx`):
+  - 27.143: (a) drop ` by ${nameOf(row.authorId)}` (the comment name); (b) `<mark>{parts.marked}</mark>` → `{parts.marked}` (no `<mark>`); (c) `gn-linked-from__dot--${row.parent.stateCategory}` → `gn-linked-from__dot--open` (the active dot); (d) drop `Glyph`'s `sourceKind === 'comment'` arm (the comment row draws a dot); (e) drop `Glyph`'s `parent.kind === 'note'` arm (the note row draws a dot). The heading's `{first.total}` → `{rows.length}` is not reachable here (3 = 3); 27.147 holds it.
+  - 27.144: (a) `first === null || first.total === 0` → `first === null` (total 0 renders a heading); (b) → `first.total === 0` without the null test (throws on `live(null)`).
+  - 27.145: (a) `parts === null` returns `null` instead of the plain span (`getByText` throws); (b) the plain branch wraps the snippet in `<mark>`.
+  - 27.146: (a) drop the `#comment-${row.sourceId}` suffix (the third call); (b) drop `if (base === null) return null` (the comment-with-no-href leg returns `'null#comment-C4'`); (c) `open(href)` without `onNavigate(href)` (no calls); (d) the note base `/notes/${parent.noteId}` → `/notes/${row.sourceId}` (the comment row's path).
+  - 27.147: (a) `while (cursor !== null)` → `if (cursor !== null)` (stops after `'100'`: 21 rows, calls `['100']`); (b) the heading's `{first.total}` → `{rows.length}` ('Linked from20'); (c) the button test `first.total > rows.length` → `first.nextCursor !== null` (the button stays).
+  - 27.148: (a) drop the `page.error !== null` branch (`live(null, …)` renders nothing: no alert); (b) the error branch without its `<h3>` (heading leg); (c) drop the `catch` in `showAll` (no alert; an unhandled rejection).
 
 - [ ] **Step 4: Implement `LinkedFromSection`**
 
@@ -2561,9 +2667,13 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
 - [ ] **Step 5: Mount on the ticket sheet, and scroll to `#comment-<id>` (27.149–27.151)**
 
   Tests, appended to `packages/app-core/test/views/linked-from-section.test.tsx` (mounting `<TicketSheet>` with `createFakeDataSource` and the `MINIMAL_READ` shape copied from `test/views/ticket-notes-section.test.tsx:64-80`; copy the props that file passes to `TicketSheet`):
-  - **27.149** the sheet asks `getLinkedFrom(WS, { kind: 'ticket', id: TICKET })` once; with one row the `linked-from` section is in the Details tab, AFTER `[data-testid="ticket-notes"]` and BEFORE the comment thread's first element (`Node.compareDocumentPosition` both ways). Control in the same `it`: with `total: 0`, no `linked-from` element.
-  - **27.150** with `window.location.hash = '#comment-c1'` and `getTicketComments` answering one comment `c1`, `Element.prototype.scrollIntoView` (spied with `vi.spyOn`, defined on the prototype first since jsdom lacks it) is called once on `#comment-c1`; after `comments.reload()` it is NOT called again; with `#heading-x` it is never called (control). Reset the hash in `afterEach`.
-  - **27.151** a click on a comment row calls the sheet's `onNavigate` with `<resolveTicketHref result>#comment-<id>`.
+  - **27.149** the sheet asks `getLinkedFrom` exactly once, `toHaveBeenCalledWith(WS, { kind: 'ticket', id: TICKET })`; with one row the `linked-from` section is in the Details tab, AFTER `[data-testid="ticket-notes"]` and BEFORE the comment thread's first element (`Node.compareDocumentPosition` both ways). Control in the same `it`: with `total: 0`, no `linked-from` element.
+    Kills: (a) mount the section after `<CommentsThread` (the BEFORE leg); (b) mount it above `<TicketNotesSection` (the AFTER leg); (c) the live query asks `{ kind: 'note', id: ticketId }` (the call leg).
+  - **27.150** with `window.location.hash = '#comment-c1'` and `getTicketComments` answering one comment `c1`, `Element.prototype.scrollIntoView` (spied with `vi.spyOn`, defined on the prototype first since jsdom lacks it) is called once, and its `mock.contexts[0]` is `document.getElementById('comment-c1')`. Then force a reload: the `getTicketComments` stub returns a NEW array on every call (a same-reference answer would not re-run the effect, and the guard mutant would survive), and `ds.pushStreamItem` (`fake-data-source.ts:128`) pushes an `event` frame, which `useLiveQuery` turns into a reload (`use-live-query.ts:215-226`; the frame shape is `ticket-sheet-comments.test.tsx:590-600`'s). Precondition: wait until the stub has been called TWICE. Only then assert `scrollIntoView` still has ONE call. Control, in the same `it`, on a fresh render: append `<div id="heading-x">` to `document.body` and set `#heading-x`. `scrollIntoView` is never called. (Without that element, `getElementById` answers null and the control passes with the `#comment-` test removed.) Reset the hash and remove the div in `afterEach`.
+    Kills: (a) drop the `scrolledCommentHash.current === hash` guard (a second call after the reload); (b) drop `!hash.startsWith('#comment-')` (the `#heading-x` element is scrolled); (c) the effect's deps `[comments.data]` → `[]` (runs before the thread arrives, finds no element, never scrolls: zero calls).
+  - **27.151** pass `resolveTicketHref: (ref) => `/t/${ref.ticketId}`` and `onNavigate`; a click on a comment row whose parent is ticket `S3` calls `onNavigate` with exactly `/t/S3#comment-<id>`.
+    Kills: (a) the sheet's `hrefOf` ignores `resolveTicketHref` (`() => null`): no link to click; (b) the mount drops `onNavigate` (the click is a plain anchor; the spy is not called).
+  - **The live-read ratchet.** `packages/app-core/test/views/ticket-sheet.test.tsx:347` pins `source.subscriptions` `toHaveLength(8)`, and its comment says each added read is a deliberate decision (`:322-343`). This step adds a ninth (`linkedFrom`): set it to `9` and add `linkedFrom` to the comment's list and history ("eight until Knowledge Graph B's Linked from"). Order (planner ruling 2026-10-04): this task lands BEFORE typed-links T5, which needs it and takes these counts 9→10 and 29→30. This task bumps 8→9 here and 28→29 at `soft-delete-client-surface.test.ts:848` (Step 1) only.
 
   Implementation in `ticket-sheet.tsx`:
   - after the `notes` live query (`:1026-1028`):
@@ -2615,17 +2725,18 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
 
 - [ ] **Step 6: Mount on the note document (27.152–27.153)**
 
-  Tests in `apps/web/test/note-document.test.tsx` (extend `world()` with an optional `getLinkedFrom` and pass it to `stubServices` the way `getNoteComments` is passed at `:125`):
+  Tests in `apps/web/test/note-document.test.tsx` (extend `world()` with an optional `getLinkedFrom` and pass it to `stubServices` the way `getNoteComments` is passed at `:129`):
   - **27.152** with `getLinkedFrom` answering one ticket row for `{ kind: 'note', id: NOTE }`, `screen.getByTestId('linked-from')` exists, is AFTER `[data-testid="note-editor"]` and BEFORE the comments region; the stub was called with `(WS_A, { kind: 'note', id: NOTE })`. Control: the default stub (total 0) renders no `linked-from`.
-  - **27.153** a click on a note-comment row calls `routerPush` with `/notes/<id>#comment-<cid>`; a ticket row calls it with the path `ticketRefHrefIn(WS_A)` returns for that ticket.
+  - **27.153** a click on a note-comment row calls `routerPush` with `/notes/<id>#comment-<cid>`; a ticket row calls it with the path `ticketRefHrefIn(WS_A)` returns for that ticket — computed in the test by calling `ticketRefHrefIn(WS_A)(ref)` and asserted non-null first (a null href renders no link, and the click loop would visit nothing).
+  - Kills (27.152–27.153): (a) the mount placed after `<NoteComments` (the BEFORE leg); (b) the live query asks `{ kind: 'ticket', id: note.noteId }` (the call leg); (c) `onNavigate={(href) => router.push(href)}` dropped (no `routerPush` call); (d) `hrefOf` built with `() => null` for tickets (the ticket row's non-null precondition).
 
-  Implementation in `apps/web/src/notes/note-document.tsx` (`NoteDocumentBody`; `dataSource` is from `useAppServices()` at `:135`, `router` at `:146`, `nameOf` at `:575`):
+  Implementation in `apps/web/src/notes/note-document.tsx` (`NoteDocumentBody`; `dataSource` is from `useAppServices()` at `:135`, `router` at `:146`, `nameOf` at `:595`):
   ```tsx
   const linkedFrom = useLiveQuery(dataSource, note.workspaceId, `${note.noteId}:linked-from`, () =>
     dataSource.query.getLinkedFrom(note.workspaceId, { kind: 'note', id: note.noteId }),
   );
   ```
-  (place it with the component's other hooks, before any early return; add `useLiveQuery`, `LinkedFromSection`, `linkedFromHref` to the `@gisik-nokma/app-core` import at `:16-34`), and between the editor's closing `</div>` (`:785`) and `<NoteComments` (`:787`):
+  (place it with the component's other hooks, before any early return; add `useLiveQuery`, `LinkedFromSection`, `linkedFromHref` to the `@gisik-nokma/app-core` import that closes at `:27`), and between the editor's closing `</div>` (`:819`) and `<NoteComments` (`:821`):
   ```tsx
         {/* "Linked from" (Knowledge Graph spec B §3.1): in the document flow, desktop and phone.
             The page's only side column is the `On this page` TOC (notes-page.tsx), empty on a phone;
@@ -2643,6 +2754,13 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
   Commit: `KG-B T3: Linked from on the note document (27.152–27.153)`.
 
 - [ ] **Step 7: Help (27.154), browser check, catalogue, mutations, DONE**
+
+  **Prose to sweep:** (in the commit that makes each one false)
+  - `docs/manual.md:2019` — "There is no list on a note or a ticket showing what else links to it." (this step already deletes it; regenerate the help.)
+  - `packages/app-core/test/views/ticket-sheet.test.tsx:322-343` — the test title "eight live reads means eight stream subscriptions" and the comment "EIGHT reads ride this sheet … The count was four until door F, … seven until the notes section" (Step 5's ratchet bullet).
+  - `apps/server/test/integration/soft-delete-client-surface.test.ts:843-847` — the member-count history ending at 28 (Step 1's bullet); `:459` "THE SIXTEEN MEMBERS OF `DataSourceQuery`" and `:838` "a seventeenth member" are already stale (28 today); reword them to not carry a number.
+  - `packages/app-core/test/replica/replica-data-source.test.ts:489` — "ELEVEN methods refuse" (13 today; Step 1 renames it).
+  - (searched, nothing false: `What notes cannot do`, `links to it`, `Linked from`, `backlink`, `members of DataSourceQuery`, `live reads` across `docs/`, `packages/app-core/src`, `apps/web/src`.)
   - **`docs/manual.md` §15.** Delete the bullet `- There is no list on a note or a ticket showing what else links to it.` (`:2019`). At the end of `### Linking to a ticket or another note` (after the paragraph ending "…does not attach anything anywhere."), add, in the manual's voice:
     ```markdown
     **Linked from.** A ticket and a note each show what links to them: under the ticket's Notes, and under a
@@ -2653,6 +2771,7 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     chip is. Nothing to list, no list.
     ```
     Run `pnpm help:generate` then `pnpm check:help > /tmp/kgb-help.log 2>&1; tail -5 /tmp/kgb-help.log`. Expected: PASS. Commit the generated files with the manual. Case **27.154**: cite it in the commit and in a comment in `linked-from-section.test.tsx` beside 27.143 ("the manual's Linked from paragraph describes this section").
+    Kills (27.154): none, guards existing behaviour (`check:help` keeps the generated help in step with the manual; deleting the new paragraph without regenerating, or regenerating without it, is what goes red).
   - **Browser** (`NEEDS: browser`), desktop and 390 px, light and dark, on a lane port with the branch built: a ticket chipped from a note, a comment and another ticket shows three rows with the right glyphs; a click on the comment row lands on the comment; a note chipped from a ticket shows the section above its comments; the guest of a shared ticket sees only what they can open. Screenshots to the lane's handoff.
   - **Catalogue:** id lines under `<!-- KG-B T3 -->`: 27.140–27.154 ✅; 27.155–27.164 reserved, unused (plain line).
   - **Features §24.B** bullet above the anchor: `✅ **"Linked from" on the ticket sheet and the note** (KG-B T3; `packages/app-core/src/views/linked-from-section.tsx`, `views/ticket-sheet.tsx`, `apps/web/src/notes/note-document.tsx`, `packages/app-core/src/online/{online-data-source,mappers}.ts`, `replica/replica-data-source.ts`) — after Notes on the sheet, after the body on a note, desktop and phone: a count, one row per visible source (status dot / page / speech-mark glyph, "GN-118 Phone pass", "Note: …", "Comment on GN-160 by …"), the snippet with the reference marked; a click opens the source, a comment at `#comment-<id>` (the sheet now scrolls to it); "Show all N" past 20; absent when nothing links; offline it is a replica gap. Cases 27.140–27.154.`
@@ -2709,8 +2828,10 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     };
     return { session, paths };
   }
+  // total 25 over a 2-row page: the tool must pass the route's TOTAL through, not count the rows it got
+  // (with total = 2 the mutant `total: page.items.length` would pass).
   const LINKED = {
-    total: 2, nextCursor: null,
+    total: 25, nextCursor: '99',
     items: [
       { sourceKind: 'note', sourceId: 'n1', authorId: 'u1', snippet: 'see [[CCSO-4 Chiller]]', updatedAt: '2026-10-03T10:00:00.000Z', parent: { kind: 'note', noteId: 'n1', title: 'Rulings' } },
       { sourceKind: 'comment', sourceId: 'c1', authorId: 'u1', snippet: '[[CCSO-4 Chiller]] again', updatedAt: '2026-10-03T09:00:00.000Z', parent: { kind: 'ticket', ticketId: 't2', projectId: 'p1', key: 'CCSO-9', title: 'Pump', stateCategory: 'open' } },
@@ -2732,13 +2853,15 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', '/v1/workspaces/w1/references?target=ticket%3At1']);
   });
   ```
+  Kills (14.66/27.165): (a) `get_ticket` does not call `readLinkedFrom` (one path; no `linkedFrom` key); (b) `readLinkedFrom` builds `target=${target.id}` without the kind (the path leg); (c) the return spreads `linkedFrom` in place of `...detail` keys (the untouched-body leg).
+  **14.456 must move to `sessionRouting` too.** It uses `sessionRecording(body)` (`read-tools.test.ts:145`), which answers the ticket body for EVERY path. So the new references read gets `{ key, title, rollup, ticketState }`, and `page.items.map` throws a TypeError, which makes 14.456 red, not "PASS" as Step 2 expects. Change `:145` to `const { session } = sessionRouting({ '/v1/workspaces/w1/tickets/t1': body, '/v1/workspaces/w1/references': { total: 0, items: [], nextCursor: null } });`. Its assertions are unchanged. 14.458 is unaffected: its `get` throws 404 on the ticket read first.
   New cases in the same `describe` as 14.456:
   ```ts
   it('27.166 get_ticket answers linkedFrom { total, items[{ sourceKind, sourceId, title, snippet }] } — no parent object, no authorId', async () => {
     const { session } = sessionRouting({ '/v1/workspaces/w1/tickets/t1': { key: 'CCSO-4', title: 'Chiller', ticketState: { fields: {} } }, '/v1/workspaces/w1/references': LINKED });
     const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as { linkedFrom: unknown };
     expect(out.linkedFrom).toEqual({
-      total: 2,
+      total: 25,
       items: [
         { sourceKind: 'note', sourceId: 'n1', title: 'Note: Rulings', snippet: 'see [[CCSO-4 Chiller]]' },
         { sourceKind: 'comment', sourceId: 'c1', title: 'Comment on CCSO-9', snippet: '[[CCSO-4 Chiller]] again' },
@@ -2750,9 +2873,11 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     const { session } = sessionRouting({ '/v1/workspaces/w1/tickets/t1': { key: 'CCSO-4', title: 'Chiller', ticketState: { fields: {} } } });
     expect(((await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as { linkedFrom: unknown }).linkedFrom).toEqual({ total: 0, items: [] });
     const failing = { ...session, get: async (path: string) => { if (path.includes('/references')) throw new HttpError(500, { error: 'boom' }); return { key: 'CCSO-4', title: 'Chiller', ticketState: { fields: {} } }; } };
-    await expect(tool('get_ticket', failing).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow();
+    // The HttpError's own message, so the rejection is the 500 rethrown and not, say, a TypeError on a missing body.
+    await expect(tool('get_ticket', failing).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow('gisik-nokma answered 500');
   });
   ```
+  Kills: 27.166 (a) `title: linkedFromSourceTitle(row)` → `title: row.sourceId`; (b) `total: page.total` → `total: page.items.length` (2 ≠ 25); (c) items map `({ ...row, title: … })` (parent and authorId leak); (d) the answer keeps `nextCursor`. 27.167 (a) the 404 branch rethrows (the first leg rejects); (b) `error.status === 404` dropped, so every HttpError is swallowed (the 500 leg resolves).
   In `packages/mcp-server/test/note-tools.test.ts`, inside `describe('14.400–14.407 note tools')` after 14.401:
   ```ts
   it('27.168 get_note answers linkedFrom from the note’s own workspace', async () => {
@@ -2762,6 +2887,7 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     expect(f.asked).toEqual([`/v1/notes/${N}`, `/v1/workspaces/${WS}/references?target=note%3A${N}`]);
   });
   ```
+  Kills (27.168): (a) `get_note` asks `{ kind: 'ticket', id: note.noteId }` (the path leg); (b) `linkedFromSourceTitle` replaced by `row.parent.title` (`'Fridge'`, not `'CCSO-2 Fridge'`); (c) `linkedFrom` left out of the return.
   (27.168 here; the hosted-door case is 27.169.)
 
   Run: `pnpm turbo run build --filter=@gisik-nokma/domain > /tmp/kgb-build.log 2>&1; pnpm --filter @gisik-nokma/mcp-server exec vitest run test/read-tools.test.ts test/note-tools.test.ts --maxWorkers=2 > /tmp/kgb-t4-red.log 2>&1; tail -20 /tmp/kgb-t4-red.log`. Expected: FAIL (no `linkedFrom`; one path, not two).
@@ -2777,21 +2903,22 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
 
   /** A 404 here is the route's "you cannot see the target", which the caller has just been allowed to read: it reads as nothing links. Any other failure throws. */
   export async function readLinkedFrom(session: Session, workspaceId: string, target: { kind: 'ticket' | 'note'; id: string }): Promise<LinkedFromAnswer> {
-    let page: LinkedFromPage;
+    // Named `linked`, not `page`: `reads.ts` already exports a function `page` (`:19`), which a local `page` would shadow.
+    let linked: LinkedFromPage;
     try {
       const q = new URLSearchParams({ target: `${target.kind}:${target.id}` });
-      page = (await session.get(`/v1/workspaces/${encodeURIComponent(workspaceId)}/references?${q.toString()}`)) as LinkedFromPage;
+      linked = (await session.get(`/v1/workspaces/${encodeURIComponent(workspaceId)}/references?${q.toString()}`)) as LinkedFromPage;
     } catch (error) {
       if (error instanceof HttpError && error.status === 404) return { total: 0, items: [] };
       throw error;
     }
     return {
-      total: page.total,
-      items: page.items.map((row) => ({ sourceKind: row.sourceKind, sourceId: row.sourceId, title: linkedFromSourceTitle(row), snippet: row.snippet })),
+      total: linked.total,
+      items: linked.items.map((row) => ({ sourceKind: row.sourceKind, sourceId: row.sourceId, title: linkedFromSourceTitle(row), snippet: row.snippet })),
     };
   }
   ```
-  (`HttpError` and `Session` are already imported in `reads.ts` if `readOrNotFound` maps a 404; if not, import them as `read-tools.ts:3-4` does.)
+  (`HttpError` and `Session` are already imported in `reads.ts`, `:2-3`.)
 
   `read-tools.ts`, `get_ticket`: import `readLinkedFrom`, add to the description: `"linkedFrom lists the first 20 tickets, notes and comments you can see that reference this ticket, with the sentence each sits in (the reference marked [[…]]); total counts only those."`, and return:
   ```ts
@@ -2851,17 +2978,22 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
         expect(linked.total).toBe(http.total);
         expect(linked.items.map((i) => [i.sourceId, i.snippet])).toEqual(http.items.map((i) => [i.sourceId, i.snippet]));
       }
+      const ownerText = (await callTool(w.app, w.owner.token, 'get_ticket', { workspaceId: w.workspaceId, ticketId: w.ticketId })).text;
+      expect(ownerText).toContain('private says'); // precondition: the private snippet IS served, to the one who may see it
       const memberText = (await callTool(w.app, w.member.token, 'get_ticket', { workspaceId: w.workspaceId, ticketId: w.ticketId })).text;
       expect(memberText).not.toContain('private says');
       expect(memberText).toContain('shared says'); // control
     });
   });
   ```
+  Kills (27.169): (a) `readLinkedFrom` returns `{ total: linked.items.length + 1, … }` (the parity and expected-count legs); (b) `items: linked.items.slice(1)` (the items parity leg); (c) Task 2's `${noteArm}` → `TRUE` (the member's total 2, and `private says` in the member text). The owner and member legs guard the route; the MCP-only mutants are (a)–(b).
   Run: `pnpm turbo run build --filter=@gisik-nokma/domain --filter=@gisik-nokma/mcp-server > /tmp/kgb-build.log 2>&1; pnpm --filter @gisik-nokma/server exec vitest run test/mcp/mcp-linked-from.test.ts test/mcp/mcp-notes.test.ts test/mcp/mcp-tickets.test.ts --maxWorkers=2 > /tmp/kgb-t4-door.log 2>&1; tail -20 /tmp/kgb-t4-door.log`. Expected: PASS.
 
   Commit: `KG-B T4: hosted-door parity for linkedFrom (27.169)`.
 
 - [ ] **Step 4: Catalogue, Features close-out, mutations, DONE**
+
+  **Prose to sweep:** none made false (searched: `get_ticket`, `get_note`, `Read one ticket in full`, `Read one note`, `linkedFrom`, `links to` in `packages/mcp-server/{src,README.md}`, `docs/manual.md` §16, `apps/server/test/mcp`). The two tool descriptions (`read-tools.ts:151-154`, `note-tools.ts:92-94`) list what each answer holds, and Step 2 extends both. `packages/mcp-server/README.md:68` lists `get_ticket` and omits `get_note` already; it names no fields, so nothing there becomes false.
   - Id lines under `<!-- KG-B T4 -->`: 27.165–27.169 ✅; 27.170–27.179 reserved, unused (plain line).
   - Features §24.B: add `✅ **MCP: get_ticket and get_note answer "linkedFrom"** (KG-B T4; `packages/mcp-server/src/tools/{reads,read-tools,note-tools}.ts`) — the first 20 visible sources as { sourceKind, sourceId, title, snippet } and a total of visible sources only, through the same route the app reads, so an assistant and the person see the same list. No new tool (spec D's graph_neighbours reads the same index). Cases 27.165–27.169.`, then delete the `<!-- KG-B bullets -->` anchor. Re-read the whole §24.B and confirm every bullet still describes the code (Task 1's rebuild line carries the measured numbers).
   - Remove the `<!-- KG-B T1 -->` … `<!-- KG-B T4 -->` anchors from file 27 only if every task's lines are present.
@@ -2871,7 +3003,7 @@ Invoke `frontend-design:frontend-design` for this task (house rule for UI work).
     |---|---|
     | 27.166 | `title: linkedFromSourceTitle(row)` → `title: row.sourceId` |
     | 27.167 | the 404 branch rethrows |
-    | 27.169 | in `readLinkedFrom`, return `{ total: page.items.length + 1, … }` (the MCP count no longer equals the endpoint's, so parity must go red) |
+    | 27.169 | in `readLinkedFrom`, return `{ total: linked.items.length + 1, … }` (the MCP count no longer equals the endpoint's, so parity must go red) |
 
   - Sweeps: mcp-server WHOLE; server `test/mcp`; `check:citations`, `check:tasks`. LOCAL.
 
