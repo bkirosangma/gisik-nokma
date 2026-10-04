@@ -36,7 +36,7 @@ const KINDS_IN_WORDS =
   'stale-ticket (A ticket has sat unmoved for a while)';
 
 describe('get_notification_preferences / set_notification_preferences (package)', () => {
-  it('14.627 a person with nothing saved gets mutedKinds [] and all five kinds unmuted, in the domain\'s order; a malformed answer is an error, never "all on"', async () => {
+  it('14.627 a person with nothing saved gets mutedKinds [] and all five kinds unmuted, in the domain\'s order; a malformed answer is an error, never "all on", and set writes nothing on it', async () => {
     const none = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: [] } } });
     const out = (await get(none.session)) as { mutedKinds: string[]; kinds: Array<{ kind: string; muted: boolean }> };
     expect(out.mutedKinds).toEqual([]);
@@ -47,6 +47,18 @@ describe('get_notification_preferences / set_notification_preferences (package)'
     expect(((await get(some.session)) as typeof out).kinds.filter((k) => k.muted).map((k) => k.kind)).toEqual(['mention']);
     const odd = recordingSession({ routes: { [`GET ${PREFS}`]: { nope: 1 } } });
     await expect(get(odd.session)).rejects.toThrow(/^your notification preferences could not be read, so nothing was changed$/);
+    // `set` reads through the same strict parse, so a malformed document that HAS mutes refuses and sends nothing: a read
+    // that fell back to "nothing muted" would PUT ['assignment'] alone and wipe the stored `mention`. The PUT route echoes,
+    // so a set that wrongly writes resolves instead of rejecting.
+    const echo = (body: unknown) => body;
+    const malformed = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: ['mention'], extra: 1 }, [`PUT ${PREFS}`]: echo } });
+    await expect(set(malformed.session, { mute: ['assignment'] })).rejects.toThrow(/^your notification preferences could not be read, so nothing was changed$/);
+    expect(puts(malformed.requests)).toEqual([]);
+    expect(malformed.requests).toEqual([{ method: 'GET', path: PREFS }]);
+    // CONTROL, same `it`: the same call against the well-formed document PUTs the merge.
+    const wellFormed = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: ['mention'] }, [`PUT ${PREFS}`]: echo } });
+    expect(await set(wellFormed.session, { mute: ['assignment'] })).toEqual({ mutedKinds: ['mention', 'assignment'], changed: true });
+    expect(puts(wellFormed.requests)).toEqual([{ method: 'PUT', path: PREFS, body: { mutedKinds: ['mention', 'assignment'] } }]);
   });
 
   it('14.628 set sends the whole document with PUT and answers what was stored; a following get equals it; the stdio door does the same through a real client', async () => {
