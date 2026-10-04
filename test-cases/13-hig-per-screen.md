@@ -292,9 +292,9 @@ without one, as that one was.
   that titles itself from `<DocumentTitle>` with a literal topic, and a third pins the two dynamic
   exceptions: each must render `<DocumentTitle>` for the resolved name AND carry a server layout for the
   generic title shown meanwhile. A fourth arm keeps every declared topic non-empty and none the bare
-  product name. The sweep walks `page.tsx` **and** `not-found.tsx`, whose exclusion list
-  (`app/page.tsx`, a bare `redirect`) is itself asserted to still be a bare redirect so it cannot become
-  a hiding place. (`apps/web/test/document-title.test.tsx`)
+  product name. The sweep walks `page.tsx` **and** `not-found.tsx` with no exclusion list: since
+  Knowledge Graph spec E (27.625) `app/page.tsx` is Home, a server page exporting its own `metadata`, and
+  is swept like every other route. (`apps/web/test/document-title.test.tsx`)
 
 **The finding.** `app/layout.tsx` set `{ title: 'Gisik Nokma' }` and nothing else set a title, so
 `/sign-in`, `/inbox`, `/help`, a board, a ticket sheet, `/settings`, `/privacy`, `/terms` and the 404
