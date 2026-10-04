@@ -186,7 +186,7 @@ export function readTools(session: Session): ToolDefinition[] {
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`,
           'ticket',
-        )) as { ticketState?: { fields?: Record<string, { value: unknown }>; links?: unknown } } & Record<string, unknown>;
+        )) as { ticketState?: { fields?: Record<string, { value: unknown }>; links?: unknown; draft?: unknown } } & Record<string, unknown>;
         // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded `ticketState.links` (this stream's ids only).
         const linked = (await readOrNotFound(
           session,
@@ -206,6 +206,8 @@ export function readTools(session: Session): ToolDefinition[] {
         return {
           ...detail,
           ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
+          // The author's own draft says so at the top level, next to `key: null`; a published ticket has no such member.
+          ...(detail.ticketState?.draft === undefined ? {} : { draft: true }),
           description: bodyAsMarkdown(description?.value ?? null),
           links: linked.links.map((l) => ({ kind: l.kind, direction: l.direction, ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title } })),
           notes: notes.slice(0, MAX_TICKET_NOTES),
