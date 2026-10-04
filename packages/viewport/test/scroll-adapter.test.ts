@@ -155,7 +155,7 @@ describe('29.031 Ctrl + wheel zooms about the pointer, nothing else is taken', (
 });
 
 describe('29.032 glides', () => {
-  it('29.032 animateTo reaches the target and settles; the first frame is partial (never a jump); one last frame reports moving: false', () => {
+  it('29.032 animateTo reaches the target and settles; the first frame is partial (never a jump); one last frame reports moving: false, with no jump on arrival; a native scroll after it is not pulled back', () => {
     const { el, adapter, fc, frames } = mount();
     adapter.animateTo({ offset: FIRST + 100 });
     fc.advance(16);
@@ -166,6 +166,14 @@ describe('29.032 glides', () => {
     expect(frames[frames.length - 1]).toMatchObject({ moving: false, velocity: 0 });
     expect(frames.some((f) => f.moving && f.velocity > 0)).toBe(true);
     expect(el.scrollLeft).toBeCloseTo(100 * 24, 0);
+    // no jump on arrival: the last step is under 1 px
+    const offs = [...new Set(frames.map((f) => f.offset))];
+    expect(Math.abs((offs[offs.length - 1] ?? 0) - (offs[offs.length - 2] ?? 0)) * 24).toBeLessThan(1);
+    // a native scroll after it settled is the user's: the finished glide does not pull it back
+    el.scrollLeft = 3000;
+    el.dispatchEvent(new Event('scroll'));
+    fc.advance(400);
+    expect(adapter.offset()).toBe(FIRST + 125);
   });
 
   it('29.032 a 1,000,000 px glide still lands inside 450 ms (+1 frame); control: reduced motion lands in the same call, and one frame later the loop is idle with no frames pending', () => {
@@ -254,6 +262,11 @@ describe('29.033 keys', () => {
     expect(press(el, 'ArrowLeft', true).defaultPrevented).toBe(true);
     fc.advance(700);
     expect(adapter.offset()).toBeCloseTo(start + 7 - 28, 1);
+    expect(press(el, 'ArrowLeft').defaultPrevented).toBe(true);
+    fc.advance(700);
+    expect(adapter.offset()).toBeCloseTo(start + 7 - 28 - 7, 1);
+    press(el, 'ArrowRight');
+    fc.advance(700);
     const before = adapter.offset();
     expect(press(el, 'PageDown').defaultPrevented).toBe(true);
     fc.advance(700);
@@ -284,7 +297,7 @@ describe('29.033 keys', () => {
     expect(adapter.scale()).toBeCloseTo(24, 2);
   });
 
-  it('29.033 two quick presses add up (the second starts from the first target); a key with Ctrl, Meta or Alt, one already handled, or one typed into an input, is left alone', () => {
+  it('29.033 two quick presses add up (the second starts from the first target), arrows and zoom alike; a key with Ctrl, Meta or Alt, one already handled, or one typed into an input, is left alone', () => {
     const { el, adapter, fc } = mount();
     el.scrollLeft = 24 * 100;
     const start = adapter.offset();
@@ -293,6 +306,11 @@ describe('29.033 keys', () => {
     press(el, 'ArrowRight');
     fc.advance(900);
     expect(adapter.offset()).toBeCloseTo(start + 14, 1);
+    press(el, '+');
+    fc.advance(32);
+    press(el, '+');
+    fc.advance(900);
+    expect(adapter.scale()).toBeCloseTo(24 * 1.25 * 1.25, 2);
     for (const mod of ['ctrlKey', 'metaKey', 'altKey'] as const) {
       const e = new KeyboardEvent('keydown', { key: 'ArrowRight', [mod]: true, bubbles: true, cancelable: true });
       el.dispatchEvent(e);
@@ -316,7 +334,7 @@ describe('29.033 keys', () => {
 describe('29.034 a mouse drag pans, with momentum', () => {
   const click = () => new MouseEvent('click', { bubbles: true, cancelable: true });
 
-  it('29.034 dragging 100 px right scrolls 100 px left; releasing at speed keeps going and stops below 2 px/s; the click that ends the drag is swallowed; frames report moving throughout the drag; control: a press that did not move clicks as usual, and a drag begun on a bar, by touch, with another button or by a second pointer does nothing', () => {
+  it('29.034 dragging 100 px right scrolls 100 px left; releasing at speed keeps going and stops below 2 px/s; the click that ends the drag is swallowed; frames report moving throughout the drag; control: a press that moved no more than 4 px clicks as usual, and a drag begun on a bar, by touch, with another button or by a second pointer does nothing', () => {
     const { el, adapter, fc, frames } = mount();
     el.scrollLeft = 2000;
     let clicks = 0;
@@ -324,7 +342,9 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
     expect(el.classList.contains('gn-dragging')).toBe(true);
     el.dispatchEvent(pointer('pointermove', { x: 900, y: 50, id: 2 })); // a second pointer is not the drag
+    el.dispatchEvent(pointer('pointerup', { x: 900, y: 50, id: 2 }));
     expect(el.scrollLeft).toBe(2000);
+    expect(el.classList.contains('gn-dragging')).toBe(true);
     for (let i = 1; i <= 6; i += 1) {
       fc.advance(16);
       el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
@@ -347,9 +367,10 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     expect(swallowed.defaultPrevented).toBe(true);
     el.querySelector('button')?.dispatchEvent(click());
     expect(clicks).toBe(1); // only the one
-    // control: a press on empty canvas that did not move is no drag, so its click goes through
+    // control: a press on empty canvas that moved no more than 4 px is no drag, so its click goes through
     el.dispatchEvent(pointer('pointerdown', { x: 400, y: 50 }));
-    el.dispatchEvent(pointer('pointerup', { x: 400, y: 50 }));
+    el.dispatchEvent(pointer('pointermove', { x: 404, y: 50 }));
+    el.dispatchEvent(pointer('pointerup', { x: 404, y: 50 }));
     el.querySelector('button')?.dispatchEvent(click());
     expect(clicks).toBe(2);
     // controls: a drag begun on a bar, by touch, or with another button
@@ -364,7 +385,7 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     expect(adapter.offset()).toBeGreaterThan(FIRST);
   });
 
-  it('29.034 a fling toward the first day stops there: the scroll rests at 0 and the loop goes idle', () => {
+  it('29.034 a fling toward the first day stops there: the scroll rests at 0 and the loop goes idle; a press during a fling catches it where it is', () => {
     const { el, fc } = mount();
     el.scrollLeft = 100;
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
@@ -376,9 +397,22 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     fc.advance(400);
     expect(el.scrollLeft).toBe(0);
     expect(fc.pending()).toBe(0);
+    // a press during a fling catches it where it is
+    el.scrollLeft = 3000;
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+    for (let i = 1; i <= 3; i += 1) {
+      fc.advance(16);
+      el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
+    }
+    el.dispatchEvent(pointer('pointerup', { x: 560, y: 50 }));
+    fc.advance(32);
+    el.dispatchEvent(pointer('pointerdown', { x: 300, y: 50 }));
+    const caught = el.scrollLeft;
+    fc.advance(500);
+    expect(el.scrollLeft).toBe(caught);
   });
 
-  it('29.034 a pointer that rested 300 ms before release, or any release under reduced motion, has no momentum', () => {
+  it('29.034 a pointer that rested 300 ms before release, any release under reduced motion, or a cancelled pointer, has no momentum', () => {
     const { el, fc } = mount();
     el.scrollLeft = 2000;
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
@@ -400,11 +434,21 @@ describe('29.034 a mouse drag pans, with momentum', () => {
     const flung = r.el.scrollLeft;
     r.fc.advance(500);
     expect(r.el.scrollLeft).toBe(flung);
+    // a cancelled pointer (the platform took the gesture) leaves no momentum either
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 50 }));
+    for (let i = 1; i <= 4; i += 1) {
+      fc.advance(16);
+      el.dispatchEvent(pointer('pointermove', { x: 500 + i * 20, y: 50 }));
+    }
+    el.dispatchEvent(pointer('pointercancel', { x: 580, y: 50 }));
+    const cancelled = el.scrollLeft;
+    fc.advance(500);
+    expect(el.scrollLeft).toBe(cancelled);
   });
 });
 
 describe('29.035 the rubber band', () => {
-  it('29.035 pulling past the first day shows a resisted overshoot (less than the pull, in its direction), and 160 ms after release it is back at 0; control: inside the limits there is none', () => {
+  it('29.035 pulling past the first day shows a resisted overshoot (less than the pull, in its direction), and 160 ms after release it is back at 0; a new pull during the spring-back holds its overshoot between moves; control: inside the limits there is none', () => {
     const { el, fc } = mount();
     el.scrollLeft = 0;
     el.dispatchEvent(pointer('pointerdown', { x: 300, y: 50 }));
@@ -417,6 +461,18 @@ describe('29.035 the rubber band', () => {
     fc.advance(48);
     expect(Math.abs(parseFloat(el.style.getPropertyValue('--tl-overshoot')))).toBeLessThan(shown);
     fc.advance(112);
+    expect(parseFloat(el.style.getPropertyValue('--tl-overshoot'))).toBeCloseTo(0, 5);
+    // a new pull while the band springs back holds its overshoot between moves
+    el.dispatchEvent(pointer('pointerdown', { x: 300, y: 50 }));
+    el.dispatchEvent(pointer('pointermove', { x: 350, y: 50 }));
+    el.dispatchEvent(pointer('pointerup', { x: 350, y: 50 }));
+    fc.advance(16);
+    el.dispatchEvent(pointer('pointerdown', { x: 300, y: 50 }));
+    el.dispatchEvent(pointer('pointermove', { x: 350, y: 50 }));
+    fc.advance(48);
+    expect(parseFloat(el.style.getPropertyValue('--tl-overshoot'))).toBeCloseTo(shown, 5);
+    el.dispatchEvent(pointer('pointerup', { x: 350, y: 50 }));
+    fc.advance(160);
     expect(parseFloat(el.style.getPropertyValue('--tl-overshoot'))).toBeCloseTo(0, 5);
     el.scrollLeft = 1000;
     el.dispatchEvent(pointer('pointerdown', { x: 300, y: 50 }));
