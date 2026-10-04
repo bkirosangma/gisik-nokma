@@ -30,7 +30,7 @@ export type Result = {
   stage: { w: number; h: number };
   /**
    * After the pan stops and the painter settles: the DOM's mounted ids against the model's window (the final scroll position,
-   * quantised as `attachDriver` does, widened by the overscan, asked of the same index). `missing` and `extra` are both 0 when the
+   * quantised as `attachDriver` does, widened by the overscan, scanned over the whole draw list). `missing` and `extra` are both 0 when the
    * deferred window caught up exactly (planner ruling 21:11, leg 2).
    */
   settled: { expected: number; mounted: number; missing: number; extra: number };
@@ -210,8 +210,10 @@ async function run(mode: Mode): Promise<Result> {
   const sx = stage.scrollLeft;
   const sy = stage.scrollTop;
   const q = (n: number): number => Math.floor(n / quantum) * quantum;
-  // firstDay 0: attachDriver's x, `(offset() - firstDay) * scale()`, is the scroller's scrollLeft
-  const model = new Set(index.query({ x0: q(sx) - overscan, x1: q(sx + vw) + quantum + overscan, y0: q(sy) - overscan, y1: q(sy + vh) + quantum + overscan }).map((d) => d.id));
+  // firstDay 0: attachDriver's x, `(offset() - firstDay) * scale()`, is the scroller's scrollLeft. The expected set is a brute-force scan of
+  // the draw list with the touch rule written out here, NOT the index under test, so an index bug cannot hide in its own oracle.
+  const w = { x0: q(sx) - overscan, x1: q(sx + vw) + quantum + overscan, y0: q(sy) - overscan, y1: q(sy + vh) + quantum + overscan };
+  const model = new Set(scene.draws.filter((d) => d.b.x1 >= w.x0 && d.b.x0 <= w.x1 && d.b.y1 >= w.y0 && d.b.y0 <= w.y1).map((d) => d.id));
   const dom = new Set([...canvas.querySelectorAll('[data-draw-id]')].map((e) => e.getAttribute('data-draw-id') ?? ''));
   const settled = { expected: model.size, mounted: dom.size, missing: [...model].filter((id) => !dom.has(id)).length, extra: [...dom].filter((id) => !model.has(id)).length };
   const round = (n: number): number => Math.round(n * 10) / 10;

@@ -9576,42 +9576,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   z-index: 1;
 }
 
-/* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
-   Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.
-   The keyframe lives beside its ONE consumer (the header's rule for keyframes).
-   Structural skeletons (S-R1): a screen's skeleton renders the real component's own container and fills it with these
-   PARTS, so no rule here names a container style, and none names a style attribute. The fill is the `surfacePlaceholder`
-   role: the track primitive in hig and minimal (unchanged look), a flat step off `surface` in neo, never the well. */
-.gn-skeleton {
-  display: block;
-  background: var(--gn-surface-placeholder);
-  border-radius: var(--gn-radius-control);
-  width: var(--gn-skeleton-w, 60%);
-  height: var(--gn-skeleton-h, 1em);
-  animation: gnPulse 1600ms var(--gn-motion-ease-out) infinite;
-}
-.gn-skeleton--block { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 4rem); }
-.gn-skeleton--circle { border-radius: 50%; width: var(--gn-skeleton-w, 2rem); height: var(--gn-skeleton-h, 2rem); }
-.gn-skeleton--card { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 5.5rem); }
-.gn-skeleton__rows { display: flex; flex-direction: column; gap: var(--gn-space-2); }
-.gn-skeleton-region { display: block; }
-.gn-pending > * { opacity: var(--gn-disabled-opacity); }
-@keyframes gnPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .gn-skeleton { animation: none; opacity: 0.8; }
-}
-
-/* ── KNOWLEDGE GRAPH (KG-C, 2026-10-03; spec C) ──
-   Four per-task regions, seeded empty by T1 so the parallel lanes write inside their own block and never insert at the
-   same point. Appended after every earlier rule ON PURPOSE (see LOADING PLACEHOLDERS above). */
-/* KG: T7 view+bar */
-/* KG: T8 inspector+list */
-/* KG: T9 tab+panel */
-/* KG: end */
-
 /* WTG4 T2: the Timeline graph painter (WTG Part 4 T2; `packages/app-core/src/timeline-graph/painter.tsx`; cases 29.301,
    29.303). The painter places every primitive in content px (left, top, width and height from its bounds), so nothing
    here sizes a bar along the axis. The scroller is Part 1's ScrollAdapter element (`overflow: auto`) and the canvas its
@@ -9621,7 +9585,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Bars speak the state chips' colour language: done is the terminal category, in progress the active one, not started
    the open one, each lettered in `textInverted` (CONTRAST_PAIRS, 4.5; the fills clear 3:1 on surface and surfaceRaised).
    A ghost is a pale fill with a dashed edge and full-contrast text, never reduced opacity (spec §13). The pin after the
-   key, the lit set (`data-dim`), drafts and passes (`data-pass-rank`) are styled by the tasks that draw them (T5 to T7). */
+   key, the lit set (`data-dim`), drafts and passes (`data-pass-rank`) are styled by the tasks that draw them (T5 to T7).
+   Placed ABOVE the loading placeholders, not at the sheet's end: that block must stay last (25.019). Later WTG4 Tn blocks
+   go after this block's end marker. */
 .gn-tlg-scroller { position: relative; overflow: auto; overscroll-behavior: contain; }
 .gn-tlg-canvas { position: relative; }
 .gn-tlg-bar,
@@ -9697,3 +9663,39 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-tlg-edges [data-kind='blocks'] .gn-tlg-edge { stroke-dasharray: 4 3; }
 .gn-tlg-edge-label { font-size: 11px; fill: var(--gn-text-muted); }
 /* WTG4 T2 end */
+
+/* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
+   Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.
+   The keyframe lives beside its ONE consumer (the header's rule for keyframes).
+   Structural skeletons (S-R1): a screen's skeleton renders the real component's own container and fills it with these
+   PARTS, so no rule here names a container style, and none names a style attribute. The fill is the `surfacePlaceholder`
+   role: the track primitive in hig and minimal (unchanged look), a flat step off `surface` in neo, never the well. */
+.gn-skeleton {
+  display: block;
+  background: var(--gn-surface-placeholder);
+  border-radius: var(--gn-radius-control);
+  width: var(--gn-skeleton-w, 60%);
+  height: var(--gn-skeleton-h, 1em);
+  animation: gnPulse 1600ms var(--gn-motion-ease-out) infinite;
+}
+.gn-skeleton--block { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 4rem); }
+.gn-skeleton--circle { border-radius: 50%; width: var(--gn-skeleton-w, 2rem); height: var(--gn-skeleton-h, 2rem); }
+.gn-skeleton--card { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 5.5rem); }
+.gn-skeleton__rows { display: flex; flex-direction: column; gap: var(--gn-space-2); }
+.gn-skeleton-region { display: block; }
+.gn-pending > * { opacity: var(--gn-disabled-opacity); }
+@keyframes gnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-skeleton { animation: none; opacity: 0.8; }
+}
+
+/* ── KNOWLEDGE GRAPH (KG-C, 2026-10-03; spec C) ──
+   Four per-task regions, seeded empty by T1 so the parallel lanes write inside their own block and never insert at the
+   same point. Appended after every earlier rule ON PURPOSE (see LOADING PLACEHOLDERS above). */
+/* KG: T7 view+bar */
+/* KG: T8 inspector+list */
+/* KG: T9 tab+panel */
+/* KG: end */
