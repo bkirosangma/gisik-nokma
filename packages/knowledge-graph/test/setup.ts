@@ -12,5 +12,6 @@ import '@testing-library/jest-dom/vitest';
  */
 afterEach(cleanup);
 
-/** jsdom has no `matchMedia`; `watchTheme` listens on one (`src/theme/read-palette.ts`). */
-window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+/** jsdom has no `matchMedia`; `watchTheme` listens on one (`src/theme/read-palette.ts`). The engine files run under
+ * `@vitest-environment node`, where there is no `window` at all. */
+if (typeof window !== 'undefined') window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
