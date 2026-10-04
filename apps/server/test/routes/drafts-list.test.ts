@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { membershipId, newUlid } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { lifecycleProjection } from '../../src/projections/lifecycle.js';
 import { listMyDrafts } from '../../src/read/drafts.js';
 import { visibleProjects } from '../../src/read/visible-projects.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -140,12 +141,17 @@ describe('28.079 G8: GET /v1/me/drafts', () => {
     expect((await items('member', `/v1/me/drafts?projectId=${read.world.projectId}`)).length).toBe(mine.length);
     for (const role of ['owner', 'admin', 'guest', 'outsider', 'stranger'] as const) expect(await items(role, '/v1/me/drafts'), role).toEqual([]);
 
-    // a workspace in the trash lists nothing; restored, it lists again
-    const trash = (at: string | null) =>
-      db.pool.query('UPDATE proj_workspaces SET deleted_at = $2 WHERE workspace_id = $1', [nb.workspaceId, at]);
-    expect((await trash(new Date().toISOString())).rowCount).toBe(1);
+    // a workspace in the trash lists nothing; restored, it lists again (the lifecycle projection's own events)
+    const lifecycle = async (type: 'workspace.deleted' | 'workspace.undeleted'): Promise<boolean[]> => {
+      await lifecycleProjection.apply(testEnvelope({
+        workspaceId: nb.workspaceId, entity: { kind: 'workspace', id: nb.workspaceId }, type, payload: {}, actorId: read.userIds.neighbour,
+      }), db.pool);
+      const { rows } = await db.pool.query<{ deleted_at: Date | null }>('SELECT deleted_at FROM proj_workspaces WHERE workspace_id = $1', [nb.workspaceId]);
+      return rows.map((r) => r.deleted_at !== null);
+    };
+    expect(await lifecycle('workspace.deleted')).toEqual([true]); // CONTROL: the workspace is in the trash
     expect(await items('neighbour', '/v1/me/drafts')).toEqual([]);
-    await trash(null);
+    expect(await lifecycle('workspace.undeleted')).toEqual([false]);
     expect(await items('neighbour', '/v1/me/drafts')).toHaveLength(1);
   });
 });
