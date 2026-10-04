@@ -59,6 +59,13 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 - ✅ **29.036 — a native scroll produces frames with the smoothed velocity in days per second, and a final frame once it is quiet; rebase keeps the day at the edge | a Ctrl + wheel zoom streams moving frames with the new scale | destroy removes every listener, the overshoot property and stops the loop; control: before destroy the same wheel zoomed.** (`packages/viewport/test/scroll-adapter.test.ts`)
 - ✅ **29.039 — a glide aimed past either scrollable end stops at that end and settles: a last frame reports moving: false and the loop goes idle; control: a target inside the extent lands exactly on it.** (`packages/viewport/test/scroll-adapter.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T7 -->
+- ❌ **29.037 — it writes ONE transform on the layer, from the camera: screen = (world - camera) * zoom; control: the touch-action and overscroll are set so the page never pans under it | wheel: a notched wheel and Ctrl + wheel zoom about the pointer (the world point under it does not move), a pixel scroll pans; all cancelled; zoom stays in [min, max] | a pixel wheel pans by delta / zoom; control: the same delta at zoom 2 moves half as many world units.** (`packages/viewport/test/camera-adapter.test.ts`)
+- ❌ **29.038 — drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | glides: the camera animates to a target inside 450 ms, never jumps on frame 1, and lands at once under reduced motion; the frame stream ends with moving: false | keys pan 80 px / zoom 1.25x, Shift pans four times as far; destroy detaches.** (`packages/viewport/test/camera-adapter.test.ts`)
+- ❌ **29.045 — a mouse drag pans the world with the pointer, then momentum carries on and stops.** (`packages/flow-graph-browser/tests/camera.spec.ts`)
+- ❌ **29.046 — Ctrl + wheel zooms about the pointer: the world point under it stays within half a pixel.** (`packages/flow-graph-browser/tests/camera.spec.ts`)
+- ❌ **29.047 — a pixel wheel scroll pans; the arrow keys pan by 80 px; plus and minus zoom; the page does not scroll.** (`packages/flow-graph-browser/tests/camera.spec.ts`)
+- ❌ **29.048 — reduced motion: a key press jumps with no glide and a drag release leaves no momentum.** (`packages/flow-graph-browser/tests/camera.spec.ts`)
+- ❌ **29.049 — two touch points pinch and pan as one gesture; the world point under their midpoint follows it.** (`packages/flow-graph-browser/tests/camera.spec.ts`)
 <!-- wtg-part1-viewport-timeline-view T8 -->
 <!-- wtg-part1-viewport-timeline-view T9 -->
 <!-- wtg-part1-viewport-timeline-view T10 -->
