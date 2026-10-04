@@ -16,8 +16,9 @@ import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './vis
 import { projectPrefixesInWorkspace } from './visible-projects.js';
 
 /**
- * "Linked from" (Knowledge Graph spec B §2.2, §3.2): the ONLY read of
- * `proj_references`. A row is returned only when the viewer may see its SOURCE
+ * "Linked from" (Knowledge Graph spec B §2.2, §3.2): the backlinks read of
+ * `proj_references` (the graph's ring walk, `read/graph-neighbours.ts`, is the
+ * table's other reader). A row is returned only when the viewer may see its SOURCE
  * — the ticket arm applies `visibleTicketsWhere` + `LIVE_TICKET_WHERE`, the
  * note arm `visibleNotesWhere` + `n.deleted = FALSE` + `NOTE_PROJECT_LIVE_WHERE`
  * (a comment is seen through its parent) — and `total` is counted from the

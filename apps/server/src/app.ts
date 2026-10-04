@@ -936,7 +936,7 @@ export function buildApp(
   // three note-addressed paths learn their workspace from the note's own row
   // rather than from the URL (see `routes/notes.ts`).
   registerNoteRoutes(app, { pool: deps.pool }, requireSession);
-  // "Linked from" (Knowledge Graph spec B): the one read of proj_references.
+  // "Linked from" (Knowledge Graph spec B): the backlinks read of proj_references.
   registerReferenceRoutes(app, { pool: deps.pool }, requireSession);
   // One ticket's history at a workspace-free path (Plan 3 Task 13) — the ledger
   // filtered to that ticket, paged by `afterSeq`/`limit`, as

@@ -204,8 +204,9 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(ticketCommentsProjection);
   // Knowledge Graph spec B. APPENDED: `apply` reads no projection's table (only
   // its own rows and `purged_entities`, which is not a projection), and no
-  // projection reads proj_references inside an ingest transaction — its one
-  // reader, `read/linked-from.ts`, is a request-path read.
+  // projection reads proj_references inside an ingest transaction — its
+  // readers, `read/linked-from.ts` and `read/graph-neighbours.ts`, are
+  // request-path reads.
   registry.register(referencesProjection);
   return registry;
 }
