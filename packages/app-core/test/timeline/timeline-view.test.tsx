@@ -776,7 +776,7 @@ describe('29.102 only the bars near the view are mounted', () => {
 
 /**
  * 29.055 (the view's half; the packing half is `packages/viewport/test/pack.test.ts`): the packer reserves an outside key
- * from the bar's END, `KEY_GAP_PX` after it, so the view must decide "outside" with the SAME predicate and draw the key at
+ * from the bar's drawn END (E11, 29.056), `KEY_GAP_PX` after it, so the view must decide "outside" with the SAME predicate and draw the key at
  * the SAME gap. A second copy of the comparison here would let the two drift apart while every test of each stays green.
  */
 describe('29.055 the view decides an outside key with the packer\'s one predicate and draws it at the packer\'s gap', () => {

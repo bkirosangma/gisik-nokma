@@ -218,8 +218,8 @@ describe('29.053 the label is part of the footprint', () => {
 
 /**
  * 29.055 — spec PK-4's prose puts an outside key "just outside its END", and the view draws it there (`KEY_GAP_PX` after
- * the bar's last day, `ui.css` `.gn-timeline__key--outside`); the first formula counted the label from the bar's START, so
- * at the Month preset 10 of 12 outside keys ran over the next bar in their row (LOCAL real-browser look, T1 harness, P1 T9;
+ * the bar's drawn end, `ui.css` `.gn-timeline__key--outside`; every bar here is at least 12 px wide, so that is its last day,
+ * and 29.057 covers the floor); the first formula counted the label from the bar's START, so at the Month preset 10 of 12 outside keys ran over the next bar in their row (LOCAL real-browser look, T1 harness, P1 T9;
  * ERRATA E10, planner ruling (b) 2026-10-04). Every leg is two bars in one row where the SECOND bar's day decides.
  */
 describe('29.055 an outside key is counted from the bar END, where it is drawn', () => {

@@ -1,7 +1,8 @@
 /**
  * Row packing (spec PK-1 to PK-6). Within one lane an item is a SET of day intervals (its segments); items are sorted by
  * (first segment start, key, id) and each goes into the FIRST row where none of its segments shares a day with a segment
- * already there. Adjacent days do not overlap, so "the next can stand side by side".
+ * already there. Adjacent days do not overlap, so "the next can stand side by side", counted in DRAWN days: a bar narrower than
+ * `MIN_BAR_PX` covers the days its floored width reaches (ERRATA E11, `footprintOf`).
  *
  * PURE and deterministic: the result is a function of the items and `ppd` only. No clock, no DOM; the text measurement
  * that gives a key label its width is INJECTED (`labelPx`).
@@ -53,7 +54,7 @@ export function naturalKeyCompare(a: string, b: string): number {
   return comparePartLists(keyPartsOf(a), keyPartsOf(b));
 }
 
-/** The gap in px between a bar's end and a key drawn outside it. `ui.css` `.gn-timeline__key--outside` draws at this gap (pinned, 29.055). */
+/** The gap in px between a bar's drawn end and a key drawn outside it. `ui.css` `.gn-timeline__key--outside` draws at this gap (pinned, 29.055). */
 export const KEY_GAP_PX = 4;
 
 /**

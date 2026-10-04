@@ -26,7 +26,7 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 
 ## 29.1 Part 1 — viewport engine, packing and the continuous Timeline view (29.001–29.119)
 
-Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; spec section 2–6 and 13. Ids by task: T1 001–007 + 014 + 016 · T2 008–013 + 015 · T3 020–025 · T4 050–054 · T5 065–067 · T6 030–036 + 039 · T7 037–038 + 045–049 · T8 080–086 · T9 055 + 087–088 + 093–107 · T10 040–044 · T11 108–112 · T12 113–117 · T13 118–119. Unused ids stay free.
+Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; spec section 2–6 and 13. Ids by task: T1 001–007 + 014 + 016 · T2 008–013 + 015 · T3 020–025 · T4 050–054 · E11 follow-up (wtg1-min-bar) 056–057 + 089 · T5 065–067 · T6 030–036 + 039 · T7 037–038 + 045–049 · T8 080–086 · T9 055 + 087–088 + 093–107 · T10 040–044 · T11 108–112 · T12 113–117 · T13 118–119. Unused ids stay free.
 
 <!-- wtg-part1-viewport-timeline-view T1 -->
 - ✅ **29.001 — frameStats: 60 fps steady is 60 and 16.7 ms; a planted 120 ms stall is the worst frame and is counted over every budget; control: no stall, none over | frameStats: p95 is the 95th-percentile gap, 6 slow frames in 100 put it on the slow value, 5 do not (nearest rank: the 95th of 100); no frames is refused, not reported as 0 fps.** (`packages/flow-graph-browser/tests/sampler.spec.ts`)
