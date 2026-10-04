@@ -10,7 +10,10 @@ describe('29.014 calendar days and the axis levels', () => {
     expect(isWeekend(3)).toBe(true);
     expect(isWeekend(4)).toBe(false);
     expect(isMonday(0)).toBe(false);
-    expect(weekdayOf(-3)).toBe(0); // 1969-12-29, a Monday
+    expect(weekdayOf(-3)).toBe(0); // 1969-12-29, a Monday (-3 + 3 = 0: the negative-remainder normalisation is not reached)
+    expect(weekdayOf(-4)).toBe(6); // 1969-12-28, a Sunday (-4 + 3 = -1: only the normalisation makes it 6)
+    expect(isWeekend(-4)).toBe(true);
+    expect(mondayOnOrBefore(-1)).toBe(-3); // 1969-12-31, a Wednesday -> 1969-12-29
     expect(mondayOnOrBefore(10)).toBe(4);
     expect(mondaysIn(5, 30)).toEqual([11, 18, 25]);
     expect(mondaysIn(4, 4)).toEqual([4]);

@@ -18,8 +18,7 @@ test('29.006 the pan bars are the spec numbers (section 13) and judge holds a re
   expect(BARS.time.phone).toEqual({ count: 600, minFps: 30, maxWorstMs: 50 });
   expect(BARS.flow.desktop).toEqual({ count: 300, minFps: 60, maxWorstMs: 16.7 });
   expect(BARS.flow.phone).toEqual({ count: 100, minFps: 30, maxWorstMs: 50 });
-  expect(BARS.view.desktop.count).toBe(2000);
-  expect(BARS.view.phone.maxWorstMs).toBe(50);
+  expect(BARS.view).toEqual({ desktop: { count: 2000, minFps: 60, maxWorstMs: 20 }, phone: { count: 2000, minFps: 30, maxWorstMs: 50 } });
   // CONTROL, same test: exactly on the bar passes
   expect(judge(record({}))).toEqual([]);
   expect(judge(record({ touch: true, count: 600, pan: { fps: 30, worstMs: 50 } }))).toEqual([]);

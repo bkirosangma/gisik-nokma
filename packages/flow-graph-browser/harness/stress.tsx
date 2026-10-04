@@ -80,6 +80,7 @@ const wordOf = (button: HTMLButtonElement): string => (button.textContent ?? '')
 async function clickToSettle(): Promise<number | null> {
   const buttons = [...host.querySelectorAll('button')];
   const button = buttons.find((b) => wordOf(b) === 'Later') ?? buttons.find((b) => wordOf(b) === 'Today');
+  (window as unknown as { __stressClicked: string | null }).__stressClicked = button === undefined ? null : wordOf(button);
   if (button === undefined) return null;
   const t0 = performance.now();
   button.click();
