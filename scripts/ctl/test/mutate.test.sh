@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2256).
+# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2259).
 # Scratch git repos only (mktemp; never a worktree of this repo). The four real-Stryker legs (13.2206–13.2208 and the real 13.2216) link the
 # checkout's own @stryker-mutator, vitest and typescript into the scratch repo and run through a PRIVATE semaphore dir (CTL_SEM_DIR), so the
 # suite, itself run inside one slot-run, never waits on a second machine slot; so does 13.2250's real run-tests queue. Every other leg replaces
@@ -39,6 +39,9 @@ mkrepo() {
 # backup-left | flips-dup | flips-missing | control-short | bad-report (fake_report.py). The verb's command is `<python> mutate.py watchdog <secs> <dir> -- <the run>`: the shim
 # keeps the watchdog (it runs INSIDE the slot) and fakes only the run. FAKE_REAL_RUN_TESTS=<ctl>: the faked run goes through the REAL run-tests (a real queue).
 # FAKE_NOREPORT_FILE=<suffix>: the Stryker run of the file ending in <suffix> exits 0 (through the watchdog) and writes NO report; other runs are untouched.
+# FAKE_REPORT_THEN_FAIL_FILE=<suffix>: that file's Stryker run writes fake_report.py's normal (valid) report, kept as DIR.fake/rtf-report.json, then exits 3.
+# FAKE_LIST_NOJSON_FILE=<base> / FAKE_LIST_FAIL_FILE=<base>: the `vitest list` control of the run labelled mutate-<k>-<base> (its label is mutate-<k>-control)
+# exits 0 writing NO --json file (marker DIR.fake/list-nojson-hit) / writes fake_report.py's normal 3-test list (kept as DIR.fake/list-fail.json), then exits 1.
 mkfake() {
   mkdir -p "$1.fake"
   cat > "$1.fake/fake-run-tests" <<'SH'
@@ -65,6 +68,20 @@ esac
 if [ -n "${FAKE_NOREPORT_FILE:-}" ] && [[ "${@: -1}" == *.conf.json ]] \
   && python3 -c 'import json,os,sys; sys.exit(0 if json.load(open(sys.argv[1]))["mutate"][0].split(":")[0].endswith(os.environ["FAKE_NOREPORT_FILE"]) else 1)' "${@: -1}"; then
   echo "queue wait: 0s"; echo "log: $d/fake.log"; exec ${wd[@]+"${wd[@]}"} true   # a Stryker that exits 0 without writing its report
+fi
+if [ -n "${FAKE_REPORT_THEN_FAIL_FILE:-}" ] && [[ "${@: -1}" == *.conf.json ]] \
+  && python3 -c 'import json,os,sys; sys.exit(0 if json.load(open(sys.argv[1]))["mutate"][0].split(":")[0].endswith(os.environ["FAKE_REPORT_THEN_FAIL_FILE"]) else 1)' "${@: -1}"; then
+  rep="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["jsonReporter"]["fileName"])' "${@: -1}")"
+  echo "queue wait: 0s"; echo "log: $d/fake.log"   # a Stryker that writes its (valid) report, then fails: a reporter or teardown error
+  exec ${wd[@]+"${wd[@]}"} bash -c 'd="$0" r="$1"; shift; python3 "$d/fake_report.py" "$@" || exit 9; cp "$r" "$d/rtf-report.json"; exit 3' "$d" "$rep" "$@"
+fi
+k="${label#mutate-}"; k="${k%%-*}"; lj=""; for a in "$@"; do case "$a" in --json=*) lj="${a#--json=}";; esac; done
+if [[ "$label" == mutate-*-control ]] && [ -n "${FAKE_LIST_NOJSON_FILE:-}" ] && grep -q -e "^--label mutate-$k-$FAKE_LIST_NOJSON_FILE " "$d/calls"; then
+  : > "$d/list-nojson-hit"; echo "queue wait: 0s"; echo "log: $d/fake.log"; exec ${wd[@]+"${wd[@]}"} true   # `vitest list` exits 0 without its JSON
+fi
+if [[ "$label" == mutate-*-control ]] && [ -n "${FAKE_LIST_FAIL_FILE:-}" ] && grep -q -e "^--label mutate-$k-$FAKE_LIST_FAIL_FILE " "$d/calls"; then
+  echo "queue wait: 0s"; echo "log: $d/fake.log"   # `vitest list` writes its full JSON, then exits 1
+  exec ${wd[@]+"${wd[@]}"} bash -c 'd="$0" j="$1"; shift; python3 "$d/fake_report.py" "$@" || exit 9; cp "$j" "$d/list-fail.json"; exit 1' "$d" "$lj" "$@"
 fi
 [ -n "${FAKE_REAL_RUN_TESTS:-}" ] && exec "$FAKE_REAL_RUN_TESTS" run-tests --label "$label" -- ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
 echo "queue wait: 0s"; echo "log: $d/fake.log"
@@ -275,6 +292,34 @@ noreport_ok() { local out rc; out="$(FAKE_MODE=flips-dup FAKE_NOREPORT_FILE=smal
   && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s)" && ! printf '%s\n' "$out" | grep -q "FileNotFoundError" && clean_tree "$R2" \
   || { echo "       (rc $rc)"; printf '%s\n' "$out" | tail -3 | cut -c1-160 | sed 's/^/       /'; return 1; }; }
 check "13.2256 a Stryker run that exits 0 but writes NO report (small.ts) is that file's TOOL-FAILURE '… Stryker failed (rc 0 …', never a FileNotFoundError crash of the whole sweep: big.ts's table row and survivors are still reported, the last line is 'FAIL mutate tool failure in 1 file(s)', exit 2, and the tree is clean" 'noreport_ok'
+
+# ---- FIX 3 (13.2257–13.2259, and 13.2221's half-installed legs): each clause of the report, `vitest list` and install guards on its own ----
+# one_failure OUT RC WANT: 13.2256's shape on R2 — small.ts is the TOOL-FAILURE line WANT and has no table row; big.ts (the control) keeps its row and a SURVIVOR
+one_failure() { local out="$1" rc="$2"
+  [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q -e "$3" && ! printf '%s\n' "$out" | grep -q "^  packages/calc/src/small.ts: [0-9]* mutants" \
+  && printf '%s\n' "$out" | grep -q "^  packages/calc/src/big.ts: [1-9][0-9]* mutants" && printf '%s\n' "$out" | grep -q "^  SURVIVOR packages/calc/src/big.ts:" \
+  && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s)" && ! printf '%s\n' "$out" | grep -q "FileNotFoundError" && clean_tree "$R2" \
+  || { echo "       (rc $rc)"; printf '%s\n' "$out" | tail -3 | cut -c1-160 | sed 's/^/       /'; return 1; }; }
+rtf_ok() { local out rc; rm -f "$R2.fake/rtf-report.json"; out="$(FAKE_MODE=flips-dup FAKE_REPORT_THEN_FAIL_FILE=small.ts mut "$R2")"; rc=$?
+  python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert [k for k in r["files"] if k.endswith("small.ts")] and r["testFiles"]' "$R2.fake/rtf-report.json" 2>/dev/null \
+    || { echo "       (precondition: small.ts's Stryker run wrote no valid report before it failed)"; return 1; }
+  one_failure "$out" "$rc" '^  TOOL-FAILURE packages/calc/src/small.ts: packages/calc/src/small.ts run [0-9]*: Stryker failed (rc 3'; }
+check "13.2257 a Stryker run that writes a VALID report and then exits non-zero (small.ts: rc 3 after its report) is that file's TOOL-FAILURE '… Stryker failed (rc 3 …' and its rows are never posted: no small.ts table row; big.ts's row and survivors are still reported, the last line is 'FAIL mutate tool failure in 1 file(s)', exit 2, the tree clean" 'rtf_ok'
+nojson_ok() { local out rc; rm -f "$R2.fake/list-nojson-hit"; : > "$R2.fake/calls"; out="$(FAKE_MODE=flips-dup FAKE_LIST_NOJSON_FILE=small.ts mut "$R2")"; rc=$?
+  [ -f "$R2.fake/list-nojson-hit" ] || { echo "       (precondition: small.ts's \`vitest list\` control never ran)"; return 1; }
+  one_failure "$out" "$rc" '^  TOOL-FAILURE packages/calc/src/small.ts: packages/calc/src/small.ts run [0-9]*: control: `vitest list` on the unmutated tree failed (rc 0'; }
+check "13.2258 a \`vitest list\` control that exits 0 but writes NO JSON (small.ts's) is that file's TOOL-FAILURE '… control: \`vitest list\` on the unmutated tree failed (rc 0', never a FileNotFoundError crash of the whole sweep: big.ts's row (its own control passed) and survivors are still reported, exit 2, the tree clean" 'nojson_ok'
+listfail_ok() { local out rc; rm -f "$R2.fake/list-fail.json"; : > "$R2.fake/calls"; out="$(FAKE_MODE=flips-dup FAKE_LIST_FAIL_FILE=small.ts mut "$R2")"; rc=$?
+  python3 -c 'import json,sys; assert len(json.load(open(sys.argv[1]))) == 3' "$R2.fake/list-fail.json" 2>/dev/null \
+    || { echo "       (precondition: small.ts's \`vitest list\` control did not write the full 3-test JSON before it failed)"; return 1; }
+  one_failure "$out" "$rc" '^  TOOL-FAILURE packages/calc/src/small.ts: packages/calc/src/small.ts run [0-9]*: control: `vitest list` on the unmutated tree failed (rc 1'; }
+check "13.2259 a \`vitest list\` control that writes its FULL JSON (3 tests, so the counts agree) and then exits 1 is that file's TOOL-FAILURE '… failed (rc 1', never a silent pass: no small.ts row; big.ts's row and survivors are still reported, exit 2, the tree clean" 'listfail_ok'
+half_ok() { local R="$T/r3$1" out rc; mkrepo "$R"; mkfake "$R"; rm "$R/node_modules/@stryker-mutator"; mkdir -p "$R/node_modules/@stryker-mutator"
+  case "$1" in core) mkdir -p "$R/node_modules/@stryker-mutator/core/bin"; : > "$R/node_modules/@stryker-mutator/core/bin/stryker.js";; runner) mkdir -p "$R/node_modules/@stryker-mutator/vitest-runner";; esac
+  out="$(mut "$R")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "Stryker is not installed in" && [ ! -s "$R.fake/calls" ] \
+  || { echo "       ($1 only: rc $rc, $(wc -l < "$R.fake/calls" 2>/dev/null || echo 0) run-tests calls: $(printf '%s' "$out" | tail -1 | cut -c1-160))"; return 1; }; }
+check "13.2221 Stryker HALF installed is 'not installed' too, before any slot is taken: a real @stryker-mutator dir holding only core/bin/stryker.js (no vitest-runner), then one holding only vitest-runner/ (no core), each exit 2 with 'Stryker is not installed in' as the last line and ZERO run-tests calls" 'half_ok core && half_ok runner'
 
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"

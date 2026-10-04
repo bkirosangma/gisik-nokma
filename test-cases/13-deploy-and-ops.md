@@ -650,7 +650,7 @@ The ledger export shares that pool and failed the same way; `pg_dump` goes throu
 
 ## `ctl mutate` — Stryker plus the custom classes on a branch's changed lines, and the `CTL_TEST_ONLY` case filter (`task/ctl-mutate`, owner-approved 2026-10-04 14:39, process findings P20 and P21)
 
-Block `13.2200`–`13.2229`, reserved by the planner after grepping every live tip and the ctl task branches (the highest in use was `13.2147`). Block `13.2250`–`13.2259` is FIX 1's (planner 2026-10-04 19:56; FIX 2 took 13.2256; 13.2257–13.2259 unused). Cases 13.2200–13.2223, 13.2228, 13.2229 and 13.2250–13.2256 are run by `scripts/ctl/test/mutate.test.sh`, 13.2224–13.2227 by `scripts/ctl/test/harness.test.sh`; both are `pnpm check:ctl` steps. Scratch git repos only; the four real-Stryker legs (13.2206–13.2208 and the real 13.2216) link the checkout's `@stryker-mutator`, `vitest` and `typescript` into the scratch repo and use a private semaphore dir.
+Block `13.2200`–`13.2229`, reserved by the planner after grepping every live tip and the ctl task branches (the highest in use was `13.2147`). Block `13.2250`–`13.2259` is FIX 1's (planner 2026-10-04 19:56; FIX 2 took 13.2256; FIX 3 took 13.2257–13.2259). Cases 13.2200–13.2223, 13.2228, 13.2229 and 13.2250–13.2259 are run by `scripts/ctl/test/mutate.test.sh`, 13.2224–13.2227 by `scripts/ctl/test/harness.test.sh`; both are `pnpm check:ctl` steps. Scratch git repos only; the four real-Stryker legs (13.2206–13.2208 and the real 13.2216) link the checkout's `@stryker-mutator`, `vitest` and `typescript` into the scratch repo and use a private semaphore dir.
 
 - 13.2200 🧪 ranges: `git diff --unified=0` gives the ADDED lines in new-file numbering: `+5,3` is 5–7 (not 5–8, not 5–6), `+11,2` is 11–12, a one-line `+30` is 30–30, a pure deletion `+22,0` adds no range and a deleted file is absent.
 - 13.2201 🧪 The file filter: `*.ts`/`*.tsx` are mutated; `*.test.*`, `*.spec.*`, a `test/`, `tests/` or `__tests__/` directory, `*.generated.ts`, `*.d.ts` and non-TS files are excluded, each clause on its own path; CONTROL — `src/latest.ts` (a name holding `test`) is mutated.
@@ -673,7 +673,7 @@ Block `13.2200`–`13.2229`, reserved by the planner after grepping every live t
 - 13.2218 🧪 CONTROL for 13.2217: a run under the cap completes; the defaults are pinned (600 s per slot-run, 300 mutants per run).
 - 13.2219 🧪 The split: a file above 300 mutants runs in chunks of at most 300, a file between 30 and 300 is one run; CONTROL — with the cap at 3000 the big file is one run.
 - 13.2220 🧪 The split boundary: a cap EQUAL to the file's count is one run, one below it splits.
-- 13.2221 🧪 Exit 2 on an unknown argument, and when Stryker is not installed in the `--repo` root.
+- 13.2221 🧪 Exit 2 on an unknown argument, and when Stryker is not installed in the `--repo` root (either `@stryker-mutator/core` or `vitest-runner` missing: each half on its own, FIX 3), before any slot-run is taken.
 - 13.2222 🧪 An injected copy that fails to parse falls back to (A) for that file only and says so (ruling (3)): Stryker on the cast-only copy, then each custom mutant as one vitest run.
 - 13.2223 🧪 `--json` prints one JSON object (files, survivors with line and replacement, skipped, failures) before the summary line.
 - 13.2224 🧪 `CTL_TEST_ONLY` matching 1 case runs exactly that case and reports `1 of 3 cases ran`, exit 0.
@@ -689,6 +689,9 @@ Block `13.2200`–`13.2229`, reserved by the planner after grepping every live t
 - 13.2254 🧪 The generated Stryker config (F3), as run-tests is handed it: `concurrency: 2`, `coverageAnalysis: perTest`, `timeoutMS: 10000`, `incremental: false`, `ignoreStatic: false`, `inPlace: true`, `cleanTempDir: always`, `disableTypeChecks: false`, `vitest.related: true`, and `mutate` is the changed range.
 - 13.2255 🧪 A custom literal on the LAST line of its range (F4), a one-line hunk `3-3`, is assigned to its run: reported as `custom:numeric 250 → 2500` and `→ 25`, never as a plain `BooleanLiteral false → true` row.
 - 13.2256 🧪 A Stryker run that exits 0 but writes NO report is THAT file's tool failure (FIX 2): `TOOL-FAILURE <file>: … Stryker failed (rc 0 …`, the other files' rows and survivors are still reported, the last line is `FAIL mutate tool failure in 1 file(s)`, exit 2; never a `FileNotFoundError` that a whole-sweep catch-all would turn into exit 2 with every file's results lost (the 13.2228 contract on the report clause, which 13.2228's rc-3 failure never reaches).
+- 13.2257 🧪 A Stryker run that writes a VALID report and then exits non-zero (rc 3: a reporter or teardown failure) is THAT file's tool failure (FIX 3): `TOOL-FAILURE <file>: … Stryker failed (rc 3 …` and none of its rows is posted; the other files' rows and survivors are still reported, exit 2 (the rc clause of the report guard, which 13.2256 does not reach).
+- 13.2258 🧪 A `vitest list` control that exits 0 but writes NO JSON is THAT file's tool failure (FIX 3): TOOL-FAILURE <file>: … control: `vitest list` on the unmutated tree failed (rc 0 …, never a `FileNotFoundError` that ends the whole sweep; the other files' rows (their own controls passed) and survivors are still reported, exit 2.
+- 13.2259 🧪 A `vitest list` control that writes its FULL JSON (the test counts agree) and then exits 1 is THAT file's tool failure (FIX 3): TOOL-FAILURE <file>: … control: `vitest list` on the unmutated tree failed (rc 1 …, never a silent pass; the other files are still reported, exit 2.
 
 ## Live-update socket routing (`hotfix/stream-same-origin`, 2026-09-23)
 
