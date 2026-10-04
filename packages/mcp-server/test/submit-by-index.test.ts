@@ -26,6 +26,8 @@ describe('submitBatchByIndex', () => {
       // A LONG answer is as untrustworthy as a short one (kills `!==` stepped to `<`).
       ['a long answer', { results: [OK, OK, OK, OK] }],
       ['a holed answer', { results: [OK, null, OK] }],
+      // `undefined` is not an object either (kills dropping `typeof value === 'object'`: `undefined.status` would throw a TypeError, not the sentence).
+      ['an undefined element', { results: [OK, undefined, OK] }],
       ['an element with no status', { results: [OK, {}, OK] }],
       ['no results at all', {}],
       ['a null body', null],
