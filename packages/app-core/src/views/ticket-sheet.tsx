@@ -47,6 +47,7 @@ import {
 } from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
+import { TicketLinksSection } from './ticket-links-section.js';
 import { TicketNotesSection } from './ticket-notes-section.js';
 import { LinkedFromSection, linkedFromHref } from './linked-from-section.js';
 import { ReopenDialog } from './reopen-dialog.js';
@@ -1045,6 +1046,10 @@ export function TicketSheet({
    */
   const notes = useLiveQuery(dataSource, workspaceId, `${ticketId}:notes`, () =>
     dataSource.query.getNotesForTicket(workspaceId, ticketId),
+  );
+  /** The Links section's read (typed links, spec A §3.1), lifted here so the section and the sheet share one instance. */
+  const links = useLiveQuery(dataSource, workspaceId, `${ticketId}:links`, () =>
+    dataSource.query.getTicketLinks(workspaceId, ticketId),
   );
   /** "Linked from" (Knowledge Graph B): the first page; "Show all" pages the rest through the same read. */
   const linkedFrom = useLiveQuery(dataSource, workspaceId, `${ticketId}:linked-from`, () =>
@@ -4219,6 +4224,21 @@ export function TicketSheet({
               ))}
           </dl>
           {phone ? descriptionSection : null}
+
+          {/* THE LINKS SECTION (Knowledge Graph spec A §3.1): under the fields, ABOVE progress,
+              subtasks and notes, because 18.241a pins Subtasks + Notes + Comments as adjacent. */}
+          <TicketLinksSection
+            dataSource={dataSource}
+            workspaceId={workspaceId}
+            ticketId={ticketId}
+            canEdit={editorSlot !== undefined}
+            make={make}
+            links={links}
+            {...(queryTickets === undefined ? {} : { queryTickets })}
+            {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+            onNavigate={onNavigate}
+            {...(cache === undefined ? {} : { precheck: (event: SubmittedEvent) => precheckEvent(event, cache) })}
+          />
 
           {ticketRead.rollup !== null ? (
             <p className="gn-ticket-sheet__progress">{formatRollup(ticketRead.rollup)}</p>
