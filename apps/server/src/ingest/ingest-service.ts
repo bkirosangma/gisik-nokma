@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import {
   domainRegistry,
   parseEvent,
@@ -146,6 +146,16 @@ type ClientDoor = { gate: SubmissionGate; sessionUserId: string };
  */
 type CommitOutcome = { result: IngestResult; committed: LedgerEvent | null };
 
+/**
+ * What `commitInTx` answers. It never touches the transaction's boundaries: `refused` means "the caller must
+ * roll back", `committed` means "the event and its projections are written inside the caller's transaction and
+ * are durable only when the caller commits it". The envelope is handed back for the same reason `CommitOutcome`
+ * hands it back.
+ */
+type InTxOutcome =
+  | { kind: 'refused'; result: Extract<IngestResult, { status: 'refused' }> }
+  | { kind: 'committed'; envelope: LedgerEvent; result: IngestResult };
+
 export function createIngestService(deps: IngestDeps): IngestService {
   const registry = deps.registry ?? domainRegistry;
   const now = deps.now ?? (() => new Date());
@@ -163,221 +173,264 @@ export function createIngestService(deps: IngestDeps): IngestService {
     }
   }
 
+  /**
+   * Judge and append ONE event inside a transaction the CALLER owns (drafts spec R47). This is everything
+   * `commitOne` did, minus `BEGIN`, `COMMIT`, `ROLLBACK` and the listener call, so that `commitOne` (one event, one
+   * transaction) and `atomic` (a set, one transaction) share one body and cannot drift. Every read goes through
+   * `client`, never `deps.pool` (purge check, the door gate, the engine context, the server gates, the
+   * projections), which is what lets a later event of a set see an earlier one's uncommitted writes under READ
+   * COMMITTED.
+   */
+  async function commitInTx(client: PoolClient, submitted: SubmittedEvent, door: ClientDoor | null): Promise<InTxOutcome> {
+    // Lock order is always workspace first, then entity — one global order
+    // across the whole server, so two ingests can never deadlock by taking
+    // the pair in opposite orders.
+    await lockWorkspace(client, submitted.workspaceId);
+    await lockEntity(client, submitted.entity.kind, submitted.entity.id);
+    const workspaceSeq = await nextWorkspaceSeq(client, submitted.workspaceId);
+    const seq = await nextSeq(client, submitted.entity.kind, submitted.entity.id);
+    const serverTime = now().toISOString();
+    const envelope: LedgerEvent = { ...submitted, serverTime, seq, workspaceSeq };
+
+    // An entity belongs to one workspace. Nothing before this point says so:
+    // the envelope carries workspaceId per event, so a second event on the
+    // same entity naming a different workspace parses cleanly and commits,
+    // and the head row's workspace_id — the tenant boundary every scoped read
+    // trusts — flips with it. The ledger is append-only, so a mis-filed event
+    // can never be taken back, only superseded (coordination doc §11).
+    //
+    // Placed after lockWorkspace + lockEntity and before deps.evaluate: the
+    // entity lock is what makes the read race-safe under READ COMMITTED (any
+    // concurrent ingest for this entity has already committed or is still
+    // waiting), and refusing before the engine keeps the rules judging only
+    // events that are honestly about this entity.
+    //
+    // This is a SERVER-SIDE refusal, deliberately not an engine rule, and it
+    // is not in the shared fixture suite. Client replicas are workspace-
+    // scoped: a replica holds one workspace's events and cannot see that an
+    // entity id is already bound elsewhere, so an engine check would make
+    // client and server disagree by construction — the same argument that
+    // settled the state-mapping occupancy question. Plan 10's offline replica
+    // therefore mirrors this KNOWINGLY, as a server-only door, rather than
+    // finding it in the fixtures.
+    const head = await readEntityHead(client, envelope.entity.kind, envelope.entity.id);
+    if (head !== null && head.workspaceId !== envelope.workspaceId) {
+      return {
+        kind: 'refused',
+        result: {
+          status: 'refused',
+          eventId: envelope.id,
+          rule: ENTITY_WORKSPACE_MISMATCH_RULE,
+          reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
+        },
+      };
+    }
+
+    // Trash series Plan 2 (spec §5.7, server half; deviation D10). BOTH
+    // doors, like `checkContestCoherence` below. The internal door needs it:
+    // an offline claim refused on a ticket comes back as a server-appended
+    // `claim.contested` on that ticket through `serverAppend`
+    // (`sync/sync-service.ts`), and against a PURGED ticket that append would
+    // write the purged entity back into the ledger with the claim embedded.
+    // Before the permission gate: a purged workspace has no members left, and
+    // "you are not a member" would name the wrong fault. Also refuses
+    // `purge.completed` from anyone — the purge appends it directly.
+    const purgedRefusal = await checkPurged(client, envelope);
+    if (purgedRefusal !== null) {
+      return {
+        kind: 'refused',
+        result: { status: 'refused', eventId: envelope.id, rule: purgedRefusal.rule, reason: purgedRefusal.reason },
+      };
+    }
+
+    // The permission gate, and `gate` is null for every internal append.
+    //
+    // Position is a recorded ruling, not a preference (coordination doc, "A
+    // forgeable `origin`…" and "The gate's placement was contradicted by a
+    // brief"): the gate lives INSIDE the ingest path — here, after the
+    // entity↔workspace guard and before the engine — rather than at the HTTP
+    // route. Decision 15 is what makes that load-bearing: Plan 10's
+    // `POST /v1/sync` wraps this same ingest, so a permission refusal on the
+    // sync path can become a `claim.contested` with no extra wiring. A gate
+    // that lived in the route would be bypassed by sync entirely.
+    //
+    // It runs before deps.evaluate because permissions are the system's
+    // rules, not a workflow's: a permission refusal should never reach the
+    // rule engine. It runs after the entity↔workspace guard, so an event that
+    // is not honestly about its entity is told that first — the refusal that
+    // names the actual fault.
+    //
+    // Per-call rather than baked into the service, because the distinguishing
+    // fact is which door the event arrived through. See
+    // ../permissions/check-permission.ts for which doors this closes and,
+    // more importantly, which it does not.
+    const refusal =
+      door === null
+        ? null
+        : // `client`, NOT `deps.pool`. The role lookup runs inside THIS
+          // transaction, which already holds the workspace and entity locks,
+          // so it reads the world this event is about to be judged against.
+          // Handing it the pool instead would compile and pass every test
+          // while opening a window in which a concurrently-committed
+          // `membership.revoked` is invisible to the gate judging the revoked
+          // person's next claim.
+          await door.gate(envelope, { db: client, sessionUserId: door.sessionUserId });
+    if (refusal !== null) {
+      return {
+        kind: 'refused',
+        result: { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason },
+      };
+    }
+
+    // The §11 envelope-coherence closer (Plan 10 Task 4). A `claim.contested`
+    // embeds the refused claim WHOLE, and until this line nothing compared the
+    // embedded claim against the envelope carrying it: a contest filed on a
+    // real ticket in its real workspace could embed a fabricated claim naming
+    // any other ticket in any other workspace, and every layer accepted it.
+    // See ../sync/contest-coherence.ts for exactly what is bound and what is
+    // deliberately not.
+    //
+    // UNCONDITIONAL — it runs on BOTH doors, and that is the difference
+    // between this check and the envelope-origin gate above. The gate must
+    // distinguish doors because the server's own appends are legitimately
+    // server-origin; there is no legitimate append, from any door, of a
+    // contest whose embedded claim is about a different ticket. So it is not
+    // carried in `door` and it is not `IngestDeps.gates` either (decision 15's
+    // gates are construction-time and unconditional, which is right here, but
+    // Plan 7 owns that field's contract and this predates it).
+    //
+    // Placed AFTER the permission gate and before `deps.evaluate`: a client
+    // that has forged its provenance is told that first — the refusal that
+    // names the fault it can actually fix — and this sits beside
+    // `contest.server-only`, the engine rule it complements. server-only says
+    // who may file a contest; this says what a filing must be about.
+    const incoherent = checkContestCoherence(envelope);
+    if (incoherent !== null) {
+      return {
+        kind: 'refused',
+        result: {
+          status: 'refused',
+          eventId: envelope.id,
+          rule: incoherent.rule,
+          reason: incoherent.reason,
+        },
+      };
+    }
+
+    const verdict = await deps.evaluate(envelope, createEngineContext(client));
+    if (verdict.refused) {
+      return {
+        kind: 'refused',
+        result: { status: 'refused', eventId: envelope.id, rule: verdict.rule, reason: verdict.reason },
+      };
+    }
+
+    // The server gates (Plan 7 Task 11). They run HERE — after the engine has
+    // accepted and before anything is appended — and the position is the
+    // whole point of the seam.
+    //
+    // Inside the transaction, reading through `client` and never
+    // `deps.pool`. A gate handed the pool would compile, pass every
+    // single-event test, and judge a world one connection away from the one
+    // this event is about to join. `test/gates/gate-seam.test.ts` pins the
+    // handle by writing a marker row from inside a gate and proving the
+    // ROLLBACK took it back — a write through the pool would autocommit and
+    // survive.
+    //
+    // A refusal here is the SAME path as an engine refusal: ROLLBACK, no
+    // append, no projection, no listener, the standard refused shape. It
+    // rolls back THIS event's transaction and no other — `commitOne` takes a
+    // connection per event (`atomic` takes one for the whole set, and a gate
+    // refusal there rolls the set back), so a gate refusal in the middle of a batch leaves
+    // its committed neighbours committed and lets the events after it be
+    // judged on their own. That is deliberate and is pinned in
+    // `test/gates/gate-seam.test.ts`; the alternative — one gate refusal
+    // discarding a whole sync push — would make an offline client's
+    // legitimate work vanish because one of its documents named a stale
+    // attachment.
+    for (const gate of gates) {
+      if (gate.eventType !== submitted.type) continue;
+      const gateRefusal = await gate.check(submitted, client);
+      if (gateRefusal !== null) {
+        return {
+          kind: 'refused',
+          result: {
+            status: 'refused',
+            eventId: envelope.id,
+            rule: gateRefusal.rule,
+            reason: gateRefusal.reason,
+          },
+        };
+      }
+    }
+
+    await insertEvent(client, envelope);
+    // REFRESH ON PUBLISH, SNAPSHOT DOOR — before the projections, and both
+    // halves of that are load-bearing.
+    //
+    // Not a projection: `snapshots` is not a `proj_` table, so
+    // `verify-projections.ts` makes no shadow copy of it and an unqualified
+    // write from inside a projection escapes `search_path` to write LIVE
+    // during a verify. Not after the loop either: `proj_tickets`'s own
+    // refresh-on-publish sets exactly the rows this selects to the new
+    // version, so running second would match nothing and be a silent no-op.
+    // `snapshot-refresh.ts` carries the argument in full.
+    //
+    // The outcome is discarded here and that is the one thing this call site
+    // gives up: a ticket whose fold could not be walked forward keeps its
+    // stale snapshot and says so only in the returned value, and ingest has
+    // no logger to put it in.
+    await refreshSnapshotsForWorkflowPublish(client, envelope);
+    for (const projection of deps.projections.all()) {
+      await projection.apply(envelope, client);
+    }
+    return { kind: 'committed', envelope, result: { status: 'committed', eventId: envelope.id, seq, serverTime } };
+  }
+
+  /**
+   * The two failures that are provable only once a transaction runs, so they cannot be refused at parse time:
+   * moved out of `commitOne`'s catch so the single path and the atomic path answer them in the same words.
+   * `null` means "not one of these": the caller rethrows. The duplicate answer stays truthful even after a failed
+   * ROLLBACK: a unique violation proves a prior transaction committed that id.
+   */
+  function answerThrown(error: unknown, submitted: SubmittedEvent): Extract<IngestResult, { status: 'invalid' }> | null {
+    if (isUniqueViolation(error, 'events_pkey')) {
+      return {
+        status: 'invalid',
+        eventId: submitted.id,
+        code: 'duplicate-event-id',
+        message: `an event with id ${submitted.id} is already in the ledger`,
+      };
+    }
+    // E6-18 — the SAME shape as the duplicate-id arm above and for the same
+    // reason: this is a failure provable only once the transaction runs, not
+    // at parse time, so it is caught here rather than refused earlier by a
+    // schema. Narrow by design (SQLSTATE 22P05 only, nothing wider) — see
+    // `isInvalidUnicodeEscape`'s own docblock.
+    if (isInvalidUnicodeEscape(error)) {
+      return {
+        status: 'invalid',
+        eventId: submitted.id,
+        code: 'invalid-byte',
+        message: `event ${submitted.id}'s payload contains a byte (U+0000) Postgres cannot store`,
+      };
+    }
+    return null;
+  }
+
   async function commitOne(submitted: SubmittedEvent, door: ClientDoor | null): Promise<CommitOutcome> {
     const client = await deps.pool.connect();
     let rollbackFailure: Error | undefined;
     try {
       await client.query('BEGIN');
-      // Lock order is always workspace first, then entity — one global order
-      // across the whole server, so two ingests can never deadlock by taking
-      // the pair in opposite orders.
-      await lockWorkspace(client, submitted.workspaceId);
-      await lockEntity(client, submitted.entity.kind, submitted.entity.id);
-      const workspaceSeq = await nextWorkspaceSeq(client, submitted.workspaceId);
-      const seq = await nextSeq(client, submitted.entity.kind, submitted.entity.id);
-      const serverTime = now().toISOString();
-      const envelope: LedgerEvent = { ...submitted, serverTime, seq, workspaceSeq };
-
-      // An entity belongs to one workspace. Nothing before this point says so:
-      // the envelope carries workspaceId per event, so a second event on the
-      // same entity naming a different workspace parses cleanly and commits,
-      // and the head row's workspace_id — the tenant boundary every scoped read
-      // trusts — flips with it. The ledger is append-only, so a mis-filed event
-      // can never be taken back, only superseded (coordination doc §11).
-      //
-      // Placed after lockWorkspace + lockEntity and before deps.evaluate: the
-      // entity lock is what makes the read race-safe under READ COMMITTED (any
-      // concurrent ingest for this entity has already committed or is still
-      // waiting), and refusing before the engine keeps the rules judging only
-      // events that are honestly about this entity.
-      //
-      // This is a SERVER-SIDE refusal, deliberately not an engine rule, and it
-      // is not in the shared fixture suite. Client replicas are workspace-
-      // scoped: a replica holds one workspace's events and cannot see that an
-      // entity id is already bound elsewhere, so an engine check would make
-      // client and server disagree by construction — the same argument that
-      // settled the state-mapping occupancy question. Plan 10's offline replica
-      // therefore mirrors this KNOWINGLY, as a server-only door, rather than
-      // finding it in the fixtures.
-      const head = await readEntityHead(client, envelope.entity.kind, envelope.entity.id);
-      if (head !== null && head.workspaceId !== envelope.workspaceId) {
+      const outcome = await commitInTx(client, submitted, door);
+      if (outcome.kind === 'refused') {
         await client.query('ROLLBACK');
-        return {
-          result: {
-            status: 'refused',
-            eventId: envelope.id,
-            rule: ENTITY_WORKSPACE_MISMATCH_RULE,
-            reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
-          },
-          committed: null,
-        };
-      }
-
-      // Trash series Plan 2 (spec §5.7, server half; deviation D10). BOTH
-      // doors, like `checkContestCoherence` below. The internal door needs it:
-      // an offline claim refused on a ticket comes back as a server-appended
-      // `claim.contested` on that ticket through `serverAppend`
-      // (`sync/sync-service.ts`), and against a PURGED ticket that append would
-      // write the purged entity back into the ledger with the claim embedded.
-      // Before the permission gate: a purged workspace has no members left, and
-      // "you are not a member" would name the wrong fault. Also refuses
-      // `purge.completed` from anyone — the purge appends it directly.
-      const purgedRefusal = await checkPurged(client, envelope);
-      if (purgedRefusal !== null) {
-        await client.query('ROLLBACK');
-        return {
-          result: { status: 'refused', eventId: envelope.id, rule: purgedRefusal.rule, reason: purgedRefusal.reason },
-          committed: null,
-        };
-      }
-
-      // The permission gate, and `gate` is null for every internal append.
-      //
-      // Position is a recorded ruling, not a preference (coordination doc, "A
-      // forgeable `origin`…" and "The gate's placement was contradicted by a
-      // brief"): the gate lives INSIDE the ingest path — here, after the
-      // entity↔workspace guard and before the engine — rather than at the HTTP
-      // route. Decision 15 is what makes that load-bearing: Plan 10's
-      // `POST /v1/sync` wraps this same ingest, so a permission refusal on the
-      // sync path can become a `claim.contested` with no extra wiring. A gate
-      // that lived in the route would be bypassed by sync entirely.
-      //
-      // It runs before deps.evaluate because permissions are the system's
-      // rules, not a workflow's: a permission refusal should never reach the
-      // rule engine. It runs after the entity↔workspace guard, so an event that
-      // is not honestly about its entity is told that first — the refusal that
-      // names the actual fault.
-      //
-      // Per-call rather than baked into the service, because the distinguishing
-      // fact is which door the event arrived through. See
-      // ../permissions/check-permission.ts for which doors this closes and,
-      // more importantly, which it does not.
-      const refusal =
-        door === null
-          ? null
-          : // `client`, NOT `deps.pool`. The role lookup runs inside THIS
-            // transaction, which already holds the workspace and entity locks,
-            // so it reads the world this event is about to be judged against.
-            // Handing it the pool instead would compile and pass every test
-            // while opening a window in which a concurrently-committed
-            // `membership.revoked` is invisible to the gate judging the revoked
-            // person's next claim.
-            await door.gate(envelope, { db: client, sessionUserId: door.sessionUserId });
-      if (refusal !== null) {
-        await client.query('ROLLBACK');
-        return {
-          result: { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason },
-          committed: null,
-        };
-      }
-
-      // The §11 envelope-coherence closer (Plan 10 Task 4). A `claim.contested`
-      // embeds the refused claim WHOLE, and until this line nothing compared the
-      // embedded claim against the envelope carrying it: a contest filed on a
-      // real ticket in its real workspace could embed a fabricated claim naming
-      // any other ticket in any other workspace, and every layer accepted it.
-      // See ../sync/contest-coherence.ts for exactly what is bound and what is
-      // deliberately not.
-      //
-      // UNCONDITIONAL — it runs on BOTH doors, and that is the difference
-      // between this check and the envelope-origin gate above. The gate must
-      // distinguish doors because the server's own appends are legitimately
-      // server-origin; there is no legitimate append, from any door, of a
-      // contest whose embedded claim is about a different ticket. So it is not
-      // carried in `door` and it is not `IngestDeps.gates` either (decision 15's
-      // gates are construction-time and unconditional, which is right here, but
-      // Plan 7 owns that field's contract and this predates it).
-      //
-      // Placed AFTER the permission gate and before `deps.evaluate`: a client
-      // that has forged its provenance is told that first — the refusal that
-      // names the fault it can actually fix — and this sits beside
-      // `contest.server-only`, the engine rule it complements. server-only says
-      // who may file a contest; this says what a filing must be about.
-      const incoherent = checkContestCoherence(envelope);
-      if (incoherent !== null) {
-        await client.query('ROLLBACK');
-        return {
-          result: {
-            status: 'refused',
-            eventId: envelope.id,
-            rule: incoherent.rule,
-            reason: incoherent.reason,
-          },
-          committed: null,
-        };
-      }
-
-      const verdict = await deps.evaluate(envelope, createEngineContext(client));
-      if (verdict.refused) {
-        await client.query('ROLLBACK');
-        return {
-          result: { status: 'refused', eventId: envelope.id, rule: verdict.rule, reason: verdict.reason },
-          committed: null,
-        };
-      }
-
-      // The server gates (Plan 7 Task 11). They run HERE — after the engine has
-      // accepted and before anything is appended — and the position is the
-      // whole point of the seam.
-      //
-      // Inside the transaction, reading through `client` and never
-      // `deps.pool`. A gate handed the pool would compile, pass every
-      // single-event test, and judge a world one connection away from the one
-      // this event is about to join. `test/gates/gate-seam.test.ts` pins the
-      // handle by writing a marker row from inside a gate and proving the
-      // ROLLBACK took it back — a write through the pool would autocommit and
-      // survive.
-      //
-      // A refusal here is the SAME path as an engine refusal: ROLLBACK, no
-      // append, no projection, no listener, the standard refused shape. It
-      // rolls back THIS event's transaction and no other — `commitOne` takes a
-      // connection per event, so a gate refusal in the middle of a batch leaves
-      // its committed neighbours committed and lets the events after it be
-      // judged on their own. That is deliberate and is pinned in
-      // `test/gates/gate-seam.test.ts`; the alternative — one gate refusal
-      // discarding a whole sync push — would make an offline client's
-      // legitimate work vanish because one of its documents named a stale
-      // attachment.
-      for (const gate of gates) {
-        if (gate.eventType !== submitted.type) continue;
-        const gateRefusal = await gate.check(submitted, client);
-        if (gateRefusal !== null) {
-          await client.query('ROLLBACK');
-          return {
-            result: {
-              status: 'refused',
-              eventId: envelope.id,
-              rule: gateRefusal.rule,
-              reason: gateRefusal.reason,
-            },
-            committed: null,
-          };
-        }
-      }
-
-      await insertEvent(client, envelope);
-      // REFRESH ON PUBLISH, SNAPSHOT DOOR — before the projections, and both
-      // halves of that are load-bearing.
-      //
-      // Not a projection: `snapshots` is not a `proj_` table, so
-      // `verify-projections.ts` makes no shadow copy of it and an unqualified
-      // write from inside a projection escapes `search_path` to write LIVE
-      // during a verify. Not after the loop either: `proj_tickets`'s own
-      // refresh-on-publish sets exactly the rows this selects to the new
-      // version, so running second would match nothing and be a silent no-op.
-      // `snapshot-refresh.ts` carries the argument in full.
-      //
-      // The outcome is discarded here and that is the one thing this call site
-      // gives up: a ticket whose fold could not be walked forward keeps its
-      // stale snapshot and says so only in the returned value, and ingest has
-      // no logger to put it in.
-      await refreshSnapshotsForWorkflowPublish(client, envelope);
-      for (const projection of deps.projections.all()) {
-        await projection.apply(envelope, client);
+        return { result: outcome.result, committed: null };
       }
       await client.query('COMMIT');
-      notifyCommitted(envelope);
-      return { result: { status: 'committed', eventId: envelope.id, seq, serverTime }, committed: envelope };
+      notifyCommitted(outcome.envelope);
+      return { result: outcome.result, committed: outcome.envelope };
     } catch (error) {
       // A ROLLBACK on a dead connection throws, and an unguarded one would
       // replace the root-cause error with its own AND skip the duplicate check
@@ -387,33 +440,8 @@ export function createIngestService(deps: IngestDeps): IngestService {
       await client.query('ROLLBACK').catch((failure: unknown) => {
         rollbackFailure = failure instanceof Error ? failure : new Error(String(failure));
       });
-      if (isUniqueViolation(error, 'events_pkey')) {
-        return {
-          result: {
-            status: 'invalid',
-            eventId: submitted.id,
-            code: 'duplicate-event-id',
-            message: `an event with id ${submitted.id} is already in the ledger`,
-          },
-          committed: null,
-        };
-      }
-      // E6-18 — the SAME shape as the duplicate-id arm above and for the same
-      // reason: this is a failure provable only once the transaction runs, not
-      // at parse time, so it is caught here rather than refused earlier by a
-      // schema. Narrow by design (SQLSTATE 22P05 only, nothing wider) — see
-      // `isInvalidUnicodeEscape`'s own docblock.
-      if (isInvalidUnicodeEscape(error)) {
-        return {
-          result: {
-            status: 'invalid',
-            eventId: submitted.id,
-            code: 'invalid-byte',
-            message: `event ${submitted.id}'s payload contains a byte (U+0000) Postgres cannot store`,
-          },
-          committed: null,
-        };
-      }
+      const answer = answerThrown(error, submitted);
+      if (answer !== null) return { result: answer, committed: null };
       throw error;
     } finally {
       // Releasing with the error destroys the connection instead of returning
