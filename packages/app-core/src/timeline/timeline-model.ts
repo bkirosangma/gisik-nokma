@@ -1,7 +1,6 @@
 import type { TicketState } from '@gisik-nokma/domain';
 import {
   TIMELINE_EMPTY_COPY,
-  TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_NO_DATES_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
@@ -9,12 +8,11 @@ import {
   contradictionCopy,
   customClaimLabel,
   dueClaimLabel,
-  formatClaimDate,
   startClaimLabel,
   unplaceableDayCopy,
   type UserNameFn,
 } from '../claims/claim-labels.js';
-import { DAY_MS, addDays, dateMs, isCalendarDay, mondayOnOrBefore } from '../claims/dates.js';
+import { isCalendarDay } from '../claims/dates.js';
 import {
   customDateClaimsOf,
   dateClaimOf,
@@ -26,14 +24,7 @@ import {
 import { matchesFilter } from '../filter/matches-filter.js';
 import { epicAncestorOf, isBuiltinEpicType, type IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
-
-export type TimelineWeekCol = { start: string; label: string };
-export type TimelineBarSpan = {
-  fromWeek: number;
-  toWeek: number;
-  clippedStart: boolean;
-  clippedEnd: boolean;
-};
+import { dayNumberOf } from './timeline-days.js';
 
 /** A claimed custom date field with its attributed rendering. Never geometry. */
 export type TimelineCustomClaim = { claim: CustomDateClaimView; label: string };
@@ -56,18 +47,16 @@ export type TimelineSideReason =
   | 'unplaceable-day';
 
 /**
- * The days a bar covers, as 0-based indexes into the window's days (`weeks.length * 7` of them, the first being the
- * first column's Monday), INCLUSIVE at both ends and clipped to the window (UX fixes T8, 23.142, audit PV-10).
- * `bar` keeps the WEEK columns the grid places the bar in; this is the day inside them, so a bar that ends on a
- * Wednesday is drawn ending on that Wednesday and not on the Sunday that closes its week.
+ * One bar. `startDay` and `endDay` are DAY NUMBERS (days since 1970-01-01, see `timeline-days.ts`), INCLUSIVE at both
+ * ends, and never clipped: the axis is continuous (TV-1), so a period is drawn where it was claimed and the viewport
+ * decides what is in view. `key` is the ticket key for the label on the bar (TV-5), `null` when the ledger holds no prefix.
  */
-export type TimelineBarDays = { from: number; to: number };
-
 export type TimelineRow = {
   ticketId: string;
   title: string;
-  bar: TimelineBarSpan;
-  days: TimelineBarDays;
+  key: string | null;
+  startDay: number;
+  endDay: number;
   startClaim: DateClaimView;
   dueClaim: DateClaimView;
   pending: boolean;
@@ -99,68 +88,37 @@ type TimelinePlacement =
   | { kind: 'row'; epicId: string | null; row: TimelineRow }
   | { kind: 'side'; entry: TimelineSideEntry }
   /** An undated epic: a lane, not missing work. */
-  | { kind: 'lane-heading' }
-  /** Fully dated, coherent, placeable — and scheduled elsewhere in time. */
-  | { kind: 'out-of-window' };
+  | { kind: 'lane-heading' };
 
 export type TimelineModel = {
-  weeks: TimelineWeekCol[];
   /**
-   * `today` as a 0-based day index into the window, or `null` when no `today` was passed or it is outside the
-   * window. The line is the view's; the model only says which day (it reads no clock — `today` is an input).
+   * `today` as a day number, or `null` when no `today` was passed or it is not a real day. The line is the view's;
+   * the model only says which day (it reads no clock: `today` is an input).
    */
   todayDay: number | null;
+  /** The earliest `startDay` and latest `endDay` over every drawn bar, or `null` when nothing is drawn. */
+  firstDay: number | null;
+  lastDay: number | null;
   groups: TimelineGroup[];
   sideList: TimelineSideEntry[];
   sideListCopy: string;
   /**
-   * Why the timeline is empty, or null when it is not. **TWO sentences as of
-   * 2026-09-20** (it was three) — the same construction
-   * `CalendarModel.emptyCopy` was given, for the same reason, and trimmed by
-   * the same owner ruling.
+   * Why the timeline is empty, or null when it is not: `TIMELINE_EMPTY_COPY`, whose one sentence names the set of
+   * narrowings that can keep a claim off the chart (the page narrows `tickets` upstream, so the model cannot tell a
+   * filter that matched nobody from a workspace nobody dated, and does not pretend to).
    *
-   * ⚠ **THE MEASUREMENT THIS FIELD WAS BUILT ON HAS PARTLY REVERTED, AND THE
-   * REVERSION IS RECORDED RATHER THAN QUIETLY RESCOPED.** Measured before this
-   * field existed, anchor `2026-08-23`: `model([])`, a filter matching nobody,
-   * an unmatched `laneEpicId`, and work that is fully dated but wholly outside
-   * the window all serialised to the SAME bytes — four emptinesses, one screen.
-   * The three sentences made that three distinct models; deleting the narrowing
-   * one (`TIMELINE_NARROWED_COPY`, owner ruling 2026-09-20, *"delete the copy"*)
-   * takes it back to TWO. **A filter that matched nobody and a workless
-   * workspace are one model again** — the collapse this field was added to end.
-   *
-   * What replaces the lost distinction is that the surviving sentence NAMES the
-   * filter, so the reader is still pointed at the control that would bring the
-   * work back; and the `narrowedAway` guard that survives is what still keeps
-   * the window sentence from carrying the both-case. Both are witnessed, the
-   * collapse included as an asserted count, at `timeline-model.test.ts` 11.61.
-   *
-   * The window miss is the case Task 11 CANNOT reconstruct: its props carry
-   * `tickets`, `filter` and `laneEpicId` and nothing about the window, so a
-   * component asked to work it out would have to restate the day arithmetic —
-   * a second statement of where the window is, free to disagree with this
-   * one's. See the precedence note at the bottom of `buildTimelineModel`.
+   * **The second arm is gone (continuous axis, 2026-10-03, TV-9).** There used to be a sentence for work that was
+   * fully dated and sat outside the eight weeks; on one continuous axis every dated bar is drawn and reachable by
+   * panning, so "outside the window" is no longer a state of the data. What replaces it is the VIEW's "Nothing in
+   * view" pill with its jump controls, which needs the viewport and so cannot be a model answer. The `narrowedAway`
+   * guard that picked between the two sentences went with the arm it chose between.
    */
   emptyCopy: string | null;
 };
 
 export type TimelineModelOptions = {
-  /** An IST day, injected like `anchor` — never read from a device. Absent: no today line. */
+  /** An IST day, injected — never read from a device. Absent: no today line. */
   today?: string;
-  /**
-   * An IST DAY, never an instant and never a clock read. The shell passes the
-   * day the domain's `istDayOf` returns for the current instant — exactly as
-   * `CalendarView` gets `today` — and Earlier/Later walk it in day-space from
-   * there. (The literal expression is deliberately NOT spelled here: the
-   * clock-free scanner is anchored on the keyword, not on its context, so
-   * prose quoting the constructor registers as a use. That is the scanner
-   * being right, and it caught this docblock.) Every column is therefore the
-   * same IST day the calendar would put a claim in; a window that opened
-   * anywhere else would file the same claim in a different week from the
-   * calendar's cell — one product, two answers.
-   */
-  anchor: string;
-  weeksCount?: number;
   userName: UserNameFn;
   filter?: FilterSpec;
   laneEpicId?: string | null;
@@ -208,7 +166,6 @@ export const NO_DATES_NOTE = 'no claimed dates';
  */
 export const NO_DAY_CLAIMS_NOTE = 'no claimed start or needed-by';
 
-const DEFAULT_WEEKS = 8;
 const NO_EPIC_TITLE = 'No epic';
 
 /**
@@ -228,7 +185,7 @@ const MISSING_CLAIM_REASONS: ReadonlySet<TimelineSideReason> = new Set<TimelineS
  * the contradiction it is — geometry is never invented to resolve it.
  * No dependencies, no critical path: out of spec.
  *
- * NO CLOCK IS READ HERE. `anchor` arrives as an IST day from the shell;
+ * NO CLOCK IS READ HERE. `today` arrives as an IST day from the shell;
  * `test/calendar/clock-free.test.ts` runs this model under four zones and
  * scans `src/timeline` for the getters that would break it.
  */
@@ -236,25 +193,7 @@ export function buildTimelineModel(
   inputs: TicketDatesInput[],
   opts: TimelineModelOptions,
 ): TimelineModel {
-  const weeksCount = opts.weeksCount ?? DEFAULT_WEEKS;
-  if (!Number.isInteger(weeksCount) || weeksCount < 1) {
-    // Loud, like `monthGridWeeks`' month check: a zero-column timeline has no
-    // window, so every fully-dated ticket would silently vanish from a view
-    // that still rendered its side list — an emptiness nothing on screen
-    // explains.
-    throw new RangeError(`a timeline needs at least one week column: ${weeksCount}`);
-  }
   const isEpicType = opts.isEpicType ?? isBuiltinEpicType;
-  const windowStart = mondayOnOrBefore(opts.anchor);
-  const weeks: TimelineWeekCol[] = [];
-  for (let index = 0; index < weeksCount; index += 1) {
-    const start = addDays(windowStart, index * 7);
-    weeks.push({ start, label: `W ${formatClaimDate(start)}` });
-  }
-  const lastWeek = weeks[weeks.length - 1];
-  if (lastWeek === undefined) throw new RangeError(`no week columns for anchor ${opts.anchor}`);
-  /** INCLUSIVE: the Sunday of the last column, not the Monday after it. */
-  const windowEnd = addDays(lastWeek.start, 6);
 
   // Built from ALL inputs, before narrowing: an ancestor removed by a filter
   // still names the lane its child belongs to, and resolving against the
@@ -277,15 +216,6 @@ export function buildTimelineModel(
     return true;
   });
 
-  function weekIndexOf(isoDay: string): number {
-    return Math.floor((dateMs(isoDay) - dateMs(windowStart)) / (7 * DAY_MS));
-  }
-
-  /** The 0-based day of the window an IST day falls on (the claimed day is a real day by the time it is asked). */
-  function dayIndexOf(isoDay: string): number {
-    return Math.round((dateMs(isoDay) - dateMs(windowStart)) / DAY_MS);
-  }
-
   function groupTitle(epicId: string | null): string {
     if (epicId === null) return NO_EPIC_TITLE;
     const state = byId.get(epicId);
@@ -296,17 +226,7 @@ export function buildTimelineModel(
     return title !== '' ? title : epicId;
   }
 
-  /**
-   * Claims in, placement out — the ONE construction, deliberately called twice.
-   *
-   * The second call is over the tickets a filter or a lane removed, and it
-   * exists so `emptyCopy` can tell "nobody claimed a period here" apart from
-   * "your filter removed all of them". That question has to be answered by
-   * running the SAME classification: a cheaper "did it have both dates"
-   * shortcut would answer a different question from the one the rows answer,
-   * and the two would drift. `calendar-model.ts`' `collectItems` carries the
-   * same note for the same reason.
-   */
+  /** Claims in, placement out: the ONE construction every ticket goes through. */
   function classify(input: TicketDatesInput): TimelinePlacement {
     const start = dateClaimOf(input, 'startDate');
     const due = dateClaimOf(input, 'dueDate');
@@ -344,7 +264,7 @@ export function buildTimelineModel(
     /**
      * Geometry needs days that exist. Asked BEFORE any comparison or
      * arithmetic, because `2026-02-30` compares perfectly well as a string
-     * and would reach `weekIndexOf`, where `dateMs` throws — blanking the
+     * and would reach `dayNumberOf`, where `dateMs` throws — blanking the
      * timeline for every other ticket in the workspace.
      */
     const unplaceable = [start, due]
@@ -367,29 +287,15 @@ export function buildTimelineModel(
     }
 
     if (start !== null && due !== null && start.date <= due.date) {
-      // Side-list membership is about missing claims; the WINDOW is about
-      // where a span is drawn. A fully-dated ticket outside it appears
-      // nowhere on the grid — navigation reaches it, it is scheduled, just
-      // not here. Said in `emptyCopy` when there is nothing else to show.
-      if (due.date < windowStart || start.date > windowEnd) return { kind: 'out-of-window' };
-      const clippedStart = start.date < windowStart;
-      const clippedEnd = due.date > windowEnd;
       return {
         kind: 'row',
         epicId: epicAncestorOf(byId, ticketId, isEpicType),
         row: {
           ticketId,
           title,
-          bar: {
-            fromWeek: clippedStart ? 0 : weekIndexOf(start.date),
-            toWeek: clippedEnd ? weeksCount - 1 : weekIndexOf(due.date),
-            clippedStart,
-            clippedEnd,
-          },
-          days: {
-            from: clippedStart ? 0 : dayIndexOf(start.date),
-            to: clippedEnd ? weeksCount * 7 - 1 : dayIndexOf(due.date),
-          },
+          key: input.key ?? null,
+          startDay: dayNumberOf(start.date),
+          endDay: dayNumberOf(due.date),
           startClaim: start,
           dueClaim: due,
           pending: start.pending || due.pending,
@@ -458,13 +364,10 @@ export function buildTimelineModel(
 
   const rowsWithEpic: Array<{ epicId: string | null; row: TimelineRow }> = [];
   const sideList: TimelineSideEntry[] = [];
-  /** Visible work that is dated, coherent, placeable — and simply elsewhere. */
-  let outOfWindow = false;
   for (const input of visible) {
     const placement = classify(input);
     if (placement.kind === 'row') rowsWithEpic.push({ epicId: placement.epicId, row: placement.row });
     else if (placement.kind === 'side') sideList.push(placement.entry);
-    else if (placement.kind === 'out-of-window') outOfWindow = true;
   }
 
   const groupsById = new Map<string | null, TimelineGroup>();
@@ -519,82 +422,18 @@ export function buildTimelineModel(
       : TIMELINE_SIDE_LIST_COPY;
 
   const hasContent = groups.length > 0 || sideList.length > 0;
-
-  /**
-   * Would the work a narrowing removed have appeared HERE?
-   *
-   * Measured by running the same `classify` over the removed inputs, and it
-   * counts only a `row` or a `side` — a filtered-out ticket that would ALSO
-   * have missed the window has not been kept off screen by the filter, and
-   * blaming the filter for it would be its own small lie. That is the
-   * mirror-image discipline `calendar-model.ts` keeps with `narrowedOutOfGrid`.
-   *
-   * Reference identity, not ids: two inputs may legitimately carry the same
-   * ticket id (the ordering fixtures do), and an id-keyed exclusion would drop
-   * the wrong one. `visible` is `inputs.filter(...)`, so the survivors ARE the
-   * input objects.
-   *
-   * Computed only when the screen is empty AND something was actually narrowed
-   * away — otherwise this is a second full classification nobody reads.
-   *
-   * SAFE TO RUN OVER UNFILTERED INPUT because the placeability guard travels
-   * INSIDE `classify`: an unplaceable day is answered before any branch
-   * reaches `weekIndexOf`, where `dateMs` throws. Hoisting that guard out of
-   * `classify` — into the `visible` loop, say — would leave this second call
-   * running arithmetic on days that are not days, and one such claim anywhere
-   * in the workspace would blank the whole timeline. That is the defect the
-   * guard was added for; it is unreachable here only because of where it sits.
-   */
-  const survived = new Set<TicketDatesInput>(visible);
-  const excluded =
-    hasContent || visible.length === inputs.length
-      ? []
-      : inputs.filter((input) => !survived.has(input));
-  const narrowedAway = excluded
-    .map((input) => classify(input))
-    .some((placement) => placement.kind === 'row' || placement.kind === 'side');
-
-  /**
-   * PRECEDENCE, and like the calendar's it is a truth condition, not a taste.
-   *
-   * `narrowedAway` still comes FIRST, and it now guards the arm it steers to
-   * rather than one of its own. It was written for the sentence that said so —
-   * a filter that removed work which would have shown here, while what survived
-   * is merely out of window, is a screen a wider filter would fill, and saying
-   * only "it's outside these weeks" would send the viewer to the wrong control.
-   * ⚠ **That sentence was deleted on 2026-09-20** (owner ruling: *"delete the
-   * copy"* — it named "the LANE", a word no screen in this product shows, and
-   * no app could render it). Deleting the CONSTANT did not require deleting the
-   * GUARD: `!narrowedAway` is what keeps `TIMELINE_OUT_OF_WINDOW_COPY` — which
-   * is deliberately NOT exhaustive, and which is exactly why it is safe to
-   * reach with a filter still live — from carrying the both-case. Its own
-   * disjunction is now `TIMELINE_EMPTY_COPY`'s third sentence.
-   *
-   * `TIMELINE_OUT_OF_WINDOW_COPY` is therefore reached only when no narrowing
-   * removed work that would have shown here: a filter can remove work that
-   * would ALSO have missed the window, leaving `narrowedAway` false and this
-   * arm reached with two narrowings in play, which is the case its
-   * non-exhaustive wording is written for.
-   *
-   * `TIMELINE_EMPTY_COPY` is reached otherwise — every loaded ticket is an
-   * undated epic (a lane, not missing work) or there are none, OR a narrowing
-   * removed work that would have shown here. So "no claimed dates are here to
-   * draw" holds of the CHART, and it does NOT say "no work is here": an undated
-   * epic IS work, and it is still a lane. Its third sentence names the set of
-   * narrowings, because this arm can no longer be told apart from a filter
-   * emptying the chart — the page narrows `tickets` upstream, so `visible ===
-   * inputs` in every app.
-   */
-  const emptyCopy = hasContent
-    ? null
-    : outOfWindow && !narrowedAway
-      ? TIMELINE_OUT_OF_WINDOW_COPY
-      : TIMELINE_EMPTY_COPY;
+  const emptyCopy = hasContent ? null : TIMELINE_EMPTY_COPY;
 
   // `today` is a day the shell vetted (`istDayOf`); a malformed or foreign string must not reach `dateMs`, which throws.
-  const todayDay =
-    opts.today !== undefined && isCalendarDay(opts.today) && opts.today >= windowStart && opts.today <= windowEnd
-      ? dayIndexOf(opts.today)
-      : null;
-  return { weeks, todayDay, groups, sideList, sideListCopy, emptyCopy };
+  const todayDay = opts.today !== undefined && isCalendarDay(opts.today) ? dayNumberOf(opts.today) : null;
+
+  let firstDay: number | null = null;
+  let lastDay: number | null = null;
+  for (const group of groups) {
+    for (const row of group.rows) {
+      firstDay = firstDay === null ? row.startDay : Math.min(firstDay, row.startDay);
+      lastDay = lastDay === null ? row.endDay : Math.max(lastDay, row.endDay);
+    }
+  }
+  return { todayDay, firstDay, lastDay, groups, sideList, sideListCopy, emptyCopy };
 }
