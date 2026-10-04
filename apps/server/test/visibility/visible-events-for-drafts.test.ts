@@ -10,6 +10,8 @@ import { applyAll, seedMember, seedProject, seedTicket, setVisibilityEnv } from 
  * Drafts T3, C4 (spec §4.2): `nowInvisibleTicketsInScope` never names another person's draft in a scope-lost
  * purge list (28.062). The local helpers are `visible-events-for.test.ts`'s (`record`, `collect`, `idsOf`,
  * `ticketEvent`, `revocationEnv` and the truncating `beforeEach`); the world is 6.103's with one more ticket.
+ * Drafts T4 adds door G2, the stream (28.073: the author's devices receive the draft's events, nobody else's
+ * do), and C4 refined (28.080: the recipient's OWN draft is named only once they can no longer open it).
  */
 
 let db: TestDatabase;
@@ -118,4 +120,73 @@ it('28.062 an owner re-granted as a member is told what only the owner bypass re
   expect(ids).not.toContain(`purge:${otherDraft}`);     // an id the recipient stands in no relationship to
   await db.pool.query('UPDATE proj_visibility SET draft_author_id = NULL WHERE ticket_id = $1', [otherDraft]);
   expect(idsOf(await collect(viewer, ws, opener.workspaceSeq - 1))).toContain(`purge:${otherDraft}`);
+});
+
+const entityIds = (items: readonly SyncItem[]): string[] =>
+  items.filter((item): item is LedgerEvent => 'entity' in item).map((event) => event.entity.id);
+
+it('28.073 the author receives their draft\'s events, nobody else does, and a draft assignment names no reach-granted; control: the published twin reaches all', async () => {
+  const ws = newUlid();
+  const project = newUlid();
+  const [author, owner, admin, assignee, other] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+  await seedProject(db.pool, ws, project);
+  await seedMember(db.pool, ws, owner, 'owner');
+  await seedMember(db.pool, ws, admin, 'admin');
+  await seedMember(db.pool, ws, author, 'member');
+  await seedMember(db.pool, ws, assignee, 'member');
+  await seedMember(db.pool, ws, other, 'member');
+  const draft = newUlid();
+  const twin = newUlid();
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: draft, draftBy: author, birthAssigneeId: assignee });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: twin, createdBy: author });
+  const edit = await record(ticketEvent(ws, 'ticket.field_set', draft, { fieldId: 'title', value: 'edited' }, author));
+  const assign = await record(ticketEvent(ws, 'ticket.assigned', draft, { assigneeId: assignee }, author));
+  const twinEdit = await record(ticketEvent(ws, 'ticket.field_set', twin, { fieldId: 'title', value: 'twin edited' }, author));
+
+  const mine = await collect(author, ws, 0);
+  expect(idsOf(mine)).toEqual(expect.arrayContaining([edit.id, assign.id, twinEdit.id]));
+  expect(entityIds(mine)).toContain(draft); // the creation event too
+  expect(idsOf(mine).filter((id) => id.startsWith('reach-granted'))).toEqual([]);
+
+  for (const [name, viewer] of [['owner', owner], ['admin', admin], ['assignee', assignee], ['another member', other]] as const) {
+    const items = await collect(viewer, ws, 0);
+    expect(idsOf(items), name).toContain(twinEdit.id); // CONTROL: the stream is live for this viewer
+    expect(idsOf(items), name).not.toContain(edit.id);
+    expect(idsOf(items), name).not.toContain(assign.id);
+    expect(entityIds(items), name).not.toContain(draft);
+    expect(idsOf(items).join('|'), name).not.toContain(draft); // no notice, purge or scope item names it
+  }
+});
+
+it('28.080 an author keeps their own draft off the purge list while they can still open it, and is told to drop it once they cannot; another person\'s draft is never named', async () => {
+  async function scenario(regrantAs: 'member' | 'guest'): Promise<{ ids: string[]; own: string; explicit: string; theirs: string }> {
+    const ws = newUlid();
+    const project = newUlid();
+    const viewer = newUlid();
+    const other = newUlid();
+    const [openToAll, explicitElsewhere, own, theirs] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    await seedProject(db.pool, ws, project);
+    await seedMember(db.pool, ws, viewer, 'member');
+    await seedMember(db.pool, ws, other, 'member');
+    await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: openToAll });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: explicitElsewhere });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: own, draftBy: viewer });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: theirs, draftBy: other });
+    await applyAll(db.pool, [setVisibilityEnv(ws, explicitElsewhere, 'explicit', [other])]);
+    const opener = await record(ticketEvent(ws, 'comment.added', openToAll, { body: 'still readable' }, viewer));
+    await record(revocationEnv(ws, viewer));
+    await record(testEnvelope({
+      workspaceId: ws, entity: { kind: 'membership', id: membershipId(ws, viewer) },
+      type: 'membership.granted', payload: { userId: viewer, role: regrantAs }, actorId: newUlid(),
+    }));
+    return { ids: idsOf(await collect(viewer, ws, opener.workspaceSeq - 1)), own, explicit: explicitElsewhere, theirs };
+  }
+  const asMember = await scenario('member');
+  expect(asMember.ids).toContain(`purge:${asMember.explicit}`); // CONTROL: the list is real and itemised
+  expect(asMember.ids).not.toContain(`purge:${asMember.own}`); // still openable
+  expect(asMember.ids).not.toContain(`purge:${asMember.theirs}`);
+  const asGuest = await scenario('guest');
+  expect(asGuest.ids).toContain(`purge:${asGuest.explicit}`);
+  expect(asGuest.ids).toContain(`purge:${asGuest.own}`); // a guest cannot create in the project: no longer theirs to open
+  expect(asGuest.ids).not.toContain(`purge:${asGuest.theirs}`);
 });
