@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GRAPH_GROUPS, newUlid, type Ulid } from '@gisik-nokma/domain';
+import { describeEvent } from '@gisik-nokma/app-core';
+import { mapHistory } from '@gisik-nokma/app-core/online';
 import { readGraphRing } from '../../src/read/graph-neighbours.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
@@ -253,7 +255,8 @@ describe('28.119 the bootstrap and the doors that serve a stored link (KG->WG sy
     for (const [door, entry] of await bootEntries('member', d)) {
       expect(entry, door).toBeDefined(); // the author still opens D
       expect(entry!.snapshot!.state, door).not.toHaveProperty('links');
-      expect(tailLinks(entry!), door).toEqual([{ kind: 'relates', targetId: null }, { kind: 'blocks', targetId: null }]);
+      // the from-form keeps its direction and loses its id (planner ruling 2026-10-04 21:08, 28.196); the plain link keeps TL4b's shape
+      expect(tailLinks(entry!), door).toEqual([{ kind: 'relates', targetId: null, from: null }, { kind: 'blocks', targetId: null }]);
       expect(JSON.stringify(entry), door).not.toContain(s);
       expect(JSON.stringify(entry), door).not.toContain(t);
     }
@@ -297,5 +300,42 @@ describe('28.119 the bootstrap and the doors that serve a stored link (KG->WG sy
       expect(other.links, role).toBeUndefined();
       for (const body of [other.events, other.boot, other.stream]) expect(body, role).not.toContain(d2);
     }
+  });
+});
+
+describe("28.196 a published draft's History reads its from-form links from its own side (D6 FIX 1)", () => {
+  it("names S on D's line and reads it in, \"Linked: is blocked by <S key>\"; a viewer who sees D but not S is served {kind, targetId: null, from: null} and reads \"Linked: is blocked by a ticket you can't see\"; CONTROL: S's re-file reads \"Linked: blocks <D key>\", and the owner keeps S's key", async () => {
+    const [s, d] = [newUlid(), newUlid()];
+    await w.published(s);
+    await w.draft(d);
+    expect(await w.fromLink(d, s)).toMatchObject({ status: 'committed' }); // S blocks D, filed on D's stream
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    const [sKey, dKey] = [(await w.stateOf('owner', s)).key, (await w.stateOf('owner', d)).key];
+    expect(sKey).toMatch(/-\d+$/); // precondition: both carry a real key, and the two differ,
+    expect(dKey).toMatch(/-\d+$/);
+    expect(sKey).not.toBe(dKey); // so a line naming D cannot pass for one naming S
+    const linkLine = async (role: ReadRole, id: string) => {
+      const res = await read.app.inject({ method: 'GET', url: `/v1/tickets/${id}/history`, headers: read.authOf(role) });
+      expect(res.statusCode, `${role} ${id}`).toBe(200);
+      const lines = mapHistory(res.json()).filter((e) => e.type === 'ticket.link_added');
+      expect(lines, `${role} ${id}`).toHaveLength(1);
+      return lines[0]!;
+    };
+
+    const ownerD = await linkLine('owner', d);
+    expect(describeEvent(ownerD)).toBe(`Linked: is blocked by ${sKey}`);
+    expect([ownerD.linkTarget, ownerD.linkDirection]).toEqual([{ key: sKey }, 'in']);
+    expect(ownerD.payload).toEqual({ kind: 'blocks', targetId: d, from: s }); // the stored from-form, served whole to a viewer of S
+    const ownerS = await linkLine('owner', s); // CONTROL: S's re-file, read out from S
+    expect(describeEvent(ownerS)).toBe(`Linked: blocks ${dKey}`);
+    expect([ownerS.linkTarget, ownerS.linkDirection]).toEqual([{ key: dKey }, 'out']);
+
+    expect(await hideFromAllButOwner(s)).toMatchObject({ status: 'committed' });
+    const hidden = await linkLine('member', d); // the member still sees the published D, and no longer S
+    expect(describeEvent(hidden)).toBe("Linked: is blocked by a ticket you can't see");
+    expect(hidden.payload).toEqual({ kind: 'blocks', targetId: null, from: null }); // the direction kept, S's id never served
+    expect([hidden.linkTarget, hidden.linkDirection]).toEqual([null, 'in']);
+    expect(JSON.stringify(hidden)).not.toContain(s);
+    expect(describeEvent(await linkLine('owner', d))).toBe(`Linked: is blocked by ${sKey}`); // CONTROL: the owner still sees S
   });
 });
