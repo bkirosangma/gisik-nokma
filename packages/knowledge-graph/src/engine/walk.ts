@@ -10,7 +10,7 @@ export type Walk = {
 };
 
 /**
- * Breadth-first from `center` over the loaded rings (port of `bfs`, `knowledge-graph-sigma.html:592-600`).
+ * Breadth-first from `center` over the loaded rings (port of `bfs`, `knowledge-graph-sigma.html:592-601`).
  * - Only edges in an enabled group are followed (§3.5 "Hidden groups are not walked").
  * - An item outside the scope is reached, marked `out`, and never walked past (§2.2, §3.1).
  * - An edge whose far end the store does not hold is ignored: the server never sends an item the viewer cannot see.
