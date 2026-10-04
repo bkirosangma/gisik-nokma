@@ -82,6 +82,20 @@ describe('27.126 visibility follows the SOURCE: no row and no count from a sourc
     expect(guest.total).toBe(1);
     expect(guest.items[0]!.snippet).toBe('see [[X-1 July invoices]]'); // the explicit note's own snippet, nothing of the shared ticket's ('needs …')
   });
+
+  it('27.126 a source in ANOTHER workspace that chips the target is never listed, though its row is in the index', async () => {
+    // The owner's predicate is `TRUE`, so only the workspace pins (`firsts`' `r.workspace_id` and each
+    // arm's parent `workspace_id`) keep the neighbour's ticket out.
+    const N = world.neighbour;
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: N.workspaceId, actorId: world.userIds.neighbour, entity: { kind: 'ticket', id: N.ticketId }, type: 'ticket.field_set', payload: { fieldId: 'description', value: body(chip(TARGET)) } }),
+    ]);
+    const raw = await db.pool.query('SELECT 1 FROM proj_references WHERE source_id = $1 AND target_id = $2', [N.ticketId, TARGET]);
+    expect(raw.rowCount).toBe(1); // the haystack holds its subject
+    const owner = await readAs('owner');
+    expect(ids(owner)).not.toContain(`ticket:${N.ticketId}`);
+    expect(owner.total).toBe(5);
+  });
 });
 
 describe('27.127 one row per source, its first reference; parents carry key, title and category', () => {
@@ -154,6 +168,26 @@ describe('27.129 a trashed source is hidden and comes back on restore', () => {
     expect(during.total).toBe(3);
     await applyCommitted(db.pool, [ev('ticket.restored')]);
     expect(ids(await readAs('owner'))).toEqual(before); // the same five sources, not merely five
+  });
+
+  it('27.129 a trashed source NOTE hides its row and its comment’s; a deleted home project hides every source filed in it; restore and undelete bring them back', async () => {
+    const before = ids(await readAs('owner'));
+    expect(before).toHaveLength(5); // precondition: the five sources, the trash above undone
+    const onNote = (type: string) => makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind: 'note', id: notes.NOTES.nPrivate }, type, payload: {} });
+    await applyCommitted(db.pool, [onNote('note.deleted')]);
+    const during = await readAs('owner');
+    expect(ids(during)).toEqual(before.filter((id) => id !== `note:${notes.NOTES.nPrivate}` && id !== `comment:${commentOnPrivate}`));
+    expect(during.total).toBe(3);
+    await applyCommitted(db.pool, [onNote('note.restored')]);
+    expect(ids(await readAs('owner'))).toEqual(before);
+    // Every source here is filed in the world's one project: its tickets go by `LIVE_TICKET_WHERE`'s
+    // container clause, its notes (and their comments) by `NOTE_PROJECT_LIVE_WHERE`.
+    const onProject = (type: string) => makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind: 'project', id: world.world.projectId }, type, payload: {} });
+    await applyCommitted(db.pool, [onProject('project.deleted')]);
+    const gone = await readAs('owner');
+    expect([gone.total, ids(gone)]).toEqual([0, []]);
+    await applyCommitted(db.pool, [onProject('project.undeleted')]);
+    expect(ids(await readAs('owner'))).toEqual(before);
   });
 });
 
