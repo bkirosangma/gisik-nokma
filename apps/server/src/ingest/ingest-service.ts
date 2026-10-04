@@ -51,6 +51,20 @@ export type IngestDeps = {
 
 export type CommittedEventListener = (event: LedgerEvent) => void;
 
+/** Why an atomic set is refused before it starts (it files one workspace's events and never founds a workspace). */
+export const ATOMIC_SINGLE_WORKSPACE_RULE = 'atomic.single-workspace';
+export const ATOMIC_NO_FOUNDING_RULE = 'atomic.no-founding';
+
+/**
+ * What an atomic set answers. There are no partial results: either every event committed (`results[i]` answers
+ * `rawEvents[i]`, all `committed`) or NOTHING did, and `index` and `result` name the FIRST event that stopped it
+ * (a refusal or an invalid answer, never a `committed` one, so a caller has no arm it cannot reach).
+ * An unexpected infrastructure error rejects the call instead, as on the single path.
+ */
+export type AtomicOutcome =
+  | { status: 'committed'; results: IngestResult[] }
+  | { status: 'rolled-back'; index: number; result: Exclude<IngestResult, { status: 'committed' }> };
+
 export type IngestService = {
   /**
    * Processes a batch in order; result[i] answers rawEvents[i]. Each event
@@ -96,6 +110,17 @@ export type IngestService = {
    * silently judged every claim against `undefined`.
    */
   ingestClientBatch(rawEvents: unknown[], sessionUserId: string): Promise<IngestResult[]>;
+  /**
+   * Commits an ORDERED set in ONE transaction under one workspace lock (drafts spec R47): every event is judged
+   * by the same gates as on the single path, against the state the earlier events of the set left; the first
+   * refusal or error rolls the whole set back; the committed listeners fire only after the single COMMIT, in the
+   * order given. All events must name one workspace and none may be `workspace.created`. At least one event.
+   *
+   * This is the INTERNAL, ungated door, like `ingestBatch`; **an HTTP route calls `ingestClientAtomic`.**
+   */
+  ingestAtomic(rawEvents: unknown[]): Promise<AtomicOutcome>;
+  /** The CLIENT door of `ingestAtomic`: every event passes `checkPermission` first, against `sessionUserId`. */
+  ingestClientAtomic(rawEvents: unknown[], sessionUserId: string): Promise<AtomicOutcome>;
   /** Broadcast hook: fires AFTER an event's transaction commits, never for
    * refused or invalid events. Returns an unsubscribe function. Plan 5 wires
    * WebSocket fan-out onto this. */
@@ -119,11 +144,14 @@ export type IngestService = {
  * `ingestBatch` stays exported on `IngestService` for the internal callers that
  * legitimately use it — the workspace bootstrap (Task 5), invite acceptance
  * (Task 14), Plan 11's seed CLIs, and tests.
+ *
+ * `ingestClientAtomic` joined it with the draft set publish (drafts T5b); `ingestAtomic` stays off for the reason
+ * `ingestBatch` is.
  */
-export type ClientIngest = Pick<IngestService, 'ingestClientBatch' | 'onEventCommitted'>;
+export type ClientIngest = Pick<IngestService, 'ingestClientBatch' | 'ingestClientAtomic' | 'onEventCommitted'>;
 
 /**
- * What the client door carries into `commitOne`: the gate, and the session it
+ * What the client door carries into `commitInTx` (through `commitOne` or `atomic`): the gate, and the session it
  * judges against.
  *
  * ONE nullable rather than two, deliberately. Two covarying parameters —
@@ -452,7 +480,8 @@ export function createIngestService(deps: IngestDeps): IngestService {
   }
 
   /**
-   * Both entry points are this loop; they differ only in the gate they carry.
+   * `ingestBatch` and `ingestClientBatch` are this loop; they differ only in the gate they carry. (The atomic pair,
+   * `ingestAtomic` and `ingestClientAtomic`, is `atomic` below: one transaction for the whole set.)
    * Parsing stays ahead of the gate so a submission that is not a well-formed
    * claim at all is answered as `invalid` rather than as a permission refusal —
    * and so a refused event always has a real ULID `eventId` to report.
@@ -514,12 +543,97 @@ export function createIngestService(deps: IngestDeps): IngestService {
     return results;
   }
 
+  function atomicShapeRefusal(event: SubmittedEvent, workspaceId: string): { rule: string; reason: string } | null {
+    if (event.workspaceId !== workspaceId) {
+      return {
+        rule: ATOMIC_SINGLE_WORKSPACE_RULE,
+        reason: 'An atomic set files every event under one workspace; this event names a different one.',
+      };
+    }
+    if (event.type === 'workspace.created') {
+      return { rule: ATOMIC_NO_FOUNDING_RULE, reason: 'A workspace is founded on its own, not inside an atomic set.' };
+    }
+    return null;
+  }
+
+  /**
+   * One BEGIN, the workspace lock once, `commitInTx` per event in the given order, one COMMIT, then the listeners
+   * in order. Parsing and the shape checks come first and touch no connection, so a malformed set costs nothing.
+   * Placement of the listener loop AFTER the COMMIT is the whole point of moving `notifyCommitted` out of
+   * `commitInTx`: a set that rolled back is invisible to the fan-out, the stream and the snapshot writer.
+   *
+   * The workspace lock is taken here before the loop, and `commitInTx` takes it again per event:
+   * `pg_advisory_xact_lock` is re-entrant inside one session, so the second call is free, and the lock order
+   * (workspace, then each entity in the order given) stays the server's one global order.
+   */
+  async function atomic(rawEvents: unknown[], door: ClientDoor | null): Promise<AtomicOutcome> {
+    const events: SubmittedEvent[] = [];
+    for (const [index, raw] of rawEvents.entries()) {
+      const parsed = parseEvent(raw, registry);
+      if (!parsed.ok) {
+        return {
+          status: 'rolled-back',
+          index,
+          result: { status: 'invalid', eventId: parsed.eventId, code: parsed.code, message: parsed.message },
+        };
+      }
+      events.push(parsed.event);
+    }
+    const first = events[0];
+    if (first === undefined) throw new Error('ingestAtomic needs at least one event');
+    for (const [index, event] of events.entries()) {
+      const fault = atomicShapeRefusal(event, first.workspaceId);
+      if (fault !== null) {
+        return { status: 'rolled-back', index, result: { status: 'refused', eventId: event.id, ...fault } };
+      }
+    }
+
+    const client = await deps.pool.connect();
+    let rollbackFailure: Error | undefined;
+    let at = 0;
+    try {
+      await client.query('BEGIN');
+      await lockWorkspace(client, first.workspaceId);
+      const envelopes: LedgerEvent[] = [];
+      const results: IngestResult[] = [];
+      for (const [index, event] of events.entries()) {
+        at = index;
+        const outcome = await commitInTx(client, event, door);
+        if (outcome.kind === 'refused') {
+          await client.query('ROLLBACK');
+          return { status: 'rolled-back', index, result: outcome.result };
+        }
+        envelopes.push(outcome.envelope);
+        results.push(outcome.result);
+      }
+      await client.query('COMMIT');
+      for (const envelope of envelopes) notifyCommitted(envelope);
+      return { status: 'committed', results };
+    } catch (error) {
+      // The guarded ROLLBACK and the destroying release, for the reasons `commitOne` gives beside its own.
+      await client.query('ROLLBACK').catch((failure: unknown) => {
+        rollbackFailure = failure instanceof Error ? failure : new Error(String(failure));
+      });
+      const answer = answerThrown(error, events[at] ?? first);
+      if (answer !== null) return { status: 'rolled-back', index: at, result: answer };
+      throw error;
+    } finally {
+      client.release(rollbackFailure);
+    }
+  }
+
   return {
     async ingestBatch(rawEvents) {
       return ingestAll(rawEvents, null);
     },
     async ingestClientBatch(rawEvents, sessionUserId) {
       return ingestAll(rawEvents, { gate: checkPermission, sessionUserId });
+    },
+    async ingestAtomic(rawEvents) {
+      return atomic(rawEvents, null);
+    },
+    async ingestClientAtomic(rawEvents, sessionUserId) {
+      return atomic(rawEvents, { gate: checkPermission, sessionUserId });
     },
     onEventCommitted(listener) {
       listeners.add(listener);

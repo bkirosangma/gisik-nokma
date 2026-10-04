@@ -1128,9 +1128,10 @@ reason on record, not an oversight:*
   the handler rather than declared as a Fastify schema, because Fastify validates before
   `preHandler` and a declared schema would answer a stranger's malformed body before the session was
   resolved. **It is NOT all-or-nothing inside one transaction, as the plan text asks**:
-  `ingestClientBatch` commits one transaction per event by published contract, and a route cannot
-  reach the internal append path (`AppDeps.ingest` is narrowed to `ClientIngest` for exactly that
-  reason). What ships is the achievable half — every question that could refuse the batch is asked
+  `ingestClientBatch` commits one transaction per event by published contract. A gated
+  one-transaction door for a set, `ingestClientAtomic`, exists since drafts T5b, but this route is
+  not moved onto it (a behaviour change to a shipped admin route, outside the drafts plan). What
+  ships is the pre-flight half — every question that could refuse the batch is asked
   UP FRONT over the whole ticket set, so a refusal appends nothing and the answered count equals the
   events appended. Four such refusals, each `422 {status:'refused', rule, reason}`:
   `migration.same-workflow`, `migration.unknown-target-state`, `migration.unmapped-state` naming

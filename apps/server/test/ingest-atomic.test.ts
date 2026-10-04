@@ -152,7 +152,8 @@ describe('28.099 ingestAtomic', () => {
     const ws = newUlid();
     const events = three(ws);
     const heard: string[] = [];
-    const refusing = service({ evaluate: refuseEvent(events[1].id) });
+    const log: string[] = [];
+    const refusing = service({ evaluate: refuseEvent(events[1].id), pool: poolRecordingTransactions(db.pool, log) });
     refusing.onEventCommitted((event) => heard.push(event.id));
 
     const outcome = await refusing.ingestAtomic(events);
@@ -165,6 +166,9 @@ describe('28.099 ingestAtomic', () => {
     expect(await inLedger(ids(events))).toBe(0);
     expect(await headsOf(events)).toBe(0);
     expect(heard).toEqual([]);
+    // The set's own ROLLBACK: a connection released mid-transaction would carry the set's writes to its next
+    // borrower, and the ledger reads above would see them only when they happened to borrow that one.
+    expect(log).toEqual(['BEGIN', 'ROLLBACK']);
 
     const again = await service().ingestAtomic(events);
     expect(again.status).toBe('committed');
@@ -175,12 +179,14 @@ describe('28.099 ingestAtomic', () => {
     const ws = newUlid();
     const events = three(ws);
     const heard: string[] = [];
-    const ingest = service({ projections: explodingProjections(events[2].id) });
+    const log: string[] = [];
+    const ingest = service({ projections: explodingProjections(events[2].id), pool: poolRecordingTransactions(db.pool, log) });
     ingest.onEventCommitted((event) => heard.push(event.id));
     await expect(ingest.ingestAtomic(events)).rejects.toThrow('planted: this projection refuses to apply');
     expect(await inLedger(ids(events))).toBe(0);
     expect(await headsOf(events)).toBe(0);
     expect(heard).toEqual([]);
+    expect(log).toEqual(['BEGIN', 'ROLLBACK']); // the catch's ROLLBACK, before the call rejects
 
     const single = three(newUlid());
     await expect(service({ projections: explodingProjections(single[2].id) }).ingestBatch(single)).rejects.toThrow(
