@@ -89,6 +89,12 @@ Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpow
 - 27.124 reserved, unused (T1).
 <!-- KG-B T2 -->
 - ✅ **27.125 — the "Linked from" wire helpers: a source title per kind (`GN-118 Phone pass`, `Note: Phone pass rulings`, `Comment on GN-118`, `Comment on note Rulings`), a ticket with no key falls back to its title; `splitSnippet` takes the first `[[` and the first `]]` AFTER it, null without both (control: a plain marker splits); `parseLinkedFromTarget` takes `ticket:` / `note:` + a ULID, anything else is null.** (`packages/domain/test/linked-from.test.ts`)
+- ✅ **27.126 — `listLinkedFrom`: visibility follows the SOURCE: a guest who can see the target gets no row AND no count from a ticket, a private note or a comment (on either) they cannot see; the owner sees all five sources (control); the guest's one row carries its own source's snippet.** (`apps/server/test/read/linked-from.test.ts`)
+- ✅ **27.127 — one row per source (its lowest ordinal's snippet), however many times it chips the target; a ticket parent carries its composed key, title, project and state category, a comment carries its PARENT's key and its own author (not the viewer's id), a note parent its title; a ticket whose project has no prefix is still listed with key `''`** (control: a composed key beside it). (`apps/server/test/read/linked-from.test.ts`)
+- ✅ **27.128 — the target's own description is not "Linked from" (the self row IS in the index); a comment ON the target that chips it IS listed (its source is the comment).** (`apps/server/test/read/linked-from.test.ts`)
+- ✅ **27.129 — a trashed source ticket hides its row and its comment's row (total drops); restore brings back the same sources.** (`apps/server/test/read/linked-from.test.ts`)
+- ✅ **27.130 — agreement: for owner, member, outsider and guest the read equals the owner's rows filtered by `canSee` / `canReadNoteById` on each row's parent; the sets differ per role (5 / 2 / 0 / 1), so the agreement is not vacuous.** (`apps/server/test/read/linked-from.test.ts`)
+- ✅ **27.131 — paging: 20 sources are one page with no cursor; a 21st gives a cursor and a second page of exactly one; newest first; no source twice.** (`apps/server/test/read/linked-from.test.ts`)
 <!-- KG-B T3 -->
 <!-- KG-B T4 -->
 
