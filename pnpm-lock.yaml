@@ -327,6 +327,9 @@ importers:
       '@gisik-nokma/ui':
         specifier: workspace:*
         version: link:../ui
+      '@gisik-nokma/viewport':
+        specifier: workspace:*
+        version: link:../viewport
       '@xyflow/react':
         specifier: ^12.8.2
         version: 12.11.6(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -489,6 +492,40 @@ importers:
       vitest:
         specifier: ^3.1.0
         version: 3.2.7(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0)
+
+  packages/flow-graph-browser:
+    dependencies:
+      '@gisik-nokma/app-core':
+        specifier: workspace:*
+        version: link:../app-core
+      '@gisik-nokma/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@gisik-nokma/viewport':
+        specifier: workspace:*
+        version: link:../viewport
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.50.0
+        version: 1.62.1
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.1.17
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.5(@types/react@19.1.17)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@22.20.1)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0)
 
   packages/knowledge-graph:
     dependencies:
@@ -705,6 +742,21 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.7(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0)
+
+  packages/viewport:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
