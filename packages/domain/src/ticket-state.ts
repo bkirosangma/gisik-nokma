@@ -12,6 +12,7 @@ import {
   ticketDeletedPayload,
   ticketDiscardedPayload,
   ticketFieldSetPayload,
+  isWithheldLinkEvent,
   ticketLinkAddedPayload,
   ticketLinkRemovedPayload,
   ticketPublishedPayload,
@@ -477,12 +478,14 @@ export function applyTicketEvent(
       return { ...state, deleted: null };
     }
     case 'ticket.link_added': {
+      if (isWithheldLinkEvent(env)) throw new Error(`applyTicketEvent: ${env.type} on ticket ${env.entity.id} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`);
       const p = ticketLinkAddedPayload.parse(env.payload);
       const links = state.links ?? [];
       if (links.some((l) => l.kind === p.kind && l.targetId === p.targetId)) return state;
       return { ...state, links: [...links, { kind: p.kind, targetId: p.targetId }] };
     }
     case 'ticket.link_removed': {
+      if (isWithheldLinkEvent(env)) throw new Error(`applyTicketEvent: ${env.type} on ticket ${env.entity.id} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`);
       const p = ticketLinkRemovedPayload.parse(env.payload);
       const rest = (state.links ?? []).filter((l) => !(l.kind === p.kind && l.targetId === p.targetId));
       if (rest.length > 0) return { ...state, links: rest };
@@ -543,10 +546,16 @@ export function applyTicketEvent(
 
 /**
  * `applyTicketEvent` for a caller whose state may be absent and whose stream
- * may hold a purged ticket's redacted creation (spec §5.4, D7) or, since drafts
- * T2, its redacted `ticket.published` (a kept numbering row): neither row
- * produces a ticket, so the input state comes back unchanged. Every other event
- * goes to `applyTicketEvent` untouched. A separate function rather than a wider
+ * may hold one of three rows that fold to nothing, so the input state comes back
+ * unchanged:
+ * - a purged ticket's redacted creation (spec §5.4, D7), which produces no ticket;
+ * - since drafts T2, its redacted `ticket.published` (a kept numbering row), which
+ *   produces no ticket either;
+ * - a link event SERVED with its target withheld (`isWithheldLinkEvent`, typed-links
+ *   T4b, spec A §2.4): the viewer may not be told the other end, so their copy
+ *   holds no link for it. It is never a ledger row, so the server's own folds
+ *   never meet one.
+ * Every other event goes to `applyTicketEvent` untouched. A separate function rather than a wider
  * return type on `applyTicketEvent`, because three callers store its result as
  * a definite `TicketState` (`apps/server/src/projections/tickets.ts`,
  * `packages/rule-engine/src/memory-context.ts`,
@@ -557,7 +566,7 @@ export function foldTicketEvent(
   env: EventEnvelope,
   deps: TicketStateDeps,
 ): TicketState | undefined {
-  if (isRedactedTicketCreated(env) || isRedactedTicketPublished(env)) return state;
+  if (isRedactedTicketCreated(env) || isRedactedTicketPublished(env) || isWithheldLinkEvent(env)) return state;
   return applyTicketEvent(state, env, deps);
 }
 

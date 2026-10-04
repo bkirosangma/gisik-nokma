@@ -5,6 +5,7 @@ import {
   type IngestResult,
   type LedgerEvent,
   type SubmittedEvent,
+  withheldLinkPayload,
 } from '@gisik-nokma/domain';
 import {
   createOutbox,
@@ -28,6 +29,7 @@ import {
   createReplicaDataSource,
   type ReplicaDataSource,
 } from '../../src/replica/replica-data-source.js';
+import { describeEvent } from '../../src/views/history-copy.js';
 
 /**
  * Plan 10 Task 12 — the replica `DataSource`. Cases 12.172–12.187.
@@ -1569,5 +1571,24 @@ describe('27.061 typed links offline: both directions from confirmed state', () 
     expect(await ds.query.getTicketLinks(WS, A)).toEqual([{ kind: 'relates', direction: 'in', ticket: ticketOf(C, 'open') }]);
     await replica.applyServerItem(envelope({ kind: 'ticket', id: C }, 'ticket.deleted', {}));
     expect(await ds.query.getTicketLinks(WS, A)).toEqual([]);
+  });
+});
+
+describe('27.090 offline History labels a withheld link event', () => {
+  it("27.090 a withheld link event reads linkTarget: null, so describeEvent says \"a ticket you can't see\"; control: a real target carries no linkTarget key", async () => {
+    const { ds, replica, taskId, epicId } = await fixture();
+    // A served copy, never a submitted claim: `envelope` mints through `newSubmittedEvent`, whose
+    // door guard (`test/setup.ts`) would refuse `targetId: null`. Its documented escape hatch.
+    (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', withheldLinkPayload('blocks')));
+    delete (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', { kind: 'relates', targetId: epicId }));
+    const links = (await ds.query.getTicketHistory(taskId)).filter((e) => e.type === 'ticket.link_added');
+    expect(links).toHaveLength(2); // precondition: both stored
+    const [withheld, real] = links;
+    expect(withheld!.linkTarget).toBeNull();
+    expect(describeEvent(withheld!)).toBe("Linked: blocks a ticket you can't see");
+    expect('linkTarget' in real!).toBe(false); // control
+    expect(describeEvent(real!)).toBe('Linked: relates to another ticket');
   });
 });
