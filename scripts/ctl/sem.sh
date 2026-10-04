@@ -64,10 +64,11 @@ ctl_sem_reclaim() {
 }
 # The slots a live gate leaves the lanes: CTL_SEM_GATE_SLOTS when set to a number, else the `gate-slots` file in the sem dir when its trimmed content is a
 # number, else 1 (a non-numeric or empty file falls through to 1, never to 0). 0 is valid in either (no grant while a gate runs). Re-read on every call,
-# so a rewrite of the file takes effect on the next poll of every waiter.
+# so a rewrite of the file takes effect on the next poll of every waiter. The read sits in a group so `2>/dev/null` is in place before the `<` opens
+# the file: a missing file (the normal state) prints nothing (13.2276).
 ctl_sem_gate_slots() {
   local c="${CTL_SEM_GATE_SLOTS:-}"
-  case "$c" in ''|*[!0-9]*) c="$(tr -d '[:space:]' < "$(ctl_sem_dir)/gate-slots" 2>/dev/null)";; esac
+  case "$c" in ''|*[!0-9]*) c="$( { tr -d '[:space:]' < "$(ctl_sem_dir)/gate-slots"; } 2>/dev/null )";; esac
   case "$c" in ''|*[!0-9]*) c=1;; esac
   echo "$c"
 }

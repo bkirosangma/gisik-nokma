@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235 and 13.2270-13.2275, test-cases/13-deploy-and-ops.md);
+# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235 and 13.2270-13.2276, test-cases/13-deploy-and-ops.md);
 # run by `ctl selftest`. Every case id starts its check's name. No real load is needed: `memory_pressure`, `sysctl` and `vm_stat` are PATH
 # stubs that read files, the clock is a file (CTL_SEM_CLOCK_FILE: a sleep advances it and runs CTL_SEM_SLEEP_HOOK, so a wait of minutes costs
 # no real time), and a slot is "held" by planting its directory with a live pid. Two cases (13.1767, 13.1774) use the REAL clock and real
@@ -186,7 +186,7 @@ reset; plant_gate >/dev/null; echo 1000 > "$st/swaprate"; script_line "1040 echo
 check "13.2234 under the cap the probes still bind during a gate: free memory 5% waits until it recovers (30 s, reason pressure), a sustained swap-in waits until it drops (>= 35 s, reason swap) — never reason gate" 'printf "%s" "$outp" | grep -q "^queue wait: 30s (waited for: pressure)\$" && printf "%s" "$outs" | grep -qE "^queue wait: [0-9]+s \(waited for: swap\)\$" && w=$(printf "%s" "$outs" | sed -n "s/^queue wait: \([0-9]*\)s.*/\1/p") && [ "$w" -ge 35 ]'
 reset; dd=$(rt --dry-run -- true); d0=$(CTL_SEM_GATE_SLOTS=0 rt --dry-run -- true); d3=$(CTL_SEM_GATE_SLOTS=3 rt --dry-run -- true); dx=$(CTL_SEM_GATE_SLOTS=abc rt --dry-run -- true)
 check "13.2235 --dry-run names the cap: 1 by default, 0 and 3 as set, 1 for a value that is not a number" '( for p in "dd 1" "d0 0" "d3 3" "dx 1"; do v=${p%% *}; n=${p#* }; eval "t=\$$v"; printf "%s" "$t" | grep -qF "waits while a gate runs and at least $n slot(s) are held (CTL_SEM_GATE_SLOTS), memory pressure" || exit 1; done )'
-# --- the gate cap from a file (13.2270-13.2275): CTL_SEM_GATE_SLOTS when numeric, else $CTL_SEM_DIR/gate-slots (trimmed, non-negative integer), else 1; re-read every poll ---
+# --- the gate cap from a file (13.2270-13.2276): CTL_SEM_GATE_SLOTS when numeric, else $CTL_SEM_DIR/gate-slots (trimmed, non-negative integer), else 1; re-read every poll ---
 gslots() { printf '%s' "$1" > "$CTL_SEM_DIR/gate-slots"; }   # the file's exact bytes ($'..' for a newline); `reset` removes it
 reset; hold 1; plant_gate >/dev/null; gslots $'2\n'; outf=$(rt -- true)
 reset; hold 1; plant_gate >/dev/null; gslots '  2  '; outw=$(rt -- true)
@@ -207,6 +207,9 @@ reset; hold 1; plant_gate >/dev/null; gslots $'1\n'; script_line "1010 echo 2 > 
 check "13.2274 the file is re-read on every poll: rewritten from 1 to 2 (at 1010) while a run waits behind one held slot and a live gate, that run is granted at the next poll (10 s, reason gate) — no restart, the holder still running" 'printf "%s" "$outr" | grep -q "^queue wait: 10s (waited for: gate)\$"'
 reset; gslots $'3\n'; df3=$(rt --dry-run -- true); reset; gslots $'3\n'; dfe=$(CTL_SEM_GATE_SLOTS=0 rt --dry-run -- true); reset; gslots abc; dfa=$(rt --dry-run -- true)
 check "13.2275 --dry-run names the cap from the file: file 3 names 3, env 0 over file 3 names 0, file abc names 1" '( for p in "df3 3" "dfe 0" "dfa 1"; do v=${p%% *}; n=${p#* }; eval "t=\$$v"; printf "%s" "$t" | grep -qF "waits while a gate runs and at least $n slot(s) are held (CTL_SEM_GATE_SLOTS), memory pressure" || exit 1; done )'
+reset; hold 1; gp=$(plant_gate); script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; outm=$(rt -- true); [ -e "$CTL_SEM_DIR/gate-slots" ]; gm=$?
+reset; dm=$(rt --dry-run -- true)
+check "13.2276 no gate-slots file (the normal state) prints no read error on any poll: one slot held and a live gate waits (20 s, reason gate — the CONTROL that the output was captured) with no 'No such file' in its 2>&1 output; --dry-run names cap 1 (CONTROL) with no 'No such file' either" '[ $gm -ne 0 ] && printf "%s" "$outm" | grep -q "^queue wait: 20s (waited for: gate)\$" && ! printf "%s" "$outm" | grep -q "No such file" && printf "%s" "$dm" | grep -qF "at least 1 slot(s) are held" && ! printf "%s" "$dm" | grep -q "No such file"'
 reset; d=$(dead_pid); plant_gate "$d" "Thu Jan  1 00:00:00 1970" >/dev/null; lp=$(live_pid); plant_gate "$lp" "Mon Jan  1 00:00:00 2001" >/dev/null
 out=$(rt -- true)
 check "13.1765 a stale gate marker is ignored and removed: a dead pid, and a live pid whose start time differs (pid reuse)" 'printf "%s" "$out" | grep -q "^queue wait: 0s" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^gate-")" ]'
