@@ -19,7 +19,7 @@ describe('29.065 edge routing on packed rows', () => {
     ]);
   });
 
-  it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor; a gutter that would stand behind the source end is not used', () => {
+  it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor; a gutter behind the source end, or a gap of exactly the gutter, is not used', () => {
     const to = bar(8, 2, 3);
     const r = routeEdge(bar(0, 0, 4), to, []);
     expect(GUTTER_PX).toBe(14);
@@ -40,7 +40,7 @@ describe('29.065 edge routing on packed rows', () => {
     ]);
   });
 
-  it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ', () => {
+  it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ; a bar that only touches a run, or lies beside it, is not in the way; every candidate blocked: the fewest crossings, the first of equals, a bar counted once', () => {
     const from = bar(0, 0, 4);
     const to = bar(20, 2, 3);
     const blocker = bar(18, 1, 2); // x 288-320 on row 1: stands in the gutter before the target at x = 306
@@ -95,7 +95,7 @@ describe('29.065 edge routing on packed rows', () => {
     expect(fewest.crossings).toBe(1);
   });
 
-  it('29.065 the target starts before the source ends: a channel between the rows, five corners at most', () => {
+  it('29.065 the target starts before the source ends: a channel between the rows, five corners at most; a target on a higher row: between the rows too; a shorter target level with the source: under the source; mixed heights: no repeated point, no collinear corner', () => {
     const from = bar(10, 0, 6);
     const to = bar(12, 1, 3);
     const r = routeEdge(from, to, []);
@@ -129,7 +129,7 @@ describe('29.065 edge routing on packed rows', () => {
     }
   });
 
-  it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above; a bar in the way is transposed with it', () => {
+  it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above; a bar in the way is transposed with it and a crossing is reported', () => {
     const from = bar(0, 0, 4);
     const to = bar(8, 2, 3);
     const land = routeEdge(from, to, []);
@@ -150,7 +150,7 @@ describe('29.065 edge routing on packed rows', () => {
     expect(routeEdge(t(from), t(bar(20, 2, 3)), walls.map(t), 'portrait').crossings).toBe(1);
   });
 
-  it('29.065 the label sits on the longest segment along the time axis', () => {
+  it('29.065 the label sits on the middle of the longest segment along the time axis, the first of equals', () => {
     const r = routeEdge(bar(0, 0, 4), bar(30, 2, 3), []);
     expect(r.label.y).toBe(14);
     expect(r.label.x).toBeGreaterThan(64);
@@ -166,7 +166,7 @@ describe('29.066 a loop is a curved return arrow, with no pill and no corners', 
   const diamond: Box = { x: 400, y: 80, w: 28, h: 28 }; // a Decision on row 2
   const target = bar(2, 0, 6); // the work it sends back to, on row 0, earlier in time
 
-  it('29.066 landscape: one cubic that leaves the diamond\'s top anchor going up, rises above both ends, and lands on the target\'s top edge just inside its start; control: a target on a lower row is entered from above too', () => {
+  it('29.066 landscape: one cubic that leaves the diamond\'s top anchor going up, rises above both ends, and lands on the target\'s top edge just inside its start; its label is the highest sampled point; control: a target on a lower row is entered from above too', () => {
     const r = routeLoop(diamond, target);
     expect(r.points[0]).toEqual({ x: 414, y: 80 }); // top anchor of the diamond
     expect(r.points[3]).toEqual({ x: target.x + 6, y: target.y }); // the target's top edge, 6 px in
@@ -186,7 +186,7 @@ describe('29.066 a loop is a curved return arrow, with no pill and no corners', 
     expect(lower.points[1].y).toBeLessThan(80);
   });
 
-  it('29.066 portrait: it leaves the diamond\'s LEFT anchor going left and lands on the target\'s top edge; control: the landscape curve is not the portrait one', () => {
+  it('29.066 portrait: it leaves the diamond\'s LEFT anchor going left and lands on the target\'s top edge; its label is the left-most sampled point; control: the landscape curve is not the portrait one', () => {
     const d: Box = { x: 100, y: 400, w: 28, h: 28 };
     const t: Box = { x: 0, y: 32, w: 100, h: 96 }; // time runs down: a column
     const r = routeLoop(d, t, [], 'portrait');
