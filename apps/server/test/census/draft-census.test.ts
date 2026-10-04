@@ -77,7 +77,8 @@ export function problems(table: Record<string, Counts>, scanned: Record<string, 
 
 /**
  * Measured on task/drafts-t3-projections after Steps 2 to 6 (the plan's 40 rows were measured on ec72d1f8;
- * the KG series added `read/graph-neighbours.ts` and `read/item-visibility.ts`). `projections/references.ts`
+ * the KG series added `read/graph-neighbours.ts` and `read/item-visibility.ts`, and the tipmerge of
+ * release/workflow-graph f95c2fab brought in KG Home, `routes/home.ts`). `projections/references.ts`
  * (errata E1) is not a row: its draft arm reads the ledger, not `proj_tickets`; 28.068 is its guard.
  */
 const CENSUS: Record<string, Site> = {
@@ -101,13 +102,14 @@ const CENSUS: Record<string, Site> = {
   'read/live-ticket.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'ticketIsLive asks LIVE_TICKET_WHERE; T9 adds the openable twin' },
   'read/notes.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'attachedTicketsByNote ANDs LIVE_TICKET_WHERE and visibleTicketsWhere' },
   'read/restricted-parents.ts': { tickets: 0, visibility: 1, canSee: 0, resolved: 1, getResolved: 0, groups: ['C'], why: 'the canSeeResolved literal carries draftAuthorId; a draft parent is never offered to the assignee arm' },
-  'read/ticket-cards.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'a by-id fetch whose callers carry the predicates (its docblock, :85-95)' },
-  'read/visible-where.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['A', 'B'], why: 'A3 and A4 live here; the note inherit arm (:299) ANDs LIVE_TICKET_WHERE' },
+  'read/ticket-cards.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'a by-id fetch whose callers carry the predicates (its docblock, :80-97)' },
+  'read/visible-where.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['A', 'B'], why: 'A3 and A4 live here; the note inherit arm (:327) ANDs LIVE_TICKET_WHERE' },
   'read/workspace-counts.ts': { tickets: 2, visibility: 2, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'visibleProjectCounts and ticketVisibleProjectIds use both predicates' },
   'routes/attachments.ts': { tickets: 0, visibility: 0, canSee: 2, resolved: 0, getResolved: 1, groups: ['B', 'D'], why: 'upload :412 and download :627 are G10 (T9); until then closed for the author too' },
   'routes/attention.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates are ANDed into the read' },
   'routes/board.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates are ANDed into the read' },
   'routes/builder-reads.ts': { tickets: 6, visibility: 1, canSee: 1, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: 'C5 at :1084 and the hidden loop at :1105, the longhand twin at :604; the rest use LIVE_TICKET_WHERE or visibleTicketsWhere' },
+  'routes/home.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: "Home's one ticket read ANDs visibleTicketsWhere (:52) and LIVE_TICKET_WHERE (:54), so its counts and ids carry no draft (28.069)" },
   'routes/list.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates are ANDed into the read' },
   'routes/my-work.ts': { tickets: 3, visibility: 2, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: 'assigned, shared and titles use both predicates; the contest roster (:333) is gated by canSee (:367)' },
   'routes/search.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'both predicates; proj_search rows exist for drafts and are read only through this join' },
