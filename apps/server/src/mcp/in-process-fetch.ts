@@ -21,7 +21,7 @@ export function inProcessFetch(app: FastifyInstance, outer: OuterCaller): typeof
     if (outer.xff !== undefined) headers['x-forwarded-for'] = outer.xff;
     const body = init?.body;
     const res = await app.inject({
-      method: (init?.method ?? 'GET') as 'GET' | 'POST',
+      method: (init?.method ?? 'GET') as 'GET' | 'POST' | 'PUT',
       url: `${url.pathname}${url.search}`,
       headers,
       // A multipart upload arrives as bytes (`encodeMultipart`); JSON as a string. Anything else is a bug upstream.
@@ -58,6 +58,7 @@ export function hostedSession(
     userId: () => userId,
     get: (path) => client.get(path, accessToken),
     post: (path, body) => client.post(path, body, accessToken),
+    put: (path, body) => client.put(path, body, accessToken),
     postEvents: (events) => client.post('/v1/events', { events }, accessToken),
     getBytes: (path) => client.getBytes(path, accessToken),
     postMultipart: (path, fields, file) => client.postMultipart(path, fields, file, accessToken),
