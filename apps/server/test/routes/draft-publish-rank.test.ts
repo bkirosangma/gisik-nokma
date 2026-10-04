@@ -96,7 +96,7 @@ describe('28.188 rank on publish, a set (R64)', () => {
     await rank(ra, 'g');
     // Sorted DESCENDING into (a1, a2), so the given order [a1, …, a2] is not the ULID order (`newUlid` is not monotonic
     // inside a millisecond): a tail that sorted its ids would place a2 first.
-    const [a2, a1] = [await draft(pa), await draft(pa)].sort();
+    const [a2, a1] = [await draft(pa), await draft(pa)].sort() as [string, string];
     const b1 = await draft(pb);
     const [beforeA, beforeB, mark] = [await drawn(pa), await drawn(pb), await head()];
 
@@ -116,7 +116,7 @@ describe('28.188 rank on publish, a set (R64)', () => {
   it('a refused set writes no rank and leaves the unranked row unranked; CONTROL: the set minus the refused id then publishes and ranks', async () => {
     const p = await project();
     const [u, live] = [await backlog(p), await backlog(p)];
-    const [d2, d1] = [await draft(p), await draft(p)].sort(); // d1 > d2 as strings: the given [d1, d2] is not the ULID order
+    const [d2, d1] = [await draft(p), await draft(p)].sort() as [string, string]; // d1 > d2 as strings: the given [d1, d2] is not the ULID order
     const mark = await head();
 
     const refused = await publishSet('member', [d1, d2, live]);
