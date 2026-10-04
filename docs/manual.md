@@ -132,6 +132,7 @@ choose **Delete** beside it.
 
 There is a small bar across the top of nearly every screen. Inside a workspace it carries:
 
+- **Gisik Nokma** — the logo at the far left. It takes you to **Home**: your workspace's numbers and its Knowledge Graph.
 - **Workspaces** — the list of every workspace you are in.
 - **My work** — the tickets assigned to you.
 - **Members** — the people in this workspace, and what they are.

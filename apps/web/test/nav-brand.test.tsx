@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ruleFor } from './helpers/css-rule-scan.js';
 import { NavBrand } from '../src/nav-brand.js';
 import { LegalNav } from '../src/legal-nav.js';
+import { AppNavSkeleton } from '../src/skeletons/app-nav-skeleton.js';
 
 /**
  * `legal-nav.tsx` imports `AccountMenu`, which reads `usePathname`/`useRouter`
@@ -185,5 +186,78 @@ describe('13.1494 below 40rem the wordmark is hidden, the tile is not', () => {
     const phone = fortyRemBlockNaming(mutant, '.gn-nav__brand-tile { display: none; }');
     expect(phone).not.toContain('.gn-nav__wordmark { display: none; }');
     expect(phone).toContain('.gn-nav__brand-tile { display: none; }');
+  });
+});
+
+/**
+ * 27.621–27.624 (Knowledge Graph spec E §2.1, decisions D-E5/D-E6/D-E7): the brand is a LINK to `/`.
+ * 27.620 (the mount in `AppNav`) lives in `app-nav.test.tsx`, where 13.1475 used to be.
+ */
+describe('27.621 the phone name: a visually-hidden label, not the wordmark', () => {
+  it('aria-labelledby names a gn-visually-hidden span reading "Gisik Nokma, Home"; the wordmark stays display:none below 40rem and does not carry the name', () => {
+    const { container } = render(<NavBrand />);
+    const link = container.querySelector('a.gn-nav__brand');
+    expect(link).not.toBeNull();
+    const nameId = link?.getAttribute('aria-labelledby') ?? '';
+    expect(nameId).not.toBe('');
+    const named = container.querySelector(`[id="${nameId}"]`);
+    expect(named).not.toBeNull();
+    expect(named?.classList.contains('gn-nav__wordmark')).toBe(false);
+    expect(named?.classList.contains('gn-visually-hidden')).toBe(true);
+    expect(named?.textContent).toBe('Gisik Nokma, Home');
+    // The CSS half: the phone block still hides the wordmark (13.1494's needle) and does not name the hidden label.
+    const phone = ((): string | undefined => {
+      const start = css.indexOf('@media (max-width: 40rem) {\n  /* The wordmark');
+      return start === -1 ? undefined : css.slice(start, css.indexOf('\n}', start) + 2);
+    })();
+    expect(phone, 'no 40rem block opens with the wordmark note').toBeDefined();
+    expect(phone).toContain('.gn-nav__wordmark { display: none; }');
+    expect(phone).not.toContain('gn-visually-hidden');
+    // control, same it: with the wordmark gone from the DOM the link is still resolvable by its name
+    container.querySelector('.gn-nav__wordmark')?.remove();
+    expect(screen.getByRole('link', { name: 'Gisik Nokma, Home' })).toBeInTheDocument();
+  });
+});
+
+describe('27.622 the brand link keeps the brand\'s own look', () => {
+  it('(0,2,1) rule: text ink, 0.25rem inline padding, 0.5rem gap; a visible focus ring; the bare .gn-nav__brand rule is still single (13.1493)', () => {
+    const rule = ruleFor(css, /^\.gn-nav a\.gn-nav__brand\s*\{/);
+    expect(rule, 'no .gn-nav a.gn-nav__brand rule').toBeDefined();
+    expect(rule).toMatch(/color:\s*var\(--gn-text\)\s*;/);
+    expect(rule).toMatch(/padding-inline:\s*0\.25rem\s*;/);
+    expect(rule).toMatch(/gap:\s*0\.5rem\s*;/);
+    const focus = ruleFor(css, /^\.gn-nav a\.gn-nav__brand:focus-visible\s*\{/);
+    expect(focus, 'no :focus-visible rule for the brand link').toBeDefined();
+    expect(focus).toMatch(/outline:\s*2px solid var\(--gn-focus-ring\)\s*;/);
+    // control, same it: the bare selector is still declared exactly once (13.1493's count)
+    expect((css.match(/^\.gn-nav__brand\s*\{/gm) ?? []).length).toBe(1);
+  });
+});
+
+describe('27.623 the skeleton\'s brand is not a link', () => {
+  it('<NavBrand link={false} /> holds no a, button or [tabindex] and keeps the tile and the wordmark; control: the default brand holds exactly one a', () => {
+    const { container } = render(<NavBrand link={false} />);
+    expect(container.querySelector('a, button, [tabindex]')).toBeNull();
+    expect(container.querySelector('.gn-nav__brand-tile svg')).not.toBeNull();
+    expect(container.querySelector('.gn-nav__wordmark')?.textContent).toBe('Gisik Nokma');
+    // the mount: the nav skeleton's brand is that non-link brand (25.057 asserts the whole skeleton holds no `a`)
+    cleanup();
+    const { container: skeleton } = render(<AppNavSkeleton />);
+    expect(skeleton.querySelector('.gn-nav__brand')).not.toBeNull();
+    expect(skeleton.querySelector('.gn-nav__brand a')).toBeNull();
+    expect(skeleton.querySelector('.gn-nav__brand')?.tagName).toBe('SPAN');
+    cleanup();
+    const { container: linked } = render(<NavBrand />);
+    expect(linked.querySelectorAll('a')).toHaveLength(1);
+  });
+});
+
+describe('27.624 LegalNav\'s brand is the same link', () => {
+  it('a link named "Gisik Nokma, Home" to / inside the Legal navigation; control: the bar\'s Sign in link is unchanged', () => {
+    render(<LegalNav />);
+    const nav = screen.getByRole('navigation', { name: 'Legal' });
+    const brand = within(nav).getByRole('link', { name: 'Gisik Nokma, Home' });
+    expect(brand).toHaveAttribute('href', '/');
+    expect(within(nav).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/sign-in');
   });
 });
