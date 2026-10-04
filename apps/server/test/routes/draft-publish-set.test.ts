@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type Ulid } from '@gisik-nokma/domain';
 import { PERMISSION_VISIBILITY_RULE, TICKET_NOT_VISIBLE_REASON } from '../../src/permissions/check-permission.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
 import { DRAFT_PUBLISH_REFUSED_RULE, MAX_PUBLISH_SET } from '../../src/routes/drafts-publish.js';
@@ -89,7 +89,7 @@ async function ownersTicketElsewhere(): Promise<string> {
   const founded = await read.app.inject({
     method: 'POST', url: '/v1/workspaces', headers: read.authOf('owner'), payload: { name: 'Elsewhere' },
   });
-  expect(founded.statusCode, founded.body).toBe(200);
+  expect(founded.statusCode, founded.body).toBe(201);
   const elsewhere = founded.json<{ workspaceId: string }>().workspaceId;
   const project = newUlid();
   const ticket = newUlid();
@@ -107,7 +107,7 @@ describe('28.103 the atomic route', () => {
   it('publishes an epic, a task under it and a root task in the given order with consecutive keys and consecutive ledger rows; CONTROL: three published one by one are consecutive too', async () => {
     // Sorted so the GIVEN order [parent, child, loose] is provably not the ULID order (`newUlid` is not
     // monotonic inside one millisecond): a route that sorted the ids would publish `loose` first.
-    const [loose, parent, child] = [newUlid(), newUlid(), newUlid()].sort();
+    const [loose, parent, child] = [newUlid(), newUlid(), newUlid()].sort() as [Ulid, Ulid, Ulid];
     await draft(parent, { typeId: 'epic' });
     await draft(child, { parentId: parent });
     await draft(loose);
@@ -187,7 +187,7 @@ describe('28.103 the atomic route', () => {
 
   it('refuses a child listed before its unpublished parent and rolls back; the reverse order succeeds', async () => {
     // Sorted so `parent` < `child`: a route that sorted the ids would turn [child, parent] into the order that succeeds.
-    const [parent, child] = [newUlid(), newUlid()].sort();
+    const [parent, child] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
     await draft(parent, { typeId: 'epic' });
     await draft(child, { parentId: parent });
 
