@@ -175,6 +175,9 @@ describe('ticketTypeDefSchema', () => {
     expect(claimedEstimate({ estimate: { value: 3 } }, 'estimate')).toBe(3);
     expect(claimedEstimate({ estimate: { value: 0 } }, 'estimate')).toBeNull();
     expect(claimedEstimate({}, 'reworkEstimate')).toBeNull();
+    // Each id reads its OWN claim: with both present, the two readings differ.
+    expect(claimedEstimate({ estimate: { value: 3 }, reworkEstimate: { value: 2 } }, 'reworkEstimate')).toBe(2);
+    expect(claimedEstimate({ estimate: { value: 3 }, reworkEstimate: { value: 2 } }, 'estimate')).toBe(3);
     expect(claimedWaitForAll({ waitForAll: { value: true } })).toBe(true);
     expect(claimedWaitForAll({ waitForAll: { value: null } })).toBe(false);
   });
