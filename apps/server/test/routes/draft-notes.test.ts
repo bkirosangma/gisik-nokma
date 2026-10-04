@@ -46,18 +46,19 @@ const attach = (role: ReadRole, noteId: string, ticketId: string) => door(read, 
 const head = async (): Promise<number> =>
   Number((await db.pool.query<{ head: string }>('SELECT COALESCE(MAX(workspace_seq), 0) AS head FROM events WHERE workspace_id = $1', [WS()])).rows[0]?.head);
 
-/** The note's event types as each of the four read surfaces serves them to `role`. */
-async function surfaces(role: ReadRole, noteId: string, ticketId: string) {
+/** The note's event types as each of the four read surfaces serves them to `role`, in the suite's world or `w`. */
+async function surfaces(role: ReadRole, noteId: string, ticketId: string, w: { read: ReadWorld; db: TestDatabase } = { read, db }) {
+  const ws = w.read.world.workspaceId;
   const stream: string[] = [];
-  for await (const item of visibleEventsFor(db.pool, read.userIds[role], WS(), 0)) {
+  for await (const item of visibleEventsFor(w.db.pool, w.read.userIds[role], ws, 0)) {
     if (!('kind' in item) && item.entity.kind === 'note' && item.entity.id === noteId) stream.push(item.type);
   }
-  const events = await read.app.inject({ method: 'GET', url: `/v1/notes/${noteId}/events`, headers: read.authOf(role) });
-  const boot = await read.app.inject({ method: 'GET', url: `/v1/sync/bootstrap?workspaceId=${WS()}`, headers: read.authOf(role) });
-  const listed = await read.app.inject({ method: 'GET', url: `/v1/workspaces/${WS()}/tickets/${ticketId}/notes`, headers: read.authOf(role) });
+  const events = await w.read.app.inject({ method: 'GET', url: `/v1/notes/${noteId}/events`, headers: w.read.authOf(role) });
+  const boot = await w.read.app.inject({ method: 'GET', url: `/v1/sync/bootstrap?workspaceId=${ws}`, headers: w.read.authOf(role) });
+  const listed = await w.read.app.inject({ method: 'GET', url: `/v1/workspaces/${ws}/tickets/${ticketId}/notes`, headers: w.read.authOf(role) });
   // The note's own detail: its `attachedTickets` must not name the draft to another reader (no trace until publish),
   // and names it to its author (planner ruling 2026-10-04, T9-Q2).
-  const detail = await read.app.inject({ method: 'GET', url: `/v1/notes/${noteId}`, headers: read.authOf(role) });
+  const detail = await w.read.app.inject({ method: 'GET', url: `/v1/notes/${noteId}`, headers: w.read.authOf(role) });
   return {
     stream,
     events: (events.json() as { events: EventView[] }).events.map((e) => e.type),
@@ -159,6 +160,42 @@ describe('28.186 a note linked to a draft is the author\'s alone (R66, Q16)', ()
   });
 });
 
+describe('28.186 a discarded draft not yet erased (R66, decision 3)', () => {
+  // The window between `ticket.discarded` and the erasure: the flag is set and the row is still there. The suite's
+  // app erases at once (its listener), so this world's app registers none and holds the window still.
+  let db2: TestDatabase;
+  let read2: ReadWorld;
+  beforeAll(async () => {
+    db2 = await createTestDatabase();
+    read2 = await buildReadTestApp(db2, { onDraftDiscarded: null });
+  }, 120_000);
+  afterAll(async () => {
+    await read2.app.close();
+    await db2.drop();
+  });
+
+  it('28.186 is closed to its author as well: no attach on the three surfaces, an empty notes list, no attachedTickets entry; CONTROL: the same reads name the draft before the discard', async () => {
+    const w = { read: read2, db: db2 };
+    const projectId = read2.world.projectId;
+    const [d, n] = [newUlid(), newUlid()];
+    expect(
+      await door(read2, 'member', 'ticket', d, 'ticket.created', { typeId: 'task', projectId, parentId: null, title: 'Quokka window', start: 'backlog', draft: true }),
+    ).toMatchObject({ status: 'committed' });
+    expect(
+      await door(read2, 'member', 'note', n, 'note.created', { title: 'Minutes window', homeProjectId: projectId, scope: { mode: 'workspace' } }),
+    ).toMatchObject({ status: 'committed' });
+    expect(await door(read2, 'member', 'note', n, 'note.attached', { ticketId: d })).toMatchObject({ status: 'committed' });
+    const full = ['note.created', 'note.attached'];
+    expect(await surfaces('member', n, d, w)).toEqual({ stream: full, events: full, bootstrap: full, listed: [n], attached: [d] }); // CONTROL
+
+    expect(await door(read2, 'member', 'ticket', d, 'ticket.discarded', {})).toMatchObject({ status: 'committed' });
+    // The window is held: flagged, not erased.
+    expect((await db2.pool.query('SELECT draft_discarded FROM proj_tickets WHERE ticket_id = $1', [d])).rows).toEqual([{ draft_discarded: true }]);
+    const bare = ['note.created'];
+    expect(await surfaces('member', n, d, w)).toEqual({ stream: bare, events: bare, bootstrap: bare, listed: [], attached: [] });
+  });
+});
+
 describe('28.191 the note attach gate, G11 (R66)', () => {
   it('lets the author attach and detach; refuses the owner and an admin as for an unknown ticket; refuses note.created naming a draft; CONTROL: the owner attaches to a published ticket', async () => {
     const [d, p, ghost] = [newUlid(), newUlid(), newUlid()];
@@ -174,6 +211,15 @@ describe('28.191 the note attach gate, G11 (R66)', () => {
     expect(await attach('member', mine, d)).toMatchObject({ status: 'committed' });
     expect(await door(read, 'owner', 'note', mine, 'note.detached', { ticketId: d })).toMatchObject(refusal);
     expect(await door(read, 'member', 'note', mine, 'note.detached', { ticketId: d })).toMatchObject({ status: 'committed' });
+    // The detach names the draft too, so it is withheld like the attach (R66): the author's three surfaces hold both,
+    // the owner's and the admin's neither.
+    const both = ['note.created', 'note.attached', 'note.detached'];
+    expect(await surfaces('member', mine, d)).toEqual({ stream: both, events: both, bootstrap: both, listed: [], attached: [] });
+    for (const role of ['owner', 'admin'] as const) {
+      expect(await surfaces(role, mine, d), role).toEqual({
+        stream: ['note.created'], events: ['note.created'], bootstrap: ['note.created'], listed: [], attached: [],
+      });
+    }
     expect(
       await door(read, 'member', 'note', newUlid(), 'note.created', {
         title: 'Born on a draft', homeProjectId: PROJECT(), scope: { mode: 'workspace' }, attachTicketId: d,
