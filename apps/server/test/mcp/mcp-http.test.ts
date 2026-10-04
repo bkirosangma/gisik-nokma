@@ -14,6 +14,7 @@ const STUB_SESSION: Session = {
   userId: () => 'u',
   get: async () => ({}),
   post: async () => ({}),
+  put: async () => { throw new Error('unused'); },
   postEvents: async () => ({}),
   getBytes: async () => { throw new Error('unused'); },
   postMultipart: async () => { throw new Error('unused'); },

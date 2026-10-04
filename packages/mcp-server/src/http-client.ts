@@ -25,6 +25,7 @@ export type GisikClient = {
   get(path: string, token: string): Promise<unknown>;
   getBytes(path: string, token: string): Promise<DownloadedBytes>;
   post(path: string, body: unknown, token: string | null): Promise<unknown>;
+  put(path: string, body: unknown, token: string): Promise<unknown>;
   postMultipart(path: string, fields: Record<string, string>, file: FileBytes, token: string): Promise<unknown>;
 };
 
@@ -103,6 +104,8 @@ export function createGisikClient(serverUrl: string, fetchImpl: typeof fetch = f
           token,
         ),
       ),
+    put: async (path, body, token) =>
+      json(await request('PUT', path, { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }, token)),
     postMultipart: async (path, fields, file, token) => {
       const boundary = `gisik-${crypto.randomUUID()}`;
       return json(

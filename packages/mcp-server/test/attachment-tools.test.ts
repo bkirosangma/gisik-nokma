@@ -35,6 +35,9 @@ function fake(sniffed = 'image/png', over: { routes?: Record<string, unknown>; d
       return routes[path];
     },
     post: async () => ({}),
+    put: async () => {
+      throw new Error('put is not stubbed in this test');
+    },
     postEvents: async (events) => {
       sent.push(...(events as Array<Record<string, unknown>>));
       return COMMITTED;

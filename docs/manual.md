@@ -132,6 +132,7 @@ choose **Delete** beside it.
 
 There is a small bar across the top of nearly every screen. Inside a workspace it carries:
 
+- **Gisik Nokma** — the logo at the far left. It takes you to **Home**: your workspace's numbers and its Knowledge Graph.
 - **Workspaces** — the list of every workspace you are in.
 - **My work** — the tickets assigned to you.
 - **Members** — the people in this workspace, and what they are.
@@ -2062,8 +2063,8 @@ do it yourself.
 - **Comments.** Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete
   anyone's). Mentions like *@Asha* notify only people who can read the ticket or note.
 - **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
-- **Every ticket action** — change any field, close and reopen, reorder the backlog, see a ticket's history, delete
-  one or bring it back.
+- **Every ticket action** — change any field, close and reopen, reorder the backlog, link two tickets (*blocks*,
+  *relates to*, *duplicates*) or remove a link from either end, see a ticket's history, delete one or bring it back.
 - **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
   read), and invitations waiting for you.
 - **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,

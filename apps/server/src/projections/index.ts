@@ -12,6 +12,7 @@ import { createProjectionRegistry, type ProjectionRegistry } from './registry.js
 import { rollupsProjection } from './rollups.js';
 import { searchProjection } from './search.js';
 import { ticketCommentsProjection } from './ticket-comments.js';
+import { ticketLinksProjection } from './ticket-links.js';
 import { ticketsProjection } from './tickets.js';
 import { referencesProjection } from './references.js';
 import { ticketTypesProjection } from './ticket-types.js';
@@ -100,6 +101,10 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // the ticket table this reads is the shadow copy, and it is complete only
   // because proj_tickets was replayed first.
   registry.register(rollupsProjection);
+  // Typed links T2 (Knowledge Graph spec A §2.5). Links read nothing from proj_tickets, but sit beside it so a
+  // reader of the registry finds the pair together: `proj_tickets.links` is the source's folded copy of the same
+  // links. After proj_rollups rather than between it and proj_tickets, because that adjacency is load-bearing (above).
+  registry.register(ticketLinksProjection);
   registry.register(membershipsProjection);
   // §8 position amended by Plan 4 Task 14: proj_invites slots directly AFTER
   // proj_memberships. Nothing in this task's own path depends on that

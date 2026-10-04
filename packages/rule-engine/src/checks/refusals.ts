@@ -1,3 +1,4 @@
+import { linkReading, type TicketLinkKind } from '@gisik-nokma/domain';
 import type { Accept, Refusal } from '../engine.js';
 
 /**
@@ -11,7 +12,8 @@ import type { Accept, Refusal } from '../engine.js';
  *
  * The ids are namespaced by what the refusal is ABOUT — `ticket.` for the
  * ticket or its type, `hierarchy.` for the shape of the tree, `field.` for a
- * claim on a field — not by which check happens to raise them. Two checks may
+ * claim on a field, `link.` for a typed link between two tickets — not by
+ * which check happens to raise them. Two checks may
  * raise the same id (`checkTicketCreated` and `checkTicketReparented` both
  * refuse `hierarchy.rank`), and a person who meets one refusal twice should not
  * have to work out whether it is the same refusal.
@@ -88,10 +90,29 @@ export const REFUSALS = {
   'field.unknown': "This ticket's type has no such field. Add the field to the ticket type first.",
   'field.title-required': 'A ticket always has a title. Change the title instead of clearing it.',
   'field.priority-required': 'A ticket always has a priority. Change it instead of clearing it.',
+  /** Typed links (Knowledge Graph spec A §2.3, rule 1). */
+  'link.self': 'A ticket cannot be linked to itself.',
+  /**
+   * Rule 2, and deliberately ONE sentence for "no such ticket" and "a ticket in
+   * another workspace": the controller ruling P12 reasoning on
+   * `hierarchy.unknown-parent` above, because `getTicketState` is global.
+   */
+  'link.unknown-target': 'The other ticket does not exist in this workspace.',
+  'link.target-deleted': 'The other ticket is deleted. Restore it, or pick another ticket.',
+  /** The two "already" refusals carry titles; their reason is built by `linkExistsRefusal`. */
+  'link.duplicate': 'This link already exists.',
+  'link.reverse': 'The reverse of this link already exists.',
+  /** A removal that names a link this stream does not hold (typed-links plan T3; not in the spec's list). */
+  'link.absent': 'This ticket holds no such link, so there is nothing to remove.',
 } as const;
 
 export function rankRefusal(childTypeName: string, parentTypeName: string): string {
   return `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.`;
+}
+
+/** `"<from>" already <reading> "<to>".`: titles, because the engine holds no ticket keys. */
+export function linkExistsRefusal(kind: TicketLinkKind, fromTitle: string, toTitle: string): string {
+  return `"${fromTitle}" already ${linkReading(kind, 'out')} "${toTitle}".`;
 }
 
 /**
