@@ -24,6 +24,7 @@ describe('the ring store (spec §2.3)', () => {
     expect(mergeRing(s, end).exhausted).toBe(true);
     expect(mergeRing(s, { ...end, cursor: 'next' }).exhausted).toBe(false);
     expect(mergeRing(s, { ...end, items: [item('d')] }).exhausted).toBe(false);
+    expect(mergeRing(mergeRing(s, end), { ...end, hop: 4, cursor: 'next' }).exhausted).toBe(true); // the end stays the end
     expect(mergeRing(s, { ...end, hop: 1, cursor: 'next' }).rings).toBe(2); // a later page of an earlier ring keeps the farthest ring
   });
 });
