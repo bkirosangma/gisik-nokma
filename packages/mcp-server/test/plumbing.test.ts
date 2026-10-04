@@ -106,6 +106,9 @@ describe('14.360–14.369 plumbing', () => {
     let logins = 0;
     const client: GisikClient = {
       get: async () => ({}),
+      put: async () => {
+        throw new Error('put is not stubbed in this test');
+      },
       getBytes: async (_path, token) => {
         seen.push(`bytes:${token}`);
         if (token === 'stale') throw new HttpError(401, null);

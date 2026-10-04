@@ -10,6 +10,8 @@ export type Session = {
   get(path: string): Promise<unknown>;
   /** A JSON POST to a route other than the event door (founding a workspace is `POST /v1/workspaces`). */
   post(path: string, body: unknown): Promise<unknown>;
+  /** A JSON PUT: the notification preferences document is REPLACED whole (`PUT /v1/me/notification-preferences`). */
+  put(path: string, body: unknown): Promise<unknown>;
   postEvents(events: unknown[]): Promise<unknown>;
   /** Raw bytes of a download (`GET /v1/attachments/:id`); never parsed as JSON. */
   getBytes(path: string): Promise<DownloadedBytes>;
@@ -68,6 +70,7 @@ export async function createSession(deps: {
     userId: () => cached.userId,
     get: (path) => withReauth((token) => deps.client.get(path, token)),
     post: (path, body) => withReauth((token) => deps.client.post(path, body, token)),
+    put: (path, body) => withReauth((token) => deps.client.put(path, body, token)),
     postEvents: (events) => withReauth((token) => deps.client.post('/v1/events', { events }, token)),
     getBytes: (path) => withReauth((token) => deps.client.getBytes(path, token)),
     postMultipart: (path, fields, file) => withReauth((token) => deps.client.postMultipart(path, fields, file, token)),
