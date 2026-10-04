@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { canSee } from '../../src/visibility/can-see.js';
 import { callTool } from './helpers/door-matrix.js';
@@ -268,7 +267,7 @@ describe('create_ticket by email through the hosted door', () => {
     expect(await canSee(db.pool, out.userId, aId)).toBe(false); // CONTROL: only the ticket they were born onto
   });
 
-  it('14.656 a refusal after confirmation (an unknown ticket type; a project the caller is not in) is the server\'s words, creates nothing, and leaves no guest membership; the ledger shows the grant taken back', async () => {
+  it('14.656 a refusal after confirmation (an unknown ticket type) is the server\'s words, creates nothing, and leaves no guest membership; the ledger shows the grant taken back', async () => {
     const w = await buildEmailWorld(db, '26560');
     const out = await w.outsider('out-656@example.test');
     const before = await ticketCount(w);
@@ -276,18 +275,11 @@ describe('create_ticket by email through the hosted door', () => {
     expect(badType.isError).toBe(true);
     expect(badType.text).toMatch(/^refused by [\w.-]+: .+/);
     expect(badType.text).not.toContain('answered 422');
-    // A second project the member is NOT on.
-    const other = newUlid();
-    await mustCommit(w.app, w.owner, [
-      event(w.workspaceId, w.owner, { kind: 'project', id: other }, 'project.created', { name: 'Closed room' }),
-      event(w.workspaceId, w.owner, { kind: 'project', id: other }, 'project.member_added', { userId: w.owner.userId, projectAdmin: true }),
-    ]);
-    const notOn = await ask(w, w.member, CREATE(), out.email!, { confirm_assignee: out.userId, projectId: other });
-    expect(notOn.isError, 'if the server lets a workspace member create in a project they are not on, say so in the HANDOFF and drop this arm: the unknown-type arm above already owns the claim').toBe(true);
+    // The plan's second arm (a project the member is not on) is dropped: the server lets a workspace member create there (HANDOFF).
     expect(await ticketCount(w)).toBe(before);
     expect(await roleOf(w, out.userId)).toBeNull();
     const ledger = (await membershipLedger(w, out.userId)).map((m) => m.type);
-    expect(ledger.length).toBeGreaterThanOrEqual(2); // the unknown-type arm reaches the engine AFTER the grant
+    expect(ledger.length).toBeGreaterThanOrEqual(2); // the unknown-type refusal reaches the engine AFTER the grant
     expect(ledger.filter((t) => t === 'membership.granted')).toHaveLength(ledger.filter((t) => t === 'membership.revoked').length); // every grant was taken back
     expect(ledger.at(-1)).toBe('membership.revoked');
     // CONTROL, same `it`: the same confirmation with the ordinary arguments creates.
