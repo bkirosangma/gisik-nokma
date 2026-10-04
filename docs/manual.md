@@ -677,6 +677,27 @@ This is the honest list. Each one is an absence, not a hidden button.
 >
 > Worth knowing about. Not worth building a process on.
 
+### Linking tickets
+
+A ticket can be linked to other tickets, and the **Links** section on its sheet, just under the fields, lists
+them. A link has one of three kinds, and reads differently from each end:
+
+- **Blocks** / **Is blocked by**: this ticket has to be finished before the other can go ahead.
+- **Relates to**: the two tickets are connected. It reads the same from both.
+- **Duplicates** / **Is duplicated by**: this ticket repeats the other.
+
+Press **Add link**, pick how this ticket relates (**Is blocked by**, say), search for the other ticket by its key
+or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and
+GN-133 is blocked by GN-142, added on GN-133, make the same link. The new row shows at once, faded, and settles when
+it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block
+each other), the reason appears beside **Add link** and nothing is added.
+
+**Remove** takes a link away, from either end, and a message offers **Undo** for a few seconds. Links to
+tickets you cannot see are not shown, and neither is a count of them.
+
+A link only records the relationship. It does not mark the card, move it, or close a duplicate: close or
+move the tickets yourself.
+
 ### Why it shows who claimed everything
 
 You will notice that nothing is shown as a bare fact. Instead of a due date reading "30 Aug 2026", it
@@ -985,7 +1006,8 @@ your admin can turn this off per state (§11) — shows no Create ticket button 
 **"Blocked" is a property of the column, not of one ticket.** Whoever built your workflow can mark a state
 as a waiting or blocked one — "Waiting on parts", "Waiting on customer". Every ticket in that column is
 in that state by definition. There is no switch you flip on an individual ticket to say it is stuck; you
-need a state built for it.
+need a state built for it. To record what a ticket is waiting on, link it to the blocking ticket (see
+Linking tickets in §5): a link notes the blocker and does not mark the card or move it.
 
 **If the board is empty** it says **which** emptiness it is. A project with no tickets at all gets
 *"No tickets here yet. Create one."* A project whose only tickets are epics gets *"No tickets in this
