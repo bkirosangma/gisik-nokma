@@ -5,6 +5,7 @@
 export * from './engine.js';
 export { evaluateEvent } from './evaluate.js';
 export { REFUSAL_RULES } from './refusal-rules.js';
+export { DRAFT_NOT_ALLOWED_RULE } from './checks/drafts.js';
 /**
  * **The refusal VOCABULARY — the exact plain-language words this engine refuses
  * with.** Added because its absence was a measured defect, not a tidiness item.

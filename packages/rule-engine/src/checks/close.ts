@@ -69,7 +69,10 @@ export async function checkTicketClosed(env: EventEnvelope, ctx: EngineContext):
   // should hear that first (the remedy is different, and the children may
   // finish before it does).
   const children = await ctx.getChildrenStates(ticket.id);
-  const openCount = children.filter((child) => child.stateCategory !== 'terminal').length;
+  // A DRAFT child is not open work (drafts spec): it is private to its author, so counting it would refuse a close
+  // over work no view shows, and the refusal's number would disclose it. Mirrored by the auto-close sweep's
+  // `NOT EXISTS` (`apps/server/src/auto-close/sweep.ts`), which must answer alike.
+  const openCount = children.filter((child) => child.stateCategory !== 'terminal' && child.draft === undefined).length;
   if (openCount > 0) {
     return refuse(REFUSAL_RULES.parentTerminal,
       `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`);
