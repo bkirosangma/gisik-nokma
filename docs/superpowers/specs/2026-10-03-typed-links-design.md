@@ -170,7 +170,7 @@ The Knowledge Graph series opens **Features.md §24 "Knowledge Graph"** ↔ **`t
 
 | Block | Spec |
 |---|---|
-| 27.001–27.079 | A (this spec) |
+| 27.001–27.094 | A (this spec; T4b's 27.080–27.094 added 2026-10-04) |
 | 27.100–27.179 | B |
 | 27.200–27.349 | C |
 | 27.400–27.549 | D |
