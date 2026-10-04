@@ -60,11 +60,11 @@ function stub(opts: { lookup?: (email: string, call: number) => Person | null; o
     routes: {
       [`GET /v1/workspaces/${WS}/tickets/${T}`]: DETAIL,
       'GET /v1/me/workspaces': DIRECTORY,
-      [`POST ${LOOKUP}`]: (body) => {
+      [`POST ${LOOKUP}`]: (body: unknown) => {
         calls += 1;
         return { user: (opts.lookup ?? byEmail)((body as { email: string }).email, calls) };
       },
-      [`POST ${OUTSIDER}`]: (body) => (opts.outsider === undefined ? { result: COMMITTED } : opts.outsider(body)),
+      [`POST ${OUTSIDER}`]: (body: unknown) => (opts.outsider === undefined ? { result: COMMITTED } : opts.outsider(body)),
     },
   });
   return { ...rec, lookups: () => calls };
