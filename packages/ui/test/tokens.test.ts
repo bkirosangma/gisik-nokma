@@ -1536,8 +1536,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
     // No two rows share a pair: a duplicate is a row that guards nothing new but inflates the count below (UX fixes T1
     // fix 1). Asserted BEFORE the count so a re-added copy fails here, by name, and not only as a number that moved.
     expect(new Set(CONTRAST_PAIRS.map((pair) => `${pair.fg}|${pair.bg}`)).size, 'duplicate fg|bg rows').toBe(CONTRAST_PAIRS.length);
-    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows.
-    expect(CONTRAST_PAIRS.length).toBe(52);
+    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows, plus one: textMuted on timelineWeekend (Workflow and Timeline graphs Part 1 T9, 29.104).
+    expect(CONTRAST_PAIRS.length).toBe(53);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
@@ -1818,17 +1818,17 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * first is its PARITY — the prototype stripes `(i % 2 ? …)` over a 0-based `i`
  * (`desktop.dc.html:3159`, blob `6d7b67c0a52c`), so the tint falls on the
  * **1-indexed EVEN** rows. That is the whole content of the construct and it is
- * silently invertible: **two families in this repo already inverted it**
- * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2703` — both
- * `odd`). The second is that the stripe is VISIBLE — a fill that composites to
+ * silently invertible: **two families in this repo inverted it**
+ * (`.gn-list__table-row`, `ui.css:1088`, still `odd`; `.gn-timeline__row`, `:2703`, `odd` until the paged Timeline grid retired in
+ * Workflow and Timeline graphs Part 1 T9). The second is that the stripe is VISIBLE — a fill that composites to
  * its own ground is a stripe that draws nothing, the identical defect class
  * 13.920 measured for the state chip under `neo`.
  *
  * **What the control does and does not prove, because a control is where this
  * repo's defects hide.** The parity case reads the selector out of `ui.css`, so
  * the parity it asserts is the stylesheet's and not this file's. The control
- * then reads the two inverted siblings **through the same instrument, on the
- * same token**, and asserts their parity is the OTHER one — proving the two
+ * then reads the inverted sibling (the list's; the Timeline's retired with its paged grid) **through the same instrument, on the
+ * same token**, and asserts its parity is the OTHER one — proving the two
  * parity strings are distinguishable here and that this rule is not merely
  * matching a sibling. **It does not prove how a browser stripes**, which needs a
  * rendered page and which no case in this repo has; and it does not prove the
@@ -1871,7 +1871,7 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     return new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? null;
   };
 
-  it('the parity is EVEN, and the two inverted families read ODD — the control', () => {
+  it('the parity is EVEN, and the inverted list family reads ODD — the control', () => {
     // LOOK THIS STRING UP IN THE FILE FIRST. It is what makes the parity
     // assertions below facts about `ui.css` rather than about a literal in this
     // test: if the selector is not in the stylesheet, nothing after it means
@@ -1882,12 +1882,11 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     expect(ZEBRA).not.toMatch(/odd/);
 
     // THE CONTROL — same instrument, same TOKEN, the OPPOSITE parity, on the
-    // two families this port measured as inverted. See the docblock for what
+    // family this port measured as inverted. See the docblock for what
     // this does and does not prove.
-    const inverted = [
-      { selector: '.gn-list__table-row:nth-child(odd)', label: 'gn-list' },
-      { selector: '.gn-timeline__row:nth-of-type(odd)', label: 'gn-timeline' },
-    ] as const;
+    // The Timeline's `.gn-timeline__row:nth-of-type(odd)` was the second inverted family; it retired with the paged grid
+    // (Workflow and Timeline graphs Part 1 T9, 29.106), so the control reads the one that is left.
+    const inverted = [{ selector: '.gn-list__table-row:nth-child(odd)', label: 'gn-list' }] as const;
     const siblingParities = new Set<string>();
     for (const { selector, label } of inverted) {
       const body = declarationsFor(UI_CSS_TEXT, selector);

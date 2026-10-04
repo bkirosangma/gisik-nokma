@@ -3,7 +3,7 @@ import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from '../../
 
 /**
  * UX fixes Task 8 (audit PV-05, PV-06, PV-10, PV-11, PV-12): the project views. The stylesheet half —
- * 23.141 (the phone calendar chip is one line), 23.142 (the timeline bar's day margins and the today line) and
+ * 23.141 (the phone calendar chip is one line), 23.142 (retired by Workflow and Timeline graphs Part 1: the bars are placed by custom properties on a day axis now, 29.106) and
  * 23.145 (wrapped timeline titles keep their left edge). jsdom lays nothing out, so each case reads the
  * DECLARATIONS that give the box its shape, and the phone rule's source order against the base it overrides.
  */
@@ -84,34 +84,6 @@ describe('23.267 the phone calendar draws a dot and a 3px line, and the agenda r
     for (const selector of ['.gn-calendar__dot', '.gn-calendar__line', '.gn-calendar__agenda-item', '.gn-calendar__dots']) {
       expect(rulesNaming(ui, selector).filter((r) => r.atRule !== PHONE), selector).toEqual([]);
     }
-  });
-});
-
-describe('23.142 timeline bars take their day margins from custom properties; the today line is a token-coloured rule', () => {
-  it('23.142 the bar is on row 1 (so a today line over it cannot push it down) and its margins are a share of its own weeks', () => {
-    const bar = ruleExactly(ui, '.gn-timeline__bar');
-    expect(valueOf(bar, 'grid-row')).toBe('1');
-    const left = valueOf(bar, 'margin-left') ?? '';
-    const right = valueOf(bar, 'margin-right') ?? '';
-    expect(left).toContain('var(--timeline-bar-lead');
-    expect(left).toContain('var(--timeline-bar-weeks');
-    expect(right).toContain('var(--timeline-bar-tail');
-    expect(right).toContain('var(--timeline-bar-weeks');
-    // The 0.1875rem breathing margin the bar always had survives next to the day share.
-    expect(left).toContain('0.1875rem');
-
-    const today = ruleExactly(ui, '.gn-timeline__today');
-    expect(valueOf(today, 'grid-row')).toBe('1');
-    expect(valueOf(today, 'pointer-events')).toBe('none');
-    expect(valueOf(today, 'border-left')).toBe('2px solid var(--gn-accent)');
-    expect(valueOf(today, 'margin-left') ?? '').toContain('var(--timeline-today-lead');
-    // Tokens only: no hex or rgb in the line's rule.
-    expect(today).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
-
-    // CONTROL — the week tracks themselves did not change: the bar still lands on whole-week grid columns.
-    expect(valueOf(ruleExactly(ui, ['.gn-timeline__weeks', '.gn-timeline__row']), 'grid-template-columns')).toBe(
-      '14.375rem var(--timeline-week-columns)',
-    );
   });
 });
 

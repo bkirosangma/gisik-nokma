@@ -1951,7 +1951,8 @@ describe('13.1144 the board\'s whole-board empty state is styled', () => {
 
 /**
  * Case `13.1147` — E4-15 (and P35, filed from the other side) — the timeline's
- * Earlier / Today / Later buttons stop wearing the browser's default bevel.
+ * nav buttons (Earlier / Today / Later then; Today alone since Workflow and
+ * Timeline graphs Part 1 T9) stop wearing the browser's default bevel.
  *
  * `.gn-timeline__nav` declared a radius, a background, a colour, a font, padding
  * and a cursor — **and no `border`** — so the UA's `2px outset rgb(0,0,0)`

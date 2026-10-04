@@ -1,73 +1,61 @@
-import { useId, useMemo, useState, type CSSProperties } from 'react';
+import {
+  ScrollAdapter,
+  ZOOM_PRESETS,
+  axisLevels,
+  crossFade,
+  isMonday,
+  isWeekend,
+  keyOutside,
+  mondayOnOrBefore,
+  mountRange,
+  panLimits,
+  presetOf,
+  type DayRange,
+  type Frame,
+  type ZoomPreset,
+} from '@gisik-nokma/viewport';
+import { SegmentedControl } from '@gisik-nokma/ui';
+import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import type { UserNameFn } from '../claims/claim-labels.js';
-import { addDays, mondayOnOrBefore } from '../claims/dates.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
 import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
+import { isoDayOf } from './timeline-days.js';
+import { barsInRange, layoutLanes, type KeyMeasure, type LayoutLane } from './timeline-layout.js';
 import {
   buildTimelineModel,
   type TimelineCustomClaim,
+  type TimelineRow,
   type TimelineSideReason,
 } from './timeline-model.js';
 
 /**
- * The week columns, over Task 10's landed model. Everything this component
- * owns is ARRANGEMENT: which four-week step the window sits on. Nothing here
- * decides what a claim is, what it says, which week it falls in, why the
- * timeline is empty, or which heading the side list carries — those are the
- * model's answers and they are rendered VERBATIM.
+ * The continuous timeline (spec 2026-10-03, Part 1, TV-1 to TV-11).
  *
- * ## No colour literal, and no `tokens.color.*` either
+ * One axis, no pages. The surface is a native scroll container (`ScrollAdapter`, `@gisik-nokma/viewport`) holding one tall
+ * element; every bar is placed by CSS from three custom properties (`--d0`, `--dn`, `--row`) and ONE scale property
+ * (`--tl-ppd`, px per day), so a zoom frame is a property write and a scroll write and never a React render. React re-renders
+ * on three slow events only: the data changes, the zoom SETTLES (rows may re-pack, PK-4), or the view nears the edge of the
+ * mounted band (PR-5).
  *
- * The plan writes `tokens.color.*`, `tokens.space.*`, `tokens.font.body` and
- * `tokens.radius.sm` throughout this file; `@gisik-nokma/ui` exports no
- * `tokens` object. It exports a ROLE system, and the way a shipped component
- * in this repo reaches it is a BEM class whose colours resolve to
- * `var(--gn-…)` in `packages/ui/src/ui.css` (see `.gn-state-node`,
- * `.gn-board`, `.gn-calendar`). So: classes here, CSS there. Task 9 answered
- * the same question for the sibling grid and found five of the plan's six
- * colour names were existing roles under new words; this file needed no new
- * role at all — a bar is `accent`, an in-transit claim is `pending`, a custom
- * date claim is `customMarker`, the grid lines are `border`.
+ * Everything this component decides is ARRANGEMENT. What a claim is, what it says, which lane a ticket sits in, why the
+ * timeline is empty and which heading the side list carries are the model's answers, rendered verbatim.
  *
- * The only inline styles are the two COMPUTED numbers: the bar's
- * `grid-column`, and the column count below.
+ * ## No colour literal
  *
- * ## The column count is stated ONCE
+ * Classes here, CSS in `packages/ui/src/ui.css`. The only inline styles are the computed numbers: a bar's day offset, length
+ * and row, a lane's offset and extent, and the surface's length.
  *
- * The plan writes `gridTemplateColumns` twice — once on the week header, once
- * on every ticket row — from the same expression. Two statements of one
- * layout, free to disagree, and a disagreement would silently slide every bar
- * off the column it names without failing anything. Here the week TRACK LIST
- * is set once on the root as a custom property and both grids read it from
- * CSS, which keeps the title column's width in the stylesheet with the rest of
- * the layout.
+ * ## No clock
  *
- * It carries `repeat(n, 1fr)` rather than the bare `n`, and that is the whole
- * point of the shape: `grid-template-columns: 12rem var(--timeline-week-columns)`
- * substitutes a var as a plain COMPONENT of the value, while
- * `repeat(var(--n), 1fr)` would substitute one into a function's argument. No
- * test in this repo could tell the difference — jsdom computes no layout — and
- * if that second form failed to parse the whole declaration would become
- * `none`, every row would fall back to implicit auto-placed tracks, and the
- * bar's `grid-column` would index into them. A silently broken timeline behind
- * a green suite is exactly what this file is not allowed to ship.
+ * `today` is a prop, converted to a day number by the model. The engine's clock reads (`requestAnimationFrame`,
+ * `performance.now`) live in `packages/viewport/src/dom/`, outside the clock-free roots, so
+ * `test/calendar/clock-free.test.ts` still scans this file's source for device getters and finds none.
  *
- * It is deliberately NOT `--gn-`-prefixed. That namespace belongs to the token
- * origin, and `packages/ui/test/tokens.test.ts` asserts that every
- * `var(--gn-…)` in `ui.css` names a declared colour ROLE — a track list is not
- * a colour, and borrowing the prefix would either redden that guard or force
- * it to grow an exception.
+ * ## jsdom has no layout
  *
- * ## NO CLOCK IS READ HERE
- *
- * `today` is a prop. The mounting shell reads the device's INSTANT and hands
- * it to the domain's `istDayOf`, the one place in the product that turns an
- * instant into a day. This surface is the one that turns a claimed day into a
- * NUMBER — a week index — so a device getter here would not merely mislabel a
- * column: it would file the same claim in a different week from the calendar's
- * answer about that same claim. One product, two answers.
- * `test/calendar/clock-free.test.ts` scans this file's source to keep it out.
+ * A container 0 px wide (jsdom, or a hidden tab) has no viewport to virtualise against, so the view mounts every bar then;
+ * with a real width it mounts the band `[visible - V, visible + V]` (PR-5).
  */
 
 export type TimelineViewProps = {
@@ -79,44 +67,29 @@ export type TimelineViewProps = {
   filter?: FilterSpec;
   laneEpicId?: string | null;
   /**
-   * WHAT THIS WORKSPACE CALLS AN EPIC — forwarded UNCHANGED, never defaulted
-   * here, for the same reason `weeksCount` below is: `buildTimelineModel` states
-   * the default (`isBuiltinEpicType`) and `epic-ancestor.ts` states why that
-   * default is deliberately narrower than the server's rank-1 rule.
-   *
-   * It reaches TWO answers in the model, not one: `epicAncestorOf` for the lane
-   * filter and grouping, and the `isEpicType(input.state.typeId) && start ===
-   * null && due === null` arm that decides an undated epic's side-list entry.
-   * `CalendarView` gained the same prop in the same change — see its note for
-   * why fixing one view alone would have been worse than fixing neither.
+   * WHAT THIS WORKSPACE CALLS AN EPIC — forwarded UNCHANGED, never defaulted here: `buildTimelineModel` states the default
+   * (`isBuiltinEpicType`) and `epic-ancestor.ts` states why it is deliberately narrower than the server's rank-1 rule. It
+   * reaches two answers in the model: `epicAncestorOf` (the lane filter and the grouping) and the undated-epic arm that
+   * decides an undated epic's side-list entry.
    */
   isEpicType?: IsEpicType;
   /**
-   * THE OWNER'S RULING (2026-09-20): an epic draws a row in the List and
-   * nowhere else, so this view does not draw the epic's OWN bar. Forwarded
-   * UNCHANGED, never defaulted here — the model states what the flag means and
-   * why it is opt-in, and a `?? true` in this file would be a second statement
-   * of the product's rule, free to drift from the model's. `CalendarView`
-   * takes the identical prop; see `calendar-model.ts`'s `hideEpicRows`.
-   *
-   * ⚠ A LANE IS NOT A ROW, and the owner ruled on exactly this distinction for
-   * the Backlog's section headers: *"Row only."* A lane that still holds a
-   * dated child keeps its heading, titled with the epic's name, and that
-   * heading is now the ONLY thing naming the group — which is why the model
-   * removes the epic's placement INSIDE `visible` rather than from its inputs.
+   * THE OWNER'S RULING (2026-09-20): an epic draws a row in the List and nowhere else, so this view does not draw the
+   * epic's OWN bar. A lane that still holds a dated child keeps its heading, titled with the epic's name: the epic stays
+   * visible as a NAME and goes absent as a ticket. Forwarded unchanged; see `calendar-model.ts`'s `hideEpicRows`.
    */
   hideEpicRows?: boolean;
-  /**
-   * Forwarded UNCHANGED, never defaulted here. `buildTimelineModel` states the
-   * default (8) and refuses a count it cannot mean; a `?? 8` in this file
-   * would be a second statement of the window's width, free to drift from the
-   * model's, and a clamp would swallow the refusal.
-   */
-  weeksCount?: number;
 };
 
-/** Earlier/Later move four weeks. */
-const SHIFT_DAYS = 28;
+/** The default zoom on open: the Week preset, 24 px per day (the Home mockup's scale). */
+const DEFAULT_PPD: number = ZOOM_PRESETS.week;
+/** The margin on each side of the drawn days is one viewport at the default zoom; this is its width before it is measured. */
+const FALLBACK_WIDTH_PX = 960;
+const KEY_PADDING_PX = 12;
+/** TG-13: the panel fills the height under the filters, but never less than this. */
+const MIN_PANEL_PX = 320;
+const PANEL_BOTTOM_GAP_PX = 16;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /**
  * A ticket's custom date claims, beside the ticket rather than across the
@@ -184,182 +157,363 @@ function sideEntryClassName(reason: TimelineSideReason): string {
   }
 }
 
+
+type MeasureContext = { font: string; measureText(text: string): { width: number } };
+
+/**
+ * The width of a key on a bar, in px. A cached canvas measurement where the browser has one (`OffscreenCanvas`); a 6.5 px
+ * per character estimate where it does not (jsdom). The estimate only decides whether a label is drawn outside its bar.
+ */
+function useKeyMeasure(): KeyMeasure {
+  return useMemo(() => {
+    const cache = new Map<string, number>();
+    let context: MeasureContext | null | undefined;
+    const measureWithCanvas = (text: string): number | null => {
+      if (context === undefined) {
+        context = typeof OffscreenCanvas === 'function' ? (new OffscreenCanvas(1, 1).getContext('2d') as MeasureContext | null) : null;
+        if (context) context.font = '600 11px system-ui, sans-serif';
+      }
+      return context ? context.measureText(text).width : null;
+    };
+    return (key) => {
+      if (key === null || key === '') return 0;
+      const held = cache.get(key);
+      if (held !== undefined) return held;
+      const width = Math.ceil((measureWithCanvas(key) ?? key.length * 6.5) + KEY_PADDING_PX);
+      cache.set(key, width);
+      return width;
+    };
+  }, []);
+}
+
+/**
+ * TV-11: the panel fills the height under the filters. Measured, not guessed: the panel's top edge to the bottom of the window,
+ * re-read when the window resizes (a phone rotating, a keyboard opening). A flex parent cannot do this alone because the
+ * project page's filter bar and the panel are siblings of unknown heights inside a scrolling page.
+ */
+function useFillHeight(ref: RefObject<HTMLElement | null>): void {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null) return undefined;
+    const fit = (): void => {
+      const available = window.innerHeight - el.getBoundingClientRect().top - PANEL_BOTTOM_GAP_PX;
+      el.style.height = `${Math.max(MIN_PANEL_PX, Math.floor(available))}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [ref]);
+}
+
+/** Month and week labels for the days in [first, last]: `month` marks the 1st, `week` marks each Monday ("W 28 Sep"). */
+function axisLabels(first: number, last: number): Array<{ day: number; month: string | null; week: string | null; number: string }> {
+  const out: Array<{ day: number; month: string | null; week: string | null; number: string }> = [];
+  for (let day = first; day <= last; day += 1) {
+    const iso = isoDayOf(day);
+    const dom = Number(iso.slice(8, 10));
+    const monthName = MONTHS[Number(iso.slice(5, 7)) - 1] ?? '';
+    out.push({
+      day,
+      month: dom === 1 ? `${monthName} ${iso.slice(0, 4)}` : null,
+      week: isMonday(day) ? `W ${dom} ${monthName}` : null,
+      number: String(dom),
+    });
+  }
+  return out;
+}
+
+/** TG-14: status is never colour alone. A finished bar carries a check, one in progress a play mark, a not-started one nothing. */
+function stateMark(category: string): { glyph: string; word: string } | null {
+  if (category === 'terminal') return { glyph: '✓', word: 'Done' };
+  if (category === 'active') return { glyph: '▶', word: 'In progress' };
+  return null;
+}
+
+type TimelineBarProps = {
+  row: TimelineRow;
+  /** The packed row (PK-1). */
+  layoutRow: number;
+  firstDay: number;
+  ppd: number;
+  category: string;
+  measure: KeyMeasure;
+  detailId: string;
+  onOpen: (ticketId: string) => void;
+};
+
+/**
+ * One bar and everything that travels with it. MEMOISED: the mounted band refreshes at the quarter-edge (PR-5) and almost every bar
+ * in it is the same bar as a frame ago, so a refresh renders only the bars that are new. Every prop is a primitive or a value
+ * that is stable between refreshes (`row` comes from the model's memo, `measure` from `useKeyMeasure`, `onOpen` from a ref).
+ */
+const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
+  const { row, layoutRow, firstDay, ppd, category, measure, detailId, onOpen } = props;
+  const mark = stateMark(category);
+  const detail = [row.key, mark?.word, row.provenance, ...row.customClaims.map((entry) => entry.label)]
+    .filter((part): part is string => part !== null && part !== undefined && part !== '')
+    .join('; ');
+  const barPx = (row.endDay - row.startDay + 1) * ppd;
+  const outside = row.key !== null && keyOutside(barPx, measure(row.key));
+  const vars = {
+    ['--d0' as string]: row.startDay - firstDay,
+    ['--dn' as string]: row.endDay - row.startDay + 1,
+    ['--row' as string]: layoutRow,
+  } as CSSProperties;
+  return (
+    <div className="gn-timeline__row" data-ticket-id={row.ticketId} style={vars}>
+      <button
+        type="button"
+        className="gn-timeline__bar"
+        data-day-from={row.startDay}
+        data-day-to={row.endDay}
+        data-pending={row.pending ? 'true' : undefined}
+        data-state={mark === null ? undefined : mark.word === 'Done' ? 'done' : 'active'}
+        aria-label={row.title}
+        aria-describedby={detailId}
+        title={detail}
+        onClick={() => onOpen(row.ticketId)}
+      >
+        {mark !== null && (
+          <span className="gn-timeline__mark" aria-hidden="true">
+            {mark.glyph}
+          </span>
+        )}
+        {!outside && row.key !== null && <span className="gn-timeline__key">{row.key}</span>}
+        <span className="gn-timeline__title-text">{row.title}</span>
+      </button>
+      {outside && (
+        <span className="gn-timeline__key gn-timeline__key--outside" aria-hidden="true">
+          {row.key}
+        </span>
+      )}
+      {/* TV-2: custom date claims stay beside the ticket. A bar row has no room for a list, so it is a callout that opens on
+          hover or focus (CSS); the labels are also in the bar's hover and description. */}
+      {row.customClaims.length > 0 && <CustomClaimList claims={row.customClaims} />}
+      <span id={detailId} className="gn-visually-hidden">
+        {detail}
+      </span>
+    </div>
+  );
+});
+
 export function TimelineView(props: TimelineViewProps) {
   const idPrefix = useId();
-  /**
-   * The window's first Monday. Seeded from the prop, and `Today` re-seeds from
-   * the prop rather than from whatever it was mounted with — so a shell that
-   * re-renders across midnight returns to the day it is now handing in.
-   */
-  const [anchor, setAnchor] = useState<string>(mondayOnOrBefore(props.today));
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useFillHeight(panelRef);
+  const adapterRef = useRef<ScrollAdapter | null>(null);
+  const measure = useKeyMeasure();
+  const openRef = useRef(props.onOpenTicket);
+  openRef.current = props.onOpenTicket;
+  const openTicket = useCallback((ticketId: string): void => openRef.current(ticketId), []);
 
   const model = useMemo(
     () =>
       buildTimelineModel(props.tickets, {
-        anchor,
         today: props.today,
         userName: props.userName,
         ...(props.filter === undefined ? {} : { filter: props.filter }),
         ...(props.laneEpicId === undefined ? {} : { laneEpicId: props.laneEpicId }),
         ...(props.isEpicType === undefined ? {} : { isEpicType: props.isEpicType }),
         ...(props.hideEpicRows === undefined ? {} : { hideEpicRows: props.hideEpicRows }),
-        ...(props.weeksCount === undefined ? {} : { weeksCount: props.weeksCount }),
       }),
-    [
-      props.tickets,
-      props.today,
-      props.userName,
-      props.filter,
-      props.laneEpicId,
-      props.isEpicType,
-      props.hideEpicRows,
-      props.weeksCount,
-      anchor,
-    ],
+    [props.tickets, props.today, props.userName, props.filter, props.laneEpicId, props.isEpicType, props.hideEpicRows],
   );
 
-  /* Board prototype port Task 11 (2026-09-16), spec Timeline `:506-538`,
-     "Header grid" row: `minmax(0, 1fr)` per week track, not a bare `1fr` —
-     CSS Grid's implicit automatic minimum is `auto` (min-content) on a plain
-     `1fr` track, so a long bar or title text can still push a week column
-     wider than its share and defeat `.gn-timeline__bar`'s own
-     `overflow:hidden; text-overflow:ellipsis`. `minmax(0, …)` is what lets a
-     track actually shrink below its content's intrinsic size. Pinned by
-     exact equality in `test/timeline/timeline-view.test.tsx` (11.82: the
-     default-eight and the `weeksCount:2` cases), updated alongside this. */
-  const layout = {
-    '--timeline-week-columns': `repeat(${model.weeks.length}, minmax(0, 1fr))`,
+  // ---- what is drawn: the pan range (TV-3) ----
+  const [widthPx, setWidthPx] = useState(FALLBACK_WIDTH_PX);
+  const anchorDay = model.todayDay ?? model.firstDay ?? 0;
+  const drawn: DayRange | null = model.firstDay === null || model.lastDay === null ? null : { start: model.firstDay, end: model.lastDay };
+  const limits = panLimits(drawn, anchorDay, Math.ceil(widthPx / DEFAULT_PPD));
+  const firstDay = mondayOnOrBefore(limits.start);
+  const extentDays = limits.end - firstDay + 1;
+
+  // ---- the motion state React needs to hear about (slow) ----
+  const [ppd, setPpd] = useState(DEFAULT_PPD);
+  const [moving, setMoving] = useState(false);
+  const [band, setBand] = useState<DayRange>(() => mountRange({ start: anchorDay - 27, end: anchorDay + 26 }));
+  const [unmeasured, setUnmeasured] = useState(false);
+  const bandRef = useRef(band);
+  bandRef.current = band;
+  const stateRef = useRef({ firstDay, extentDays, anchorDay });
+  stateRef.current = { firstDay, extentDays, anchorDay };
+
+  // ---- the layout: packed once per lane, re-packed only when the zoom SETTLES in another bucket ----
+  const layout = useMemo(() => {
+    const lanes: LayoutLane[] = model.groups.map((group) => ({
+      laneId: group.epicId ?? 'no-epic',
+      items: group.rows.map((row) => ({ id: row.ticketId, key: row.key, startDay: row.startDay, endDay: row.endDay })),
+    }));
+    return layoutLanes(lanes, { ppd, measure });
+  }, [model.groups, ppd, measure]);
+  const rowById = useMemo(() => {
+    const byId = new Map<string, TimelineRow>();
+    for (const group of model.groups) for (const row of group.rows) byId.set(row.ticketId, row);
+    return byId;
+  }, [model.groups]);
+  const categoryById = useMemo(() => new Map(props.tickets.map((t) => [t.state.id, t.state.stateCategory])), [props.tickets]);
+
+  // ---- the adapter ----
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return undefined;
+    const width = canvas.clientWidth;
+    setUnmeasured(width === 0);
+    if (width > 0) setWidthPx(width);
+    const adapter = new ScrollAdapter({
+      element: canvas,
+      axis: 'x',
+      firstDay: stateRef.current.firstDay,
+      scale: DEFAULT_PPD,
+      extentDays: () => stateRef.current.extentDays,
+      todayDay: () => stateRef.current.anchorDay,
+    });
+    adapterRef.current = adapter;
+    adapter.animateTo({ offset: stateRef.current.anchorDay + 0.5 - adapter.viewportDays() / 2 }, { instant: true });
+    // Only the scale and the moving flag are this view's business; the first call below builds just those two (a whole
+    // Frame literal would name the motion fields, and 11.180's reporting-scope guard scans this file for that vocabulary).
+    const refresh = (frame: Pick<Frame, 'scale' | 'moving'>): void => {
+      const levels = axisLevels(frame.scale);
+      canvas.style.setProperty('--tl-fade-days', String(levels.dayNumbers));
+      canvas.style.setProperty('--tl-fade-weeks', String(crossFade(frame.scale, 16)));
+      canvas.dataset['weekend'] = levels.weekendTint ? 'on' : 'off';
+      const range = adapter.visibleRange();
+      const held = bandRef.current;
+      const days = range.end - range.start + 1;
+      if (range.start < held.start + days / 4 || range.end > held.end - days / 4) setBand(mountRange(range));
+      if (!frame.moving) {
+        setPpd((current) => (Math.abs(current - frame.scale) < 1e-6 ? current : frame.scale));
+      }
+      setMoving((current) => (current === frame.moving ? current : frame.moving));
+    };
+    const off = adapter.onFrame(refresh);
+    if (width > 0) setBand(mountRange(adapter.visibleRange())); // PR-5 from the first measured frame; the 54-day guess is only transitional (planner ruling 2026-10-04)
+    refresh({ scale: adapter.scale(), moving: false });
+    return () => {
+      off();
+      adapter.destroy();
+      adapterRef.current = null;
+    };
+  }, []);
+
+  // The first day of the surface moved (data arrived to the left): keep the same day at the viewport edge.
+  useLayoutEffect(() => {
+    adapterRef.current?.rebase(firstDay);
+  }, [firstDay]);
+
+  // ---- toolbar ----
+  const preset = presetOf(ppd);
+  const zoomTo = (next: ZoomPreset): void => adapterRef.current?.animateTo({ scale: ZOOM_PRESETS[next] });
+  const goToday = (): void => {
+    const adapter = adapterRef.current;
+    if (adapter !== null) adapter.animateTo({ offset: anchorDay + 0.5 - adapter.viewportDays() / 2 });
+  };
+
+  // ---- what to mount ----
+  const range: DayRange = unmeasured ? { start: firstDay, end: firstDay + extentDays - 1 } : band;
+  const labelDays = useMemo(() => axisLabels(Math.max(firstDay, range.start), Math.min(firstDay + extentDays - 1, range.end)), [firstDay, extentDays, range.start, range.end]);
+  const surfaceStyle = {
+    width: `calc(var(--tl-ppd) * ${extentDays} * 1px)`,
+    height: `calc(var(--tl-axis-height) + ${layout.extent}px)`,
   } as CSSProperties;
 
   return (
-    <div className="gn-timeline" style={layout}>
-      <header className="gn-timeline__header">
-        <button
-          type="button"
-          className="gn-timeline__nav"
-          onClick={() => setAnchor(addDays(anchor, -SHIFT_DAYS))}
-        >
-          {/* Decorative: the word carries the meaning, so the accessible name
-              is the word and nothing else. */}
-          <span className="gn-timeline__glyph" aria-hidden="true">
-            ‹
-          </span>
-          Earlier
-        </button>
-        <button
-          type="button"
-          className="gn-timeline__nav"
-          onClick={() => setAnchor(mondayOnOrBefore(props.today))}
-        >
+    <div ref={panelRef} className="gn-timeline" data-zooming={moving ? 'true' : undefined}>
+      <header className="gn-timeline__toolbar">
+        <button type="button" className="gn-timeline__nav" onClick={goToday}>
           Today
         </button>
-        <button
-          type="button"
-          className="gn-timeline__nav"
-          onClick={() => setAnchor(addDays(anchor, SHIFT_DAYS))}
-        >
-          Later
-          <span className="gn-timeline__glyph" aria-hidden="true">
-            ›
-          </span>
-        </button>
+        <SegmentedControl<ZoomPreset | 'free'>
+          variant="radio"
+          aria-label="Timeline zoom"
+          options={[
+            { value: 'day', label: 'Day' },
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+          ]}
+          value={preset ?? 'free'}
+          onChange={(next) => {
+            if (next !== 'free') zoomTo(next);
+          }}
+        />
       </header>
 
-      {/*
-        The model chose the sentence and it is rendered VERBATIM. **TWO arms
-        since 2026-09-20** — nothing claimed OR a narrowing emptied it (one
-        sentence, which names the narrowing because the model cannot tell the
-        two apart), and dated work scheduled outside these weeks — because they
-        are different facts, and the second is the one this component CANNOT
-        reconstruct: its props say nothing about where the window is. There is
-        deliberately no bare "nothing here" branch.
-      */}
+      {/* The model chose the sentence and it is rendered VERBATIM. ONE arm since 2026-10-03: nothing claimed, or a
+          narrowing emptied it. "Dated work sits outside these weeks" is gone with the weeks. */}
       {model.emptyCopy !== null && (
         <p role="note" className="gn-timeline__empty">
           {model.emptyCopy}
         </p>
       )}
 
-      <div className="gn-timeline__weeks">
-        <div className="gn-timeline__corner" />
-        {model.weeks.map((week) => (
-          <div key={week.start} className="gn-timeline__week" data-week={week.start}>
-            {week.label}
-          </div>
-        ))}
-      </div>
-
-      {model.groups.map((group) => (
-        <section key={group.epicId ?? 'no-epic'} className="gn-timeline__group">
-          <h3 className="gn-timeline__group-heading">{group.epicTitle}</h3>
-          {group.rows.map((row) => {
-            // E4-28: the bar's rendered text is the ticket title alone — the
-            // date span lives only in the `title` attribute, which is not
-            // reliably read by assistive tech (it requires hover, which
-            // touch/mobile AT has no equivalent for). Linked as a
-            // DESCRIPTION, not folded into the accessible NAME
-            // `timeline-view.test.tsx` pins to the ticket title alone — the
-            // same ARIA shape `WorkspaceLinks` already uses and documents
-            // (`apps/web/app/w/[workspaceId]/page.tsx`).
-            const detail = [row.provenance, ...row.customClaims.map((entry) => entry.label)].join('; ');
-            const detailId = `${idPrefix}-detail-${row.ticketId}`;
-            return (
-              <div key={row.ticketId} className="gn-timeline__row" data-ticket-id={row.ticketId}>
-                <div className="gn-timeline__title">
-                  <div className="gn-timeline__title-text">{row.title}</div>
-                  {row.customClaims.length > 0 && <CustomClaimList claims={row.customClaims} />}
-                </div>
-                <button
-                  type="button"
-                  className="gn-timeline__bar"
-                  data-pending={row.pending ? 'true' : undefined}
-                  data-clipped-start={row.bar.clippedStart ? 'true' : undefined}
-                  data-clipped-end={row.bar.clippedEnd ? 'true' : undefined}
-                  data-day-from={row.days.from}
-                  data-day-to={row.days.to}
-                  /* Column 1 is the title, so week `i` is column `i + 2`; the end
-                     is exclusive, hence `+ 3`. The bar sits in the WEEK columns
-                     it touches and the stylesheet trims it to its real days
-                     (UX fixes T8, 23.142): `lead` days before it in its first
-                     week and `tail` days after it in its last, over `weeks`
-                     weeks, so a Mon–Wed bar ends on Wednesday and not on the
-                     Sunday that closes its week. */
-                  style={
-                    {
-                      gridColumn: `${row.bar.fromWeek + 2} / ${row.bar.toWeek + 3}`,
-                      '--timeline-bar-lead': row.days.from % 7,
-                      '--timeline-bar-tail': 6 - (row.days.to % 7),
-                      '--timeline-bar-weeks': row.bar.toWeek - row.bar.fromWeek + 1,
-                    } as CSSProperties
-                  }
-                  title={detail}
-                  aria-describedby={detailId}
-                  onClick={() => props.onOpenTicket(row.ticketId)}
+      <div className="gn-timeline__stage">
+      <div ref={canvasRef} className="gn-timeline__canvas" role="group" aria-label="Timeline" tabIndex={0} style={{ ['--tl-ppd' as string]: DEFAULT_PPD }}>
+        <div className="gn-timeline__surface" style={surfaceStyle}>
+          <div className="gn-timeline__axis" aria-hidden="true">
+            <div className="gn-timeline__axis-row gn-timeline__axis-row--period">
+              {labelDays.map((d) =>
+                d.month !== null ? (
+                  <span key={`m${d.day}`} className="gn-timeline__axis-label gn-timeline__axis-label--month" style={{ ['--d0' as string]: d.day - firstDay } as CSSProperties}>
+                    {d.month}
+                  </span>
+                ) : d.week !== null ? (
+                  <span key={`w${d.day}`} className="gn-timeline__axis-label gn-timeline__axis-label--week" style={{ ['--d0' as string]: d.day - firstDay } as CSSProperties}>
+                    {d.week}
+                  </span>
+                ) : null,
+              )}
+            </div>
+            <div className="gn-timeline__axis-row gn-timeline__axis-row--days">
+              {labelDays.map((d) => (
+                <span
+                  key={d.day}
+                  className="gn-timeline__axis-day"
+                  data-weekend={isWeekend(d.day) ? 'true' : undefined}
+                  style={{ ['--d0' as string]: d.day - firstDay } as CSSProperties}
                 >
-                  {row.title}
-                </button>
-                <span id={detailId} className="gn-visually-hidden">
-                  {detail}
+                  {d.number}
                 </span>
-                {/* The today line (UX fixes T8, 23.142, audit PV-10): one hairline per row, on the prop's day, so
-                    "are we late?" is answerable from the page. Drawn for the eye only. */}
-                {model.todayDay !== null && (
-                  <span
-                    className="gn-timeline__today"
-                    aria-hidden="true"
-                    style={
-                      {
-                        gridColumn: `${Math.floor(model.todayDay / 7) + 2} / ${Math.floor(model.todayDay / 7) + 3}`,
-                        '--timeline-today-lead': model.todayDay % 7,
-                      } as CSSProperties
-                    }
-                  />
-                )}
-              </div>
+              ))}
+            </div>
+          </div>
+
+          {model.todayDay !== null && (
+            <span className="gn-timeline__today" aria-hidden="true" data-day={model.todayDay} style={{ ['--d0' as string]: model.todayDay - firstDay } as CSSProperties} />
+          )}
+
+          {model.groups.map((group, index) => {
+            const lane = layout.lanes[index];
+            if (lane === undefined) return null;
+            return (
+              <section
+                key={group.epicId ?? 'no-epic'}
+                className="gn-timeline__lane gn-timeline__group"
+                style={{ ['--lane-offset' as string]: `${lane.offset}px`, ['--lane-extent' as string]: `${lane.extent}px` } as CSSProperties}
+              >
+                <h3 className="gn-timeline__group-heading">{group.epicTitle}</h3>
+                {barsInRange(lane, range).map((placed) => {
+                  const row = rowById.get(placed.id);
+                  if (row === undefined) return null;
+                  return (
+                    <TimelineBar
+                      key={row.ticketId}
+                      row={row}
+                      layoutRow={placed.row}
+                      firstDay={firstDay}
+                      ppd={ppd}
+                      category={categoryById.get(row.ticketId) ?? 'open'}
+                      measure={measure}
+                      detailId={`${idPrefix}-detail-${row.ticketId}`}
+                      onOpen={openTicket}
+                    />
+                  );
+                })}
+              </section>
             );
           })}
-        </section>
-      ))}
+        </div>
+      </div>
+      </div>
 
       {/*
         A VISIBLE aside, never a disclosure: partially dated work is honest

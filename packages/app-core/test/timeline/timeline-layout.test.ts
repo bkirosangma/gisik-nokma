@@ -73,9 +73,11 @@ describe('29.082 the fewest rows', () => {
 });
 
 describe('29.083 the key label is part of the footprint, at the bucketed scale', () => {
-  const lane = (): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-123'), item('b', 3, 6, 'GN-124')] });
+  // The key is drawn 4 px after the bar's END (29.055, ERRATA E10), so a one-day bar with a 70 px key reserves
+  // ceil(74 / scale) days after its day: days 0-5 at 16 px/day, days 0-3 at 32.
+  const lane = (): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-123'), item('b', 4, 7, 'GN-124')] });
 
-  it('29.083 a one-day bar whose key needs 70 px reserves 5 days at 16 px/day, so a bar on day 3 goes to a second row; at 32 px/day the label needs 3 days and they share one row; the key of each bar is measured', () => {
+  it('29.083 a one-day bar whose key needs 70 px reserves days 0-5 at 16 px/day, so a bar on day 4 goes to a second row; at 32 px/day it reserves days 0-3 and they share one row; the key of each bar is measured', () => {
     expect(layoutLanes([lane()], { ppd: 16, measure: fixed(70) }).lanes[0]?.rows).toBe(2);
     expect(layoutLanes([lane()], { ppd: 32, measure: fixed(70) }).lanes[0]?.rows).toBe(1);
     // Each bar's own key is measured: only GN-123 (the one-day bar) needs 70 px. Control: when only GN-124 needs it, the
@@ -93,23 +95,23 @@ describe('29.083 the key label is part of the footprint, at the bucketed scale',
 });
 
 describe('29.084 the paper pin', () => {
-  it('29.084 a pinned bar adds 14 px to its label footprint: 60 px of key at 16 px/day is 4 days, 74 px is 5; control: the unpinned neighbour on day 4 shares a row, the pinned one does not; the pin is read per bar, and a bar with no pinned flag is unpinned', () => {
+  it('29.084 a pinned bar adds 14 px to its label footprint: 4 + 60 px of key at 16 px/day is 4 days after the bar, 4 + 74 px is 5; control: the unpinned neighbour on day 5 shares a row, the pinned one does not; the pin is read per bar, and a bar with no pinned flag is unpinned', () => {
     expect(PIN_PX).toBe(14);
-    const make = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1', pinned), item('b', 4, 6, 'GN-2')] });
+    const make = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1', pinned), item('b', 5, 7, 'GN-2')] });
     expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
     expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(2);
-    // Exactly 14 px, by behaviour: 50 + 14 = 64 px is 4 days at 16 px/day (one row), 51 + 14 = 65 px is 5 (two rows).
-    // 13 px would put 51 in one row; 15 px would put 50 in two.
-    expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(50) }).lanes[0]?.rows).toBe(1);
-    expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(51) }).lanes[0]?.rows).toBe(2);
-    expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(51) }).lanes[0]?.rows).toBe(1);
-    // The pin is read per bar: pinning the SECOND bar (day 4, 60 + 14 = 74 px is 5 days, 4-8) widens its own footprint
-    // into c on day 8. Control: unpinned it ends on day 7 and all three share one row.
-    const second = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1'), item('b', 4, 4, 'GN-2', pinned), item('c', 8, 9, 'GN-3')] });
+    // Exactly 14 px, by behaviour: 4 + 46 + 14 = 64 px is 4 days at 16 px/day (one row), 4 + 47 + 14 = 65 px is 5 (two
+    // rows). 13 px would put 47 in one row; 15 px would put 46 in two.
+    expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(46) }).lanes[0]?.rows).toBe(1);
+    expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(47) }).lanes[0]?.rows).toBe(2);
+    expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(47) }).lanes[0]?.rows).toBe(1);
+    // The pin is read per bar: pinning the SECOND bar (day 5, 4 + 60 + 14 = 78 px is 5 days after it, 5-10) widens its own
+    // footprint into c on day 10. Control: unpinned it ends on day 9 and all three share one row.
+    const second = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1'), item('b', 5, 5, 'GN-2', pinned), item('c', 10, 11, 'GN-3')] });
     expect(layoutLanes([second(true)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(2);
     expect(layoutLanes([second(false)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
-    // A bar with no pinned flag at all (the field is optional) is unpinned: it shares a row with its day-4 neighbour.
-    const bare: LayoutLane = { laneId: 'l', items: [{ id: 'a', key: 'GN-1', startDay: 0, endDay: 0 }, item('b', 4, 6, 'GN-2')] };
+    // A bar with no pinned flag at all (the field is optional) is unpinned: it shares a row with its day-5 neighbour.
+    const bare: LayoutLane = { laneId: 'l', items: [{ id: 'a', key: 'GN-1', startDay: 0, endDay: 0 }, item('b', 5, 7, 'GN-2')] };
     expect(layoutLanes([bare], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
   });
 });

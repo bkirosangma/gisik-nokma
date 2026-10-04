@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseRules, ruleExactly, valueOf } from './helpers/css-rules.js';
 import { cssOf, expectRow, flatBoundaryOffenders, type RosterRow } from './helpers/style-patterns.js';
 
-/** Styling refresh Plan B, Task B8 — cases 20.271–20.272 (§20.28). */
+/** Styling refresh Plan B, Task B8 — cases 20.271–20.272 (§20.28). The weeks-band and clipped-edge rows were retired by Workflow and Timeline graphs Part 1 T9 (29.106). */
 const ROWS: RosterRow[] = [
   { sheet: 'ui', selectors: '.gn-timeline__nav', pattern: 'P-QUIET' },
-  { sheet: 'ui', selectors: '.gn-timeline__weeks', declarations: { background: 'var(--gn-surface-track)', 'box-shadow': 'var(--gn-shadow-track)' } },
   { sheet: 'ui', selectors: '.gn-timeline__side', declarations: { background: 'var(--gn-surface-track)', 'box-shadow': 'var(--gn-shadow-track)' } },
 ];
 /** Every property the two views' navs must agree on (13.1147's pair, restated). */
@@ -22,9 +21,9 @@ describe('20.271 the Timeline follows the rules', () => {
       expect(valueOf(timeline, property), `nav pair: ${property}`).not.toBeNull();
       expect(valueOf(timeline, property), `nav pair: ${property}`).toBe(valueOf(calendar, property));
     }
-    // Control: the states the surface still bears are declared.
-    expectRow({ sheet: 'ui', selectors: '.gn-timeline__bar[data-clipped-start]', declarations: { 'border-left': '2px dashed var(--gn-border-strong)' } });
-    expectRow({ sheet: 'ui', selectors: '.gn-timeline__bar[data-clipped-end]', declarations: { 'border-right': '2px dashed var(--gn-border-strong)' } });
+    // Control: the states the surface still bears are declared. The clipped-edge rows are retired with the paging (29.106): a bar is
+    // never cut at a window edge on a continuous axis, so the in-transit outline is the only bar state left.
+    expectRow({ sheet: 'ui', selectors: '.gn-timeline__bar[data-pending]', declarations: { outline: '2px dashed var(--gn-pending)' } });
     expectRow({
       sheet: 'ui',
       selectors: ['.gn-timeline__side-entry--start-after-due', '.gn-timeline__side-entry--unplaceable-day'],
