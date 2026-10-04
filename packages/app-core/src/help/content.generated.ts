@@ -11155,7 +11155,31 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — change any field, close and reopen, reorder the backlog, see a ticket's history, delete one or bring it back."
+                      "text": " — change any field, close and reopen, reorder the backlog, link two tickets ("
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "blocks"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "relates to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "duplicates"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") or remove a link from either end, see a ticket's history, delete one or bring it back."
                     }
                   ],
                   [
