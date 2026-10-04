@@ -109,6 +109,9 @@ export const SWEEP: Record<string, SweepEntry> = {
   get_attention: { args: { workspaceId: 'w' } },
   list_notifications: { args: {}, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
   mark_notifications_read: { args: { all: true }, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
+  get_notification_preferences: { args: {}, session: { get: async () => ({ mutedKinds: [] }) } },
+  set_notification_preferences: { args: { mute: ['mention'] }, session: { get: async () => ({ mutedKinds: [] }), put: async (_path, body) => body } },
+  list_saved_filters: { args: { workspaceId: 'w' }, session: { get: async () => ({ savedFilters: [], listColumns: {}, grouping: {} }) } },
   list_my_invitations: { args: {}, session: { get: async () => ({ invitations: [] }) } },
   respond_to_invitation: { args: { inviteId: 'i', answer: 'accept' } },
   // discovery end
