@@ -138,6 +138,7 @@ describe('Links section', () => {
     await ingest.releaseAll();
     await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeNull());
     expect(within(screen.getByRole('region', { name: 'Is blocked by' })).getByText('Title GN-133')).toBeInTheDocument();
+    expect(screen.getByText('Linked: is blocked by GN-133')).toBeInTheDocument();
 
     await openPicker(user); // control: "Blocks" files on this ticket's stream
     await chooseKind(user, 'Blocks');
@@ -191,6 +192,48 @@ describe('Links section', () => {
     await findTicket(user);
     expect((await screen.findByRole('alert')).textContent).toBe('A ticket cannot be linked to itself.');
     expect(source2.ingested).toEqual([]);
+    cleanup();
+
+    // the other two non-commit answers speak in their own words, exactly
+    const silent = createFakeDataSource({ getTicketLinks: async () => [] }, () => []);
+    const { unmount } = render(<Harness dataSource={silent} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
+    await openPicker(user);
+    await findTicket(user);
+    expect((await screen.findByRole('alert')).textContent).toBe('The server did not answer this change.');
+    unmount();
+    const invalid = createFakeDataSource({ getTicketLinks: async () => [] }, (events) => [
+      { status: 'invalid', eventId: events[0]!.id, code: 'malformed', message: 'That link was malformed.' } as IngestResult,
+    ]);
+    render(<Harness dataSource={invalid} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
+    await openPicker(user);
+    await findTicket(user);
+    expect((await screen.findByRole('alert')).textContent).toBe('That link was malformed.');
+  });
+
+  it('27.066 the busy row stays visible beside a loaded link to the same ticket of another kind, direction or id; control: it does not double the loaded row it becomes', async () => {
+    const user = userEvent.setup();
+    for (const stored of [row('relates', 'out', 'GN-133', OTHER), row('blocks', 'in', 'GN-133', OTHER), row('blocks', 'out', 'GN-9', 'id_other')]) {
+      const ingest = deferredIngest(() => {});
+      const source = createFakeDataSource({ getTicketLinks: async () => [stored] }, ingest.script);
+      const { container, unmount } = render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
+      await screen.findByText(`Title ${stored.ticket.key}`);
+      await openPicker(user);
+      await findTicket(user); // "Blocks" OTHER, outgoing
+      expect(within(await screen.findByRole('region', { name: 'Blocks' })).getByText('Chiller')).toBeInTheDocument();
+      expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(1);
+      await ingest.releaseAll();
+      unmount();
+    }
+    // control: the same link already loaded is drawn once, not twice
+    const same = row('blocks', 'out', 'GN-133', OTHER);
+    const ingest = deferredIngest(() => {});
+    const source = createFakeDataSource({ getTicketLinks: async () => [same] }, ingest.script);
+    const { container } = render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
+    await screen.findByText('Title GN-133');
+    await openPicker(user);
+    await findTicket(user);
+    expect(container.querySelectorAll('.gn-ticket-sheet__link-row')).toHaveLength(1);
+    await ingest.releaseAll();
   });
 
   it('27.068 one remove per double click; Undo re-adds once; control: the row is gone from the reloaded list', async () => {
@@ -297,5 +340,28 @@ describe('Links section', () => {
     await screen.findByRole('button', { name: 'GN-133 Chiller' });
     const options = within(screen.getByRole('listbox', { name: 'Tickets' })).getAllByRole('option');
     expect(options.map((o) => o.textContent)).toEqual(['GN-133 Chiller']);
+  });
+
+  it('27.073 a slow earlier search never overwrites a later answer; control: the later answer is shown', async () => {
+    const source = createFakeDataSource({ getTicketLinks: async () => [] });
+    const user = userEvent.setup();
+    let releaseSlow: () => void = () => {};
+    const queryTickets = async (q: string) => {
+      if (q === 'C') {
+        await new Promise<void>((resolve) => {
+          releaseSlow = resolve;
+        });
+        return [{ ticketId: 'old', projectId: 'p', key: 'GN-OLD', title: 'Stale' }];
+      }
+      return [{ ticketId: OTHER, projectId: 'p', key: 'GN-133', title: 'Chiller' }];
+    };
+    render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={queryTickets} />);
+    await screen.findByText('No links yet.');
+    await openPicker(user);
+    await user.type(screen.getByLabelText('Find a ticket'), 'Ch');
+    await screen.findByRole('button', { name: 'GN-133 Chiller' });
+    await act(async () => releaseSlow());
+    expect(screen.queryByRole('button', { name: 'GN-OLD Stale' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'GN-133 Chiller' })).toBeInTheDocument();
   });
 });
