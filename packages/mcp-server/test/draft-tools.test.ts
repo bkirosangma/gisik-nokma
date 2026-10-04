@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ULID_REGEX, domainRegistry, parseEvent } from '@gisik-nokma/domain';
+import { HttpError } from '../src/http-client.js';
 import type { Session } from '../src/session.js';
+import { draftTools, eraseSetOf } from '../src/tools/draft-tools.js';
 import { readTools, type ToolDefinition } from '../src/tools/read-tools.js';
+import { allTools } from '../src/tools/register.js';
 import { ticketTools } from '../src/tools/ticket-tools.js';
 import { writeTools } from '../src/tools/write-tools.js';
 import { NO_TRANSFER } from './fixtures/fake-session.js';
@@ -171,5 +174,185 @@ describe('28.140 delete_ticket on a draft', () => {
     const published = fake({ get: () => detail({ draft: false, key: 'K-1' }) });
     const preview = await pick(ticketTools(published.session), 'delete_ticket').handler({ workspaceId: WS, ticketId: ROOT });
     expect(preview).toMatchObject({ preview: true, wouldChange: 'Moves K-1 "Count the crates" to Deleted items; it can be restored for 15 days.' }); // CONTROL
+  });
+});
+
+const ROW = (n: number, over: Record<string, unknown> = {}) => ({
+  workspaceId: 'w1', ticketId: tid(`D${n}`), projectId: 'p1', projectName: 'Stock', title: `Draft ${n}`,
+  typeId: 'task', parentId: null, updatedAt: `2026-10-03T0${n}:00:00.000Z`, ...over,
+});
+
+describe('28.133 list_my_drafts', () => {
+  it('28.133 reads /v1/me/drafts, narrows by workspace and project, answers eight named fields, pages', async () => {
+    const wire = [ROW(1, { attachmentCount: 2, key: 'LEAK-1' }), ROW(2), ROW(3)];
+    const { session, gets } = fake({ get: () => ({ items: wire }) });
+    const list = pick(draftTools(session), 'list_my_drafts');
+
+    const all = (await list.handler({})) as { items: Array<Record<string, unknown>>; nextCursor: string | null };
+    expect(gets).toEqual(['/v1/me/drafts']); // no query string with no arguments
+    expect(all.items).toHaveLength(3);
+    expect(Object.keys(all.items[0] ?? {}).sort()).toEqual(
+      ['parentId', 'projectId', 'projectName', 'ticketId', 'title', 'typeId', 'updatedAt', 'workspaceId'],
+    );
+    expect(all.items[0]).toEqual({
+      workspaceId: 'w1', ticketId: tid('D1'), projectId: 'p1', projectName: 'Stock', title: 'Draft 1',
+      typeId: 'task', parentId: null, updatedAt: '2026-10-03T01:00:00.000Z',
+    }); // the planted `key` and `attachmentCount` did not reach the answer
+    expect(all.nextCursor).toBeNull();
+
+    await list.handler({ workspaceId: 'w 1', projectId: 'p/1' });
+    expect(gets[1]).toBe('/v1/me/drafts?workspaceId=w+1&projectId=p%2F1');
+
+    const first = (await list.handler({ limit: 2 })) as { items: unknown[]; nextCursor: string | null };
+    expect(first.items).toHaveLength(2);
+    expect(first.nextCursor).not.toBeNull();
+    const rest = (await list.handler({ limit: 2, cursor: first.nextCursor })) as { items: unknown[]; nextCursor: string | null };
+    expect(rest.items).toHaveLength(1);
+    expect(rest.nextCursor).toBeNull();
+  });
+});
+
+describe('28.134 publish_draft', () => {
+  it('28.134 posts one id to the atomic route, sends no event, reads nothing first, and answers the key the route assigned', async () => {
+    const { session, posts, gets, sent } = fake({ post: () => ({ results: [{ ticketId: ROOT, key: 'RP-7' }] }) });
+    const publish = pick(draftTools(session), 'publish_draft');
+    expect(await publish.handler({ workspaceId: 'w 1', ticketId: ROOT })).toEqual({ ticketId: ROOT, key: 'RP-7', published: true });
+    expect(posts).toEqual([{ path: '/v1/workspaces/w%201/drafts/publish', body: { ticketIds: [ROOT], origin: 'mcp' } }]);
+    expect(sent).toEqual([]);
+    expect(gets).toEqual([]);
+
+    // CONTROL: an answer with no row for this ticket is an error, never a success without a key.
+    const empty = fake({ post: () => ({ results: [{ ticketId: tid('X9'), key: 'RP-8' }] }) });
+    await expect(pick(draftTools(empty.session), 'publish_draft').handler({ workspaceId: WS, ticketId: ROOT })).rejects.toThrow(
+      'gisik-nokma published no ticket for this draft',
+    );
+  });
+});
+
+describe('28.135 publish_draft refusals', () => {
+  const raising = (error: unknown) => pick(draftTools(fake({ post: () => { throw error; } }).session), 'publish_draft');
+  const call = { workspaceId: WS, ticketId: ROOT };
+
+  it('28.135 a refused set is the engine\'s rule and sentence; a 404 is not found; other failures are rethrown as they are', async () => {
+    const refusal = new HttpError(409, {
+      rule: 'draft.publish-refused', ticketId: ROOT,
+      cause: { rule: 'draft.parent-unpublished', reason: 'Publish its parent first.' },
+    });
+    await expect(raising(refusal).handler(call)).rejects.toThrow('refused by draft.parent-unpublished: Publish its parent first.');
+    await expect(raising(new HttpError(404, {})).handler(call)).rejects.toThrow('draft not found or not visible to you');
+
+    // CONTROL: a 500 and a 409 that is not this refusal are the HttpError they are. The other 409 carries a `cause`, so
+    // only the `rule === 'draft.publish-refused'` test (not the `cause !== undefined` guard) keeps it from being rewritten.
+    // Each clause of the 409 arm has its own control (P11): a publish-refused 409 with no `cause` (the `cause` clause),
+    // and the same body under a 422 (the `status === 409` clause).
+    const causeless = new HttpError(409, { rule: 'draft.publish-refused', ticketId: ROOT });
+    const not409 = new HttpError(422, refusal.body);
+    for (const other of [new HttpError(500, {}), new HttpError(409, { rule: 'something.else', cause: { rule: 'x.y', reason: 'z' } }), causeless, not409]) {
+      await expect(raising(other).handler(call)).rejects.toBe(other);
+    }
+  });
+});
+
+/** The workspace drafts list the preview walks: a root, a child, a grandchild, a sibling root and the sibling's child. */
+const DRAFTS = [
+  { ticketId: ROOT, parentId: null, attachmentCount: 1 },
+  { ticketId: tid('C1'), parentId: ROOT, attachmentCount: 2 },
+  { ticketId: tid('G1'), parentId: tid('C1'), attachmentCount: 0 },
+  { ticketId: tid('S1'), parentId: null, attachmentCount: 5 },
+  { ticketId: tid('S2'), parentId: tid('S1'), attachmentCount: 7 },
+];
+const discardRoutes = (isDraft: boolean) => (path: string) => {
+  if (path === `/v1/workspaces/${WS}/tickets/${ROOT}`) return { ...detail({ draft: isDraft }), title: 'Count the crates' };
+  if (path === `/v1/workspaces/${WS}/drafts`) return { items: DRAFTS };
+  throw new Error(`unexpected GET ${path}`);
+};
+const PREVIEW = {
+  preview: true,
+  wouldChange:
+    'Erases the draft "Count the crates", 2 sub-drafts and 3 attachments uploaded to them (permanently deleted). Linked notes are kept. This cannot be undone.',
+  counts: { subDrafts: 2, attachments: 3 },
+  nothingChanged: true,
+  confirm: 'confirm_name must be "Count the crates"',
+};
+
+describe('28.136 discard_draft previews first', () => {
+  it('28.136 without the exact title nothing is sent; with it one ticket.discarded goes and the drafts list is not read', async () => {
+    const { session, sent } = fake({ get: discardRoutes(true) });
+    const discard = pick(draftTools(session), 'discard_draft');
+    for (const given of [undefined, 'count the crates', 'Count the crates ', '']) {
+      expect(await discard.handler({ workspaceId: WS, ticketId: ROOT, ...(given === undefined ? {} : { confirm_name: given }) }), String(given)).toEqual(PREVIEW);
+    }
+    expect(sent).toEqual([]);
+
+    // CONTROL: the exact title commits, and a confirmed discard makes no read of the list.
+    const live = fake({ get: discardRoutes(true) });
+    const out = await pick(draftTools(live.session), 'discard_draft').handler({ workspaceId: WS, ticketId: ROOT, confirm_name: 'Count the crates' });
+    expect(out).toEqual({ ticketId: ROOT, discarded: true });
+    expect(live.sent).toHaveLength(1);
+    const envelope = live.sent[0]?.[0] as { type: string; payload: unknown; entity: unknown; actorId: string; origin: string; workspaceId: string };
+    expect(envelope).toMatchObject({ type: 'ticket.discarded', payload: {}, entity: { kind: 'ticket', id: ROOT }, actorId: USER, origin: 'mcp', workspaceId: WS });
+    expect(accepted(envelope).ok, JSON.stringify(accepted(envelope))).toBe(true);
+    expect(live.gets).toEqual([`/v1/workspaces/${WS}/tickets/${ROOT}`]);
+  });
+});
+
+describe('28.137 discard_draft on a ticket that is not a draft', () => {
+  it('28.137 is refused with the pointer to delete_ticket, even with the exact name; an unreadable ticket is not found', async () => {
+    const { session, sent, gets } = fake({ get: discardRoutes(false) });
+    const discard = pick(draftTools(session), 'discard_draft');
+    const MESSAGE = 'This ticket is not a draft. Use delete_ticket to remove a published ticket.';
+    await expect(discard.handler({ workspaceId: WS, ticketId: ROOT })).rejects.toThrow(MESSAGE);
+    await expect(discard.handler({ workspaceId: WS, ticketId: ROOT, confirm_name: 'Count the crates' })).rejects.toThrow(MESSAGE);
+    expect(sent).toEqual([]);
+    expect(gets.every((p) => !p.endsWith('/drafts'))).toBe(true);
+
+    const missing = fake({ get: () => { throw new HttpError(404, {}); } });
+    await expect(pick(draftTools(missing.session), 'discard_draft').handler({ workspaceId: WS, ticketId: ROOT })).rejects.toThrow(
+      'ticket not found or not visible to you',
+    );
+
+    // CONTROL: the same call on a draft previews.
+    const draft = fake({ get: discardRoutes(true) });
+    expect(await pick(draftTools(draft.session), 'discard_draft').handler({ workspaceId: WS, ticketId: ROOT })).toMatchObject({ preview: true });
+  });
+});
+
+describe('28.138 the erasure set', () => {
+  it('28.138 counts descendants and their attachments, not siblings; survives a cycle; an unknown id is zero', () => {
+    expect(eraseSetOf(DRAFTS, ROOT)).toEqual({ subDrafts: 2, attachments: 3 });
+    expect(eraseSetOf(DRAFTS, tid('S1'))).toEqual({ subDrafts: 1, attachments: 12 }); // CONTROL: the sibling's own set
+    expect(eraseSetOf(DRAFTS, tid('G1'))).toEqual({ subDrafts: 0, attachments: 0 }); // a leaf
+    expect(eraseSetOf(DRAFTS, tid('Z9'))).toEqual({ subDrafts: 0, attachments: 0 });
+    const loop = [
+      { ticketId: tid('A1'), parentId: tid('B1'), attachmentCount: 1 },
+      { ticketId: tid('B1'), parentId: tid('A1'), attachmentCount: 1 },
+    ];
+    expect(eraseSetOf(loop, tid('A1'))).toEqual({ subDrafts: 1, attachments: 2 });
+  });
+});
+
+describe('28.141 the registry', () => {
+  it('28.141 the module is the three tools in order, each described word for word, and allTools ends with them', () => {
+    const { session } = fake();
+    const tools = draftTools(session);
+    expect(tools.map((t) => t.name)).toEqual(['list_my_drafts', 'publish_draft', 'discard_draft']);
+    expect(tools.map((t) => Object.keys(t.inputSchema).sort())).toEqual([
+      ['cursor', 'limit', 'projectId', 'workspaceId'],
+      ['ticketId', 'workspaceId'],
+      ['confirm_name', 'ticketId', 'workspaceId'],
+    ]);
+    for (const tool of tools) expect(tool.description.length, `${tool.name} has no description`).toBeGreaterThan(0);
+    // What an assistant reads before it calls, pinned exactly (P20 class 2d).
+    expect(tools.map((t) => t.description)).toEqual([
+      'List your drafts: tickets only you can see, until you publish them. They have no key. Reads across every workspace you ' +
+        'belong to; narrow it with `workspaceId` and/or `projectId`. Each draft names its project, type and parent. ' +
+        'Pages with `cursor`; the response carries `nextCursor` (null on the last page).',
+      'Publish one of your drafts: it takes its key and joins the end of its project\'s Backlog, and everyone who can see the project ' +
+        'can now see it. A draft whose parent is still a draft cannot be published until the parent is. The answer carries the new key.',
+      'Discard one of your drafts: it is erased, with its sub-drafts and the attachments uploaded to them, and cannot be recovered. ' +
+        'confirm_name must be the draft\'s exact title; without it you get a preview of what would be erased and nothing changes. ' +
+        'Only a draft can be discarded: use delete_ticket for a published ticket.',
+    ]);
+    expect(allTools(session).map((t) => t.name).slice(-4)).toEqual(['list_deleted', 'list_my_drafts', 'publish_draft', 'discard_draft']);
   });
 });
