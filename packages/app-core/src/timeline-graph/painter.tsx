@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties, type ReactElement } from 'react';
+import { memo, useDeferredValue, useMemo, type CSSProperties, type ReactElement } from 'react';
 import type { Draw, DrawBar, DrawDiamond, DrawEdge, View } from './draw-types.js';
 import type { DrawIndex } from './draw-index.js';
 
@@ -16,7 +16,12 @@ export type TimelinePainterProps = {
 
 const box = (b: Draw['b']): CSSProperties => ({ left: b.x0, top: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 });
 
-function Bar({ d, selected, onPick }: { d: DrawBar; selected: boolean; onPick?: (ticketId: string) => void }): ReactElement {
+/**
+ * Memoised: a window change re-renders the painter with ~500 primitives of which only the ones entering the window are new.
+ * Without `memo` every mounted bar re-renders on every change; measured on the Pixel 7 proxy (29.301, 4x CPU throttle) that
+ * made each change 62-103 ms of render and commit, every one a frame over the 50 ms bar.
+ */
+const Bar = memo(function Bar({ d, selected, onPick }: { d: DrawBar; selected: boolean; onPick?: (ticketId: string) => void }): ReactElement {
   return (
     <button
       type="button" data-draw-id={d.id} data-style={d.style} data-pass-rank={d.passRank} aria-pressed={selected} aria-label={d.ariaLabel} data-dim={d.dim === true} data-draft={d.draft}
@@ -29,22 +34,23 @@ function Bar({ d, selected, onPick }: { d: DrawBar; selected: boolean; onPick?: 
       {d.pin !== null && <span className="gn-tlg-pin" aria-hidden="true" data-at={d.pinAt} data-notes={d.pin.notes} data-attachments={d.pin.attachments} />}
     </button>
   );
-}
-function Diamond({ d, selected, onPick }: { d: DrawDiamond; selected: boolean; onPick?: (ticketId: string) => void }): ReactElement {
+});
+const Diamond = memo(function Diamond({ d, selected, onPick }: { d: DrawDiamond; selected: boolean; onPick?: (ticketId: string) => void }): ReactElement {
   return (
     <button type="button" data-draw-id={d.id} data-style={d.style} aria-pressed={selected} aria-label={d.ariaLabel} className="gn-tlg-diamond" style={box(d.b)} onClick={() => onPick?.(d.ticketId)}>
       {d.mark !== null && <span className="gn-tlg-mark" aria-hidden="true">{d.mark === 'done' ? '✓' : '▶'}</span>}
       {d.revised && <span className="gn-tlg-revised">revised</span>}
     </button>
   );
-}
+});
 
 /**
  * Mounts only the primitives inside `view` widened by `overscan` (spec VP: "window the DOM"). Edges go in ONE svg per render, not one per edge; the
  * scroller (Part 1's adapter, through `attachDriver`) moves the content, so this component re-renders when the quantised window changes, not per frame.
  */
 export function TimelinePainter(p: TimelinePainterProps): ReactElement {
-  const win: View = { x0: p.view.x0 - p.overscan, x1: p.view.x1 + p.overscan, y0: p.view.y0 - p.overscan, y1: p.view.y1 + p.overscan };
+  const view = useDeferredValue(p.view);
+  const win: View = { x0: view.x0 - p.overscan, x1: view.x1 + p.overscan, y0: view.y0 - p.overscan, y1: view.y1 + p.overscan };
   const mounted = useMemo(() => p.index.query(win), [p.index, win.x0, win.x1, win.y0, win.y1]); // eslint-disable-line react-hooks/exhaustive-deps
   const edges = mounted.filter((d): d is DrawEdge => d.kind === 'edge');
   return (
