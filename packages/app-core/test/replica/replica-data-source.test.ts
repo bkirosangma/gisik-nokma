@@ -1612,5 +1612,9 @@ describe("28.196 offline History reads a published draft's from-form links from 
     ]);
     expect(lines.map((e) => e.linkDirection)).toEqual(['in', 'in', 'out', 'out']);
     expect(lines.map((e) => e.linkTarget)).toEqual([undefined, null, null, undefined]); // the replica holds no key
+    // Link events only, as the server serves them (view-types `linkDirection`): no other event on D carries a direction.
+    const others = (await ds.query.getTicketHistory(D)).filter((e) => !e.type.startsWith('ticket.link_'));
+    expect(others.map((e) => e.type)).toContain('ticket.created'); // CONTROL: the haystack holds non-link events
+    expect(others.filter((e) => 'linkDirection' in e)).toEqual([]);
   });
 });

@@ -181,6 +181,7 @@ describe('28.196 a draft-side from entry reads in, and keeps its direction when 
     expect(linkPayloadDirection({ kind: 'blocks', targetId: TARGET })).toBe('out'); // CONTROL: a plain link
     expect(linkPayloadDirection(withheldLinkPayload('blocks', 'out'))).toBe('out');
     expect(linkPayloadDirection(null)).toBe('out'); // not a payload at all
+    expect(linkPayloadDirection(undefined)).toBe('out'); // nor a missing one: `'from' in undefined` would throw
     // The served shapes, byte for byte (planner ruling 2026-10-04 21:08): the direction kept, never an id.
     expect(JSON.stringify(withheldLinkPayload('duplicates', 'in'))).toBe('{"kind":"duplicates","targetId":null,"from":null}');
     expect(JSON.stringify(withheldLinkPayload('duplicates', 'out'))).toBe('{"kind":"duplicates","targetId":null}'); // CONTROL: TL4b's shape
