@@ -47,6 +47,9 @@ describe('27.035–27.042 typed-link rules', () => {
     expect(await evaluateEvent(link(A, 'duplicates', B), world(link(A, 'duplicates', B)))).toEqual({
       refused: true, rule: 'link.duplicate', reason: '"Ice maker" already duplicates "Chiller".' });
     expect(await evaluateEvent(link(A, 'relates', B), world(link(A, 'blocks', B)))).toEqual(ok);
+    // Among other stored links: the match is the middle of three, so a scan of only the first or only the last misses it.
+    expect(await evaluateEvent(link(A, 'blocks', B), world(link(A, 'relates', C), link(A, 'blocks', B), link(A, 'duplicates', C)))).toEqual({
+      refused: true, rule: 'link.duplicate', reason: '"Ice maker" already blocks "Chiller".' });
   });
   it('27.039 relates refused in either direction; control: a third ticket accepted', async () => {
     expect(await evaluateEvent(link(A, 'relates', B), world(link(B, 'relates', A)))).toEqual({
@@ -56,7 +59,13 @@ describe('27.035–27.042 typed-link rules', () => {
   it('27.040 blocks reverse refused; control: a three-cycle is accepted', async () => {
     expect(await evaluateEvent(link(A, 'blocks', B), world(link(B, 'blocks', A)))).toEqual({
       refused: true, rule: 'link.reverse', reason: '"Chiller" already blocks "Ice maker".' });
+    // The cycle step by step: only the DIRECT reverse is refused.
+    expect(await evaluateEvent(link(A, 'blocks', B), world())).toEqual(ok);
+    expect(await evaluateEvent(link(B, 'blocks', C), world(link(A, 'blocks', B)))).toEqual(ok);
     expect(await evaluateEvent(link(C, 'blocks', A), world(link(A, 'blocks', B), link(B, 'blocks', C)))).toEqual(ok);
+    // Among the target's other stored links: the match is the middle of three.
+    expect(await evaluateEvent(link(A, 'blocks', B), world(link(B, 'relates', C), link(B, 'blocks', A), link(B, 'duplicates', C)))).toEqual({
+      refused: true, rule: 'link.reverse', reason: '"Chiller" already blocks "Ice maker".' });
   });
   it('27.041 duplicates reverse refused; control: nothing stored accepted', async () => {
     expect(await evaluateEvent(link(A, 'duplicates', B), world(link(B, 'duplicates', A)))).toEqual({
@@ -70,6 +79,8 @@ describe('27.035–27.042 typed-link rules', () => {
     expect(await evaluateEvent(link(B, 'relates', A, 'ticket.link_removed'), stored)).toEqual(ok);
     // The KIND is part of the stored link: the storing stream removing another kind is absent too.
     expect(await evaluateEvent(link(B, 'blocks', A, 'ticket.link_removed'), stored)).toMatchObject({ refused: true, rule: 'link.absent' });
+    // Among other stored links: the match is the middle of three.
+    expect(await evaluateEvent(link(B, 'relates', A, 'ticket.link_removed'), world(link(B, 'blocks', C), link(B, 'relates', A), link(B, 'duplicates', C)))).toEqual(ok);
   });
 });
 
