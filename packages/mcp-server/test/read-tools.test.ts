@@ -13,7 +13,7 @@ import { NO_TRANSFER } from './fixtures/fake-session.js';
 /**
  * Plan: MCP server, Task 8. Cases 14.60–14.66.
  */
-/** `byPath` answers named paths differently (the links read beside a ticket detail); every other path gets `answer`. */
+/** `byPath` answers named paths differently (the links and notes reads beside a ticket detail); every other path gets `answer`. */
 function sessionRecording(answer: unknown, byPath: Record<string, unknown> = {}): { session: Session; paths: string[] } {
   const paths: string[] = [];
   const session: Session = {
@@ -25,6 +25,10 @@ function sessionRecording(answer: unknown, byPath: Record<string, unknown> = {})
   };
   return { session, paths };
 }
+
+/** `get_ticket`'s second and third reads (typed-links T4, MCP sweep 2 T3) for ticket t1 in w1, answering none. */
+const NO_LINKS = { '/v1/workspaces/w1/tickets/t1/links': { links: [] } };
+const NO_NOTES = { '/v1/workspaces/w1/tickets/t1/notes': { notes: [] } };
 
 function tool(name: string, session: Session) {
   const found = readTools(session).find((t) => t.name === name);
@@ -129,10 +133,11 @@ describe('the read tools', () => {
       ticketState: { kind: 'ticket', id: 't1', assigneeId: null, collaboratorIds: [] },
       title: 'A ticket', stateProvenance: null, parent: null, rollup: null,
     };
-    const { session, paths } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
-    // T9 adds ONE key (`description`, as Markdown) and typed links T4 one more (`links`); everything else is the server's, untouched.
-    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] }, links: [] });
-    expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', '/v1/workspaces/w1/tickets/t1/links']);
+    const { session, paths } = sessionRecording(body, { ...NO_LINKS, ...NO_NOTES });
+    // T9 adds ONE key (`description`, as Markdown), typed links T4 one more (`links`) and MCP sweep 2 T3 two (`notes`,
+    // `notesTotal`); everything else is the server's, untouched.
+    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] }, links: [], notes: [], notesTotal: 0 });
+    expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', '/v1/workspaces/w1/tickets/t1/links', '/v1/workspaces/w1/tickets/t1/notes']);
     // The mixed casing is the SERVER's contract. Normalising it here would be
     // this package inventing a shape, which is exactly what the spec forbids.
   });
@@ -143,7 +148,7 @@ describe('the read tools', () => {
       key: 'CCSO-4', title: 'Chiller', rollup: null,
       ticketState: { kind: 'ticket', id: 't1', assigneeId: 'u1', fields: { description: { value: doc }, priority: { value: 'P2' } } },
     };
-    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
+    const { session } = sessionRecording(body, { ...NO_LINKS, ...NO_NOTES });
     const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & {
       ticketState: { fields: Record<string, unknown>; assigneeId: string };
     };
@@ -160,12 +165,12 @@ describe('the read tools', () => {
       ticketState: { kind: 'ticket', id: 't1', fields: {}, links: [{ kind: 'blocks', targetId: 'b1' }] },
     };
     const row = { kind: 'blocks', direction: 'out', ticket: { id: 'b1', projectId: 'p1', key: 'CCSO-5', title: 'Ice maker', stateCategory: 'open' } };
-    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [row] } });
+    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [row] }, ...NO_NOTES });
     const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & { ticketState: Record<string, unknown> };
     expect(out['links']).toEqual([{ kind: 'blocks', direction: 'out', ticket: { id: 'b1', key: 'CCSO-5', title: 'Ice maker' } }]);
     expect('links' in out.ticketState).toBe(false); // one representation
     expect(out.ticketState['id']).toBe('t1'); // control: the rest of the state is served
-    const none = sessionRecording({ ...body, ticketState: { kind: 'ticket', id: 't1', fields: {} } }, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
+    const none = sessionRecording({ ...body, ticketState: { kind: 'ticket', id: 't1', fields: {} } }, { ...NO_LINKS, ...NO_NOTES });
     expect(((await tool('get_ticket', none.session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown>)['links']).toEqual([]);
     // The detail answers and the links read 404s (visibility changed between the two reads): the uniform sentence, never the raw HTTP error.
     // The detail must answer here: 14.458 404s every path, so its detail read throws first and the links read is never reached.
