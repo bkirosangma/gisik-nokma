@@ -2,13 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   ENTITY_COLUMN_NAMES,
   PURGE_TABLE_RULES,
+  workspaceScopedTables,
   type PurgeTableRule,
 } from '../../src/purge/table-rules.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
  * Spec §5.5 — every table has a purge rule, and a guard that proves it.
- * Cases 19.081–19.083 (`test-cases/19-trash.md` §19.9).
+ * Cases 19.081–19.083 (`test-cases/19-trash.md` §19.9); 27.026 (typed links, `test-cases/27-knowledge-graph.md`) at the end.
  *
  * The schema is read from `information_schema` of a freshly MIGRATED database,
  * never from a list in this file: a table added next month must redden this
@@ -111,5 +112,16 @@ describe('19.083 every base table carries a deliberate rule', () => {
     expect(
       mislabelled({ ...PURGE_TABLE_RULES, proj_tickets: { rule: 'not-entity-bearing', why: 'planted' } }),
     ).toEqual(['proj_tickets']);
+  });
+});
+
+describe('27.026 typed links have an erase rule at both ends', () => {
+  it('27.026 proj_ticket_links is erased by workspace_id, source_id and target_id, and a workspace purge takes it', () => {
+    expect(PURGE_TABLE_RULES['proj_ticket_links']).toMatchObject({ rule: 'erase', by: ['workspace_id', 'source_id', 'target_id'] });
+    expect(workspaceScopedTables()).toContain('proj_ticket_links');
+    // The migrated table carries every column the rule names (19.082's comparator, on this one rule).
+    expect(unknownColumns({ proj_ticket_links: PURGE_TABLE_RULES['proj_ticket_links']! })).toEqual([]);
+    // CONTROL: the same comparator names a by-column the table does not have.
+    expect(unknownColumns({ proj_ticket_links: { rule: 'erase', by: ['ticket_id'], why: 'planted' } })).toEqual(['proj_ticket_links.ticket_id']);
   });
 });

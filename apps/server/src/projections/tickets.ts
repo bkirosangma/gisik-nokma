@@ -6,6 +6,7 @@ import {
   isRedactedTicketCreated,
   workflowDefinedPayloadSchema,
   type LedgerEvent,
+  type TicketLink,
   type TicketState,
   type TicketStateDeps,
   type WorkflowDef,
@@ -115,6 +116,11 @@ type TicketRow = {
    */
   deleted_at: Date | null;
   deleted_by: string | null;
+  /**
+   * `TicketState.links`' column (typed-links T2, Knowledge Graph spec A §2.5): the source's OUTBOUND links as the
+   * reducer folds them, `[]` for a ticket with none. `proj_ticket_links` is the queryable copy of the same links.
+   */
+  links: TicketLink[];
 };
 
 /**
@@ -214,6 +220,10 @@ export function rowToTicketState(row: TicketRow): TicketState {
       row.deleted_at === null || row.deleted_by === null
         ? null
         : { actorId: row.deleted_by, at: row.deleted_at.toISOString() },
+    // Absent when empty, the reducer's own shape (typed-links T1): the rig compares the two with toEqual. Unlike
+    // `rank` and `deleted` above, the reducer never writes an empty `links` (its last removal drops the key), so the
+    // column's `[]` reads back as no key at all.
+    ...(row.links.length > 0 ? { links: row.links } : {}),
   };
 }
 
@@ -286,8 +296,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
-        closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by, links)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -305,7 +315,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        rank = EXCLUDED.rank,
        reopened_at = EXCLUDED.reopened_at,
        deleted_at = EXCLUDED.deleted_at,
-       deleted_by = EXCLUDED.deleted_by`,
+       deleted_by = EXCLUDED.deleted_by,
+       links = EXCLUDED.links`,
     [
       next.id,
       next.workspaceId,
@@ -354,6 +365,10 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // at creation and on every restore.
       next.deleted?.at ?? null,
       next.deleted?.actorId ?? null,
+      // The source's outbound links (typed-links T2). `?? []` because the reducer leaves the key ABSENT for a ticket
+      // with none (never `[]`), and the column is NOT NULL; the ON CONFLICT list above is what makes the last
+      // removal's absent key clear an existing row rather than leave it holding a stale link.
+      JSON.stringify(next.links ?? []),
     ],
   );
 }
