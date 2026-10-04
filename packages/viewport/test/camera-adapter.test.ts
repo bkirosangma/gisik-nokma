@@ -293,7 +293,7 @@ describe('29.037 the camera', () => {
     el.dispatchEvent(pointer('pointerup', { x: 500, y: 300 }));
   });
 
-  it('29.038 glides: the camera animates to a target inside 450 ms, never jumps on frame 1, and lands at once under reduced motion; the frame stream ends with moving: false | Frame.velocity is world x per second, smoothed 0.8 / 0.2, and 0 at rest; the last frame carries the landing | maxMs never stretches a glide past 450 ms (900 asked) and a shorter one is honoured (100); the last frame moves under 1 px (x and y) and is the resting one; the first frame covers 1 - e^(-16 / tau) of the way | each axis lands though another settles first | a zoom past maxZoom lands at maxZoom and rests | reduced motion: a released flick leaves no momentum', () => {
+  it('29.038 glides: the camera animates to a target inside 450 ms, never jumps on frame 1, and lands at once under reduced motion; the frame stream ends with moving: false | Frame.velocity is world x per second, smoothed 0.8 / 0.2, and 0 at rest; the last frame carries the landing | Frame.velocity at 8 ms frames | maxMs never stretches a glide past 450 ms (900 asked) and a shorter one is honoured (100); the last frame moves under 1 px (x and y) and is the resting one; the first frame covers 1 - e^(-16 / tau) of the way | each axis lands though another settles first | a zoom past maxZoom lands at maxZoom and rests | reduced motion: a released flick leaves no momentum', () => {
     const { cam, fc, frames } = mount();
     cam.camera({ x: 5000, y: 3000, zoom: 2 });
     fc.advance(16);
@@ -301,6 +301,16 @@ describe('29.037 the camera', () => {
     expect(cam.getCamera().x).toBeLessThan(5000);
     // the first frame reports a fifth of its speed: 0.8 * 0 + 0.2 * (x - 0) / 0.016 s
     expect(frames[0]?.velocity).toBeCloseTo((cam.getCamera().x / 0.016) * 0.2, 6);
+    // at 8 ms frames (a 120 Hz display) the speed is per 8 ms: 0.2 * x / 0.008 s (control: the 16 ms frame above)
+    const view8 = document.createElement('div');
+    sizeOf(view8, { clientWidth: 800, scrollWidth: 800, clientHeight: 600, scrollHeight: 600 });
+    const fc8 = fakeClock(8);
+    const frames8: Frame[] = [];
+    const cam8 = new CameraAdapter({ element: view8, layer: document.createElement('div'), minZoom: 0.2, maxZoom: 4, reducedMotion: () => false, clock: fc8.clock });
+    cam8.onFrame((f) => frames8.push(f));
+    cam8.camera({ x: 5000 });
+    fc8.advance(8);
+    expect(frames8[0]?.velocity).toBeCloseTo((cam8.getCamera().x / 0.008) * 0.2, 6);
     // the second keeps 0.8 of the first: 0.8 * v0 + 0.2 * (x2 - x1) / 0.016 s
     const x1 = cam.getCamera().x;
     fc.advance(16);
