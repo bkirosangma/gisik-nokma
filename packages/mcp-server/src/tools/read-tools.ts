@@ -169,8 +169,9 @@ export function readTools(session: Session): ToolDefinition[] {
         )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string } }> };
         // The description is a document: answer it as Markdown (with what Markdown cannot show), never as the raw tree.
         const { description, ...fields } = detail.ticketState?.fields ?? {};
-        // One representation of links: `ticketState.links` (outbound ids only) is dropped in favour of `links`.
-        const { links: _outbound, ...state } = detail.ticketState ?? {};
+        // One representation of links: `ticketState.links` (the ids held on this ticket's stream: its outbound links, plus a
+        // draft's inbound `from` entries) is dropped in favour of `links`.
+        const { links: _held, ...state } = detail.ticketState ?? {};
         return {
           ...detail,
           ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),

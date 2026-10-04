@@ -125,8 +125,10 @@ type TicketRow = {
   draft_at: Date | null;
   draft_discarded: boolean | null;
   /**
-   * `TicketState.links`' column (typed-links T2, Knowledge Graph spec A §2.5): the source's OUTBOUND links as the
-   * reducer folds them, `[]` for a ticket with none. `proj_ticket_links` is the queryable copy of the same links.
+   * `TicketState.links`' column (typed-links T2, Knowledge Graph spec A §2.5): the links held on this ticket's own
+   * stream as the reducer folds them, `[]` for a ticket with none. That is its outbound links plus, on a draft, the
+   * inbound `from` entries filed from its side (drafts R42). `proj_ticket_links` is the queryable copy of the same
+   * links, one row per link keyed by its source (`from` for a draft-side entry, else this ticket).
    */
   links: TicketLink[];
   /** `TicketState.pendingChildren`' column (drafts T6, owner ruling O1): `[]` on every ticket that holds none. */

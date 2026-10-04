@@ -102,8 +102,10 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // because proj_tickets was replayed first.
   registry.register(rollupsProjection);
   // Typed links T2 (Knowledge Graph spec A §2.5). Links read nothing from proj_tickets, but sit beside it so a
-  // reader of the registry finds the pair together: `proj_tickets.links` is the source's folded copy of the same
-  // links. After proj_rollups rather than between it and proj_tickets, because that adjacency is load-bearing (above).
+  // reader of the registry finds the pair together: `proj_tickets.links` is the folded copy of the same links on the
+  // stream that holds them, the source's own, except a draft-side `from` entry (drafts R42), held on the draft's row
+  // while its row here is keyed by its source. After proj_rollups rather than between it and proj_tickets, because
+  // that adjacency is load-bearing (above).
   registry.register(ticketLinksProjection);
   registry.register(membershipsProjection);
   // §8 position amended by Plan 4 Task 14: proj_invites slots directly AFTER
