@@ -7,6 +7,8 @@ export default defineConfig({
   testDir: './tests',
   timeout: 120_000,
   workers: 1,
+  // Playwright empties its outputDir at the start of every run; the stress records live beside it, in test-results/stress.jsonl.
+  outputDir: 'test-results/pw',
   projects: [{ name: 'desktop', use: { ...devices['Desktop Chrome'], headless: process.env['FG_HEADED'] !== '1' } }],
   use: { baseURL: 'http://localhost:3192' },
   webServer: { command: 'vite --config vite.config.ts', url: 'http://localhost:3192/stress.html', reuseExistingServer: false, timeout: 60_000 },

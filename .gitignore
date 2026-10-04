@@ -56,5 +56,5 @@ gisik-nokma-lanes/
 # Claude Code agent worktrees (a committed gitlink here broke CI checkout post-job: no .gitmodules entry)
 .claude/worktrees/
 
-# flow-graph-browser: stress records the harness appends through its /__results endpoint (a real-phone run writes here too)
+# flow-graph-browser: the stress records now live in test-results/ (ignored above); this is the OLD path, kept so a checkout that still has a results/ folder stays clean
 packages/flow-graph-browser/results/
