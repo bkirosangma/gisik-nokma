@@ -437,7 +437,7 @@ export default function WorkspaceHomePage() {
         <>
           <h1 className="gn-page-title">
             <span className="gn-visually-hidden">Workspace</span>
-            <Skeleton width="18rem" height="var(--gn-title-page-size)" />
+            <Skeleton className="gn-skeleton--title" width="18rem" />
           </h1>
           <ProjectGridSkeleton />
         </>
