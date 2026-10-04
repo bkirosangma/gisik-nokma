@@ -58,6 +58,11 @@ export const TOOL_NAMES_BY_MODULE = {
     'list_deleted',
     // trash end
   ],
+  draft: [
+    // draft begin (drafts T7)
+    'list_my_drafts', 'publish_draft', 'discard_draft',
+    // draft end
+  ],
 } satisfies Record<string, string[]>;
 
 export const TOOL_NAMES: string[] = Object.values(TOOL_NAMES_BY_MODULE).flat();
