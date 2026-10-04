@@ -1,20 +1,25 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { GUTTER_PX, LOOP_LIFTS_PX, routeEdge, routeLoop, type Box } from '../src/index.js';
+import { GUTTER_PX, LOOP_LIFTS_PX, routeEdge, routeLoop, type Box, type Pt } from '../src/index.js';
 
 const bar = (day: number, row: number, days: number, ppd = 16): Box => ({ x: day * ppd, y: row * 40, w: days * ppd, h: 28 });
 const axisAligned = (pts: readonly { x: number; y: number }[]) => pts.every((p, i) => i === 0 || p.x === (pts[i - 1] as { x: number }).x || p.y === (pts[i - 1] as { y: number }).y);
 
 describe('29.065 edge routing on packed rows', () => {
-  it('29.065 same row, target later: a straight line from the end anchor to the start anchor; every step axis-aligned', () => {
+  it('29.065 same row, target later: a straight line from the end anchor to the start anchor; every step axis-aligned; control: a target EARLIER on the same row is no straight line, it takes the channel', () => {
     const r = routeEdge(bar(0, 0, 4), bar(8, 0, 3), []);
     expect(r.points).toEqual([{ x: 64, y: 14 }, { x: 128, y: 14 }]);
     expect(r.crossings).toBe(0);
     // a gap narrower than the 14 px gutter has no gutter candidate: only the straight-line candidate gives two points here
     expect(routeEdge(bar(0, 0, 4), { x: 72, y: 0, w: 48, h: 28 }, []).points).toEqual([{ x: 64, y: 14 }, { x: 72, y: 14 }]);
+    // CONTROL, same it: the target EARLIER on the same row: out past the source end, along the row's bottom edge, back to the
+    // gutter before the target, and in from the left (never a straight line drawn backwards)
+    expect(routeEdge(bar(8, 0, 3), bar(0, 0, 4), []).points).toEqual([
+      { x: 176, y: 14 }, { x: 190, y: 14 }, { x: 190, y: 28 }, { x: -14, y: 28 }, { x: -14, y: 14 }, { x: 0, y: 14 },
+    ]);
   });
 
-  it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor', () => {
+  it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor; a gutter that would stand behind the source end is not used', () => {
     const to = bar(8, 2, 3);
     const r = routeEdge(bar(0, 0, 4), to, []);
     expect(GUTTER_PX).toBe(14);
@@ -23,6 +28,11 @@ describe('29.065 edge routing on packed rows', () => {
     expect(r.points).toContainEqual({ x: to.x - 14, y: to.y + 14 });
     expect(axisAligned(r.points)).toBe(true);
     expect(r.crossings).toBe(0);
+    // a gap of 8 px on another row: the gutter before the target (x = 58) is behind the source end (64), so the path takes
+    // the channel between the rows instead of running backwards in it
+    expect(routeEdge(bar(0, 0, 4), { x: 72, y: 80, w: 48, h: 28 }, []).points).toEqual([
+      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 58, y: 54 }, { x: 58, y: 94 }, { x: 72, y: 94 },
+    ]);
   });
 
   it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ', () => {
@@ -52,6 +62,32 @@ describe('29.065 edge routing on packed rows', () => {
     const grazed = routeEdge(from, to, touching);
     expect(grazed.points).toEqual(clean.points);
     expect(grazed.crossings).toBe(0);
+    // one bar at a time beside the first candidate's runs (64 -> 306 on y = 14, 14 -> 94 on x = 306, 306 -> 320 on y = 94):
+    // touching a run's END, or level with a run but past it, is not in the way (the whole route is the clean one); CONTROL
+    // per row: the same bar moved or stretched onto the run is (another route, or the same one with a crossing reported)
+    const sides: [string, Box, Box][] = [
+      ['touches the y=14 run end from the right', { x: 306, y: 0, w: 10, h: 28 }, { x: 305, y: 0, w: 10, h: 28 }],
+      ['touches the y=94 run start from the left', { x: 296, y: 80, w: 10, h: 28 }, { x: 297, y: 80, w: 10, h: 28 }],
+      ['touches the x=306 run end from below', { x: 300, y: 94, w: 12, h: 20 }, { x: 300, y: 93, w: 12, h: 20 }],
+      ['touches the x=306 run start from above', { x: 300, y: -6, w: 12, h: 20 }, { x: 300, y: -5, w: 12, h: 20 }],
+      ['below the y=14 run', { x: 100, y: 20, w: 20, h: 20 }, { x: 100, y: 10, w: 20, h: 20 }],
+      ['above the y=14 run', { x: 100, y: -30, w: 20, h: 10 }, { x: 100, y: -30, w: 20, h: 50 }],
+      ['level with the y=14 run, past its end', { x: 330, y: 0, w: 10, h: 28 }, { x: 300, y: 0, w: 40, h: 28 }],
+      ['level with the y=94 run, before its start', { x: 200, y: 80, w: 10, h: 28 }, { x: 200, y: 80, w: 110, h: 28 }],
+      ['right of the x=306 run', { x: 310, y: 40, w: 10, h: 20 }, { x: 300, y: 40, w: 20, h: 20 }],
+      ['left of the x=306 run', { x: 290, y: 40, w: 10, h: 20 }, { x: 290, y: 40, w: 20, h: 20 }],
+      ['below the x=306 run', { x: 300, y: 100, w: 12, h: 10 }, { x: 300, y: 80, w: 12, h: 30 }],
+      ['above the x=306 run', { x: 300, y: -20, w: 12, h: 10 }, { x: 300, y: -20, w: 12, h: 40 }],
+    ];
+    for (const [name, beside, across] of sides) {
+      expect(routeEdge(from, to, [beside]), name).toEqual(clean);
+      expect(routeEdge(from, to, [across]), `${name} (control)`).not.toEqual(clean);
+    }
+    // every candidate blocked: the first candidate crosses ONE bar (on two of its runs), the gutter after the source one,
+    // the channel one; the fewest crossings, the first of equals, is reported and a bar counts once however many runs it crosses
+    const fewest = routeEdge(from, to, [{ x: 290, y: 0, w: 30, h: 40 }, { x: 72, y: 40, w: 12, h: 10 }]);
+    expect(fewest.points).toEqual(clean.points);
+    expect(fewest.crossings).toBe(1);
   });
 
   it('29.065 the target starts before the source ends: a channel between the rows, five corners at most', () => {
@@ -65,9 +101,25 @@ describe('29.065 edge routing on packed rows', () => {
     // the channel runs half-way between the source's bottom (28) and the target's top (40), out past the source end (256 + 14)
     // and back to the gutter before the target (192 - 14)
     expect(r.points).toEqual([{ x: 256, y: 14 }, { x: 270, y: 14 }, { x: 270, y: 34 }, { x: 178, y: 34 }, { x: 178, y: 54 }, { x: 192, y: 54 }]);
+    // a target on a HIGHER row: the channel runs half-way between the target's bottom (28) and the source's top (80), not on
+    // the target row's edge (FD-1)
+    expect(routeEdge(bar(10, 2, 6), bar(12, 0, 3), []).points).toEqual([
+      { x: 256, y: 94 }, { x: 270, y: 94 }, { x: 270, y: 54 }, { x: 178, y: 54 }, { x: 178, y: 14 }, { x: 192, y: 14 },
+    ]);
+    // bars of mixed height (a 40 px box whose middle is level with the source's bottom): the channel's zero-length step and
+    // collinear corner are dropped, so no two points repeat and no three lie on one line
+    const mixed = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: 8, w: 48, h: 40 }, []).points;
+    expect(mixed[0]).toEqual({ x: 64, y: 14 });
+    expect(mixed[mixed.length - 1]).toEqual({ x: 70, y: 28 });
+    expect(axisAligned(mixed)).toBe(true);
+    for (let i = 2; i < mixed.length; i += 1) {
+      const [a, b, c] = [mixed[i - 2], mixed[i - 1], mixed[i]] as [Pt, Pt, Pt];
+      expect(b, `point ${i - 1} repeats`).not.toEqual(a);
+      expect((a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y), `points ${i - 2}..${i} on one line`).toBe(false);
+    }
   });
 
-  it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above', () => {
+  it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above; a bar in the way is transposed with it', () => {
     const from = bar(0, 0, 4);
     const to = bar(8, 2, 3);
     const land = routeEdge(from, to, []);
@@ -77,6 +129,12 @@ describe('29.065 edge routing on packed rows', () => {
     expect(port.label).toEqual({ x: land.label.y, y: land.label.x });
     // the last step runs DOWN onto the target's start anchor (its top edge's middle): the arrowhead enters from above
     expect(port.points.slice(-2)).toEqual([{ x: 94, y: 114 }, { x: 94, y: 128 }]);
+    // a bar standing in the landscape gutter before the target (x 100-120 on row 1), transposed, forces the transposed detour
+    // (the gutter after the source, y = 78); CONTROL: the same bar NOT transposed stands nowhere near the portrait route,
+    // which keeps the first candidate
+    const blocker: Box = { x: 100, y: 40, w: 20, h: 28 };
+    expect(routeEdge(t(from), t(to), [t(blocker)], 'portrait').points).toEqual([{ x: 14, y: 64 }, { x: 14, y: 78 }, { x: 94, y: 78 }, { x: 94, y: 128 }]);
+    expect(routeEdge(t(from), t(to), [blocker], 'portrait').points).toEqual(port.points);
   });
 
   it('29.065 the label sits on the longest segment along the time axis', () => {
@@ -104,6 +162,7 @@ describe('29.066 a loop is a curved return arrow, with no pill and no corners', 
     expect(r.crossings).toBe(0);
     expect(r.label.y).toBeLessThan(0); // the label is at the curve\'s highest point, above both ends
     expect(r.label.y).toBeGreaterThan(-28);
+    expect(r.label).toEqual({ x: 135.48, y: -15.7 }); // the highest of the 49 sampled points, rounded to 0.01 px
     // CONTROL, same it: a target on a LOWER row than the diamond still arrives from above, and the curve still rises above the higher end (the diamond)
     const lower = routeLoop(diamond, bar(2, 4, 6));
     expect(lower.points[3]).toEqual({ x: 38, y: 160 });
@@ -123,6 +182,8 @@ describe('29.066 a loop is a curved return arrow, with no pill and no corners', 
     expect(r.points[2].x).toBe(6); // lands vertically
     expect(r.points[2].y).toBeLessThan(32);
     expect(r.label.x).toBeLessThan(6); // the curve\'s left-most point is left of where it lands
+    expect(r.d).toBe('M 100 414 C -22 414, 6 4, 6 32');
+    expect(r.label).toEqual({ x: 3.23, y: 108.19 });
     expect(routeLoop(d, t, [], 'landscape').d).not.toBe(r.d);
   });
 
@@ -136,7 +197,7 @@ describe('29.066 a loop is a curved return arrow, with no pill and no corners', 
 });
 
 describe('29.067 a loop lifts over a bar that is in its way', () => {
-  it('29.067 the smallest lift that crosses no third bar wins; with nothing in the way the first lift is used; with all three blocked the one with the fewest crossings is reported', () => {
+  it('29.067 the smallest lift that crosses no third bar wins; with nothing in the way the first lift is used; with all three blocked the one with the fewest crossings is reported; a bar that only touches the sampled curve, or lies beside it, is not in the way', () => {
     const diamond: Box = { x: 400, y: 80, w: 28, h: 28 };
     const target: Box = { x: 32, y: 0, w: 96, h: 28 };
     expect(LOOP_LIFTS_PX).toEqual([28, 64, 100]);
@@ -163,5 +224,22 @@ describe('29.067 a loop lifts over a bar that is in its way', () => {
     const fewest = routeLoop(diamond, target, [...wall, low]);
     expect(fewest.crossings).toBe(1);
     expect(fewest.points[1].y).toBe(-64);
+    // at lift 28 the middle sample (t = 0.5) is exactly (226, -11). A bar with an EDGE on that point, or beside the arc, is not
+    // in the way (the first lift is kept); CONTROL per row: the same bar moved 1 px onto the point, or moved onto the arc at
+    // x 220-240 where only the first lift passes, is (the second lift is taken)
+    const sides: [string, Box, Box][] = [
+      ['left edge on the point', { x: 226, y: -20, w: 4, h: 20 }, { x: 225, y: -20, w: 4, h: 20 }],
+      ['right edge on the point', { x: 222, y: -20, w: 4, h: 20 }, { x: 223, y: -20, w: 4, h: 20 }],
+      ['top edge on the point', { x: 224, y: -11, w: 4, h: 6 }, { x: 224, y: -12, w: 4, h: 6 }],
+      ['bottom edge on the point', { x: 224, y: -17, w: 4, h: 6 }, { x: 224, y: -16, w: 4, h: 6 }],
+      ['left of the arc', { x: -100, y: -30, w: 10, h: 30 }, { x: 220, y: -30, w: 10, h: 30 }],
+      ['right of the arc', { x: 500, y: -30, w: 10, h: 30 }, { x: 220, y: -30, w: 10, h: 30 }],
+      ['above the arc', { x: 200, y: -200, w: 40, h: 10 }, { x: 200, y: -20, w: 40, h: 10 }],
+      ['below the arc', { x: 200, y: 120, w: 40, h: 10 }, { x: 200, y: -20, w: 40, h: 10 }],
+    ];
+    for (const [name, beside, across] of sides) {
+      expect(routeLoop(diamond, target, [beside]).points[1].y, name).toBe(-28);
+      expect(routeLoop(diamond, target, [across]).points[1].y, `${name} (control)`).toBe(-64);
+    }
   });
 });
