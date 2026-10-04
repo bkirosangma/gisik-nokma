@@ -2442,13 +2442,15 @@ function ProjectBoard() {
                   <p className="gn-project__breadcrumb">{workspaceName}</p>
                 ) : namesPending ? (
                   <p className="gn-project__breadcrumb">
-                    <Skeleton width="8rem" height="1em" />
+                    <Skeleton width="8rem" height="1.125rem" />
                   </p>
                 ) : null}
                 {projectName !== null ? (
                   <ProjectTitle workspaceId={workspaceId} projectId={projectId} projectName={projectName} />
                 ) : namesPending ? (
-                  <Skeleton className="gn-project__title-skeleton" width="14rem" height="var(--gn-title-page-size)" />
+                  <div className="gn-project__title-row">
+                    <Skeleton className="gn-project__title-skeleton gn-skeleton--title" width="14rem" />
+                  </div>
                 ) : null}
                 {/* The SAME component and the SAME word the workspace home's card
                     uses for this state, so the two screens cannot describe one fact
@@ -2580,6 +2582,11 @@ function ProjectBoard() {
                       </option>
                     ))}
                   </select>
+                ) : !isPhone && board.data === null && board.error === null ? (
+                  /* The select's place while the board is on its way (smoothness-2 G1, 25.241): the header grows leftwards when the
+                     select arrives with `board.data`, and the search box beside it moved 184 px. A board with one workflow collapses it. On a phone the
+                     first frame is the desktop arm (`isPhone` is false until script), so the class hides the slot there, as it hides the select. */
+                  <Skeleton shape="block" className="gn-project__workflow-slot" width="10.5rem" height="2.75rem" />
                 ) : null}
                 {/*
                   IN `.gn-project__header`, BESIDE THE FILTERS BUTTON — and the placement

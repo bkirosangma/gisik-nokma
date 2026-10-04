@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ctl seats [--json] [--flag] — one line per tmux window of session gisik: busy/idle, background shells and monitors, the input
-# box (empty / text / copy-mode), Ctx % and model, the worktree's branch@head with unpushed and dirty counts, and the last
+# box (empty / text / copy-mode), Ctx %, model and effort (`?` when the status line has no effort segment), the worktree's branch@head with unpushed and dirty counts, and the last
 # DONE / CHECKPOINT / "needs fresh session" line with its age. --flag prints only the seats that need action. READ-ONLY:
 # `tmux list-windows` and `tmux capture-pane` only, never send-keys; git is read with GIT_OPTIONAL_LOCKS=0 so a lane's own
 # git is never blocked. Windows are read in parallel (13 windows well under 2 s); the parsing is verbs/seats.py.

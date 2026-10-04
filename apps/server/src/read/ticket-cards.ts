@@ -241,9 +241,11 @@ function titleOf(row: ProjTicketRow): string {
  * the stored data already (`ticket.field_set` refuses an absent value outright
  * so a `null` is always somebody's act) — this function's only job is to not
  * throw them away.
+ *
+ * `dueDateOfClaim` is the rule over ONE claim, for reads that select `fields -> 'dueDate'` alone (home, spec E);
+ * `dueDateOf` is the same body over a full row.
  */
-function dueDateOf(row: ProjTicketRow): TicketDueDate {
-  const claim = row.fields['dueDate'];
+export function dueDateOfClaim(claim: FieldClaim | undefined, ticketId: string): TicketDueDate {
   if (claim === undefined) {
     return { state: 'never-claimed' };
   }
@@ -259,7 +261,7 @@ function dueDateOf(row: ProjTicketRow): TicketDueDate {
   const value = claim.value as { date?: unknown; note?: unknown };
   if (typeof value !== 'object' || typeof value.date !== 'string') {
     throw new Error(
-      `assembleTicketCards: the dueDate claim on ticket ${row.ticket_id} is neither a clearing nor a { date } — the door refuses that, so this event did not come through it`,
+      `assembleTicketCards: the dueDate claim on ticket ${ticketId} is neither a clearing nor a { date } — the door refuses that, so this event did not come through it`,
     );
   }
   return {
@@ -272,6 +274,11 @@ function dueDateOf(row: ProjTicketRow): TicketDueDate {
       serverTime: claim.serverTime,
     },
   };
+}
+
+/** The due-date state of a full ticket row: `dueDateOfClaim` over its `dueDate` claim. */
+function dueDateOf(row: ProjTicketRow): TicketDueDate {
+  return dueDateOfClaim(row.fields['dueDate'], row.ticket_id);
 }
 
 /**

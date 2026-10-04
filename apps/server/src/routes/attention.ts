@@ -35,7 +35,7 @@ const DAY_MS = 86_400_000;
  * directions rather than by hand, so the day the offset rule ever changes there
  * is one place to change it.
  */
-function addIstDays(day: string, delta: number): string {
+export function addIstDays(day: string, delta: number): string {
   return istDayOf(new Date(Date.parse(istDayBounds(day).startUtc) + delta * DAY_MS).toISOString());
 }
 
@@ -403,12 +403,13 @@ function stateNameOf(defs: Map<string, PublishedWorkflowDef>, card: TicketCard):
  * `now` is the one dependency this route has that its neighbours do not, and it
  * defaults here, and **this is no longer the only place it defaults.** Task 15's
  * `registerStreamRoute` has its own `deps.now ?? (() => new Date())` for the
- * heartbeat deadline, and `ingest-service.ts` has had one since before this
- * branch. `buildApp` threads the SAME optional `deps.now` to both routes, so
- * pinning it pins both and leaving it unset gives both the wall clock — there is
- * no drift today. **But there is no single definition to change**, so anyone
- * replacing "the real clock" here must change the stream route in the same
- * breath or the server keeps two of them.
+ * heartbeat deadline, so does `registerHomeRoutes` (spec E), and `ingest-service.ts`
+ * has had one since before this branch. `buildApp` threads the SAME optional
+ * `deps.now` to the three routes, so pinning it pins all three and leaving it
+ * unset gives all three the wall clock — there is no drift today. **But there is
+ * no single definition to change**, so anyone replacing "the real clock" here
+ * must change the stream and home routes in the same breath or the server keeps
+ * three of them.
  */
 export function registerAttentionRoutes(
   app: FastifyInstance,

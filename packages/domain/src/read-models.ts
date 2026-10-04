@@ -697,6 +697,23 @@ export type AttentionResponse = {
 };
 
 /**
+ * Home (Knowledge Graph spec E §2.4): six numbers over what this viewer may see in one workspace, and the ids
+ * behind each, so a number can light its items on the graph. A count is never capped; its ids are, at
+ * `HOME_ID_CAP`, and the client says how many are not on the graph. `members` is `null` when the viewer may
+ * not be told the roster (a guest, `read/workspace-counts.ts`'s `visibleMemberCount`): absent, not zero.
+ */
+export const HOME_ID_CAP = 2000;
+export const HOME_NUMBER_KEYS = ['tickets', 'open', 'pastDue', 'dueSoon', 'members', 'notes'] as const;
+export type HomeNumberKey = (typeof HOME_NUMBER_KEYS)[number];
+export type HomeResponse = {
+  workspaceId: string;
+  generatedAt: string;
+  dueSoonDays: number;
+  counts: { tickets: number; open: number; pastDue: number; dueSoon: number; members: number | null; notes: number };
+  ids: Record<HomeNumberKey, string[]>;
+};
+
+/**
  * ## The builder's read surface (Plan 5 Task 9b)
  *
  * Plan 8's workflow builder consumes these through Plan 6's `DataSource.query`.

@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Button, useWait } from '@gisik-nokma/ui';
 import type { NoteScopeMode, NoteSummary } from '@gisik-nokma/domain';
@@ -85,6 +85,7 @@ export const WorkspaceNotesSection = memo(function WorkspaceNotesSection({
   searchQuery = '',
   authorId,
   scopeMode,
+  onSettled,
 }: {
   workspace: WorkspaceRef;
   openNoteId?: string;
@@ -93,6 +94,8 @@ export const WorkspaceNotesSection = memo(function WorkspaceNotesSection({
   searchQuery?: string;
   authorId?: string;
   scopeMode?: NoteScopeMode;
+  /** Whether both of this workspace's reads have answered (smoothness-2 G1, 25.247): the page shows the lists together, when every workspace has. */
+  onSettled?: (workspaceId: string, settled: boolean) => void;
 }) {
   const { dataSource } = useAppServices();
   const user = useCurrentUser();
@@ -105,6 +108,19 @@ export const WorkspaceNotesSection = memo(function WorkspaceNotesSection({
   const deleted = useLiveQuery(dataSource, workspace.id, 'deleted-notes', () => dataSource.query.getDeletedNotes(workspace.id), {
     cacheKey: 'deleted-notes',
   });
+
+  // `hasAnswered` as well as `data`: it is a guard against a future KEY change. `hasAnswered` is lifetime, not per key, and a key
+  // change nulls `data` until the new key's read answers (`useLiveQuery`'s key effect), so with it the page would not put its skeleton
+  // back over a list that was already drawn. Today it never decides anything: both keys are constants ('notes', 'deleted-notes'),
+  // `reload()` never blanks `data`, and a refusal that withdraws a cached answer sets `error` in the same update. A refusal is an
+  // answer (the page draws the empty groups, as it always did). A layout effect, so the
+  // cached lists the page remounts with (25.152) are reported before the first paint and are never hidden behind a skeleton.
+  const settled =
+    (notes.data !== null || notes.hasAnswered || notes.error !== null) && (deleted.data !== null || deleted.hasAnswered || deleted.error !== null);
+  useLayoutEffect(() => {
+    onSettled?.(workspace.id, settled);
+    return () => onSettled?.(workspace.id, false);
+  }, [onSettled, workspace.id, settled]);
 
   /**
    * `useNotesSearch` owns its OWN `query`/`setQuery`, uncontrolled — it is

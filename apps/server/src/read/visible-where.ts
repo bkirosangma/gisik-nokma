@@ -206,6 +206,15 @@ export const LIVE_BASE_WHERE =
  *    (`AND (t.deleted_at IS NULL OR t.ticket_id IS NULL)`, which a grep for
  *    those words finds and a line number does not keep — it has moved since
  *    this citation was written) — a citation that RESOLVED and was still wrong.
+ *    ⚠ **Re-measured at the Knowledge Graph spec E Task 1 tree (home), from the same
+ *    grep, and every figure above is superseded by this one:** `git grep -n
+ *    "LIVE_TICKET_WHERE" -- apps/server/src` finds **17** executable
+ *    `${LIVE_TICKET_WHERE}` sites across 12 files (this file's own note-attachment
+ *    arm included; the other two hits in this file are docblock text: the earlier paragraph above and this one), **6** array
+ *    members written `LIVE_TICKET_WHERE,` across 5 files (`routes/home.ts`'s
+ *    ticket SELECT is the sixth) and 16 import lines — **23 uses of the
+ *    constant**. The longhand sweep (`deleted_at +IS +NULL`) was NOT re-run
+ *    here: its count above is the earlier tree's.
  *
  * AND it into every SELECT that serves a VIEW. Do NOT add it to
  * `../projections/tickets.ts`'s `getTicketStateFromDb` /

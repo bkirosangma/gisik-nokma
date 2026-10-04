@@ -55,14 +55,29 @@ async function inTx<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
 }
 const payloadOf = async (client: PoolClient | typeof db.pool, id: string, type: string): Promise<unknown> =>
   (await client.query('SELECT payload FROM events WHERE entity_id = $1 AND type = $2', [id, type])).rows[0]?.payload;
+/** Every ledger row the entity still has, in its own seq order: what a purge must leave is read whole. */
+const streamOf = async (id: string): Promise<{ type: string; payload: unknown }[]> =>
+  (await db.pool.query('SELECT type, payload FROM events WHERE entity_id = $1 ORDER BY seq', [id])).rows;
+const fieldSet = (base: Base, id: string, value: string): LedgerEvent =>
+  ev(base, 'ticket', id, 'ticket.field_set', { fieldId: 'title', value });
 
 describe('28.022 a discarded draft leaves no gap', () => {
-  it('28.022 D1 (draft), T2, discard D1, T3: T2 is #1 and T3 is #2', async () => {
+  it('28.022 D1 (draft), T2, discard D1, T3: T2 is #1 and T3 is #2; D1 keeps exactly its redacted creation', async () => {
     const base = await seedWorkspace(db.pool);
     const P = newUlid();
     const [D1, T2, T3] = [newUlid(), newUlid(), newUlid()] as const;
     await append(draftCreated(base, D1, P), ticketCreated(base, T2, P, 'two'));
+    // a real draft stream: edited, assigned, then discarded (T5 commits ticket.discarded, then purges)
+    await append(
+      fieldSet(base, D1, 'd edited'),
+      ev(base, 'ticket', D1, 'ticket.assigned', { assigneeId: base.OWNER }),
+      ev(base, 'ticket', D1, 'ticket.discarded', {}),
+    );
+    // control: before the purge every row of the draft is there
+    expect((await streamOf(D1)).map((row) => row.type)).toEqual(['ticket.created', 'ticket.field_set', 'ticket.assigned', 'ticket.discarded']);
     await purgeLedger(D1); // the discard's ledger half
+    // a discard erases everything (spec R37): exactly one redacted creation remains, nothing else
+    expect(await streamOf(D1)).toEqual([{ type: 'ticket.created', payload: { projectId: P, purged: true, draft: true } }]);
     await append(ticketCreated(base, T3, P, 'three'));
     const numbers = await ticketNumbers(db.pool, base.WS, [D1, T2, T3]);
     expect([numbers.get(D1), numbers.get(T2), numbers.get(T3)]).toEqual([undefined, 1, 2]);
@@ -90,12 +105,14 @@ describe('28.023 purge failure (1): an unpublished draft consumes no number when
 });
 
 describe('28.024 purge failure (2): a purged published draft keeps its slot', () => {
-  it('28.024 the redacted ticket.published row is still a numbering row; later numbers do not shift', async () => {
+  it('28.024 the redacted ticket.published row is still a numbering row; later numbers do not shift; X keeps exactly its two redacted rows', async () => {
     const base = await seedWorkspace(db.pool);
     const P = newUlid();
     const [A, X, B, C] = [newUlid(), newUlid(), newUlid(), newUlid()] as const;
     await append(ticketCreated(base, A, P, 'a'), draftCreated(base, X, P), ticketCreated(base, B, P, 'b'));
-    await append(published(base, X, P), ticketCreated(base, C, P, 'c'));
+    await append(fieldSet(base, X, 'x drafted'), published(base, X, P), fieldSet(base, X, 'x live'), ticketCreated(base, C, P, 'c'));
+    // control: before the purge X's edits on both sides of the publish are there
+    expect((await streamOf(X)).map((row) => row.type)).toEqual(['ticket.created', 'ticket.field_set', 'ticket.published', 'ticket.field_set']);
     const before = await ticketNumbers(db.pool, base.WS, [A, X, B, C]);
     expect([before.get(A), before.get(B), before.get(X), before.get(C)]).toEqual([1, 2, 3, 4]);
     await purgeLedger(X);
@@ -103,6 +120,11 @@ describe('28.024 purge failure (2): a purged published draft keeps its slot', ()
     expect([after.get(A), after.get(B), after.get(X), after.get(C)]).toEqual([1, 2, 3, 4]);
     expect(await payloadOf(db.pool, X, 'ticket.published')).toEqual({ projectId: P, purged: true });
     expect(await payloadOf(db.pool, X, 'ticket.created')).toEqual({ projectId: P, purged: true, draft: true });
+    // exactly the two redacted numbering rows remain, in seq order; both edits are gone
+    expect(await streamOf(X)).toEqual([
+      { type: 'ticket.created', payload: { projectId: P, purged: true, draft: true } },
+      { type: 'ticket.published', payload: { projectId: P, purged: true } },
+    ]);
   });
 });
 
