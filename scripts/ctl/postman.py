@@ -152,7 +152,8 @@ def alive(pid):
 # ───────────────────────────── the shadow log ─────────────────────────────
 # `--shadow` writes NOTHING a seat can see: no ledger line, no inbox line, no notes line, no pane paste, no DONE write-back, no page. It appends
 # one JSON object per computed delivery to postman/shadow.jsonl and `ctl postman audit --since|--window|--parity` compares that with
-# DISPATCH-log.md and the ledger. Records: origin "queue" (a QUEUE-dispatch line: verb, win, line_time, src, refused), "ledger" (a message a seat
+# DISPATCH-log.md and the ledger. Records: origin "queue" (a QUEUE-dispatch line: verb, win, line_time, src, refused, ref = its branch, brief = a
+# NEXT/FIX line's brief token as written — the two names a BY-ORCH log line can agree with), "ledger" (a message a seat
 # posted with ctl post: id, channel flag|inbox|pane, would), "msg" (a message the run would have appended: notes, audit notes), "baseline".
 def shadow_path(): return p("shadow.jsonl")
 
@@ -604,7 +605,8 @@ def shadow_queue(lt, verb, toks, src, m=None, refused=None):
     if not SHADOW: return
     mm = re.fullmatch(r"(?:lane)?([0-9]{1,2})", toks[0]) if toks else None
     shadow_add({"origin": "queue", "verb": verb, "win": mm.group(1) if mm else (toks[0] if toks else ""), "line_time": lt, "src": src,
-                "sid": m["id"] if m else None, "ref": m.get("ref") if m else None, "refused": refused, "to": "main"})
+                "sid": m["id"] if m else None, "ref": m.get("ref") if m else None, "brief": toks[1] if verb in ("NEXT", "FIX") and len(toks) > 1 else None,
+                "refused": refused, "to": "main"})
 
 
 def queue_done(lt, result):
@@ -681,30 +683,54 @@ def audit_scan(stats):
 
 
 # ───────────────────────────── the shadow parity audit ─────────────────────────────
-# `ctl postman audit --parity | --since T | --window N` compares the shadow log with the dispatcher's own record (DISPATCH-log.md) and the
-# ledger. Buckets (planner conditions A+B for retiring the dispatcher: >= 20 deliveries AND one gate cycle with zero missed / duplicate):
-#   matched   a delivery the dispatcher logged (verb, lane) paired one-to-one with a shadow queue record of that verb and lane, the shadow record
-#             no later than 2 min after the log line and no more than CTL_POSTMAN_AUDIT_TOL (45 min) before it;
+# `ctl postman audit --parity | --since T | --window N` compares the shadow log with the dispatcher's own record (DISPATCH-log.md, which also
+# carries the orchestrator's acks), QUEUE-dispatch.md and the ledger. Buckets:
+#   matched   (a) a delivery the dispatcher logged (verb, lane) paired one-to-one with a shadow queue record of that verb and lane, or (b) a
+#             BY-ORCH AGREEMENT (below); either way the record lies in the PAIRING WINDOW: no later than 2 min after the log line and no more
+#             than CTL_POSTMAN_AUDIT_TOL (45 min) before it. Dispatcher pairs are made first; agreements take the records left over;
 #   missed    a dispatcher delivery with no shadow record to pair with (named with the bridge's refusal reason when there is one), or a ledger
 #             message since the shadow baseline with no shadow record;                                            -> exit 1
 #   duplicate a surplus shadow record: the same queue src twice, the same ledger id twice, or two ledger messages to one seat with the same kind
 #             and body within CTL_POSTMAN_DUP_WINDOW (10 min);                                                     -> exit 1
-#   extra     a shadow queue delivery the dispatcher never logged (the orchestrator did it directly, or the line was held); informational.
-#   by-orch   a DISPATCH-log line that says the orchestrator delivered it (see below); informational, pairs nothing.
-# Condition A counts QUEUE deliveries only (the shadow's queue records, the ones the dispatcher's log is compared with); the ledger records
-# (seats' own `ctl post` messages, which the dispatcher never carried) are counted beside them but not toward it. `--window N` = the last N
-# queue deliveries.
+#   extra     a shadow queue delivery nothing matched, printed with ONE reason word (EXTRA REASONS below);
+#   by-orch   a DISPATCH-log line that says the orchestrator delivered it, each of its verbs marked agreed, or why not.
+# CONDITION A (planner ruling 2026-10-04 09:03, "count MATCHED, never shadow deliveries"): PASS = matched (dispatcher pairs + BY-ORCH
+# agreements) >= 20 AND missed = 0 AND duplicate = 0 AND every EXTRA has a reason. A miss or a duplicate exits 1; a clean parity whose
+# condition A fails prints `CONDITION A FAIL: <each failing clause>` and exits 2; exit 0 only with `CONDITION A PASS`. The queue deliveries in
+# the window and the ledger records (seats' own `ctl post` messages, which the dispatcher never carried) are printed beside it as information
+# and count toward nothing. `--window N` = the last N queue deliveries. Condition B (one gate cycle, zero missed) is the choice of window.
 # A DISPATCH-log line is free text. The exact form `HH:MM DELIVERED <VERB> <lane> ...` is always read as one delivery. Any other line is cut
 # into clauses at ';' and at a sentence end ('. ' / '! ' / '? '); a clause counts only if it says delivered/sent and none of not delivered /
 # nothing delivered / held / HOLD / skipped / refused / cancelled / withdrawn, and a clause that says delivered BY the orchestrator is not a
 # dispatcher delivery (the orchestrator restarts a lane of its choosing, so its lane is no evidence for the queue line's): it is printed as
-# BY-ORCH and pairs nothing. In a counted clause each NEXT / FIX / MERGETIP names its lane, first match wins:
+# BY-ORCH and can only AGREE (below). In a counted clause each NEXT / FIX / MERGETIP names its lane, first match wins:
 #   1. `VERB lane N` / `VERB laneN`;  2. `to lane N` / `to lanes N,M` / `(lane N)` / `delivered|sent lane N` after the verb, before the next
 #   queue verb (NEXT FIX MERGETIP NOTE CLOSE REVIEW HOLD); 3. `lane N` just before it (`lane 3 U-T11b FIX 1`, `sent lane 1 the P-T10 MERGETIP`);
 #   4. only when no lane is named for it, the number right after the verb (`NEXT 4`, `MERGETIP 5`).
 # So in `T9 FIX 1 pointer to lane3` the 1 is the fix ROUND and the lane is 3. A verb right after `into` (folded into another delivery) or
 # followed by `already` (`FIX 1 already DONE`) is skipped; `to lanes 1-5` (a range) names no lane. A counted clause whose verb gets no lane is printed as UNPARSED.
+# BY-ORCH AGREEMENT. Each NEXT / FIX / MERGETIP of a BY-ORCH clause is ground truth for ONE shadow queue record in its pairing window when all
+# three agree:
+#   verb  the same verb;
+#   lane  a lane the clause NAMES by rules 1-3, equal to the record's. Rule 4 never applies: in `ACK batch-6 FIX 3 delivered by orchestrator`
+#         the 3 is the fix ROUND, so that clause names no lane and agrees with nothing;
+#   ref   the REF WORDS — the words right before the verb (back to the clause start or the previous queue verb), lower case, split on anything
+#         but a letter or a digit, without `lane N` and without ack hold held dispatcher note delivered sent by the orchestrator to and — joined
+#         with nothing between them, hold a letter and spell a CONTIGUOUS RUN of WHOLE words of the record's brief stem (`BRIEF-<stem>.md`) or
+#         branch name (`task/<name>`), joined the same way: `T9` agrees with BRIEF-sm-t9-notes-fix-1.md, `G-9 T1` with BRIEF-g9-t1-live-drag-
+#         fix-1.md, `ctl-run-tests` with BRIEF-ctl-run-tests-fix-1.md, `ctl seats` with ctl-seats-fix-1; `T1` never with t10-… (whole words) and
+#         `ctl tipmerge` never with ctl-auto-tipmerge (contiguous); no ref words, or a record with no brief and no branch, agree with nothing.
+# A BY-ORCH verb that agrees with nothing pairs nothing and is never a MISSED (the record stays EXTRA and needs a reason).
+# EXTRA REASONS — the first that holds, over the QUEUE-dispatch.md and DISPATCH-log.md lines in the record's pairing window. A line NAMES the
+# record when its words (after the line's HH:MM time) hold the record's WHOLE brief stem or branch name as a run, or its ref words before the
+# record's verb agree (the ref rule). A line that says the hold is closed (`…; hold closed`) still says HOLD: the dispatcher held it.
+#   held        a line that says HOLD / held and names it (`HH:MM HOLD dispatcher: FIX 4 BRIEF-x-fix-2.md …`, `HOLD batch-6 FIX 3 (not delivered…)`);
+#   no-deliver  a line that says deliver(ed) nothing / nothing delivered / nothing to deliver and names it (`ACK deliver nothing for <branch> …`);
+#   superseded  a LATER queue record to the same lane in its pairing window, with no delivery to that lane logged between them (a dispatcher
+#               pair or a BY-ORCH verb naming that lane, from the record's own log minute to the minute before the later record);
+#   ?           none: printed `reason=?`, and condition A fails.
 DELIVER_VERBS = ("NEXT", "FIX", "MERGETIP")
+COND_A_MIN = 20          # planner condition A: matched >= 20
 AUDIT_TOL = int(os.environ.get("CTL_POSTMAN_AUDIT_TOL", "2700"))
 DUP_WINDOW = int(os.environ.get("CTL_POSTMAN_DUP_WINDOW", "600"))
 D_G0 = re.compile(r"^\d\d:\d\d DELIVERED (NEXT|FIX|MERGETIP) (?:lane\s*)?([0-9]{1,2})\b")
@@ -718,34 +744,70 @@ D_ALREADY = re.compile(r"^\s*(?:[0-9]{1,2}\s+)?already\b")
 D_POS = re.compile(r"\b(?:delivered|sent)\b")
 D_NEG = re.compile(r"not delivered|nothing delivered|nothing to deliver|deliver nothing|not sent|\bheld\b|\bHOLD\b|skipped|refused|cancelled|withdrawn", re.I)
 D_ORCH = re.compile(r"\bby (?:the )?orchestrator\b", re.I)
+D_HELD = re.compile(r"\b(?:HOLD|held)\b", re.I)
+D_NODEL = re.compile(r"\bdeliver(?:ed)? nothing\b|\bnothing (?:delivered|to deliver)\b", re.I)
+D_LANEW = re.compile(r"\blane\s*[0-9]{1,2}\b", re.I)
+D_STOP = {"ack", "hold", "held", "dispatcher", "note", "delivered", "sent", "by", "the", "orchestrator", "to", "and"}
 
 
-def clause_pairs(c):
-    """-> [(verb, lane or None)] for one counted clause (rules 1-4 above)."""
+def words(s): return re.findall(r"[a-z0-9]+", s.lower())
+
+
+def ref_words(pre):
+    """The ref words of the text right before a verb (the ref rule above)."""
+    return [w for w in words(D_LANEW.sub(" ", pre)) if w not in D_STOP]
+
+
+def run_in(sub, seq): return bool(sub) and any(seq[i:i + len(sub)] == sub for i in range(len(seq) - len(sub) + 1))
+
+
+def rec_names(r):
+    """A shadow queue record's names, as word lists: its brief's stem and its branch's name."""
+    out = [words(re.sub(r"(?i)^brief-|\.md$", "", os.path.basename(r["brief"])))] if r.get("brief") else []
+    if r.get("ref"): out.append(words(re.sub(r"^task/", "", r["ref"])))
+    return [n for n in out if n]
+
+
+def ref_agrees(ws, r):
+    """The ref rule: the ref words, joined with nothing between them, hold a letter and spell a contiguous run of a name's words joined the same way."""
+    s = "".join(ws)
+    return bool(re.search(r"[a-z]", s)) and any(s == "".join(n[i:j]) for n in rec_names(r) for i in range(len(n)) for j in range(i + 1, len(n) + 1))
+
+
+def names(text, r):
+    """True when a free-text line names the record (EXTRA REASONS above); the line's leading HH:MM time is no word of it."""
+    text = re.sub(r"^[0-9]{1,2}:[0-9]{2}\s+", "", text)
+    if any(run_in(n, words(text)) for n in rec_names(r)): return True
+    keys = list(D_KEY.finditer(text))
+    return any(k.group(1) == r["verb"] and ref_agrees(ref_words(text[keys[i - 1].end() if i else 0:k.start()]), r) for i, k in enumerate(keys))
+
+
+def clause_pairs(c, named=False):
+    """-> [(verb, lane or None, ref words)] for one counted clause (rules 1-4 above; named=True, a BY-ORCH clause: rules 1-3 only)."""
     keys, out = list(D_KEY.finditer(c)), []
     for i, k in enumerate(keys):
         pre = c[keys[i - 1].end() if i else 0:k.start()]
         seg = c[k.end():keys[i + 1].start() if i + 1 < len(keys) else len(c)]
         if k.group(1) not in DELIVER_VERBS or D_INTO.search(pre) or D_ALREADY.match(seg): continue
-        mv, mt, mp, mn = D_VLANE.match(seg), D_TO.search(seg), D_PRE.search(pre), D_VNUM.match(seg)
+        mv, mt, mp, mn = D_VLANE.match(seg), D_TO.search(seg), D_PRE.search(pre), None if named else D_VNUM.match(seg)
         lanes = [mv.group(1)] if mv else re.findall(r"[0-9]{1,2}", mt.group(1)) if mt else [mp.group(1)] if mp else [mn.group(1)] if mn else [None]
-        out += [(k.group(1), n) for n in lanes]
+        out += [(k.group(1), n, ref_words(pre)) for n in lanes]
     return out
 
 
 def parse_dispatch_line(line):
-    """-> (pairs [(verb, lane)], unparsed bool, by_orchestrator bool) for one DISPATCH-log line."""
+    """-> (pairs [(verb, lane)], unparsed bool, by_orchestrator bool, BY-ORCH verbs [(verb, lane or None, ref words)]) for one DISPATCH-log line."""
     m0 = D_G0.match(line)
-    if m0: return [(m0.group(1), m0.group(2))], False, False
-    pairs, cand, orch = [], False, False
+    if m0: return [(m0.group(1), m0.group(2))], False, False, []
+    pairs, cand, orch, opairs = [], False, False, []
     for clause in re.split(r";|(?<=[.!?])\s+", line[6:]):
         if not D_POS.search(clause) or D_NEG.search(clause): continue
         if D_ORCH.search(clause):
-            orch = orch or bool(D_KEY.search(clause)); continue
-        for verb, lane in clause_pairs(clause):
+            orch = orch or bool(D_KEY.search(clause)); opairs += clause_pairs(clause, named=True); continue
+        for verb, lane, _ in clause_pairs(clause):
             if lane is None: cand = True
             else: pairs.append((verb, lane))
-    return pairs, cand and not pairs, orch
+    return pairs, cand and not pairs, orch, opairs
 
 
 def parse_when(v):
@@ -769,7 +831,7 @@ def audit_parity(o):
     queue = [r for r in recs if r.get("origin") == "queue"]
     lrecs = [r for r in recs if r.get("origin") == "ledger"]
     base = next((r["upto"] for r in recs if r.get("origin") == "baseline"), 0)
-    deliveries = sorted([r for r in queue if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])     # condition A's unit
+    deliveries = sorted([r for r in queue if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])     # what --window counts
     since, desc = 0.0, "all shadow records"
     try:
         if "--window" in o:
@@ -778,6 +840,7 @@ def audit_parity(o):
         elif "--since" in o: since = parse_when(o["--since"]); desc = "since %s" % o["--since"]
     except (ValueError, AssertionError) as e: fail("postman", "audit: %s" % (e if str(e) else "--window needs a positive number"))
     inw = lambda r: r["epoch"] >= since
+    near = lambda r, t: r["epoch"] <= t + 120 and t - r["epoch"] <= AUDIT_TOL          # the pairing window
     missed, dups, extras, matched, unparsed, by_orch = [], [], [], [], [], []
     # duplicates among shadow records
     seen = {}
@@ -804,36 +867,60 @@ def audit_parity(o):
         for m in ms[1:]:
             if epoch(m["ts"]) - epoch(last["ts"]) < DUP_WINDOW: dups.append("ledger #%d repeats #%d (%s → %s, same body) within %d s" % (m["id"], last["id"], kind, to, DUP_WINDOW))
             last = m
-    # the dispatcher's deliveries
-    dl = os.path.join(ROOT, "DISPATCH-log.md")
-    lines = open(dl, errors="replace").read().splitlines()[-1500:] if os.path.exists(dl) else []
+    # the dispatcher's deliveries and the orchestrator's acks
+    rd = lambda f: open(os.path.join(ROOT, f), errors="replace").read().splitlines()[-1500:] if os.path.exists(os.path.join(ROOT, f)) else []
+    lines, qlines = rd("DISPATCH-log.md"), rd("QUEUE-dispatch.md")
     ts = verdict_times(lines); dis = []
     for i, line in enumerate(lines):
         if ts[i] is None or ts[i] < since - 60: continue
-        pairs, cand, orch = parse_dispatch_line(line)
+        pairs, cand, orch, opairs = parse_dispatch_line(line)
         for verb, win in pairs: dis.append((ts[i], verb, str(int(win)), line))
         if cand: unparsed.append(line)
-        if orch: by_orch.append(line)
+        if orch: by_orch.append((line, [(ts[i], verb, None if win is None else str(int(win)), ws) for verb, win, ws in opairs]))
+    lane = lambda r: str(int(r["win"]))
     avail = sorted([r for r in pool if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])
     refused = [r for r in pool if r.get("refused")]
     for t, verb, win, line in sorted(dis):
-        hit = next((r for r in avail if r["verb"] == verb and str(int(r["win"])) == win and r["epoch"] <= t + 120 and t - r["epoch"] <= AUDIT_TOL), None) if win.isdigit() else None
+        hit = next((r for r in avail if r["verb"] == verb and lane(r) == win and near(r, t)), None) if win.isdigit() else None
         if hit: avail.remove(hit); matched.append((hit, line))
         else:
             why = next((" (the bridge refused it: %s)" % r["refused"] for r in refused if r["verb"] == verb and str(r["win"]).lstrip("0") == win.lstrip("0") and abs(t - r["epoch"]) <= AUDIT_TOL), "")
             missed.append("%s %s: the dispatcher delivered it, no shadow delivery to pair with%s — %s" % (verb, win, why, line[:160]))
-    extras = ["%s %s %s %s (no dispatcher delivery logged)" % (r["line_time"], r["verb"], r["win"], r.get("ref") or "") for r in avail]
+    agreed, orch_out = 0, []
+    for line, ops in by_orch:
+        st = []
+        for t, verb, win, ws in ops:
+            hit = next((r for r in avail if r["verb"] == verb and lane(r) == win and ref_agrees(ws, r) and near(r, t)), None) if win else None
+            if hit: avail.remove(hit); matched.append((hit, "BY-ORCH " + line)); agreed += 1; st.append("%s lane %s agreed" % (verb, win))
+            else: st.append("%s: names no lane" % verb if not win else "%s lane %s: no shadow record agrees on verb + lane + ref" % (verb, win))
+        orch_out.append("%s [%s]" % (line[:200], "; ".join(st) or "no NEXT/FIX/MERGETIP"))
+    # EXTRA REASONS (the docblock above)
+    evid = [(t, x) for t, x in zip(ts, lines) if t is not None] + [(t, x) for t, x in zip(verdict_times(qlines), qlines) if t is not None]
+    lane_dl = [(t, win) for t, _, win, _ in dis] + [(t, win) for _, ops in by_orch for t, _, win, _ in ops if win]
+    said = lambda r, pat: any(near(r, t) and pat.search(x) and names(x, r) for t, x in evid)
+    superseded = lambda r: any(q["epoch"] > r["epoch"] and lane(q) == lane(r) and near(r, q["epoch"])
+                               and not any(w == lane(r) and r["epoch"] - 60 <= t < q["epoch"] - 60 for t, w in lane_dl) for q in pool if not q.get("refused"))
+    extras = [(r, "held" if said(r, D_HELD) else "no-deliver" if said(r, D_NODEL) else "superseded" if superseded(r) else "?") for r in avail]
+    noreason = sum(1 for _, w in extras if w == "?")
     n_in, n_led = sum(1 for r in deliveries if inw(r)), sum(1 for r in lrecs if inw(r))
     for x in matched: print("MATCHED   %s %s (shadow %s) = %s" % (x[0]["verb"], x[0]["win"], x[0]["ts"], x[1][:110]))
     for x in missed: print("MISSED    " + x)
     for x in dups: print("DUPLICATE " + x)
-    for x in extras: print("EXTRA     " + x)
+    for r, w in extras: print("EXTRA     %s %s %s %s (no dispatcher delivery, no BY-ORCH agreement) reason=%s" % (r["line_time"], r["verb"], r["win"], " ".join(v for v in (r.get("brief"), r.get("ref")) if v), w))
     for x in unparsed: print("UNPARSED  " + x[:200])
-    for x in by_orch: print("BY-ORCH   " + x[:200])
-    print("window: %s; shadow queue deliveries in it: %d (condition A needs >= 20: %s); ledger records beside them: %d" % (desc, n_in, "met" if n_in >= 20 else "NOT met", n_led))
+    for x in orch_out: print("BY-ORCH   " + x)
+    print("window: %s; shadow queue deliveries in it: %d; ledger records beside them: %d (information only: condition A counts MATCHED)" % (desc, n_in, n_led))
+    need = (["matched %d < %d" % (len(matched), COND_A_MIN)] if len(matched) < COND_A_MIN else []) + (["missed %d" % len(missed)] if missed else []) \
+        + (["duplicate %d" % len(dups)] if dups else []) + (["%d EXTRA without a reason" % noreason] if noreason else [])
+    split = "matched %d = dispatcher pairs %d + BY-ORCH agreements %d" % (len(matched), len(matched) - agreed, agreed)
+    if need: print("CONDITION A FAIL: %s (%s)" % ("; ".join(need), split))
+    else:
+        rs = ", ".join("%s %d" % (k, sum(1 for _, w in extras if w == k)) for k in ("held", "no-deliver", "superseded") if any(w == k for _, w in extras))
+        print("CONDITION A PASS: matched %d >= %d, missed 0, duplicate 0, every EXTRA has a reason (%s) (%s)" % (len(matched), COND_A_MIN, rs or "no EXTRA", split))
     print("POSTMAN AUDIT %s %d/%d/%d" % (desc, len(matched), len(missed), len(dups)))
-    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d by_orchestrator=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed), len(by_orch))
+    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d by_orchestrator=%d agreed=%d no_reason=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed), len(by_orch), agreed, noreason)
     if missed or dups: fail("postman", "audit parity %s" % tail)
+    if need: print("FAIL postman audit parity %s; condition A not met" % tail); sys.exit(2)
     ok("postman", "audit parity %s" % tail)
 
 
