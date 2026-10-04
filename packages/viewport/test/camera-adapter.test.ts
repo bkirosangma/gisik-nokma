@@ -412,7 +412,7 @@ describe('29.037 the camera', () => {
     expect(r.cam.getCamera().x).toBe(120);
   });
 
-  it('29.038 keys pan 80 px / zoom 1.25x, Shift pans four times as far; destroy detaches | every handled key is cancelled; each arrow pans its way, = and _ zoom; the first zoom frame follows its tau, the zoom holds the centre and arrives without a jump; quick presses add up | ignored and not cancelled: an unhandled key, Alt, Ctrl, Meta, an already cancelled key, and typing in an input, textarea, select or contenteditable (control: a plain child pans) | destroy stops the loop mid-glide and drops the frame callbacks', () => {
+  it('29.038 keys pan 80 px / zoom 1.25x, Shift pans four times as far; destroy detaches | every handled key is cancelled; each arrow pans its way, = and _ zoom; the first zoom frame follows its tau, the zoom holds the centre and arrives without a jump; quick presses add up | keys compose on the pending target: → then + and + then → land both; a pending x alone, a pending y alone and an off-centre pending zoom are kept, and so is the view resized mid-glide; the zoom clamps before it re-anchors; control: a lone + and a quick + + hold the centre on every frame | ignored and not cancelled: an unhandled key, Alt, Ctrl, Meta, an already cancelled key, and typing in an input, textarea, select or contenteditable (control: a plain child pans) | destroy stops the loop mid-glide and drops the frame callbacks', () => {
     const { el, cam, fc, frames } = mount();
     const press = (key: string, shiftKey = false) => el.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }));
     // dispatchEvent answers false when the handler cancelled the event
@@ -470,6 +470,60 @@ describe('29.037 the camera', () => {
     press('+');
     fc.advance(700);
     expect(cam.scale()).toBe(1.5625);
+    // keys compose on the pending target (planner ruling 2026-10-04): a key applies to the camera the pending glide lands on,
+    // so a pan keeps a pending zoom, and a zoom keeps a pending x and y about the centre of the view the glide lands on
+    const after32 = (first: () => void, key: string): void => {
+      first();
+      fc.advance(32);
+      press(key);
+      fc.advance(700);
+    };
+    // → then +: the pan lands at x 80, and + holds that view's centre, world (480, 300): x 480 - 400 / 1.25, y 300 - 300 / 1.25
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    after32(() => press('ArrowRight'), '+');
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(160, 9), y: expect.closeTo(60, 9), zoom: 1.25 });
+    // + then →: the zoom lands at (80, 60, 1.25), and → pans 80 px at THAT zoom, 64 world units
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    after32(() => press('+'), 'ArrowRight');
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(144, 9), y: expect.closeTo(60, 9), zoom: 1.25 });
+    // a pending x alone, and a pending y alone, are kept too: (80, 0) zooms to (160, 60), and (0, 80) to (80, 140)
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    after32(() => cam.camera({ x: 80 }), '+');
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(160, 9), y: expect.closeTo(60, 9), zoom: 1.25 });
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    after32(() => cam.camera({ y: 80 }), '+');
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(80, 9), y: expect.closeTo(140, 9), zoom: 1.25 });
+    // a pending zoom about the left edge (anchorPx 0) lands at (0, 150, 2); + holds THAT view's centre, world (200, 300)
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    after32(() => cam.animateTo({ scale: 2 }, { anchorPx: 0 }), '+');
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(40, 9), y: expect.closeTo(180, 9), zoom: 2.5 });
+    // at maxZoom the zoom clamps before it re-anchors: → then + at zoom 4 lands at (20, 0, 4), not shifted for a zoom of 5
+    cam.camera({ x: 0, y: 0, zoom: 4 }, { instant: true });
+    after32(() => press('ArrowRight'), '+');
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(20, 9), y: expect.closeTo(0, 9), zoom: 4 });
+    // the view resized to 800 x 400 under a pending + about its old centre (400, 300): that glide lands at (80, 60, 1.25), whose
+    // centre is now world (400, 220), so a second + lands at (144, 92, 1.5625)
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    press('+');
+    fc.advance(16);
+    sizeOf(el, { clientWidth: 800, scrollWidth: 800, clientHeight: 400, scrollHeight: 400 });
+    press('+');
+    fc.advance(700);
+    expect(cam.getCamera()).toEqual({ x: expect.closeTo(144, 9), y: expect.closeTo(92, 9), zoom: 1.5625 });
+    sizeOf(el, { clientWidth: 800, scrollWidth: 800, clientHeight: 600, scrollHeight: 600 });
+    // control: a lone + and a quick + + hold the centre's world point on EVERY frame (a zoom-only glide about the centre)
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    const held = cam.toWorld({ x: 400, y: 300 });
+    const drift: number[] = [];
+    const offDrift = cam.onFrame(() => {
+      const w = cam.toWorld({ x: 400, y: 300 });
+      drift.push(Math.hypot(w.x - held.x, w.y - held.y) * cam.scale());
+    });
+    after32(() => press('+'), '+');
+    offDrift();
+    expect(cam.scale()).toBe(1.5625);
+    expect(drift.length).toBeGreaterThan(10);
+    expect(Math.max(...drift)).toBeLessThan(0.5);
     // ignored, and left uncancelled: a key the camera does not handle, a modifier, and a key another handler already cancelled
     cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
     expect(press('a')).toBe(true);
