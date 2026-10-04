@@ -47,6 +47,12 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 - ✅ **29.013 — wheelIntent is the Knowledge Graph classifier exactly; the time surfaces take over only Ctrl + wheel; control: Shift + wheel and a plain vertical wheel are the platform's.** (`packages/viewport/test/zoom.test.ts`)
 - ✅ **29.015 — no Date, Math.random, performance, requestAnimationFrame, setTimeout or document in src (outside dom/); control: the scan finds a planted read.** (`packages/viewport/test/seam.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T3 -->
+- ❌ **29.020 — 28 days from a Monday; the day before a start is the previous chunk's last; control: no chunk starts on a non-Monday.** (`packages/viewport/test/range.test.ts`)
+- ❌ **29.021 — still: one viewport either side; moving: ahead by max(V, 1.5 s of travel) and half a viewport behind | at most two in flight; the visible chunks first; low-priority behind-the-travel fetches are cancelled when a visible one needs the slot | travelling later, the chunk BEHIND the view is low priority and starts after the visible one; control: standing still, the same chunk is high | a reversal cancels every low-priority fetch; chunks outside the index bounds and loaded chunks are never fetched.** (`packages/viewport/test/range.test.ts`)
+- ❌ **29.022 — idle widening alternates sides outward and stops at 40 chunks, 10,000 entries or the index extent; control: nothing loaded plans nothing | past the cap the farthest chunk goes first and nothing within a viewport of the view is ever evicted.** (`packages/viewport/test/range.test.ts`)
+- ❌ **29.023 — the next coarser preset, the same centre at another scale, the neighbouring packing scales, the mount range | pan limits: the drawn extent plus a viewport either side, never narrower than today +/- 56; nothing drawn is the minimum.** (`packages/viewport/test/range.test.ts`)
+- ❌ **29.024 — a stale chunk is still returned; putChunk clears the mark; markStale on an unloaded chunk reports false | patchEntry changes the index and every chunk copy and reports how many; an unknown id reports 0.** (`packages/viewport/test/range.test.ts`)
+- ❌ **29.025 — scopes: the same scope in another order is one cache; the fifth scope drops the least recently used; a get refreshes.** (`packages/viewport/test/range.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T4 -->
 <!-- wtg-part1-viewport-timeline-view T5 -->
 <!-- wtg-part1-viewport-timeline-view T6 -->
