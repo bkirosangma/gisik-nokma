@@ -326,6 +326,20 @@ describe('12.119–12.122 the read model is folded by the domain reducer, never 
     ]);
   });
 
+  it('29.156 the replica folds estimate, reworkEstimate and waitForAll claims through the same reducer', async () => {
+    const replica = await seededReplica();
+    await replica.applyServerItem(created(TICKET, 'Estimate me'));
+    for (const [fieldId, value] of [['estimate', 3], ['reworkEstimate', 2], ['waitForAll', true], ['waitForAll', null]] as const) {
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.field_set', { fieldId, value }));
+    }
+    const fields = (await replica.getTicket(TICKET))?.confirmed?.fields;
+    expect(fields?.['estimate']?.value).toBe(3);
+    expect(fields?.['reworkEstimate']?.value).toBe(2);
+    expect(fields).toHaveProperty('waitForAll'); // a clearing claim, not a deleted key
+    expect(fields?.['waitForAll']?.value).toBeNull();
+    expect(fields?.['priority']?.value).toBe('P2'); // control
+  });
+
   /**
    * 12.17 — the same envelope applied twice to the replica returns {applied:true} then {applied:false}, and listEntityEvents confirms only one row was stored: duplicate stream delivery is a no-op.
    */
