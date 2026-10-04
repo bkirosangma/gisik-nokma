@@ -136,7 +136,7 @@
 - **Consumes:** nothing from earlier tasks. From the codebase: `TimelineView` and `TicketDatesInput` exported by `@gisik-nokma/app-core`, `themeStylesheet` from `@gisik-nokma/ui/tokens`, `@gisik-nokma/ui/ui.css`.
 - **Produces:**
   - `@gisik-nokma/viewport`: `DAYS_PER_WEEK`, `weekdayOf(day): 0..6` (0 = Monday), `isMonday`, `isWeekend`, `mondayOnOrBefore`, `mondaysIn(first, last)`, `axisLevels(ppd): {weekLabels, dayNumbers, weekendTint}`, `crossFade(ppd, threshold, half = 2)`. Day numbers are epoch days: day 0 is Thursday 1970-01-01, day 4 is Monday 1970-01-05.
-  - `@gisik-nokma/flow-graph-browser` (private): `frameStats(gapsMs): FrameStats`, `samplePan(step, durationMs): Promise<number[]>`, `parseResult(body)`, `StressRecord`, `SceneName = 'time' | 'flow' | 'view'`, `BARS`, `barFor(record)`, `judge(record): string[]`, `timeScene`, `flowScene`; the page `stress.html?scene=time|flow|view&n=<count>[&auto=1]`; `window.__stress`; `POST /__results` appending to `results/stress.jsonl`.
+  - `@gisik-nokma/flow-graph-browser` (private): `frameStats(gapsMs): FrameStats`, `samplePan(step, durationMs): Promise<number[]>`, `parseResult(body)`, `StressRecord`, `SceneName = 'time' | 'flow' | 'view'`, `BARS`, `barFor(record)`, `judge(record): string[]`, `timeScene`, `flowScene`; the page `stress.html?scene=time|flow|view&n=<count>[&auto=1]`; `window.__stress`; `POST /__results` appending to `test-results/stress.jsonl`.
   - The catalogue: `test-cases/29-workflow-timeline-graphs.md` with Part 1's per-task anchors and one Part anchor for each of Parts 2 to 5, and Features section 26 likewise (see the Global Constraints for the spellings).
   - The registration set and the gate pinned to the MEASURED count (46 when written).
 
@@ -1641,7 +1641,7 @@ Parts 2 to 5 each own ONE anchor below, seeded here so the sub-sections always s
   ```bash
   pnpm turbo run build --filter=@gisik-nokma/flow-graph-browser^...
   FG_HEADED=1 /Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh fgb-headed -- pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/stress.spec.ts --grep "29.003" > /tmp/fgb-headed.log 2>&1; tail -n 12 /tmp/fgb-headed.log
-  tail -n 3 packages/flow-graph-browser/results/stress.jsonl
+  tail -n 3 packages/flow-graph-browser/test-results/stress.jsonl
   ```
 
   Read the `view` record's `pan.fps`, `pan.worstMs`, `pan.p95Ms` and `clickToSettleMs`, and count what the page mounted (open `stress.html?scene=view&n=2000&auto=1` in the headed window and run `document.querySelectorAll('.gn-timeline__bar').length` in its console; the shipped view mounts only its eight-week window, so this is far below 2,000 and the record must say so). Append a `## Records` section to the end of the package README (T13 adds the second record under it):
@@ -1664,7 +1664,7 @@ Parts 2 to 5 each own ONE anchor below, seeded here so the sub-sections always s
   cd packages/flow-graph-browser && pnpm exec vite --host   # run_in_background; note the pid
   ```
 
-  URL for the owner: `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` (the page runs three pans by itself and posts its record). Wait for the record: `tail -n 2 packages/flow-graph-browser/results/stress.jsonl` shows a line with `"touch":true`. Stop the server by its exact pid (no `pkill`). Add the phone row to the README table and write `phone: N fps, worst N ms, p95 N ms, click-to-settle N ms (device: <the UA string's model>)` on the same 29.016 line. If the owner is not available, the line stays ❌ and the lane reports `NEEDS: owner phone` as a standing blocker for T13 only (T2 to T12 are not held up by it); in that case also write the desktop half now.
+  URL for the owner: `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` (the page runs three pans by itself and posts its record). Wait for the record: `tail -n 2 packages/flow-graph-browser/test-results/stress.jsonl` shows a line with `"touch":true`. Stop the server by its exact pid (no `pkill`). Add the phone row to the README table and write `phone: N fps, worst N ms, p95 N ms, click-to-settle N ms (device: <the UA string's model>)` on the same 29.016 line. If the owner is not available, the line stays ❌ and the lane reports `NEEDS: owner phone` as a standing blocker for T13 only (T2 to T12 are not held up by it); in that case also write the desktop half now.
 
   Flip 29.016 to 🧪 only when both halves carry their numbers (T13's catalogue test, 29.119, requires at least two `N fps` figures on this line).
 
@@ -11574,7 +11574,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
   ```bash
   pnpm turbo run build --filter=@gisik-nokma/flow-graph-browser^...
   FG_HEADED=1 /Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh fgb-headed -- pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/stress.spec.ts --grep "29.003" > /tmp/fgb-headed.log 2>&1; tail -n 12 /tmp/fgb-headed.log
-  tail -n 3 packages/flow-graph-browser/results/stress.jsonl
+  tail -n 3 packages/flow-graph-browser/test-results/stress.jsonl
   ```
 
   Run it three times; the log prints `fg-stress view (...)` with the pan's `fps`, `worstMs`, `p95Ms` and `clickToSettleMs`. Count what the page mounted (open `stress.html?scene=view&n=2000&auto=1` in the headed window and run `document.querySelectorAll('.gn-timeline__bar').length` in the console): it is far below 2,000, and the figure goes in the record. Take the MEDIAN run by fps and write its row (`judge` is applied to that record in `harness/bars.ts`; if it lists a reason, the bar is missed).
@@ -11583,7 +11583,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
 
 - [ ] **Step 4: Re-measure on the owner's real phone (case 29.118, phone half)**
 
-  Exactly T1 step 15: start `pnpm exec vite --host` from `packages/flow-graph-browser` in the background (note the pid), ask the controller to relay `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` to the owner, wait for a `"touch":true` line in `results/stress.jsonl`, stop the server by its exact pid (no `pkill`). Ask for the page THREE times when the owner is willing; the page runs three pans per load.
+  Exactly T1 step 15: start `pnpm exec vite --host` from `packages/flow-graph-browser` in the background (note the pid), ask the controller to relay `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` to the owner, wait for a `"touch":true` line in `test-results/stress.jsonl`, stop the server by its exact pid (no `pkill`). Ask for the page THREE times when the owner is willing; the page runs three pans per load.
 
 - [ ] **Step 5: Write the records**
 
