@@ -143,7 +143,7 @@ describe('§11 closer — the INTERNAL door (ingestBatch)', () => {
   it('refuses a contest embedding a claim about a DIFFERENT TICKET, and appends nothing', async () => {
     // Mutation that reddens it, naming its own site: delete the
     // `original.entity.id !== env.entity.id` comparison in
-    // src/sync/contest-coherence.ts. Deleting the CALL in commitOne reddens this
+    // src/sync/contest-coherence.ts. Deleting the CALL in commitInTx reddens this
     // too — which is the point of testing at the door rather than only at the
     // function.
     const forged = contest({
@@ -296,7 +296,7 @@ describe('§11 closer — the CLIENT door (POST /v1/events)', () => {
     // The ordering the coherence check was placed to preserve: a client that has
     // forged its provenance is told the fault it can actually fix, and Plan 4's
     // gate keeps owning that refusal. Mutation that reddens it: move the
-    // coherence check above the gate in commitOne.
+    // coherence check above the gate in commitInTx.
     const { app, headers, user, workspaceId, ticketId } = await founder();
     const forged = contest({
       workspaceId,

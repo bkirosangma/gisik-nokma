@@ -167,6 +167,7 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // cookie-authenticatable mutation that appends events or writes rows:
   '/v1/workspaces', // creates a workspace and appends its founding events
   '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', // admin bulk migration, envelope-origin 'web'
+  '/v1/workspaces/:workspaceId/drafts/publish', // a cookie POST that appends ticket.published events (drafts T5b)
   '/v1/me/notifications/:id/read', // per-user write
   // The BULK form of the line above, and it is registered separately because
   // that is the whole hazard this set has: `has(input.routeUrl)` is an EXACT
