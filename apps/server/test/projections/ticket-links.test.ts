@@ -46,14 +46,17 @@ describe('27.020 proj_ticket_links', () => {
     const A = await newTicket('Link source');
     const B = await newTicket('Link target');
     const X = await newTicket('Second link source');
+    const C = await newTicket('Second link target');
     // The admin from MCP, so neither the actor nor the origin is the fixture's default (owner, 'web').
     const blocks = link('ticket.link_added', A, 'blocks', B, { actorId: f.ids.admin, origin: 'mcp' });
     const relates = link('ticket.link_added', A, 'relates', B);
     // ANOTHER source's link of the removed kind to the same target: the removal below must leave it alone.
     const otherSource = link('ticket.link_added', X, 'blocks', B);
+    // The SAME source's link of the removed kind to ANOTHER target: the removal must leave that alone too.
+    const otherTarget = link('ticket.link_added', A, 'blocks', C);
     // The entity seq and the workspace seq differ, so a row holding the wrong one cannot pass.
     expect(blocks.seq).not.toBe(blocks.workspaceSeq);
-    await applyCommitted(db.pool, [blocks, relates, otherSource]);
+    await applyCommitted(db.pool, [blocks, relates, otherSource, otherTarget]);
     const rows = await rowsBetween(A, B);
     expect(rows.map((r) => ({ ...r, created_at: r.created_at.toISOString() }))).toEqual([
       { workspace_id: f.WS, source_id: A, target_id: B, kind: 'blocks', created_by: f.ids.admin, created_at: blocks.serverTime, origin: 'mcp', seq: blocks.workspaceSeq },
@@ -61,11 +64,15 @@ describe('27.020 proj_ticket_links', () => {
     ]);
     // CONTROL first: the other source's row is there before the removal, so its surviving below is not vacuous.
     expect((await rowsBetween(X, B)).map((r) => r.kind)).toEqual(['blocks']);
+    // CONTROL first: and so is the same source's row to the other target.
+    expect((await rowsBetween(A, C)).map((r) => r.kind)).toEqual(['blocks']);
     await applyCommitted(db.pool, [link('ticket.link_removed', A, 'blocks', B)]);
     // CONTROL: the second kind between the same pair is its own row and survives the removal.
     expect((await rowsBetween(A, B)).map((r) => r.kind)).toEqual(['relates']);
     // CONTROL: so does the other source's link of the same kind to the same target (the key holds the source).
     expect((await rowsBetween(X, B)).map((r) => r.kind)).toEqual(['blocks']);
+    // CONTROL: and so does the same source's link of the same kind to another target (the key holds the target).
+    expect((await rowsBetween(A, C)).map((r) => r.kind)).toEqual(['blocks']);
   });
 });
 
