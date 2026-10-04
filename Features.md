@@ -3453,6 +3453,16 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ✅ **The assistant can define workflows and types, migrate a type, set who sees a ticket and change workspace settings — behind a confirmation** (MCP-everything T12; `packages/mcp-server/src/tools/definition-admin-tools.ts`) — `define_workflow` and `define_ticket_type` are validated with the product's own schemas before anything is sent; `migrate_ticket_type` uses the app's migration route (all-or-nothing pre-flight); `set_visibility` (workspace / project / inherit / explicit people); `update_workspace_settings`. Each previews what would change (tickets in the workflow, of the type, that move) until `confirm_name` is exact. Cases 14.530–14.536.
 - ✅ **One `search` for tickets and notes, Deleted items, and member help for everything the assistant can now do** (MCP-everything T13; `packages/mcp-server/src/tools/read-tools.ts`, `trash-tools.ts`, `project-tools.ts`, `docs/manual.md` §16) — `search` (tickets and/or notes, by words or, for notes, by meaning; `search_tickets` kept one release as its old name), `list_deleted` (with the tool that restores each item), `update_project` files a project in a group, the stale "prefix cannot be changed" texts are gone, and manual §16 lists notes, comments, files, every ticket action, your inbox and the admin acts with their check-first rule. The hosted round trip walks notes → comments → files → ticket acts → trash → an admin preview → search with every event `origin: mcp`. Sixty-three tools in both doors. Cases 14.550–14.555.
 
+<!-- mcp-sweep-2 bullets: append below, one per task, each when its task lands -->
+<!-- ms2 T2 bullet -->
+<!-- ms2 T3 bullet -->
+<!-- ms2 T4 bullet -->
+<!-- ms2 T5 bullet -->
+<!-- ms2 T6 bullet -->
+<!-- ms2 T7 bullet -->
+<!-- ms2 T8 bullet -->
+<!-- ms2 T9 bullet -->
+
 ## 15. Notes
 
 - ⚙️ **A note is an entity in the ledger** — nine `note.*` events (`packages/domain/src/events/note-events.ts`), folded by `applyNoteEvent` (`packages/domain/src/note-state.ts`); `comment.added` is filed against notes as well as tickets. Spec: `docs/superpowers/specs/2026-09-23-notes-design.md` §3.
