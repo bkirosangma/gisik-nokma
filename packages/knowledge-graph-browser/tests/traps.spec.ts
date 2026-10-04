@@ -197,10 +197,12 @@ test('27.276 trap 8: after load every clear item is inside the stage and the fit
   expect((await check()).out.length).toBeGreaterThan(0); // control: the check does see an item outside
 });
 
-test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to 8%; an edge hover dims nothing and thickens the edge, and back on the item dims again; control: leaving restores every item', async ({ page }) => {
+test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to 8%; an edge hover dims nothing and thickens the edge, and back on the item dims again; control: leaving restores every item and edge', async ({ page }) => {
   await openAdapter(page);
   const s = await stageAt(page);
   const centre = await pagePoint(page, 'ticket:t142');
+  const edge0 = await page.evaluate(() => window.__kg.probe!.edgeDisplay('parent|ticket:t131|ticket:t133')!.opacity);
+  expect(edge0).toBe(0.45); // a parent edge at rest: not the hover's 0.08, so the after-leave comparison can fail
   await page.mouse.move(centre.x, centre.y);
   await still(page);
   const hovered = await page.evaluate(() => {
@@ -233,9 +235,9 @@ test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to
   await still(page);
   const after = await page.evaluate(() => {
     const k = window.__kg, p = k.probe!;
-    return k.scene().nodes.filter((n) => !n.fog && p.nodeDisplay(n.ref)!.opacity !== 1).map((n) => n.ref);
+    return { dimmed: k.scene().nodes.filter((n) => !n.fog && p.nodeDisplay(n.ref)!.opacity !== 1).map((n) => n.ref), edge: p.edgeDisplay('parent|ticket:t131|ticket:t133')!.opacity };
   });
-  expect(after).toEqual([]); // control: every non-fog item back to 1
+  expect(after).toEqual({ dimmed: [], edge: edge0 }); // control: every non-fog item back to 1, the other edge back to its own
 });
 
 test('27.279 trap 11: an edge hover reports the edge and the pointer, and Sigma draws no edge label; control: the edge thickened', async ({ page }) => {
