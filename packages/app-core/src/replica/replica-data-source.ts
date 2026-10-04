@@ -17,6 +17,7 @@ import {
   PRIORITIES,
   PURGED_OUTBOX_NOTICE,
   isCreatableState,
+  isWithheldLinkEvent,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -1712,6 +1713,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           clientTime: event.clientTime,
           serverTime: event.serverTime,
           seq: event.seq,
+          // Typed-links T4b: the server served this link with its target withheld
+          // (`targetId: null`), so History reads "a ticket you can't see". A real
+          // target carries no label offline: this device holds no key for it.
+          ...(isWithheldLinkEvent(event) ? { linkTarget: null } : {}),
         }));
       return limit === undefined ? kept : kept.slice(0, limit);
     },
