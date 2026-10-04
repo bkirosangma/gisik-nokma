@@ -249,8 +249,14 @@ describe('29.099 there are no pages: no Earlier / Later, a Today button, a zoom 
     }
   });
 
-  it('29.099 the axis has a period row with a W label on each Monday and a day-number row; a weekend day carries the mark', () => {
+  it('29.099 the axis has a period row with a W label on each Monday and a day-number row; a weekend day carries the mark', async () => {
     const { container } = renderTimeline([]);
+    // The fades the stylesheet reads are set on the canvas by the first refresh, which jsdom runs on mount at Week (24 px/day):
+    // the W labels and the day numbers fully shown, the weekend tint on. Literals: crossFade(24, 16) = crossFade(24, 20) = 1.
+    const canvas = container.querySelector('.gn-timeline__canvas') as HTMLElement;
+    expect(canvas.style.getPropertyValue('--tl-fade-weeks')).toBe('1');
+    expect(canvas.style.getPropertyValue('--tl-fade-days')).toBe('1');
+    expect(canvas.dataset['weekend']).toBe('on');
     const axis = container.querySelector('.gn-timeline__axis');
     expect(axis?.querySelectorAll('.gn-timeline__axis-row')).toHaveLength(2);
     // 2026-08-24 is a Monday, 2026-08-29 a Saturday
@@ -283,6 +289,27 @@ describe('29.099 there are no pages: no Earlier / Later, a Today button, a zoom 
     expect(mon % 7).toBe(0);
     // The chart itself is one focusable group named EXACTLY "Timeline" (the name a screen reader announces on entering it).
     expect(screen.getByRole('group', { name: 'Timeline' })).toHaveClass('gn-timeline__canvas');
+    // ...and they follow the zoom: at Month (8 px/day) the W labels and the day numbers fade out and the tint is off. LAST in
+    // this it, since the axis above is read at Week. Reduced motion makes the zoom instant (see the toolbar it), so the frame
+    // lands once Month is marked.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+    try {
+      const zoom = screen.getByRole('radiogroup', { name: 'Timeline zoom' });
+      fireEvent.click(within(zoom).getByRole('radio', { name: 'Month' }));
+      await waitFor(() => expect(within(zoom).getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true'));
+      expect(canvas.style.getPropertyValue('--tl-fade-weeks')).toBe('0');
+      expect(canvas.style.getPropertyValue('--tl-fade-days')).toBe('0');
+      expect(canvas.dataset['weekend']).toBe('off');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -679,6 +706,16 @@ describe('29.100 the key is on the bar; the accessible name stays the title', ()
     expect(screen.getByRole('button', { name: 'Done one' })).toHaveAttribute('title', expect.stringMatching(/^Done; /));
     expect(screen.getByRole('button', { name: 'Active one' })).toHaveAttribute('title', expect.stringMatching(/^In progress; /));
     expect(screen.getByRole('button', { name: 'Fresh one' }).getAttribute('title')).not.toMatch(/Done|In progress/);
+    // EXACTLY, not by pattern (planner P20 class 2d): a not-started bar has no state word and these bars no key, so its
+    // hover and its description are the provenance sentence alone, with no empty "; " segment where the word would go. The
+    // description is read with toBe, never toHaveTextContent (a substring match "; starts …" would pass). Control: the Done
+    // bar's strings are exact too, so the leg is not satisfied by any string.
+    const description = (title: string) =>
+      document.getElementById(screen.getByRole('button', { name: title }).getAttribute('aria-describedby') as string)?.textContent;
+    expect(screen.getByRole('button', { name: 'Fresh one' })).toHaveAttribute('title', "starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
+    expect(description('Fresh one')).toBe("starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
+    expect(screen.getByRole('button', { name: 'Done one' })).toHaveAttribute('title', "Done; starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
+    expect(description('Done one')).toBe("Done; starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
   });
 });
 
