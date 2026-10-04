@@ -36,7 +36,7 @@ export const TOOL_NAMES_BY_MODULE = {
   discovery: [
     // discovery begin (T10)
     'list_ticket_types', 'list_workflows', 'my_work', 'get_attention',
-    'list_notifications', 'mark_notifications_read', 'list_my_invitations', 'respond_to_invitation',
+    'list_notifications', 'mark_notifications_read', 'get_notification_preferences', 'set_notification_preferences', 'list_saved_filters', 'list_my_invitations', 'respond_to_invitation',
     // discovery end
   ],
   memberAdmin: [
