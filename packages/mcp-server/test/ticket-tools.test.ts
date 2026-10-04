@@ -259,7 +259,7 @@ describe('27.055–27.057 link_tickets', () => {
     expect(f.batches).toHaveLength(1);
   });
 
-  it("27.056 action 'remove' files link_removed on the STORED source, from either end; control: an outgoing link stays on this stream, a missing one is an error naming it", async () => {
+  it("27.056 action 'remove' files link_removed on the STORED source, from either end; a links-read 404 is the uniform sentence and sends nothing; control: an outgoing link stays on this stream, a missing one is an error naming it", async () => {
     const removal = async (kind: string, targetId: string) => {
       const f = fake(linkRoutes);
       await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId, kind, action: 'remove' });
@@ -277,6 +277,13 @@ describe('27.055–27.057 link_tickets', () => {
       `no "relates" link between ${T} and ${B} that you can see`,
     );
     expect(f.batches).toHaveLength(0);
+    // A links read that 404s (the ticket is gone or hidden from you) answers the uniform sentence, never the raw HTTP error.
+    // Every detail answers (ROUTES) and `/links` is not routed, so the 404 is the links read's; the first leg is this removal answered.
+    const gone = fake(ROUTES);
+    await expect(tool('link_tickets', gone.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'blocks', action: 'remove' })).rejects.toThrow(
+      /^ticket not found or not visible to you$/,
+    );
+    expect(gone.batches).toHaveLength(0);
   });
 
   it('27.057 a refusal passes through in the house shape', async () => {

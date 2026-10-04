@@ -154,7 +154,7 @@ describe('the read tools', () => {
     expect(JSON.stringify(out)).not.toContain('"type":"doc"');
   });
 
-  it('27.058 get_ticket adds links from the links route (kind, direction, ticket {id, key, title}) and drops ticketState.links; control: no links answers links: []', async () => {
+  it('27.058 get_ticket adds links from the links route (kind, direction, ticket {id, key, title}) and drops ticketState.links; a links-read 404 is the uniform sentence; control: no links answers links: []', async () => {
     const body = {
       key: 'CCSO-4', title: 'Chiller', rollup: null,
       ticketState: { kind: 'ticket', id: 't1', fields: {}, links: [{ kind: 'blocks', targetId: 'b1' }] },
@@ -167,6 +167,20 @@ describe('the read tools', () => {
     expect(out.ticketState['id']).toBe('t1'); // control: the rest of the state is served
     const none = sessionRecording({ ...body, ticketState: { kind: 'ticket', id: 't1', fields: {} } }, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
     expect(((await tool('get_ticket', none.session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown>)['links']).toEqual([]);
+    // The detail answers and the links read 404s (visibility changed between the two reads): the uniform sentence, never the raw HTTP error.
+    // The detail must answer here: 14.458 404s every path, so its detail read throws first and the links read is never reached.
+    const linksPath = '/v1/workspaces/w1/tickets/t1/links';
+    const raced = sessionRecording(body);
+    const linksGone: Session = {
+      ...raced.session,
+      get: async (path) => {
+        const answer = await raced.session.get(path); // records the path
+        if (path === linksPath) throw new HttpError(404, { error: 'not_found' });
+        return answer;
+      },
+    };
+    await expect(tool('get_ticket', linksGone).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow(/^ticket not found or not visible to you$/);
+    expect(raced.paths).toEqual(['/v1/workspaces/w1/tickets/t1', linksPath]); // the detail answered; the 404 is the links read's
   });
 
   it('14.458 get_ticket maps a 404 to the uniform sentence', async () => {
