@@ -36,13 +36,23 @@ export type SegmentedControlProps<T extends string> = {
    * a track that wraps or fits never needs it.
    */
   fade?: boolean;
+  /**
+   * `'tabs'` (the default) is a tablist: `tablist` / `tab` / `aria-selected`, for a choice that switches a panel or a route.
+   * `'radio'` is a radio group: `radiogroup` / `radio` / `aria-checked`, for a choice of ONE value that switches no panel —
+   * the Timeline's Day | Week | Month zoom (spec VP-10; Workflow and Timeline graphs Part 1 T9, case 29.087). Only the roles
+   * change: the classes, the roving tabindex and the arrow keys (which move AND select) are the same, so a radio group looks
+   * and moves exactly like the tab track. Absent, every existing render site is byte-identical.
+   */
+  variant?: 'tabs' | 'radio';
 };
 
 /**
  * HIG's method / view picker. Replaces the bordered `.gn-view-tabs` buttons
  * with a fill track and a raised selected segment, keeping the exact roles the
  * old markup carried — `tablist`, `tab`, `aria-selected` — so the accessible-name
- * ratchet (13.285/13.287) sees no loss.
+ * ratchet (13.285/13.287) sees no loss. `variant="radio"` swaps those three for
+ * `radiogroup`, `radio` and `aria-checked` (29.087); everything below about the
+ * keyboard holds for both.
  *
  * ## P9 — the roles promised a keyboard model that was not there
  *
@@ -82,7 +92,9 @@ export function SegmentedControl<T extends string>({
   'aria-label': ariaLabel,
   className,
   fade = false,
+  variant = 'tabs',
 }: SegmentedControlProps<T>) {
+  const radio = variant === 'radio';
   const edgesRef = useScrollEdges<HTMLDivElement>('x');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = options.findIndex((option) => option.value === value);
@@ -127,7 +139,7 @@ export function SegmentedControl<T extends string>({
     // the track rather than replacing it — and `undefined` leaves the attribute
     // byte-identical to what every existing call site already renders.
     <div
-      role="tablist"
+      role={radio ? 'radiogroup' : 'tablist'}
       aria-label={ariaLabel}
       ref={fade ? edgesRef : undefined}
       className={[
@@ -144,9 +156,9 @@ export function SegmentedControl<T extends string>({
             ref={(element) => {
               tabRefs.current[index] = element;
             }}
-            role="tab"
+            role={radio ? 'radio' : 'tab'}
             type="button"
-            aria-selected={on}
+            {...(radio ? { 'aria-checked': on } : { 'aria-selected': on })}
             tabIndex={index === tabStopIndex ? 0 : -1}
             className={on ? 'gn-segmented__item gn-segmented__item--on' : 'gn-segmented__item'}
             onClick={() => onChange(option.value)}

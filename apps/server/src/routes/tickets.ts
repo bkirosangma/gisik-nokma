@@ -715,8 +715,9 @@ export function registerTicketRoutes(
         depth += 1;
       }
 
-      // Spec A §2.4: the folded links are the engine's whole truth; a reader gets
-      // only the targets they can see, and no key at all when none remain (the
+      // Spec A §2.4 and drafts R41: the folded links are the engine's whole truth;
+      // a reader gets only the entries whose OTHER end they can open (`from` for a
+      // draft-side entry, else `targetId`), and no key at all when none remain (the
       // reducer's absent-not-empty shape), so nothing counts a hidden one. The
       // one predicate every door uses (`withhold-link-targets.ts`, typed-links T4b).
       const servedState: TicketState = await withholdLinks(state, targetSight(deps.pool, request.currentUserId));

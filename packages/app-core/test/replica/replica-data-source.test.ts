@@ -1580,7 +1580,7 @@ describe('27.090 offline History labels a withheld link event', () => {
     // A served copy, never a submitted claim: `envelope` mints through `newSubmittedEvent`, whose
     // door guard (`test/setup.ts`) would refuse `targetId: null`. Its documented escape hatch.
     (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
-    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', withheldLinkPayload('blocks')));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', withheldLinkPayload('blocks', 'out')));
     delete (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads;
     await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.link_added', { kind: 'relates', targetId: epicId }));
     const links = (await ds.query.getTicketHistory(taskId)).filter((e) => e.type === 'ticket.link_added');
@@ -1590,5 +1590,31 @@ describe('27.090 offline History labels a withheld link event', () => {
     expect(describeEvent(withheld!)).toBe("Linked: blocks a ticket you can't see");
     expect('linkTarget' in real!).toBe(false); // control
     expect(describeEvent(real!)).toBe('Linked: relates to another ticket');
+  });
+});
+
+describe("28.196 offline History reads a published draft's from-form links from its own side (drafts T6 FIX 1)", () => {
+  it("28.196 a from entry reads \"is blocked by\" with the replica's keyless label, and \"is blocked by a ticket you can't see\" when its source was withheld ({kind, targetId: null, from: null}); CONTROL: plain links on the same ticket read out", async () => {
+    const { ds, replica, taskId: D, epicId: S } = await fixture();
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', { kind: 'blocks', targetId: D, from: S }));
+    // Served copies, never submitted claims (27.090's escape hatch): a source this device may not see, then a plain target.
+    (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', withheldLinkPayload('blocks', 'in')));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', withheldLinkPayload('blocks', 'out')));
+    delete (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: D }, 'ticket.link_added', { kind: 'duplicates', targetId: S }));
+    const lines = (await ds.query.getTicketHistory(D)).filter((e) => e.type === 'ticket.link_added');
+    expect(lines.map((e) => describeEvent(e))).toEqual([
+      'Linked: is blocked by another ticket',
+      "Linked: is blocked by a ticket you can't see",
+      "Linked: blocks a ticket you can't see", // CONTROL: a withheld plain target reads out
+      'Linked: duplicates another ticket', // CONTROL: a plain link reads out
+    ]);
+    expect(lines.map((e) => e.linkDirection)).toEqual(['in', 'in', 'out', 'out']);
+    expect(lines.map((e) => e.linkTarget)).toEqual([undefined, null, null, undefined]); // the replica holds no key
+    // Link events only, as the server serves them (view-types `linkDirection`): no other event on D carries a direction.
+    const others = (await ds.query.getTicketHistory(D)).filter((e) => !e.type.startsWith('ticket.link_'));
+    expect(others.map((e) => e.type)).toContain('ticket.created'); // CONTROL: the haystack holds non-link events
+    expect(others.filter((e) => 'linkDirection' in e)).toEqual([]);
   });
 });

@@ -227,18 +227,38 @@ export const ticketFieldSetPayload = z.object({
     .refine((value) => value !== undefined, 'is required: a field claim with no value would record a clearing nobody made'),
 });
 
-export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullable() });
+/**
+ * `childId` (drafts spec R4, owner ruling O1, drafts T6): filed ONLY on a draft D's stream. `{ newParentId: D,
+ * childId: C }` holds the published C as D's pending child; `{ newParentId: null, childId: C }` withdraws it. C's
+ * stream is never written until D is published, when the server re-files `{ newParentId: D }` on C's own stream.
+ */
+export const ticketReparentedPayload = z
+  .object({ newParentId: ulidString.nullable(), childId: ulidString.optional() })
+  .refine((p) => p.childId === undefined || p.childId !== p.newParentId, { message: 'a ticket cannot be its own pending child' });
 
 /**
  * Typed ticket links (Knowledge Graph spec A §2.2). Both events go on the
- * SOURCE ticket's stream, whoever writes them, so a link has one history.
+ * SOURCE ticket's stream, whoever writes them, so a link has one history,
+ * with ONE exception: a link whose target is a DRAFT (below).
  * `relates` is stored as written; its "either direction" rule is the engine's
  * (`rule-engine/src/checks/links.ts`), not this schema's.
+ *
+ * `from` (drafts spec R42): the SOURCE of a link filed on the stream of a DRAFT it points at. A link whose
+ * source is a published ticket S and whose target is a draft D is never written on S's stream (that stream is
+ * public and would name a private ticket); it is written on D's stream as `{ kind, targetId: D, from: S }` and
+ * re-filed on S's stream, plain, when D is published. A payload without `from` is exactly what it always was.
  */
 export const TICKET_LINK_KINDS = ['blocks', 'relates', 'duplicates'] as const;
 export type TicketLinkKind = (typeof TICKET_LINK_KINDS)[number];
-export const ticketLinkAddedPayload = z.object({ kind: z.enum(TICKET_LINK_KINDS), targetId: ulidString }).strict();
-export const ticketLinkRemovedPayload = z.object({ kind: z.enum(TICKET_LINK_KINDS), targetId: ulidString }).strict();
+const linkPayloadShape = {
+  kind: z.enum(TICKET_LINK_KINDS),
+  targetId: ulidString,
+  from: ulidString.optional(),
+};
+const fromDiffersFromTarget = (p: { targetId: string; from?: string | undefined }): boolean => p.from !== p.targetId;
+const FROM_MESSAGE = 'a link\'s "from" must be a different ticket from its target';
+export const ticketLinkAddedPayload = z.object(linkPayloadShape).strict().refine(fromDiffersFromTarget, { message: FROM_MESSAGE });
+export const ticketLinkRemovedPayload = z.object(linkPayloadShape).strict().refine(fromDiffersFromTarget, { message: FROM_MESSAGE });
 export const TICKET_LINK_EVENT_TYPES = ['ticket.link_added', 'ticket.link_removed'] as const;
 export function isTicketLinkEvent(type: string): boolean {
   return (TICKET_LINK_EVENT_TYPES as readonly string[]).includes(type);
@@ -246,15 +266,36 @@ export function isTicketLinkEvent(type: string): boolean {
 
 /**
  * The payload a link event is SERVED with when this viewer may not be told
- * its target (typed-links T4b; spec A §2.4). Never stored: the ledger holds
+ * its other end (typed-links T4b; spec A §2.4). Never stored: the ledger holds
  * the real id, and the server builds this per viewer at every door
  * (`apps/server/src/visibility/withhold-link-targets.ts`). One constructor and
- * one key order, so a hidden, a purged and a never-minted target serialise
- * byte for byte the same. The purge precedent is `redactedTicketCreatedPayload`
- * (`purge.ts`).
+ * one key order per direction, so a hidden, a purged and a never-minted end
+ * serialise byte for byte the same. A plain link (`'out'`) is
+ * `{kind, targetId: null}`. A draft-side `from` entry (`'in'`, drafts T6, R42)
+ * keeps its `from` key with the id withheld, `{kind, targetId: null, from:
+ * null}`, so every reader still reads it from the end it points into (drafts
+ * T6 FIX 1, planner ruling 2026-10-04 21:08). The purge precedent is
+ * `redactedTicketCreatedPayload` (`purge.ts`).
  */
-export function withheldLinkPayload(kind: TicketLinkKind): { kind: TicketLinkKind; targetId: null } {
-  return { kind, targetId: null };
+export function withheldLinkPayload(
+  kind: TicketLinkKind,
+  direction: 'out' | 'in',
+): { kind: TicketLinkKind; targetId: null; from?: null } {
+  return direction === 'in' ? { kind, targetId: null, from: null } : { kind, targetId: null };
+}
+
+/**
+ * Which way a link event reads from the ticket whose stream holds it (drafts
+ * T6, R42; spec A §2.1). `'in'` for a payload with a `from` key: a draft-side
+ * entry pointing INTO that ticket, whose other end is `from` (an id, or `null`
+ * when served withheld). `'out'` for every other payload, whose other end is
+ * `targetId`. It reads the KEY, never its value, so a withheld `from: null`
+ * still reads `'in'`. ONE rule, read by the server's withhold and History
+ * route, the offline replica and MCP (drafts T6 FIX 1, planner rulings
+ * 2026-10-04 20:52 and 21:08).
+ */
+export function linkPayloadDirection(payload: unknown): 'out' | 'in' {
+  return payload !== null && typeof payload === 'object' && 'from' in payload ? 'in' : 'out';
 }
 
 /** True exactly for a served-withheld link event; `=== null`, as `isRedactedTicketCreated` uses `=== true`. */

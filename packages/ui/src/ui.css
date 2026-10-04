@@ -2644,8 +2644,9 @@ a.gn-ticket-sheet__crumb--link {
 /* "Chip tray" (`:416`): `display:flex;gap:8px;flex-wrap:wrap;
    background:var(--fill4);border-radius:var(--ctlR);padding:10px 12px`.
    `fill4` → `--gn-fill-quaternary`, already the established mapping for this
-   exact prototype variable (`.gn-list__table-row:nth-child(odd)` below, the
-   timeline's own week columns). */
+   exact prototype variable (`.gn-list__table-row:nth-child(odd)` below; the
+   timeline's week-column zebra used it too, until Workflow and Timeline graphs
+   Part 1 T9 retired the paged grid). */
 .gn-list__columns-tray {
   display: flex;
   gap: 0.5rem;
@@ -2788,7 +2789,7 @@ a.gn-ticket-sheet__crumb--link {
   box-shadow: none;
   border-color: transparent;
 }
-/* "Group header row": `padding 11px 16px`; the prototype drew it as `trayBg + trayShadow`, the pair `.gn-timeline__weeks` uses
+/* "Group header row": `padding 11px 16px`; the prototype drew it as `trayBg + trayShadow`, the pair the Timeline's retired `.gn-timeline__weeks` band used
    (`--gn-surface-sunken`/`--gn-shadow-sunken`); UX fixes T6 (23.095) flattened it to a quaternary tint, so the heading
    no longer reads as a text field. DECLARED DIVERGENCE, not a
    match: the prototype draws this as a `<tr>` spanning the table's columns;
@@ -2964,8 +2965,8 @@ a.gn-ticket-sheet__crumb--link {
 /* "Header cell": `13px/18px; 600; label2; trayBg; padding 11px 16px;
    nowrap`. `label2` → `--gn-text-muted`, `trayBg` → `--gn-surface-sunken` —
    both already declared, both already paired for identical prototype
-   vocabulary elsewhere in this file (`.gn-timeline__weeks`, `:1934-1937`
-   below). Uniform across every column — `ticket-list.tsx` applies this
+   vocabulary elsewhere in this file (the Timeline's `.gn-timeline__weeks`
+   band, retired by Workflow and Timeline graphs Part 1). Uniform across every column — `ticket-list.tsx` applies this
    class to the title header AND every mapped data header alike, since the
    metric does not vary by column. */
 .gn-list__table-header {
@@ -2978,7 +2979,7 @@ a.gn-ticket-sheet__crumb--link {
   white-space: nowrap;
 }
 /* "Zebra": odd rows `fill4` → `--gn-fill-quaternary`, already declared and
-   consumed elsewhere. `:nth-child`, not `:nth-of-type` as Task 11's
+   consumed elsewhere. `:nth-child`, not `:nth-of-type` as Task 11's (since retired)
    `.gn-timeline__row` needed — checked, not assumed identical: `Table`'s
    `<tbody>` (`table.tsx`) contains ONLY `<tr>` siblings (one per row, no
    heading or other element mixed in, unlike the timeline's `<h3>`-then-rows
@@ -4747,12 +4748,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    (23.095) replaced that zebra with a hairline; the parity is worked through in this block, and the type rows keep the zebra.
 
    THE PRODUCT'S OTHER TWO ZEBRAS DIFFER, AND THAT IS RECORDED RATHER THAN
-   HARMONISED. `.gn-list__table-row` (`:1088`) and `.gn-timeline__row` (`:2703`)
-   both stripe the ODD child, so those two families read INVERTED against the
-   prototype. **The measurement and its named owner already exist**
-   (the Members note that recorded it was removed with that zebra by UX fixes T6; the owner, "whoever next touches those two families", is unchanged),
-   so this rule adds the third member of the matching set and re-records
-   nothing — harmonising those two is not this screen's change. */
+   HARMONISED. `.gn-list__table-row` (`:1088`) stripes the ODD child, and
+   `.gn-timeline__row` did too until the paged Timeline grid retired (Workflow and Timeline graphs Part 1), so the
+   list family reads INVERTED against the prototype. **The measurement and its named owner already exist**
+   (the Members note that recorded it was removed with that zebra by UX fixes T6; the owner, "whoever next touches that family", is unchanged),
+   so this rule re-records nothing — harmonising the list is not this screen's change. */
 .ticket-type-list__rows li:nth-child(even) .ticket-type-list__row {
   background: var(--gn-fill-quaternary);
 }
@@ -5914,56 +5914,39 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   .gn-calendar__agenda-item:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 }
 
-/* Plan 9 Task 11 — the timeline's week columns.
+/* The continuous timeline (Workflow and Timeline graphs, Part 1; spec 2026-10-03 VP-1 to VP-11, TV-1 to TV-11).
 
-   NO NEW ROLE. The plan's `tokens.color.barActive`, `pendingHatch`, `ink`,
-   `inkMuted`, `line`, `surface` and `customMarker` are seven names for six
-   roles this file already carries: a bar is `accent` on `accent-text`, an
-   in-transit claim is `pending`, a claim on a workspace-defined date field is
-   `custom-marker`, and the grid lines are `border`. Task 9 added the one role
-   the roster really was missing; this surface needed none.
+   REPLACES Plan 9 Task 11's week-column grid. One scroll container (`.gn-timeline__canvas`, driven by `ScrollAdapter`)
+   holds one surface; every bar, label and the today line is placed from three or four custom properties and ONE scale,
+   `--tl-ppd` (px per day), which the adapter writes on the canvas. So a zoom frame is a property write and a scroll write:
+   the layout engine multiplies, React does not render. `--d0` is a day offset from the surface's first day (always a
+   Monday), `--dn` a length in days, `--row` a packed row.
 
-   The week track list arrives as `--timeline-week-columns`, set once by the
-   component on `.gn-timeline`, and it carries `repeat(n, 1fr)` rather than the
-   bare `n` so the var substitutes as a plain component of the value — nothing
-   here computes layout in a test, and `repeat(var(--n), 1fr)` failing to parse
-   would silently turn the whole declaration into `none`.
-
-   It is NOT `--gn-`-prefixed on purpose: that namespace is the token origin's,
-   and tokens.test.ts asserts every `var(--gn-…)` here names a declared colour
-   role. A track list is not a colour. */
+   NO NEW COLOUR EXCEPT ONE ROLE. A bar is `accent` on `accent-text`, an in-transit claim is `pending`, a claim on a custom
+   date field is `custom-marker`, the lines are `border`. The weekend tint is the new role `timelineWeekend`
+   (`--gn-timeline-weekend`), decoration only; the day numbers on it are held to 4.5:1 by two `CONTRAST_PAIRS` rows. The
+   component-local names (`--tl-*`) are not colours and are deliberately NOT `--gn-`-prefixed: `tokens.test.ts` asserts every
+   `var(--gn-...)` in this file names a declared role. */
 
 .gn-timeline {
+  --tl-weekend: var(--gn-timeline-weekend);
+  --tl-axis-height: 3.25rem; /* two 26 px rows: the period label and the day numbers (VP-11) */
+  display: flex;
+  flex-direction: column;
+  min-height: 20rem; /* 320 px (TG-13); the view sets its own height to fill the space under the filters */
   background: var(--gn-surface);
   color: var(--gn-text);
   font: inherit;
 }
-.gn-timeline__header {
+.gn-timeline__toolbar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
+  flex: none;
 }
-/* E4-15 / P35 (2026-09-21). This rule declared a radius, a background, a
-   colour, a font, padding and a cursor — and **no `border`** — so the three
-   Earlier / Today / Later buttons kept the user agent's `2px outset` bevel:
-   measured `border: 2px outset rgb(0,0,0)` with the product's own
-   `background: rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`.
-   The rule applied; the UA border survived it. **That is outside round 1's P1
-   population by construction** — P1 selected classes with ZERO matching
-   selector blocks, and this one matched — and it is why P35 filed the same
-   defect from the other side: *"matched a selector block"* and *"is fully
-   styled"* are different questions.
-
-   The values are the CALENDAR nav's own (`:3295`), which is the same
-   three-button control on the sibling view, so the two views' navs now agree
-   rather than one of them wearing the browser's default bevel. `border: none`
-   is the property that removes the bevel; the rest is the harmonisation the
-   calendar already settled.
-   Styling refresh Plan B (Task B8): P-QUIET — the values above are superseded
-   in step with the calendar's nav (Task B7): a quiet outlined 44px pill in
-   text2, washed on hover. The border is now the 1px `--gn-border` edge, still
-   a declared `border`, so no UA bevel can survive. */
+/* Today: a quiet outlined 44 px pill in text2, washed on hover (Styling refresh Plan B, Task B8). The 1px `--gn-border` edge is
+   a declared border, so no user-agent bevel can survive (E4-15 / P35). */
 .gn-timeline__nav {
   display: inline-flex;
   align-items: center;
@@ -5978,10 +5961,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-timeline__nav:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
-.gn-timeline__glyph { color: var(--gn-text-muted); margin: 0 0.2rem; }
 .gn-timeline__nav:focus-visible,
 .gn-timeline__bar:focus-visible,
-.gn-timeline__open:focus-visible {
+.gn-timeline__open:focus-visible,
+.gn-timeline__canvas:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
@@ -5993,147 +5976,186 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-size: 0.85rem;
 }
 
-/* Board prototype port Task 11 (2026-09-16), spec Timeline `:506-538`. NO NEW
-   ROLE: `trayBg`/`trayShadow` → `--gn-surface-sunken`/`--gn-shadow-sunken`
-   (the same pair the board's own column trays already use for identical
-   prototype vocabulary — `.gn-board__column`, Task 6) and `fill4` →
-   `--gn-fill-quaternary` — both already declared, already consumed elsewhere
-   in this file. `accent`/`accentText` for the bar are UNCHANGED from Plan
-   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3602-3605`
-   below) already settled "accent ground + onColor" as
-   `background: var(--gn-accent); color: var(--gn-accent-text)` over the
-   plan's literal `--onColor` → `--gn-text-inverted` mapping, because
-   `CONTRAST_PAIRS` (`tokens.ts`) measures `accentText` against `accent` and
-   never measures `textInverted` there at all — this bar already used that
-   exact pair, so nothing here changes it.
+/* The scroller. `overscroll-behavior: contain` and the adapter's non-passive Ctrl + wheel listener are what keep the PAGE from
+   scrolling under it (VP-2); touch keeps the platform's own pan and momentum. A mouse drag on empty canvas pans, so the cursor
+   says so. */
+.gn-timeline__stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.gn-timeline__canvas {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  cursor: grab;
+}
+.gn-timeline__canvas.gn-dragging { cursor: grabbing; user-select: none; }
+.gn-timeline__surface {
+  position: relative;
+  min-width: 100%;
+  /* Short lanes still fill the canvas, so the weekend tint and the today line run to the chart's bottom edge. */
+  min-height: 100%;
+  /* The rubber band: the adapter writes the resisted overshoot here while the pointer pulls past the first or last day. */
+  transform: translateX(var(--tl-overshoot, 0px));
+}
+/* Weekend columns, lightly tinted through the whole height at 16 px/day and above (VP-11). The surface starts on a Monday, so
+   one tile is seven days: five clear, two tinted. The adapter's frame handler turns it off below 16 px/day. */
+.gn-timeline__surface,
+.gn-timeline__axis {
+  background-image: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--tl-ppd) * 5px),
+    var(--tl-weekend) calc(var(--tl-ppd) * 5px),
+    var(--tl-weekend) calc(var(--tl-ppd) * 7px)
+  );
+  background-size: calc(var(--tl-ppd) * 7px) 100%;
+}
+.gn-timeline__canvas[data-weekend='off'] .gn-timeline__surface,
+.gn-timeline__canvas[data-weekend='off'] .gn-timeline__axis { background-image: none; }
 
-   The two grids that must agree, reading ONE count. The first column is the
-   title column, widened from Plan 9's 12rem to the spec's 230px (14.375rem)
-   — pinned by an EXACT substring match in
-   `test/timeline/timeline-view.test.tsx` (`grid-template-columns: 12rem
-   var(--timeline-week-columns);`, 11.82's third case), which that case's own
-   docblock sanctions changing ("a change to the width alone will redden
-   this too, and re-reading this comment is the intended cost") — updated
-   alongside this. Week `i` is column `i + 2`, which is what the bar's
-   computed `grid-column` says too; that arithmetic depends on there being
-   exactly ONE leading track, not on its width, so it is unaffected. */
-.gn-timeline__weeks,
-.gn-timeline__row {
-  display: grid;
-  grid-template-columns: 14.375rem var(--timeline-week-columns);
-  align-items: center;
+/* The axis header: its own layer, sticky at the top (VP-8), two rows. The labels cross-fade with the scale through
+   `--tl-fade-weeks` and `--tl-fade-days`, which the adapter's frame handler writes (never a pop, VP-11). */
+.gn-timeline__axis {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: var(--tl-axis-height);
+  background-color: var(--gn-surface);
+  border-bottom: 1px solid var(--gn-border);
 }
-/* Header grid: trayBg + trayShadow on the CONTAINER — `.gn-timeline__corner`
-   and `.gn-timeline__week` are transparent grid items sitting on top of it,
-   the same "background on the row, not the cell" shape the list's group
-   header bar (`.gn-list__section-title`, below) uses.
-   Styling refresh Plan B (Task B8): the ground is now the recessed TRACK
-   (`surface-track` / `shadow-track`) instead of the sunken tray. */
-.gn-timeline__weeks {
-  background: var(--gn-surface-track);
-  box-shadow: var(--gn-shadow-track);
-}
-/* Row: min-height 42px, zebra fill4. `:nth-of-type`, not `:nth-child` — each
-   row's siblings inside `.gn-timeline__group` include the group's own `<h3
-   class="gn-timeline__group-heading">` ahead of the rows, and `:nth-child`
-   would count that heading as sibling #1, shifting every row's parity by
-   one. `:nth-of-type` counts only same-tag-name siblings (every sibling
-   `<div>` in a group is a `.gn-timeline__row` — the heading is an `<h3>`),
-   so the first row is always odd regardless of the heading above it. */
-.gn-timeline__row { min-height: 2.625rem; }
-.gn-timeline__row:nth-of-type(odd) { background: var(--gn-fill-quaternary); }
-.gn-timeline__week {
-  padding: 0.5625rem 0.625rem;
+.gn-timeline__axis-row { position: relative; height: 1.625rem; }
+.gn-timeline__axis-label,
+.gn-timeline__axis-day {
+  position: absolute;
+  top: 0;
+  left: calc(var(--d0) * var(--tl-ppd) * 1px);
   font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 600;
+  line-height: 1.625rem;
   color: var(--gn-text-muted);
-}
-
-/* The web app on phones — the Timeline (Plan Task 8, case 21.113). At <=40rem `.gn-timeline` itself is the
-   horizontal scroller (the component has no inner track), so the weeks band and the rows scroll inside it and
-   the PAGE does not. The band and each row keep a 40rem floor and a 9rem title column (14.375rem above), so a
-   week track stays about 3.75rem wide; the toolbar wraps and is `sticky; left: 0`, so Today and the week
-   arrows stay in view while the grid scrolls under them. Inside the one 40rem arm and AFTER every base rule it
-   overrides. */
-@media (max-width: 40rem) {
-  .gn-timeline { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
-  .gn-timeline__header { flex-wrap: wrap; position: sticky; left: 0; }
-  .gn-timeline__weeks,
-  .gn-timeline__row { grid-template-columns: 9rem var(--timeline-week-columns); min-width: 40rem; }
-}
-
-.gn-timeline__group-heading {
-  margin: 0;
-  padding: 0.5rem 0.25rem 0.15rem;
-  font-size: 0.9rem;
-}
-/* Ruling 22 (coordinator, 2026-09-16) — "Row title": `padding 6px 12px;
-   15px/20px; ellipsis; nowrap`, the spec Timeline table's fourth row
-   (`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:372`),
-   dropped from the plan's own condensed prose and so absent from this
-   task's brief — landed directly from the spec, not the brief, per the
-   plan's own rule that where the two disagree the spec wins. `min-width: 0`
-   is kept (not a metric, but load-bearing for `.gn-timeline__title-text`'s
-   ellipsis to truncate inside a grid item rather than push the column
-   wide); ellipsis/nowrap themselves already live on that child, unchanged
-   here. */
-.gn-timeline__title {
-  padding: 0.375rem 0.75rem;
-  min-width: 0;
-  font-size: 0.9375rem;
-  line-height: 1.25rem;
-}
-.gn-timeline__title-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
+.gn-timeline__axis-label { padding-left: 0.25rem; font-weight: 600; }
+.gn-timeline__axis-label--week { opacity: var(--tl-fade-weeks, 1); }
+.gn-timeline__axis-label--month { opacity: calc(1 - var(--tl-fade-weeks, 1)); }
+.gn-timeline__axis-day {
+  width: calc(var(--tl-ppd) * 1px);
+  text-align: center;
+  opacity: var(--tl-fade-days, 1);
+}
+
+/* A lane (an epic): absolutely placed under the axis by the packed layout. Its heading sticks to the left edge (VP-8). */
+.gn-timeline__lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--tl-axis-height) + var(--lane-offset));
+  height: var(--lane-extent);
+}
+.gn-timeline__group-heading {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: inline-block;
+  height: 2.125rem; /* 34 px: the mockup's lane heading */
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.15rem;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+  line-height: 1.25rem;
+  background: var(--gn-surface);
+}
+
+/* A bar is 28 px tall in a 40 px row pitch (TG-13). `.gn-timeline__row` only carries the data attribute and the custom
+   properties down to its children. The key is the first line; a bar 150 px wide or more also shows the title on a second line
+   (container query on the bar itself). `top` is transitioned so a re-pack glides over 200 ms (PK-6). */
+.gn-timeline__row { display: contents; }
 .gn-timeline__bar {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  container-type: inline-size;
+  left: calc(var(--d0) * var(--tl-ppd) * 1px);
+  width: calc(var(--dn) * var(--tl-ppd) * 1px);
+  top: calc(34px + var(--row) * 40px + 6px);
+  height: 28px;
+  padding: 2px 6px;
   border: none;
   border-radius: 0.375rem;
-  /* UX fixes T8 (23.142, audit PV-10): the bar sits in the WEEK columns it touches and these margins trim it to its
-     real days. A percentage margin resolves against the grid AREA (the weeks the bar spans), so `lead` days of
-     `7 * weeks` is exactly that share of it. The view sets the three custom properties; the 0.1875rem is the
-     breathing room the bar always had. `grid-row: 1` keeps the today line (also row 1) from pushing it down. */
-  grid-row: 1;
-  margin: 0.3125rem 0;
-  margin-left: calc(var(--timeline-bar-lead, 0) / (7 * var(--timeline-bar-weeks, 1)) * 100% + 0.1875rem);
-  margin-right: calc(var(--timeline-bar-tail, 0) / (7 * var(--timeline-bar-weeks, 1)) * 100% + 0.1875rem);
-  padding: 0.1875rem 0.5625rem;
+  overflow: hidden;
   text-align: left;
   font: inherit;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 12px;
   white-space: nowrap;
   cursor: pointer;
   background: var(--gn-accent);
   color: var(--gn-accent-text);
+  transition: top 200ms ease;
 }
-/* In transit: outlined, never a different hue — a claim on its way to the
-   server is the same claim, and recolouring it would say it means something
-   else. The same treatment `.gn-calendar__item--pending` uses. */
+.gn-timeline__mark { margin-right: 3px; }
+.gn-timeline__key { font-weight: 600; }
+.gn-timeline__bar .gn-timeline__title-text { display: none; overflow: hidden; text-overflow: ellipsis; }
+@container (min-width: 150px) {
+  .gn-timeline__bar .gn-timeline__title-text { display: block; }
+}
+/* A bar shorter than its key shows the key just outside its end, never hidden (PK-4). It fades out while a zoom is moving
+   and returns after the re-pack. The `+ 4px` is `KEY_GAP_PX` (packages/viewport/src/pack.ts): the packer reserves the key's
+   room from the bar's end at that gap, so the two move together (29.055 pins both). */
+.gn-timeline__key--outside {
+  position: absolute;
+  z-index: 1;
+  left: calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + 4px);
+  top: calc(34px + var(--row) * 40px + 6px);
+  line-height: 28px;
+  font-size: 11px;
+  color: var(--gn-text);
+  white-space: nowrap;
+  pointer-events: none;
+  transition: top 200ms ease, opacity 150ms ease;
+}
+.gn-timeline[data-zooming='true'] .gn-timeline__key--outside { opacity: 0; }
+/* In transit: outlined, never a different hue — a claim on its way to the server is the same claim. The same treatment
+   `.gn-calendar__item--pending` uses. */
 .gn-timeline__bar[data-pending] { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
-/* A period that continues past the window's edge. Dashed at the end it is
-   clipped at, and only that end — the bar does not claim to start or finish
-   where the window happens to. Corner radius follows the base bar's 6px. */
-.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 0.375rem 0.375rem 0; }
-.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 0.375rem 0 0 0.375rem; }
-.gn-timeline__bar[data-clipped-start][data-clipped-end] { border-radius: 0; }
-/* The today line (UX fixes T8, 23.142, audit PV-10): a hairline in the middle of today's day, in every row. A
-   zero-width item in the one-week column today falls in; its percentage margin is a share of that week. It paints
-   in the accent (a token) and takes no click. */
+@media (prefers-reduced-motion: reduce) {
+  .gn-timeline__bar,
+  .gn-timeline__key--outside { transition: none; }
+}
+/* The today line (UX fixes T8, 23.142): one hairline through the whole surface, in the middle of today's day, UNDER the bars. */
 .gn-timeline__today {
-  grid-row: 1;
-  align-self: stretch;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc((var(--d0) + 0.5) * var(--tl-ppd) * 1px);
   width: 0;
-  margin-left: calc((var(--timeline-today-lead, 0) + 0.5) / 7 * 100%);
   border-left: 2px solid var(--gn-accent);
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
+
+/* TV-2: a ticket's custom date claims stay beside the ticket. A bar row has no room for a list, so it is a callout beside the
+   bar's end that opens on hover or keyboard focus (the labels are also in the bar's hover text and its description, so nothing
+   is reachable only by hover). `.gn-timeline__row` is `display: contents`; :hover and :focus-within still follow its descendants. */
+.gn-timeline__row > .gn-timeline__claims {
+  display: none;
+  position: absolute;
+  z-index: 4;
+  left: calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + 4px);
+  top: calc(34px + var(--row) * 40px + 6px);
+  max-width: 18rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 0.375rem;
+  background: var(--gn-surface-raised);
+}
+.gn-timeline__row:hover > .gn-timeline__claims,
+.gn-timeline__row:focus-within > .gn-timeline__claims { display: block; }
 
 .gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
 .gn-timeline__claim { font-size: 0.75rem; color: var(--gn-custom-marker); }
@@ -6149,12 +6171,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    rule would cross the glyphs. */
 .gn-timeline__claim[data-pending] { outline: 1px dashed var(--gn-pending); outline-offset: 1px; }
 
-/* Undrawn footer: padding 12px 14px, trayBg + trayShadow — the same pair
-   `.gn-timeline__weeks` above uses for the identical prototype vocabulary.
+/* Undrawn footer: padding 12px 14px, trayBg + trayShadow — the pair the
+   paged grid's weeks band also used (retired with the paging by Workflow and
+   Timeline graphs Part 1 T9) for the identical prototype vocabulary.
    No radius: the spec's Timeline metrics give this row none, matching the
    list's group-header bar below.
-   Styling refresh Plan B (Task B8): the same recessed TRACK as the weeks band
-   above (`surface-track` / `shadow-track`), replacing the sunken tray. */
+   Styling refresh Plan B (Task B8): a recessed TRACK (`surface-track` /
+   `shadow-track`), replacing the sunken tray. */
 .gn-timeline__side {
   padding: 0.75rem 0.875rem;
   background: var(--gn-surface-track);

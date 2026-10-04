@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { isTicketLinkEvent, isWithheldLinkEvent } from '@gisik-nokma/domain';
+import { isTicketLinkEvent, isWithheldLinkEvent, linkPayloadDirection } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { keysForAncestors } from '../read/ancestry.js';
 import { canSee } from '../visibility/can-see.js';
@@ -13,12 +13,14 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * the claim itself (`type`, `version`, `payload`), who made it (`actorId`),
  * where from (`origin`), when they say it happened and when we received it
  * (`clientTime`, `serverTime`), and where it sits in this entity's own history
- * (`seq`). Nothing is summarised, and nothing is derived but ONE field — spec
- * §3's exception is that the history view IS the ledger, filtered, and a field
- * this route computed would make it something else. The one exception is the
- * tenth, `linkTarget`, on link events only (typed-links T4, spec A §2.4): the
- * other end's key, or `null` when this viewer cannot see it. Its own docblock
- * below says why it is derived here.
+ * (`seq`). Nothing is summarised, and nothing is derived but the two link
+ * labels — spec §3's exception is that the history view IS the ledger,
+ * filtered, and a field this route computed would make it something else. The
+ * exceptions are two fields on link events only: the tenth, `linkTarget`
+ * (typed-links T4, spec A §2.4), the other end's key, or `null` when this
+ * viewer cannot see it; and the eleventh, `linkDirection` (drafts T6 FIX 1),
+ * which way the link reads from this ticket. Their own docblocks below say why
+ * they are derived here.
  *
  * ## What is deliberately NOT here, and why that is not a redaction
  *
@@ -30,9 +32,10 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * from this ticket's own history and belongs to the sync surface that resumes
  * by it. Provenance is untouched — spec §6's rule is that a claim is never
  * redacted from someone entitled to the state, and every claim-bearing field
- * above goes out whole, with ONE exception: a link event's `payload.targetId`
- * is withheld (`null`) when this viewer cannot see the target (spec A §2.4,
- * see `linkTarget`), and a contest of such a link claim goes out with that
+ * above goes out whole, with ONE exception: a link event's other end
+ * (`payload.targetId`, or a draft-side entry's `from` with its `targetId`) is
+ * withheld (`null`) when this viewer cannot see it (spec A §2.4, see
+ * `linkTarget`), and a contest of such a link claim goes out with that
  * payload withheld and the gate's cause in place of its own, because a
  * `link.reverse` reason names the hidden ticket's title (typed-links T4b). The
  * claim is not cut: only the other end's id and the contest's cause are
@@ -49,13 +52,24 @@ export type TicketHistoryEvent = {
   serverTime: string;
   seq: number;
   /**
-   * Link events only (spec A §2.4): the one derived field this route serves.
-   * `{ key }` names a target this viewer can see; `null` is a target they
-   * cannot, and then the payload's `targetId` is withheld too, which is the
+   * Link events only (spec A §2.4): one of the two derived fields this route
+   * serves. `{ key }` names the other end, which this viewer can see: the
+   * target, or a draft-side entry's `from` (drafts T6 FIX 1: `S blocks D` filed
+   * from D's side names S on D's line, never D itself). `null` is an end they
+   * cannot see, and then the payload's id is withheld too, which is the
    * spec's rule overriding "every claim-bearing field goes out whole" for one
    * id, the other end's. Absent on every other event type.
    */
   linkTarget?: { key: string | null } | null;
+  /**
+   * Link events only (drafts T6 FIX 1): which way the link reads from THIS
+   * ticket, `linkPayloadDirection` of the payload as served. `'in'` is a
+   * draft-side `from` entry kept on a published draft's stream (D's line for
+   * `S blocks D` reads "is blocked by S"); served withheld it is
+   * `{kind, targetId: null, from: null}`, so the direction survives the
+   * withhold. `'out'` is every other link. Absent on every other event type.
+   */
+  linkDirection?: 'out' | 'in';
 };
 
 /**
@@ -330,17 +344,24 @@ export function registerTicketHistoryRoute(
       // ONE sight for the page (`withhold-link-targets.ts`): a link whose target
       // they cannot see goes out with `targetId: null`, and a contest of such a
       // claim with the gate's cause. Then the link events are labelled from that
-      // output (spec A §2.4): a withheld one reads `linkTarget: null`, a string
-      // target its key. A page is at most `MAX_LIMIT` events, so the per-target
-      // loop is bounded.
+      // output (spec A §2.4): a withheld one reads `linkTarget: null`, a visible
+      // other end its key, and every one its `linkDirection` (drafts T6 FIX 1),
+      // read from the payload as served: a withheld draft-side entry keeps its
+      // `from` key, so it still reads in. A page is at most `MAX_LIMIT` events,
+      // so the per-target loop is bounded.
       const sees = targetSight(deps.pool, request.currentUserId);
       const events: TicketHistoryEvent[] = [];
       for (const row of rows) events.push(await withholdEvent(toHistoryEvent(row), sees));
+      // The other end: a draft-side entry's `from` (it points INTO this ticket), else the target.
+      const otherEnd = (e: TicketHistoryEvent): unknown => {
+        const p = e.payload as { targetId?: unknown; from?: unknown };
+        return p.from ?? p.targetId;
+      };
       const linkTargets = [
         ...new Set(
           events
             .filter((e) => isTicketLinkEvent(e.type))
-            .map((e) => (e.payload as { targetId?: unknown }).targetId)
+            .map(otherEnd)
             .filter((t): t is string => typeof t === 'string'),
         ),
       ];
@@ -359,9 +380,10 @@ export function registerTicketHistoryRoute(
         if (!isTicketLinkEvent(e.type)) continue;
         if (isWithheldLinkEvent(e)) e.linkTarget = null;
         else {
-          const target = (e.payload as { targetId?: unknown }).targetId;
-          if (typeof target === 'string') e.linkTarget = { key: keyOf.get(target) ?? null };
+          const other = otherEnd(e);
+          if (typeof other === 'string') e.linkTarget = { key: keyOf.get(other) ?? null };
         }
+        e.linkDirection = linkPayloadDirection(e.payload);
       }
       return { ticketId: id, events };
     },

@@ -36,6 +36,31 @@ const TWO_SCOPES =
   'list_tickets takes one scope, not both: pass projectId (the tickets of one project) OR ' +
   'workspaceId (every project you can see in that workspace).';
 
+/** `get_ticket` shows at most this many attached notes; `notesTotal` counts every one the caller can read (MCP sweep 2 §3.2). */
+const MAX_TICKET_NOTES = 50;
+const notesUnread = (why: string): string =>
+  `The ticket was read but the notes attached to it could not be (${why}), so nothing is returned: an empty list would read as "no notes".`;
+
+type AttachedNote = { noteId: string; title: string; authorId: string; updatedAt: string };
+
+/**
+ * The notes attached to a ticket that THIS caller may read, as the Notes section of the ticket sheet reads them
+ * (`GET …/tickets/:id/notes`, `apps/server/src/routes/notes.ts:88-98`). The route has no visibility check of its own (it
+ * answers an empty list for another person's draft or an erased one, drafts T9, and nothing more), so the caller reads
+ * the ticket first. Any failure here fails the call (GT-5).
+ */
+async function attachedNotes(session: Session, path: string): Promise<AttachedNote[]> {
+  let body: unknown;
+  try {
+    body = await session.get(path);
+  } catch (error) {
+    throw new Error(notesUnread(error instanceof Error ? error.message : String(error)));
+  }
+  const list = (body as { notes?: unknown } | null)?.notes;
+  if (!Array.isArray(list)) throw new Error(notesUnread('the answer was not a list of notes'));
+  return (list as AttachedNote[]).map((n) => ({ noteId: n.noteId, title: n.title, authorId: n.authorId, updatedAt: n.updatedAt }));
+}
+
 /** What `/members` and `/actor-names` carry, narrowed to what this tool reads. */
 type RosterRow = { userId: string; displayName: string; role?: string; email?: string; removed?: true };
 
@@ -152,6 +177,8 @@ export function readTools(session: Session): ToolDefinition[] {
         'Read one ticket in full: its visibility row, its folded state (assignee, collaborators, ' +
         'custom fields, transition history), its title, who last moved it, its parent, its rollup and its typed links ' +
         '(`links`: kind, direction "out"/"in" and the other ticket, visible ends only). ' +
+        '`notes` lists the notes attached to it that you can read (noteId, title, authorId, updatedAt; newest first, at most 50) and ' +
+        '`notesTotal` counts them all; read one in full with get_note. ' +
         'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found.',
       inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1) },
       handler: async (args) => {
@@ -161,21 +188,29 @@ export function readTools(session: Session): ToolDefinition[] {
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`,
           'ticket',
         )) as { ticketState?: { fields?: Record<string, { value: unknown }>; links?: unknown } } & Record<string, unknown>;
-        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded outbound `ticketState.links`.
+        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded `ticketState.links` (this stream's ids only).
         const linked = (await readOrNotFound(
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/links`,
           'ticket',
         )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string } }> };
+        // AFTER the ticket read: the notes route does not check the ticket (GT-1).
+        const notes = await attachedNotes(
+          session,
+          `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/notes`,
+        );
         // The description is a document: answer it as Markdown (with what Markdown cannot show), never as the raw tree.
         const { description, ...fields } = detail.ticketState?.fields ?? {};
-        // One representation of links: `ticketState.links` (outbound ids only) is dropped in favour of `links`.
-        const { links: _outbound, ...state } = detail.ticketState ?? {};
+        // One representation of links: `ticketState.links` (the ids held on this ticket's stream: its outbound links, plus a
+        // draft's inbound `from` entries) is dropped in favour of `links`.
+        const { links: _held, ...state } = detail.ticketState ?? {};
         return {
           ...detail,
           ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
           description: bodyAsMarkdown(description?.value ?? null),
           links: linked.links.map((l) => ({ kind: l.kind, direction: l.direction, ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title } })),
+          notes: notes.slice(0, MAX_TICKET_NOTES),
+          notesTotal: notes.length,
         };
       },
     },

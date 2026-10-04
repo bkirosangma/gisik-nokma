@@ -33,20 +33,23 @@ export function countDoorCalls(text: string): Calls {
 
 /** Every door of group D, per file. G10 is routes/attachments.ts and the fourth canOpen of routes/tickets.ts; G11 is check-permission.ts's canOpen; the note-event doors are noteEventVisibleTo and isClosedOrErasedDraft. */
 const DOORS: Record<string, Partial<Calls>> = {
-  'permissions/check-permission.ts': { ticketAccess: 1, canOpen: 1 }, // G1, G11
+  'permissions/check-permission.ts': { ticketAccess: 1, canOpen: 3 }, // G1; G11 (T9, 28.191); the link block's other ends (drafts T6, 28.114) and the pending child (28.128)
   'read/drafts.ts': { holdsDraftRights: 1 }, // listMyDrafts holds each row to R18, the same function the doors use
   'read/notes.ts': { holdsDraftRights: 1 }, // the note detail's own-draft rows (attachedTicketsByNote ownDrafts), R18
+  'read/ticket-links.ts': { listMyDrafts: 1 }, // the author's own drafts as ends, on a draft's own sheet only (drafts T6, 28.117)
   'routes/attachments.ts': { canOpen: 2 }, // G10: upload, download
   'routes/drafts.ts': { listMyDrafts: 2 }, // G8, both reads
   'routes/drafts-publish.ts': { ticketAccess: 1 }, // the set publish (drafts T5b): the first id the caller cannot open refuses the set before ingest (28.098)
   'routes/notes.ts': { isClosedOrErasedDraft: 1, noteEventVisibleTo: 1 }, // the ticket's notes list, the note events route
   'routes/people.ts': { isOpenableDraft: 1 }, // R8 (drafts T5): the outsider door refuses an assignment on the caller's own draft
+  'routes/ticket-links.ts': { ticketAccess: 1 }, // the links route: a draft is the unknown-ticket body to everyone but its author (drafts T6, 28.117)
   'routes/tickets.ts': { canOpen: 4 }, // G7: the detail read, the parent crumb, the epic walk; G10: the attachments list
   'sync/contests-route.ts': { canOpen: 1 }, // G6
   'sync/reconcile-route.ts': { canOpen: 1 }, // G5
   'sync/sync-routes.ts': { canOpen: 1, listMyDrafts: 1, noteEventVisibleTo: 1 }, // G3, G4, the bootstrap notes tail
   'visibility/can-open.ts': { ticketAccess: 1, isOpenableDraft: 2, holdsDraftRights: 1, isClosedOrErasedDraft: 1 }, // canOpen is ticketAccess; ticketAccess is canSee then isOpenableDraft; R18; isClosedOrErasedDraft asks isOpenableDraft; noteEventVisibleTo asks isClosedOrErasedDraft
   'visibility/visible-events-for.ts': { canOpen: 1, ticketAccess: 1, noteEventVisibleTo: 1 }, // G2, C4's own-draft test, the note arm
+  'visibility/withhold-link-targets.ts': { canOpen: 1 }, // targetSight: every door's link-end predicate; the author's own draft end is served (drafts T6, 28.117-28.119)
 };
 
 function walk(dir: string, out: string[] = []): string[] {

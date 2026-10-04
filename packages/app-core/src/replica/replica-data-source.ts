@@ -18,7 +18,9 @@ import {
   PURGED_OUTBOX_NOTICE,
   isCreatableState,
   isDraft,
+  isTicketLinkEvent,
   isWithheldLinkEvent,
+  linkPayloadDirection,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -1370,12 +1372,18 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         ticket: { id: other.id, projectId: other.projectId, key: null, title: titleOf(other), stateCategory: other.stateCategory },
       });
       const live = (t: TicketState | undefined): t is TicketState => t !== undefined && (t.deleted ?? null) === null;
+      // Drafts R41: a draft end appears only on a draft's own sheet, and a discarded draft never.
+      const shown = (t: TicketState | undefined): t is TicketState =>
+        live(t) && (t.draft === undefined || (me.draft !== undefined && t.draft.discarded !== true));
       const out = (me.links ?? []).flatMap((l) => {
-        const o = byId.get(l.targetId);
-        return live(o) ? [view(o, l.kind, 'out')] : [];
+        // A draft-side entry (`from`) is a link FROM the other ticket: it reads as incoming on the draft's sheet.
+        const o = byId.get(l.from ?? l.targetId);
+        return shown(o) ? [view(o, l.kind, l.from === undefined ? 'out' : 'in')] : [];
       });
       const incoming = [...byId.values()].flatMap((o) =>
-        o.id === ticketId || !live(o) ? [] : (o.links ?? []).filter((l) => l.targetId === ticketId).map((l) => view(o, l.kind, 'in')),
+        o.id === ticketId || !shown(o)
+          ? []
+          : (o.links ?? []).filter((l) => l.from === undefined && l.targetId === ticketId).map((l) => view(o, l.kind, 'in')),
       );
       return [...out, ...incoming];
     },
@@ -1779,6 +1787,9 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // (`targetId: null`), so History reads "a ticket you can't see". A real
           // target carries no label offline: this device holds no key for it.
           ...(isWithheldLinkEvent(event) ? { linkTarget: null } : {}),
+          // Drafts T6 FIX 1: which way it reads from this ticket, by the server's own rule on the payload as served
+          // (a withheld draft-side entry keeps its `from` key, so it still reads in).
+          ...(isTicketLinkEvent(event.type) ? { linkDirection: linkPayloadDirection(event.payload) } : {}),
         }));
       return limit === undefined ? kept : kept.slice(0, limit);
     },

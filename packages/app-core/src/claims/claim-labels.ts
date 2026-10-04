@@ -196,19 +196,22 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
   'These tickets cannot be drawn as a bar yet: a start or due date is missing, a start comes after its due date, or a date is not a day on the calendar.';
 
 /**
- * The FIRST empty timeline: nothing here has a date claim at all.
+ * THE empty timeline: nothing here is drawn and nothing is listed beside it.
+ * ONE arm since the continuous axis (Workflow and Timeline graphs Part 1 T9,
+ * TV-9, 29.095): there is no window, so dated work is never "elsewhere in
+ * time" — it is drawn, and reached by panning.
  *
- * The timeline had NO empty copy of any kind, while its sibling calendar —
+ * The timeline once had NO empty copy of any kind, while its sibling calendar —
  * same package, written for exactly this failure — had three sentences. Four
  * different emptinesses serialised to identical bytes: nothing loaded, a
- * filter that matched nobody, a lane nobody belongs to, and work that is fully
- * dated and merely elsewhere in time.
+ * filter that matched nobody, a lane nobody belongs to, and work that was fully
+ * dated and outside the old eight-week window (that fourth one is gone with
+ * the window).
  *
- * Reached when nothing is on screen, nothing visible is scheduled outside the
- * window, and nothing a narrowing removed would have shown here — i.e. every
- * loaded ticket is an undated epic (a lane, not missing work) or there are
- * none — OR when a narrowing did remove work that would have shown here, which
- * is why the third sentence below names it. The second sentence carries the
+ * Reached when nothing is drawn and nothing is side-listed — i.e. every loaded
+ * ticket is an undated epic (a lane, not missing work) or there are none — OR
+ * when a narrowing removed everything that would have shown here, which is why
+ * the third sentence below names it. The second sentence carries the
  * SAME PROMISE as the calendar's, word for word — "undated work is absent, not
  * estimated". ⚠ **"verbatim" was the wrong word and is corrected 2026-09-20:**
  * the rest of the sentence names this surface's own noun ("the periods someone
@@ -236,27 +239,7 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * `timeline-view.test.tsx`'s "names only controls the TIMELINE has".
  */
 export const TIMELINE_EMPTY_COPY =
-  'No claimed dates are here to draw. Undated work is absent, not estimated. The timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, closed tickets being hidden, or an epic, which is drawn in the List and not here.';
-
-/**
- * The THIRD empty timeline, and the ONE case the component cannot reconstruct
- * from its own props: the work is fully dated, coherent, placeable, and simply
- * scheduled elsewhere in time.
- *
- * Task 11's props carry `tickets`, `filter` and `laneEpicId` but nothing about
- * the window, so a component asked to work this out would have to redo the day
- * arithmetic — a second statement of where the window is, free to disagree
- * with the model's.
- *
- * DELIBERATELY NOT EXHAUSTIVE ("dated work here sits outside", not "every
- * piece of dated work"). A filter can remove work that would ALSO have missed
- * the window, which leaves this arm reachable with a second narrowing live —
- * and an exhaustive sentence there would be the `CALENDAR_ALL_HIDDEN_COPY`
- * failure in timeline clothes. The quantifier is what would be false; the fact
- * stated is true either way.
- */
-export const TIMELINE_OUT_OF_WINDOW_COPY =
-  'Dated work here sits outside the weeks in view. Nothing was dropped. Move the window Earlier or Later to reach it.';
+  'No claimed dates are here to draw. Undated work is absent, not estimated. The timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off this chart without dropping it: your filter, closed tickets being hidden, or an epic, which is drawn in the List and not here.';
 
 /**
  * A claimed day that no calendar has, named rather than silently dropped.

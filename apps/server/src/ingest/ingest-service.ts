@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import {
   domainRegistry,
+  newUlid,
   parseEvent,
   ENTITY_WORKSPACE_MISMATCH_RULE,
   type EventTypeRegistry,
@@ -8,6 +9,8 @@ import {
   type IngestResult,
   type LedgerEvent,
   type SubmittedEvent,
+  type TicketLink,
+  type TicketLinkKind,
 } from '@gisik-nokma/domain';
 import type { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createEngineContext } from '../engine-context.js';
@@ -27,6 +30,8 @@ import { refreshSnapshotsForWorkflowPublish } from '../sync/snapshot-refresh.js'
 import { bootstrapWorkspace } from '../workspaces/bootstrap-workspace.js';
 import { readEntityHead } from '../projections/entity-heads.js';
 import { checkPurged } from '../purge/check-purged.js';
+import { purgedIdsAmong } from '../purge/purged-lookup.js';
+import { canSee } from '../visibility/can-see.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
 
 export type IngestDeps = {
@@ -54,6 +59,14 @@ export type CommittedEventListener = (event: LedgerEvent) => void;
 /** Why an atomic set is refused before it starts (it files one workspace's events and never founds a workspace). */
 export const ATOMIC_SINGLE_WORKSPACE_RULE = 'atomic.single-workspace';
 export const ATOMIC_NO_FOUNDING_RULE = 'atomic.no-founding';
+
+/**
+ * The rule id of a publish refused because one of its draft's incoming links could not be re-filed on its
+ * source (drafts spec R44, Q17), or one of its pending children could not be moved under it (owner ruling O1). It
+ * is the ingest layer's own: the engine never emits it, because it wraps the engine's (or the gate's) verdict on
+ * the NESTED `ticket.link_added` or `ticket.reparented` in the story of the publish.
+ */
+export const DRAFT_LINK_REFILE_REFUSED_RULE = 'draft.link-refile-refused';
 
 /**
  * What an atomic set answers. There are no partial results: either every event committed (`results[i]` answers
@@ -178,11 +191,114 @@ type CommitOutcome = { result: IngestResult; committed: LedgerEvent | null };
  * What `commitInTx` answers. It never touches the transaction's boundaries: `refused` means "the caller must
  * roll back", `committed` means "the event and its projections are written inside the caller's transaction and
  * are durable only when the caller commits it". The envelope is handed back for the same reason `CommitOutcome`
- * hands it back.
+ * hands it back. `followers` are the events the event itself caused inside the same transaction (the re-filed
+ * links of a publish, drafts T6); the caller notifies them after the envelope, in order, after its `COMMIT`.
  */
 type InTxOutcome =
   | { kind: 'refused'; result: Extract<IngestResult, { status: 'refused' }> }
-  | { kind: 'committed'; envelope: LedgerEvent; result: IngestResult };
+  | { kind: 'committed'; envelope: LedgerEvent; result: IngestResult; followers: LedgerEvent[] };
+
+/** One link another ticket filed toward a DRAFT from the draft's side (drafts spec R42): its kind and its source. */
+type IncomingLink = { kind: TicketLinkKind; sourceId: string };
+
+/**
+ * The links other tickets filed toward this DRAFT (drafts spec R42): the `from` entries of its head row, minus
+ * sources that were erased (nothing is left to file for them; the purge removed the rows, drafts T6 decision 10).
+ * Read before the `ticket.published` fold, which drops these entries from the very row this reads.
+ */
+async function incomingDraftLinks(client: PoolClient, draftId: string): Promise<IncomingLink[]> {
+  const { rows } = await client.query<{ links: TicketLink[] }>('SELECT links FROM proj_tickets WHERE ticket_id = $1', [draftId]);
+  const held = (rows[0]?.links ?? []).filter((l): l is TicketLink & { from: string } => l.from !== undefined);
+  const erased = await purgedIdsAmong(client, 'ticket', held.map((l) => l.from));
+  return held.filter((l) => !erased.has(l.from)).map((l) => ({ kind: l.kind, sourceId: l.from }));
+}
+
+/**
+ * The plain link the publish files on the source's stream (R44): the publisher as actor, the publish's own
+ * origin (`'server'` would be refused by the client door's envelope-origin rule, drafts T6 decision 7).
+ */
+function refileEvent(publish: LedgerEvent, link: IncomingLink): SubmittedEvent {
+  return {
+    id: newUlid(),
+    workspaceId: publish.workspaceId,
+    entity: { kind: 'ticket', id: link.sourceId },
+    type: 'ticket.link_added',
+    version: 1,
+    payload: { kind: link.kind, targetId: publish.entity.id },
+    actorId: publish.actorId,
+    origin: publish.origin,
+    clientTime: publish.clientTime,
+  };
+}
+
+/**
+ * The published tickets this DRAFT holds as pending children (owner ruling O1), minus erased ones (skipped like an
+ * erased link source, decision 10). Read before the `ticket.published` fold, which drops them from the row.
+ */
+async function pendingDraftChildren(client: PoolClient, draftId: string): Promise<string[]> {
+  const { rows } = await client.query<{ pending_children: string[] }>(
+    'SELECT pending_children FROM proj_tickets WHERE ticket_id = $1',
+    [draftId],
+  );
+  const held = rows[0]?.pending_children ?? [];
+  const erased = await purgedIdsAmong(client, 'ticket', held);
+  return held.filter((id) => !erased.has(id));
+}
+
+/** The plain reparent the publish files on a pending child's own stream, worn as `refileEvent` wears its link. */
+function childRefileEvent(publish: LedgerEvent, childId: string): SubmittedEvent {
+  return {
+    id: newUlid(),
+    workspaceId: publish.workspaceId,
+    entity: { kind: 'ticket', id: childId },
+    type: 'ticket.reparented',
+    version: 1,
+    payload: { newParentId: publish.entity.id },
+    actorId: publish.actorId,
+    origin: publish.origin,
+    clientTime: publish.clientTime,
+  };
+}
+
+/** The phrase a publish's refusal names a source with when the publisher cannot see it (drafts T6 decision 12). */
+const UNSEEN_SOURCE = 'a ticket you can no longer see';
+
+/** The two sentences of a refused re-file: `named` is the other ticket's quoted title, or `null` when unseen. */
+const linkRefileReason = (named: string | null, cause: string): string =>
+  `The link from ${named ?? UNSEEN_SOURCE} to this draft could not be filed there: ${cause}`;
+const childRefileReason = (named: string | null, cause: string): string =>
+  named === null
+    ? `A ticket you can no longer see could not be moved under this draft: ${cause}`
+    : `The ticket ${named} could not be moved under this draft: ${cause}`;
+
+/**
+ * The publish's refusal when a nested re-file was refused. The other ticket (a link's source, a pending child) is
+ * named by its title when the internal door ran or the publisher can still see it, and by a fixed phrase
+ * otherwise: the cause is the nested verdict's own reason, and a hidden ticket must not leak through its title.
+ * The nested verdict is always a refusal (`InTxOutcome`): a server-built payload from stored entries never fails
+ * the parse, and a thrown error aborts the whole transaction rather than coming back here.
+ */
+async function refileRefusal(
+  client: PoolClient,
+  publish: LedgerEvent,
+  otherId: string,
+  refused: Extract<IngestResult, { status: 'refused' }>,
+  door: ClientDoor | null,
+  sentence: (named: string | null, cause: string) => string,
+): Promise<Extract<IngestResult, { status: 'refused' }>> {
+  const visible = door === null || (await canSee(client, door.sessionUserId, otherId));
+  const { rows } = await client.query<{ title: string | null }>(
+    `SELECT fields -> 'title' ->> 'value' AS title FROM proj_tickets WHERE ticket_id = $1`,
+    [otherId],
+  );
+  const title = rows[0]?.title;
+  return {
+    status: 'refused',
+    eventId: publish.id,
+    rule: DRAFT_LINK_REFILE_REFUSED_RULE,
+    reason: sentence(visible && title ? `"${title}"` : null, refused.reason),
+  };
+}
 
 export function createIngestService(deps: IngestDeps): IngestService {
   const registry = deps.registry ?? domainRegistry;
@@ -208,6 +324,9 @@ export function createIngestService(deps: IngestDeps): IngestService {
    * `client`, never `deps.pool` (purge check, the door gate, the engine context, the server gates, the
    * projections), which is what lets a later event of a set see an earlier one's uncommitted writes under READ
    * COMMITTED.
+   *
+   * A `ticket.published` also re-files its draft's incoming links and moves its pending children by calling itself
+   * (drafts T6, owner ruling O1); the nested events are returned as `followers`.
    */
   async function commitInTx(client: PoolClient, submitted: SubmittedEvent, door: ClientDoor | null): Promise<InTxOutcome> {
     // Lock order is always workspace first, then entity — one global order
@@ -409,10 +528,35 @@ export function createIngestService(deps: IngestDeps): IngestService {
     // stale snapshot and says so only in the returned value, and ingest has
     // no logger to put it in.
     await refreshSnapshotsForWorkflowPublish(client, envelope);
+    // Drafts R44 and owner ruling O1. Read BEFORE the fold: `ticket.published` drops the draft-side entries and the
+    // pending children from the row.
+    const publishing = envelope.type === 'ticket.published';
+    const incoming = publishing ? await incomingDraftLinks(client, envelope.entity.id) : [];
+    const children = publishing ? await pendingDraftChildren(client, envelope.entity.id) : [];
     for (const projection of deps.projections.all()) {
       await projection.apply(envelope, client);
     }
-    return { kind: 'committed', envelope, result: { status: 'committed', eventId: envelope.id, seq, serverTime } };
+    // The publish's second half, in the SAME transaction (R44): each incoming link is filed on its source's stream
+    // through `commitInTx` itself, so it passes the purge check, the publisher's door gate (rule 6 against the
+    // source again), the engine and the server gates. The draft is already published here, so a plain link naming
+    // it is accepted. A refusal refuses the publish; the caller rolls everything back. Then each pending child is
+    // moved under the draft on its own stream, the same way, judged as the plain reparent it now is.
+    const followers: LedgerEvent[] = [];
+    for (const link of incoming) {
+      const refiled = await commitInTx(client, refileEvent(envelope, link), door);
+      if (refiled.kind === 'refused') {
+        return { kind: 'refused', result: await refileRefusal(client, envelope, link.sourceId, refiled.result, door, linkRefileReason) };
+      }
+      followers.push(refiled.envelope, ...refiled.followers);
+    }
+    for (const childId of children) {
+      const moved = await commitInTx(client, childRefileEvent(envelope, childId), door);
+      if (moved.kind === 'refused') {
+        return { kind: 'refused', result: await refileRefusal(client, envelope, childId, moved.result, door, childRefileReason) };
+      }
+      followers.push(moved.envelope, ...moved.followers);
+    }
+    return { kind: 'committed', envelope, followers, result: { status: 'committed', eventId: envelope.id, seq, serverTime } };
   }
 
   /**
@@ -458,6 +602,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
       }
       await client.query('COMMIT');
       notifyCommitted(outcome.envelope);
+      for (const follower of outcome.followers) notifyCommitted(follower);
       return { result: outcome.result, committed: outcome.envelope };
     } catch (error) {
       // A ROLLBACK on a dead connection throws, and an unguarded one would
@@ -603,7 +748,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
           await client.query('ROLLBACK');
           return { status: 'rolled-back', index, result: outcome.result };
         }
-        envelopes.push(outcome.envelope);
+        envelopes.push(outcome.envelope, ...outcome.followers);
         results.push(outcome.result);
       }
       await client.query('COMMIT');
