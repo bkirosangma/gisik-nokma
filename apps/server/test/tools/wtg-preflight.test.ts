@@ -1,4 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
@@ -174,4 +176,27 @@ describe('29.151 report, exit code, read-only', () => {
     expect(cli.slice(cli.indexOf('async function main'))).toMatch(exitWiring);
     expect('process.exitCode = 0;').not.toMatch(exitWiring); // control
   });
+
+  it('29.151 the spawned CLI prints the report, exits 1 for a shadow, 0 for a clean database and 2 without DATABASE_URL', async () => {
+    // A process, not an import of main: the entry-point guard, the DATABASE_URL read and the exit code only exist when it runs as a CLI.
+    const run = (env: NodeJS.ProcessEnv) =>
+      spawnSync('pnpm', ['exec', 'tsx', 'src/tools/wtg-preflight.ts'], { cwd: join(dirname(fileURLToPath(import.meta.url)), '../..'), encoding: 'utf8', env });
+    const withShadow = run({ ...process.env, DATABASE_URL: db.url }); // the 29.147 fixtures left shadows in this file's database
+    expect(withShadow.status).toBe(1);
+    expect(withShadow.stdout).toMatch(/wtg-preflight: database gisik_test_\w+ \(\d+ workspaces\)/);
+    expect(withShadow.stdout).toMatch(/field-claim\s+\S+ field estimate/);
+    const fresh = await createTestDatabase();
+    try {
+      const clean = run({ ...process.env, DATABASE_URL: fresh.url }); // control: the same CLI, a database with nothing to report
+      expect(clean.status).toBe(0);
+      expect(clean.stdout).toContain('shadowing custom fields: none');
+    } finally {
+      await fresh.drop();
+    }
+    const env = { ...process.env };
+    delete env['DATABASE_URL'];
+    const missing = run(env);
+    expect(missing.status).toBe(2);
+    expect(missing.stderr).toContain('DATABASE_URL is required');
+  }, 120_000);
 });
