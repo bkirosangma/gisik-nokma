@@ -3460,6 +3460,7 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ⚙️ **MCP sweep 2 plumbing** (MCP sweep 2 T2; `packages/mcp-server/src/session.ts`, `lazy-session.ts`, `http-client.ts`, `tools/submit.ts`, `tools/preview.ts`, `apps/server/src/mcp/in-process-fetch.ts`) — a `Session` can now `PUT` (the stdio client, `createSession` with its one re-login, the lazy wrapper and the hosted door); `submitBatchByIndex` reads every outcome of one `POST /v1/events` without throwing on a refusal (the batch commits event by event); `confirmOrPreview` names the argument to repeat; the `assign-outsider` `{ result }` is unwrapped and a 429 from the lookup becomes a sentence. No tool changes by itself. Cases 14.600-14.604.
 <!-- ms2 T3 bullet -->
 <!-- ms2 T4 bullet -->
+- ✅ **The assistant can restore an earlier version of a note** (MCP sweep 2 T4; `packages/mcp-server/src/tools/note-tools.ts`) — `restore_note_version(noteId, versionId)` writes the stored document of a version listed by `get_note_history` back as the note's body, exactly (Markdown is never involved, so nothing it cannot carry is lost); a version born empty restores the empty document; the current body writes nothing; a deleted note must be brought back first; the note's author, an admin who can read it and the owner may, and anyone else is refused in the gate's own words. The restore is the newest version in the note's History and is itself undone by restoring the version it replaced. Cases 14.610-14.616.
 <!-- ms2 T5 bullet -->
 <!-- ms2 T6 bullet -->
 <!-- ms2 T7 bullet -->
