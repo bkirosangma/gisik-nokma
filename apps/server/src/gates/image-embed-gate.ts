@@ -54,7 +54,7 @@ async function checkDocEmbeds(doc: unknown, ticketId: string, db: Queryable): Pr
   // short-circuited on the fetched row.
   //
   // Deliberately NOT also scoped by workspace. What binds this ticket to this
-  // event's workspace is the entity↔workspace guard in `commitOne`, which runs
+  // event's workspace is the entity↔workspace guard in `commitInTx`, which runs
   // before any gate and refuses an event filing a ticket under a workspace it
   // does not belong to; adding `workspace_id = ...` here would restate that
   // guard in a place that cannot be the one enforcing it, and would read as
