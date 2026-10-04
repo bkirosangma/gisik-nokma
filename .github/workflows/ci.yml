@@ -544,6 +544,8 @@ jobs:
       - run: pnpm --filter @gisik-nokma/workflow-canvas-browser exec playwright install --with-deps chromium
       # KG-C T1: `knowledge-graph-browser`'s `test` drives a real Chromium against its own Vite harness (:3191).
       - run: pnpm --filter @gisik-nokma/knowledge-graph-browser exec playwright install --with-deps chromium
+      # WTG Part 1 T1: `flow-graph-browser`'s `test` drives a real Chromium against its own Vite harness (:3192).
+      - run: pnpm --filter @gisik-nokma/flow-graph-browser exec playwright install --with-deps chromium
       - run: pnpm turbo run test --filter='!@gisik-nokma/server'
 
   # apps/web/e2e (Playwright) needs a deployable stack -- Plan 11 Task 13's

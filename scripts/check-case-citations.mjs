@@ -154,8 +154,8 @@ export function extractCheckedIds(text) {
 // fixture comment, not only inside the `it(...)` that uses it), any
 // `*.test.ts`/`*.test.tsx` file wherever it lives (five apps/mobile and
 // apps/desktop tests are co-located under `src/`, not under `test/`), and
-// the e2e specs under `apps/web/e2e*/`, and the canvas browser suite's `packages/workflow-canvas-browser/tests/` (G-9 T1).
-function isTestPath(relPath) {
+// the e2e specs under `apps/web/e2e*/`, the canvas browser suite's `packages/workflow-canvas-browser/tests/` (G-9 T1), the Knowledge Graph's (KG-C T1) and the flow/time suite's `packages/flow-graph-browser/tests/` (WTG Part 1 T1).
+export function isTestPath(relPath) {
   if (relPath.includes('/node_modules/')) return false;
   if (/(^|\/)test\//.test(relPath)) return true;
   if (/\.test\.tsx?$/.test(relPath)) return true;
@@ -170,6 +170,8 @@ function isTestPath(relPath) {
   if (/^packages\/workflow-canvas-browser\/tests\//.test(relPath)) return true;
   // KG-C T1: the Knowledge Graph browser suite is a package of its own (Playwright against a Vite harness, on the gate), its specs live in `tests/`.
   if (/^packages\/knowledge-graph-browser\/tests\//.test(relPath)) return true;
+  // WTG Part 1 T1: the flow/time browser suite is a package of its own (Playwright against a Vite harness, on the gate), its specs live in `tests/`.
+  if (/^packages\/flow-graph-browser\/tests\//.test(relPath)) return true;
   return false;
 }
 

@@ -87,6 +87,23 @@ export function NotesPage({ noteId }: { noteId?: string }) {
 
   const { rows: workspaces, error: refusal } = useMyWorkspaces();
   /**
+   * WHICH WORKSPACES' LISTS HAVE ANSWERED (smoothness-2 G1, 25.247). Each section reports its own two reads; the sections stay
+   * mounted (their reads run) but the page keeps them out of sight, with ONE skeleton list in their place, until every workspace
+   * has answered, then shows them all in one commit. Reads end in network order: a section that painted on its own readiness
+   * landed above or below a slower one's and pushed it (two workspaces, 13 ms apart, 0.71 at 390).
+   */
+  const [settledIds, setSettledIds] = useState<ReadonlySet<string>>(() => new Set());
+  const reportSettled = useCallback((workspaceId: string, settled: boolean) => {
+    setSettledIds((previous) => {
+      if (previous.has(workspaceId) === settled) return previous;
+      const next = new Set(previous);
+      if (settled) next.add(workspaceId);
+      else next.delete(workspaceId);
+      return next;
+    });
+  }, []);
+  const listsReady = workspaces !== null && workspaces.every((workspace) => settledIds.has(workspace.id));
+  /**
    * ONE filter for every section (18.190). It lives on the page rather than in
    * each section because "narrow the tree" is one act by one person, and two
    * inputs could be left disagreeing — which reads as a tree that half-answered.
@@ -174,6 +191,12 @@ export function NotesPage({ noteId }: { noteId?: string }) {
    * open: with none there are no headings to list, so Contents is not offered (hidden, not a dead segment).
    */
   const phone = useNotesPhone();
+  /**
+   * The panel and its launcher wait for the session to answer (smoothness-2 G1, 25.246). The bottom bar renders once the session
+   * is known and declares `--gn-bar-lift` on the body then, which raises every fixed layer over it by the bar's height: a panel
+   * painted a frame earlier rose 56px when it did (CLS 0.034 at 390). Drawn in the commit the bar arrives in, it is placed once.
+   */
+  const panelShown = phone && session.kind !== 'loading';
   const [pane, setPane] = useState<'notes' | 'contents'>(noteId === undefined ? 'notes' : 'contents');
   const activePane = noteId === undefined ? 'notes' : pane;
   const launcherRef = useRef<HTMLButtonElement | null>(null);
@@ -198,7 +221,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   const currentNoteId = noteId ?? remembered?.noteId;
 
   useNotesPanelBehaviour({
-    active: phone,
+    active: panelShown,
     open: treeOpen,
     setOpen: setTreeOpen,
     asideRef: panelRef,
@@ -289,17 +312,23 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           {EMPTY_NOTES_COPY}
         </p>
       ) : (
-        workspaces.map((workspace) => (
-          <WorkspaceNotesSection
-            key={workspace.id}
-            workspace={workspace}
-            openNoteId={currentNoteId}
-            titleFilter={titleFilter}
-            searchQuery={searchQuery}
-            authorId={authorId === '' ? undefined : authorId}
-            scopeMode={scopeMode === '' ? undefined : (scopeMode as NoteScopeMode)}
-          />
-        ))
+        <>
+          {listsReady ? null : <NoteRowSkeleton label="Loading your notes" />}
+          <div className="gn-notes__sections" hidden={!listsReady}>
+            {workspaces.map((workspace) => (
+              <WorkspaceNotesSection
+                key={workspace.id}
+                workspace={workspace}
+                openNoteId={currentNoteId}
+                titleFilter={titleFilter}
+                searchQuery={searchQuery}
+                authorId={authorId === '' ? undefined : authorId}
+                scopeMode={scopeMode === '' ? undefined : (scopeMode as NoteScopeMode)}
+                onSettled={reportSettled}
+              />
+            ))}
+          </div>
+        </>
       )}
     </>
   );
@@ -321,7 +350,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             tree carry the Create button too (spec §9.7's "No notes yet" AND the button; 18.184). It is absent
             while loading and after a refusal: a Create over a spinner or a refusal panel is a control whose effect
             nobody can see. */}
-        <div className="gn-notes__bar">
+        <div className={refusal === null && (signedIn || session.kind === 'loading') ? 'gn-notes__bar gn-notes__bar--reserved' : 'gn-notes__bar'}>
           {/* Below 60rem (globals.css): a `<details>`-style drawer. Always in the DOM — CSS alone decides whether
               it is painted, `aria-expanded` is the observable a test (or a screen reader) can see regardless of
               viewport, and `aria-controls` names the tree it opens. A ghost `Button` (UX fixes T9, 23.160, audit
@@ -344,9 +373,10 @@ export function NotesPage({ noteId }: { noteId?: string }) {
         </div>
         <div className="gn-notes__body">
           {phone ? (
-            <NotesPanel
+            panelShown ? <NotesPanel
               open={treeOpen}
               asideRef={panelRef}
+              reserveSearch={signedIn && refusal === null && (workspaces === null || workspaces.length > 0)}
               onPick={(event) => {
                 if (event.target instanceof Element && event.target.closest('a') !== null) {
                   setTreeOpen(false);
@@ -373,7 +403,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
               }
             >
               {activePane === 'contents' ? <NotesContents headings={headings} query={searchQuery} /> : treeBody}
-            </NotesPanel>
+            </NotesPanel> : null
           ) : (
             <nav
               ref={treeRef}
@@ -435,7 +465,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           <aside className="gn-notes__toc" aria-label="On this page">
             {phone ? null : <TocLauncher headings={headings} scrollContainerRef={editorRootRef} />}
           </aside>
-          {phone ? <NotesLauncher open={treeOpen} onToggle={togglePanel} buttonRef={launcherRef} /> : null}
+          {panelShown ? <NotesLauncher open={treeOpen} onToggle={togglePanel} buttonRef={launcherRef} /> : null}
         </div>
       </div>
       {/* Spec §9.7: a note that stops being readable while open. Mounted at

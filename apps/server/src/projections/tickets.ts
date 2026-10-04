@@ -4,6 +4,7 @@ import {
   applyTicketEvent,
   foldTicketToWorkflowVersion,
   isRedactedTicketCreated,
+  isRedactedTicketPublished,
   workflowDefinedPayloadSchema,
   type LedgerEvent,
   type TicketState,
@@ -115,6 +116,13 @@ type TicketRow = {
    */
   deleted_at: Date | null;
   deleted_by: string | null;
+  /**
+   * `TicketState.draft`'s columns (drafts spec §2.3). All NULL on every non-draft. `draft_discarded` is
+   * TRUE only between `ticket.discarded` and the erase (a crash window the sweep closes, T5).
+   */
+  draft_author_id: string | null;
+  draft_at: Date | null;
+  draft_discarded: boolean | null;
 };
 
 /**
@@ -214,6 +222,19 @@ export function rowToTicketState(row: TicketRow): TicketState {
       row.deleted_at === null || row.deleted_by === null
         ? null
         : { actorId: row.deleted_by, at: row.deleted_at.toISOString() },
+    // ABSENT on every non-draft, never `undefined`-valued and never null: the reducer writes no `draft` key
+    // for a published ticket and `ticket.published` removes it, and the dual-client rig compares whole
+    // states with `toEqual` (28.045). `draft_at` is `timestamptz` against an ISO string, so the null arm is
+    // spelled out as `reopened_at`'s is.
+    ...(row.draft_author_id === null || row.draft_at === null
+      ? {}
+      : {
+          draft: {
+            authorId: row.draft_author_id,
+            at: row.draft_at.toISOString(),
+            ...(row.draft_discarded === true ? { discarded: true as const } : {}),
+          },
+        }),
   };
 }
 
@@ -286,8 +307,9 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
-        closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by,
+        draft_author_id, draft_at, draft_discarded)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -305,7 +327,10 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        rank = EXCLUDED.rank,
        reopened_at = EXCLUDED.reopened_at,
        deleted_at = EXCLUDED.deleted_at,
-       deleted_by = EXCLUDED.deleted_by`,
+       deleted_by = EXCLUDED.deleted_by,
+       draft_author_id = EXCLUDED.draft_author_id,
+       draft_at = EXCLUDED.draft_at,
+       draft_discarded = EXCLUDED.draft_discarded`,
     [
       next.id,
       next.workspaceId,
@@ -354,6 +379,11 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // at creation and on every restore.
       next.deleted?.at ?? null,
       next.deleted?.actorId ?? null,
+      // The draft block, all three from the SAME `next.draft` (the `closed` rule): a publish folds to NO
+      // `draft`, and the DO UPDATE list above is what makes that CLEAR the columns of an existing row.
+      next.draft?.authorId ?? null,
+      next.draft?.at ?? null,
+      next.draft?.discarded ?? null,
     ],
   );
 }
@@ -562,8 +592,10 @@ export const ticketsProjection: Projection = {
     }
     // Trash series Plan 2 (spec §5.4): a purged ticket's REDACTED creation
     // produces no ticket. Skipped before `current` is read, like the two
-    // content-free types above — folding it would throw by design (D7).
-    if (isRedactedTicketCreated(event)) {
+    // content-free types above — folding it would throw by design (D7). The
+    // same for a purged ticket's redacted PUBLISH (drafts T2: kept as a
+    // numbering row).
+    if (isRedactedTicketCreated(event) || isRedactedTicketPublished(event)) {
       return;
     }
 

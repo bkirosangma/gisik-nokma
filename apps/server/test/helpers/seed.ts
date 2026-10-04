@@ -1,4 +1,4 @@
-import { membershipId, type LedgerEvent } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, membershipId, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Pool } from 'pg';
 import { membershipsProjection } from '../../src/projections/proj-memberships.js';
 import { projInvites } from '../../src/projections/proj-invites.js';
@@ -242,6 +242,12 @@ export interface SeedTicketArgs {
    */
   birthAssigneeId?: string;
   /**
+   * Seed a DRAFT by this user (drafts spec §2): `ticket.created {draft: true, start: 'backlog'}` with this
+   * user as the event's actor (the projections take the author from the actor), a Backlog head row, and
+   * `draft_author_id` / `draft_at` on it. `createdBy` is ignored when this is set.
+   */
+  draftBy?: string;
+  /**
    * The `proj_tickets` head row's `state_category`. Defaults to `'open'`, which
    * is what every caller got before this parameter existed, so adding it changes
    * no fixture that does not ask.
@@ -358,8 +364,10 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
       // fixture that could only produce that shape is why every read door passed
       // its tests while 500-ing on a real birth-assigned ticket.
       ...(args.birthAssigneeId === undefined ? {} : { assigneeId: args.birthAssigneeId }),
+      // A draft (drafts T3): born in the Backlog, its author the event's actor.
+      ...(args.draftBy === undefined ? {} : { start: 'backlog', draft: true }),
     },
-    actorId: args.createdBy ?? SEED_ACTOR,
+    actorId: args.draftBy ?? args.createdBy ?? SEED_ACTOR,
   });
   await appendTestEvent(pool, created);
   await applyAll(pool, [created]);
@@ -423,8 +431,9 @@ async function insertTicketHead(
   await pool.query(
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
-        state_id, state_category, assignee_id, collaborator_ids, fields, transitions)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
+        draft_author_id, draft_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      ON CONFLICT (ticket_id) DO NOTHING`,
     [
       args.ticketId,
@@ -434,7 +443,7 @@ async function insertTicketHead(
       args.parentId ?? null,
       args.workflowId ?? SEED_WORKFLOW_ID,
       args.workflowVersion ?? SEED_WORKFLOW_VERSION,
-      args.stateId ?? SEED_STATE_ID,
+      args.stateId ?? (args.draftBy === undefined ? SEED_STATE_ID : BACKLOG_STATE_ID),
       args.stateCategory ?? 'open',
       // The COLUMN half of an assignment; the ledger half is appended above.
       // A BIRTH assignee lands in the same column with no follow-up event behind
@@ -461,6 +470,8 @@ async function insertTicketHead(
         },
       }),
       JSON.stringify([]),
+      args.draftBy ?? null,
+      args.draftBy === undefined ? null : created.serverTime,
     ],
   );
 }

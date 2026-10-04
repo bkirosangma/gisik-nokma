@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1824 for `ctl seats`; run by `ctl selftest`.
+# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1824 and 13.2032-13.2034 for `ctl seats`; run by `ctl selftest`.
 # Two layers: seats.py is driven over a directory of captured panes (+ their git facts), and the whole verb is driven
 # against a fake `tmux` on PATH that serves those panes and logs every call (so "capture-pane only, never send-keys" is
 # a measured fact, not a promise). Real captures live in fixtures/seats/ (taken from the live gisik session 2026-10-03
@@ -18,14 +18,15 @@ T=$(cd "$(mktemp -d)" && pwd -P)
 
 # --- builders -------------------------------------------------------------------------------------------------
 BAR='────────────────────────────────────────'
-# mkpane OUT TRANSCRIPT BOX CTX MODEL FOOTER_MIDDLE — a Claude Code pane: transcript, rule, ❯ box, rule, status line, footer.
+# mkpane OUT TRANSCRIPT BOX CTX MODEL FOOTER_MIDDLE [EFFORT] — a Claude Code pane (EFFORT defaults to high; `none` drops the segment, as on the DeepSeek backend): transcript, rule, ❯ box, rule, status line, footer.
 mkpane() {
-  local out="$1" transcript="$2" box="$3" ctx="$4" model="$5" mid="$6"
+  local out="$1" transcript="$2" box="$3" ctx="$4" model="$5" mid="$6" eff="${7:-high}" seg=""
+  [ "$eff" = none ] || seg="effort: $eff | "
   { printf '%s\n' "$transcript"
     printf '\033[38;5;245m%s\n' "$BAR"
     printf '\033[39m❯\xc2\xa0%b\n' "$box"
     printf '\033[38;5;245m%s\n' "$BAR"
-    printf '\033[39m  \033[38;5;241muser@example.com | %s | advisor: opus | effort: high | Ctx %s%% | session 9%% (resets 6:00am) | weekly 2%% (resets mon 6:30am)\033[39m\n' "$model" "$ctx"
+    printf '\033[39m  \033[38;5;241muser@example.com | %s | advisor: opus | %sCtx %s%% | session 9%% (resets 6:00am) | weekly 2%% (resets mon 6:30am)\033[39m\n' "$model" "$seg" "$ctx"
     printf '  \033[38;5;241m-- INSERT --\033[39m \033[38;5;131m⏵⏵ bypass permissions on\033[38;5;241m%s · ← for agents\033[39m\n' "$mid"
   } > "$out"
 }
@@ -162,7 +163,7 @@ i=0; for n in main exec1 planner reviewerA reviewerC dispatcher scratch; do i=$(
 J=$(run "$d" --json)
 check "13.1809 roles: main -> controller, exec* -> lane, planner, reviewer*, dispatcher, anything else -> other" '[ "$(for i in 1 2 3 4 5 6 7; do jv "$J" $i "d[\"role\"]"; done | tr "\n" " ")" = "controller lane planner reviewer reviewer dispatcher other " ]'
 d=$(fixture); cp "$FX/busy-sonnet.pane" "$d/2.pane"; meta "$d" 2 exec2 0 task/x abc1234 3 2
-check "13.1810 text line: one line per seat — window, name, role | state | sh/mon | box | Ctx model | branch@head unpushed dirty | last" '[ "$(run "$d" | head -1)" = "gisik:2 exec2 lane | busy 3m59s | sh 0 mon 0 | box empty | Ctx 11% sonnet-5-5 | task/x@abc1234 unpushed 3 dirty 2 | last: none" ]'
+check "13.1810 text line: one line per seat — window, name, role | state | sh/mon | box | Ctx model/effort | branch@head unpushed dirty | last" '[ "$(run "$d" | head -1)" = "gisik:2 exec2 lane | busy 3m59s | sh 0 mon 0 | box empty | Ctx 11% sonnet-5-5/high | task/x@abc1234 unpushed 3 dirty 2 | last: none" ]'
 d=$(fixture); mkpane "$d/2.pane" "⏺ x" "hello" 12 sonnet-5-5 " · 1 shell"; meta "$d" 2 exec2 1 task/x abc1234 0 0
 check "13.1810 text line: copy mode is in the STATE field (| unknown copy-mode |) and box text is visible" 'run "$d" | head -1 | grep -q "| unknown copy-mode |" && run "$d" | head -1 | grep -q "box text: hello"'
 d2=$(fixture); mkpane "$d2/2.pane" "⏺ x" "" 12 sonnet-5-5 " · 2 shells, 1 monitor"; meta "$d2" 2 exec2 0
@@ -268,5 +269,20 @@ check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed gh
     [ "$want" = "$got" ] || { ok=0; echo "    panel [$pdir]: ctl_box_text=[$want] seats=[$got]"; }
   done
   [ $ok = 1 ]'
+# ============ 13.2032-13.2034: the effort the status line shows (`ctl restart --effort`, owner 2026-10-04) ============
+# statusline-command.sh writes an "effort: <level>" segment; the real captures all carry "effort: high", so every other level is built here.
+levels_ok() { local e d2; for e in xhigh max medium low; do d2=$(fixture); mkpane "$d2/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" "$e"; meta "$d2" 2 exec2 0; [ "$(effort_of "$d2" 2)" = "$e" ] || return 1; done; }
+effort_of() { jv "$(run "$1" --json)" "$2" 'd["effort"]'; }
+d=$(fixture); cp "$FX/busy-sonnet.pane" "$d/2.pane"; meta "$d" 2 exec2 0
+check "13.2032 effort: read from the status line's own \"effort: <level>\" segment — high from the real capture; xhigh, max, medium, low from built panes (a parser fixed on \"high\" is red); CONTROL in the same check: the model beside it is still read (sonnet-5-5)" \
+  '[ "$(effort_of "$d" 2)" = high ] && [ "$(jv "$(run "$d" --json)" 2 "d[\"model\"]")" = sonnet-5-5 ] && levels_ok'
+d=$(fixture); mkpane "$d/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" none; meta "$d" 2 exec2 0 task/x abc1234 0 0
+d2=$(fixture); mkpane "$d2/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" medium; meta "$d2" 2 exec2 0 task/x abc1234 0 0
+check "13.2033 no effort segment (the DeepSeek backend sends none): effort is null in --json and the text line reads \"sonnet-5-5/?\" — never a guessed level; CONTROL in the same check: the same pane with \"effort: medium\" reads \"sonnet-5-5/medium\"" \
+  '[ "$(jv "$(run "$d" --json)" 2 "d[\"effort\"]")" = None ] && run "$d" | head -1 | grep -q "| Ctx 12% sonnet-5-5/? |" && run "$d2" | head -1 | grep -q "| Ctx 12% sonnet-5-5/medium |"'
+d=$(fixture); { printf 'gisik:2 exec2 lane | idle | sh 0 mon 0 | box empty | Ctx 11%% sonnet-5-5/max | task/x clean | last: none\n'; printf '⏺ the status line says | effort: max | Ctx 99%% in this sentence\n'; } > "$d/2.pane"; mkpane "$d/2.tmp" "⏺ working" "" 27 opus-5-5 "" low; cat "$d/2.tmp" >> "$d/2.pane"; meta "$d" 2 exec2 0
+check "13.2034 scrollback: a ctl-seats line (sonnet-5-5/max) and a sentence quoting \"| effort: max |\" above the real status line (effort low) — the effort comes from the REAL status line; CONTROL in the same check: the real pane alone reads the same" \
+  '[ "$(effort_of "$d" 2)" = low ] && d2=$(fixture) && cp "$d/2.tmp" "$d2/2.pane" && meta "$d2" 2 exec2 0 && [ "$(effort_of "$d2" 2)" = low ] && [ "$(jv "$(run "$d" --json)" 2 "d[\"model\"]")" = opus-5-5 ]'
+
 rm -rf "$T"
 [ "$fails" -eq 0 ] && echo "seats tests green" || { echo "$fails seats tests red"; exit 1; }

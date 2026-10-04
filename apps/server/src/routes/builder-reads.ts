@@ -594,12 +594,15 @@ export async function readTicketCounts(db: Queryable, workspaceId: string): Prom
     // container half), and it is in the JOIN's ON clause rather than the
     // WHERE, deliberately: this is a LEFT JOIN whose whole job is to report a
     // count of ZERO for a type that has no tickets, and a WHERE on the
-    // right-hand alias would turn a zero into an absent row.
+    // right-hand alias would turn a zero into an absent row. It is the longhand
+    // twin of `LIVE_TICKET_WHERE`, draft half included (drafts T3); in the `ON`,
+    // not the `WHERE`, for the zero-count reason above.
     `SELECT t.type_id, count(k.ticket_id)::int AS count
        FROM proj_ticket_types t
        LEFT JOIN proj_tickets k
          ON k.workspace_id = t.workspace_id AND k.type_id = t.type_id
         AND k.deleted_at IS NULL
+        AND k.draft_author_id IS NULL
         AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = k.project_id AND dp.deleted_at IS NOT NULL)
       WHERE t.workspace_id = $1
       GROUP BY t.type_id`,
@@ -1071,10 +1074,14 @@ export function registerBuilderReadRoutes(
         );
       }
 
+      // `draft_author_id IS NULL` (drafts T3, C5): a draft is not migrated; it is re-pinned to the type's
+      // CURRENT workflow when it is published (spec §2.3). And being invisible to everyone else, it must not
+      // count as "not visible to you" in the `hidden` loop below, which would block the migration and
+      // disclose that the draft exists (Q9).
       const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string; closed_at: Date | null }>(
         `SELECT ticket_id, state_id, closed_at
            FROM proj_tickets
-          WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3
+          WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3 AND draft_author_id IS NULL
           ORDER BY ticket_id`,
         [workspaceId, typeId, fromWorkflowId],
       );

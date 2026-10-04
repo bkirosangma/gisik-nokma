@@ -1,0 +1,121 @@
+import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for.js';
+import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { testEnvelope } from '../helpers/envelope.js';
+import { appendTestEvent } from '../helpers/ledger.js';
+import { applyAll, seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+
+/**
+ * Drafts T3, C4 (spec §4.2): `nowInvisibleTicketsInScope` never names another person's draft in a scope-lost
+ * purge list (28.062). The local helpers are `visible-events-for.test.ts`'s (`record`, `collect`, `idsOf`,
+ * `ticketEvent`, `revocationEnv` and the truncating `beforeEach`); the world is 6.103's with one more ticket.
+ */
+
+let db: TestDatabase;
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+});
+
+afterAll(async () => {
+  await db.drop();
+});
+
+beforeEach(async () => {
+  // The projections are rebuildable and truncate; `events` does not, which is
+  // why each test mints a fresh workspace id.
+  await db.pool.query('TRUNCATE proj_visibility');
+  await db.pool.query('TRUNCATE proj_memberships');
+  await db.pool.query('TRUNCATE proj_projects');
+});
+
+/** Seed an event into BOTH the ledger and the projections, the way ingest does. */
+async function record(env: LedgerEvent): Promise<LedgerEvent> {
+  await appendTestEvent(db.pool, env);
+  await applyAll(db.pool, [env]);
+  return env;
+}
+
+/** `afterSeq` is the WORKSPACE cursor (coordination §18), never a per-entity seq. */
+async function collect(userId: string, workspaceId: string, afterSeq = 0): Promise<SyncItem[]> {
+  const items: SyncItem[] = [];
+  for await (const item of visibleEventsFor(db.pool, userId, workspaceId, afterSeq)) {
+    items.push(item);
+  }
+  return items;
+}
+
+function idsOf(items: readonly SyncItem[]): string[] {
+  return items.map((item) =>
+    'kind' in item
+      ? item.kind === 'purge'
+        ? `purge:${item.entityId}`
+        : item.kind === 'reach-granted'
+          ? // The ids, not a count: two notices naming different tickets must
+            // not compare equal — see the same spelling in `stream-socket.ts`.
+            `reach-granted:${item.tickets.map((t) => t.id).join(',')}`
+          : `scope-revoked:${item.projectId ?? item.workspaceId}`
+      : item.id,
+  );
+}
+
+function ticketEvent(
+  workspaceId: string,
+  type: string,
+  ticketId: string,
+  payload: unknown,
+  actorId: string,
+): LedgerEvent {
+  return testEnvelope({
+    workspaceId,
+    entity: { kind: 'ticket', id: ticketId },
+    type,
+    payload,
+    actorId,
+  });
+}
+
+function revocationEnv(workspaceId: string, userId: string): LedgerEvent {
+  return testEnvelope({
+    workspaceId,
+    entity: { kind: 'membership', id: membershipId(workspaceId, userId) },
+    type: 'membership.revoked',
+    payload: { userId },
+    actorId: newUlid(),
+  });
+}
+
+it('28.062 an owner re-granted as a member is told what only the owner bypass reached, and never another person\'s draft; control: cleared, the draft id is named', async () => {
+  const ws = newUlid();
+  const theirs = newUlid();
+  const viewer = newUlid();
+  const author = newUlid();
+  const openToAll = newUlid();
+  const explicitElsewhere = newUlid();
+  const otherDraft = newUlid();
+  await seedProject(db.pool, ws, theirs);
+  await seedMember(db.pool, ws, viewer, 'owner');
+  await seedMember(db.pool, ws, author, 'member', [{ projectId: theirs }]);
+  await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: openToAll });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: explicitElsewhere });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: otherDraft, draftBy: author });
+  await applyAll(db.pool, [setVisibilityEnv(ws, openToAll, 'workspace')]);
+  await applyAll(db.pool, [setVisibilityEnv(ws, explicitElsewhere, 'explicit', [newUlid()])]);
+  // an audience that does NOT name the viewer: once the flag is cleared the draft is "invisible to a member",
+  // so only the flag, not the audience, can keep its id out of the list
+  await applyAll(db.pool, [setVisibilityEnv(ws, otherDraft, 'explicit', [author])]);
+
+  const opener = await record(ticketEvent(ws, 'comment.added', openToAll, { body: 'still readable' }, viewer));
+  await record(revocationEnv(ws, viewer));
+  await record(testEnvelope({
+    workspaceId: ws, entity: { kind: 'membership', id: membershipId(ws, viewer) },
+    type: 'membership.granted', payload: { userId: viewer, role: 'member' }, actorId: newUlid(),
+  }));
+
+  const ids = idsOf(await collect(viewer, ws, opener.workspaceSeq - 1));
+  expect(ids).toContain(`purge:${explicitElsewhere}`); // CONTROL: the list is real and itemised
+  expect(ids).not.toContain(`purge:${otherDraft}`);     // an id the recipient stands in no relationship to
+  await db.pool.query('UPDATE proj_visibility SET draft_author_id = NULL WHERE ticket_id = $1', [otherDraft]);
+  expect(idsOf(await collect(viewer, ws, opener.workspaceSeq - 1))).toContain(`purge:${otherDraft}`);
+});

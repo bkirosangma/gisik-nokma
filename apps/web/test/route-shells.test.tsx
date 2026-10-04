@@ -39,9 +39,9 @@ describe('route shells (spec D5, S1; audit SM-02)', () => {
     expect(main).toHaveAttribute('aria-busy', 'true');
     expect(main.querySelectorAll('a, button, input')).toHaveLength(0);
     // EXACT: the list tab is the list's own table (smoothness T6, S-R1 rule 1) with eight real rows (a 7-row list must fail,
-    // not just a 2-row one), and each row's state chip is one block: five tab blocks + the toolbar block + eight chips.
+    // not just a 2-row one), and each row's state chip is one block: five tab blocks + the header's three control places (search, Filters, Create ticket; G1 25.242) + eight chips.
     expect(main.querySelectorAll('.gn-list .gn-list__table-wrap table.gn-table.gn-list__table tbody tr.gn-list__table-row')).toHaveLength(8);
-    expect(main.querySelectorAll('.gn-skeleton--block')).toHaveLength(5 + 1 + 8);
+    expect(main.querySelectorAll('.gn-skeleton--block')).toHaveLength(5 + 3 + 8);
     expect(main.querySelectorAll('.gn-board__column')).toHaveLength(0);
     // Control: the board tab draws three real columns of three real cards (S-R1 rule 1: the frame is the real element),
     // and no stand-in `card` shape.

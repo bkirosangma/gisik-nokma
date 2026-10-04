@@ -81,7 +81,8 @@ export async function foldTicketHead(
     seq = env.seq;
     if ((TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
       // `foldTicketEvent`, not `applyTicketEvent`: a purged ticket's redacted
-      // creation produces no state (spec §5.4), and the `state === undefined`
+      // creation, and its redacted publish (drafts T2), produce no state
+      // (spec §5.4), and the `state === undefined`
       // return below already means "nothing to snapshot".
       state = foldTicketEvent(state, env, deps);
     }
@@ -92,7 +93,7 @@ export async function foldTicketHead(
     // nothing here. `transitions[]` carries `actorId` and `seq` and no clock at
     // all, so the state claim does; and the assignment claim is on no part of
     // the state.
-    if (env.type === 'ticket.created' || env.type === 'ticket.transitioned') {
+    if (env.type === 'ticket.created' || env.type === 'ticket.transitioned' || env.type === 'ticket.published') {
       stateClaim = { actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
     }
     if (env.type === 'ticket.assigned') {

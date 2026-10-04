@@ -88,13 +88,30 @@ export function ProjectPageSkeleton({ tab = 'board' }: { tab?: ProjectTab }) {
     <main id="gn-main" className="gn-shell gn-shell--wide gn-shell--skeleton" aria-busy="true">
       <AppNavSkeleton />
       <SkeletonRegion label="Loading the project">
-        <Skeleton width="14rem" height="1rem" />
-        <Skeleton className="gn-project__title-skeleton" width="18rem" height="var(--gn-title-page-size)" />
-        <div className="gn-project__tabs-skeleton">
-          {TAB_SHAPES.map((index) => <Skeleton key={index} shape="block" width="5rem" height="2.25rem" />)}
+        {/* The page's own head, scope row and tab rail (smoothness-2 G1, 25.240): the real container classes with the text as
+            placeholder parts, at the real line heights, so the route's fallback swaps for the page without moving the board. */}
+        <div className="gn-project">
+          <div className="gn-project__head">
+            <div className="gn-project__identity">
+              <p className="gn-project__breadcrumb">
+                <Skeleton width="14rem" height="1.125rem" />
+              </p>
+              <div className="gn-project__title-row">
+                <Skeleton className="gn-project__title-skeleton gn-skeleton--title" width="18rem" />
+              </div>
+            </div>
+            <div className="gn-project__header">
+              <Skeleton shape="block" className="gn-project__search-slot" width="12.5rem" height="2.75rem" />
+              <Skeleton shape="block" className="gn-project__filters" width="5rem" height="2.75rem" />
+              <Skeleton shape="block" className="gn-project__create-slot" width="11rem" height="3rem" />
+            </div>
+          </div>
+          <p className="gn-project__scope-row" />
+          <div className="gn-segmented gn-project__rail">
+            {TAB_SHAPES.map((index) => <Skeleton key={index} shape="block" width="5rem" height="2.75rem" />)}
+          </div>
+          <ProjectTabBodySkeleton tab={tab} />
         </div>
-        <Skeleton shape="block" height="2.75rem" />
-        <ProjectTabBodySkeleton tab={tab} />
       </SkeletonRegion>
     </main>
   );
@@ -105,7 +122,7 @@ export function ListPageShell({ title, rows = 6, wide = false }: { title: string
     <main id="gn-main" className={wide ? 'gn-shell gn-shell--wide gn-shell--skeleton' : 'gn-shell gn-shell--skeleton'} aria-busy="true">
       <AppNavSkeleton />
       <SkeletonRegion label={`Loading ${title}`}>
-        <Skeleton className="gn-page-title" width="12rem" height="var(--gn-title-page-size)" />
+        <Skeleton className="gn-page-title gn-skeleton--title" width="12rem" />
         <div className="gn-shell__main">
           <Skeleton shape="block" height="3rem" rows={rows} />
         </div>
@@ -119,7 +136,7 @@ export function FormPageShell({ title, centred = false }: { title: string; centr
     <main id="gn-main" className={centred ? 'gn-shell gn-shell--centred gn-shell--skeleton' : 'gn-shell gn-shell--skeleton'} aria-busy="true">
       {centred ? null : <AppNavSkeleton />}
       <SkeletonRegion label={`Loading ${title}`}>
-        <Skeleton className="gn-page-title" width="12rem" height="var(--gn-title-page-size)" />
+        <Skeleton className="gn-page-title gn-skeleton--title" width="12rem" />
         <Skeleton shape="block" height="18rem" />
       </SkeletonRegion>
     </main>
@@ -133,7 +150,7 @@ export function NotesPageShell() {
       <SkeletonRegion label="Loading your notes">
         <div className="gn-notes">
           <div className="gn-notes__header">
-            <Skeleton className="gn-page-title" width="8rem" height="var(--gn-title-page-size)" />
+            <Skeleton className="gn-page-title gn-skeleton--title" width="8rem" />
           </div>
           <div className="gn-notes__body">
             {/* The real CLOSED drawer (notes-page.tsx): at <=60rem the `--drawer` rule hides it and the body is one column, so the
@@ -142,7 +159,7 @@ export function NotesPageShell() {
               <Skeleton height="1.25rem" rows={8} />
             </nav>
             <section className="gn-notes__document">
-              <Skeleton width="60%" height="var(--gn-title-page-size)" />
+              <Skeleton className="gn-skeleton--title" width="60%" />
               <Skeleton shape="block" height="var(--gn-notes-editor-min)" />
             </section>
           </div>

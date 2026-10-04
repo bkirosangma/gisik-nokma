@@ -1,5 +1,6 @@
 import {
   isRedactedTicketCreated,
+  isRedactedTicketPublished,
   ticketCreatedPayload,
   ticketReparentedPayload,
   visibilitySetPayload,
@@ -247,8 +248,8 @@ export const projVisibility: Projection = {
         await tx.query(
           `INSERT INTO proj_visibility
              (ticket_id, workspace_id, project_id, parent_id, own_mode, own_user_ids,
-              resolved_mode, resolved_user_ids, resolved_from, seq)
-           VALUES ($1, $2, $3, $4, 'inherit', '{}', $6, '{}', '', $5)
+              resolved_mode, resolved_user_ids, resolved_from, seq, draft_author_id)
+           VALUES ($1, $2, $3, $4, 'inherit', '{}', $6, '{}', '', $5, $7)
            ON CONFLICT (ticket_id) DO NOTHING`,
           [
             event.entity.id,
@@ -259,12 +260,32 @@ export const projVisibility: Projection = {
             // A placeholder the re-resolution below overwrites; resolved_mode is
             // NOT NULL and has no default, so the insert must name something.
             ROOT_DEFAULT_MODE,
+            // The audience mirror of the draft flag (drafts spec R19): the event's ACTOR, because the payload
+            // names no author. `canSeeResolved` and `visibleTicketsWhere` close the row for everyone on it.
+            payload.draft === true ? event.actorId : null,
           ],
         );
         // NOT resolveOne. Under canonical replay this ticket's children may
         // already be in the table, resolved against a parent that did not yet
         // exist — see the docblock. They are visited here or never.
         await reResolveSubtree(tx, event.entity.id);
+        return;
+      }
+
+      case 'ticket.published': {
+        // A purged ticket's redacted publish names a ticket that no longer has a row; `replayRemaining`
+        // feeds it through here (T2). The UPDATE below would be a no-op anyway, and the guard says so.
+        if (isRedactedTicketPublished(event)) {
+          return;
+        }
+        // The publish ends the draft (spec §7.1). `resolved_*` already hold the project default (a ticket is
+        // born `project`-mode and `reResolveSubtree` ran at creation), so nothing is re-resolved; `seq`
+        // advances like every other change to this row. `ticket.discarded` needs no arm: the erase deletes
+        // the row (T5).
+        await tx.query(
+          'UPDATE proj_visibility SET draft_author_id = NULL, seq = $2 WHERE ticket_id = $1',
+          [event.entity.id, event.seq],
+        );
         return;
       }
 
