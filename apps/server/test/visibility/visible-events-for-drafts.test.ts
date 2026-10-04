@@ -11,7 +11,8 @@ import { applyAll, seedMember, seedProject, seedTicket, setVisibilityEnv } from 
  * purge list (28.062). The local helpers are `visible-events-for.test.ts`'s (`record`, `collect`, `idsOf`,
  * `ticketEvent`, `revocationEnv` and the truncating `beforeEach`); the world is 6.103's with one more ticket.
  * Drafts T4 adds door G2, the stream (28.073: the author's devices receive the draft's events, nobody else's
- * do), and C4 refined (28.080: the recipient's OWN draft is named only once they can no longer open it).
+ * do, and no `reach-granted` names a draft, whether the trigger is the draft's own or a published parent's), and
+ * C4 refined (28.080: the recipient's OWN draft is named only once they can no longer open it).
  */
 
 let db: TestDatabase;
@@ -125,7 +126,7 @@ it('28.062 an owner re-granted as a member is told what only the owner bypass re
 const entityIds = (items: readonly SyncItem[]): string[] =>
   items.filter((item): item is LedgerEvent => 'entity' in item).map((event) => event.entity.id);
 
-it('28.073 the author receives their draft\'s events, nobody else does, and a draft assignment names no reach-granted; control: the published twin reaches all', async () => {
+it('28.073 the author receives their draft\'s events, nobody else does, and no reach-granted names the draft, from its own assignment past its history or a published parent\'s walk; control: the published twin reaches all, its assignment is noticed, the published sibling is named', async () => {
   const ws = newUlid();
   const project = newUlid();
   const [author, owner, admin, assignee, other] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
@@ -142,6 +143,8 @@ it('28.073 the author receives their draft\'s events, nobody else does, and a dr
   const edit = await record(ticketEvent(ws, 'ticket.field_set', draft, { fieldId: 'title', value: 'edited' }, author));
   const assign = await record(ticketEvent(ws, 'ticket.assigned', draft, { assigneeId: assignee }, author));
   const twinEdit = await record(ticketEvent(ws, 'ticket.field_set', twin, { fieldId: 'title', value: 'twin edited' }, author));
+  // a grant trigger on the published twin: the control of the mid-cursor leg at the end
+  await record(ticketEvent(ws, 'ticket.assigned', twin, { assigneeId: assignee }, author));
 
   const mine = await collect(author, ws, 0);
   expect(idsOf(mine)).toEqual(expect.arrayContaining([edit.id, assign.id, twinEdit.id]));
@@ -156,6 +159,29 @@ it('28.073 the author receives their draft\'s events, nobody else does, and a dr
     expect(entityIds(items), name).not.toContain(draft);
     expect(idsOf(items).join('|'), name).not.toContain(draft); // no notice, purge or scope item names it
   }
+
+  // The published-parent leg, for the case line's own subjects. A grant trigger on a published parent walks its
+  // `inherit` children (`audienceDependents`), so a draft child IS a candidate there, and only the per-candidate
+  // `canSee` in `grantNoticeFor` keeps it off the notice. All three tickets are created below the cursor, so
+  // `withHeadSeq` keeps every one the filter admits; the published sibling, named in the same item, is the control.
+  // It runs BEFORE the author's mid-cursor leg, which deleting that `canSee` would also red.
+  const [parent, draftChild, sibling] = [newUlid(), newUlid(), newUlid()];
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: parent });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: draftChild, parentId: parent, draftBy: author, birthAssigneeId: assignee });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: sibling, parentId: parent });
+  const parentAssign = await record(ticketEvent(ws, 'ticket.assigned', parent, { assigneeId: assignee }, owner));
+  for (const [name, viewer] of [['owner', owner], ['admin', admin], ['assignee', assignee]] as const) {
+    const notices = idsOf(await collect(viewer, ws, parentAssign.workspaceSeq - 1)).filter((id) => id.startsWith('reach-granted'));
+    expect(notices, `parent leg: ${name}`).toEqual([`reach-granted:${parent},${sibling}`]);
+  }
+
+  // The author's leg at a cursor PAST the draft's creation and edit. From cursor 0 `withHeadSeq` drops every
+  // candidate, so the cursor-0 assert above holds whatever the filter does; from `edit`, the draft's own
+  // `ticket.assigned` is a grant trigger with history at or below the cursor, and only `canSee` keeps it unnamed.
+  const mid = idsOf(await collect(author, ws, edit.workspaceSeq));
+  expect(mid, 'author mid-cursor').toContain(assign.id); // the draft's trigger is on this stream, past G2
+  // CONTROL in one assert with the leg: the twin's trigger at the same cursor IS noticed, the draft's is not
+  expect(mid.filter((id) => id.startsWith('reach-granted')), 'author mid-cursor').toEqual([`reach-granted:${twin}`]);
 });
 
 it('28.080 an author keeps their own draft off the purge list while they can still open it, and is told to drop it once they cannot; another person\'s draft is never named', async () => {

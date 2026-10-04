@@ -64,8 +64,22 @@ describe('28.070 ticketAccess, canOpen and isOpenableDraft', () => {
     });
   });
 
-  it('R18: demoted to guest (on the project or not), revoked, discarded or with the project in the trash, the author no longer opens it; restored, they do', async () => {
+  it('R18: an owner or an admin author opens their own draft as a member author does, and no one else opens it; demoted to guest (on the project or not), revoked, discarded or with the project in the trash, the author no longer opens it; restored, they do', async () => {
     const { workspaceId, projectId } = read.world;
+    // R18's owner and admin arms. The other draft authors in this file are workspace members (the project lead
+    // included), so these two arms of `holdsDraftRights` are pinned only here. Each draft is closed to the other of
+    // the two and to `world.draftId`'s member author.
+    const ownerDraft = newUlid();
+    const adminDraft = newUlid();
+    await seedTicket(db.pool, { workspaceId, projectId, ticketId: ownerDraft, draftBy: read.userIds.owner });
+    await seedTicket(db.pool, { workspaceId, projectId, ticketId: adminDraft, draftBy: read.userIds.admin });
+    for (const [mine, theirs, draftId] of [['owner', 'admin', ownerDraft], ['admin', 'owner', adminDraft]] as const) {
+      expect(await ticketAccess(db.pool, read.userIds[mine], draftId), mine).toBe('own-draft');
+      expect(await canOpen(db.pool, read.userIds[mine], draftId), mine).toBe(true);
+      expect(await ticketAccess(db.pool, read.userIds[theirs], draftId), `${theirs} on the ${mine}'s draft`).toBe('none');
+      expect(await ticketAccess(db.pool, read.userIds.member, draftId), `member on the ${mine}'s draft`).toBe('none');
+    }
+
     const author = newUlid();
     const ticketId = newUlid();
     await seedMember(db.pool, workspaceId, author, 'member');
