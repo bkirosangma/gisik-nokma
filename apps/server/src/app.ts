@@ -47,6 +47,7 @@ import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketLinkRoutes } from './routes/ticket-links.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerNoteRoutes } from './routes/notes.js';
+import { registerReferenceRoutes } from './routes/references.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerPurgedLookupRoute } from './purge/lookup-route.js';
 import { registerDeletedItemsRoutes } from './routes/deleted-items.js';
@@ -936,6 +937,8 @@ export function buildApp(
   // three note-addressed paths learn their workspace from the note's own row
   // rather than from the URL (see `routes/notes.ts`).
   registerNoteRoutes(app, { pool: deps.pool }, requireSession);
+  // "Linked from" (Knowledge Graph spec B): the backlinks read of proj_references.
+  registerReferenceRoutes(app, { pool: deps.pool }, requireSession);
   // One ticket's history at a workspace-free path (Plan 3 Task 13) — the ledger
   // filtered to that ticket, paged by `afterSeq`/`limit`, as
   // `TicketHistoryEvent`s. It is NOT a duplicate of the `/events` door

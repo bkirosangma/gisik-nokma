@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   applyTicketEvent,
   domainRegistry,
+  foldTicketEvent,
   isTicketLinkEvent,
+  isWithheldLinkEvent,
   linkReading,
   makeEnvelope,
   newUlid,
@@ -13,6 +15,7 @@ import {
   ticketLinkRemovedPayload,
   type TicketState,
   type TicketStateDeps,
+  withheldLinkPayload,
 } from '../src/index.js';
 
 const SOURCE = newUlid();
@@ -121,5 +124,51 @@ describe('27.008 how a link reads, and the link-event predicate', () => {
     expect(isTicketLinkEvent('ticket.link_added')).toBe(true);
     expect(isTicketLinkEvent('ticket.link_removed')).toBe(true);
     expect(isTicketLinkEvent('ticket.assigned')).toBe(false); // control: a ticket event that is not a link
+  });
+});
+
+describe('27.080 a link event served with its target withheld', () => {
+  it('27.080 a withheld link folds to nothing, applyTicketEvent names it; control: a real target folds', () => {
+    const born = bornState();
+    const add = (targetId: string | null, type: 'ticket.link_added' | 'ticket.link_removed' = 'ticket.link_added') =>
+      makeEnvelope({
+        type,
+        entity: { kind: 'ticket', id: SOURCE },
+        payload: targetId === null ? withheldLinkPayload('blocks') : { kind: 'blocks', targetId },
+      });
+    const thrown = (fn: () => unknown): string => {
+      try {
+        fn();
+      } catch (err) {
+        return (err as Error).message;
+      }
+      return 'no throw';
+    };
+    expect(withheldLinkPayload('blocks')).toEqual({ kind: 'blocks', targetId: null });
+    expect(JSON.stringify(withheldLinkPayload('blocks'))).toBe('{"kind":"blocks","targetId":null}');
+    expect(foldTicketEvent(born, add(null), deps)).toBe(born);
+    expect(foldTicketEvent(born, add(null, 'ticket.link_removed'), deps)).toBe(born);
+    expect(() => applyTicketEvent(born, add(null), deps)).toThrow(/withheld/);
+    // P20 2d: the refusal sentence, exactly, from each arm.
+    expect(thrown(() => applyTicketEvent(born, add(null), deps))).toBe(
+      `applyTicketEvent: ticket.link_added on ticket ${SOURCE} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`,
+    );
+    const linked = foldTicketEvent(born, add(TARGET), deps)!;
+    expect(linked.links).toEqual([{ kind: 'blocks', targetId: TARGET }]);
+    expect(foldTicketEvent(linked, add(null), deps)).toBe(linked); // a withheld one leaves a held link alone
+    expect(foldTicketEvent(linked, add(null, 'ticket.link_removed'), deps)).toBe(linked); // a withheld removal too
+    expect(isWithheldLinkEvent({ type: 'ticket.field_set', payload: { fieldId: 'x', targetId: null } })).toBe(false);
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: { kind: 'blocks', targetId: TARGET } })).toBe(false);
+    // T1 (AMEND p11): a link event whose payload is null is not "withheld".
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: null })).toBe(false);
+    // T2 (AMEND p11): an ABSENT targetId is not a withheld one. The control is the same event with targetId present-and-null.
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: { kind: 'blocks' } })).toBe(false);
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: withheldLinkPayload('blocks') })).toBe(true);
+    // T3 (AMEND p11): the REMOVE arm names it too, exactly. The control is a real removal of the one held link, which leaves no key.
+    expect(() => applyTicketEvent(linked, add(null, 'ticket.link_removed'), deps)).toThrow(/withheld/);
+    expect(thrown(() => applyTicketEvent(linked, add(null, 'ticket.link_removed'), deps))).toBe(
+      `applyTicketEvent: ticket.link_removed on ticket ${SOURCE} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`,
+    );
+    expect('links' in applyTicketEvent(linked, add(TARGET, 'ticket.link_removed'), deps)).toBe(false);
   });
 });
