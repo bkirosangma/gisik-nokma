@@ -156,8 +156,13 @@ describe('27.290–27.292 the door: session, query, the one 404', () => {
       expect({ label, status: res.status, body: res.body }).toEqual({ label, status: 400, body: { error: 'invalid_query' } });
     }
     // A REPEATED key reaches the handler as an array (Fastify's query parser): refused, never a 500 from `.split`.
+    // `ws`, `proj` and `groups` need the route's type guard; `center`, `hops` and `cursor` are refused by their own checks too.
     const plain = new URLSearchParams(q as Record<string, string>).toString();
-    for (const [label, extra] of [['ws twice', `ws=${ws()}`], ['proj twice', `proj=${w().projectId}&proj=${w().projectId}`], ['groups twice', 'groups=blocks']] as const) {
+    const twice = [
+      ['ws twice', `ws=${ws()}`], ['proj twice', `proj=${w().projectId}&proj=${w().projectId}`], ['groups twice', 'groups=blocks'],
+      ['center twice', `center=${T(w().epicId)}`], ['hops twice', 'hops=1'], ['cursor twice', 'cursor=0&cursor=0'],
+    ] as const;
+    for (const [label, extra] of twice) {
       const res = await getRing('member', `${plain}&${extra}`);
       expect({ label, status: res.status, body: res.body }).toEqual({ label, status: 400, body: { error: 'invalid_query' } });
     }
