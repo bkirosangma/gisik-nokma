@@ -52,9 +52,10 @@ export type Resolved = { preview: Preview & { person: LookedUpPerson; joinsAsGue
  * Look the address up and either answer the preview of whoever it resolves to NOW, or (when `confirm` is exactly that person's userId)
  * hand the person back to be acted on. `headline` is the tool's own first sentence, built only if a preview is needed.
  *
- * `draft` (create_ticket's `draft: true`, drafts T7): a draft takes nobody from outside (R8), so for an outsider the preview states
- * the server's own refusal, in its rule and sentence (`@gisik-nokma/domain`, one definition), instead of promising a guest that the
- * confirmation would then be refused. Call 2 still goes to the server, which refuses it as before (planner ruling 2026-10-04).
+ * `draft` (create_ticket's `draft: true`, drafts T7; assign_ticket on an existing draft, from its call-1 ticket read): a draft takes
+ * nobody from outside (R8), so for an outsider the preview states the server's own refusal, in its rule and sentence
+ * (`@gisik-nokma/domain`, one definition), instead of promising a guest that the confirmation would then be refused. Call 2 still goes
+ * to the server, which refuses it as before (planner rulings 2026-10-04 23:35 and 2026-10-05 00:44).
  */
 export async function resolveAssignee(
   session: Session,

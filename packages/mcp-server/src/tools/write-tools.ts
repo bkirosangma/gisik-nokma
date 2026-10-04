@@ -191,10 +191,11 @@ export function writeTools(session: Session): ToolDefinition[] {
         // Call 1 reads the ticket FIRST, so a ticket the caller cannot see is answered before any lookup (AE-11). Call 2 reads it only to
         // name it in a fresh preview: the server's own refusal then covers a ticket that went away between the calls.
         let ticket = a.confirm_assignee === undefined ? await readTicket(session, a.workspaceId, a.ticketId) : undefined;
+        // An existing draft takes nobody from outside (R8, planner ruling 2026-10-05 00:44): call 1's read says whether it is one.
         const resolved = await resolveAssignee(session, a.workspaceId, a.assignee_email, a.confirm_assignee, async (person) => {
           ticket ??= await readTicket(session, a.workspaceId, a.ticketId);
           return `Assigns ${ticket.key ?? a.ticketId} "${ticket.title}" to ${person.name} (${person.email}).`;
-        });
+        }, ticket?.ticketState.draft !== undefined);
         if ('preview' in resolved) return resolved.preview;
         return submitForAssignee(session, a.workspaceId, resolved.person, envelope(session, a.workspaceId, a.ticketId, 'ticket.assigned', { assigneeId: resolved.person.userId }));
       },

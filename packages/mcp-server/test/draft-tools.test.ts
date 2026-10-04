@@ -365,12 +365,14 @@ describe('28.141 the registry', () => {
   });
 });
 
+/** The people-lookup answers 28.146 and 28.147 share: a member and an outsider. */
+const ASHA = { userId: '01J0ASHA0000000000000000AA', name: 'Asha Rao', email: 'asha@example.com', inWorkspace: true };
+const RAVI = { userId: '01J0RAV10000000000000000AA', name: 'Ravi Menon', email: 'ravi@example.com', inWorkspace: false };
+const R8 = 'refused by draft.no-outsiders: Publish the ticket before inviting someone from outside';
+const GUEST = 'Ravi Menon is not in this workspace and WILL BE ADDED AS A GUEST. They will join this workspace as a guest and see only this ticket.';
+
 describe('28.146 create_ticket {draft} by email: an outsider is refused in the preview, in the server\'s words', () => {
-  const ASHA = { userId: '01J0ASHA0000000000000000AA', name: 'Asha Rao', email: 'asha@example.com', inWorkspace: true };
-  const RAVI = { userId: '01J0RAV10000000000000000AA', name: 'Ravi Menon', email: 'ravi@example.com', inWorkspace: false };
   const DIRECTORY = { workspaces: [{ workspaceId: WS, name: 'Corner Shop', prefix: 'CS', role: 'owner', archived: false, projects: [{ projectId: PRJ, name: 'Counter', description: null, prefix: 'CC', archived: false }] }] };
-  const R8 = 'refused by draft.no-outsiders: Publish the ticket before inviting someone from outside';
-  const GUEST = 'Ravi Menon is not in this workspace and WILL BE ADDED AS A GUEST. They will join this workspace as a guest and see only this ticket.';
   const call1 = async (person: typeof ASHA, extra: Record<string, unknown>) => {
     const f = fake({
       get: (path) => { if (path === '/v1/me/workspaces') return DIRECTORY; throw new Error(`unexpected GET ${path}`); },
@@ -423,5 +425,38 @@ describe('28.146 create_ticket {draft} by email: an outsider is refused in the p
     }
     expect(spelled).toEqual(['packages/domain/src/draft.ts']);
     expect(readFileSync(join(root, 'apps/server/src/routes/people.ts'), 'utf8')).toMatch(/DRAFT_NO_OUTSIDERS_REASON,\n[^]*from '@gisik-nokma\/domain'/); // CONTROL: the server reads it
+  });
+});
+
+describe('28.147 assign_ticket by email on an EXISTING draft: an outsider is refused in the preview, in the server\'s words', () => {
+  const call1 = async (person: typeof ASHA, draft: boolean) => {
+    const f = fake({
+      get: (path) => { if (path === `/v1/workspaces/${WS}/tickets/${ROOT}`) return detail({ draft }); throw new Error(`unexpected GET ${path}`); },
+      post: (path) => { if (path === `/v1/workspaces/${WS}/people-lookup`) return { user: person }; throw new Error(`unexpected POST ${path}`); },
+    });
+    const out = (await pick(writeTools(f.session), 'assign_ticket').handler({ workspaceId: WS, ticketId: ROOT, assignee_email: person.email })) as {
+      preview: boolean; wouldChange: string; joinsAsGuest: boolean;
+    };
+    expect(f.sent, 'call 1 assigns nobody').toEqual([]);
+    return out;
+  };
+
+  it('28.147 an existing draft for an outsider previews the R8 refusal, not a guest; a member and a published ticket are unchanged', async () => {
+    // (1) an existing draft + an outsider: the server's own refusal, word for word, and no promise of a guest. A draft has no key,
+    // so the preview names it by id.
+    const refused = await call1(RAVI, true);
+    expect(refused.wouldChange).toBe(`Assigns ${ROOT} "Count the crates" to Ravi Menon (ravi@example.com). ${R8}`);
+    expect(refused.wouldChange).not.toContain('WILL BE ADDED AS A GUEST');
+    expect(refused.joinsAsGuest).toBe(false);
+
+    // (2) CONTROL: the same draft + a member names the member and carries no R8 text.
+    const member = await call1(ASHA, true);
+    expect(member.wouldChange).toBe(`Assigns ${ROOT} "Count the crates" to Asha Rao (asha@example.com). Asha Rao is already in this workspace.`);
+    expect(member.joinsAsGuest).toBe(false);
+
+    // (3) CONTROL: a published ticket + an outsider is the guest preview MCP sweep 2 shipped, unchanged.
+    const guest = await call1(RAVI, false);
+    expect(guest.wouldChange).toBe(`Assigns K-1 "Count the crates" to Ravi Menon (ravi@example.com). ${GUEST}`);
+    expect(guest.joinsAsGuest).toBe(true);
   });
 });
