@@ -281,10 +281,8 @@ describe('27.150 the sheet scrolls to #comment-<id> once the thread arrives, onc
     expect(scroll).not.toHaveBeenCalled();
     cleanup();
 
-    // The comments answer BEFORE the ticket, so the thread is drawn after its read answered. On a lane
-    // port (2026-10-04) a fresh load at #comment-<id> never scrolled while the effect was keyed on
-    // `comments.data` (the element appeared 117 ms after the read); jsdom redraws in an order that
-    // scrolls either way, so this leg pins the ordering, and the live probe (HANDOFF) is the regression evidence.
+    // The comments answer BEFORE the ticket. This leg pins that ordering; jsdom redraws in an order that
+    // scrolls even with the effect keyed on `comments.data`, so the regression kill is the next `it`.
     window.location.hash = '#comment-c1';
     render(
       sheet(
@@ -297,6 +295,32 @@ describe('27.150 the sheet scrolls to #comment-<id> once the thread arrives, onc
     await screen.findByTestId('comment-c1');
     await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
     expect(scroll.mock.contexts[0]).toBe(document.getElementById('comment-c1'));
+  });
+});
+
+describe('27.150 the scroll does not wait for the thread read to change', () => {
+  afterEach(() => {
+    window.location.hash = '';
+    vi.restoreAllMocks();
+  });
+
+  it('27.150 a hash that names an ALREADY-drawn comment scrolls on the next render, with the thread read unchanged (lane port 2026-10-04: an effect keyed on comments.data never scrolled there)', async () => {
+    if (!('scrollIntoView' in Element.prototype)) {
+      Object.defineProperty(Element.prototype, 'scrollIntoView', { value: () => undefined, configurable: true, writable: true });
+    }
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => undefined);
+    const getTicketComments = vi.fn(async () => [comment('c1')]);
+    const source = createFakeDataSource({ getTicket: async () => MINIMAL_READ, getTicketComments });
+    const { rerender } = render(sheet(source));
+    await screen.findByTestId('comment-c1');
+    expect(scroll).not.toHaveBeenCalled();
+    window.location.hash = '#comment-c1';
+    // A re-render with the SAME source (`sheet()` passes a new onClose): the thread's data keeps its identity.
+    rerender(sheet(source));
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById('comment-c1'));
+    // Control, same it: the thread was read ONCE, so no refetch is what scrolled it.
+    expect(getTicketComments).toHaveBeenCalledTimes(1);
   });
 });
 
