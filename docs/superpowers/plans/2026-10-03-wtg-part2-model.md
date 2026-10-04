@@ -329,7 +329,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
     ## 29.2 Part 2: the model
 
-    Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`. Ids by task: the Global Constraints "Catalogue" line. `29.171`-`29.179` stay free.
+    Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`. Ids by task: the Global Constraints "Catalogue" line. `29.171`-`29.179` stay free. Ids follow this per-task split, not the sub-block subjects in the table above (planner ruling 2026-10-04, Q1).
 
     <!-- wtg-part2-model T1 -->
     ```
@@ -355,6 +355,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   `apps/server/test/tools/wtg-preflight.test.ts` (copy `apps/server/test/tools/sweep-orphans.test.ts`'s `createTestDatabase` lifecycle and `apps/server/test/search/preflight.test.ts`'s one-database-per-file shape):
   ```ts
+  import { readFileSync } from 'node:fs';
+  import { fileURLToPath } from 'node:url';
   import { afterAll, beforeAll, describe, expect, it } from 'vitest';
   import { newUlid } from '@gisik-nokma/domain';
   import {
@@ -418,6 +420,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       await projectRaw(superseded, fixed);
       await defineRaw(clean, def('task', { fields: [num('estimates'), num('Estimate'), num('rework')] }));
       await projectRaw(clean, def('task', { fields: [num('estimates'), num('Estimate'), num('rework')] }));
+      await claimRaw(clean, 'Estimate'); // the claim source gets its own near miss, so a case-folding claims query is caught too
 
       const { shadows } = await wtgPreflight(db.pool);
       expect(shadows).toContainEqual({ source: 'ledger-definition', workspaceId: dirty, typeId: 'invoice', fieldId: 'estimate', eventId });
@@ -436,12 +439,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     it('29.148 reports rank, workflow and the task workflow per workspace; a workspace without one is absent', async () => {
       const a = newUlid(); const b = newUlid(); const c = newUlid();
       await projectRaw(a, def('task', { workflowId: 'wf-a' }));
-      await projectRaw(a, def('decision', { rank: 3, workflowId: 'wf-a' }));
+      await projectRaw(a, def('decision', { name: 'Decision', rank: 3, workflowId: 'wf-a' })); // name differs from the id, so `name` is read from the name column
       await projectRaw(b, def('task', { workflowId: 'wf-b1' }));
       await projectRaw(b, def('decision', { rank: 5, workflowId: 'wf-b2' }));
       await projectRaw(c, def('task'));
       const { decisionTypes } = await wtgPreflight(db.pool);
-      expect(decisionTypes).toContainEqual({ workspaceId: a, name: 'decision', rank: 3, workflowId: 'wf-a', taskWorkflowId: 'wf-a', rankMatchesSeed: true, sameWorkflowAsTask: true });
+      expect(decisionTypes).toContainEqual({ workspaceId: a, name: 'Decision', rank: 3, workflowId: 'wf-a', taskWorkflowId: 'wf-a', rankMatchesSeed: true, sameWorkflowAsTask: true });
       expect(decisionTypes).toContainEqual({ workspaceId: b, name: 'decision', rank: 5, workflowId: 'wf-b2', taskWorkflowId: 'wf-b1', rankMatchesSeed: false, sameWorkflowAsTask: false });
       expect(decisionTypes.some((d) => d.workspaceId === c)).toBe(false);
     });
@@ -469,17 +472,40 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       const clean: WtgPreflightReport = { database: 'x', workspaces: 3, shadows: [], decisionTypes: [], terminalInitialWorkflows: [] };
       expect(wtgPreflightExitCode(clean)).toBe(0);
       expect(formatWtgPreflight(clean)).toContain('shadowing custom fields: none');
-      const warn = { ...clean, decisionTypes: [{ workspaceId: 'W2', name: 'Decision', rank: 5, workflowId: 'wf', taskWorkflowId: 'wf', rankMatchesSeed: false, sameWorkflowAsTask: true }] };
-      expect(wtgPreflightExitCode(warn)).toBe(0);
+      const warn = {
+        ...clean,
+        decisionTypes: [{ workspaceId: 'W2', name: 'Decision', rank: 5, workflowId: 'wf', taskWorkflowId: 'wf', rankMatchesSeed: false, sameWorkflowAsTask: true }],
+        terminalInitialWorkflows: [{ workspaceId: 'W3', workflowId: 'wf-shipped', version: 2, initialStateId: 'shipped', boundTypes: 1 }],
+      };
+      expect(wtgPreflightExitCode(warn)).toBe(0); // both warning kinds present, still 0
       expect(formatWtgPreflight(warn)).toContain('W2');
-      const blocked = { ...clean, shadows: [{ source: 'field-claim' as const, workspaceId: 'W1', fieldId: 'estimate', claims: 2 }] };
+      expect(formatWtgPreflight(warn)).toMatch(/W3 workflow wf-shipped v2/); // a terminal-initial finding is printed too
+      const blocked = {
+        ...clean,
+        shadows: [
+          { source: 'field-claim' as const, workspaceId: 'W1', fieldId: 'estimate', claims: 2 },
+          { source: 'ledger-definition' as const, workspaceId: 'W4', typeId: 'invoice', fieldId: 'waitForAll', eventId: 'EV1' },
+        ],
+      };
       expect(wtgPreflightExitCode(blocked)).toBe(1);
       expect(formatWtgPreflight(blocked)).toMatch(/field-claim\s+W1.*estimate/);
+      expect(formatWtgPreflight(blocked)).toMatch(/ledger-definition\s+W4 type invoice field waitForAll \(event EV1\)/); // the event id the owner needs
       await expect(inReadOnlyTransaction(db.pool, (tx) => tx.query(`INSERT INTO proj_workspaces (workspace_id) VALUES ('w-ro')`))).rejects.toThrow(/read-only transaction/);
       await db.pool.query(`INSERT INTO proj_workspaces (workspace_id) VALUES ($1)`, [newUlid()]); // control
+      // The CLI's own wiring (planner ruling 2026-10-04, Q2): a spawned CLI cannot observe read-only-ness, so the
+      // source is read. Control: the same pattern does not match the direct call a broken main() would make.
+      const wiring = /inReadOnlyTransaction\(pool, wtgPreflight\)/;
+      const cli = readFileSync(fileURLToPath(new URL('../../src/tools/wtg-preflight.ts', import.meta.url)), 'utf8');
+      expect(cli.slice(cli.indexOf('async function main'))).toMatch(wiring);
+      expect('const report = await wtgPreflight(pool);').not.toMatch(wiring); // control
     });
   });
   ```
+  **Kills:**
+  - 29.147 shadow detector: (a) delete the `ledger` query and its `...ledger.rows.map` (the `dirty` and `superseded` ledger-definition legs); (b) delete the `claims` query (the `claims: 1` leg); (c) `lower(f->>'id') = ANY(...)` / `lower(e.payload->>'fieldId') = ANY(...)` in place of the exact match (the `clean` workspace's `'Estimate'` field and claim are reported).
+  - 29.148 decision types: (a) `rankMatchesSeed: true` (the rank-5 row); (b) `sameWorkflowAsTask: true` (the `wf-b2` row); (c) `t.type_id AS name` in place of `t.name` (the `'Decision'` row).
+  - 29.149 terminal-initial workflows: (a) drop the `w.version = (SELECT max(...))` clause (`fixed` v1 is listed); (b) drop the `EXISTS (... 'terminal')` clause (`open` is listed); (c) drop `AND t.workflow_id = w.workflow_id` from `bound_types` (`broke` reads 1).
+  - 29.151 report and exit code: (a) `report.shadows.length + report.decisionTypes.length + report.terminalInitialWorkflows.length > 0` in `wtgPreflightExitCode` (`warn` exits 1); (b) delete the `terminalInitialWorkflows` `for` line in `formatWtgPreflight` (no `W3` line); (c) drop the `(event ...)` suffix (the `EV1` leg); (d) `'BEGIN'` in place of `'BEGIN READ ONLY'` (the INSERT inside succeeds); (e) `main` calls `wtgPreflight(pool)` directly, outside `inReadOnlyTransaction` (the source-text leg).
   Run (LOCAL, build first): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t1-red -- pnpm --filter @gisik-nokma/server exec vitest run test/tools/wtg-preflight.test.ts --maxWorkers=2 > /tmp/wtg2-t1-red.log 2>&1; tail -30 /tmp/wtg2-t1-red.log`. Expected: FAIL, `Cannot find module '../../src/tools/wtg-preflight.js'`.
 
   Commit: `wtg2 T1: red tests for the pre-flight detectors`.
@@ -670,10 +696,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
       const found = scanTerminalReaders(ROOT, SCAN_DIRS);
       expect([...found.keys()].sort()).toEqual(Object.keys(TERMINAL_READERS).sort());
-      expect(Object.values(TERMINAL_READERS).every((c) => ['definition', 'invariant', 'done-meaning'].includes(c))).toBe(true);
+      // The `Reader` type already restricts the values, so a membership check could not fail; pin instead that every class is in
+      // use (T17 reads the done-meaning class as its work list, and an all-'invariant' registry would hand it nothing).
+      expect(new Set(Object.values(TERMINAL_READERS))).toEqual(new Set(['definition', 'invariant', 'done-meaning']));
     });
   });
   ```
+  **Kills:**
+  - 29.150 the census: (a) delete the `if (text.startsWith('//') || ...) return;` line (`src/docblock.ts` is listed); (b) drop `|\.test\.` from `SKIP` (`src/planted.test.ts` is listed); (c) drop the `['"]terminal['"]` alternative from `PATTERN` (`src/planted.ts` is not found, and the ROOT scan loses files the registry lists).
   Run (LOCAL): `... vitest run test/census/terminal-category-readers.test.ts` with label `wtg2-t1-census`. Expected: FAIL; the diff lists the files the scan found (38 at `ec72d1f8`; they are the keys below). Then fill `TERMINAL_READERS` with exactly these (the classes are this task's reading; each file's lines at plan time are in Step 6's table):
   ```ts
   export const TERMINAL_READERS: Record<string, Reader> = {
@@ -745,6 +775,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   `- ⚙️ **Part 2 pre-flight** (wtg2 T1; `apps/server/src/tools/wtg-preflight.ts`, `pnpm --filter @gisik-nokma/server run wtg:preflight`) — a READ ONLY report of custom fields that would shadow the new built-ins (ledger events, type rows, claims), existing `decision` types, workflows whose initial state is terminal; exit 1 on a shadow. A source-walking census (`apps/server/test/census/terminal-category-readers.test.ts`) classifies every reader of the terminal category. Cases 29.147-29.152.`
   Checks: `node scripts/check-case-ids.mjs`, `pnpm check:citations`, `pnpm check:tasks`; server `test/tools test/census` suites (LOCAL).
 
+  **Prose to sweep:**
+  - None for the case file's sub-block table (`test-cases/29-workflow-timeline-graphs.md:11-14`): it allocates blocks by Part, and its Plan column names this plan for every Part 2 row; the per-task split below this plan's own anchor is what binds (`:3`, `:62` "Never write below another Part's anchor"). (planner ruling 2026-10-04, Q1)
+
   Commit: `wtg2 T1: Features bullet`.
 
 - [ ] **Step 8: THE RECORDED OWNER STEP (case 29.152)**
@@ -754,6 +787,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   > `DATABASE_URL='<the prod connection string from the DigitalOcean database page>' DATABASE_CA_CERT="$(cat <the cluster CA pem>)" pnpm --filter @gisik-nokma/server run wtg:preflight`
   > It opens one READ ONLY transaction and rolls it back. Paste the full output below. **Go for T4:** `shadowing custom fields: none`. **Stop and ask:** any `ledger-definition` line (a rename cannot repair an old event; T4 would need a tolerant legacy parse) or `field-claim` line (existing values would be reread as the new built-in). `decision` and terminal-initial lines are information for T7 and the planner.
 
+  **Kills:**
+  - 29.152 owner prod run: none, a recorded 🧪 run, not a test (it reads the prod ledger with the script that 29.147-29.151 already pin; its control is the Step 6 dev run).
+
   Flip 29.152 to 🧪 only when the output is pasted. Push. DONE + REVIEW (NEEDS: nothing; the dev-run output, the Step 1 tip/stamp result, and the owner block above in the HANDOFF).
 
 **Mutations:** 29.147 scan only `proj_ticket_types` → superseded, claim assertions red. 29.148 drop `rankMatchesSeed` comparison → the rank-5 row reads true. 29.149 drop the `max(version)` clause → `fixed` appears. 29.150 drop the comment filter → `docblock.ts` appears in the control. 29.151 drop `BEGIN READ ONLY` → the INSERT inside succeeds.
@@ -762,12 +798,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 2: `leads_to` and its label: events, engine rules, permission, projection, History, redaction (cases 29.120-29.127)
 
-**Branch:** `task/wtg2-leads-to` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** typed-links T1-T4 merged (T2-T4 are plan text only on the knowledge-graph tip: this task is written as the DELTA on their shapes, cited as "typed-links T<n> `symbol`"); the Drafts task that adds the `from` member to both link payloads (R42-R44; no Drafts plan file exists at drafting time, so re-read the merged `ticket-events.ts` and `checks/links.ts` first and keep every Drafts line).
+**Branch:** `task/wtg2-leads-to` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** typed-links T1-T4 merged (T2-T4 are plan text only on the knowledge-graph tip: this task is written as the DELTA on their shapes, cited as "typed-links T<n> `symbol`"); the Drafts task that adds the `from` member to both link payloads (R42-R44; no Drafts plan file exists at drafting time, so re-read the merged `ticket-events.ts` and `checks/links.ts` first and keep every Drafts line). **Needs Drafts T6, with `refileEvent` carrying `label`** (planner ruling 2026-10-04, Q3: the Drafts plan's `refileEvent` / `IncomingLink` file `{kind, targetId}` only, which would re-file a Decision's labelled branch without its label and refuse the publish `link.label-required`; the fix is routed to the Drafts plan, and the 29.126 publish leg below fails until it lands).
 
 **Files:**
 - Create: `packages/domain/src/link-label.ts`; `packages/domain/test/link-label.test.ts`; `apps/server/migrations/1792100000000_proj-ticket-links-leads-to.sql` (re-check it still sorts after the highest applied migration; `pnpm check:migrations`); `packages/rule-engine/test/links-leads-to.test.ts` (copy typed-links T3 `test/links.test.ts` helpers); `apps/server/test/permissions/check-leads-to-permission.test.ts` (copy typed-links T3 `check-link-permission.test.ts`); `packages/app-core/test/precheck-leads-to.test.ts` (copy typed-links T3 `precheck-links.test.ts`); `apps/server/test/projections/ticket-links-leads-to.test.ts` (copy typed-links T2 `ticket-links.test.ts` setup).
-- Modify: `packages/domain/src/index.ts:19` (export `link-label.js` beside `display-name.js`); `packages/domain/src/events/ticket-events.ts:216-232` (kind list, payload, imports `:1-4`); `packages/domain/src/ticket-types.ts:123` (`DECISION_TYPE_ID`); `packages/domain/src/entity-state.ts:129` (`TicketLink`); `packages/domain/src/ticket-state.ts:463-468` (add arm); `packages/rule-engine/src/checks/refusals.ts` (two keys + builder, beside typed-links T3's `link.*`); `packages/rule-engine/src/checks/links.ts` (typed-links T3 `checkTicketLink`); `apps/server/src/projections/ticket-links.ts` (typed-links T2); `apps/server/src/read/ticket-links.ts`, `apps/server/src/routes/ticket-history.ts` (typed-links T4); `packages/app-core/src/view-types.ts`, `online/mappers.ts` (`mapTicketState`, `mapTicketLinks`), `replica/replica-data-source.ts` (`getTicketLinks`) (typed-links T4); `packages/app-core/src/views/history-copy.ts:226-235`; `packages/mcp-server/src/tools/ticket-tools.ts:41-44` (`redactedPayload`) and typed-links T4's `link_tickets`; `packages/mcp-server/src/tools/read-tools.ts` (typed-links T4's `get_ticket.links` map); `apps/mobile/src/editor/editor-html.generated.ts` (regenerated).
-- Tests extended: `packages/domain/test/ticket-link-events.test.ts:92-105` (27.008 pins three readings rows with `toEqual`: it goes red on purpose, edited in Step 2); `apps/server/test/census/ticket-vocabulary-census.test.ts`; `packages/app-core/test/views/history-copy.test.ts` (27.005 block); `packages/mcp-server/test/redacted-payload.test.ts` (27.006).
+- Modify: `packages/domain/src/index.ts:19` (export `link-label.js` beside `display-name.js`); `packages/domain/src/events/ticket-events.ts:216-232` (kind list, payload, imports `:1-4`); `packages/domain/src/ticket-types.ts:123` (`DECISION_TYPE_ID`); `packages/domain/src/entity-state.ts:130` (`TicketLink`); `packages/domain/src/ticket-state.ts:463-468` (add arm); `packages/rule-engine/src/checks/refusals.ts` (two keys + builder, beside typed-links T3's `link.*`); `packages/rule-engine/src/checks/links.ts` (typed-links T3 `checkTicketLink`); `apps/server/src/projections/ticket-links.ts` (typed-links T2); `apps/server/src/read/ticket-links.ts`, `apps/server/src/routes/ticket-history.ts` (typed-links T4); `packages/app-core/src/view-types.ts`, `online/mappers.ts` (`mapTicketState`, `mapTicketLinks`), `replica/replica-data-source.ts` (`getTicketLinks`) (typed-links T4); `packages/app-core/src/views/history-copy.ts:226-235`; `packages/mcp-server/src/tools/ticket-tools.ts:41-44` (`redactedPayload`) and typed-links T4's `link_tickets`; `packages/mcp-server/src/tools/read-tools.ts` (typed-links T4's `get_ticket.links` map); `apps/mobile/src/editor/editor-html.generated.ts` (regenerated).
+- Tests extended: `packages/domain/test/ticket-link-events.test.ts:112-125` (27.008 pins three readings rows with `toEqual`: it goes red on purpose, edited in Step 2); `apps/server/test/census/ticket-vocabulary-census.test.ts`; `packages/app-core/test/views/history-copy.test.ts` (27.005 block); `packages/mcp-server/test/redacted-payload.test.ts` (27.006).
 
 **Interfaces:**
 - Consumes: typed-links T1 `TICKET_LINK_KINDS`, `linkReading`, `TicketLink`, `payloadIds`, `redactedPayload`; T2 `proj_ticket_links`; T3 `checkTicketLink`, `REFUSALS`, `linkExistsRefusal`; T4 `TicketLinkWire`, `TicketLinkView`; Drafts' optional `from` on both payloads.
@@ -823,10 +859,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect([linkReading('leads_to', 'out'), linkReading('leads_to', 'in')]).toEqual(['leads to', 'comes after']);
       // through the door
       const { serverTime: _s, seq: _q, ...sub } = makeEnvelope({ type: 'ticket.link_added', entity: { kind: 'ticket', id: newUlid() }, payload: { kind: 'blocks', targetId: TARGET, label: 'Yes' } });
+      expect(parseEvent({ ...sub, payload: { kind: 'leads_to', targetId: TARGET, label: 'Yes' } }).ok).toBe(true); // control: the door is not refusing the envelope itself
       expect(parseEvent(sub).ok).toBe(false);
     });
   });
   ```
+  **Kills:**
+  - 29.120 label only on leads_to: (a) drop the kind `.refine(...)` on `ticketLinkAddedPayload` (the `blocks` + label legs, schema and door, parse); (b) drop `.max(LINK_LABEL_MAX)` (the 61-character leg); (c) drop the blank `.refine` in `linkLabelSchema` (the `'   '` leg); (d) `label.toLocaleLowerCase('en')` without `.trim()` in `normaliseLinkLabel` (the `' Yes '` leg); (e) `'leads_to'` missing from `TICKET_LINK_KINDS` (the kinds leg and every leads_to parse).
   29.121 in the same file, folding with the `ticket-link-events.test.ts` fixtures (`born`, `deps`):
   ```ts
   it('29.121 the fold keeps the label on leads_to only, adds idempotently, relabels by remove+add', () => {
@@ -840,6 +879,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(applyTicketEvent(born, link('ticket.link_added', 'blocks', TARGET), deps).links).toEqual([{ kind: 'blocks', targetId: TARGET }]); // control
   });
   ```
+  **Kills:**
+  - 29.121 the fold keeps the label: (a) the add arm without the label spread (`{ kind: p.kind, targetId: p.targetId }` as today: the `'Yes'` and `'Maybe'` legs); (b) `label: p.label ?? null` (or `label: p.label`, an undefined key) in the add arm (the `'label' in` leg and the `blocks` control); (c) also compare `l.label === p.label` in the idempotence `some(...)` (the second add appends, `toBe(a)` fails).
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t2-domain -- pnpm --filter @gisik-nokma/domain exec vitest run test/link-label.test.ts --maxWorkers=2 > /tmp/wtg2-t2-domain.log 2>&1; tail -30 /tmp/wtg2-t2-domain.log`. Expected: FAIL (`normaliseLinkLabel` is not exported).
   Commit: `wtg2 T2: case lines 29.120-29.127 and the RED domain tests`.
 
@@ -878,7 +919,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     .refine((p) => p.label === undefined || p.kind === 'leads_to', { message: 'a label belongs to a leads_to link only', path: ['label'] });
   ```
   `ticketLinkRemovedPayload` is untouched (it picks up the fourth kind from the enum).
-  `entity-state.ts:129`: `export type TicketLink = { kind: TicketLinkKind; targetId: string; label?: string /* + Drafts' from */ };` with the docblock line "`label`: a `leads_to` branch name, ABSENT when none".
+  `entity-state.ts:130`: `export type TicketLink = { kind: TicketLinkKind; targetId: string; label?: string /* + Drafts' from */ };` with the docblock line "`label`: a `leads_to` branch name, ABSENT when none".
   `ticket-state.ts:463-468`: the add arm pushes the label only when present (keep the Drafts `from` spread if the arm has one):
   ```ts
       return {
@@ -886,7 +927,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
         links: [...links, { kind: p.kind, targetId: p.targetId, ...(p.label === undefined ? {} : { label: p.label }) }],
       };
   ```
-  `ticket-link-events.test.ts` 27.008 (`:92-105`): add `['leads_to', 'leads to', 'comes after']` to the expected rows and say in the commit that 27.008 is edited on purpose.
+  `ticket-link-events.test.ts` 27.008 (`:112-125`): add `['leads_to', 'leads to', 'comes after']` to the expected rows and say in the commit that 27.008 is edited on purpose.
 
   Run the domain suite WHOLE (`pnpm --filter @gisik-nokma/domain build && … exec vitest run --maxWorkers=2`). Expected: PASS 29.120, 29.121, 27.001-27.008. Flip 29.120, 29.121 ✅.
   Commit: `wtg2 T2: leads_to, the label, DECISION_TYPE_ID and the fold`.
@@ -938,9 +979,15 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await evaluateEvent(lead(D, B, 'Yes'), afterRemove)).toEqual(ok);
     expect(await evaluateEvent(lead(D, B, 'no'), afterRemove)).toMatchObject({ rule: 'link.label-duplicate' });
     expect(await evaluateEvent(lead(D, B, 'Maybe'), two)).toMatchObject({ rule: 'link.duplicate' }); // control: no removal first
+    // the pair is judged BEFORE the label: 'No' is also the sibling C's label, so a label block placed first answers label-duplicate
+    expect(await evaluateEvent(lead(D, B, 'No'), two)).toMatchObject({ rule: 'link.duplicate' });
   });
   ```
-  Add a third `it` for the draft form after reading the Drafts R42 shape in the merged code: an event on the draft X's stream `{kind:'leads_to', targetId: X, from: D}` (X made the way the Drafts task's engine tests make a draft) is refused `link.label-required` without a label and accepted with one, and the same from a Task source is accepted unlabeled.
+  Add a third `it` for the draft form after reading the Drafts R42 shape in the merged code: an event on the draft X's stream `{kind:'leads_to', targetId: X, from: D}` (X made the way the Drafts task's engine tests make a draft) is refused `link.label-required` without a label and accepted with one, and the same from a Task source is accepted unlabeled. In the same `it`, with `D -> B` labelled `'Yes'` stored (plain), the from-form with `label: ' yes '` is refused `link.label-duplicate` (the clash is read from `pairSource`'s links, not from the draft X's). Also in the same `it` (planner ruling 2026-10-04, Q3): a draft Decision DD whose own list holds an INCOMING from-entry `{kind:'leads_to', targetId: DD, from: S, label: 'Yes'}` (S a published Task) files a plain `leads_to` DD -> B with `label: 'Yes'`: accepted (the incoming entry is not DD's branch); control: with a plain DD -> C `'Yes'` stored, the same event is refused `link.label-duplicate`.
+  **Kills:**
+  - 29.122 loops and label-free links: (a) remove the `kind !== 'leads_to' &&` guard on the reverse branch (the two-ticket loop is refused `link.reverse`); (b) drop `pairSource.typeId === DECISION_TYPE_ID` so every `leads_to` source needs a label (the label-free A -> B leg); (c) `leads_to: { out: 'leads_to', … }` in `READINGS` (the `link.duplicate` reason). The self leg and the `blocks` control guard typed-links T3 behaviour (`link.self`, the reverse branch).
+  - 29.123 Decision labels: (a) `l.label === parsed.data.label` in `clash` (no `normaliseLinkLabel`: `' yes '` is accepted); (b) move the clash test out of the `typeId === DECISION_TYPE_ID` block (the Task repeating `'Yes'` is refused); (c) put the label block before the same-pair duplicate check (the `'No'` on `two` leg answers `link.label-duplicate`); (d) `labelDuplicateRefusal` without `.trim()` (the reason reads `" yes "`).
+  - 29.123 draft form (third `it`): (a) judge on `source` (the draft X) instead of `pairSource` (the unlabelled from-form is accepted); (b) read `clash` from X's links (the `' yes '` from-form is accepted); (c) drop `l.from === undefined` from `clash` (DD's incoming `'Yes'` refuses DD -> B `link.label-duplicate`).
 
   Run: `slot-run.sh wtg2-t2-engine -- pnpm --filter @gisik-nokma/rule-engine exec vitest run test/links-leads-to.test.ts --maxWorkers=2 > /tmp/wtg2-t2-engine.log 2>&1; tail -40 /tmp/wtg2-t2-engine.log`. Expected: FAIL (the loop is refused `link.reverse`; no label rule).
 
@@ -968,20 +1015,30 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       if (pairSource.typeId === DECISION_TYPE_ID) {
         if (parsed.data.label === undefined) return refuse('link.label-required');
         const wanted = normaliseLinkLabel(parsed.data.label);
-        const clash = (pairSource.links ?? []).some((l) => l.kind === 'leads_to' && l.label !== undefined && normaliseLinkLabel(l.label) === wanted);
+        // Only the source's OWN outgoing entries (no `from`): a `from` entry on a draft Decision's list is a link INTO it
+        // (planner ruling 2026-10-04, Q3; LK-3.3 "its outgoing labels"). Other drafts' private branches are not read here
+        // (D-7): a duplicate among them is refused at publish, when the re-file runs through this check.
+        const clash = (pairSource.links ?? []).some((l) => l.from === undefined && l.kind === 'leads_to' && l.label !== undefined && normaliseLinkLabel(l.label) === wanted);
         if (clash) return refuse('link.label-duplicate', labelDuplicateRefusal(parsed.data.label));
       }
     }
     return ACCEPT;
   ```
-  If the Drafts task already resolves the pair's source into a variable, use it instead of `pairSource` and delete the `from` line. Order matters: `link.duplicate` (same ordered pair) is judged before the label rules, as the test pins.
+  **Placement after Drafts T6 (planner ruling 2026-10-04, Q4).** The block above is written against typed-links T3's single path; Drafts T6 replaces that path with `pairVerdict` plus `checkFromForm`. On the merged code:
+  - the reverse-guard exemption goes inside `pairVerdict`'s `stored(target, source, kind)` branch: `if (kind !== 'leads_to' && stored(target, source, kind))` (LK-3.2);
+  - the label rules move into one shared helper, `labelVerdict(source: TicketState, label: string | undefined): Accept | Refusal` (the `typeId === DECISION_TYPE_ID` block above, reading `source.links`), and run ONLY after `pairVerdict` returns ACCEPT, on both paths: in `checkTicketLink`, `const v = pairVerdict(entity, target, kind); return v !== ACCEPT || kind !== 'leads_to' ? v : labelVerdict(entity, parsed.data.label);` and in `checkFromForm` the same with `source` (the real source, not the draft);
+  - the `pairSource` / `from` lines above are then deleted (`checkFromForm` already resolves the source).
+  Order matters: `link.duplicate` (same ordered pair) is judged before the label rules, as the test pins.
   Run the rule-engine suite WHOLE. Expected: PASS 29.122, 29.123 and typed-links 27.035-27.042; `engine.test.ts:671-702` unchanged (dotted ids are `REFUSALS` keys, not `REFUSAL_RULES`). Flip ✅.
   Commit: `wtg2 T2: leads_to engine rules (loops allowed, Decision labels)`.
 
 - [ ] **Step 4: Permission and precheck (29.124)**
 
   `check-leads-to-permission.test.ts`: the typed-links T3 world (`buildReadTestApp`; member sees `taskInEpicId` and `sharedTaskId`, not `hiddenTaskId`); one `it` files `{kind:'leads_to', targetId: hidden, label:'Yes'}` as the member and expects `permission.visibility` with `'The other ticket does not exist in this workspace, or you cannot see it.'`; control: target `sharedTaskId` returns `null`. No production change: the gate keys on event type and `targetId`, not kind (typed-links T3 `check-permission.ts` arm).
-  `precheck-leads-to.test.ts`: seed a cache with a Decision (`ticketStateSeed({ id: D, typeId: 'decision', … })`) and a Task; `precheckEvent(lead(D, B), cache)` is `{ kind: 'refused', rule: 'link.label-required', reason: <the literal sentence> }`; with `label: 'Yes'` it is `{ kind: 'passed' }`. No production change either: typed-links T3 routes link events to the shared engine.
+  `precheck-leads-to.test.ts`: seed a cache with a Decision (`ticketStateSeed({ id: D, typeId: 'decision', … })`) and a Task; `precheckEvent(lead(D, B), cache)` is `{ kind: 'refused', rule: 'link.label-required', reason: <the literal sentence> }`; with `label: 'Yes'` it is `{ kind: 'passed' }`. No production change either: typed-links T3 routes link events to the shared engine. (`B` is the seeded Task: an uncached target answers `not-evaluated` before the engine runs, which would make the refusal leg unreachable.)
+  **Kills:**
+  - 29.124 gate: none, guards existing behaviour (typed-links T3's `check-permission.ts` link arm keys on the event type and `targetId`, not the kind; its own mutant "skip `canSee` for `leads_to`" is a mutant of that arm).
+  - 29.124 precheck: (a) delete `if (parsed.data.label === undefined) return refuse('link.label-required');` (the precheck passes the unlabelled Decision link); (b) any edit of the `'link.label-required'` sentence in `REFUSALS` (the word-for-word reason).
   Run both files. Expected: PASS (they pass at once; they are regression pins, so prove them with the mutation in the table). Flip 29.124 ✅.
   Commit: `wtg2 T2: pin the gate and the precheck for leads_to`.
 
@@ -1024,12 +1081,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       [f.WS, f.TE, f.TP, kind, label, f.ids.owner]);
     await expect(insert('parent', null)).rejects.toMatchObject({ code: '23514' });
     await expect(insert('blocks', 'Yes')).rejects.toMatchObject({ code: '23514' });
-    await expect(insert('leads_to', 'Yes')).resolves.toBeDefined();
+    await expect(insert('leads_to', 'Yes')).resolves.toMatchObject({ rowCount: 1 }); // control: the two CHECKs admit a labelled leads_to
     await db.pool.query("DELETE FROM proj_ticket_links WHERE source_id = $1 AND target_id = $2 AND label = 'Yes'", [f.TE, f.TP]); // a hand-made row has no ledger event
     const verdict = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() });
     expect(verdict.clean, JSON.stringify(verdict.diffs)).toBe(true);
   });
   ```
+  **Kills:**
+  - 29.125 the projection: (a) `null` in place of `label ?? null` in the INSERT values (the first leg reads `['leads_to', null]`, the relabel leg `null`); (b) delete the `proj_ticket_links_label_check` ADD (the `('blocks', 'Yes')` insert resolves); (c) delete the re-ADD of `proj_ticket_links_kind_check` (the `'parent'` insert resolves, and `def` is undefined); (d) the fold's add arm without the label spread (the `getTicketStateFromDb` leg). The `verifyProjections` leg guards existing behaviour (live and rebuild share one projection).
   Run with `pnpm check:migrations` and the server `test/projections` folder. Expected: PASS. Flip 29.125 ✅.
   Commit: `wtg2 T2: proj_ticket_links takes leads_to and a label`.
 
@@ -1047,7 +1106,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - `history-copy.test.ts`, inside the 27.005 describe: `describe('29.126 …')` with `linkEvent` extended by a `label` member: `expect(describeEvent(…('ticket.link_added','leads_to',{key:'GN-147'},'Yes'))).toBe('Linked: leads to GN-147 (Yes)')`; withheld `"Linked: leads to a ticket you can't see (Yes)"`; no label `'Linked: leads to GN-147'`; census loop `for (const kind of TICKET_LINK_KINDS) expect(describeEvent(linkEvent('ticket.link_added', kind, { key: 'GN-1' }))).not.toBe('ticket.link_added')` (29.127).
   - `redacted-payload.test.ts`: `redactedPayload('ticket.link_added','e1',{ kind:'leads_to', targetId:null, label:'Yes' })` equals `{ kind:'leads_to', target:"a ticket you can't see", label:'Yes' }` (29.126); census loop over every kind (29.127); in `ticket-tools.test.ts` a `link_tickets` call with `kind: 'leads_to'` rejects at the input schema before anything is sent (29.126).
   - `apps/server/test/routes/ticket-links.test.ts` (typed-links T4): a `leads_to` row with label `Yes` appears on `GET …/links` with `label: 'Yes'` in both directions and a label-free row has no `label` key; the History route's hidden-target event keeps `payload.label`. Replica/mapper cases: extend typed-links 27.061 and 27.063 with a labelled link (`mapTicketLinks` keeps it; `getTicketLinks` returns it for `out` and `in`). All named 29.126.
-  - Ruling B, same file (`ticket-links.test.ts`), ONE `it('29.126 a stranger never sees a leads_to edge to someone else\'s draft; the author does')` (Drafts' draft helpers, as Drafts 28.117 builds them): published S, the member's draft D, a from-form `{kind:'leads_to', targetId: D, from: S, label: 'Yes'}` on D's stream. As another member AND as the owner: `GET …/tickets/S/links` has no row naming D and its length equals the length read before the link was filed; `GET …/tickets/S` `ticketState.links` has no entry naming D; `GET …/tickets/S/history` has no event naming D or `Yes`, same length as before. CONTROL in the same `it()`: the author's `GET …/tickets/D/links` lists S as `in` with `label: 'Yes'`. Then publish D: the owner's S read lists D as `out` with `label: 'Yes'` (the R44 re-file).
+  - Ruling B, same file (`ticket-links.test.ts`), ONE `it('29.126 a stranger never sees a leads_to edge to someone else\'s draft; the author does')` (Drafts' draft helpers, as Drafts 28.117 builds them): published S, the member's draft D, a from-form `{kind:'leads_to', targetId: D, from: S, label: 'Yes'}` on D's stream. As another member AND as the owner: `GET …/tickets/S/links` has no row naming D and its length equals the length read before the link was filed; `GET …/tickets/S` `ticketState.links` has no entry naming D; `GET …/tickets/S/history` has no event naming D or `Yes`, same length as before. CONTROL in the same `it()`: the author's `GET …/tickets/D/links` lists S as `in` with `label: 'Yes'`. Then publish D: the owner's S read lists D as `out` with `label: 'Yes'` (the R44 re-file). A Decision's branch to a draft (planner ruling 2026-10-04, Q3), same `it`: published Decision P, the member's draft D2, from-form `{kind:'leads_to', targetId: D2, from: P, label: 'Yes'}`; publish D2 succeeds and `GET …/tickets/P/links` lists D2 as `out` with `label: 'Yes'` (a re-file without `label` is refused `link.label-required` and the publish with it). And a duplicate made while private: draft D3 with the from-form `P -> D3` `'No'`, then a plain `P -> Y` `'No'` to a published Y is ACCEPTED (D3's entry is private, D-7); publishing D3 is refused `draft.link-refile-refused` and D3 stays a draft (control: P's links are unchanged, Y still `'No'`).
   - Census, `ticket-vocabulary-census.test.ts` (append inside the 27.004 file, new `describe('29.127 …')`):
     ```ts
     it('29.127 payloadIds names only the target of a labelled link; every kind reads both ways', () => {
@@ -1058,6 +1117,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       for (const kind of TICKET_LINK_KINDS) for (const dir of ['out', 'in'] as const) expect(linkReading(kind, dir).length).toBeGreaterThan(0);
     });
     ```
+    **Kills:**
+    - 29.126 the label everywhere: (a) drop the `label` suffix in `history-copy.ts` (`'Linked: leads to GN-147 (Yes)'` reads without `(Yes)`); (b) append ` (${label})` unconditionally (the no-label leg reads `(null)`); (c) drop the label spread from the `routes/ticket-history.ts` withheld branch (the History route's hidden-target `payload.label`); (d) drop the label spread in `redactedPayload` (the `redacted-payload.test.ts` leg); (e) keep `z.enum(TICKET_LINK_KINDS)` in `link_tickets` (the `leads_to` call passes the input schema); (f) `label: r.label` unconditionally in `read/ticket-links.ts` (the label-free row carries `label: null`); (g) select the label in a second statement without Drafts T6's `ends` filter (the stranger's S read lists D: ruling B); (h) `refileEvent` without `label` (the D2 publish is refused `link.label-required`; once routed, a Drafts mutant); (i) `labelVerdict` skipped on `checkTicketLink`'s plain path (the D3 re-file, filed on P's stream, is accepted and P holds two `'No'` branches). The ruling-B History leg guards Drafts behaviour (the from-form event is on D's stream).
+    - 29.127 the census: (a) `leads_to: { out: '', in: '' }` in `READINGS` (the readings loop). The two `payloadIds` legs guard existing behaviour (`apps/server/src/purge/check-purged.ts:52-56` reads `targetId` only; T2 does not touch it).
     Fanout needs no new arm (the no-op arm `fanout.ts:390` matches by event type); `check-purged.ts` needs none (a label is not an id).
   - Mobile bundle: `pnpm --filter @gisik-nokma/editor run build:webview && pnpm --filter @gisik-nokma/mobile run generate:editor-html`, then `grep -c leads_to apps/mobile/src/editor/editor-html.generated.ts` must print at least 1. `generate-editor-html.mjs --check` WARNS and exits 0 when the webview bundle is unbuilt (read its header), so it proves nothing until the first command has run; the `grep` is the real assertion.
 
@@ -1081,6 +1143,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     | 29.126 | select the label in a second statement without Drafts T6's `ends` filter | the stranger's S read lists D (ruling B) |
     | 29.127 | `payloadIds` scans every string member | lookalike label reported |
 
+  **Prose to sweep:**
+  - `packages/domain/test/ticket-link-events.test.ts:113` — the 27.008 `it` title says "all six readings"; Step 2 adds the `leads_to` row, so there are eight.
+  - `test-cases/27-knowledge-graph.md:28` — 27.008 "all six `linkReading(kind, dir)` readings are asserted (blocks / is blocked by; relates to / relates to; duplicates / is duplicated by)": now eight, with leads to / comes after.
+  - `test-cases/27-knowledge-graph.md:21` — 27.001 "accept `{kind, targetId}` for each of the three kinds": the test loops `TICKET_LINK_KINDS`, which is now four, and `ticket.link_added` also takes `label`.
   Push. DONE + REVIEW (NEEDS: none; the Links UI is T3).
 
 ---
@@ -1162,7 +1228,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   });
   it('29.131 relabel is one remove+add call, ordered, undoable, once per double click; unchanged files nothing', async () => {
     let stored = [row('leads_to', 'out', 'GN-147', 'Yes')];
-    const source = createFakeDataSource({ getTicketLinks: async () => stored }, (events) => { stored = [row('leads_to', 'out', 'GN-147', 'Maybe')]; return COMMIT(events); });
+    // The ingest is HELD until `release()`, so the double click's second click lands while the first relabel is in flight and the
+    // form is still mounted. With an instantly-resolving fake the first relabel finishes and unmounts the form between the two
+    // clicks, and the second click cannot reach `relabel` whether or not the `inFlight` guard exists.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const source = createFakeDataSource({ getTicketLinks: async () => stored }, async (events) => { await gate; stored = [row('leads_to', 'out', 'GN-147', 'Maybe')]; return COMMIT(events); });
     render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit isDecision={false} make={make} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit label: leads to GN-147' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));                        // control: unchanged
@@ -1172,15 +1243,20 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     await userEvent.clear(input);
     await userEvent.type(input, ' Maybe ');
     await userEvent.dblClick(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeNull(); // precondition: still in flight, the form is mounted
     expect(source.ingested).toHaveLength(1);
+    release();
     expect(source.ingested[0]!.map((e) => [e.type, e.entity.id, e.payload])).toEqual([
       ['ticket.link_removed', TICKET, { kind: 'leads_to', targetId: OTHER }],
       ['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Maybe' }],
     ]);
     await screen.findByText('Relabelled: leads to GN-147 (Maybe)');
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(source.ingested[1]!.map((e) => e.type)).toEqual(['ticket.link_removed', 'ticket.link_added']);
-    expect((source.ingested[1]![1]!.payload as { label?: string }).label).toBe('Yes');
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(source.ingested[1]!.map((e) => [e.type, e.entity.id, e.payload])).toEqual([
+      ['ticket.link_removed', TICKET, { kind: 'leads_to', targetId: OTHER }],
+      ['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }],
+    ]);
   });
   it('29.132 sibling label refused locally; a refused add is compensated', async () => {
     const two = [row('leads_to', 'out', 'GN-147', 'Yes'), row('leads_to', 'out', 'GN-150', 'No', '01J9GTKC000000000000000000')];
@@ -1192,6 +1268,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect((await screen.findByRole('alert')).textContent).toBe('This Decision already has a branch labelled "yes".');
     expect(local.ingested).toHaveLength(0);
+    // control: a case-only change of the row's OWN label is not a clash with itself (the form stays open after a local refusal)
+    await userEvent.clear(screen.getByLabelText('New label'));
+    await userEvent.type(screen.getByLabelText('New label'), 'no');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(local.ingested).toHaveLength(1));
     cleanup();
     const REASON = 'This Decision already has a branch labelled "Maybe".';
     const refuseAdd: IngestScript = (events) => events.map((e, i) => i === 0
@@ -1204,11 +1285,20 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     await userEvent.type(screen.getByLabelText('New label'), 'Maybe');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(server.ingested).toHaveLength(2));
-    expect(server.ingested[1]!.map((e) => [e.type, e.payload])).toEqual([['ticket.link_added', { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]]);
+    expect(server.ingested[1]!.map((e) => [e.type, e.entity.id, e.payload])).toEqual([['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]]);
     expect((await screen.findByRole('alert')).textContent).toBe(REASON);
   });
   ```
-  Write 29.129 (grouping, chip, `Remove: leads to GN-147 (Yes)`, toast `Removed link: leads to GN-147 (Yes)`, Undo re-adds with `label: 'Yes'`, control `Remove: comes after GN-133` with no chip), 29.130 (a Decision: result buttons `toBeDisabled()` until the label has text, hint `Required: name this branch, for example Yes or No.`, `source.ingested` empty after clicking the disabled button; controls as the case line, the refusal one via an ingest script answering `{status:'refused', rule:'link.label-required', reason:'Name the branch: a link from a Decision needs a label, such as "Yes" or "No".'}` and `getByRole('alert')`), and 29.133 (`viewport({ phone: true })`: `getByRole('dialog', { name: 'Add link' })` contains `Link label`; the relabel form is present; desktop: no dialog) in the same shape. Sheet case 29.130b in the sheet test file: a `MINIMAL_READ` whose `ticketState.typeId` is `'decision'` opens Add link, chooses "Leads to", and the result button is disabled; control: `typeId: 'task'` enables it.
+  **Kills:**
+  - 29.128 streams and label: (a) `onOther: false` on the `comes-after` choice (the second event lands on `TICKET`); (b) `add(r)` sends `label` untrimmed (`'  Yes '`); (c) drop the "clears `label` after the call" (the Comes after add carries `label: 'Yes'`); (d) `eventFor` spreads `{ label }` even when it is `undefined` (`'label' in payload` is true).
+  - 29.128 draft: (a) file the `comes-after` add with T5's plain `eventFor(..., onOther: true, ...)`, around Drafts T8's routing (lands on `OTHER`); (b) drop `label` from the routed from-form (no `label: 'Yes'`).
+  - 29.131 relabel: (a) swap the two events in the `ingest` array (order); (b) delete the `inFlight` guard (the held double click files twice); (c) delete `if (clean === (row.label ?? '')) {...}` (the unchanged Save files a pair); (d) Undo built as `relabel(row, row.label ?? '')` on the ORIGINAL row (it compares equal and sends nothing).
+  - 29.132 sibling and compensation: (a) `o.label === clean` without `normaliseLinkLabel` (`' yes'` is sent); (b) drop `o !== row` (the case-only `'no'` relabel of GN-150 is refused against itself); (c) delete the compensating `ingest` (second call missing); (d) compensate with `mk('ticket.link_added', clean)` (`label: 'Maybe'`).
+  Write 29.129 (grouping: `getByRole('region', { name: 'Leads to' })` holds GN-147 and `getByRole('region', { name: 'Comes after' })` holds GN-133; chip: the GN-147 row's `.gn-ticket-sheet__link-label` reads `Yes`; `Remove: leads to GN-147 (Yes)`, toast `Removed link: leads to GN-147 (Yes)`, Undo re-adds with the exact payload `{ kind: 'leads_to', targetId: OTHER, label: 'Yes' }`; control `Remove: comes after GN-133` and its row's `querySelector('.gn-ticket-sheet__link-label')` is `null`), 29.130 (a Decision: result buttons `toBeDisabled()` while the label is empty AND while it is whitespace only (`'   '`), hint `Required: name this branch, for example Yes or No.`, `source.ingested` empty after clicking the disabled button; then typing `Yes` makes the button enabled and clicking it files ONE `ticket.link_added` with `label: 'Yes'`; controls as the case line, the refusal one via an ingest script answering `{status:'refused', rule:'link.label-required', reason:'Name the branch: a link from a Decision needs a label, such as "Yes" or "No".'}` and `getByRole('alert')`), and 29.133 (`viewport({ phone: true })`: `getByRole('dialog', { name: 'Add link' })` contains `Link label`; the relabel form is present; desktop: no dialog) in the same shape. Sheet case 29.130b in the sheet test file: a `MINIMAL_READ` whose `ticketState.typeId` is `'decision'` opens Add link, chooses "Leads to", and the result button is disabled; control: `typeId: 'task'` enables it.
+  **Kills:** (the prose-specified cases):
+  - 29.129 grouping, chip, Remove, Undo: (a) build the Undo `link_added` without `l.label` (no `label` in the re-added payload); (b) the Remove `aria-label` without `withLabel` (`Remove: leads to GN-147`); (c) drop `'leads to'` / `'comes after'` from `GROUP_ORDER` (no such region); (d) render the chip as `<span ...>{l.label ?? ''}</span>` unconditionally (the control row has a chip).
+  - 29.130 Decision label required: (a) `labelNeeded = false` (the Decision add is enabled); (b) `disabled={labelNeeded && label === ''}` without `.trim()` (the whitespace-only leg is enabled); (c) `disabled={labelNeeded}` (never enabled after typing `Yes`); (d) `labelNeeded = isDecision && isLeads(choice)` (Comes after disabled on a Decision); 29.130b: the sheet mount without `isDecision={state.typeId === DECISION_TYPE_ID}` (the Decision sheet's button is enabled).
+  - 29.133 phone: (a) render the `Link label` input only in the Popover branch, outside the shared `picker` (absent from the phone dialog); (b) render the relabel `<form>` only when `!phone` (absent on the phone).
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t3-red -- pnpm --filter @gisik-nokma/app-core exec vitest run test/views/ticket-links-leads-to.test.tsx --maxWorkers=2 > /tmp/wtg2-t3-red.log 2>&1; tail -40 /tmp/wtg2-t3-red.log`. Expected: FAIL (no "Leads to" option, no `isDecision` prop).
   Commit: `wtg2 T3: case lines 29.128-29.133 and the RED section tests`.
 
@@ -1284,7 +1374,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   ```
   Each result button gets `disabled={labelNeeded && label.trim() === ''}`; `add(r)` calls `eventFor(…, 'ticket.link_added', isLeads(choice) && label.trim() !== '' ? label.trim() : undefined)`, puts the same label on the pending row, and clears `label` after the call. Changing `choice` to a non-leads kind never sends the typed label. `TicketLinksSectionProps` gains `isDecision: boolean`; the toast render calls `toast.undo()`; the existing remove path wraps its event as `undo: () => file(addEvent, key)`.
   `ticket-sheet.tsx`: add `isDecision={state.typeId === DECISION_TYPE_ID}` to the mount (import the constant from `@gisik-nokma/domain`); the draft flag is already passed by Drafts T8.
-  `ui.css`, inside the links block (tokens read in this file: `--gn-text-muted` `:87`, `--gn-surface-raised` `:243`, `--gn-radius-card` `:287`):
+  `ui.css`, inside the links block (tokens read in this file: `--gn-text-muted` `:87`, `--gn-surface-raised` `:244`, `--gn-radius-card` `:287`):
   ```css
   .gn-ticket-sheet__link-row { flex-wrap: wrap; }
   .gn-ticket-sheet__link-label { flex: none; padding: 0 0.5rem; border-radius: var(--gn-radius-card); background: var(--gn-surface-raised); color: var(--gn-text-muted); font-size: 0.8125rem; }
@@ -1299,6 +1389,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 - [ ] **Step 3: Manual, Features**
   - `docs/manual.md` §5, in the "Linking tickets" paragraph, add: "Leads to" and "Comes after" describe order of work; give a link a label (for example Yes) to name a branch, edit it with Edit label, and a Decision's branches must each have a label that no other branch of that Decision uses. Run `pnpm help:generate && pnpm check:help`.
   - `Features.md`: put under `<!-- wtg-part2-model T3 bullet -->` (keep the anchor line, T19 reads the bullets below it) `- ✅ **Leads-to links in the ticket sheet** (`packages/app-core/src/views/ticket-links-section.tsx`, `ticket-sheet.tsx`) — the Links section adds "Leads to" / "Comes after" with a label (required for a Decision's branches), groups them, shows the label on each row and relabels in one step with Undo. Cases 29.128-29.133.`
+  - **Prose to sweep:** (none of these files is on the ref yet; the lines are typed-links T5's plan text, `docs/superpowers/plans/2026-10-03-typed-links.md` on the ref, which becomes the merged file's text):
+    - typed-links plan `:1717` (T5's manual "Linking tickets" paragraph) — lists "the five readings"; after this task there are seven ("Leads to", "Comes after"). Re-read the merged paragraph and fix the count with this step's addition.
+    - typed-links plan `:1494` (case 27.065 in `test-cases/27-knowledge-graph.md`) — "grouped by their reading from this ticket (Blocks, Is blocked by, Relates to, Duplicates, Is duplicated by)": the section now also groups "Leads to" and "Comes after".
+    - typed-links plan `:1601` (the `toast` state's docblock/comment in the merged section, if it was carried over) — `undo: SubmittedEvent`; this task changes it to `undo: () => Promise<void>`.
+    - typed-links plan `:1479` ("The Select offers all five readings from THIS ticket"), if carried into a comment above `CHOICES` in the merged file.
   Commit: `wtg2 T3: manual and Features`.
 
 - [ ] **Step 4: Mutations (each red, then reverted)**
@@ -1326,9 +1421,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Files:**
 - Modify (domain): `packages/domain/src/ticket-types.ts:8` and after `:207`; `packages/domain/src/events/ticket-events.ts:149-152` (+ the `ticketFieldSetPayload` docblock `:195-198`); `packages/domain/src/ticket-state.ts:221-222`.
-- Modify (engine): `packages/rule-engine/src/checks/fields.ts:85-90` (docblock "five" to "eight") and after `:152` (three arms).
+- Modify (engine): `packages/rule-engine/src/checks/fields.ts:72-77` (docblock "five" to "eight") and after `:155` (three arms).
 - Modify (app-core): `workflow-builder/fields.ts:33-38`; `views/history-copy.ts:134-141`; `views/optimistic-ticket.ts:30-60,75-100`; `views/ticket-sheet.tsx` (`FIXED_FIELD_ROWS :588`, `OWN_ROW_FIELD_IDS :605-611`, state `:869-871`, read `:2438`, submit after `:2312`, row after `:4071`, renumber `:4073,:4105`); `views/new-ticket-dialog.tsx` (`:207`, `:493`, `:616`, `:814`, `:930`, `:947`, render after `:1160`); `views/create-ticket-flow.tsx:361-362`.
-- Modify (other): `packages/ui/src/ui.css:3618`; `packages/mcp-server/src/tools/ticket-tools.ts:19,76`; `docs/manual.md:519,546`; `packages/app-core/src/help/content.generated.ts` (generated); `Features.md`; `test-cases/29-workflow-timeline-graphs.md`.
+- Modify (other): `packages/ui/src/ui.css:3618`; `packages/mcp-server/src/tools/ticket-tools.ts:19,85`; `docs/manual.md:519,546`; `packages/app-core/src/help/content.generated.ts` (generated); `Features.md`; `test-cases/29-workflow-timeline-graphs.md`.
 - Tests (modify): `packages/domain/test/ticket-types.test.ts:180`; `packages/domain/test/ticket-state.test.ts`; `packages/rule-engine/test/fields.test.ts`, `ticket-type.test.ts`; `packages/app-core/test/workflow-builder/summaries.test.ts:100-113`, `rule-editors.test.tsx:129-133`; `test/views/history-copy.test.ts`, `ticket-sheet.test.tsx:3099-3110,3236-3270`, `ticket-sheet-optimistic.test.tsx`, `new-ticket-dialog.test.tsx`, `create-ticket-flow.test.tsx`; `packages/mcp-server/test/ticket-tools.test.ts:96-100`; `apps/server/test/proj-tickets.test.ts`; `apps/server/test/tools/wtg-preflight.test.ts` (T1's, one assertion).
 
 **Interfaces:**
@@ -1384,6 +1479,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(claimedWaitForAll({ waitForAll: { value: null } })).toBe(false);
   });
   ```
+  **Kills:**
+  - 29.153 reserved ids and schemas: (a) drop `'reworkEstimate'` (or any one of the three) from `BUILTIN_FIELD_IDS` (its shadow parse no longer throws; also the `:180` eight-id pin); (b) `.min(0)` in `estimateValueSchema` (`0` parses); (c) `return fields[id]?.value as number ?? null` in `claimedEstimate`, skipping the schema (the `{ value: 0 }` leg reads `0`); (d) `z.boolean()` for `waitForAllValueSchema` (`false` parses).
   `apps/server/test/tools/wtg-preflight.test.ts`: add to the 29.147 `it`: `expect(NEW_BUILTIN_FIELD_IDS.every((id) => (BUILTIN_FIELD_IDS as readonly string[]).includes(id))).toBe(true);` (import `BUILTIN_FIELD_IDS` from `@gisik-nokma/domain`).
 
   `packages/domain/test/ticket-state.test.ts` (after 3.966; uses `createdWith`, `createdState`, `fold`, `deps`, `TICKET`, `makeEnvelope`):
@@ -1412,6 +1509,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.154 optional birth estimate: (a) `estimate: estimateValueSchema.default(1)` (the absent-key control); (b) `estimateValueSchema.nullable().optional()` (`null` parses); (c) `z.coerce.number()...` in `estimateValueSchema` (`'3'` parses).
+  - 29.155 creation fold: (a) `estimate: claim(p.estimate ?? null, env)` unconditionally (the control gains an `estimate` key); (b) delete the `...(p.estimate === undefined ? {} : ...)` line (no `estimate` claim).
+  - 29.156 field_set folds: none in this task's code, guards existing behaviour (the generic `ticket.field_set` arm of `applyTicketEvent` folds any field id as a claim and keeps a `null` claim); non-vacuous: the replace (`3` then `5`) and the null-claim leg (`toBeNull`, not `undefined`) each fail if that arm is changed. The replica half guards the same reducer through the store.
   Replica (29.156 second half): in `packages/sync-client/test/replica.test.ts`, copy the nearest existing `ticket.field_set` case (grep `fieldId: 'dueDate'` there for the helper and the store read), apply `{fieldId:'estimate', value: 3}` and assert the replica's ticket state has `fields.estimate.value === 3`.
 
   Run (LOCAL; build domain first): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t4-domain -- pnpm --filter @gisik-nokma/domain exec vitest run --maxWorkers=2 > /tmp/wtg2-t4-domain.log 2>&1; tail -30 /tmp/wtg2-t4-domain.log`. Expected FAIL (undefined exports, five-id list).
@@ -1472,6 +1573,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     }
   });
   ```
+  **Kills:**
+  - 29.157 estimate arms: (a) `.min(0)` in `estimateValueSchema` (`0` accepted); (b) place the estimate arm after the "Now, and only now" type resolution (the `ctxWithoutTheTicketsType` leg is refused); (c) `'Estimate'` for both ids in the `fieldKindRefusal` call (the `reworkEstimate` reason).
+  - 29.158 waitForAll arm: (a) `waitForAllValueSchema = z.boolean()` (`false` accepted); (b) `if (value === null) return refuse('field.type-mismatch', ...)` (the `null` leg refused).
   `packages/rule-engine/test/ticket-type.test.ts` (uses `def`, `typeDefined`, `ctx`):
   ```ts
   it('29.159 a custom field that shadows a flow built-in is refused at the door', async () => {
@@ -1481,11 +1585,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await checkTicketTypeDefined(typeDefined(def({ id: 'invoice', name: 'Invoice', rank: 3, fields: [{ id: 'estimates', name: 'E', type: 'number' }] })), ctx())).toEqual({ refused: false }); // control
   });
   ```
+  **Kills:**
+  - 29.159 shadow refused at the door: (a) leave `BUILTIN_FIELD_IDS` at the five ids (`ticket-types.ts:8`; the `estimate` definition is accepted).
   (Confirm the literal rule id by running once: `REFUSAL_RULES.malformedPayload` in `packages/rule-engine/src/refusal-rules.ts`; the first run's diff names it.)
 
   Run `wtg2-t4-engine` (`pnpm --filter @gisik-nokma/rule-engine exec vitest run test/fields.test.ts test/ticket-type.test.ts`). Expected FAIL (accepted/unknown-field).
 
-  Implement in `checks/fields.ts` after the priority arm (`:152`), before "Now, and only now" (`:153`); import `estimateValueSchema, waitForAllValueSchema`; docblock `:85-90` "the five built-ins" becomes eight:
+  Implement in `checks/fields.ts` after the priority arm (`:155`), before "Now, and only now" (`:157`); import `estimateValueSchema, waitForAllValueSchema`; docblock `:72-77` "the five built-ins" becomes eight:
   ```ts
   // Estimate and rework estimate (ES-1, ES-5): the same whole-day schema, answered before the type resolves.
   if (p.fieldId === 'estimate' || p.fieldId === 'reworkEstimate') {
@@ -1523,6 +1629,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(Object.keys(plain?.fields ?? {}).sort()).toEqual(['priority', 'title']);
   });
   ```
+  **Kills:**
+  - 29.160 projection round trip: (a) delete the creation fold's `estimate` line in `ticket-state.ts` (the projection folds through `applyTicketEvent`, `projections/tickets.ts:4,24`; NEWBORN's estimate is absent); (b) `estimate: claim(p.estimate ?? null, env)` unconditionally (the GRANDCHILD control gains a key). The three `field_set` legs guard existing behaviour (the generic claim fold and the JSON column).
   `history-copy.test.ts` (copy 3.973's `eventOf` + `describeEvent` shape, `:241-260`):
   ```ts
   it('29.161 estimate, rework estimate and wait-for-all sentences; priority and custom fields unchanged', () => {
@@ -1537,16 +1645,24 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(set('region', 'North')).toBe('Set region to North');
   });
   ```
+  **Kills:**
+  - 29.161 History sentences: (a) `` `${n} days` `` in `days` (the "1 day" leg); (b) swap the two `waitForAll` sentences (on/off legs); (c) `return null` for a `null` estimate (falls to the generic sentence, "Cleared Estimate" leg); (d) `fieldId === 'estimate' ? 'Estimate' : 'Estimate'` (the rework leg).
   `summaries.test.ts` 3.972: expected difference `['priority', 'waitForAll']`, add `expect([...BUILTIN_FIELD_IDS]).toContain('waitForAll'); expect(chosen).not.toContain('waitForAll');`, control `expect(chosen).toEqual(['title','description','dueDate','startDate','estimate','reworkEstimate'])`; rename the title "MINUS priority and waitForAll". `rule-editors.test.tsx:133`: `['Title','Description','Due date','Start date','Estimate','Rework estimate','Counterparty (Errand)']`. 29.162's rule check in `packages/rule-engine/test/` next to `require-different-user.test.ts` style: `evaluateRequireField({kind:'require-field', field:'estimate'}, input)` with `ticket.fields.estimate` absent refuses and `{value: 3}` passes (copy the nearest `require-field` test's `input` builder: grep `require-field` in `packages/rule-engine/test`).
+
+  **Kills:**
+  - 29.162 picker: (a) add `{ id: 'waitForAll', ... }` to `BUILTIN_FIELD_CHOICES` (3.972's difference and `not.toContain`); (b) omit the `reworkEstimate` entry (the control list and `rule-editors.test.tsx:133`). The `evaluateRequireField` half guards existing behaviour (the generic require-field rule over `ticket.fields`).
 
   `packages/mcp-server/test/ticket-tools.test.ts` after `:100` (uses `tool`, `fake`, `ROUTES`, `WS`, `T`):
   ```ts
   for (const id of ['estimate', 'reworkEstimate', 'waitForAll']) {
-    await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { [id]: 3 } })).rejects.toThrow(`"${id}" is a built-in field`);
+    await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { [id]: 3 } })).rejects.toThrow(`"${id}" is a built-in field and cannot be set through fields`);
   }
   expect(f.batches, '29.163 refusals send nothing').toHaveLength(1);
   ```
-  (placed inside the `it` that already holds the title guard, before its control line, so the count stays and the control still proves a custom field sends one event.)
+  (placed inside the `it` that already holds the title guard, before its control line, so the count stays and the control still proves a custom field sends one event. The full sentence is asserted: both throws start `"<id>" is a built-in field`, so the prefix alone passes whether or not `FLOW_BUILT_IN` picks the right one.)
+
+  **Kills:**
+  - 29.163 MCP guard: (a) leave `BUILT_IN` without the three ids (a `field_set` is sent, no rejection, and the batch count becomes 2); (b) drop the `FLOW_BUILT_IN.has(key) ? ...` branch (the "use the estimate argument" sentence is thrown).
 
   Implement: `workflow-builder/fields.ts`: after the `startDate` entry add `{ id: 'estimate', name: 'Estimate', source: 'Built-in' }, { id: 'reworkEstimate', name: 'Rework estimate', source: 'Built-in' }`; append to the docblock a third bullet: `waitForAll` is EXCLUDED because it is optional but a gate on `true` is meaningless as a require-field (a rule on a switch would force every move to turn it on); case 3.972 names both exclusions. `history-copy.ts` before the generic arm:
   ```ts
@@ -1562,7 +1678,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     return null;
   }
   ```
-  and in the `ticket.field_set` case after the `fieldId` null check: `const flow = flowFieldSentence(fieldId, payload['value']); if (flow !== null) return flow;`. MCP `ticket-tools.ts:19`: `const BUILT_IN = new Set([...existing, 'estimate', 'reworkEstimate', 'waitForAll']);` and change the throw at `:76` to
+  and in the `ticket.field_set` case after the `fieldId` null check: `const flow = flowFieldSentence(fieldId, payload['value']); if (flow !== null) return flow;`. MCP `ticket-tools.ts:19`: `const BUILT_IN = new Set([...existing, 'estimate', 'reworkEstimate', 'waitForAll']);` and change the throw at `:85` to
   `throw new Error(FLOW_BUILT_IN.has(key) ? \`"${key}" is a built-in field and cannot be set through fields\` : \`"${key}" is a built-in field: use the ${key} argument\`);` with `const FLOW_BUILT_IN = new Set(['estimate','reworkEstimate','waitForAll']);` (the "use the argument" sentence would be false until Part 5 adds the arguments; Part 5 deletes `FLOW_BUILT_IN`).
 
   Run (`wtg2-t4-server-app`): domain+rule-engine builds, then `pnpm --filter @gisik-nokma/server exec vitest run test/proj-tickets.test.ts`, app-core `test/views/history-copy.test.ts test/workflow-builder`, mcp-server WHOLE. Expected PASS after the edits (FAIL before). Flip 29.160-29.163 ✅.
@@ -1607,6 +1723,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'estimate', value: null });
   });
   ```
+  **Kills:**
+  - 29.164 the Estimate row: (a) render the row after `field-type` (the second position leg); (b) `Number.isFinite(next)` in place of `estimateValueSchema.safeParse(next).success` in `submitEstimate` (`2.5`, `0`, `366` file events and the alert is gone); (c) `payload: { fieldId: 'estimate', value: raw }` (the string `'3'`).
+  - 29.164 clear and no generic rows: (a) drop `'reworkEstimate','waitForAll'` from `OWN_ROW_FIELD_IDS` (`field-waitForAll` / `field-reworkEstimate` rows appear); (b) `const next = Number(raw)` without the blank arm (`0` is invalid, nothing is filed); (c) render `estimateClaim.actorId` raw instead of `nameOf(...)` (the "set by Anselma Marak" leg).
   Amend 13.113's `ids` (`:3099-3110`) to insert `'field-estimate'` after `'field-start'`; amend 16.129 (`:3236-3270`): `rows` length 9, Visibility (index 7) tinted `true`, counterparty (index 8) tinted `false`, and fix the "seven fixed rows" comment to eight. `ticket-sheet-optimistic.test.tsx` (uses `mount`, `committed`, `userEvent`):
   ```tsx
   it('29.164 an estimate shows at once with Saving… and survives a stale reload', async () => {
@@ -1625,6 +1744,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(row().textContent).not.toContain('No estimate');
   });
   ```
+  **Kills:**
+  - 29.164 optimistic: (a) drop `'estimate'` from `CLAIM_FIELDS` / the `readValueOf` case (the overlay never applies: no "Saving…", or the stale reload shows "No estimate"); (b) delete `optimistic.begin({ estimate: next })` (no "Saving…" while the write is pending).
   `new-ticket-dialog.test.tsx` (inside the 13.1443 describe, uses `baseProps`) and `create-ticket-flow.test.tsx` (uses `renderFlow`, `ticketCreatedPayload`):
   ```tsx
   it('29.165 the Estimate input is empty by default, omitted when empty, and an invalid number disables Create', () => {
@@ -1633,6 +1754,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(screen.getByLabelText('Estimate (days)')).toHaveValue(null);
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
+    expect(onCreate).toHaveBeenCalledTimes(1); // the next leg reads calls[0]; without this, no call at all would pass it
     expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('estimate');
   });
   it('29.165 an estimate of 2.5 disables Create with its reason; 5 is carried as the number 5', () => {
@@ -1657,6 +1779,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(ticketCreatedPayload(source)['estimate']).toBe(5);
   });
   ```
+  **Kills:**
+  - 29.165 empty by default, omitted: (a) payload `estimate: Number(estimate)` unconditionally (`estimate: 0` is in the draft); (b) `useState('1')` (the input is not empty).
+  - 29.165 invalid disables Create: (a) drop `estimateInvalid` from the Create `disabled` condition (the button is enabled); (b) payload `estimate: estimate` (the string `'5'`).
+  - 29.165 flow sends a bare number: (a) `estimate: String(draft.estimate)` in `create-ticket-flow.tsx` (`'5'`); (b) delete the `create-ticket-flow.tsx:362` line (no member).
+  - 29.166 dev rebuild: none, a recorded 🧪 run, not a test (it guards the existing rebuild and verifier over the dev ledger).
   Run (`wtg2-t4-ui`): `pnpm --filter @gisik-nokma/domain build && pnpm --filter @gisik-nokma/rule-engine build`, then app-core `test/views/ticket-sheet.test.tsx test/views/ticket-sheet-optimistic.test.tsx test/views/new-ticket-dialog.test.tsx test/views/create-ticket-flow.test.tsx`. Expected FAIL (no row, no input).
 
   Implement.
@@ -1715,6 +1842,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   `docs/manual.md:519`: `- **Start date**, **Due date** and **Estimate (days)** — optional, empty by default. Leave any blank to claim nothing; an estimate is a whole number of days from 1 to 365.` `:546` append a step `6. **Set or clear its estimate** — the **Estimate** row's number box, like Start. (§5)`. Run `pnpm help:generate && pnpm check:help`. Mobile bundle: `pnpm --filter @gisik-nokma/editor run build:webview && node apps/mobile/scripts/generate-editor-html.mjs --check`; if it reports `stale`, rerun without `--check` and commit the generated file. Features: put under `<!-- wtg-part2-model T4 bullet -->` (keep the anchor line, T19 reads the bullets below it)
   `- ✅ **Estimate** (wtg2 T4; `packages/domain/src/ticket-types.ts`, `views/ticket-sheet.tsx`, `views/new-ticket-dialog.tsx`) — a whole-day estimate (1 to 365) beside Start and Due, in the new-ticket form and the sheet; History reads "Set Estimate to 3 days". It joins the require-field picker.` and `- ⚙️ **Rework estimate and Wait for all incoming built-ins** (wtg2 T4; same files, `packages/rule-engine/src/checks/fields.ts`) — claims written by `ticket.field_set`, validated by the engine, read through `claimedEstimate` / `claimedWaitForAll`; `fields` in MCP `update_ticket` refuses all three. Controls arrive in Part 3. Cases 29.153-29.166.`
+  **Prose to sweep:**
+  - `packages/rule-engine/src/checks/fields.ts:72-76` — "the five built-ins ... `title`, `description`, `dueDate`, `startDate` and `priority` ride this event": the count AND the name list (Step 3 changes only the word "five").
+  - `packages/app-core/src/views/ticket-sheet.tsx:568-569` — `FIXED_FIELD_ROWS` docblock: "the fixed rows `State · Assignee · Priority · Due · Start · Type · Visibility`" (Estimate is now between Start and Type, eight rows).
+  - `packages/app-core/src/views/ticket-sheet.tsx:591-592` — `OWN_ROW_FIELD_IDS` docblock: "`title`, `description`, `dueDate`, `startDate` and `priority`" (now eight ids).
+  - `packages/app-core/src/workflow-builder/fields.ts:24` — "**The four that remain can all be genuinely unset**" (six remain after Step 4 adds Estimate and Rework estimate).
+  - `Features.md:484` — "five built-ins are answered BEFORE the ticket's type is resolved".
+
   Run `node scripts/check-case-ids.mjs && pnpm check:citations`. Commit: `wtg2 T4: manual, help, bundle, Features`.
 
 - [ ] **Step 7: Dev rebuild (29.166), sweeps, DONE**
@@ -1730,11 +1864,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 **Files:**
 - Create: `apps/server/migrations/1792100100000_proj-tickets-decision.sql`; `packages/domain/test/decision-event.test.ts`; `apps/server/test/projections/tickets-decision.test.ts`; `packages/sync-client/test/replica-decision.test.ts`; `packages/app-core/test/views/decision-type-defaults.test.ts`.
 - Modify (re-read each; lines are from the tip): `packages/domain/src/events/ticket-events.ts` (after `ticketReopenedPayload`, `:315`; imports `:1-4`); `packages/domain/src/vocabulary.ts` (import list `:46-53`, new block after the link pair `:274-285`); `packages/domain/src/entity-state.ts` (`TicketState` `:33-127`, new exported types after `TicketLink` `:129`); `packages/domain/src/ticket-state.ts` (docblock `:53-107`, list `:89-107`, import `:7-21`, new arm after `ticket.link_removed` `:469-477`, new exports after `foldTicketEvent` `:504`); `packages/domain/src/ticket-types.ts` (`BUILTIN_TICKET_TYPE_SEEDS` `:142-147`); `apps/server/src/projections/tickets.ts` (`TicketRow` `:87-118`, `rowToTicketState` `:152-218`, `upsertTicket` `:284-359`); `apps/server/src/sync/sync-routes.ts` (docblock `:30-60`); `apps/server/src/purge/check-purged.ts` (`payloadIds` `:25-75`); `apps/server/src/notifications/fanout.ts` (chain `:353-401`); `packages/app-core/src/workflow-builder/ticket-types/icons.tsx` (`TYPE_ICONS` `:30-96`); `packages/app-core/src/online/mappers.ts` (`mapTicketState` `:1956`, end of literal `:2056`); `packages/app-core/src/views/history-copy.ts` (`describeEvent` switch `:150-247`); `packages/app-core/src/views/new-ticket-dialog.tsx:71-77` and `ticket-sheet.tsx:171-182`; `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:194`; `packages/mcp-server/src/tools/ticket-tools.ts:39-65`.
-- Tests edited (they go red on purpose): `packages/domain/test/ticket-state.test.ts:712` (`toHaveLength(17)`), `packages/domain/test/ticket-types.test.ts:164-190`, `packages/app-core/test/views/history-copy.test.ts` (`REGISTRATIONS_ON_2026_10_03`, the CONTROL case's `.toBe(17)`, `VALID_PAYLOAD`), `packages/app-core/test/ticket-types/ticket-types.test.tsx:668,685-686` (the list sorts by `rank` then id, so Decision draws between Story and Task), `apps/web/test/project-create-gate.test.tsx:449` (the fallback ladder is now five), `packages/rule-engine/test/live-ticket.test.ts:62-81`, `packages/rule-engine/test/ticket-type.test.ts:140-155`, `apps/server/test/permissions/check-role-permission.test.ts:637-649`, `apps/server/test/routes/workspaces.test.ts:142-155,365`, `apps/server/test/routes/workspace-bootstrap-failure.test.ts:~251`, `apps/server/test/seed/seed-cc.test.ts:164-169`, `apps/server/test/census/ticket-vocabulary-census.test.ts`, `apps/server/test/permissions/check-visibility-permission.test.ts`, `apps/server/test/notifications/fanout.test.ts:182-203`, `packages/mcp-server/test/redacted-payload.test.ts`.
+- Tests edited (they go red on purpose): `packages/domain/test/ticket-state.test.ts:714` (`toHaveLength(19)` on the ref at 457f3caa: Drafts T1 already added `ticket.published` / `ticket.discarded`), `packages/domain/test/ticket-types.test.ts:164-190`, `packages/app-core/test/views/history-copy.test.ts` (`REGISTRATIONS_ON_2026_10_03`, the CONTROL case's `.toBe(17)`, `VALID_PAYLOAD`), `packages/app-core/test/ticket-types/ticket-types.test.tsx:668,685-686` (the list sorts by `rank` then id, so Decision draws between Story and Task), `apps/web/test/project-create-gate.test.tsx:449` (the fallback ladder is now five), `packages/rule-engine/test/live-ticket.test.ts:62-81`, `packages/rule-engine/test/ticket-type.test.ts:140-155`, `apps/server/test/permissions/check-role-permission.test.ts:637-649`, `apps/server/test/routes/workspaces.test.ts:142-155,365`, `apps/server/test/routes/workspace-bootstrap-failure.test.ts:~251`, `apps/server/test/seed/seed-cc.test.ts:164-169`, `apps/server/test/census/ticket-vocabulary-census.test.ts`, `apps/server/test/permissions/check-visibility-permission.test.ts`, `apps/server/test/notifications/fanout.test.ts:182-203`, `packages/mcp-server/test/redacted-payload.test.ts`.
 
 **Interfaces:**
 - Consumes: T2 `DECISION_TYPE_ID`, `linkLabelSchema`, `TicketLink`, `normaliseLinkLabel`.
-- Produces (`@gisik-nokma/domain`): `ticketDecidedPayload`, `DECISION_CLOSE_STARTED_MAX = 50`, `type PassRevision = {from: string|null; to: string|null; by: string; at: string}`, `type PassRecord = {pass: number; outcome: string|null; by: string; at: string; revisions: PassRevision[]}`, `TicketState.outcome?: string` (ABSENT when none), `TicketState.passes?: PassRecord[]` (absent until the first choice), `releaseOutcome(state: TicketState): TicketState` (the PS-2 reset seam), `TICKET_EVENT_TYPES` gains `'ticket.decided'` (18 members), `BUILTIN_TICKET_TYPE_SEEDS` gains `{id: DECISION_TYPE_ID, name: 'Decision', icon: 'diamond', rank: 3}` (5 seeds). Server: `proj_tickets.outcome text NULL`, `proj_tickets.passes jsonb NOT NULL DEFAULT '[]'`.
+- Produces (`@gisik-nokma/domain`): `ticketDecidedPayload`, `DECISION_CLOSE_STARTED_MAX = 50`, `type PassRevision = {from: string|null; to: string|null; by: string; at: string}`, `type PassRecord = {pass: number; outcome: string|null; by: string; at: string; revisions: PassRevision[]}`, `TicketState.outcome?: string` (ABSENT when none), `TicketState.passes?: PassRecord[]` (absent until the first choice), `releaseOutcome(state: TicketState): TicketState` (the PS-2 reset seam), `TICKET_EVENT_TYPES` gains `'ticket.decided'` (20 members on the ref at 457f3caa; re-measure), `BUILTIN_TICKET_TYPE_SEEDS` gains `{id: DECISION_TYPE_ID, name: 'Decision', icon: 'diamond', rank: 3}` (5 seeds). Server: `proj_tickets.outcome text NULL`, `proj_tickets.passes jsonb NOT NULL DEFAULT '[]'`.
 
 **Why `ticket.decided` is NOT in `BOOTSTRAP_BACKFILL_TYPES` (spec §8.4's row says it is; contract decision 1).** The docblock at `sync-routes.ts:22-30` states the rule: a type the reducer folds rides the snapshot, and only types that carry content beyond the fold (`comment.added`, `attachment.added`, the contest pair, `visibility.set`, the comment edit and delete) are backfilled below it. `ticket.decided` folds fully into `outcome` and `passes` (the pass record IS the content, and `closeStarted` is a request for the settle, not history a replica needs). Backfilling it would also double-apply it: `refoldTicket` folds both the snapshot's state and the backfilled tail. The census in Step 5 asserts it is in exactly one list. A new type, so there is no retro problem (a snapshot written before this task cannot lack what no event ever carried).
 
@@ -1834,6 +1968,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(yes.outcome).toBe('Yes');
       const no = applyTicketEvent(yes, decided('No', { from: 'Yes' }), deps);
       expect(no.outcome).toBe('No');
+      // `from` is not folded under ANY name: the fold adds exactly these two keys to the born state
+      expect(Object.keys(no).filter((k) => !(k in born)).sort()).toEqual(['outcome', 'passes']);
       const cleared = applyTicketEvent(no, decided(null, { from: 'No' }), deps);
       expect('outcome' in cleared).toBe(false);
       expect(cleared.passes).toHaveLength(1); // the record stays
@@ -1857,6 +1993,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(s4.passes?.[0]?.revisions).toHaveLength(3);
       expect(s4.passes?.[0]?.revisions.at(-1)).toEqual({ from: null, to: 'Yes', by: B, at: T4 });
       expect(s1.passes?.[0]?.revisions).toEqual([]); // control: earlier values are never mutated
+      expect('passes' in applyTicketEvent(bornState(), decided(null), deps)).toBe(false); // a clear with no pass records nothing
     });
     it('29.357 after releaseOutcome the next choice opens pass 2 and pass 1 is unchanged', () => {
       const born = bornState();
@@ -1871,6 +2008,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.134 the seed: (a) seed `rank: 4` (the seed `toEqual`); (b) drop the Decision seed line (`ids` list and `toHaveLength(5)`); (c) seed `icon: 'check'` (the seed `toEqual`).
+  - 29.135 payload: (a) `outcome: linkLabelSchema.nullable().optional()` (`ok({})`); (b) `closeStarted: z.array(z.string())` (`['GN-146']` parses); (c) drop `.max(DECISION_CLOSE_STARTED_MAX)` (51 ids parse); (d) drop `.strict()` (`note: 'x'` parses).
+  - 29.135 registration: (a) register with `entityKind: 'note'` (`entityKind` leg and both `parseEvent` legs); (b) omit `'ticket.decided'` from `TICKET_EVENT_TYPES` (the `includes` leg).
+  - 29.136 current outcome: (a) `outcome: p.outcome` kept on a clear (`'outcome' in cleared`); (b) fold `decidedFrom: p.from` or `closeStarted` onto the state (the added-keys leg, the `OTHER` leg); (c) drop `passes: next` from the returned state (`cleared.passes`).
+  - 29.356 passes: (a) append a pass on any differing choice (`s2.passes`); (b) rule 1 on `last.outcome === null` (`s4.passes` length 1); (c) `revised` without `outcome` (s2's `outcome: 'No'`, s3's `toBeNull`); (d) delete `if (outcome === null) return state;` (the no-pass clear leg gains `passes`).
+  - 29.357 release: (a) revise instead of append after a release: rule 1's condition reduced to `last === undefined` (`s2.passes` has one record); (b) `releaseOutcome` also drops `passes` (`released.passes`); (c) `releaseOutcome` returns `{ ...state }` when there is nothing to release (`toBe(born)`).
   Run (domain tests import `../src`, no build): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t5-red -- pnpm --filter @gisik-nokma/domain exec vitest run test/decision-event.test.ts > /tmp/wtg2-t5-red.log 2>&1; tail -30 /tmp/wtg2-t5-red.log`. Expected: FAIL on the missing exports (`DECISION_TYPE_ID` resolves from T2; `ticketDecidedPayload`, `releaseOutcome` do not).
 
 - [ ] **Step 3: Domain implementation**
@@ -1911,7 +2055,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   /** One pass of a Decision: the choice that opened it (`by`, `at`) and every revision since. `outcome` is the pass's CURRENT value (null after a clear). */
   export type PassRecord = { pass: number; outcome: string | null; by: string; at: string; revisions: PassRevision[] };
   ```
-  `ticket-state.ts`: import `ticketDecidedPayload` (`:7-21`) and `PassRecord` (type, `:5`); add `'ticket.decided',` after `'ticket.link_removed',` in `TICKET_EVENT_TYPES`; in the docblock replace "SEVENTEEN of the TWENTY-TWO" with "EIGHTEEN of the TWENTY-THREE" and append "`ticket.decided` (wtg2 T5) moved both numbers again: it folds into `outcome` and `passes`."; new arm after `ticket.link_removed` (copy of the shape of `ticket.ranked`, `:427-435`):
+  `ticket-state.ts`: import `ticketDecidedPayload` (`:7-21`) and `PassRecord` (type, `:5`); add `'ticket.decided',` after `'ticket.link_removed',` in `TICKET_EVENT_TYPES`; in the docblock replace "NINETEEN of the TWENTY-FOUR" (`ticket-state.ts:65` on the ref; the plan was written before Drafts T1 moved it from SEVENTEEN of TWENTY-TWO) with "TWENTY of the TWENTY-FIVE" and append "`ticket.decided` (wtg2 T5) moved both numbers again: it folds into `outcome` and `passes`."; new arm after `ticket.link_removed` (copy of the shape of `ticket.ranked`, `:427-435`):
   ```ts
     case 'ticket.decided': {
       const p = ticketDecidedPayload.parse(env.payload);
@@ -1955,7 +2099,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   }
   ```
   `ticket-types.ts` seeds (after `sub-task`): `{ id: DECISION_TYPE_ID, name: 'Decision', icon: 'diamond', rank: 3 },`.
-  Update the five tests that pin the old arithmetic: `ticket-state.test.ts:712` `toHaveLength(18)` with the docblock count; `ticket-types.test.ts:168-174` gains `['decision', 3]` and `toHaveLength(5)` at `:185`; `history-copy.test.ts` CONTROL `.toBe(18)` and `REGISTRATIONS_ON_2026_10_03` `21` (docblock "22" becomes "23 registered, this census covers 21"); `ticket-types.test.tsx` compares the rendered order with `[...builtins].sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : 1)).map((b) => b.name)`; `project-create-gate.test.tsx:449` expects `['Epic', 'Story', 'Task', 'Sub-task', 'Decision']` (derive it from `BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name)`, not retyped); `live-ticket.test.ts` `GATED` gains `['ticket.decided', () => ({ outcome: 'Yes' })]` (its "whole vocabulary" case parses `vocabulary.ts` and fails until it does); `ticket-type.test.ts` gains, after the dispatch case, a second `it` for the rank lock: `evaluateEvent(typeDefined(def({ id: 'decision', name: 'Decision', rank: 4 })), ctx())` equals `{ refused: true, rule: 'type.builtin-rank', reason: '"Decision" is the built-in decision type; its rank is 3 and cannot be changed. Define a custom type for differently-ranked work.' }` and the same def at rank 3 is accepted (29.134 control).
+  Update the five tests that pin the old arithmetic: `ticket-state.test.ts:714` `toHaveLength(20)` with the docblock count; `ticket-types.test.ts:168-174` gains `['decision', 3]` and `toHaveLength(5)` at `:185`; `history-copy.test.ts` CONTROL `.toBe(20)` (`:134` is `.toBe(19)` on the ref) and `REGISTRATIONS_ON_2026_10_03` `23` (`:53` is `22` on the ref; re-read its docblock's counts and move each by one) (numbers measured at 457f3caa, after Drafts T1; re-measure on the tip); `ticket-types.test.tsx` compares the rendered order with `[...builtins].sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : 1)).map((b) => b.name)`; `project-create-gate.test.tsx:449` expects `['Epic', 'Story', 'Task', 'Sub-task', 'Decision']` (derive it from `BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name)`, not retyped); `live-ticket.test.ts` `GATED` gains `['ticket.decided', () => ({ outcome: 'Yes' })]` (its "whole vocabulary" case parses `vocabulary.ts` and fails until it does); `ticket-type.test.ts` gains, after the dispatch case, a second `it` for the rank lock: `evaluateEvent(typeDefined(def({ id: 'decision', name: 'Decision', rank: 4 })), ctx())` equals `{ refused: true, rule: 'type.builtin-rank', reason: '"Decision" is the built-in decision type; its rank is 3 and cannot be changed. Define a custom type for differently-ranked work.' }` and the same def at rank 3 is accepted (29.134 control).
+  **Kills:** (the rank-lock `it`): (a) drop the Decision seed line (the rank-4 def is accepted: no built-in to lock); (b) seed `rank: 4` (the rank-3 control is refused).
   Run the domain suite: `slot-run.sh wtg2-t5-domain -- pnpm --filter @gisik-nokma/domain exec vitest run --maxWorkers=2`. Expected: PASS. Flip 29.134 (domain half), 29.135 (domain half), 29.136, 29.356, 29.357 ✅ as each test goes green.
   Commit: `wtg2 T5: the Decision seed, ticket.decided and the fold`.
 
@@ -1989,7 +2134,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   `upsertTicket`: append `outcome, passes` to the INSERT column list, `$21, $22` to VALUES (re-read: typed-links T2 made `links` `$20`; if T9 landed first, continue its numbering), `outcome = EXCLUDED.outcome, passes = EXCLUDED.passes` to ON CONFLICT, and the values `next.outcome ?? null, JSON.stringify(next.passes ?? [])` (the `?? null` guard is `rank`'s, `:318-326`).
   `check-purged.ts` `payloadIds`: `case 'ticket.decided': { const ids = payload['closeStarted']; if (Array.isArray(ids)) for (const id of ids) add('ticket', id); break; }` (a decision naming an erased ticket is refused at the door, the way a link to one is).
   `fanout.ts`, in the chain beside the link arm (`:390`): `} else if (env.type === 'ticket.decided') { // Outcomes notify nobody (NT-4); an explicit arm writes the decision where the next reader looks. } else if (...)`.
-  `sync-routes.ts` docblock: "TWENTY-TWO" to "TWENTY-THREE", "seventeen of them" to "eighteen of them", and a sentence in the pair history: "**twenty-three and eighteen with wtg2 T5** (`ticket.decided`, which FOLDS into `outcome` and `passes`, so it is deliberately NOT backfilled)". Do not add it to `BOOTSTRAP_BACKFILL_TYPES`.
+  `sync-routes.ts` docblock (on the ref, `:34` "TWENTY-FOUR", `:39` "nineteen of them", `:55` the pair history ending "twenty-four and nineteen with drafts T1 ... which is the pair at HEAD"): "TWENTY-FOUR" to "TWENTY-FIVE" (keeping the "twenty-four until ..." history), "nineteen of them" to "twenty of them", "The pair has moved six times" (`:48`) to seven, and a sentence in the pair history: "**twenty-five and twenty with wtg2 T5** (`ticket.decided`, which FOLDS into `outcome` and `passes`, so it is deliberately NOT backfilled)", moving "which is the pair at HEAD" to it. Do not add it to `BOOTSTRAP_BACKFILL_TYPES`.
   Tests: `apps/server/test/projections/tickets-decision.test.ts`, structure of `tickets-rank.test.ts:1-100` (the `workflow.defined` + `ticket-type.defined` seed in `beforeAll`, `rowFor`, `applyCommitted`, `makeCommitted`, `rowToTicketState`):
   ```ts
   it('29.137 outcome and passes land, read back equal to the reducer, vanish on a clear and rebuild equal to live', async () => {
@@ -1997,7 +2142,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     await applyCommitted(db.pool, [makeCommitted({ workspaceId: WS, actorId: actor, entity: { kind: 'ticket', id }, type: 'ticket.created', payload: { typeId: TYPE_ID, projectId: PRJ, parentId: null, title: 'Go ahead?' } })]);
     const row0 = await rowFor(id);
     expect(row0.outcome).toBeNull(); expect(row0.passes).toEqual([]);
-    expect('outcome' in rowToTicketState(row0)).toBe(false); // control: the reducer's absent shape
+    expect(['outcome', 'passes'].filter((k) => k in rowToTicketState(row0))).toEqual([]); // control: the reducer's absent shape, BOTH keys
     const yes = makeCommitted({ workspaceId: WS, actorId: actor, entity: { kind: 'ticket', id }, type: 'ticket.decided', payload: { outcome: 'Yes' } });
     await applyCommitted(db.pool, [yes]);
     const state = rowToTicketState(await rowFor(id));
@@ -2010,6 +2155,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
   });
   ```
+  **Kills:**
+  - 29.137 projection round trip: (a) `rowToTicketState` spreads `passes: row.passes` unconditionally (the both-keys control; the earlier control checked `outcome` only, so this table mutant survived); (b) drop `outcome = EXCLUDED.outcome` from ON CONFLICT (`state.outcome` stays absent after `yes`); (c) write `JSON.stringify([])` for `passes` (the `passes` `toEqual`).
   (import `verifyProjections` from `../../src/tools/verify-projections.js` and `buildProjectionRegistry` from `../../src/projections/index.js`, as `test/verify-projections.test.ts:278` does.) Also: `check-visibility-permission.test.ts`, new `describe('29.135 ticket.decided has ticket.field_set's right')` using that file's `workspace()`, `seedGuest`, `seedMember`, `seedTicket`, `setVisibilityEnv`, `gate`, `ticketEvent`: for each of `['ticket.decided', 'ticket.field_set']` with payloads `{outcome:'Yes'}` / `{fieldId:'title',value:'x'}` a guest on a project-visible ticket is refused `{rule: PERMISSION_VISIBILITY_RULE, reason: TICKET_NOT_VISIBLE_REASON}`; the same guest explicitly shared (`setVisibilityEnv(..., 'explicit', [guest])`) and a project member get `null` (same `it`, so both halves and the control). `fanout.test.ts`: extend the 27.007 case's type loop with a `ticket.decided` event (payload `{ outcome: 'Yes' }`) and keep its `assigned()` control. Census, appended to `ticket-vocabulary-census.test.ts` (`describe('29.137 …')`):
   ```ts
   it('29.137 ticket.decided is folded and in no backfill list; payloadIds names every closeStarted id and nothing else', () => {
@@ -2021,6 +2168,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(payloadIds('ticket.decided', { outcome: 'Yes' })).toEqual([]); // control: no request, no ids
   });
   ```
+  **Kills:**
+  - 29.137 census: (a) add `'ticket.decided'` to `BOOTSTRAP_BACKFILL_TYPES` (`[folded, backfilled]`); (b) delete the `case 'ticket.decided'` arm in `payloadIds` (returns `[]`); (c) `add('ticket', ids[0])` only (the second id is missing).
+  - 29.135 permission door (`check-visibility-permission.test.ts`): Kills: none, guards existing behaviour (this task edits no permission file; the visibility gate judges by entity kind `ticket`, so `ticket.decided` inherits `ticket.field_set`'s answer. Non-vacuous: the guest-refused and member/shared-accepted halves sit in one `it`, so a gate that answered by type either way goes red).
+  - 27.007 fan-out loop with `ticket.decided`: Kills: none, guards existing behaviour (the `fanout.ts:353-397` chain has no default branch, so the explicit no-op arm and its absence behave alike; the leg pins that nobody is notified).
   Update the three founding-sequence tests (`check-role-permission.test.ts:637-649`, `workspaces.test.ts:142-155` and `:365`, `workspace-bootstrap-failure.test.ts:~251`) to one more `'ticket-type.defined'`, `slice(2, 7)` and `['epic', 'story', 'task', 'sub-task', 'decision']` (the grant moves to index 7), and `seed-cc.test.ts:164-169` `118 + 7` with "the five built-in ticket types" and "seventh... " in its prose. Re-read each for the literal numbers before editing.
   Run (LOCAL): `pnpm --filter @gisik-nokma/domain build && pnpm --filter @gisik-nokma/rule-engine build`, then `slot-run.sh wtg2-t5-server -- pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2` plus `pnpm check:migrations`. Expected: PASS. Flip 29.135 and 29.137 (server halves).
   Commit: `wtg2 T5: proj_tickets outcome and passes, the doors and the census`.
@@ -2045,7 +2196,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     }
     ```
     and `VALID_PAYLOAD['ticket.decided'] = { outcome: 'Yes' }` in `history-copy.test.ts`, plus a describe with the four sentences as literal strings and a no-payload fallback (`eventOf('ticket.decided')` with payload `{}` returns the wire name).
-  - `ticket-tools.ts` `redactedPayload` (sibling: the link branch, `:41-44`): `if (type === 'ticket.decided' && Array.isArray(payload['closeStarted'])) return { ...payload, closeStarted: (payload['closeStarted'] as unknown[]).map((v) => (v === null ? "a ticket you can't see" : v)) };` The route that nulls hidden ids is T17 (see its History step); the outcome label stays. `redacted-payload.test.ts` gains the two assertions and the existing census loop (`for (const r of domainRegistry.registrations()) …not.toThrow()`) covers the empty payload.
+  - `ticket-tools.ts` `redactedPayload` (sibling: the link branch, `:41-44`): `if (type === 'ticket.decided' && Array.isArray(payload['closeStarted'])) return { ...payload, closeStarted: (payload['closeStarted'] as unknown[]).map((v) => (v === null ? "a ticket you can't see" : v)) };` The route that nulls hidden ids is T17 (see its History step); the outcome label stays. `redacted-payload.test.ts` gains the two assertions, a mixed list so each half can fail on its own: `expect(redactedPayload('ticket.decided', 'e1', { outcome: 'Yes', from: 'No', closeStarted: [null, T] })).toEqual({ outcome: 'Yes', from: 'No', closeStarted: ["a ticket you can't see", T] })` (the outcome and `from` kept, only the withheld id phrased) and `expect(redactedPayload('ticket.decided', 'e1', { outcome: null })).toEqual({ outcome: null })` (no `closeStarted`, untouched); the existing census loop (`for (const r of domainRegistry.registrations()) …not.toThrow()`) covers the empty payload.
+    Kills: (a) delete the `ticket.decided` branch (the null stays null); (b) map every id to the phrase (the visible `T` is lost); (c) return `{ closeStarted: ... }` without `...payload` (outcome and `from` are lost).
   - Tests: `packages/app-core/test/views/decision-type-defaults.test.ts` (29.134):
     ```ts
     import { describe, expect, it } from 'vitest';
@@ -2064,18 +2216,29 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       });
     });
     ```
+    **Kills:**
+    - 29.134 defaults: (a) drop the Decision exclusion in `defaultRootTypeFor` (the `task` leg: `'decision' < 'task'` wins the rank-3 tie); (b) drop it in `subtaskTypeFor` (the parent-rank-2 leg: the shallowest legal is the rank-3 Decision); (c) `candidates = preferred` with no fallback to `legal` (the two last-resort legs return `null`/throw on an empty reduce).
+
+    `history-copy.ts` sentences (the describe named above): `Kills:` (a) swap `from` and `outcome` in the revised sentence; (b) drop the `(was ${from})` branch; (c) `return 'Decided'` for the empty payload instead of `event.type`.
     `mappers.test.ts` (`describe` near 13.724): `29.358` builds `ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' })`, spreads `ticketState: { ...body.ticketState, outcome: 'Yes', passes: [{ pass: 1, outcome: 'Yes', by: 'u', at: '2026-10-03T09:00:00.000Z', revisions: [] }] }`, and expects both onto `mapTicketRead(...).ticket`; the undecided body maps to a state with neither key. `replica-decision.test.ts`: copy the helpers of `replica.test.ts:80-290` (`envelope`, `workflowDefined`, `typeDefined`, `created`, `bootstrapOf`, `seededReplica`), then
     ```ts
     it('29.358 the replica folds ticket.decided into the confirmed state', async () => {
       const replica = await seededReplica();
       await replica.applyServerItem(created(TICKET, 'Go ahead?'));
+      await replica.applyServerItem(created(OTHER_TICKET, 'Never decided'));
       await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.decided', { outcome: 'Yes' }, { actorId: USER_B }));
       const confirmed = (await replica.getTicket(TICKET))?.confirmed;
       expect(confirmed?.outcome).toBe('Yes');
       expect(confirmed?.passes).toMatchObject([{ pass: 1, outcome: 'Yes', by: USER_B, revisions: [] }]);
-      expect('outcome' in ((await replica.getTicket(OTHER_TICKET))?.confirmed ?? {})).toBe(false); // control
+      // control: a REAL undecided ticket (an absent one would make `?? {}` pass whatever the replica does)
+      const other = (await replica.getTicket(OTHER_TICKET))?.confirmed;
+      expect(other?.id).toBe(OTHER_TICKET);
+      expect(['outcome', 'passes'].filter((k) => k in other!)).toEqual([]);
     });
     ```
+    **Kills:**
+    - 29.358 replica: (a) delete the `case 'ticket.decided'` arm in `applyTicketEvent` (`confirmed.outcome` undefined; the replica folds through the shared reducer); (b) `stamp.by` taken from anything but `env.actorId`, e.g. the ticket's creator (the decision is filed by `USER_B`).
+    - 29.358 mapper (`mappers.test.ts`): (a) drop the `passes` spread from `mapTicketState` (the table mutant); (b) drop the `outcome` spread; (c) spread `outcome: null` when the wire omits it (the undecided body gains the key).
   Run: build domain, rule-engine, app-core; `slot-run.sh wtg2-t5-client -- pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2`, then mcp-server and sync-client whole. Expected: PASS. Flip 29.134, 29.137, 29.358 ✅.
   Commit: `wtg2 T5: the diamond icon, Decision defaults, mapper, History and replica`.
 
@@ -2083,6 +2246,19 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   1. Regenerate the editor bundle (contract decision 12): `pnpm --filter @gisik-nokma/editor run build:webview && pnpm --filter @gisik-nokma/mobile run generate:editor-html`; then `grep -c 'ticket.decided' apps/mobile/src/editor/editor-html.generated.ts` must print at least 1 (`--check` WARNS and exits 0 when the webview is unbuilt, so the grep is the assertion). Commit the generated file.
   2. WHOLE suites (the registry list and the `TicketState` shape reach every door): domain, rule-engine, app-core, sync-client, mcp-server, server (the dual-client rig `apps/server/test/dual-client/` compares whole states with `toEqual`), web. `pnpm check:citations && node scripts/check-case-ids.mjs && pnpm check:migrations`.
   3. Features: put the two bullets of Step 1 under the `<!-- wtg-part2-model T5 bullet -->` anchor (keep the anchor line: T19's 29.146 guard reads the bullets below it) (re-read them against the code).
+  **Prose to sweep:** (lines read on the ref at 457f3caa; the manual and its generated help are T7's, per the Why above):
+  - `packages/app-core/src/views/new-ticket-dialog.tsx:59-60` — `defaultRootTypeFor`'s docblock: "Among the legal ones the DEEPEST is chosen" (now: except a Decision, unless it is the only legal type).
+  - `packages/app-core/src/views/ticket-sheet.tsx:156-157` — `subtaskTypeFor` rule 2: "otherwise the SHALLOWEST legal type" (same exception).
+  - `apps/server/src/routes/workspaces.ts:62` — the founding SEQUENCE docblock: "the four built-in types".
+  - `apps/server/src/projections/ticket-types.ts:157` — "A ladder is four built-ins plus a workspace's custom ...".
+  - `apps/server/src/seed/seed-convenience-corner.ts:166` — "the four built-in ticket types bound to it".
+  - `apps/server/src/seed/seed-dev-workspace.ts:26` — "the four built-in ticket types".
+  - `packages/app-core/src/online/online-data-source.ts:499` — "bootstrap materialises the four built-ins".
+  - `packages/app-core/src/workflow-builder/ticket-types/icons.tsx:2` — "enough to name the four" built-ins (the plan edits "sixteen" on the same line; this half too).
+  - `packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:92` — "the four built-ins are rank-locked".
+  - `Features.md:485` — "re-ranks one of the four built-ins".
+  - `apps/server/src/sync/sync-routes.ts:48` — "The pair has moved six times" (seven after this task; folded into the docblock edit above).
+
   4. Flip the seven cases ✅ in the SAME commits as their tests. Push. DONE + REVIEW (NEEDS: T2 merged; T1's recorded result).
 
 **Mutations** (each on the green branch, expect the named red, restore):
@@ -2193,6 +2369,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(await checkTicketDecided(decided('yes', 'Yes'), yes)).toEqual({ refused: true, rule: 'decision.same-outcome', reason: 'The decision is already Yes.' });
       expect(await checkTicketDecided(decided('No'), yes)).toEqual({ refused: true, rule: 'decision.stale-from', reason: 'The decision changed to Yes since you looked.' });
       expect(await checkTicketDecided(decided('No', 'Maybe'), yes)).toMatchObject({ rule: 'decision.stale-from' });
+      // order: stale-from is judged BEFORE the label (an unknown label AND a stale `from`); every other leg has only one fault
+      expect(await checkTicketDecided(decided('Maybe'), yes)).toEqual({ refused: true, rule: 'decision.stale-from', reason: 'The decision changed to Yes since you looked.' });
       expect(await checkTicketDecided(decided('No', 'Yes'), yes)).toEqual({ refused: false }); // control: the right `from`
       expect(await checkTicketDecided(decided(null, 'Yes'), yes)).toEqual({ refused: false });
       expect(await checkTicketDecided(decided(null), yes)).toMatchObject({ rule: 'decision.stale-from' });
@@ -2213,12 +2391,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(await evaluateEvent(move('done'), world([], on(D, 'ticket.link_added', { kind: 'blocks', targetId: NEXT })))).toEqual({ refused: false });
       expect(await evaluateEvent(move('doing'), world(['Yes', 'No']))).toEqual({ refused: false });
       expect(await checkTicketClosed(close(), world(['Yes'], decided('Yes'), move('done')))).toEqual({ refused: false });
+      // a TASK with an outgoing leads_to and no outcome: NEXT gets its own branch (D's link is outgoing from D, not from NEXT)
       const taskWithBranch = on(NEXT, 'ticket.transitioned', { to: 'done' });
-      expect(await evaluateEvent(taskWithBranch, world(['Yes']))).toEqual({ refused: false });
+      expect(await evaluateEvent(taskWithBranch, world(['Yes'], on(NEXT, 'ticket.link_added', { kind: 'leads_to', targetId: NEXT2 })))).toEqual({ refused: false });
       // a cleared decision is outcome-less again
       expect(await evaluateEvent(move('done'), world(['Yes'], decided('Yes'), decided(null, 'Yes')))).toEqual(outcomeRequired);
       // the parent-terminal invariant keeps its place in front
-      const child = makeEnvelope({ type: 'ticket.created', entity: { kind: 'ticket', id: NEXT2 }, workspaceId: WS, payload: { typeId: 'task', projectId: PROJECT, parentId: D, title: 'child' } });
+      const CHILD = '01J9GCHD000000000000000000'; // NEXT2 is already created by `world`
+      const child = makeEnvelope({ type: 'ticket.created', entity: { kind: 'ticket', id: CHILD }, workspaceId: WS, payload: { typeId: 'task', projectId: PROJECT, parentId: D, title: 'child' } });
       expect(await evaluateEvent(move('done'), world(['Yes'], child))).toMatchObject({ rule: 'parent-terminal-with-open-children' });
     });
     it('29.140 the exemption parameter is off by default and lifts only the outcome rule', () => {
@@ -2228,7 +2408,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
-  (`world([], child)` for the open-child case: the child is created with `parentId: D`; `world`'s `NEXT2` is already created, so use a fresh id `CHILD = '01J9GCHD000000000000000000'` in that one line.) Run: `pnpm --filter @gisik-nokma/domain build` then `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t6-red -- pnpm --filter @gisik-nokma/rule-engine exec vitest run test/decision.test.ts > /tmp/wtg2-t6-red.log 2>&1; tail -30 /tmp/wtg2-t6-red.log`. Expected: FAIL (no `checks/decision.js`).
+  (The open-child case creates `CHILD` with `parentId: D`; `world`'s `NEXT2` is already created, hence the fresh id.)
+  **Kills:**
+  - 29.138 whose it is: (a) drop `if (ticket.typeId !== DECISION_TYPE_ID) return refuse('decision.not-a-decision');` (the Task answers `decision.unknown-outcome`); (b) omit the `case 'ticket.decided'` arm in `evaluate.ts` (the two `evaluateEvent` legs); (c) move the kind guard after `getTicketState` (the note leg answers `unknown-ticket` or reads a ticket).
+  - 29.139 outcome rules: (a) `label === outcome` in place of `sameLabel` (`'  yes '` refused); (b) unknown-outcome checked before stale-from (the `decided('Maybe')` over `Yes` leg names labels); (c) treat an absent `from` as "any" (`decided('No')` over `Yes` accepted); (d) `if (outcome === null) return ACCEPT;` (the clear-of-nothing leg).
+  - 29.140 DC-5: (a) `(ticket.links ?? []).length > 0` in place of the `leads_to` test (the blocks-only control is refused); (b) delete the `decisionOutcomeRequired` call in `transition.ts` (the first leg is accepted); (c) delete it in `close.ts` (the close leg is accepted); (d) run DC-5 before the open-child count (the child leg names the outcome); (e) drop `ticket.typeId !== DECISION_TYPE_ID ||` from `decisionOutcomeRequired` (the Task-with-a-branch control is refused; before this fix the Task had no branch of its own, so the control could not fail).
+  - 29.140 exemption: (a) ignore `branchNotTaken` (the `true` leg refuses); (b) default `branchNotTaken = true` (the default leg passes). Run: `pnpm --filter @gisik-nokma/domain build` then `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t6-red -- pnpm --filter @gisik-nokma/rule-engine exec vitest run test/decision.test.ts > /tmp/wtg2-t6-red.log 2>&1; tail -30 /tmp/wtg2-t6-red.log`. Expected: FAIL (no `checks/decision.js`).
 
 - [ ] **Step 3: Engine implementation**
 
@@ -2323,6 +2508,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(ok).toMatchObject({ status: 'committed' }); // control: the same move, now with an outcome, from the same row
   });
   ```
+  **Kills:** 29.140 real door: (a) delete the `decisionOutcomeRequired` call in `transition.ts` (the first submission commits); (b) omit the `ticket.decided` arm in `evaluate.ts` (the decision is refused or unhandled, so the control move is refused again).
   (`D`'s workflow has `todo -> doing -> done` declared edges as in `sweep.test.ts:140-150`; start the Decision `focus` and move it to `doing` in the seed so `doing -> done` is one declared edge.) `sweep.ts`: add the clause after the child-guard `NOT EXISTS` (`:206-211`) and the parameter:
   ```sql
           -- DC-5 (wtg2 T6): a Decision with branches and no outcome is not a candidate. `checks/decision.ts` refuses its close,
@@ -2361,11 +2547,16 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const chosen = await seedDecision(ws, { branches: true, outcome: 'set' });
     const free = await seedDecision(ws, { branches: false, outcome: 'none' });
     const task = await seedTicket({ workspaceId: ws, enteredAt: '2026-08-02T00:00:00.000Z' });
+    // the Task control gets a branch of its own, so it is a candidate only because of `t.type_id = $3`
+    const tail = await seedTicket({ workspaceId: ws, enteredAt: '2026-09-17T00:00:00.000Z', state: 'doing' });
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: ws, actorId: HUMAN, entity: { kind: 'ticket', id: task }, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: tail }, serverTime: '2026-08-02T00:00:30.000Z' })]);
     expect(await sweep()).toEqual({ workspacesOn: 1, candidates: 3, closed: 3, refused: 0 });
     for (const id of [chosen, free, task]) expect(await closedAt(id)).not.toBeNull();
     for (const id of [bare, cleared]) expect(await closedAt(id)).toBeNull();
   });
   ```
+  (Check that `seedTicket`'s "entered" instant is still its own `enteredAt` after the link: the sweep's LATERAL reads only `ticket.created` / `ticket.transitioned` / `ticket.published`, so a `ticket.link_added` does not move it.)
+  **Kills:** 29.142 sweep mirror: (a) delete the clause (`bare` and `cleared` become candidates: 5 candidates, 2 refused); (b) drop `AND t.outcome IS NULL` (`chosen` is excluded: candidates 2); (c) drop the `EXISTS (... 'leads_to')` (`free` is excluded); (d) drop `t.type_id = $3 AND` (the Task with a branch is excluded; before this fix the Task had no link, so this mutant survived).
   Run (LOCAL): build domain and rule-engine, `slot-run.sh wtg2-t6-server -- pnpm --filter @gisik-nokma/server exec vitest run test/decision test/auto-close --maxWorkers=2`. Expected: PASS. Flip 29.140 (door half) and 29.142 ✅.
   Commit: `wtg2 T6: the real-door case and the auto-close sweep mirror`.
 
@@ -2409,6 +2600,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await precheckEvent(closeTicket(), readyCache({ typeId: 'decision', stateId: 'done', stateCategory: 'terminal' }))).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
     expect(await precheckEvent(done(), readyCache({ typeId: 'decision', links: [link], outcome: 'Yes' }))).toEqual({ kind: 'passed' }); // control
     expect(await precheckEvent(done(), readyCache({ typeId: 'task', links: [link] }))).toEqual({ kind: 'passed' }); // control: a Task
+    expect(await precheckEvent(done(), readyCache({ typeId: 'task' }))).toEqual({ kind: 'passed' }); // control: a Task with no visible link is not deferred
     const decide = (outcome: string | null, from?: string | null) => make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.decided', payload: { outcome, ...(from === undefined ? {} : { from }) } });
     expect(await precheckEvent(decide('Yes'), readyCache({ typeId: 'decision', links: [link] }))).toEqual({ kind: 'passed' });
     expect(await precheckEvent(decide('Maybe'), readyCache({ typeId: 'decision', links: [link] }))).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
@@ -2416,10 +2608,15 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await precheckEvent(decide('Yes'), readyCache({ typeId: 'task', links: [link] }))).toMatchObject({ kind: 'refused', rule: 'decision.not-a-decision' });
   });
   ```
+  **Kills:** 29.141 client mirror: (a) `acceptRestsOnUnseenBranches` returns `false` (the no-visible-branch move passes); (b) delete `if (decisionBranchesUnseen(ticket)) return notEvaluated();` in `precheckTicketClosed` (the branch-less close passes); (c) map `decision.unknown-outcome` to `refused` (`decide('Maybe')`); (d) drop `ticket.typeId === DECISION_TYPE_ID &&` from `decisionBranchesUnseen` (the link-less Task control defers); (e) delete the `ticket.decided` routing line in `precheckEvent` (every `decide` leg answers `not-evaluated`).
   Run: build rule-engine, `slot-run.sh wtg2-t6-app -- pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2`. Expected: PASS. Flip 29.141 ✅.
   Commit: `wtg2 T6: the client precheck mirror`.
 
 - [ ] **Step 6: Wide runs, Features, DONE**
+  **Prose to sweep:** (lines read on the ref at 457f3caa):
+  - `packages/rule-engine/src/checks/close.ts:9-17` — the close door's docblock lists its legality as "only legal from a terminal state" and "only legal over finished children"; DC-5 adds a third refusal (`decision.outcome-required`) at the same `return`.
+  - `packages/app-core/src/precheck.ts:118-119` — "Five gates keep it for `ticket.transitioned`'s accept path": `acceptRestsOnUnseenBranches` is a sixth, and the numbered list (`:125-156`) needs its entry (`:123` "not one of the four" is already off by one on the ref).
+
   Build domain, rule-engine, app-core, then WHOLE rule-engine, app-core, sync-client (its local context evaluates through the engine) and server suites; `pnpm check:citations && node scripts/check-case-ids.mjs`. Flip anything left ✅ in the commit of its test; put the Step 1 bullet under the `<!-- wtg-part2-model T6 bullet -->` anchor (keep the anchor line: 29.146 reads the bullets below it). No mobile bundle step: this task changes no registry, no vocabulary and no notification kind. Push. DONE + REVIEW (NEEDS: T5, T2 merged; the `ticket.decided` server door gates `decision.bad-close-started` and `decision.cascade-blocked` are T16's, not here).
 
 **Mutations** (each on the green branch, expect the named red, restore):
@@ -2446,7 +2643,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Files:**
 - Create: `apps/server/src/flow/decision-backfill.ts`; `apps/server/src/tools/backfill-decision-type.ts` (CLI); `apps/server/test/flow/decision-backfill.test.ts`; `packages/app-core/test/views/subtask-type-for.test.ts`.
-- Modify: `apps/server/src/ops/backup-daemon-main.ts` (import block `:1-27`, env read after `:194`, job after the `auto-close` entry `:276-292`); `apps/server/package.json:15` (script `wtg:backfill-decision`); `.env.example:385` (new variable); `docs/manual.md:48,227,1555,1579`; `packages/app-core/src/help/content.generated.ts` (generated); `Features.md:485,521,544`.
+- Modify: `apps/server/src/ops/backup-daemon-main.ts` (import block `:1-27`, env read after `:194`, job LAST in `scheduledJobs`, after `expired-sessions` `:305-310`, (planner ruling 2026-10-04, Q5)); `apps/server/package.json:15` (script `wtg:backfill-decision`); `.env.example:385` (new variable); `docs/manual.md:48,227,1555,1579`; `packages/app-core/src/help/content.generated.ts` (generated); `Features.md:485,521,544`.
 - Modify tests (the pins the fifth seed breaks): `apps/server/test/routes/workspaces.test.ts:117,142-155,233,264-265,365`; `apps/server/test/permissions/check-role-permission.test.ts:625-650,748-901`; `apps/server/test/routes/workspace-bootstrap-failure.test.ts:62,255-263`; `apps/server/test/seed/seed-cc.test.ts:164-169`; `apps/server/test/ops/backup-daemon-main.test.ts` (new case after 6.350); `packages/domain/test/ticket-types.test.ts:164-190`; `packages/app-core/test/ticket-types/ticket-types.test.tsx:239,342` (+ one icon case); `packages/app-core/test/views/new-ticket-dialog.test.tsx:1066-1100`.
 
 **Interfaces:**
@@ -2559,14 +2756,15 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect((await findDecisionBackfillCandidates(db.pool)).map((c) => c.workspaceId)).toEqual([live]); // dry-run view
       const report = await backfillDecisionType({ pool: db.pool, ingest: door() });
       expect(report).toEqual({ candidates: 1, defined: 1, refused: 0, alreadyHad: 1 });
-      expect(await decisionRows(live)).toHaveLength(1); // control: the live one did get it
+      expect(await decisionRows(live)).toEqual([expect.objectContaining({ workflow_id: `wf-main-${live}`, defined_by: SYSTEM_ACTOR_FLOW })]); // control: the live one did get it
       expect(await decisionRows(custom)).toEqual([expect.objectContaining({ name: 'Choices', rank: 5, icon: 'flag' })]);
       expect(await decisionEvents(custom)).toHaveLength(1); // only their own
       for (const skipped of [trashed, marked, taskless]) expect(await decisionRows(skipped)).toEqual([]);
     });
 
     it('29.143 counts a refused and an invalid answer in refused and logs each, instead of throwing', async () => {
-      await seedLegacy(newUlid());
+      const ws = newUlid();
+      await seedLegacy(ws);
       const log = vi.fn();
       const refusing = { ingestBatch: async (events: unknown[]) => events.map((e) => ({ status: 'refused' as const, eventId: (e as { id: string }).id, rule: 'test.rule', reason: 'nope' })) };
       const invalid = { ingestBatch: async (events: unknown[]) => events.map(() => ({ status: 'invalid' as const, eventId: null, code: 'invalid-payload' as const, message: 'bad' })) };
@@ -2574,7 +2772,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(await backfillDecisionType({ pool: db.pool, ingest: invalid as never, log })).toEqual({ candidates: 1, defined: 0, refused: 1, alreadyHad: 0 });
       expect(log).toHaveBeenCalledTimes(2);
       expect(String(log.mock.calls[0]?.[0])).toContain('test.rule');
+      expect(String(log.mock.calls[0]?.[0])).toContain(ws); // the line names the workspace the refusal belongs to
       expect(String(log.mock.calls[1]?.[0])).toContain('INVALID');
+      expect(String(log.mock.calls[1]?.[0])).toContain(ws);
     });
 
     it('29.143 the interval reader and the boot-then-repeat delay', () => {
@@ -2589,6 +2789,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.143 binds to the task type's workflow: (a) `WHERE t.type_id = 'epic'` / bind to the workspace's first workflow by id (`wf-main-…` < `wf-task-…`, the `workflow_id` leg and the payload leg); (b) `origin: 'web'` in the backfill event (the `toMatchObject` leg, or the report leg if the door refuses it); (c) retype the definition instead of `builtinTicketTypeDefs(workflowId)` with `rank: 4` (the payload equality leg).
+  - 29.143 a second run adds nothing: (a) drop the first `NOT EXISTS (... d.type_id = $1)` (the second run reports `candidates: 1` and a second event); (b) `alreadyHad: 0` instead of the `had` count (`alreadyHad: 1` leg).
+  - 29.143 adopts and skips: (a) drop the `proj_workspaces` `NOT EXISTS` (trashed and marked become candidates); (b) drop `OR w.purge_marked_at IS NOT NULL` (the marked workspace alone); (c) drop the first `NOT EXISTS` (the custom workspace gains a second definition, `decisionEvents(custom)` length 2).
+  - 29.143 refused and invalid counted: (a) `if (result.status === 'refused') report.refused += 1` only (the invalid run reports `refused: 0`); (b) `throw` on a non-committed result (the call rejects); (c) `const workspaceId = 'unknown'` in the log (the `toContain(ws)` legs).
+  - 29.143 interval reader and delay: (a) `firstThenEvery` returns `every` on the first call too (`30_000` leg); (b) `return bootMs` without `Math.min` (the `quick` leg reads `30_000`); (c) drop `raw.trim() === ''` (the blank value reads `0`).
   Run (LOCAL; `pnpm --filter @gisik-nokma/domain build && pnpm --filter @gisik-nokma/rule-engine build` first): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t7-backfill -- pnpm --filter @gisik-nokma/server exec vitest run test/flow/decision-backfill.test.ts --maxWorkers=2 > /tmp/wtg2-t7-backfill.log 2>&1; tail -30 /tmp/wtg2-t7-backfill.log`. Expected FAIL (module not found).
 
 - [ ] **Step 3: Implement** — `apps/server/src/flow/decision-backfill.ts`:
@@ -2702,7 +2908,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 - [ ] **Step 4: Daemon wiring, CLI, env, wiring case**
 
-  `backup-daemon-main.ts`: import `{ backfillDecisionType, decisionBackfillIntervalMs, DECISION_BACKFILL_BOOT_DELAY_MS, firstThenEvery } from '../flow/decision-backfill.js';` and, after `const sessionSweepIntervalMs = ...` (`:194`), `const decisionBackfillEveryMs = decisionBackfillIntervalMs(process.env);`. After the `auto-close` entry add:
+  `backup-daemon-main.ts`: import `{ backfillDecisionType, decisionBackfillIntervalMs, DECISION_BACKFILL_BOOT_DELAY_MS, firstThenEvery } from '../flow/decision-backfill.js';` and, after `const sessionSweepIntervalMs = ...` (`:194`), `const decisionBackfillEveryMs = decisionBackfillIntervalMs(process.env);`. Append LAST in `scheduledJobs`, after the `expired-sessions` entry (`:305-310`), so no existing ordinal comment goes false (planner ruling 2026-10-04, Q5):
   ```ts
     {
       // Spec DC-3: the Decision type for workspaces founded before the seed existed. Boot + daily, idempotent.
@@ -2714,7 +2920,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       delayMs: firstThenEvery(decisionBackfillEveryMs, DECISION_BACKFILL_BOOT_DELAY_MS),
     },
   ```
-  `delayMs: firstThenEvery(...)` is a closure created ONCE here, so its `first` flag survives the scheduler's up-front call and re-arms. `.env.example` after `:385`: `# (worker) how often the Decision-type backfill runs (wtg-part2-model T7, spec DC-3); optional, default 86400000 (daily). The first run is min(30000, this) after boot. Same refusal shape as the sweeps above.` then `DECISION_BACKFILL_INTERVAL_MS=86400000`. `package.json:15` (after `verify:projections`): `"wtg:backfill-decision": "tsx src/tools/backfill-decision-type.ts",`.
+  `delayMs: firstThenEvery(...)` is a closure created ONCE here, so its `first` flag survives the scheduler's up-front call and re-arms. `.env.example` after `:385`: `# (worker) how often the Decision-type backfill runs (wtg-part2-model T7, spec DC-3); optional, default 86400000 (daily). The first run is min(30000, this) after boot. Same refusal shape as the sweeps above.` (a job of the same daemon: no ordinal in the new comment, (planner ruling 2026-10-04, Q5)) then `DECISION_BACKFILL_INTERVAL_MS=86400000`. `package.json:15` (after `verify:projections`): `"wtg:backfill-decision": "tsx src/tools/backfill-decision-type.ts",`.
 
   `apps/server/src/tools/backfill-decision-type.ts` (sibling: `src/seed/cli-seed-dev-workspace.ts:45-47` composes the pool and the door; T1's `src/tools/wtg-preflight.ts` has the `executedDirectly` guard):
   ```ts
@@ -2765,6 +2971,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(after.rows).toEqual([{ workflow_id: wf }]);
   }, 60_000);
   ```
+  **Kills:**
+  - 29.143 the daemon runs the job: (a) leave the `decision-backfill` entry out of `scheduledJobs` (no log line; `after.rows` is `[]`); (b) `run` logs the line without calling `backfillDecisionType` (`after.rows` is `[]`).
   Run `wtg2-t7-daemon` (`test/ops/backup-daemon-main.test.ts test/flow`) then `pnpm check:env`. Expected FAIL before the wiring, PASS after. Flip 29.143 ✅.
 
   Commit: `wtg2 T7: the daemon runs the backfill; CLI; env (29.143)`.
@@ -2789,6 +2997,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(defaultRootTypeFor([decision, { id: 'errand', name: 'Errand', rank: 3, workflowId: 'wf-errand' }, { id: 'chore', name: 'Chore', rank: 3, workflowId: 'wf-errand' }])?.id).toBe('chore'); // the id tie-break among the rest is unchanged
   });
   ```
+  **Kills:** (T5 owns both readers, so these are T5-code mutants that T7's cases must also kill, as Step 6 says):
+  - 29.144 defaultRootTypeFor: (a) reduce over `legal` instead of `candidates` (drop the `DECISION_TYPE_ID` filter: the first two legs return `decision`); (b) `const candidates = preferred` with no fallback (the `[decision]` leg returns `null`); (c) `type.id > best.id` in the tie-break (the chore leg returns `errand`).
   New `packages/app-core/test/views/subtask-type-for.test.ts`:
   ```ts
   import { describe, expect, it } from 'vitest';
@@ -2807,15 +3017,23 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:** (T5's code):
+  - 29.144 subtaskTypeFor: (a) reduce over `legal` instead of `candidates` (the errand leg and the sub-task leg return `decision`); (b) no fallback to `legal` when `preferred` is empty (the last-resort leg returns `null`). The rule-1 leg guards existing behaviour (`task` wins whenever legal).
   Icon case, `ticket-types.test.tsx` (imports `TYPE_ICON_NAMES` at `:24`; add `TYPE_ICONS, TypeIcon` and `DECISION_TYPE_ID`):
   ```tsx
   it('29.144 every built-in seed names an icon this build can draw, and the Decision draws a diamond, not the folder fallback', () => {
     for (const def of builtinTicketTypeDefs('wf')) expect(TYPE_ICON_NAMES, def.id).toContain(def.icon);
     const decision = builtinTicketTypeDefs('wf').find((d) => d.id === DECISION_TYPE_ID)!;
+    expect(decision.icon).toBe('diamond');
     const { container } = render(<TypeIcon name={decision.icon} />);
-    expect(container.querySelector('path')?.getAttribute('d')).not.toBe(TYPE_ICONS.folder[0].d);
+    const drawn = container.querySelector('path')?.getAttribute('d');
+    // The diamond's own path, not merely "not the folder": an absent <path> reads `undefined`, which is not the folder either.
+    expect(drawn).toBe(TYPE_ICONS.diamond[0].d);
+    expect(drawn).not.toBe(TYPE_ICONS.folder[0].d);
   });
   ```
+  **Kills:** (T5's code):
+  - 29.144 the diamond: (a) delete the `diamond:` entry from `TYPE_ICONS` (the `TYPE_ICON_NAMES` leg fails for `decision`, and `TYPE_ICONS.diamond[0]` throws); (b) seed the Decision with `icon: 'flag'` (the `toBe('diamond')` and path legs).
   Run `wtg2-t7-readers` (app-core `test/views/new-ticket-dialog.test.tsx test/views/subtask-type-for.test.ts test/ticket-types/ticket-types.test.tsx`). Expected PASS on arrival: T5 owns the two readers, the diamond icon and the notice (reconciler: one owner), and these cases pin them from the founding side. A red here means T5 did not land as planned: STOP, `NEEDS: planner`.
 
   Implement: nothing in `new-ticket-dialog.tsx`, `ticket-sheet.tsx`, `icons.tsx` or `page.tsx` (T5 owns them). Prove it: `git grep -n DECISION_TYPE_ID packages/app-core/src/views/new-ticket-dialog.tsx packages/app-core/src/views/ticket-sheet.tsx` prints a line in each, and `grep -n "diamond:" packages/app-core/src/workflow-builder/ticket-types/icons.tsx` prints one.
@@ -2827,6 +3045,17 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 - [ ] **Step 6: Manual, help, Features, sweeps, DONE**
 
   `docs/manual.md:48` row becomes `| **Epic / Story / Task / Sub-task / Decision** | The five built-in kinds of ticket. Epic is the biggest and Sub-task the smallest; a Decision sits at the same level as a Task and stands for a choice between branches of work. An admin can rename these. |`; `:227` "Five built-in kinds of ticket: **epic**, **story**, **task**, **sub-task** and **decision**."; `:1555` "The five built-in types have no Reorder button"; `:1579` "You **can** rename epic, story, task, sub-task and decision". Run `pnpm help:generate && pnpm check:help`. `Features.md:485,521,544`: "four" becomes "five" and name the Decision where the list is spelled out. Add under `<!-- wtg-part2-model T7 bullet -->`: `- ⚙️ **The Decision type reaches existing workspaces** (wtg2 T7; `apps/server/src/flow/decision-backfill.ts`, job `decision-backfill` on the backup worker, `DECISION_BACKFILL_INTERVAL_MS`, CLI `pnpm --filter @gisik-nokma/server run wtg:backfill-decision [--dry-run]`) — an idempotent job defines the built-in Decision type in every live workspace that has a task type and no decision type, bound to the task type's workflow, filed by the flow actor; new workspaces get it from the founding sequence. Cases 29.143-29.144.`
+  **Prose to sweep:** (beyond the manual and Features lines above; each read on the ref; the fifth seed (T5) makes the "four" false, and T7 owns the founding-side prose):
+  - `docs/faq.md:451` — "An admin can rename all four built-in types"; `docs/faq.md:457` — "The four built-in types have no such button".
+  - `apps/server/src/routes/workspaces.ts:62` — founding SEQUENCE "(the default workflow, the four built-in types, the founder's owner grant)".
+  - `apps/server/src/seed/seed-convenience-corner.ts:166` — "the four built-in ticket types bound to it"; `apps/server/src/seed/seed-dev-workspace.ts:26` — "the four built-in ticket types".
+  - `apps/server/src/projections/ticket-types.ts:157` — "A ladder is four built-ins plus a workspace's custom".
+  - `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:169` — docblock "asserting four types the workspace was never asked about" (`:195`'s notice is T5's edit).
+  - Test prose the Step 5 sweep's grep does not match: `apps/server/test/helpers/events.ts:58` ("as `foundingSequence` files the four built-ins"), `apps/server/test/ingest.test.ts:27`, `apps/server/test/ops/export-ledger.test.ts:59`, `apps/server/test/ops/restore-drill.test.ts:328` ("four ticket types"), `apps/server/test/permissions/check-role-permission.test.ts:625,627` ("the four built-in types", in a test TITLE), `apps/server/test/routes/workspace-bootstrap-failure.test.ts:251` ("all seven events"), `apps/server/test/routes/workspace-founding-origin.test.ts:84`, `apps/server/test/routes/workspaces.test.ts:231` ("still seven events"), `apps/server/test/seed/seed-cc.test.ts:154` ("Seven events the seed"), `apps/web/test/filters-sheet.test.tsx:457` (title "offering the four built-ins"), `apps/web/test/project-create-gate.test.tsx:432`.
+  - `docs/product-coverage-map.md:120` — "four built-in job types".
+  - `apps/server/test/ops/backup-daemon-main.test.ts:71` — `describe('… one scheduler for all six jobs'` (seven on the ref already, eight after this task).
+  - (Not to edit: `apps/server/migrations/1787961700000_proj-ticket-types.sql:66` says "the four built-ins" in a COMMENT ON, but an applied migration is never edited.)
+
   Run `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:env && pnpm check:tasks`. The mobile editor bundle does not change (no domain registry change in this task: `DECISION_TYPE_ID` and the seed are T2's and T5's, which regenerated it); run `node apps/mobile/scripts/generate-editor-html.mjs --check` once to prove it. **Mutations:** 29.143 (bind to the first workflow; drop the NOT EXISTS; drop the `proj_workspaces` exclusion; count only `'refused'`; make `firstThenEvery` always return the interval), 29.144 (drop the `DECISION_TYPE_ID` filter in both readers; drop `diamond`: T5's code, which T7's cases must also kill). Push. DONE + REVIEW (NEEDS: T6, T8).
 
 ---
@@ -2884,6 +3113,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   it('29.200 the causes are strict and discriminated; isFlowCause and viewerSafeCause', () => {
     for (const c of [reopenedByFlow, notTaken, ledTo, { ...ledTo, label: undefined }]) expect(flowCauseSchema.safeParse(c).success).toBe(true);
     expect(flowCauseSchema.safeParse({ ...ledTo, extra: 1 }).success).toBe(false);
+    expect(flowCauseSchema.safeParse({ ...notTaken, extra: 1 }).success).toBe(false); // each arm is strict on its own
+    expect(flowCauseSchema.safeParse({ ...reopenedByFlow, extra: 1 }).success).toBe(false);
     expect(flowCauseSchema.safeParse({ ...notTaken, pass: 0 }).success).toBe(false);
     expect(flowCauseSchema.safeParse({ ...notTaken, decisionTicketId: 'nope' }).success).toBe(false);
     expect(flowCauseSchema.safeParse({ kind: 'led-to', sourceTicketId: SRC }).success).toBe(false); // triggeredBy required
@@ -2911,6 +3142,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(isSystemActor(SYSTEM_ACTOR_FLOW)).toBe(true);
   });
   ```
+  **Kills:**
+  - 29.200 strict and discriminated: (a) drop `.strict()` from `ledToCauseSchema` (the `ledTo` extra-key leg); (b) drop `.strict()` from `branchNotTakenCauseSchema` / `reopenedByFlowCauseSchema` (their extra-key legs); (c) `pass: z.number().int().min(0)` (the `pass: 0` leg); (d) `viewerSafeCause = (c) => ({ ...c })` (the `{ kind }` leg and the no-`SRC` leg).
+  - 29.201 the payloads: (a) `ticketClosedPayload` cause = `flowCauseSchema.optional()` (the `ledTo`-on-close leg); (b) `ticketReopenedPayload` cause = `flowCauseSchema.optional()` (the `notTaken`-on-reopen leg); (c) leave `workflow.ts:207` without the `flowCauseSchema` arm (the `[true, true, true, true]` leg).
+  - 29.202 the reserved actor: (a) spell the constant `…SYS0FI` (the ULID leg); (b) leave `[SYSTEM_ACTOR_FLOW, 'Flow']` out of `SYSTEM_ACTOR_NAMES` (the name and `isSystemActor` legs).
   and the reducer case (29.206), a Decision with outcome `No`, in a done state:
   ```ts
   it('29.206 reopened-by-flow releases a Decision outcome and keeps passes; Tasks and other causes are untouched; closed carries the cause', () => {
@@ -2922,6 +3157,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(applyTicketEvent({ ...decision, typeId: 'task' }, flowMove, deps).outcome).toBe('No'); // control: a Task keeps it
     const personMove = makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: decision.id }, payload: { to: 'todo' } });
     expect(applyTicketEvent(decision, personMove, deps).outcome).toBe('No'); // control: no cause, no release
+    // Another flow cause: only reopened-by-flow releases (the person-move control above has NO cause, so "release on any cause" survives it).
+    const ledMove = makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: decision.id }, payload: { to: 'todo', cause: ledTo }, actorId: SYSTEM_ACTOR_FLOW });
+    expect(applyTicketEvent(decision, ledMove, deps).outcome).toBe('No');
     const closeEv = makeEnvelope({ type: 'ticket.closed', entity: { kind: 'ticket', id: decision.id }, payload: { cause: notTaken }, actorId: SYSTEM_ACTOR_FLOW });
     const closed = applyTicketEvent(decision, closeEv, deps);
     expect(closed.closed).toMatchObject({ actorId: SYSTEM_ACTOR_FLOW, cause: notTaken });
@@ -2931,6 +3169,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect('cause' in (plain.closed ?? {})).toBe(false); // an uncaused close stays {actorId, at}
   });
   ```
+  **Kills:**
+  - 29.206 the reducer arms: (a) drop the `releaseOutcome` ternary (the `toBeUndefined` leg); (b) drop `&& moved.typeId === DECISION_TYPE_ID` (the Task control); (c) `p.cause !== undefined` in place of `p.cause?.kind === 'reopened-by-flow'` (the `ledMove` leg); (d) drop `...(p.cause === undefined ? {} : { cause: p.cause })` from the `ticket.closed` arm (the `toMatchObject` cause leg), or write `cause: p.cause` unconditionally (the `'cause' in` leg).
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t8-red -- pnpm --filter @gisik-nokma/domain exec vitest run test/flow-causes.test.ts > /tmp/wtg2-t8-red.log 2>&1; tail -30 /tmp/wtg2-t8-red.log`. Expected: FAIL (no `flow/causes`).
 
 - [ ] **Step 3: Domain implementation**
@@ -2996,12 +3236,17 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const forged = { refused: true, rule: 'cause.forged', reason: FORGED };
     expect(await evaluateEvent(by(PERSON, 'ticket.transitioned', { to: 'done', cause: notTaken }), w())).toEqual(forged);
     expect(await evaluateEvent(by(PERSON, 'ticket.transitioned', { to: 'doing', cause: ledTo }), w())).toEqual(forged); // forged even though the edge is declared
-    expect(await evaluateEvent(by(PERSON, 'ticket.closed', { cause: notTaken }), w(by(PERSON, 'ticket.transitioned', { to: 'doing' }), by(PERSON, 'ticket.transitioned', { to: 'done' })))).toEqual(forged); // before the terminal and children checks
+    expect(await evaluateEvent(by(PERSON, 'ticket.closed', { cause: notTaken }), w(by(PERSON, 'ticket.transitioned', { to: 'doing' }), by(PERSON, 'ticket.transitioned', { to: 'done' })))).toEqual(forged); // a closable ticket: without the guard this close is accepted
+    expect(await evaluateEvent(by(PERSON, 'ticket.closed', { cause: notTaken }), w())).toEqual(forged); // a ticket in To do: a guard placed after the terminal check would answer close-requires-terminal
     expect(await evaluateEvent(by(PERSON, 'ticket.reopened', { cause: reopened }), w())).toEqual(forged); // before the not-closed check
-    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'doing', cause: ledTo }), w())).toEqual({ refused: false }); // control: the flow's led-to on a declared edge
+    // control: the flow's led-to on a declared edge. From Backlog (the universal Start edge), because T13 adds `cause.led-to-not-backlog`
+    // and a led-to out of To do would then be refused for a reason that is not this case's.
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: ledTo }), buildMemoryContext([WF_STRICT], [typeDefined(TASK), createdIn('backlog')]))).toEqual({ refused: false });
     expect(await evaluateEvent(by(PERSON, 'ticket.transitioned', { to: 'doing', cause: { kind: 'reopened-for-child', childTicketId: D } }), w())).toEqual({ refused: false }); // control: a person's old cause
   });
   ```
+  **Kills:**
+  - 29.203 forged at three doors, first: (a) run `flowCauseForgery` after the edge lookup in `transition.ts` (the first leg answers `illegal-transition`); (b) drop the guard from `checkTicketReopened` (the reopen leg answers `not-closed`); (c) drop the guard from `checkTicketClosed` (the closable-ticket leg is accepted), or move it after the terminal check (the To-do leg answers `close-requires-terminal`); (d) `isFlowCause(cause) && true` without the actor test (the flow control is refused).
   29.204 (flow actor; `ctxStrict(...)` is the `ctx` of `transition-backlog.test.ts` with an actor-agnostic history):
   ```ts
   it('29.204 the flow moves over undeclared edges, and every invariant still holds', async () => {
@@ -3016,15 +3261,19 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened }), closed)).toMatchObject({ rule: 'closed-ticket' });
     // invariants: a child leaving terminal under a terminal parent
     const P = '01J9GPAR000000000000000000';
-    const underDone = buildMemoryContext([WF_STRICT], [typeDefined(TASK), createdIn('focus', P), createdIn('focus'), /* child T under P */ ...finish(T), ...finish(P)]);
+    // P first (no parent, id P), then T under P. (`createdIn(start, parentId, id = T)`: the earlier `createdIn('focus', P), createdIn('focus')`
+    // created T twice, the second time with no parent, so P was never a ticket and the invariant could not fire.)
+    const underDone = buildMemoryContext([WF_STRICT], [typeDefined(TASK), createdIn('focus', null, P), createdIn('focus', P), ...finish(T), ...finish(P)]);
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened }), underDone)).toMatchObject({ rule: 'child-open-under-terminal-parent' });
     // invariants: a parent entering terminal over an open child
     const overOpen = buildMemoryContext([WF_STRICT], [typeDefined(TASK), createdIn('focus'), childOf(T)]);
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), overOpen)).toMatchObject({ rule: 'parent-terminal-with-open-children' });
-    // control: led-to opens no edge
-    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: ledTo }), ctx('focus'))).toMatchObject({ rule: 'illegal-transition' });
+    // control: led-to opens no edge. From Backlog, so T13's `cause.led-to-not-backlog` (a led-to only out of Backlog) does not answer first.
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: ledTo }), ctx('backlog'))).toMatchObject({ rule: 'illegal-transition' });
   });
   ```
+  **Kills:**
+  - 29.204 undeclared edges, invariants hold: (a) drop `to.id === def.initialStateId ||` (the done -> todo leg); (b) drop `|| to.id === BACKLOG_STATE_ID` (the done -> backlog leg); (c) `def.states.findLast((s) => s.category === 'terminal')` (the two-terminal `done` leg and the `dropped` leg); (d) compute the exempt edge before the closed check and return accept (the closed leg); (e) an exemption for `led-to` too, e.g. `cause.kind === 'led-to' ? { from, to: to.id, rules: [] }` (the control). The two hierarchy legs guard existing behaviour (the invariants run after the edge lookup) and die only if the exemption returns early past them.
   Write `createdIn(start, parentId = null, id = T)`, `finish(id)` and `childOf(parent)` as three-line helpers at the head of the file (a `ticket.created` envelope with `parentId`, and the two `done`-bound transitions), copying the `created` builder of `checks/test-support.ts:80-100`; the rule ids are the pinned strings in `refusal-rules.ts` (`closed-ticket`, `parent-terminal-with-open-children`, `child-open-under-terminal-parent` — read the file and use its exact kebab ids if these differ). The three negative cases:
   ```ts
   it('29.361 a person gets no exemption, with or without a cause', async () => {
@@ -3032,6 +3281,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await evaluateEvent(by(PERSON, 'ticket.transitioned', { to: 'todo' }), atDone())).toMatchObject({ rule: 'illegal-transition' });
     expect(await evaluateEvent(by(PERSON, 'ticket.transitioned', { to: 'done', cause: notTaken }), ctx('focus'))).toMatchObject({ rule: 'cause.forged' });
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), ctx('focus'))).toEqual({ refused: false }); // control
+    // The actor test inside flowExemptEdge, on its own: at the door the forgery guard answers first for a person with a flow
+    // cause, so dropping the actor test there changes no evaluateEvent result. Asked directly, it must still say no.
+    const done = WF_STRICT.states.find((s) => s.id === 'done')!;
+    expect(flowExemptEdge(by(PERSON, 'ticket.transitioned', { to: 'done', cause: notTaken }), WF_STRICT, 'todo', done, notTaken)).toBeNull();
+    expect(flowExemptEdge(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), WF_STRICT, 'todo', done, notTaken)).toEqual({ from: 'todo', to: 'done', rules: [] }); // control
   });
   it('29.362 the flow actor needs the cause', async () => {
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done' }), ctx('focus'))).toMatchObject({ rule: 'illegal-transition' });
@@ -3042,9 +3296,20 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: reopened }), ctx('focus'))).toMatchObject({ rule: 'illegal-transition' }); // reopened-by-flow into a terminal
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: notTaken }), atDone())).toMatchObject({ rule: 'illegal-transition' }); // not-taken into the initial state
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'doing', cause: reopened }), ctx('backlog'))).toMatchObject({ rule: 'illegal-transition' }); // neither initial nor backlog
-    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), atDone())).toMatchObject({ rule: 'illegal-transition' }); // not-taken from a terminal ticket: nothing to pass over
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), atDone())).toMatchObject({ rule: 'illegal-transition' }); // done -> done (refused by `fromStateId === to.id`)
+    // not-taken from a terminal ticket: nothing to pass over. From the SECOND terminal state, so the `!== 'terminal'` clause decides,
+    // not the same-state test above. (`buildMemoryContext` folds history without evaluating it, so the undeclared move to `dropped` is
+    // a legal fixture.)
+    const atDropped = buildMemoryContext([WF_TWO_TERMINALS], [typeDefined(TASK), createdIn('focus'), by(PERSON, 'ticket.transitioned', { to: 'doing' }), by(PERSON, 'ticket.transitioned', { to: 'dropped' })]);
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), atDropped)).toMatchObject({ rule: 'illegal-transition' });
   });
   ```
+  (import `flowExemptEdge` beside `evaluateEvent`.)
+
+  **Kills:**
+  - 29.361 a person gets no exemption: (a) drop `env.actorId !== SYSTEM_ACTOR_FLOW ||` from `flowExemptEdge` (the direct `toBeNull` leg; at the door this mutant is equivalent because the forgery guard runs first); (b) drop the forgery guard in `transition.ts` (the `cause.forged` leg answers `illegal-transition`). The first two legs guard existing behaviour (undeclared edges for a person).
+  - 29.362 the flow needs the cause: (a) drop `|| !isFlowCause(cause)` (a cause-less flow move reaches `cause.kind` on `undefined` and throws, or is accepted); (b) return the synthetic edge for the flow actor whatever the cause (both legs accepted).
+  - 29.363 the cause must fit: (a) ignore `to` for `reopened-by-flow` (the into-terminal leg is accepted); (b) drop `stateCategoryOf(def, fromStateId) !== 'terminal'` (the `atDropped` leg is accepted); (c) drop `to.id === firstTerminal.id` (the not-taken-into-initial leg is accepted).
   (`atDone` and `ctx` are the file-level helpers above, hoisted out of the first `it`.) Run `slot-run.sh wtg2-t8-eng-red -- pnpm --filter @gisik-nokma/rule-engine exec vitest run test/flow-cause.test.ts`. Expected: FAIL.
 
 - [ ] **Step 5: Engine implementation**
@@ -3108,7 +3373,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     return { kind: 'reopened-for-child', childTicketId: asString(record['childTicketId'], `${path}.childTicketId`) };
   }
   ```
-  The existing test 3.43 (`reopened-by-decree`) stays a refusal control and its expected message gains the list; update the literal. `replica-data-source.ts:709-717` (`causeOf`): after the existing `record.kind` test, `if (isFlowCause(cause)) return viewerSafeCause(cause);` before the `reopened-for-child` line, so the replica serves the same `{kind}` the server does. `board.tsx:2267`: `{card.cause?.kind === 'reopened-for-child' ? (…chip…) : null}`; the chips for the flow kinds are Part 3-4's.
+  The existing test 3.43 (`reopened-by-decree`) stays a refusal control and its expected message gains the list; update the literal. `replica-data-source.ts:727-735` (`causeOf`): after the `typeof cause !== 'object' || cause === null` guard (`:731`) and before `const record` (`:732`), `if (isFlowCause(cause)) return viewerSafeCause(cause);` (planner ruling 2026-10-04, Q8: below the `reopened-for-child` early return it could never run, which is Kills (c)), so the replica serves the same `{kind}` the server does. `board.tsx:2267`: `{card.cause?.kind === 'reopened-for-child' ? (…chip…) : null}`; the chips for the flow kinds are Part 3-4's.
   `check-purged.ts` `payloadIds` (sibling: the `ticket.link_added` arm): add
   ```ts
   case 'ticket.transitioned':
@@ -3123,7 +3388,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   }
   ```
   (T5 added a `closeStarted` arm on `ticket.decided`; keep it.) `redactedPayload` in `history-copy.ts` (T5's edit site): when `cause.sourceTicketId`/`decisionTicketId` is `null` the sentence says "a ticket you can't see", when `triggeredBy`/`decidedBy` is `null` "someone you can't see" (the copy for a visible id is T17's).
-  Tests, `apps/server/test/read/flow-cause-serving.test.ts` (world: `state-provenance`'s existing test file for the seed): a ticket transitioned by `SYSTEM_ACTOR_FLOW` with `cause: notTaken` serves `cause: { kind: 'branch-not-taken' }` and `JSON.stringify(provenance)` contains neither `D` nor `PERSON`; a `reopened-for-child` cause is served whole (control). Mapper test in `packages/app-core/test/online/` (sibling: test 3.43): all three flow kinds map to `{kind}`; `reopened-by-decree` throws. Replica test (sibling: `replica-data-source` cause test): `causeOf` with a full flow cause returns `{ kind }` only. Purge test (sibling: `apps/server/test/purge/check-purged.test.ts`): a `ticket.closed` with `cause.decisionTicketId` of an erased ticket is refused with `PURGE_RULE`; with a live id it is accepted. Board test: a card with `cause: { kind: 'led-to' }` renders no "reopened, live work added" chip, `reopened-for-child` does (29.207).
+  Tests, `apps/server/test/read/flow-cause-serving.test.ts` (world: `state-provenance`'s existing test file for the seed): a ticket transitioned by `SYSTEM_ACTOR_FLOW` with `cause: notTaken` serves `cause: { kind: 'branch-not-taken' }` and `JSON.stringify(provenance)` contains neither `D` nor `PERSON`; a `reopened-for-child` cause is served whole (control). Mapper test in `packages/app-core/test/online/` (sibling: test 3.43): all three flow kinds map to `{kind}`; `reopened-by-decree` throws. Replica test (sibling: `replica-data-source` cause test): `causeOf` with a full flow cause returns `{ kind }` only. Purge test (sibling: `apps/server/test/purge/check-purged.test.ts`): a `ticket.closed` with `cause.decisionTicketId` of an erased ticket is refused with `PURGE_RULE`; with a live id it is accepted; and a `ticket.transitioned` whose `cause.sourceTicketId` (a `led-to`) names an erased ticket is refused too, with a live id accepted (the `sourceTicketId` line is otherwise unpinned: every other leg names a `decisionTicketId`). History test (sibling: `packages/app-core/test/views/history-copy.test.ts`): a `ticket.closed` whose `branch-not-taken` cause arrives redacted (`decisionTicketId: null`, `decidedBy: null`) reads a sentence containing "a ticket you can't see" and "someone you can't see"; the same event with both ids present contains neither phrase (control; the visible-id sentence itself is T17's). Board test: a card with `cause: { kind: 'led-to' }` renders no "reopened, live work added" chip, `reopened-for-child` does (29.207).
+
+  **Kills:**
+  - 29.207 served as `{kind}`, mapped, replica, board: (a) `servedCause = (raw) => raw as TransitionCause` (the provenance JSON contains `D`); (b) drop the `FLOW_KINDS` arm in `mapCause` (the three flow kinds throw); (c) put the replica's `isFlowCause` line after the `reopened-for-child` early return (`causeOf` returns `null`); (d) render the chip on `card.cause !== null` (the `led-to` card shows it).
+  - 29.208 purge door and History: (a) drop `case 'ticket.closed':` from `payloadIds` (the erased-decision close is accepted); (b) drop the `add('ticket', …sourceTicketId)` line (the erased-source transition is accepted); (c) render the redacted `decidedBy` with the generic actor fallback instead of "someone you can't see" (the History leg).
   Run: build domain, rule-engine, app-core; `slot-run.sh wtg2-t8-consumers -- pnpm --filter @gisik-nokma/server exec vitest run test/read test/purge --maxWorkers=2` and the app-core suite. Expected: PASS. Flip 29.207, 29.208 ✅.
   Commit: `wtg2 T8: serve flow causes as kinds, map them, name them to the purge door`.
 
@@ -3136,19 +3405,33 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const outcomeRequired = { refused: true, rule: 'decision.outcome-required', reason: 'Choose an outcome before finishing this decision.' };
     expect(await evaluateEvent(dec(FLOW, 'done', notTaken), decisionWorld(['Yes', 'No']))).toEqual({ refused: false });
     expect(await evaluateEvent(dec(PERSON, 'done'), decisionWorld(['Yes', 'No']))).toEqual(outcomeRequired); // a person: still DC-5 (control)
-    expect(await evaluateEvent(dec(FLOW, 'done', ledTo), decisionWorld(['Yes', 'No']))).toMatchObject({ rule: 'illegal-transition' }); // the flow without the cause
+    // (planner ruling 2026-10-04, Q6: no `led-to` leg. `doing -> done` is declared on WF_STRICT, so it would answer
+    // decision.outcome-required here and cause.led-to-not-backlog after T13; the two legs below carry the case line.)
+    expect(await evaluateEvent(dec(FLOW, 'done', reopened), decisionWorld(['Yes', 'No']))).toEqual(outcomeRequired); // the flow with ANOTHER flow cause on the declared doing -> done edge: DC-5 still applies (the case line's and the table's mutant)
+    expect(await evaluateEvent(dec(FLOW, 'done'), decisionWorld(['Yes', 'No']))).toEqual(outcomeRequired); // the flow with no cause on the declared edge
     const closing = decisionWorld(['Yes', 'No'], dec(FLOW, 'done', notTaken));
     expect(await evaluateEvent(by(FLOW, 'ticket.closed', { cause: notTaken }), closing)).toEqual({ refused: false });
     expect(await evaluateEvent(by(PERSON, 'ticket.closed', {}), closing)).toEqual(outcomeRequired); // control
     expect(await evaluateEvent(dec(FLOW, 'done', notTaken), decisionWorld(['Yes', 'No'], by(PERSON, 'ticket.decided', { outcome: 'Yes' })))).toEqual({ refused: false }); // control: an outcome never needed the exemption
   });
   ```
+  **Kills:**
+  - 29.205 the DC-5 exemption: (a) `decisionOutcomeRequired(ticket, isFlowCause(payload.cause))` (the `reopened` leg is accepted); (b) pass `false` in `transition.ts` (the first leg answers `decision.outcome-required`); (c) pass `false` in `checks/close.ts` (the flow's close leg answers `decision.outcome-required`); (d) pass `env.actorId === SYSTEM_ACTOR_FLOW` (the cause-less flow leg is accepted).
+
   (`decisionWorld` is T6's `world` re-declared locally on `WF_STRICT`: three lines, the Decision created `focus` in `doing` with `leads_to` links.) Implementation: `transition.ts`, T6's line becomes `const outcomeRequired = decisionOutcomeRequired(ticket, payload.cause?.kind === 'branch-not-taken');`, and `checks/close.ts`'s `return decisionOutcomeRequired(ticket) ?? ACCEPT;` becomes `return decisionOutcomeRequired(ticket, parsed.data.cause?.kind === 'branch-not-taken') ?? ACCEPT;`. The forgery guard has already run, so the cause is trusted by the time it reaches either line. Run the file and the whole rule-engine suite. Expected: PASS. Flip 29.205 ✅.
   Commit: `wtg2 T8: branch-not-taken exempts the Decision outcome rule`.
+
+**Prose to sweep:** (read on the ref; the `workflow.ts:204-206` "no rule reads it" comment and the `system-actors.ts:61` "Two entries" comment are already Step 3 edits):
+- `packages/domain/src/events/ticket-events.ts:328` — `ticket.closed` "the envelope carries actor and time; the payload says nothing"; `:330` — `ticket.reopened` "same empty payload". Both payloads now carry an optional flow cause. (The plan's `:313,315` are the `ec72d1f8` lines; they are `:329,331` on the ref.)
+- `packages/app-core/src/online/mappers.ts:553-555` — "`TransitionCause` has exactly one member": it has two after Step 6.
+- `apps/server/src/read/state-provenance.ts:73-74` — "a transition carries one only when the actor reopened a parent for a child"; and `:7` — "the reopen `cause` if the transition carried one" (a `led-to` cause is not a reopen).
+- `packages/domain/src/read-models.ts:34` — "a reopen names the child that caused it": the widened `TransitionCause` (`:35`) now also holds the flow kinds, which name no child.
 
 - [ ] **Step 8: Census, bundle, wide runs, DONE**
 
   Census row (29.209): in the Part 2 census file add a `T8` row listing `cause.forged` in the refusal vocabulary and the three cause kinds; mirror T5's row. Mobile bundle: `pnpm --filter @gisik-nokma/editor run build:webview && pnpm --filter @gisik-nokma/mobile run generate:editor-html`, then `grep -c "branch-not-taken" apps/mobile/src/editor/editor-html.generated.ts` must print a number above 0 (`--check` warns and exits 0 when the webview is unbuilt, so the grep is the assertion; grep for the kind, not for `SYS0FW`, which is likely tree-shaken out of the editor bundle). Build domain, rule-engine, app-core; run the WHOLE domain, rule-engine, app-core, sync-client and server suites (`slot-run.sh wtg2-t8-wide -- … --maxWorkers=2`), `pnpm check:citations && node scripts/check-case-ids.mjs`. Flip 29.209 ✅; put the Step 1 bullet under the `<!-- wtg-part2-model T8 bullet -->` anchor (keep the anchor line: 29.146 reads the bullets below it). Push. DONE + REVIEW (NEEDS: T5 merged; Step 7 needs T6; `closed.cause` has no column until T9; the History sentences and chips for the flow causes are T17's).
+
+  **Kills:** 29.209 census and bundle: (a) skip `generate:editor-html` after the domain change (the `grep -c "branch-not-taken"` prints 0). The census row's own failure mode is the census file's (T2/T5 rows set its shape; T19 cross-checks every row).
 
 **Mutations** (each on the green branch, expect the named red, restore):
 
@@ -3181,7 +3464,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - `packages/domain/src/entity-state.ts:33-143` (`TicketState`: `periods?`, `rounds?`; `closed` is T8's).
   - `packages/domain/src/ticket-state.ts`: the creation return (`:177-265`), the `ticket.transitioned` arm (`:276-333`), the `ticket.workflow_rebound` arm (`:368-399`), plus `TICKET_FOLD_VERSION` beside `TICKET_EVENT_TYPES` (`:89-107`).
   - `packages/domain/src/index.ts` (after `:39`): two `export *` lines; T10 later replaces them with `export * from './flow/index.js'`.
-  - `apps/server/src/projections/tickets.ts`: `TicketRow` (`:87-118`), `rowToTicketState` (`:152-218`), `upsertTicket` (`:284-359`).
+  - `apps/server/src/projections/tickets.ts`: `TicketRow` (`:87-118`), `rowToTicketState` (`:152-218`), `upsertTicket` (`:284-359`); `loadDeps` (`:423`) moves to `apps/server/src/sync/ledger-deps.ts` as `depsAsOfEvent` (planner ruling 2026-10-04, Q9).
   - `apps/server/src/ledger/snapshot-store.ts` (`writeSnapshot`, `overwriteSnapshot`, `readLatestSnapshot`), `apps/server/src/sync/snapshot-writer.ts` (`foldTicketHead` `:52-109`, `runSnapshotPass` `:224-`, the due query in `runSnapshotPass`, `startSnapshotWriter`), `apps/server/src/index.ts:297`.
   - `packages/sync-client/src/precheck/local-context.ts:145-156` (the pending fold), `packages/sync-client/src/storage/schema.ts:21`, `packages/sync-client/src/replica/replica.ts:411-414` and `:2152`.
 - Test (create): `packages/domain/test/work-periods.test.ts`, `apps/server/test/projections/tickets-periods.test.ts`, `apps/server/test/sync/snapshot-fold-version.test.ts`, `packages/sync-client/test/replica-periods.test.ts`. Edit: `packages/sync-client/test/replica-comment-changes.test.ts:42` (`toBe(4)` becomes `toBe(5)`, and the `'4'` at `:54` becomes `'5'`), `apps/server/test/snapshot-store.test.ts` (the `readLatestSnapshot` `toEqual` literals gain `foldVersion: 2`).
@@ -3296,7 +3579,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     it('29.351 terminal to active opens period 2; terminal to terminal opens nothing; a rebound opens', () => {
       const two = fold([created(1), to('doing', 2), to('done', 3), to('doing', 4)]);
       expect(two.periods).toEqual([{ start: T(2), end: T(3), pass: 1 }, { start: T(4), end: null, pass: 1 }]);
-      expect(fold([created(1), to('doing', 2), to('done', 3), to('dropped', 4)]).periods).toHaveLength(1);
+      expect(fold([created(1), to('doing', 2), to('done', 3), to('dropped', 4)]).periods).toEqual([{ start: T(2), end: T(3), pass: 1 }]); // not re-ended at T(4) either
       const rebound = fold([created(1), ev('ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'working' }, 2)]);
       expect(rebound.periods).toEqual([{ start: T(2), end: null, pass: 1 }]);
       expect('periods' in fold([created(1), ev('ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'new' }, 2)])).toBe(false);
@@ -3312,6 +3595,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(next.periods).toEqual([{ start: T(2), end: T(3), pass: 1 }, { start: T(7), end: null, pass: 2 }]);
       const child = fold([created(1), to('done', 2, { kind: 'reopened-for-child', childTicketId: DECISION })]);
       expect('rounds' in child).toBe(false); // control
+      expect('rounds' in fold([...closedAt4, ev('ticket.reopened', {}, 5), to('doing', 6)])).toBe(false); // control: a person's reopen
       const eager = fold([created(1, { typeId: 'eager' }), to('done', 2), to('doing', 3, RESET)]); // initial state is active
       expect(eager.periods?.[1]).toEqual({ start: T(3), end: null, pass: 2 });
     });
@@ -3328,6 +3612,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.167 actual dates: (a) open a period in the `ticket.reopened` arm (`endedAtOf(reopened)` becomes null); (b) creation without the `born` fold (the born-active leg reads `[null, null, false]`); (c) `return periods` in place of the zero-length period when nothing is open and `!wasTerminal` (the open-to-terminal leg); (d) `setPeriods` writing `periods: []` instead of dropping the key (the idle control).
+  - 29.168 derived helpers: (a) `ticketRound` returns `s.rounds ?? 0`; (b) `hasStarted` as `last === undefined || last.end === null` (idle reads started). The `istDayOf` legs guard existing behaviour (`ist-day.ts:43`).
+  - 29.350 closes on terminal or Backlog: (a) close the open period on any move into an `open`-category state (the `review` -> `todo` leg); (b) delete the `BACKLOG_STATE_ID` line (Backlog is `open`, so the period stays open); (c) `if (closed !== null) return periods` in the terminal branch (the done leg keeps `end: null`).
+  - 29.351 terminal moves and rebound: (a) drop the `move.wasTerminal ?` test (done -> dropped appends a zero-length period); (b) the rebound arm without `foldWorkPeriods` (no period for `working`); (c) terminal -> active re-opens the last period instead of appending (the two-period leg).
+  - 29.352 rounds: (a) also count `ticket.reopened` with the cause (`ticketRound(reset)` is 2); (b) `reset = p.cause !== undefined` (the reopened-for-child control gains `rounds`); (c) fold periods with `round: state.rounds ?? 1` (the eager leg's second period has `pass: 1`).
+  - 29.353 not taken: (a) fold periods for a `branch-not-taken` move (`'periods' in nt` is true); (b) `notTakenOf` returning `null` for every cause (the resolution leg).
+
   Run (`slot-run.sh` below is `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh`): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t9-dom -- pnpm --filter @gisik-nokma/domain exec vitest run test/work-periods.test.ts --maxWorkers=2 > /tmp/wtg2-t9-dom.log 2>&1; tail -30 /tmp/wtg2-t9-dom.log`. Expected: FAIL (`../src/flow/derive.js` does not exist). Commit: `wtg2 T9: RED reducer cases for work periods`.
 
 - [ ] **Step 3: Implement the domain**
@@ -3429,9 +3721,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 - [ ] **Step 4: RED projection tests (29.169, 29.170, 29.359)**
 
   `apps/server/test/projections/tickets-periods.test.ts`: copy `tickets-rank.test.ts:1-98` (imports, `createTestDatabase`, the `workflow.defined` with `doing`/`done` states plus a `ticket-type.defined`, `rowFor`, `columnsOf`), and add to the workflow `{ id: 'done', name: 'Done', category: 'terminal' }` and a transition `{ from: '*', to: 'done', rules: [] }` (and to `todo`). `makeCommitted` takes `serverTime` through `...partial`. A helper `step(ticketId, type, payload, n)` = `makeCommitted({ workspaceId: WS, actorId, entity: {kind:'ticket', id}, type, payload, serverTime: \`2026-09-0${n}T10:00:00.000Z\` })`.
-  - **29.169:** apply created (n=1, `start: 'focus'`), `ticket.transitioned {to:'doing'}` (2), `{to:'done'}` (3), `ticket.closed` (4), `ticket.reopened` (5), `{to:'doing'}` (6). Row: `row.periods` `toEqual([{start:'2026-09-02T10:00:00.000Z', end:'2026-09-03T10:00:00.000Z', pass:1}, {start:'2026-09-06T10:00:00.000Z', end:null, pass:1}])`; `row.started_at.toISOString()` is the first start; `row.ended_at` is `null` (the second period is open); `row.rounds` 1; `row.closed_cause` null. `rowToTicketState(row).periods` equals `row.periods`; for a never-started ticket `'periods' in rowToTicketState(row)` is `false` and `'rounds' in` is `false` (control). Then close it with a not-taken cause (`ticket.transitioned {to:'done', cause: NOT_TAKEN}` + `ticket.closed {cause: NOT_TAKEN}` on a second ticket) and assert `row.closed_cause` `toEqual(NOT_TAKEN)` and `rowToTicketState(row).closed?.cause` `toEqual(NOT_TAKEN)`. Republish: apply a `workflow.defined` v2 for the same workflow id with the same states plus `{ id: 'review', name: 'Review', category: 'active' }`, then re-select the first ticket: `workflow_version` is 2 AND `periods` is unchanged.
+  - **29.169:** apply created (n=1, `start: 'focus'`), `ticket.transitioned {to:'doing'}` (2), `{to:'done'}` (3), `ticket.closed` (4), `ticket.reopened` (5), `{to:'doing'}` (6). Row: `row.periods` `toEqual([{start:'2026-09-02T10:00:00.000Z', end:'2026-09-03T10:00:00.000Z', pass:1}, {start:'2026-09-06T10:00:00.000Z', end:null, pass:1}])`; `row.started_at.toISOString()` is the first start; `row.ended_at` is `null` (the second period is open); `row.rounds` 1; `row.closed_cause` null. `rowToTicketState(row).periods` equals `row.periods`; a third ticket stopped after `{to:'done'}` (3) has `started_at.toISOString()` `'2026-09-02T10:00:00.000Z'` AND `ended_at.toISOString()` `'2026-09-03T10:00:00.000Z'` (the first ticket's `ended_at` is `null`, so without this no non-null `ended_at` is ever asserted); for a never-started ticket `'periods' in rowToTicketState(row)` is `false` and `'rounds' in` is `false` (control). Then close it with a not-taken cause (`ticket.transitioned {to:'done', cause: NOT_TAKEN}` + `ticket.closed {cause: NOT_TAKEN}` on a second ticket) and assert `row.closed_cause` `toEqual(NOT_TAKEN)` and `rowToTicketState(row).closed?.cause` `toEqual(NOT_TAKEN)`. Republish: apply a `workflow.defined` v2 for the same workflow id with the same states plus `{ id: 'review', name: 'Review', category: 'active' }`, then re-select the first ticket: `workflow_version` is 2 AND `periods` is unchanged.
   - **29.170:** `columnsOf` contains the five names; `SELECT column_default, is_nullable FROM information_schema.columns WHERE table_name='proj_tickets' AND column_name IN ('periods','rounds')` gives `'[]'::jsonb` / `1` and `NO`. Simulate a pre-migration row: `UPDATE proj_tickets SET periods = '[]', started_at = NULL, ended_at = NULL WHERE ticket_id = $1`; assert `rowToTicketState(row)` has no `periods`; `await rebuildProjection('proj_tickets', { pool: db.pool, projections: buildProjectionRegistry() })` (imported as at the top of `proj-rollups.test.ts`); the row has its two periods back. Control: a ticket created after the migration is correct with no rebuild.
-  - **29.359:** after the 29.169 world plus a flow-reset ticket (created, `doing`, `done`, `closed`, `reopened {cause: RESET}`, `{to:'todo', cause: RESET}`, `{to:'doing'}` so `rounds` is 2): `const report = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() }); expect(report.clean, formatReport(report)).toBe(true);` (imports from `../../src/tools/verify-projections.js`). Control: `UPDATE proj_tickets SET periods = '[]' WHERE ticket_id = $1`, run again, `expect(report.clean).toBe(false)`, restore.
+  - **29.359:** after the 29.169 world plus a flow-reset ticket (created, `doing`, `done`, `closed`, `reopened {cause: RESET}`, `{to:'todo', cause: RESET}`, `{to:'doing'}` so `rounds` is 2): precondition, its row has `rounds` 2 and `periods` of two entries (passes 1 and 2), and `rowToTicketState(row).rounds` is 2 (nothing else reads a round above 1 back). Then a third publish of the same workflow (v3) that RE-CATEGORISES `doing` to `open` (same ids otherwise), applied after every ticket event above: `const report = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() }); expect(report.clean, formatReport(report)).toBe(true);` (imports from `../../src/tools/verify-projections.js`). The v3 re-categorisation is what lets the case see a rebuild that folds with the definitions of NOW instead of those in force at each event (`getWorkflowDefsInForce(db, ws, event.workspaceSeq)`, `projections/tickets.ts:425`): with v2's additive change only, both folds produce the same periods. Control: `UPDATE proj_tickets SET periods = '[]' WHERE ticket_id = $1`, run again, `expect(report.clean).toBe(false)`, restore.
+  **Kills:**
+  - 29.169 projection round trip: (a) omit the `periods` spread from `rowToTicketState` (the equality leg, and the republish re-upserts `[]`); (b) drop `cause` from `rowToTicketState`'s `closed` (the not-taken `closed?.cause` leg); (c) write `null` for `ended_at` in `upsertTicket` (the third ticket's `ended_at`); (d) `row.periods.length >= 0` in the spread (the never-started control gains `periods: []`).
+  - 29.170 migration defaults: (a) `periods jsonb NULL` with no default (the `column_default` / `is_nullable` leg); (b) `rowToTicketState` spreading `periods` unconditionally (the simulated pre-migration row reads `periods: []`).
+  - 29.359 rebuild equals live: (a) `row.rounds > 2` (or no `rounds` spread) in `rowToTicketState` (the precondition leg); (b) the table's mutant, `getWorkflowDefsInForce` at the latest seq in the ticket projection (the v3 re-categorisation makes the rebuild drop `doing`'s periods; the verifier reports drift).
+
   Run: `slot-run.sh wtg2-t9-proj -- pnpm --filter @gisik-nokma/server exec vitest run test/projections/tickets-periods.test.ts --maxWorkers=2 > /tmp/wtg2-t9-proj.log 2>&1; tail -30 /tmp/wtg2-t9-proj.log`. Expected: FAIL (`column "periods" does not exist`). Commit: `wtg2 T9: RED projection cases for periods`.
 
 - [ ] **Step 5: Migration and projection**
@@ -3471,9 +3768,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 - [ ] **Step 6: RED then GREEN snapshot fold version (29.355)**
 
-  `apps/server/test/sync/snapshot-fold-version.test.ts`: copy `snapshot-writer.test.ts:1-98` (ledger-only seeding with `insertEvent` + `makeCommitted`, `wfBasic`, the type/workflow entities). Seed created (`serverTime` S1), `ticket.transitioned {to:'doing'}` (S2, seq 2). Write the snapshot of `fullFold()` at seq 2 with `writeSnapshot`, then `UPDATE snapshots SET state = state - 'periods', fold_version = 1 WHERE entity_id = $1` (a pre-periods row). Append `{to:'done'}` (S3). `await runSnapshotPass(db.pool, { minEvents: 20 })` (the head is one event past the snapshot, below the threshold, so only the stale row makes it due). Expect `readLatestSnapshot(db.pool, 'ticket', TICKET)` to have `seq` 3, `foldVersion` 2 and `state.periods` `[{start: S2, end: S3, pass: 1}]` (S2 sits BELOW the old snapshot's seq, so only a full fold recovers it). Control in the same `it`: a second ticket whose snapshot is `fold_version` 2 and carries a marker `periods: [{start:'M', end:null, pass:1}]` resumes (its pass result has `start: 'M'`, `end: S3`) and `readEntityEvents` is called with `afterSeq` = its snapshot seq (use the file's `recording()` proxy). Run: `slot-run.sh wtg2-t9-snap -- pnpm --filter @gisik-nokma/server exec vitest run test/sync/snapshot-fold-version.test.ts test/sync/snapshot-writer.test.ts test/sync/snapshot-refresh.test.ts test/snapshot-store.test.ts --maxWorkers=2 > /tmp/wtg2-t9-snap.log 2>&1; tail -30 /tmp/wtg2-t9-snap.log`. Expected: FAIL (`foldVersion` undefined). Implement:
+  `apps/server/test/sync/snapshot-fold-version.test.ts`: copy `snapshot-writer.test.ts:1-98` (ledger-only seeding with `insertEvent` + `makeCommitted`, `wfBasic`, the type/workflow entities). Seed created (`serverTime` S1), `ticket.transitioned {to:'doing'}` (S2, seq 2). Write the snapshot of `fullFold()` at seq 2 with `writeSnapshot`, then `UPDATE snapshots SET state = state - 'periods', fold_version = 1 WHERE entity_id = $1` (a pre-periods row). Append `{to:'done'}` (S3). `const { written } = await runSnapshotPass(recording(db.pool, calls), { minEvents: 20 })` (the head is one event past the snapshot, below the threshold, so only the stale row makes it due). Expect `written` `toEqual([{ entityId: TICKET, seq: 3 }])`, `tailReadsFor(calls, TICKET)` `toEqual([0])` (a full fold, not a resume), and `readLatestSnapshot(db.pool, 'ticket', TICKET)` to have `seq` 3, `foldVersion` 2 and `state.periods` `[{start: S2, end: S3, pass: 1}]` (S2 sits BELOW the old snapshot's seq, so only a full fold recovers it). A second pass, `runSnapshotPass(recording(db.pool, calls2), { minEvents: 20 })`, gives `written` `[]` AND `tailReadsFor(calls2, TICKET)` `[]` (the restated ticket is not due again; `written` alone cannot show it, because a due ticket whose head has not moved is skipped after its tail read). Control in the same `it`: a second ticket whose snapshot is `fold_version` 2 at its doing seq and carries a marker `periods: [{start:'M', end:null, pass:1}]`, then `{to:'done'}` at S3. The pass does NOT fold it (one event past, not stale: it is absent from `written`), so call `foldTicketHead(recordingClient, TICKET_2, deps)` directly: its `state.periods` is `[{start: 'M', end: S3, pass: 1}]` (resumed from the marker, not refolded) and its tail read's `afterSeq` is that snapshot's seq. Third ticket, same `it` (planner ruling 2026-10-04, Q9), on the state-dropping fixture of `snapshot-refresh.test.ts` (case 12.192's base: a workflow v1 with an extra ACTIVE state `review`, v2 published without it): TICKET_3 created in `review` (S1), moved to `doing` (S2), then the v2 publish, then `{to:'done'}` (S3); a pre-periods snapshot at seq 2 as above. The pass restates it: `written` contains `{ entityId: TICKET_3, seq: <its head> }` and its snapshot's `state.periods` is `[{start: S1, end: S3, pass: 1}]`. Control: folding the same history with the pass's newest `deps` (`buildLedgerDeps(client, WS)`) throws `/has no state "review"/`, so the leg is not passing on a history the newest definitions could fold anyway. Run: `slot-run.sh wtg2-t9-snap -- pnpm --filter @gisik-nokma/server exec vitest run test/sync/snapshot-fold-version.test.ts test/sync/snapshot-writer.test.ts test/sync/snapshot-refresh.test.ts test/snapshot-store.test.ts --maxWorkers=2 > /tmp/wtg2-t9-snap.log 2>&1; tail -30 /tmp/wtg2-t9-snap.log`. Expected: FAIL (`foldVersion` undefined). Implement:
   - `snapshot-store.ts`: `export type Snapshot = {...existing, foldVersion: number}`, `export type SnapshotInput = Omit<Snapshot, 'foldVersion'>`; `writeSnapshot(client, snapshot: SnapshotInput)` and `overwriteSnapshot` insert `fold_version` as `$6` = `TICKET_FOLD_VERSION` (the `DO UPDATE SET` also sets `fold_version = excluded.fold_version`); `readLatestSnapshot` selects `fold_version` and returns `foldVersion: row.fold_version`.
-  - `snapshot-writer.ts` `foldTicketHead`: after `readLatestSnapshot`, `const stale = stored !== null && stored.foldVersion < TICKET_FOLD_VERSION; const previous = stale ? null : stored;` (everything below uses `previous`), and return `restated: stale` in `FoldedTicketHead`. A stale row is as good as none for FOLDING: its `provenance` is recomputed from the full tail.
+  - `snapshot-writer.ts` `foldTicketHead`: after `readLatestSnapshot`, `const stale = stored !== null && stored.foldVersion < TICKET_FOLD_VERSION; const previous = stale ? null : stored;` (everything below uses `previous`), and return `restated: stale` in `FoldedTicketHead`. A stale row is as good as none for FOLDING: its `provenance` is recomputed from the full tail. **On the stale path the fold resolves definitions AS OF EACH EVENT, never through the caller's newest `deps`** (planner ruling 2026-10-04, Q9): a full fold with the newest definitions throws `applyTicketEvent: workflow ... has no state ...` for any ticket that lived through a state-dropping publish (`snapshot-writer.ts:186-193`, measured), and that ticket would stay stale and due forever. Use the proj_tickets projection's rule (`projections/tickets.ts:29-31`): move its `loadDeps(db, event)` (`:423`) to `sync/ledger-deps.ts` as `export async function depsAsOfEvent(client: PoolClient, event: LedgerEvent): Promise<TicketStateDeps>` (the projection imports it back, no behaviour change there) and, when `stale`, call it per tail event in place of `deps`. The current-version path keeps the caller's `deps` unchanged. Never skip-and-enumerate: a skipped ticket keeps a snapshot without periods that bootstrap goes on serving.
   - `runSnapshotPass`: replace the grouped sub-select with the latest row per ticket and add the stale arm:
     ```sql
     SELECT e.workspace_id, e.entity_id FROM events e
@@ -3487,6 +3784,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     params `[minEvents, TICKET_FOLD_VERSION]`. (`DISTINCT ON` matters: superseded rows are never deleted, `snapshot-writer.ts:179`, so a plain `fold_version < $2` over all rows would keep a restated ticket due forever.) Write with `head.restated ? overwriteSnapshot : writeSnapshot` (the restate may land on the seq a stale row already holds; the plain INSERT's pkey collision stays reserved for case 12.89's overlapping passes).
   - `startSnapshotWriter`: option `immediate?: boolean`; when true, run one pass before the first interval tick. `index.ts:297` passes `immediate: true`, so a deploy restates within seconds and not one interval later.
   - `sync-routes.ts` `bootstrapTicket` keeps serving a stale row until the pass restates it (serving `null` would send the replica the full history, which the `snapshot-refresh.ts` docblock shows can name a dropped state). The window is one pass; Review Focus carries it.
+  **Kills:**
+  - 29.355 restate a stale snapshot: (a) ignore `foldVersion` in `foldTicketHead` (`previous = stored`; resumes the stripped state, `periods` becomes `[{S3, S3}]` and the tail read is `[2]`); (b) drop `OR s.fold_version < $2` from the due query (TICKET is not due, `written` is `[]`); (c) the plain `fold_version < $2` over every snapshot row instead of `DISTINCT ON` (the second pass's `tailReadsFor(calls2, TICKET)` is `[3]`); (d) `stale` computed as `foldVersion <= TICKET_FOLD_VERSION` (the control ticket is refolded from event 1 and loses the marker `'M'`); (e) the stale path folds with the caller's newest `deps` (TICKET_3's fold throws, the pass logs it and TICKET_3 is absent from `written`).
+
   Re-run. Expected: PASS 29.355 and the three existing files. Commit: `wtg2 T9: restate snapshots written before periods existed`.
 
 - [ ] **Step 7: RED then GREEN replica (29.354, 29.360)**
@@ -3497,11 +3797,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   it('29.354 a pending event leaves periods unchanged; the accepted one records them', async () => {
     const { storage, replica } = await freshReplica();
     const A = newUlid();
-    await apply(replica, [ticketCreated(A)]);
+    await apply(replica, [ticketCreated(A), envelope({ kind: 'ticket', id: A }, 'ticket.transitioned', { to: 'doing' })]);
+    // Precondition: a CONFIRMED open period, so "unchanged" is a value, not an absence (an absent key would also pass a
+    // keepConfirmedPeriods that wiped the periods).
+    expect((await replica.getTicket(A))!.confirmed!.periods).toEqual([{ start: TIME, end: null, pass: 1 }]);
     await queue(storage, claim({ kind: 'ticket', id: A }, 'ticket.transitioned', { to: 'done' }));
     const pending = (await buildPendingOverlay({ storage, replica })).states.get(A)!;
     expect(pending.stateId).toBe('done');
-    expect('periods' in pending).toBe(false);
+    expect(pending.periods).toEqual([{ start: TIME, end: null, pass: 1 }]); // not closed at the device clock
     await apply(replica, [envelope({ kind: 'ticket', id: A }, 'ticket.transitioned', { to: 'done' })]); // control
     expect((await replica.getTicket(A))!.confirmed!.periods).toEqual([{ start: TIME, end: TIME, pass: 1 }]);
   });
@@ -3525,6 +3828,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect((await reopened.getTicket(A))!.confirmed!.periods).toEqual([{ start: TIME, end: null, pass: 1 }]);
   });
   ```
+  (29.354 assumes `purge-world.ts`'s workflow has an `active` state `doing` and a terminal `done`, and that `envelope(...)` stamps `serverTime: TIME`; if its names differ, use its active and terminal ids.)
+  **Kills:**
+  - 29.354 pending keeps confirmed periods: (a) drop `keepConfirmedPeriods` from `local-context.ts` (the overlay's period is closed at the claim's `clientTime`); (b) `keepConfirmedPeriods` as `setPeriods(after, [])` (the overlay has no periods).
+  - 29.360 schema 5 re-pull: (a) delete the `priorVersion < 5` block (the version-4 reopen owes nothing); (b) read `priorVersion` after `migrateLocal` (always 5, owes nothing). (The table's row "owe for `priorVersion` NaN" is equivalent: a replica opened for the first time holds no tickets when the block runs, so it owes nothing either way; no reachable state has tickets and no `meta` table.)
+
   (`TicketBootstrap` is `{workspaceId, definitions, ticket: BootstrapTicket}`, `replica.ts:111-120`; `loadTicketBootstrap` writes the snapshot and calls `refoldTicket`, `replica.ts:1451-1474`, so the held ticket's confirmed state becomes the snapshot's.) Expected FAIL. Implement: `schema.ts:21` `LOCAL_SCHEMA_VERSION = 5` with a docblock line "Raised to 5 by Workflow and Timeline graphs T9: no DDL; `createReplica` re-pulls every held ticket because its stored snapshot predates work periods"; `replica.ts`: before `await migrateLocal(storage)` (`:414`) read the prior version without assuming `meta` exists,
   ```ts
   const metaExists = (await storage.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'meta'", [])).length > 0;
@@ -3540,6 +3848,15 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   }
   ```
   (`NaN < 5` is false, so a fresh file owes nothing.) `local-context.ts:150-152`: `const before = states.get(ticketId); const next = foldTicketEvent(before, env, localDeps); if (next !== undefined) states.set(ticketId, keepConfirmedPeriods(before, next));`. Update the two assertions in `replica-comment-changes.test.ts`. Run the file plus `slot-run.sh wtg2-t9-sync -- pnpm --filter @gisik-nokma/sync-client exec vitest run --maxWorkers=2 > /tmp/wtg2-t9-sync.log 2>&1; tail -30 /tmp/wtg2-t9-sync.log`. Expected: PASS 29.354, 29.360. Commit: `wtg2 T9: keep periods off pending folds and re-pull held tickets on schema 5`.
+
+**Prose to sweep:**
+- `packages/sync-client/src/storage/schema.ts:7-15` — "this constant is written into `meta` and never read back by anything ... The day this schema must ALTER rather than CREATE, the version needs a reader": Step 7 adds that reader (`priorVersion` in `replica.ts`).
+- `packages/sync-client/src/storage/schema.ts:70-72` — the `snapshot_provenance` docblock repeats "`LOCAL_SCHEMA_VERSION` is written into `meta` and never read back by anything".
+- `Features.md:432` — "Local replica schema ... `LOCAL_SCHEMA_VERSION` is written into `meta` and never read back by anything".
+- `apps/server/src/sync/snapshot-writer.ts:32-44` — `foldTicketHead`: "Resume from a ticket's latest snapshot ... the resume is from the previous snapshot's STATE, not from event 1 ... the tail read's `afterSeq` bind is the previous snapshot's seq": false for a snapshot with `fold_version` below `TICKET_FOLD_VERSION` (full fold, `afterSeq` 0).
+- `apps/server/src/sync/snapshot-writer.ts:186-193` — "`deps` here resolve the NEWEST definitions, and that is safe only because of the publish door": the stale restate now resolves definitions as of each event (`depsAsOfEvent`) and is the exception (planner ruling 2026-10-04, Q9).
+- `apps/server/src/projections/tickets.ts:423` — `loadDeps` moves to `sync/ledger-deps.ts` as `depsAsOfEvent`; the docblocks at `:29-31` and `:395-419` that describe "this loader" point at its new home.
+- `apps/server/src/sync/snapshot-writer.ts:206-208` — "The whole due set ... Bounded by the number of tickets that crossed the threshold since the last pass": the first pass after the migration restates EVERY snapshotted ticket (all rows are `fold_version` 1).
 
 - [ ] **Step 8: Wide runs, bundle, ledger, flip, push**
   1. `pnpm --filter @gisik-nokma/mobile exec node scripts/generate-editor-html.mjs --check`; if red, run without `--check` and commit `editor-html.generated.ts` (contract decision 12).
@@ -3712,8 +4029,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(keysOf(a.starts)).toEqual(['140']);
       expect(keysOf(a.ends)).toEqual(['152']);
 
-      // two starts feeding one node
-      const two = analyzeFlow([fnode(A), fnode(B), fnode(C)], [edge(A, C), edge(B, C)]);
+      // two starts feeding one node (nodes given in DESCENDING id, so "ascending id" needs the `ids` sort)
+      const two = analyzeFlow([fnode(C), fnode(B), fnode(A)], [edge(A, C), edge(B, C)]);
       expect(two.starts).toEqual([A, B]);
       expect(two.ends).toEqual([C]);
 
@@ -3744,7 +4061,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       // a pure cycle starts its search at the smallest id; with a Start in front the same pair closes at B>A
       const pure = analyzeFlow([fnode(A), fnode(B)], [edge(A, B), edge(B, A)]);
       expect([...pure.backEdges]).toEqual([edgeKey({ sourceId: B, targetId: A })]);
-      const swappedPure = analyzeFlow([fnode(A), fnode(B)], [edge(B, A), edge(A, B)]);
+      // nodes AND edges given in reverse: the root is the smallest id by the sort, not by input position
+      const swappedPure = analyzeFlow([fnode(B), fnode(A)], [edge(B, A), edge(A, B)]);
       expect([...swappedPure.backEdges]).toEqual([edgeKey({ sourceId: B, targetId: A })]);
       // the search enters at the Start, not at the smallest id: a(1) <-> b(2) with the feeder f(3) -> b closes at a>b
       const feeder = analyzeFlow([fnode(A), fnode(B), fnode(C)], [edge(A, B), edge(B, A), edge(C, B)]);
@@ -3771,6 +4089,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       // a dated node beats an undated one even when the undated id is smaller
       const undatedFirst = [fnode(A), fnode(B), fnode(C, { explicitDue: '2026-10-03' }), fnode(D)];
       expect(analyzeFlow(undatedFirst, diamond).order).toEqual([A, C, B, D]);
+      // a node with BOTH days sorts by its start: c (start 10-03, due 10-09) before b (due 10-05). No other row has a node
+      // with both, so without this one "due else start" would pass.
+      const both = [fnode(A), fnode(B, { explicitDue: '2026-10-05' }), fnode(C, { explicitStart: '2026-10-03', explicitDue: '2026-10-09' }), fnode(D)];
+      expect(analyzeFlow(both, diamond).order).toEqual([A, C, B, D]);
       // a loop is not an ordering constraint: the back edge is left out
       expect(analyzeFlow([fnode(A), fnode(B)], [edge(A, B), edge(B, A)]).order).toEqual([A, B]);
     });
@@ -3789,6 +4111,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.180 Start and End: (a) add every edge endpoint to `known` (drop the `!known.has(...)` skip; the hole leg gains an End `uid(99)` and an order member); (b) `const ids = [...known]` without `.sort(byId)` (the two-starts leg, nodes given descending, reads `[B, A]`); (c) `starts = ids.filter((id) => hasIncoming.has(id))` (the mockup reads every non-Start).
+  - 29.181 back edges: (a) `[...set]` in place of `[...set].sort(byId)` (the mockup closes at `143>144`); (b) `for (const root of ids)` in place of `[...starts, ...ids]` (the feeder row closes at `b>a`); (c) `const ids = [...known]` unsorted (the swapped pure cycle, nodes given `[B, A]`, closes at `a>b`).
+  - 29.182 flow order: (a) the undated-first comparator from the mutation table (the dated-beats-undated row); (b) `n.explicitDue ?? n.explicitStart` for the sort day (the both-days row reads `[A, B, C, D]`); (c) drop the back-edge `continue` when counting `waiting` (the loop reads `[]`).
+  - 29.186 purity: (a) `[...set]` unsorted out-edges (the reversed input gives another order and other back edges); (b) sort `edges` in place inside `analyzeFlow` (the frozen array throws).
 
   `packages/domain/test/flow/graph.test.ts` (cases 29.183, 29.184):
   ```ts
@@ -3827,7 +4154,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       // an edge out of a Not-taken source stays in the effective graph (only a Decision's choice cuts edges)
       const notTaken = { kind: 'not-taken' as const, decisionTicketId: A, outcome: 'Yes', pass: 1 };
       const withNotTaken = [decision(A), fnode(X), fnode(Y, { notTaken }), fnode(T), fnode(Z)];
-      expect(effectiveEdges(withNotTaken, tailEdges)).toHaveLength(5);
+      expect(effectiveEdges(withNotTaken, tailEdges)).toEqual(tailEdges);
 
       // a ticket cut off by the choice must not become a root and so live for free (z has no other way in)
       expect(live('Yes')).not.toContain('z');
@@ -3873,10 +4200,16 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(keysOf(no)).toEqual(['145', '146']);
       expect(yes.has(M['146']) && no.has(M['146'])).toBe(true); // GN-146 is the shared tail
       expect(branchOf(M['144'], 'Maybe', edges, analysis).size).toBe(0); // CONTROL: no such label, no branch
-      expect(branchOf(M['151'], 'Need more info', edges, analysis).has(M['151'])).toBe(false); // never through the Decision itself
+      // never through the Decision itself: 149 -> 150 -> 151 stops AT 151 (exact set, so a walk through it, which adds 151 and 152, fails)
+      expect(keysOf(branchOf(M['151'], 'Need more info', edges, analysis))).toEqual(['149', '150']);
     });
   });
   ```
+  **Kills:**
+  - 29.183 effective graph and live set: (a) `a === b` in `sameLabel` (the `'  YES '` and `'no'` rows read `['a']`); (b) `liveSet` finds `hasIncoming` over `forwardEdges(effectiveEdges(nodes, edges), analysis)` (z becomes a root: the `'Yes'`, `'Maybe'` and mockup rows gain it); (c) `effectiveEdges` also drops edges out of a source with `notTaken !== null` (the Not-taken row loses `y>t`, `y>z`); (d) return `false` for a Decision with `outcome === null` in the filter (the `null` control reads `['a']`).
+  - 29.183 sameLabel: (a) `a === b` (the trim/case row); (b) `if (a === null || b === null) return true` (the null-vs-label rows).
+  - 29.184 loop body: (a) `return fromTarget` (the mutation-table row; `151>149` gains 152, `151>141` gains 145, 146, 152); (b) build `fromTarget` over `edges` instead of `forward` (the walk follows the back edge `151>141` and the `151>149` body gains 141, 142, 143, 144, 147, 148).
+  - 29.184 branch: (a) drop `decisionId` from `reach` in `branchOf` (the "Need more info" branch gains 151 and 152); (b) `e.label === label` in place of `sameLabel` in the edge `find` (the `'yes'` branch is empty); (c) `[...set]` unsorted out-edges in `analyzeFlow` (both 144 branches gain 143).
 
   `packages/domain/test/flow/node.test.ts` (case 29.185; `simpleKanbanWorkflowDef` is `simple-kanban.ts:64`, the same fixture the other domain tests use):
   ```ts
@@ -3925,6 +4258,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
       const decider = newUlid();
       const richId = newUlid();
+      // The cause must parse (`flowCauseSchema` takes ULIDs, T8): with 'dec-1' / 'ev-1' `isFlowCause` fails and
+      // `resolutionOf` reads null, so the notTaken expectation below would be red against a correct flowNodeOf.
+      const decisionTicketId = newUlid();
+      const decisionEventId = newUlid();
+      const passes = [{ pass: 1, outcome: 'Yes', by: decider, at: '2026-10-02T10:00:00.000Z', revisions: [] }];
       const rich = flowNodeOf(
         ticket({
           id: richId,
@@ -3940,13 +4278,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
             waitForAll: claim(true),
           },
           outcome: 'Yes',
-          passes: [{ pass: 1, outcome: 'Yes', by: decider, at: '2026-10-02T10:00:00.000Z', revisions: [] }],
+          passes,
           periods: [{ start: '2026-10-02T09:00:00.000Z', end: null, pass: 2 }],
           rounds: 2,
           closed: {
             actorId: decider,
             at: '2026-10-03T09:00:00.000Z',
-            cause: { kind: 'branch-not-taken', decisionTicketId: 'dec-1', outcome: 'No', pass: 1, decidedBy: decider, decisionEventId: 'ev-1' },
+            cause: { kind: 'branch-not-taken', decisionTicketId, outcome: 'No', pass: 1, decidedBy: decider, decisionEventId },
           },
           deleted: { actorId: decider, at: '2026-10-03T10:00:00.000Z' },
         }),
@@ -3954,13 +4292,27 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
         { draft: true },
       );
       expect(rich).toMatchObject({
+        id: richId, typeId: DECISION_TYPE_ID,
         isDecision: true, parentId: 'parent-1', stateId: 'doing', category: 'active', closed: true, trashed: true, draft: true,
         outcome: 'Yes', started: true, rounds: 2, explicitStart: '2026-10-05', explicitDue: '2026-10-09',
         estimate: 3, reworkEstimate: 2, waitForAll: true,
-        notTaken: { kind: 'not-taken', decisionTicketId: 'dec-1', outcome: 'No', pass: 1 },
       });
-      expect(rich.passes).toHaveLength(1);
+      // exact, not a subset match: the resolution is the four-member reading, never the raw cause (which also has decidedBy, decisionEventId)
+      expect(rich.notTaken).toEqual({ kind: 'not-taken', decisionTicketId, outcome: 'No', pass: 1 });
+      expect(rich.passes).toEqual(passes);
       expect(rich.periods).toEqual([{ start: '2026-10-02T09:00:00.000Z', end: null, pass: 2 }]);
+
+      // "started" is the LAST period open, not "has a period": a finished period reads false
+      expect(flowNodeOf(ticket({ periods: [{ start: '2026-10-02T09:00:00.000Z', end: '2026-10-02T17:00:00.000Z', pass: 1 }] }), wf).started).toBe(false);
+      // the reducer writes `closed: null` and `deleted: null` (not absent) at creation and on reopen/restore: both read false
+      expect(flowNodeOf(ticket({ closed: null, deleted: null }), wf)).toMatchObject({ closed: false, trashed: false });
+
+      // the workflow facts are read, not assumed: an initial state that is not the first listed, and two terminal states
+      // (the FIRST declared is the one Not taken files into, planner ruling 8); no terminal state at all reads null
+      const custom = { ...wf, initialStateId: 'doing', states: [...wf.states, { id: 'cancelled', name: 'Cancelled', category: 'terminal' as const }] };
+      expect(flowNodeOf(ticket(), custom)).toMatchObject({ initialStateId: 'doing', firstTerminalStateId: 'done' });
+      const noTerminal = { ...wf, states: wf.states.filter((s) => s.category !== 'terminal') };
+      expect(flowNodeOf(ticket(), noTerminal).firstTerminalStateId).toBeNull();
 
       // an explicit flag beats the state's own soft-delete flag in both directions
       expect(flowNodeOf(ticket({ deleted: { actorId: decider, at: '2026-10-03T10:00:00.000Z' } }), wf, { trashed: false }).trashed).toBe(false);
@@ -3986,6 +4338,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.185 quiet node and helpers: (a) `notTaken: (state.closed?.cause ?? null) as never` in place of `resolutionOf(state)` (the exact `notTaken` leg gets the raw cause); (b) `started: (state.periods ?? []).length > 0` in place of `hasStarted(state)` (the finished-period leg reads true); (c) `closed: state.closed !== undefined` / `trashed: flags.trashed ?? state.deleted !== undefined` (the `closed: null, deleted: null` leg); (d) `firstTerminalStateId: wf.states.findLast((s) => s.category === 'terminal')?.id ?? null` (the custom workflow reads `cancelled`), or `initialStateId: wf.states[0]!.id` (reads `todo`); (e) `explicitStart: dayClaim(state, 'dueDate')` (the rich node reads `2026-10-09`).
+  - 29.185 wrong-shape claims: (a) `state.fields['waitForAll']?.value !== undefined` (mutation table; `waitForAll: claim(null)` reads true); (b) `typeof state.fields['estimate']?.value === 'number' ? value : null` (mutation table; 0 and 1.5 read as numbers); (c) drop `IST_DAY_REGEX.test(date) &&` in `dayClaim` (`'next week'` is read as a due day).
 
   `packages/domain/test/flow/clock-free.test.ts` (case 29.186). The app-core scan (`packages/app-core/test/helpers/clock-scan.ts`, used at `packages/app-core/test/calendar/clock-free.test.ts:218-292`) pins its list of domain files to the two the calendar imports and does not reach this directory, so the flow directory carries its own scan with the same five patterns. T11 adds `plan.ts` and T15 adds `settle.ts` to the named list:
   ```ts
@@ -4026,6 +4381,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.186 clock-free: (a) add `const t = new Date();` to `analysis.ts` (mutation table; `dirty` is `['analysis.ts']`); (b) a `Date.now()` or `.toLocaleDateString(` in `graph.ts` or `node.ts` (the same leg names the file).
 
   Run (`slot-run.sh` below is `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh`): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t10-red -- pnpm --filter @gisik-nokma/domain exec vitest run test/flow --maxWorkers=2 > /tmp/wtg2-t10-red.log 2>&1; tail -30 /tmp/wtg2-t10-red.log`. Expected: FAIL (`analyzeFlow is not a function`, `flowNodeOf is not a function`, and the clock-free test fails on `toContain('analysis.ts')` because the file does not exist).
 
@@ -4338,8 +4695,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
    * the raw members, so a node and the sheet cannot disagree about "started" or "Not taken".
    *
    * `flags.trashed` defaults to the soft-delete flag on the state; `flags.draft` defaults to false and
-   * is set by the caller that knows the ticket is the viewer's own draft (a draft is not a column the
-   * reducer folds into `TicketState` on this tip).
+   * is set by the caller that knows the ticket is the viewer's own draft (`TicketState.draft` holds the
+   * author, but only the read, T12, knows who the viewer is).
    */
   export function flowNodeOf(state: TicketState, wf: WorkflowDef, flags: { trashed?: boolean; draft?: boolean } = {}): FlowNode {
     return {
@@ -4392,6 +4749,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | 29.185 | `claimedEstimate(state.fields, 'estimate')` becomes `typeof state.fields['estimate']?.value === 'number' ? ... : null` | the same test (0 and 366 are numbers) |
   | 29.186 | add `const t = new Date();` to `analysis.ts` | the scan names `analysis.ts` |
 
+  **Prose to sweep:**
+  - This task's own `node.ts` docblock (plan Step 5) said "a draft is not a column the reducer folds into `TicketState` on this tip"; on the ref `packages/domain/src/entity-state.ts:127-134` declares `draft?: TicketDraft` (Drafts). Corrected in the plan's code block above; keep the corrected wording.
+  - Nothing on the ref is made false (searched: `analyzeFlow`, `FlowNode`, `flowNodeOf`, `backEdges`, `liveSet`, `loopBody`, `flow/index`, `./flow/` in `packages/domain/src/index.ts`, Features.md, docs/manual.md). The `./flow/*.js` lines this step collapses are added by T8/T9, not on the ref.
+
   Push. DONE + REVIEW (NEEDS: T2, T4, T5, T8, T9 merged; `claimedEstimate` / `resolutionOf` names re-read).
 
 ---
@@ -4431,7 +4792,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - `- ❌ **29.196 — pass 2 of a loop target starts the day after the Decision's finish and is as long as the rework estimate (else the estimate), pass 1 stays in the output, explicit dates belong to pass 1 only, and what leaves the loop chains from the loop's last run;** control: before any loop outcome there is one pass and the exit chains from the pass-1 finish. Mutation: chain the exit from pass k, or drop the loop-target predecessor → the exit or the pass-2 start moves.`
   - `- ❌ **29.197 — a ticket is on the timeline when it has a non-pruned planned interval or has been worked;** control: an undated, never-worked ticket and a ticket with an estimate but no ready day are not. Mutation: make onTimeline plan-only → the undated worked ticket drops out.`
   - `- ❌ **29.198 — planFlow does not mutate its input and answers the same for any input order;** control: frozen inputs would throw on a write. Mutation: sort the caller's node array in place as the first line of planFlow → the frozen run throws.`
-  - `- ❌ **29.199 — data a half-applied cascade can produce (a Decision that recorded a loop outcome before its body was reset) plans without recursing forever, pass 1 is unchanged, and no interval has a start after its end;** control: pass 1 of the same ticket equals its plan without the half-applied pass. Mutation: delete the busy guard → the call overflows the stack.`
+  - `- ❌ **29.199 — data a half-applied cascade can produce (a Decision that recorded a loop outcome before its body was reset) plans without recursing forever, pass 1 of each re-run ticket is unchanged, and no interval has a start after its end;** control: pass 1 of the same ticket equals its plan without the half-applied pass. (planner ruling 2026-10-04, Q10: a ticket that does not re-run, D, chains from the loop's last run by design, so its interval is not pinned; the start-after-end clause covers it.) Mutation: delete the busy guard → the call overflows the stack.`
 
   Commit: `wtg2 T11: case lines for the planner`.
 
@@ -4469,7 +4830,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
         fnode(D, { explicitDue: '2026-10-10', estimate: 4 }),
         fnode(E, { explicitStart: '2026-10-07' }),
         fnode(F, { explicitDue: '2026-10-08' }),
+        fnode(uid(7), { explicitStart: '2026-10-04', explicitDue: '2026-10-04' }), // start EQUAL to due is scheduled (kills `>=`)
       ]);
+      expect(span(p, uid(7))).toBe('2026-10-04..2026-10-04 explicit');
       expect(span(p, A)).toBe('2026-10-01..2026-10-04 explicit');
       expect(get(p, B)).toEqual({ intervals: [], unscheduled: 'start-after-due', onTimeline: false });
       expect(span(p, C)).toBe('2026-10-01..2026-10-03 explicit');
@@ -4513,7 +4876,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(get(p, C).intervals[0]).toEqual({ pass: 1, start: '2026-10-09', end: '2026-10-10', basis: 'explicit' });
       // a start-less explicit due never carries the glyph
       const due = planOf([nodes[0] as FlowNode, fnode(B, { explicitDue: '2026-10-06', estimate: 1 })], [edge(A, B)]);
-      expect(get(due, B).intervals[0]).not.toHaveProperty('startsBeforePredecessor');
+      // exact, so a missing interval cannot pass a `not.toHaveProperty` on `undefined`, and the flag is keyed on the explicit
+      // START (`from` is 10-06, before the ready day 10-08: a flag computed from `from` would appear here)
+      expect(get(due, B).intervals[0]).toEqual({ pass: 1, start: '2026-10-06', end: '2026-10-06', basis: 'explicit' });
     });
   });
 
@@ -4594,6 +4959,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       const decided = planOf(diamond({ d: { outcome: 'No', category: 'terminal', stateId: 'done' } }), diamondEdges);
       expect(get(decided, A).intervals[0]).toMatchObject({ start: '2026-10-07', end: '2026-10-07', pruned: true });
       expect(get(decided, A).onTimeline).toBe(false);
+      expect(span(decided, B)).toBe('2026-10-07..2026-10-09 chained'); // the interval exists, so the next leg is not about `undefined`
       expect(get(decided, B).intervals[0]).not.toHaveProperty('pruned');
       // the tail is live through B alone: ready 10-10, not 10-08 from the pruned ghost
       expect(span(decided, C)).toBe('2026-10-10..2026-10-11 chained');
@@ -4625,8 +4991,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       const tail = planOf(diamond({ d: { outcome: 'Yes', category: 'terminal' }, c: { waitForAll: true } }), diamondEdges);
       expect(span(tail, C)).toBe('2026-10-08..2026-10-09 chained'); // waits for A (10-07), not for the pruned B (10-09)
       const notTaken = { kind: 'not-taken' as const, decisionTicketId: D, outcome: 'Yes', pass: 1 };
-      const stale = planOf(diamond({ d: { outcome: 'Yes', category: 'terminal' }, b: { notTaken, category: 'terminal' }, c: { waitForAll: true } }), diamondEdges);
+      // The Decision's outcome is cleared again (a loop reset), so B is LIVE in the effective graph; only its old Not-taken
+      // resolution keeps it out. (With the outcome 'Yes' B is already excluded as pruned, and the notTaken test is never reached.)
+      const stale = planOf(diamond({ b: { notTaken, category: 'terminal' }, c: { waitForAll: true } }), diamondEdges);
       expect(span(stale, C)).toBe('2026-10-08..2026-10-09 chained');
+      // CONTROL: the same undecided diamond without the resolution waits for B (10-09)
+      expect(span(planOf(diamond({ c: { waitForAll: true } }), diamondEdges), C)).toBe('2026-10-10..2026-10-11 chained');
     });
   });
 
@@ -4662,7 +5032,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
         '2:2026-10-13..2026-10-14:chained', // D ended 10-12: the target starts the day after, two days (rework estimate)
       ]);
       expect(p.get(B)?.intervals.map((i) => `${i.pass}:${i.start}..${i.end}`)).toEqual([
-        '1:2026-10-08..2026-10-09', // chained from A's ACTUAL pass-1 end (10-07), not its plan
+        '1:2026-10-08..2026-10-09', // chained from A's pass-1 end, 10-07 (actual and plan agree for A; D's pass 1 below is where B's actual 10-10 beats its plan 10-09)
         '2:2026-10-15..2026-10-16', // A pass 2 ends 10-14; no rework estimate, so the estimate (2)
       ]);
       expect(p.get(D)?.intervals.map((i) => `${i.pass}:${i.start}..${i.end}`)).toEqual(['1:2026-10-11..2026-10-11', '2:2026-10-17..2026-10-17']);
@@ -4713,12 +5083,17 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   describe('29.198 the planner is pure', () => {
     it('29.198 it does not mutate its input and ignores input order', () => {
-      const { nodes, edges } = loopWorld();
-      const frozenNodes = Object.freeze(nodes.map((n) => Object.freeze({ ...n, periods: Object.freeze([...n.periods]) as FlowNode['periods'] })));
-      const frozenEdges = Object.freeze(edges.map((e) => Object.freeze(e)));
-      const a = planFlow({ nodes: frozenNodes, edges: frozenEdges });
-      const b = planFlow({ nodes: [...frozenNodes].reverse(), edges: [...frozenEdges].reverse() });
-      for (const n of nodes) expect(b.get(n.id)).toEqual(a.get(n.id));
+      // Two worlds: the loop, and the undecided diamond, whose tail C has two predecessors with DIFFERENT ends (10-07, 10-09).
+      // In the loop alone no node has two predecessors, so an order-dependent pick (the first known end instead of the
+      // earliest) would answer the same for both orders; reversing the diamond's edges reverses C's incoming list.
+      for (const { nodes, edges } of [loopWorld(), { nodes: diamond(), edges: diamondEdges }]) {
+        const frozenNodes = Object.freeze(nodes.map((n) => Object.freeze({ ...n, periods: Object.freeze([...n.periods]) as FlowNode['periods'] })));
+        const frozenEdges = Object.freeze(edges.map((e) => Object.freeze(e)));
+        const a = planFlow({ nodes: frozenNodes, edges: frozenEdges });
+        const b = planFlow({ nodes: [...frozenNodes].reverse(), edges: [...frozenEdges].reverse() });
+        expect(a.size).toBe(nodes.length); // two empty maps would agree on every `get`
+        for (const n of nodes) expect(b.get(n.id)).toEqual(a.get(n.id));
+      }
     });
   });
 
@@ -4734,12 +5109,35 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       const p = planOf(nodes, edges);
       expect(span(p, A, 0)).toBe('2026-10-05..2026-10-07 explicit');
       expect(span(p, B, 0)).toBe('2026-10-08..2026-10-09 chained');
-      // the cycle through passes is cut where it closes: some pass-2 interval is unscheduled, none throws
+      // CONTROL (the case line's): pass 1 of A and B equals their plan without the half-applied pass
+      const clean = planOf(nodes.map((n) => ({ ...n, rounds: 1, passes: [] })), edges);
+      for (const id of [A, B]) expect(get(p, id).intervals[0]).toEqual(get(clean, id).intervals[0]);
+      // the cycle through passes is cut where it closes: A's and B's pass 2 are unscheduled, nothing is invented, none throws
+      for (const id of [A, B]) expect([get(p, id).intervals.map((i) => i.pass), get(p, id).unscheduled]).toEqual([[1], 'no-dates']);
       const all = [A, B, D].flatMap((id) => get(p, id).intervals);
+      expect(all.length).toBeGreaterThan(0);
       expect(all.every((i) => i.start <= i.end)).toBe(true);
     });
   });
   ```
+  **Kills:** (each mutant is an edit to Step 3's `plan.ts`, hand-evaluated against these inputs):
+  - 29.190 explicit rows: (a) the start-and-estimate row before the start-and-due row (A reads `10-01..10-09`); (b) `start >= due` for start-after-due (the start-equals-due node is unscheduled); (c) `addDays(due, -estimate)` in the due-and-estimate row (D reads `10-06..10-10`).
+  - 29.190 neither date: (a) `return { interval: null, reason: 'no-estimate' }` regardless of `ready` (D and the control read `no-estimate`); (b) `made(ready, addDays(ready, estimate), 'chained')` (B ends `2027-01-03`); (c) `addDays` as day-field arithmetic with no carry, `` `${day.slice(0, 8)}${pad(Number(day.slice(8, 10)) + n, 2)}` `` (B ends `2026-12-33`).
+  - 29.191 the glyph: (a) the table's `... ? {} : {}` (B loses `startsBeforePredecessor`); (b) `from < ready` in place of `start < ready` (the due-only B gains the flag); (c) `start !== null && ready !== null` without `start < ready` (C, starting after its ready day, gains the flag).
+  - 29.192 actual ends: (a) `period.end.slice(0, 10)` for `istDayOf(period.end)` (the 19:00Z leg is ready 10-05); (b) `n.periods.filter(...).at(0)` / the first period (the reopened leg chains from 10-04); (c) `cellOf(...)?.interval?.end ?? actualEnd(p, k)` (plan before actual; the closed leg reads `10-10`).
+  - 29.193 any vs all: (a) `addDays(earliest(known), 1)` for waitForAll (the table row); (b) `known.length === ends.length` required for `any` too (the any-without-B leg is `no-dates`); (c) `addDays(latest(known), 1)` without the all-known test (the waitForAll-without-B leg is scheduled `10-06..10-07`).
+  - 29.194 loop edges: (a) the table's two-place `forwardEdges(edges, analysis)` → `edges` (GN-143 reads `10-21`); (b) `addDays(earliest(known), 0)` (GN-141 starts on its predecessor's due day).
+  - 29.195 pruned ghosts: (a) delete the `live.has(n.id) && !(...)` continue (the tail reads `10-08..10-09`); (b) push `cell.interval` unflagged for a non-live node (A loses `pruned: true` and `onTimeline` turns true); (c) `onTimeline: intervals.length > 0 || ...` (A's `onTimeline` is true).
+  - 29.195 revisions: (a) the table's `return revised` (the early-revision leg is ready 10-06); (b) drop the `revisions` arm of `endIn` (the revised leg reads `10-07..10-09`).
+  - 29.195 waitForAll and Not-taken: (a) delete the `live.has(n.id) && !(...)` continue (the decided tail waits for the ghost B, `10-10`); (b) drop `&& p.notTaken === null` (the undecided stale leg waits for B, `10-10..10-11`).
+  - 29.196 pass 2: (a) the table's deletion of the loop-target predecessor (A, B and D lose pass 2); (b) `const days = n.estimate ?? n.reworkEstimate` (A's pass 2 is three days); (c) `firstPass` for every `k` (A's pass 2 is its explicit `10-05..10-07`).
+  - 29.196 exit chaining: (a) the table's `const pass = k` (E reads `10-13..10-14`); (b) `lastPass` computed as `1` for every node (same).
+  - 29.196 no-estimate and pending loop: (a) `reason: 'no-dates'` in `laterPass`'s `days === null` branch (A's `unscheduled` reads `no-dates`); (b) `member` without the `loopsInto` clause (the pending A has pass 1 only).
+  - 29.197 on the timeline: (a) the table's removal of `|| n.periods.length > 0` (C drops out); (b) `onTimeline: n.periods.length > 0` alone (A drops out).
+  - 29.198 pure: (a) the table's in-place `sort` (the frozen run throws); (b) `const earliest = (days) => days[0]` (the reversed diamond plans C at `10-10..10-11`).
+  - 29.199 half-applied cascade: (a) the table's deletion of the `busy` line (stack overflow); (b) the busy branch returns `cellOf(k - 1, id)` (an invented pass-2 interval; A's passes read `[1, 2]`).
+
+  The legs added in this test-strength pass (29.190 start-equals-due, 29.191 exact due-only interval, 29.195 the undecided Not-taken leg and its control, 29.198 the diamond world and `a.size`, 29.199 the clean control and the pass-2 legs) were computed by hand through Step 3's code, not by running it.
 
   Run (`slot-run.sh` is `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh`): `slot-run.sh wtg2-t11-red -- pnpm --filter @gisik-nokma/domain exec vitest run test/flow/plan.test.ts --maxWorkers=2 > /tmp/wtg2-t11-red.log 2>&1; tail -30 /tmp/wtg2-t11-red.log`. Expected: FAIL (`planFlow is not a function`).
 
@@ -4973,6 +5371,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | 29.199 | delete the `busy` guard line | the half-applied cascade test |
   | 29.186 | add `const __t = new Date();` to `plan.ts` | `clock-free.test.ts` names `plan.ts` |
 
+  **Prose to sweep:** none found (searched: `planner`, `planFlow`, `plan.ts`, `planned interval` in `Features.md`, `docs/manual.md` and `packages/domain/src` on the ref, where the planner hits are unrelated "planner ruling" notes; T10's `clock-free.test.ts` docblock, ORIG 3996-4001, names no file list and its named list is extended by this task's one line; T10's Features bullet, ORIG 4378, describes only T10's four files and stays true).
+
   Push. DONE + REVIEW (NEEDS: T10 merged).
 
 ---
@@ -4983,11 +5383,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Files:**
 - Create: `apps/server/src/flow/read-flow.ts`; `apps/server/src/routes/flow.ts`; `apps/server/test/flow/read-flow.test.ts`
-- Modify: `apps/server/src/app.ts` (import beside `registerTicketHistoryRoute`, `:45`; registration directly after `registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);`, `:945`)
+- Modify: `apps/server/src/app.ts` (import beside `registerTicketHistoryRoute`, `:46`; registration directly after `registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);`, `:949`)
 - Catalogue: `test-cases/29-workflow-timeline-graphs.md` under `<!-- wtg-part2-model T12 -->`; `Features.md` §26 under `<!-- wtg-part2-model T12 bullet -->`
 
 **Interfaces:**
-- **Consumes:** `visibleTicketsWhere(eff, userId, params)` and `LIVE_TICKET_WHERE` (`apps/server/src/read/visible-where.ts:136`, `:231`); `SqlParams` (`read/sql-params.ts`); `resolveEffectiveRole(db, userId, workspaceId)` (`permissions/effective-role.ts:119`); `rowToTicketState(row)` (`projections/tickets.ts:152`); `foldedWorkflowDefs(db, workspaceId, pairs)` keyed `` `${workflowId}@${version}` `` (`read/workflow-defs.ts`); `keysForAncestors(db, workspaceId, ancestors)` (`read/ancestry.ts:356`); `NOT_FOUND_BODY` (`routes/tickets.ts:53`); `Queryable` (`db/queryable.ts:20`); `flowNodeOf`, `statesWithBacklog`, `FlowNode`, `FlowEdge`, `TicketState` (domain); `listMyDrafts` (Drafts R55; this task reads each row's `ticketId`).
+- **Consumes:** `visibleTicketsWhere(eff, userId, params)` and `LIVE_TICKET_WHERE` (`apps/server/src/read/visible-where.ts:138`, `:256`); `SqlParams` (`read/sql-params.ts`); `resolveEffectiveRole(db, userId, workspaceId)` (`permissions/effective-role.ts:119`); `rowToTicketState(row)` (`projections/tickets.ts:160`); `foldedWorkflowDefs(db, workspaceId, pairs)` keyed `` `${workflowId}@${version}` `` (`read/workflow-defs.ts`); `keysForAncestors(db, workspaceId, ancestors)` (`read/ancestry.ts:356`); `NOT_FOUND_BODY` (`routes/tickets.ts:54`); `Queryable` (`db/queryable.ts:20`); `flowNodeOf`, `statesWithBacklog`, `FlowNode`, `FlowEdge`, `TicketState` (domain); `listMyDrafts` (Drafts R55; this task reads each row's `ticketId`).
 - **Produces:** `readFlow(db: Queryable, args: {workspaceId: string; seedId: string; viewerId: string | null; cap?: number}): Promise<{nodes: FlowNode[]; edges: FlowEdge[]; truncated: boolean; reached: number}>` (the pinned contract shape); `walkFlow(db, args): Promise<FlowWalk>` (the same read plus the folded states, the state names and the `blocks` links, for the route); `FLOW_DEFAULT_CAP = 300`, `FLOW_MAX_RINGS = 30`; `registerFlowRoute(app, deps: {pool: Queryable}, requireSession)` serving `GET /v1/workspaces/:workspaceId/tickets/:ticketId/flow` with `FlowReadWire = {rootId; tickets: FlowTicketWire[]; links: {sourceId; targetId; label: string | null; kind: 'leads_to' | 'blocks'}[]; truncated; reached}` and `FlowTicketWire = {id; key: string | null; title; projectId; assigneeId: string | null; stateName; node: FlowNode}`. The wire is transitional: Part 3 T3 owns `GET …/flow` and replaces this route and `FlowReadWire` with its rich `FlowRead` (Part 3 D-W3-4), re-pointing this task's route assertions; Parts 3-5 consume `readFlow` and Part 3's `FlowRead`, never this wire. Keep it small.
 
 **Why one statement per ring and ids only.** The walk (FL-2: "one query per ring, at most 30 rings") needs to know WHICH tickets a viewer may take next, not their rows. Each ring statement returns the ids of tickets that are in this workspace, are linked by `leads_to` to the previous ring, were not seen, and pass the admission test; the rows are fetched ONCE at the end for at most `cap` ids. So a hub with 100 000 neighbours costs ids, not 100 000 folded states. The link scan uses `proj_ticket_links`' primary key (`source_id, target_id, kind`) and its `target_idx` (typed-links T2 DDL), which is what `source_id = ANY(f) OR target_id = ANY(f)` wants.
@@ -5002,7 +5402,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Why the 31st ring is queried and `reached` is a count of what the walk admitted.** `truncated` must be true when more tickets exist than the answer holds, and a flow whose 31st ring is empty must NOT be marked truncated. So after ring 30 the walk asks the ring statement once more and sets `truncated` only when it returns rows, without adding them. `reached` is the number of tickets admitted before the walk stopped (it stops after the ring in which the count first passes `cap`), which is what the surfaces print as "Showing 300 of the first N reached" (FL-2). The `nodes` are the first `cap` in walk order: the seed, then ring by ring, ascending id inside a ring.
 
-**Why the route returns 404 for every unreadable seed.** A seed the viewer cannot read, one that does not exist and one in another workspace all produce `nodes: []`, and the route answers the one `NOT_FOUND_BODY` for all three (the pattern of `routes/ticket-history.ts:255-330`, where `canSee` guards the same oracle). Verified at drafting time: the walk and its SQL were run against a scratch database on the shared test Postgres with the repo's real migrations, `visible-where.ts` with the Drafts clauses added by hand, and a stub for the Drafts helper; the three read cases passed and nine mutations were killed (the table below). The route file typechecks; the real-world test file below is the one thing not run before the plan was written.
+**Why the route returns 404 for every unreadable seed.** A seed the viewer cannot read, one that does not exist and one in another workspace all produce `nodes: []`, and the route answers the one `NOT_FOUND_BODY` for all three (the pattern of `routes/ticket-history.ts:266-312`, where `canSee` guards the same oracle). Verified at drafting time: the walk and its SQL were run against a scratch database on the shared test Postgres with the repo's real migrations, `visible-where.ts` with the Drafts clauses added by hand, and a stub for the Drafts helper; the three read cases passed and nine mutations were killed (the table below). The route file typechecks; the real-world test file below is the one thing not run before the plan was written.
 
 - [ ] **Step 1: Case lines**
 
@@ -5100,7 +5500,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       makeCommitted({ workspaceId: WS, actorId: OWNER, entity: { kind: 'ticket', id: TR }, type: 'ticket.deleted', payload: {} }),
       created(FA, 'Published A'),
       created(FB, 'Published B'),
-      created(FD, 'My draft', { draft: true }, MEMBER),
+      // `ticketCreatedPayload` refuses `draft: true` without `start: 'backlog'` ("a draft is born in the backlog",
+      // `packages/domain/src/events/ticket-events.ts:170-176`); `test/helpers/draft-world.ts:63` seeds the same shape.
+      created(FD, 'My draft', { draft: true, start: 'backlog' }, MEMBER),
       link(FD, FB, 'leads_to', MEMBER),
       // Drafts R42: a link whose TARGET is the draft is filed on the DRAFT's stream with `from` naming the source.
       makeCommitted({
@@ -5177,6 +5579,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(owner.edges).toEqual([]);
       expect(owner.reached).toBe(1); // ruling B: no edge to someone else's draft and no count of it (T2's 29.126 is the links-read twin)
       expect((await readFlow(db.pool, { workspaceId: WS, seedId: FD, viewerId: OWNER })).nodes).toEqual([]);
+      // ...and another workspace member who reads FA (`outsider`: off the roster, but rule A lets them read project-mode work)
+      const other = await readFlow(db.pool, { workspaceId: WS, seedId: FA, viewerId: rw.userIds.outsider });
+      expect([nodeIds(other), other.edges, other.reached]).toEqual([[FA], [], 1]);
       // the system read (viewerId null: the promoter, the settler, the sweep) ignores visibility but never reads a draft
       expect(nodeIds(await readFlow(db.pool, { workspaceId: WS, seedId: FA, viewerId: null }))).toEqual([FA]);
     });
@@ -5217,16 +5622,29 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       // CONTROL: seeded in the middle the same chain is 16 rings each way, so all 33 are read and nothing is cut
       const middle = await readFlow(db.pool, { workspaceId: WS, seedId: chain[16] as string, viewerId: OWNER });
       expect([middle.nodes.length, middle.truncated, middle.reached, middle.edges.length]).toEqual([33, false, 33, 32]);
+      // The boundary (Review Focus 5): a flow of EXACTLY 31 read from its head fills ring 30, and its 31st ring is
+      // queried and EMPTY, so it is not truncated. The middle read above never reaches ring 30, so without this leg
+      // `truncated = true` at the ring limit (ignoring what the 31st ring returned) stays green.
+      const exact = await seedChain(31);
+      const whole = await readFlow(db.pool, { workspaceId: WS, seedId: exact[0] as string, viewerId: OWNER });
+      expect([whole.nodes.length, whole.nodes.at(-1)?.id, whole.truncated, whole.reached]).toEqual([31, exact[30], false, 31]);
     });
 
     it('29.189 past the cap the first `cap` tickets in ring order are returned, reached counts the ring, and no edge reaches a cut ticket', async () => {
       const hub = newUlid();
       const leaves = Array.from({ length: 5 }, () => newUlid()).sort();
-      await applyCommitted(db.pool, [created(hub, 'Hub'), ...leaves.map((id, i) => created(id, `Leaf ${i}`)), ...leaves.map((id) => link(hub, id))]);
+      // Created and linked in DESCENDING id order, so heap order and link order are the reverse of the expected order:
+      // without the ring statement's `ORDER BY t.ticket_id` the cut keeps leaves[4] and leaves[3], and the order leg reds.
+      const descending = [...leaves].reverse();
+      await applyCommitted(db.pool, [created(hub, 'Hub'), ...descending.map((id) => created(id, `Leaf ${leaves.indexOf(id)}`)), ...descending.map((id) => link(hub, id))]);
       const capped = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 3 });
       expect(capped.nodes.map((n) => n.id)).toEqual([hub, leaves[0], leaves[1]]); // seed first, then ascending id inside the ring
       expect([capped.truncated, capped.reached]).toEqual([true, 6]);
       expect(edgeKeys(capped)).toEqual([`${hub}>${leaves[0]}:null`, `${hub}>${leaves[1]}:null`].sort());
+      // The cap landing exactly on a ring boundary with more beyond: cap 1 holds the seed, the walk still asks ring 1,
+      // so `reached` counts it and `truncated` is true (a `>=` in `order.length > cap` stops at the seed: 1 and false).
+      const seedOnly = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 1 });
+      expect([seedOnly.nodes.map((n) => n.id), seedOnly.edges, seedOnly.truncated, seedOnly.reached]).toEqual([[hub], [], true, 6]);
       // CONTROL: room for all six
       const roomy = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 6 });
       expect([roomy.nodes.length, roomy.truncated, roomy.reached, roomy.edges.length]).toEqual([6, false, 6, 5]);
@@ -5244,6 +5662,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       const links = body.links.map((l) => `${l.kind}:${l.sourceId}>${l.targetId}:${l.label}`).sort();
       expect(links).toEqual([`blocks:${SH}>${TE}:null`, `leads_to:${HI}>${TE}:Yes`, `leads_to:${SH}>${HI}:null`].sort());
       expect([body.truncated, body.reached]).toEqual([false, 3]);
+      // Keys: every ticket here is published, so each wire key is non-null and is the key the single-ticket route
+      // (`GET /v1/workspaces/:ws/tickets/:id`, an independent reader) prints for it; three different tickets, three keys.
+      for (const id of [SH, HI, TE]) {
+        const viaTicket = (await rw.app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${id}`, headers: rw.authOf('owner') })).json().key;
+        expect(viaTicket).toMatch(/^[A-Z0-9]+-\d+$/);
+        expect(body.tickets.find((t) => t.id === id)?.key).toBe(viaTicket);
+      }
 
       const author = (await get('member', FA)).json() as FlowReadWire;
       const draft = author.tickets.find((t) => t.id === FD);
@@ -5253,6 +5678,15 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+
+  **Kills:** (edits of Step 3's `read-flow.ts` and Step 4's `routes/flow.ts`; each turns its `it()` red):
+  - 29.187 read: (a) `const seeable = viewer === null ? 'TRUE' : visibleTicketsWhere(...)` becomes `const seeable = 'TRUE'` (the member's read from SH gains HI and TE); (b) drop `AND target_id = ANY ($2::text[])` from the closing statement (the member's `edges` gain `SH>HI`, and the JSON contains HI); (c) `if ('seedId' in from) return [from.seedId];` as the first line of `admit` (the hidden seed HI reads as `nodes: [HI]`, not the empty read).
+  - 29.187 route: (a) delete `if (walk.read.nodes.length === 0) return reply.code(404).send(NOT_FOUND_BODY);` (the hidden seed answers 200); (b) the route passes `viewerId: null` instead of `request.currentUserId` (the member's wire gains HI, its title "Salary review — keep private", and the `leads_to` link); (c) `const seeable = 'TRUE'` as above (same legs, through the wire).
+  - 29.188 drafts: (a) `ownDrafts.length === 0 ? 'FALSE' :` becomes `true ? 'FALSE' :` (the author's read loses FD and FB); (b) `flowNodeOf(state, def, { draft: ownSet.has(state.id) })` becomes `flowNodeOf(state, def)` (the draft-flag leg reads `[]`); (c) `${LIVE_TICKET_WHERE}` becomes `${LIVE_BASE_WHERE}` in the ring statement (drops `t.draft_author_id IS NULL`: the system read from FA gains FD and FB, while the owner's and the outsider's reads stay a hole because `visibleTicketsWhere` carries its own draft clause, so this leg alone dies).
+  - 29.188 deleted and blocks: (a) `((${LIVE_TICKET_WHERE} AND ${seeable}) OR ${own})` becomes `((${seeable}) OR ${own})` (the owner's read gains TR: the owner's `visibleTicketsWhere` is `(v.draft_author_id IS NULL)` alone, `visible-where.ts:142`); (b) the ring statement's `AND l.kind = 'leads_to'` becomes `AND l.kind IN ('leads_to', 'blocks')` (the owner's read gains BL); (c) `viewer === null ? 'TRUE'` becomes `viewer === null ? 'FALSE'` (the system read is empty).
+  - 29.189 rings: (a) `if (ring === FLOW_MAX_RINGS)` becomes `if (ring === FLOW_MAX_RINGS + 1)` (the 33-chain's head reads 32); (b) `truncated = next.length > 0;` becomes `truncated = true;` (the exact-31 chain reads `truncated: true`); (c) the ring statement's `CASE WHEN l.source_id = ANY (${f}::text[]) THEN l.target_id ELSE l.source_id END` becomes `l.target_id` (the walk only goes forward: the middle read has 17 tickets, not 33).
+  - 29.189 cap: (a) `const reached = order.length` becomes `Math.min(order.length, cap)` (the star reports 3); (b) `if (order.length > cap) break;` becomes `>=` (the cap-1 read stops at the seed: reached 1, truncated false); (c) drop `ORDER BY t.ticket_id` from the ring statement (rows come back in heap / link order, which the descending insertion makes the reverse of id order, so the cut keeps leaves[4] and leaves[3]).
+  - 29.189 wire: (a) `stateNames.set(state.id, known.name)` becomes `stateNames.set(state.id, known.id)` (SH's `stateName` reads `waiting`); (b) `key: keys.get(node.id) ?? null` becomes `key: keys.get(rootId) ?? null` (HI's and TE's keys equal SH's, and the draft FD gets FA's key instead of null); (c) drop `...walk.blocks.map(...)` from `links` (the `blocks:SH>TE` row is missing).
 
   Build first (the server reads the domain's `dist`): `slot-run.sh wtg2-t12-build -- pnpm --filter @gisik-nokma/domain build > /tmp/wtg2-t12-build.log 2>&1; tail -20 /tmp/wtg2-t12-build.log`. Run (`slot-run.sh` is `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh`; the tests use the shared test Postgres on 54329, `TEST_DATABASE_ADMIN_URL`): `slot-run.sh wtg2-t12-red -- pnpm --filter @gisik-nokma/server exec vitest run test/flow/read-flow.test.ts --maxWorkers=2 > /tmp/wtg2-t12-red.log 2>&1; tail -30 /tmp/wtg2-t12-red.log`. Expected: FAIL (`Failed to resolve import "../../src/flow/read-flow.js"`).
 
@@ -5441,7 +5875,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 - [ ] **Step 4: The route**
 
-  `apps/server/src/routes/flow.ts` (the registration signature is `registerTicketHistoryRoute`'s, `routes/ticket-history.ts:265-270`; `request.currentUserId` is the augmentation every route file uses):
+  `apps/server/src/routes/flow.ts` (the registration signature is `registerTicketHistoryRoute`'s, `routes/ticket-history.ts:266-270`; `request.currentUserId` is the augmentation every route file uses):
   ```ts
   import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
   import type { FlowNode, TicketState } from '@gisik-nokma/domain';
@@ -5539,7 +5973,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   }
   ```
 
-  `apps/server/src/app.ts`: add `import { registerFlowRoute } from './routes/flow.js';` after the `registerTicketHistoryRoute` import (`:45`), and after `registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);` (`:945`):
+  `apps/server/src/app.ts`: add `import { registerFlowRoute } from './routes/flow.js';` after the `registerTicketHistoryRoute` import (`:46`), and after `registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);` (`:949`):
   ```ts
   // One ticket's flow (wtg Part 2, FL-1): the weakly connected component over "leads to", for the signed-in viewer.
   // Same preHandler by parameter, same reason as its neighbours: the handler reads `request.currentUserId`.
@@ -5548,6 +5982,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   Run the Step 2 command. Expected: PASS (7 tests). Then `slot-run.sh wtg2-t12-tc -- pnpm --filter @gisik-nokma/server typecheck > /tmp/wtg2-t12-tc.log 2>&1; tail -20 /tmp/wtg2-t12-tc.log`. Expected: clean.
 
   Commit: `wtg2 T12: the flow route`.
+
+**Prose to sweep:**
+- `apps/server/src/read/ancestry.ts:341-342` — `keysForAncestors` is "for a small set of ANCESTOR tickets (parents, epics) — never the page's own cards, which `read/ticket-cards.ts`'s `cardKeysFor` already keys"; `routes/flow.ts` `flowWire` now keys the flow's own cards with it.
+- `apps/server/src/read/ancestry.ts:350-353` — "every caller here already has a `boardAncestryFor` result, and that walk never crosses a workspace boundary"; the flow route is a caller with no `boardAncestryFor` result (its single workspace comes from the walk's `t.workspace_id` clause instead).
 
 - [ ] **Step 5: Flip, Features, mutations, DONE**
   - Flip 29.187-29.189 to ✅ in the same commit; `pnpm check:citations`, `node scripts/check-case-ids.mjs`. The server suite runs WHOLE (`slot-run.sh wtg2-t12-all -- pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2`): `app.ts` gained a route and the route census tests list every registered path.
@@ -5576,14 +6014,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Files:**
 - Create: `packages/domain/src/flow/promotion.ts`; `packages/domain/test/flow-promotion.test.ts`; `apps/server/src/flow/promote.ts`; `apps/server/test/flow/flow-world.ts` (the shared test world; T14, T16 import it); `apps/server/test/flow/promote.test.ts`; `packages/rule-engine/test/led-to-promotion.test.ts`
-- Modify: `packages/domain/src/flow/index.ts` (add `export * from './promotion.js';` after T10's exports); `packages/rule-engine/src/transition.ts` (one clause after the `resolveCurrentStateId` check, `:81-100` at `ec72d1f8`); `packages/rule-engine/src/checks/refusals.ts` (one `REFUSALS` key, beside the `link.*` keys T2 adds); `apps/server/src/app.ts` (register the promoter beside the fan-out, `:1130-1140`)
+- Modify: `packages/domain/src/flow/index.ts` (add `export * from './promotion.js';` after T10's exports); `packages/rule-engine/src/transition.ts` (one clause after the `resolveCurrentStateId` check, `:81-100` at `ec72d1f8`); `packages/rule-engine/src/checks/refusals.ts` (one `REFUSALS` key, beside the `link.*` keys T2 adds); `apps/server/src/app.ts` (register the promoter beside the fan-out, `:1136-1149`)
 - Catalogue: `test-cases/29-workflow-timeline-graphs.md` under `<!-- wtg-part2-model T13 -->`; `Features.md` §26 under `<!-- wtg-part2-model T13 bullet -->`
 
 **Interfaces:**
-- **Consumes:** `FlowNode`, `FlowEdge`, `edgeKey`, `analyzeFlow(...).backEdges`, `effectiveEdges`, `sameLabel` (T10: re-read `packages/domain/src/flow/index.ts` after T10 merged and fix the three import lines of `promotion.ts` to the files that really hold them; the code below assumes `./types.js`, `./analysis.js`, `./graph.js`); `readFlow(db, {workspaceId, seedId, viewerId: null, cap}) -> {nodes, edges, truncated, reached}` (T12); `isFlowCause`, `SYSTEM_ACTOR_FLOW`, `DECISION_TYPE_ID` (T8, T5); `latestWorkflowDefs` (`apps/server/src/read/workflow-defs.ts:25`); `LIVE_TICKET_WHERE` (`apps/server/src/read/visible-where.ts:231`).
+- **Consumes:** `FlowNode`, `FlowEdge`, `edgeKey`, `analyzeFlow(...).backEdges`, `effectiveEdges`, `sameLabel` (T10: re-read `packages/domain/src/flow/index.ts` after T10 merged and fix the three import lines of `promotion.ts` to the files that really hold them; the code below assumes `./types.js`, `./analysis.js`, `./graph.js`); `readFlow(db, {workspaceId, seedId, viewerId: null, cap}) -> {nodes, edges, truncated, reached}` (T12); `isFlowCause`, `SYSTEM_ACTOR_FLOW`, `DECISION_TYPE_ID` (T8, T5); `latestWorkflowDefs` (`apps/server/src/read/workflow-defs.ts:25`); `LIVE_TICKET_WHERE` (`apps/server/src/read/visible-where.ts:256`).
 - **Produces:** `promotionsFor(input: {nodes: FlowNode[]; edges: FlowEdge[]; targetIds: readonly string[]}): Promotion[]` and `type Promotion = {targetId: string; sourceTicketId: string; label: string | null}` (domain); server `type FlowIngest = {ingestBatch(events: SubmittedEvent[]): Promise<IngestResult[]>}`, `FLOW_SERVER_CAP = 2000`, `promoteTargets(deps: FlowPromoteDeps, workspaceId: string, targetIds: readonly string[]): Promise<{promoted: number; refused: number; skipped: number}>` (T14 and T16 call it), `triggeredByOf(db, sourceTicketId): Promise<string>`, `createFlowPromoter(deps): {onCommitted(event: EventEnvelope): Promise<void>}`, and the engine refusal `cause.led-to-not-backlog`.
 
-**Why the promoter gets `ingest` as `{ingestBatch}` and app.ts passes `{ingestBatch: deps.serverAppend}`.** `AppDeps.ingest` is the narrowed `ClientIngest` with no `ingestBatch` (`apps/server/src/app.ts:87`); the internal door reaches the app only as the named capability `serverAppend` (`:137`, type `ServerAppend` at `routes/invites.ts:40`). `FlowIngest` accepts the whole `IngestService` too (the daemon passes it), because a function taking `unknown[]` is assignable to one taking `SubmittedEvent[]`.
+**Why the promoter gets `ingest` as `{ingestBatch}` and app.ts passes `{ingestBatch: deps.serverAppend}`.** `AppDeps.ingest` is the narrowed `ClientIngest` with no `ingestBatch` (`apps/server/src/app.ts:89`); the internal door reaches the app only as the named capability `serverAppend` (`:139`, type `ServerAppend` at `routes/invites.ts:40`). `FlowIngest` accepts the whole `IngestService` too (the daemon passes it), because a function taking `unknown[]` is assignable to one taking `SubmittedEvent[]`.
 
 **Why a flow-caused move into Backlog is a trigger for the moved ticket itself (an addition to AP-4's table).** AP-4 says the target's OWN move into Backlog is not a trigger, meaning a person's "Send to backlog" must stick. A loop or pass-2 settle (PS-5.3) also sends a ticket to Backlog, filed by `SYSTEM_ACTOR_FLOW` with a flow cause, and the Decision's satisfied edge then must promote it. Without this, that ticket would wait for the sweep. The distinction is the actor plus the cause, so a person's move is untouched (29.216).
 
@@ -5647,32 +6085,34 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   describe('29.211 waitForAll and I*(T)', () => {
     it('29.211 every considered edge; back edges, not-taken and other-label edges dropped; empty I* promotes nothing', () => {
       const tail = (over: Partial<FlowNode> = {}) => backlog('t', { waitForAll: true, ...over });
-      expect(ids(promotionsFor({ nodes: [done('a'), done('b'), tail()], edges: [edge('a', 't'), edge('b', 't')], targetIds: ['t'] }))).toHaveLength(1);
+      expect(ids(promotionsFor({ nodes: [done('a'), done('b'), tail()], edges: [edge('a', 't'), edge('b', 't')], targetIds: ['t'] }))).toEqual(['a>t']);
       // control: one unsatisfied forward edge holds the target
       expect(promotionsFor({ nodes: [done('a'), active('b'), tail()], edges: [edge('a', 't'), edge('b', 't')], targetIds: ['t'] })).toEqual([]);
-      // loop: s -> t -> m -> later -> t; later -> t is the back edge, so s alone decides
-      const loop = (later: FlowNode, withS: boolean) =>
+      // loop: s -> t -> u -> v -> t; v -> t is the back edge, so s alone decides. The loop's ids sort AFTER 't' on purpose:
+      // without s, analyzeFlow's DFS roots at the smallest unvisited id, and a loop node named below 't' (e.g. 'later')
+      // would be the root, making m -> later the back edge and later -> t FORWARD, so the fallback below would go untested.
+      const loop = (v: FlowNode, withS: boolean) =>
         promotionsFor({
-          nodes: [done('s'), tail(), node('m'), later],
-          edges: [...(withS ? [edge('s', 't')] : []), edge('t', 'm'), edge('m', 'later'), edge('later', 't')], targetIds: ['t'],
+          nodes: [done('s'), tail(), node('u'), v],
+          edges: [...(withS ? [edge('s', 't')] : []), edge('t', 'u'), edge('u', 'v'), edge('v', 't')], targetIds: ['t'],
         });
-      expect(loop(active('later'), true)).toHaveLength(1);
-      expect(loop(active('later'), false)).toEqual([]); // I' empty, so I(T) = the back edge, unsatisfied
-      expect(loop(done('later'), false)).toHaveLength(1);
+      expect(ids(loop(active('v'), true))).toEqual(['s>t']);
+      expect(loop(active('v'), false)).toEqual([]); // I' empty, so I(T) = the back edge v -> t, unsatisfied
+      expect(ids(loop(done('v'), false))).toEqual(['v>t']); // the "unless none remain" fallback: only the back edge decides
       // diamond tail: b was closed Not taken, so only a is waited for; with b merely open the tail waits
       const diamond = (b: FlowNode, outcome: string | null) =>
         promotionsFor({
           nodes: [done('d', undefined, { isDecision: true, outcome }), done('a'), b, tail()],
           edges: [edge('d', 'a', 'A'), edge('d', 'b', 'B'), edge('a', 't'), edge('b', 't')], targetIds: ['t'],
         });
-      expect(diamond(done('b', undefined, { notTaken: NOT_TAKEN }), 'A')).toHaveLength(1);
+      expect(ids(diamond(done('b', undefined, { notTaken: NOT_TAKEN }), 'A'))).toEqual(['a>t']);
       expect(diamond(backlog('b'), 'A')).toEqual([]);
       // revised to B: a (finished with work) stays, but b is now the taken branch and is not done
       expect(diamond(active('b'), 'B')).toEqual([]);
       // a Decision edge straight into the tail: another label drops it, a pending Decision still holds it
       const direct = (outcome: string | null) =>
         promotionsFor({ nodes: [done('d', undefined, { isDecision: true, outcome }), done('a'), tail()], edges: [edge('d', 't', 'B'), edge('a', 't')], targetIds: ['t'] });
-      expect(direct('A')).toHaveLength(1);
+      expect(ids(direct('A'))).toEqual(['a>t']);
       expect(direct(null)).toEqual([]);
       // empty I*: the only source is not taken
       expect(promotionsFor({ nodes: [done('s', undefined, { notTaken: NOT_TAKEN }), tail()], edges: [edge('s', 't')], targetIds: ['t'] })).toEqual([]);
@@ -5693,7 +6133,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   describe('29.213 attribution and order', () => {
     it('29.213 latest finisher, then smallest id; the edge label; sorted by target', () => {
-      const pick = (a: FlowNode, b: FlowNode) => promotionsFor({ nodes: [a, b, backlog('t')], edges: [edge('a', 't', 'x'), edge('b', 't', 'y')], targetIds: ['t'] })[0];
+      // Edges listed b first on purpose: the tie leg must need `incoming.sort` (input already in id order would pass without it).
+      const pick = (a: FlowNode, b: FlowNode) => promotionsFor({ nodes: [a, b, backlog('t')], edges: [edge('b', 't', 'y'), edge('a', 't', 'x')], targetIds: ['t'] })[0];
       expect(pick(done('a', '2026-10-01T09:00:00.000Z'), done('b', '2026-10-03T09:00:00.000Z'))).toEqual({ targetId: 't', sourceTicketId: 'b', label: 'y' });
       expect(pick(done('a', '2026-10-03T09:00:00.000Z'), done('b', '2026-10-03T09:00:00.000Z'))?.sourceTicketId).toBe('a'); // tie: smallest id
       expect(pick(node('a', { stateId: 'done', category: 'terminal' }), done('b'))?.sourceTicketId).toBe('b'); // control: no period loses
@@ -5702,6 +6143,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.210 satisfied edge: (a) `source.closed` in place of `source.category !== 'terminal'` in `satisfied` (the `done('s')` leg, `closed: false`); (b) drop `|| source.notTaken !== null` (the not-taken leg); (c) `source.outcome === edge.label` in place of `sameLabel(...)` (the case-folded `'Yes'`/`'yes'` leg).
+  - 29.211 waitForAll and I*: (a) `const base = incoming` (keep back edges; `loop(active('v'), true)` sees v); (b) `const base = forward` (drop the only-back-edges fallback; `loop(done('v'), false)` promotes nothing); (c) drop `i.node.notTaken === null` from the I* filter (the Not-taken diamond leg); (d) drop `inEffective.has(...)` (`direct('A')`); (e) `.every` → `.some` (the one-unsatisfied control).
+  - 29.212 targets and sources: (a) delete `target.stateId !== BACKLOG_STATE_ID ||` (the `node('t')` To do target); (b) drop `!node.trashed` from the I(T) push (the trashed-b leg); (c) drop `!node.draft` from the I(T) push (the draft-b leg).
+  - 29.213 attribution and order: (a) `considered[0]` in place of the reduce (the date leg names a); (b) `>=` in the reduce (the tie leg names b); (c) delete `incoming.sort(...)` (the tie leg, edges given b first, names b); (d) drop `.sort()` on the target ids (`['z', 'm']`).
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t13-dom -- pnpm --filter @gisik-nokma/domain exec vitest run test/flow-promotion.test.ts --maxWorkers=2 > /tmp/wtg2-t13-dom.log 2>&1; tail -30 /tmp/wtg2-t13-dom.log`. Expected: FAIL (`promotionsFor is not a function`).
 
 - [ ] **Step 3: `promotionsFor`**
@@ -5852,7 +6298,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     createFlowPromoter({ pool: db.pool, ingest: realIngest(db.pool), log: (m) => logs.push(m), ...over });
   const finishing = async (s: string) => step(db.pool, s, 'ticket.transitioned', { to: 'done' });
   ```
-  - **29.214:** `s = addTicket({start:'focus', moves:['doing']})`, `t = addTicket({assigneeId: ASSIGNEE})`, `k = addTicket({typeId: KICKOFF_TASK})`, `lead(s,t)`, `lead(s,k)`. Control first: `await p.onCommitted(linkEvent)` leaves `stateOf(t)` = `'backlog'`. Then `await p.onCommitted(await finishing(s))`. Expect `stateOf(t)` = `'todo'`, `stateOf(k)` = `'kickoff'`, and `ledger(db.pool, t, 'ticket.transitioned')` equals `[{actor_id: SYSTEM_ACTOR_FLOW, origin: 'server', payload: {to: 'todo', cause: {kind: 'led-to', sourceTicketId: s, triggeredBy: PERSON}}}]` (no `label` key for an unlabelled edge).
+  - **29.214:** `s = addTicket({start:'focus', moves:['doing']})`, `t = addTicket({assigneeId: ASSIGNEE})`, `k = addTicket({typeId: KICKOFF_TASK})`, `linkT = lead(s,t)`, `linkK = lead(s,k)`. Control first: `await p.onCommitted(linkT); await p.onCommitted(linkK)` (both link events re-target their target, so both are evaluated) leaves `stateOf(t)` and `stateOf(k)` = `'backlog'` and `ledger(db.pool, t, 'ticket.transitioned')` = `[]`. Then the source is finished by a DIFFERENT person than the one who created and started it: `await p.onCommitted(await step(db.pool, s, 'ticket.transitioned', { to: 'done' }, ASSIGNEE))`. Expect `stateOf(t)` = `'todo'`, `stateOf(k)` = `'kickoff'`, and `ledger(db.pool, t, 'ticket.transitioned')` equals `[{actor_id: SYSTEM_ACTOR_FLOW, origin: 'server', payload: {to: 'todo', cause: {kind: 'led-to', sourceTicketId: s, triggeredBy: ASSIGNEE}}}]` (no `label` key for an unlabelled edge; `ASSIGNEE`, not `PERSON`, so "the actor of the LATEST transition" is told apart from the creator and from the first transition).
   - **29.215:** a table of `[name, build, promotes]`, each `build` makes its own tickets and returns `{event, target}`; the loop asserts `stateOf(target)` is `'todo'` or `'backlog'`:
     ```ts
     const A = () => addTicket(db.pool, { start: 'focus', moves: ['doing', 'done'] });  // finished source
@@ -5867,19 +6313,25 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       ['waitForAll cleared on the target', async () => { const [a, b, t] = [await A(), await addTicket(db.pool, { start: 'focus', moves: ['doing'] }), await addTicket(db.pool)]; await wait(t); await lead(db.pool, a, t); await lead(db.pool, b, t); return { event: await step(db.pool, t, 'ticket.field_set', { fieldId: 'waitForAll', value: null }), target: t }; }, true],
       ['restored on the target', async () => { const s = await A(); const t = await addTicket(db.pool); await lead(db.pool, s, t); await step(db.pool, t, 'ticket.deleted', {}); return { event: await step(db.pool, t, 'ticket.restored', {}), target: t }; }, true],
       ['published draft (hand-built Drafts event, R55)', async () => { const s = await A(); const t = await addTicket(db.pool); await lead(db.pool, s, t); return { event: makeEnvelope({ type: 'ticket.published', workspaceId: WS, entity: { kind: 'ticket', id: t }, payload: { projectId: PROJECT } }), target: t }; }, true],
-      ['CONTROL a blocks link', async () => { const s = await A(); const t = await addTicket(db.pool); await lead(db.pool, s, t); await unlink(db.pool, s, t); return { event: await step(db.pool, s, 'ticket.link_added', { kind: 'blocks', targetId: t }), target: t }; }, false],
+      ['CONTROL a blocks link', async () => { const s = await A(); const t = await addTicket(db.pool); const o = await addTicket(db.pool); await lead(db.pool, s, t); return { event: await step(db.pool, o, 'ticket.link_added', { kind: 'blocks', targetId: t }), target: t }; }, false],
       ['CONTROL a draft-side (from) link', async () => { const s = await A(); const t = await addTicket(db.pool); await lead(db.pool, s, t); return { event: makeEnvelope({ type: 'ticket.link_added', workspaceId: WS, entity: { kind: 'ticket', id: t }, payload: { kind: 'leads_to', targetId: t, from: s } }), target: t }; }, false],
       ['CONTROL an assignment', async () => { const s = await A(); const t = await addTicket(db.pool); await lead(db.pool, s, t); return { event: await step(db.pool, t, 'ticket.assigned', { assigneeId: ASSIGNEE }), target: t }; }, false],
       ['CONTROL a title edit', async () => { const s = await A(); const t = await addTicket(db.pool); await lead(db.pool, s, t); return { event: await step(db.pool, t, 'ticket.field_set', { fieldId: 'title', value: 'x' }), target: t }; }, false],
     ];
+    for (const [name, build, promotes] of rows) {
+      const { event, target } = await build();
+      expect([name, await stateOf(db.pool, target)]).toEqual([name, 'backlog']); // precondition: nothing ran onCommitted yet
+      await promoter().onCommitted(event);
+      expect([name, await stateOf(db.pool, target)]).toEqual([name, promotes ? 'todo' : 'backlog']);
+    }
     ```
-    The `unlink` in the blocks control removes the `leads_to` row first so only the event under test could promote; the `from` control keeps its row but its event must not trigger (the Drafts projection writes such a row with `source_id = from`, R42).
-  - **29.216:** `s` finishing promotes `t`; `step(t, 'ticket.transitioned', {to: 'backlog'})` by `PERSON`, then `onCommitted` of it: `stateOf(t)` stays `'backlog'`. Control: `step(s, ..., {to: 'doing'})` then `{to: 'done'}` and `onCommitted` of the second: `'todo'`. Flow-caused arm: `makeCommitted` a transition to `'backlog'` for `t` with `actorId: SYSTEM_ACTOR_FLOW` and `cause: {kind: 'reopened-by-flow', decisionTicketId: newUlid(), outcome: 'Loop', pass: 2, decidedBy: PERSON, decisionEventId: newUlid()}`: `onCommitted` promotes `t` again.
-  - **29.217:** `s` finished, `t`; `lead`. `readFlow(db.pool, {workspaceId: WS, seedId: t, viewerId: ASSIGNEE, cap: 300})` returns no node `s` (this world has no memberships, so a viewer sees nothing: the control proving the viewer-scoped read cannot be the one the promoter uses); `onCommitted(finishing)` promotes `t`.
+    Every CONTROL row keeps a pending, already-satisfied `leads_to` row into `t` (filed through `applyCommitted`, so no promoter ever saw it): a control whose event is wrongly mapped to `t` promotes it and goes red. The blocks control files its link from a third ticket `o`, so its `targetId` is `t` and dropping the `kind === 'leads_to'` test re-targets `t` (an earlier version unlinked s -> t first, which left nothing to promote and made the control unable to fail). The `from` control keeps its row but its event must not trigger (the Drafts projection writes such a row with `source_id = from`, R42).
+  - **29.216:** `s` finishing promotes `t`; `step(t, 'ticket.transitioned', {to: 'backlog'})` by `PERSON`, then `onCommitted` of it: `stateOf(t)` stays `'backlog'`. Control: `step(s, ..., {to: 'doing'})` then `{to: 'done'}` and `onCommitted` of the second: `'todo'`. Flow-caused arm: APPLY a transition to `'backlog'` for `t` as the flow, `const back = await step(db.pool, t, 'ticket.transitioned', {to: 'backlog', cause: {kind: 'reopened-by-flow', decisionTicketId: newUlid(), outcome: 'Loop', pass: 2, decidedBy: PERSON, decisionEventId: newUlid()}}, SYSTEM_ACTOR_FLOW)`; `stateOf(t)` reads `'backlog'` (precondition), then `onCommitted(back)` promotes `t` again (`'todo'`).
+  - **29.217** (planner ruling 2026-10-04, Q11: a member who sees `t` but not `s`, so the control separates "this source is hidden" from "everything is hidden"): its own database with T12's 29.187 world (`buildReadTestApp(db)`: MEMBER can read `sharedTaskId` and not `hiddenTaskId`). `s = hiddenTaskId`, finished through `applyCommitted` (no promoter sees it); `t = sharedTaskId`, moved to Backlog the same way (precondition: `stateOf(t)` is `'backlog'`); `leads_to` `s -> t` the same way. Control: `readFlow(db.pool, {workspaceId: WS, seedId: t, viewerId: MEMBER, cap: 300})` has node `t` and no node `s`. Trigger by MEMBER (AP-4, `ticket.field_set` of `waitForAll` on `t`): `const on = await step(db.pool, t, 'ticket.field_set', { fieldId: 'waitForAll', value: true }, MEMBER)` (precondition: accepted), then `onCommitted(on)`: `stateOf(t)` is `'todo'` and its `led-to` cause has `sourceTicketId: s`.
   - **29.218:** `s` finished; `shipped = addTicket({typeId: SHIPPED_TASK})`, `t`; `lead` both; `promoteTargets(deps, WS, [shipped, t])`: `stateOf(shipped)` stays `'backlog'`, `logs` has one line matching `/initial state .* terminal/`, `stateOf(t)` is `'todo'`, report `{promoted: 1, refused: 0, skipped: 1}`.
-  - **29.219:** (a) `ingest: { ingestBatch: async (events) => events.map((e) => ({ status: 'refused', eventId: e.id, rule: 'illegal-transition', reason: 'no' })) }` → report `refused: 1`, a log line containing `illegal-transition`, no throw; `status: 'invalid', code: 'x', message: 'y'` → counted and logged with `x`. (b) A real promotion twice: `promoteTargets` second call reports `{promoted: 0, refused: 0, skipped: 0}` and the ledger holds one `led-to` row. (c) Rule-engine file below.
-  - **29.220:** two linked tickets, `createFlowPromoter({..., flowCap: 1})`: nothing files, `logs` has a line matching `/truncated/`; control: default cap promotes.
-  - **29.221:** copy `test/notifications/fanout.test.ts:858-898` ('boot wiring'): a `recordingIngest` whose `onEventCommitted` pushes to `listeners` and whose `ingestBatch` is unused, and a real-door `serverAppend` that records submitted events and answers `committed`. After `buildApp({..., serverAppend})`, `for (const l of listeners) l(finishingEvent)` and `await vi.waitFor(() => expect(sent.map((e) => e.type)).toEqual(['ticket.transitioned']))` with `sent[0].actorId === SYSTEM_ACTOR_FLOW`. Then `await app.close()`, fire the same event again: `sent` is unchanged. Fire-and-forget arm: `createFlowPromoter({pool: {query: async () => { throw new Error('db down'); }} as never, ...}).onCommitted(finishingEvent)` resolves, and `logs` has `flow promotion failed for event`.
+  - **29.219:** (a) `s` finished, `t`, `lead(s,t)`; `ingest: { ingestBatch: async (events) => events.map((e) => ({ status: 'refused', eventId: e.id, rule: 'illegal-transition', reason: 'no' })) }` → `promoteTargets` resolves to exactly `{promoted: 0, refused: 1, skipped: 0}`, a log line containing `illegal-transition`, no throw; `status: 'invalid', code: 'x', message: 'y'` → exactly `{promoted: 0, refused: 1, skipped: 0}` and a log line containing `INVALID` and `x`. (b) A real promotion twice: `promoteTargets` second call reports `{promoted: 0, refused: 0, skipped: 0}` and the ledger holds one `led-to` row. (c) Rule-engine file below.
+  - **29.220:** a waitForAll target whose cut source is the one holding it. `x = addTicket()`, `y = addTicket()`, `[lo, hi] = [x, y].sort()` (ULIDs from `newUlid` are not ordered within a millisecond, so sort them); walk `lo` to `'doing'` then `'done'` and `hi` to `'doing'` with `step`; `t = addTicket()`, `wait(t)` (the 29.215 helper), `lead(lo,t)`, `lead(hi,t)`. `promoteTargets({...deps, flowCap: 2}, WS, [t])`: T12's read keeps the seed then ring 1 in ascending id, so `nodes` = `[t, lo]` and `truncated` (reached 3); expect exactly `{promoted: 0, refused: 0, skipped: 1}`, `stateOf(t)` = `'backlog'`, and a `logs` line matching `/truncated/`. Controls, default cap: `promoteTargets(deps, WS, [t])` is `{promoted: 0, refused: 0, skipped: 0}` and `'backlog'` (the whole read sees `hi` holding it); then `hi` to `'done'` and the same call is `{promoted: 1, refused: 0, skipped: 0}` and `'todo'`. (With two plain linked tickets and cap 1 the read is `[t]` alone, which promotes nothing whether or not `truncated` is honoured.)
+  - **29.221:** copy `test/notifications/fanout.test.ts:870-910` ('boot wiring'): a `recordingIngest` whose `onEventCommitted` pushes to `listeners` and whose `ingestBatch` is unused, and a real-door `serverAppend` that records submitted events and answers `committed`. After `buildApp({..., serverAppend})`, `for (const l of listeners) l(finishingEvent)` and `await vi.waitFor(() => expect(sent.map((e) => e.type)).toEqual(['ticket.transitioned']))` with `sent[0].actorId === SYSTEM_ACTOR_FLOW`. Then `await app.close()` and `expect(listeners).toEqual([])`: the fake's unsubscribe REMOVES the listener (as in the fan-out test), and the hub and the fan-out let go on close too, so a promoter that is never unsubscribed is still in the list. This is the after-close leg; a "fire again and `sent` is unchanged" check alone cannot fail, because the promoter is fire-and-forget and the check would run before a leaked listener's queries finish. Fire the same event to whatever is left: `sent` is unchanged (`serverAppend` records without applying, so `t` is still in Backlog and a live promoter WOULD file again). Fire-and-forget arm: `createFlowPromoter({pool: {query: async () => { throw new Error('db down'); }} as never, ...}).onCommitted(finishingEvent)` resolves, and `logs` has `flow promotion failed for event`.
 
   `packages/rule-engine/test/led-to-promotion.test.ts` (29.219c; copy `transition-backlog.test.ts:1-26` for `WF_STRICT` with `{from: 'doing', to: 'todo'}` added, `createdIn`, `ctx`):
   ```ts
@@ -5893,7 +6345,16 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(await evaluateEvent(move('todo'), ctx('focus', move('doing')))).toEqual({ refused: false });    // a person's move is untouched
   });
   ```
-  (`move` takes no cause, as in the sibling file.) Run: `slot-run.sh wtg2-t13-srv -- pnpm --filter @gisik-nokma/server exec vitest run test/flow/promote.test.ts --maxWorkers=2` and the rule-engine file, each `> /tmp/<label>.log 2>&1; tail -40`. Expected: FAIL (`createFlowPromoter` and the refusal do not exist).
+  **Kills:**
+  - 29.214 the committed finish files one led-to move: (a) `to: 'todo'` in place of `node.initialStateId` (the Kickoff target is refused, `stateOf(k)` stays `'backlog'`); (b) `ORDER BY e.seq ASC` in `triggeredByOf` (names the first transition's `PERSON`, not `ASSIGNEE`); (c) `label: p.label` unconditionally (the payload gains `label: null`).
+  - 29.215 every AP-4 trigger: (a) drop `'ticket.link_removed'` from the link arm (the link-removed row); (b) drop `'ticket.decided'` from `SOURCE_SIDE` (the decided row); (c) drop `payload['kind'] === 'leads_to' &&` (the blocks control); (d) drop `payload['from'] === undefined &&` (the from control); (e) drop `payload['fieldId'] === 'waitForAll'` (the title-edit control).
+  - 29.216 Send to backlog sticks: (a) `own.push(event.entity.id)` for every `ticket.transitioned` (the person's move is undone); (b) delete the flow-caused `own.push` line (the flow-caused arm stays in Backlog); (c) drop `event.actorId === SYSTEM_ACTOR_FLOW &&` and `isFlowCause(...)` (the person's move is re-promoted).
+  - 29.217 a hidden source counts: (a) `viewerId: event.actorId` in `promoteTargets`' `readFlow` call (MEMBER reads `t` but not `s`, so `t` has no satisfied edge and stays in Backlog); (b) admit only sources the triggering actor can see in `promotionsFor`'s input (same leg).
+  - 29.218 terminal initial state: (a) drop the `blocked.has(p.targetId)` branch (the Shipped target is moved to `'shipped'`, report `promoted: 2`); (b) drop `report.skipped += 1` in that branch (report `skipped: 0`).
+  - 29.219 refused, idempotent, engine clause: (a) `report.promoted += 1` for every result (the refused report); (b) delete the `target.stateId !== BACKLOG_STATE_ID` test in `promotionsFor` (the second call reports `refused: 1`); (c) delete the `cause.led-to-not-backlog` clause in `transition.ts` (the `doing -> todo` led-to leg is accepted); (d) drop `payload.cause?.kind === 'led-to' &&` (the person's `doing -> todo` is refused).
+  - 29.220 the server cap: (a) delete the `if (flow.truncated) {...}` block (`nodes` = `[t, lo]` promotes `t`); (b) drop its `log(...)` line (no `/truncated/` line).
+  - 29.221 the app wiring: (a) delete `unsubscribeFlowPromoter()` (the listener is still in `listeners`); (b) delete the `createFlowPromoter`/`onEventCommitted` lines in `app.ts` (`sent` stays empty); (c) drop the `try`/`catch` in `onCommitted` (the db-down call rejects).
+  (`move` takes no cause, as in the sibling file.) Run: `slot-run.sh wtg2-t13-srv -- pnpm --filter @gisik-nokma/server exec vitest run test/flow/promote.test.ts --maxWorkers=2` and the rule-engine suite WHOLE (planner ruling 2026-10-04, Q7: the new `led-to` refusal reaches every `led-to` fixture; T8's `test/flow-cause.test.ts` `led-to` legs start in Backlog and must stay green), each `> /tmp/<label>.log 2>&1; tail -40`. Expected: FAIL (`createFlowPromoter` and the refusal do not exist).
 
 - [ ] **Step 5: The engine clause, the promoter, the wiring**
 
@@ -5905,7 +6366,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     // DECLARED edge (doing -> todo) and drag work in progress back. Keyed on the cause, so a person's own move is untouched.
     if (payload.cause?.kind === 'led-to' && resolved.stateId !== BACKLOG_STATE_ID) return refuse('cause.led-to-not-backlog');
   ```
-  Add `import { refuse } from './checks/refusals.js';` (the overload `refuse(rule: keyof typeof REFUSALS): Refusal`, `refusals.ts:232`).
+  Add `import { refuse } from './checks/refusals.js';` (the overload `refuse(rule: keyof typeof REFUSALS): Refusal`, `refusals.ts:198`).
 
   `apps/server/src/flow/promote.ts`:
   ```ts
@@ -6051,9 +6512,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   ```
   A `ticket.link_added` with `from` has `payload['from']` defined, so it is skipped (R42: a draft-side link). `ticket.deleted`/`ticket.restored` re-evaluate the source's targets because the read puts the trashed source out of I(T) (AP-3).
 
-  `apps/server/src/app.ts`, after the `unsubscribeNotifications` hook (`:1141`):
+  `apps/server/src/app.ts`, appended after the draft-erasure block's `onClose` hook (`:1181-1198`, the last listener on the ref), so no existing ordinal comment goes false (planner ruling 2026-10-04, Q5):
   ```ts
-  // The auto-promotion listener (wtg Part 2, AP-5): the fourth listener on the commit feed, fire-and-forget like the fan-out above.
+  // The auto-promotion listener (wtg Part 2, AP-5): a listener on the commit feed, fire-and-forget like the fan-out above.
   // It files through the internal door, which an app holds only as the named capability `serverAppend`.
   const flowPromoter = createFlowPromoter({ pool: deps.pool, ingest: { ingestBatch: deps.serverAppend } });
   const unsubscribeFlowPromoter = deps.ingest.onEventCommitted((event) => {
@@ -6087,6 +6548,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | 29.220 | ignore `flow.truncated` | the capped case |
   | 29.221 | delete `unsubscribeFlowPromoter()` | the after-close case |
 
+  **Prose to sweep:**
+  - `docs/manual.md:512-513` — "On means the ticket waits, unordered work with a Start button, until somebody starts it (§8)": a Backlog ticket with an incoming "leads to" is now started by the flow when its source finishes.
+  - `docs/manual.md:937-938` — "Each row also has a **Start** button that moves that ticket into its workflow": still true, but the Backlog section says nothing of the automatic move; add one sentence (the flow moves a "leads to" target out of the Backlog as "Flow"; a person's Send to backlog sticks).
+
   Push. DONE + REVIEW (NEEDS: T8/T10/T12 merged; Drafts R55 event name re-read).
 
 ---
@@ -6097,7 +6562,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Files:**
 - Create: `apps/server/src/flow/sweep.ts`; `apps/server/src/ops/daemon-listeners.ts`; `apps/server/test/flow/sweep.test.ts`; `apps/server/test/ops/daemon-listeners.test.ts`
-- Modify: `apps/server/src/ops/backup-daemon-main.ts` (import beside `:8`; the interval variable after `autoCloseSweepIntervalMs`, `:178-182`; the listener registration right after `createIngestService`, `:202-206`; a job after the `auto-close` job, `:277-292`); `apps/server/test/ops/backup-daemon-main.test.ts` (two cases after 13.731, `:218-226`); `.env.example` (after `AUTO_CLOSE_SWEEP_INTERVAL_MS`, `:369`)
+- Modify: `apps/server/src/ops/backup-daemon-main.ts` (import beside `:8`; the interval variable after `autoCloseSweepIntervalMs`, `:178-182`; the listener registration right after `createIngestService`, `:202-206`; a job LAST in `scheduledJobs`, after T7's `decision-backfill`, which follows `expired-sessions` `:305-310`, (planner ruling 2026-10-04, Q5)); `apps/server/test/ops/backup-daemon-main.test.ts` (two cases after 13.731, `:218-226`); `.env.example` (after `AUTO_CLOSE_SWEEP_INTERVAL_MS`, `:369`)
 - Catalogue: `test-cases/29-workflow-timeline-graphs.md` under `<!-- wtg-part2-model T14 -->`; `Features.md` §26 under `<!-- wtg-part2-model T14 bullet -->`
 
 **Interfaces:**
@@ -6132,13 +6597,30 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     runFlowSweep({ pool: db.pool, ingest: realIngest(db.pool), log: (m) => logs.push(m), ...over });
   const finishedSource = () => addTicket(db.pool, { start: 'focus', moves: ['doing', 'done'] });
   const openSource = () => addTicket(db.pool, { start: 'focus', moves: ['doing'] });
+  // The candidate list. The SELECT is a superset whose every extra row the rule then declines, so the REPORT cannot tell a
+  // narrower or wider SELECT apart; the calls into the real `promoteTargets` can. (`vi.mock` is hoisted; keep it at file top.)
+  vi.mock('../../src/flow/promote.js', async (importOriginal) => {
+    const real = await importOriginal<typeof import('../../src/flow/promote.js')>();
+    return { ...real, promoteTargets: vi.fn(real.promoteTargets) };
+  });
+  const candidates = () => vi.mocked(promoteTargets).mock.calls.map(([, workspaceId, ids]) => [workspaceId, [...ids].sort()]);
+  beforeEach(() => vi.mocked(promoteTargets).mockClear());
   ```
-  - **29.222:** `s = finishedSource()`, `o = openSource()`, `t1`, `t2` in Backlog; `lead(s, t1)`, `lead(o, t2)`. `expect(await sweep()).toEqual({ promoted: 1, settled: 0, refused: 0 })`; `stateOf(t1)` is `'todo'`, `stateOf(t2)` is `'backlog'`.
-  - **29.223:** two worlds in one test, built with the real door so the events are engine-legal: a helper `submit(ingest, ticketId, to)` calls `ingest.ingestBatch([{ id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.transitioned', version: 1, payload: { to }, actorId: PERSON, origin: 'web', clientTime: new Date().toISOString() }])`. World A: `ingest = realIngest(db.pool)`; `const off = ingest.onEventCommitted((e) => void createFlowPromoter({ pool: db.pool, ingest, log: () => {} }).onCommitted(e))`; `s` active, `t` linked; `await submit(ingest, s, 'done')`; `await vi.waitFor(async () => expect(await stateOf(db.pool, t)).toBe('todo'))`; a sweep then reports `promoted: 0`. World B (a second `s2`, `t2` in the same database): the listener never attached (this is what the daemon's ingest is); `submit(...)` leaves `stateOf(t2)` `'backlog'`; `sweep()` reports `promoted: 1` and `stateOf(t2)` is `'todo'`.
-  - **29.224:** after one sweep, `(await ledger(db.pool, t, 'ticket.transitioned')).length` is 1 and a second `sweep()` equals `{ promoted: 0, settled: 0, refused: 0 }` with the count still 1.
+  (When T16 gives `settleHalf` a body, a world with no Decision makes it call nothing; if T16's settle half calls `promoteTargets`, filter these assertions to the promote half's calls.)
+  - **29.222:** `s = finishedSource()`, `o = openSource()`, `t1`, `t2` in Backlog; `lead(s, t1)`, `lead(o, t2)`. `expect(await sweep()).toEqual({ promoted: 1, settled: 0, refused: 0 })`; `stateOf(t1)` is `'todo'`, `stateOf(t2)` is `'backlog'`; and `expect(candidates()).toEqual([[WS, [t1]]])` (the read count through the candidate list, as the case line says: `t2`'s only source is active, so the SELECT must not even offer it).
+  - **29.223:** two worlds in one test, built with the real door so the events are engine-legal: a helper `submit(ingest, ticketId, to)` calls `ingest.ingestBatch([{ id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.transitioned', version: 1, payload: { to }, actorId: PERSON, origin: 'web', clientTime: new Date().toISOString() }])`. World A: `ingest = realIngest(db.pool)`; `const off = ingest.onEventCommitted((e) => void createFlowPromoter({ pool: db.pool, ingest, log: () => {} }).onCommitted(e))`; `s` active, `t` linked; `await submit(ingest, s, 'done')`; `await vi.waitFor(async () => expect(await stateOf(db.pool, t)).toBe('todo'))`; a sweep then reports `promoted: 0`. World B (a second `s2`, `t2` in the same database): first `off()`, then a FRESH `const bare = realIngest(db.pool)` that no listener was ever attached to (this is what the daemon's ingest is; World A's `ingest` still carries its listener until `off()`, and submitting through it would promote `t2` at once and make World B a copy of World A); `await submit(bare, s2, 'done')` leaves `stateOf(t2)` `'backlog'` (nothing is listening, so this read is not racing anything); `sweep()` reports exactly `{ promoted: 1, settled: 0, refused: 0 }` and `stateOf(t2)` is `'todo'`.
+  - **29.224:** `s = finishedSource()`, `t` in Backlog, `lead(s, t)`. After one sweep (`{ promoted: 1, settled: 0, refused: 0 }`), `(await ledger(db.pool, t, 'ticket.transitioned')).length` is 1 and a second `sweep()` equals `{ promoted: 0, settled: 0, refused: 0 }` with the count still 1, and the second run offered nothing: after `mockClear()` between the runs, `expect(candidates()).toEqual([])`. (Without that leg the case cannot fail on this task's code: `promotionsFor` also skips a non-Backlog target, so a SELECT that drops `t.state_id = $1` still files nothing and reports zero; the case line's "refused > 0" outcome needs both filters gone.)
   - **29.225:** `s = addTicket({ start: 'focus', moves: ['doing'] })`, finished by `await step(db.pool, s, 'ticket.transitioned', { to: 'done' }, ASSIGNEE)` (not the creator `PERSON`); after `sweep()` the `led-to` cause on `t` has `triggeredBy: ASSIGNEE`. Fallback: `s2 = addTicket({ start: 'focus' })`, then `UPDATE proj_tickets SET state_id = 'done', state_category = 'terminal' WHERE ticket_id = $1` (a republish that re-categorises a state leaves a terminal ticket with no transition event: `auto-close/sweep.ts:198-206`); its target's cause has `triggeredBy: SYSTEM_ACTOR_FLOW`.
-  - **29.226:** (a) `waitForAll` target `t` with sources `a` (finished) and `b` (open): `sweep()` gives `promoted: 0` (the SQL selects it, the rule declines), then `b` finishes (`step`) and a second sweep gives `promoted: 1`. (b) `d = addTicket({ typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] })`, `decide(db.pool, d, 'Yes')`, targets `y` (`lead(d, y, 'Yes')`) and `n` (`lead(d, n, 'No')`): only `y` is promoted. (c) a trashed target (`step(t, 'ticket.deleted', {})`) is not promoted; a draft target (`UPDATE proj_tickets SET draft_author_id = $1`, the column Drafts adds, §11 of its spec) is not promoted. (d) a `SHIPPED_TASK` target is skipped: `logs` has a line matching `/initial state .* terminal/` and `refused` is 0.
-  - **29.227:** `sweep({ ingest: { ingestBatch: async (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'illegal-transition', reason: 'no' })) } })` → `{ promoted: 0, settled: 0, refused: 1 }` and a log line containing `illegal-transition`; the same with `status: 'invalid'` (`code: 'x'`, `message: 'y'`) → `refused: 1`, a log line containing `x`. Control: the real door → `promoted: 1`.
+  - **29.226:** the arms run in order in one database, so each report below is exact (an earlier arm's promoted ticket has left Backlog), and `vi.mocked(promoteTargets).mockClear()` runs before every sweep so `candidates()` is that sweep's alone. (a) `waitForAll` target `t` with sources `a` (finished) and `b` (open): `sweep()` gives `{ promoted: 0, settled: 0, refused: 0 }` and `candidates()` is `[[WS, [t]]]` (the SQL selects it, the rule declines), then `b` finishes (`step`) and a second sweep gives `{ promoted: 1, settled: 0, refused: 0 }`. (b) `d = addTicket({ typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] })`, `decide(db.pool, d, 'Yes')`, targets `y` (`lead(d, y, 'Yes')`) and `n` (`lead(d, n, 'No')`): the sweep gives `{ promoted: 1, ... }`, `stateOf(y)` = `'todo'`, `stateOf(n)` = `'backlog'`, and `candidates()` holds both `n` and `y` (a superset; the label rule decides). (c) `s = finishedSource()` and three targets led from it: `tt` trashed (`step(tt, 'ticket.deleted', {})`), `td` a draft (`UPDATE proj_tickets SET draft_author_id = $1 WHERE ticket_id = $2`; the column is on the ref, `migrations/1791600000000_drafts.sql:10`), and the control `tc` untouched. The sweep gives `{ promoted: 1, settled: 0, refused: 0 }`, `stateOf(tc)` = `'todo'`, `tt` and `td` stay `'backlog'`, and no candidate list contains `tt` or `td` (`LIVE_TICKET_WHERE` is `... AND t.draft_author_id IS NULL`, `read/visible-where.ts:256`, so the SELECT drops both). (d) a `SHIPPED_TASK` target led from a finished source is skipped: the sweep gives exactly `{ promoted: 0, settled: 0, refused: 0 }`, `stateOf` stays `'backlog'`, and `logs` has a line matching `/initial state .* terminal/`.
+  - **29.227:** `s = finishedSource()`, `t`, `lead(s, t)`. `sweep({ ingest: { ingestBatch: async (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'illegal-transition', reason: 'no' })) } })` → `{ promoted: 0, settled: 0, refused: 1 }` and a log line containing `illegal-transition`; the same with `status: 'invalid'` (`code: 'x'`, `message: 'y'`) → exactly `{ promoted: 0, settled: 0, refused: 1 }`, a log line containing `x`. Control: the real door → `{ promoted: 1, settled: 0, refused: 0 }`.
+
+  **Kills:**
+  - 29.222 promotes what is due: (a) drop `AND s.state_category = 'terminal'` from the SELECT (`candidates()` gains `t2`); (b) `return { promoted: 0, ... }` from `promoteHalf` without calling `promoteTargets` (report `promoted: 0`, `t1` stays).
+  - 29.223 the missed promotion: (a) the case line's mutant: add to the SELECT's EXISTS `AND NOT EXISTS (SELECT 1 FROM events e WHERE e.entity_kind = 'ticket' AND e.entity_id = s.ticket_id AND e.type = 'ticket.transitioned' AND e.server_time > now() - interval '1 hour')` (World B's just-finished source is skipped, `t2` stays in Backlog); (b) have `runFlowSweep` skip `promoteHalf` (World B stays).
+  - 29.224 idempotent: (a) drop `t.state_id = $1 AND` from the SELECT (the second run's `candidates()` is `[[WS, [t]]]`).
+  - 29.225 triggeredBy: none in this task's code (the attribution is T13's `triggeredByOf`; T13 mutant `ORDER BY e.seq ASC` or "use the source's `ticket.created` actor" turns the `ASSIGNEE` leg red, and `if (row === undefined) return PERSON` the fallback leg). Guards the sweep reaching `promoteTargets` with the real attribution path.
+  - 29.226 superset, rule decides: (a) drop `${LIVE_TICKET_WHERE}` from the SELECT (arm c: `candidates()` contains `tt` and `td`); (b) `refused += report.refused + report.skipped` in `promoteHalf` (arm d: `refused: 1`); Arms a and b otherwise guard T13's rule (`.every`, `satisfied`'s label test).
+  - 29.227 refusals counted: (a) drop `refused += report.refused;` in `promoteHalf` (both arms report `refused: 0`).
 
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t14 -- pnpm --filter @gisik-nokma/server exec vitest run test/flow/sweep.test.ts --maxWorkers=2 > /tmp/wtg2-t14.log 2>&1; tail -40 /tmp/wtg2-t14.log`. Expected: FAIL (`../../src/flow/sweep.js` does not exist).
 
@@ -6173,7 +6655,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   /**
    * A SUPERSET of the promotable tickets, in SQL: live, in Backlog, with an incoming `leads_to` from a live terminal source. The exact
    * rule (waitForAll, a Decision's label, not-taken sources, drafts) is `promotionsFor`'s, so a candidate it declines costs one read and
-   * never an event. Draft targets are excluded by the rule, not here, so this file needs no Drafts column.
+   * never an event. Draft and trashed targets never reach the rule: `LIVE_TICKET_WHERE` already carries
+   * `t.draft_author_id IS NULL` (`read/visible-where.ts:256`), so this file names no Drafts column itself.
    */
   async function promoteHalf(deps: FlowSweepDeps): Promise<{ promoted: number; refused: number }> {
     const { rows } = await deps.pool.query<{ workspace_id: string; ticket_id: string }>(
@@ -6241,7 +6724,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
      const flowSweepIntervalMs = Number(rawFlowInterval === undefined || rawFlowInterval.trim() === '' ? '300000' : rawFlowInterval);
      ```
   3. right after `const ingest = createIngestService({...})` (`:202-206`): `registerDaemonListeners(ingest, { pool, transports: [notificationTransport] });` (the unsubscribe is discarded: the process ends with the pool, `shutdown` below).
-  4. in `scheduledJobs`, after the `auto-close` entry:
+  4. in `scheduledJobs`, appended LAST (after T7's `decision-backfill`, which follows `expired-sessions`, `:305-310`) (planner ruling 2026-10-04, Q5):
      ```ts
      {
        name: 'flow',
@@ -6252,7 +6735,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
        delayMs: () => requirePositiveIntervalMs(flowSweepIntervalMs, 'FLOW_SWEEP_INTERVAL_MS'),
      },
      ```
-  `.env.example`, after `AUTO_CLOSE_SWEEP_INTERVAL_MS=3600000`:
+  `.env.example`, after T7's `DECISION_BACKFILL_INTERVAL_MS=86400000` (the last daemon variable; the comment names no ordinal, (planner ruling 2026-10-04, Q5)):
   ```
   # The flow sweep (workflow and timeline graphs, AP-5) is a job of the same daemon: it promotes Backlog tickets whose incoming "leads to"
   # condition is met and repairs a promotion the server's listener missed. Same read-once, validate-on-every-call shape and the same
@@ -6270,11 +6753,24 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(run.stderr).toContain('FLOW_SWEEP_INTERVAL_MS');
   }, 120_000);
   it('29.228 the flow job runs and logs its counts', async () => {
+    // A due promotion in the daemon's database: zero counts on an empty database cannot tell a job that runs the sweep
+    // through the daemon's ingest from one that only prints the line. (This file shares one database across its cases.)
+    await seedFlowWorld(db.pool);
+    const s = await addTicket(db.pool, { start: 'focus', moves: ['doing', 'done'] });
+    const t = await addTicket(db.pool);
+    await lead(db.pool, s, t);
     const line = (out: string) => out.split('\n').flatMap((l) => { try { return [JSON.parse(l) as { msg?: string }]; } catch { return []; } }).find((e) => e.msg === 'flow sweep complete');
     const run = await runDaemon({ DATABASE_URL: db.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000', FLOW_SWEEP_INTERVAL_MS: '300' }, (out) => line(out) !== undefined);
-    expect(line(run.stdout)).toMatchObject({ msg: 'flow sweep complete', promoted: 0, settled: 0, refused: 0 });
+    expect(line(run.stdout)).toMatchObject({ msg: 'flow sweep complete', promoted: 1, settled: 0, refused: 0 });
+    expect(await stateOf(db.pool, t)).toBe('todo');
   }, 60_000);
   ```
+  (imports `seedFlowWorld`, `addTicket`, `lead`, `stateOf` from `../flow/flow-world.js`.)
+
+  **Kills:**
+  - 29.228 zero interval refused and named: (a) `requirePositiveIntervalMs(autoCloseSweepIntervalMs, 'FLOW_SWEEP_INTERVAL_MS')` or reading `AUTO_CLOSE_SWEEP_INTERVAL_MS` for the flow interval (the zero run announces itself); (b) `'AUTO_CLOSE_SWEEP_INTERVAL_MS'` as the name argument (stderr lacks `FLOW_SWEEP_INTERVAL_MS`).
+  - 29.228 the job runs: (a) delete the `flow` entry from `scheduledJobs` (no line; `line(...)` is `undefined`); (b) `runFlowSweep({ pool, ingest: { ingestBatch: async () => [] } })` (the line reports `promoted: 0`, `t` stays in Backlog); (c) `promoted: report.refused` in the log line.
+
   `apps/server/test/ops/daemon-listeners.test.ts` (29.229; pool and ingest as `promote.test.ts`, a `canSeeTicket: async () => true`, the in-app transport from `notifications/transport.ts`):
   ```ts
   it('29.229 the daemon ingest delivers through the fan-out until it is unsubscribed', async () => {
@@ -6282,7 +6778,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const off = registerDaemonListeners(ingest, { pool: db.pool, transports: [createInAppTransport(db.pool)], canSeeTicket: async () => true });
     const t1 = await addTicket(db.pool);
     await ingest.ingestBatch([assign(t1, ASSIGNEE)]);
-    await vi.waitFor(async () => expect((await listNotifications(db.pool, ASSIGNEE, {})).notifications).toHaveLength(1));
+    await vi.waitFor(async () => expect((await listNotifications(db.pool, ASSIGNEE, {})).notifications.map((n) => n.kind)).toEqual(['assignment']));
     off();
     const t2 = await addTicket(db.pool);
     await ingest.ingestBatch([assign(t2, ASSIGNEE)]);
@@ -6290,6 +6786,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect((await listNotifications(db.pool, ASSIGNEE, {})).notifications).toHaveLength(1);
   });
   ```
+  **Kills:**
+  - 29.229 delivers until unsubscribed: (a) `ingest.onEventCommitted(...); return () => {};` (a no-op unsubscribe: the t2 assignment delivers, length 2); (b) drop `void fanout.onCommitted(event)` (no first notification); (c) drop the `canSeeTicket` pass-through in `registerDaemonListeners` (the real `canSee` finds no visibility row for `ASSIGNEE` and suppresses the first notification).
+
   where `assign(ticketId, assigneeId)` builds the `ticket.assigned` submitted event as `promote.test.ts` builds its events (actor `PERSON`, `origin: 'web'`). Run the daemon file, the new test and `pnpm check:env`. Expected: PASS; flip 29.228-29.229 ✅.
 
   Commit: `wtg2 T14: the flow job, FLOW_SWEEP_INTERVAL_MS, daemon listeners`.
@@ -6298,6 +6797,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - **Features** (under `<!-- wtg-part2-model T14 bullet -->`; keep the anchor line, T19 reads the bullets below it): `- ⚙️ **Flow sweep** (wtg2 T14; `apps/server/src/flow/sweep.ts`, `apps/server/src/ops/backup-daemon-main.ts`) — a daemon job every five minutes (`FLOW_SWEEP_INTERVAL_MS`) promotes what the server's listener missed, idempotently; the daemon's own commits notify through the same fan-out. Cases 29.222-29.229.` (write the backticks plain, as in T13's bullet)
   - **Sweeps:** server WHOLE; `pnpm check:env`, `pnpm check:citations`, `node scripts/check-case-ids.mjs`.
   - **Mutations:** the ones named on 29.222-29.229, run, then reverted.
+
+  **Prose to sweep:**
+  - `apps/server/test/ops/backup-daemon-main.test.ts:71` — `describe('backup-daemon-main — one scheduler for all six jobs'`: already seven jobs on the ref; T7 and this task each add one.
+  - `apps/server/test/ops/backup-daemon-main.test.ts:202`, `:207`, `:215` — 13.731's docblock: "the SAME scheduler as the other four", "does arm all five jobs", "the fifth job being wired" (stale on the ref already; this task adds one more job).
+  - `Features.md:2914-2915` — "`backup-daemon-main.ts` itself now calls `startScheduler` directly with all five jobs (four when this bullet was written ...)": same count, now wrong by more.
 
   Push. DONE + REVIEW (NEEDS: T13 merged).
 
@@ -6402,7 +6906,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(keysOf(plan.started)).toEqual(['149']);
       // naming the started ticket closes it too, in its place in the flow order
       const named = planSettle({ nodes, edges, decisionId: K['144'], closeStarted: [K['149']] });
-      expect(show(named)).toContain('not-taken-close:149');
+      expect(show(named)).toEqual([
+        'not-taken-transition:148', 'not-taken-close:148',
+        'not-taken-transition:149', 'not-taken-close:149',
+        'not-taken-transition:150', 'not-taken-close:150',
+        'not-taken-transition:151', 'not-taken-close:151',
+        'not-taken-transition:152', 'not-taken-close:152',
+      ]);
       expect(named.started).toEqual([]);
       // an id that is not on a left branch is not honoured (it is the gate's job to refuse it)
       const stray = planSettle({ nodes, edges, decisionId: K['144'], closeStarted: [K['140']] });
@@ -6441,13 +6951,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     it('29.365 GN-151 = "Need more info": the target reopens to its initial state, the rest of the body (the Decision too) goes to Backlog, nothing is pruned', () => {
       const edges = m.edges();
       const nodes = m.nodes({
-        '149': { ...FINISHED, closed: true },
+        // an initial state that is not 'todo', so the step must read the node's own `initialStateId`
+        '149': { ...FINISHED, closed: true, initialStateId: 'intake' },
         '150': FINISHED, // finished but not closed: no reopen step
-        '151': decided('Need more info'),
+        '151': decided('Need more info'), // decided, not closed: no reopen step for the Decision either
       });
       const plan = planSettle({ nodes, edges, decisionId: K['151'] });
-      expect(show(plan)).toEqual(['reopen:149', 'to-initial:149', 'to-backlog:150', 'reopen:151'].filter((s) => s !== 'reopen:151').concat(['to-backlog:151']));
-      expect(plan.steps[1]).toEqual({ kind: 'to-initial', ticketId: K['149'], toStateId: 'todo' });
+      expect(show(plan)).toEqual(['reopen:149', 'to-initial:149', 'to-backlog:150', 'to-backlog:151']);
+      expect(plan.steps[1]).toEqual({ kind: 'to-initial', ticketId: K['149'], toStateId: 'intake' });
       expect(plan.touchesOthers).toBe(true);
       // nothing is closed Not taken: GN-152 ("Yes") keeps waiting
       expect(show(plan).some((s) => s.startsWith('not-taken'))).toBe(false);
@@ -6470,8 +6981,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
         '147': FINISHED, '148': FINISHED, '149': FINISHED, '150': FINISHED, '151': decided('No'),
       });
       const plan = planSettle({ nodes, edges: m.edges(), decisionId: K['151'] });
-      expect(keysOf(plan.steps.map((s) => s.ticketId))).toEqual(['141', '142', '143', '144', '147', '148', '149', '150', '151']);
-      expect(plan.steps.map((s) => s.kind)).toEqual(['to-initial', ...Array(8).fill('to-backlog')]);
+      // in step order (`keysOf` sorts, so it would not see the order): parents first, then the flow order 141, 143, 142, ...;
+      // the loop body's own order (from the walk) puts 142 before 143, so dropping the sort turns this red
+      expect(show(plan)).toEqual([
+        'to-initial:141', 'to-backlog:143', 'to-backlog:142', 'to-backlog:144', 'to-backlog:147',
+        'to-backlog:148', 'to-backlog:149', 'to-backlog:150', 'to-backlog:151',
+      ]);
     });
 
     it('29.365 this Decision\'s own Not-taken tickets return to Backlog with the loop; another Decision\'s stay', () => {
@@ -6515,8 +7030,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       // an outcome on a Decision that has not finished: the cascade waits for the finish
       const waiting = planSettle({ nodes: [decision(DEC, { outcome: 'No', stateId: 'doing', category: 'active' }), fnode(X), fnode(Y, notTaken(DEC))], edges, decisionId: DEC });
       expect(waiting).toEqual({ steps: [], blocked: null, started: [], touchesOthers: false });
-      // not a Decision, or not in the flow: nothing
-      expect(planSettle({ nodes: pass1('No', {}), edges, decisionId: X }).steps).toEqual([]);
+      // not a Decision, or not in the flow: nothing. y's Not-taken cause names x here, so the `isDecision` test is what
+      // stops the plan (x has no outcome, and without the test its unsettled arm would return y)
+      expect(planSettle({ nodes: pass1('No', {}, notTaken(X)), edges, decisionId: X }).steps).toEqual([]);
       expect(planSettle({ nodes: pass1('No', {}), edges, decisionId: uid(77) }).steps).toEqual([]);
     });
 
@@ -6606,6 +7122,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       for (const e of events) {
         expect(e.actorId).toBe(SYSTEM_ACTOR_FLOW);
         expect(e.origin).toBe('server');
+        expect(e).toMatchObject({ workspaceId: ctx.workspaceId, clientTime: ctx.clientTime, version: 1 });
         expect(parseEvent(e)).toMatchObject({ ok: true });
         expect((e.payload as { cause: unknown }).cause).toEqual({
           kind: 'reopened-by-flow', decisionTicketId: K['151'], outcome: 'Need more info', pass: 1, decidedBy: uid(501), decisionEventId: uid(500),
@@ -6616,7 +7133,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
       // the Not-taken pair: a transition to the first terminal state, then the close, both branch-not-taken
       const branch = settleEvents(planSettle({ nodes: m.nodes({ '144': decided('Yes') }), edges: m.edges(), decisionId: K['144'] }), { ...ctx, decisionId: K['144'], outcome: 'Yes' });
-      expect(branch.map((e) => e.type)).toEqual(['ticket.transitioned', 'ticket.closed']);
+      expect(branch.map((e) => [e.type, keysOf([e.entity.id])[0]])).toEqual([['ticket.transitioned', '145'], ['ticket.closed', '145']]);
       expect((branch[0]?.payload as { to: string }).to).toBe('done');
       for (const e of branch) {
         expect(parseEvent(e)).toMatchObject({ ok: true });
@@ -6627,6 +7144,21 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:** (each hand-evaluated against the mockup analysis: back edges `146>143`, `151>141`, `151>149`; flow order 140, 141, 143, 142, 144, 145, 147, 148, 146, 149, 150, 151, 152)
+  - 29.364 GN-144 = Yes: (a) drop `live.has(id) ||` from the left-branch filter (GN-146 closes too); (b) `toStateId: 'backlog'` in the `not-taken-transition` step (`steps[0]` names the wrong state).
+  - 29.364 GN-144 = No: (a) `if (false) waiting.push(id)` (149 closes, `started` is `[]`); (b) `if (n.started) waiting.push(id)` ignoring `named` (the named leg keeps 149 in `started`); (c) drop `n.category === 'terminal' ||` from the left filter (finished 147 closes); (d) iterate `[...left, ...named]` (the stray 140 closes).
+  - 29.364 children first: (a) `depth(a) - depth(b)` in `childrenFirst` (x closes before y; the flow order alone puts x first, so only the depth term reorders); (b) drop `live.has(child.id) ||` in the child loop (the live child closes, no `child-open`); (c) `child.started` without `!named.has(child.id)` (the named leg still blocks).
+  - 29.364 drafts and trashed: (a) `movable = (n) => !n.trashed` (the draft leg closes 145); (b) `movable = (n) => !n.draft` (the trashed leg closes 145).
+  - 29.365 GN-151 = Need more info: (a) `to: 'to-backlog'` for the target (table row; `to-backlog:149`); (b) `toStateId: 'todo'` in place of `node.initialStateId` (expects `'intake'`); (c) `leave` without the `n.closed` test (adds `reopen:150` and `reopen:151`).
+  - 29.365 started body / quiet: (a) drop `if (n.category === 'terminal')` for the target (the working 149 gets `to-initial`); (b) drop `n.stateId !== BACKLOG_STATE_ID` (the quiet leg moves 150); (c) `touchesOthers: steps.length > 0` (the quiet leg reads `true`).
+  - 29.365 "No" loop: (a) delete `moved.sort(...)` in the loop arm (body order puts 142 before 143); (b) `n.id === chosen.sourceId` in place of `chosen.targetId` in the loop arm (151 gets `to-initial`, 141 `to-backlog`).
+  - 29.365 own Not-taken: (a) `n.notTaken !== null && live.has(n.id)` in `ownNotTaken` (table row; z moves); (b) delete the `ownNotTaken(...)` loop in the loop arm (y stays).
+  - 29.366 revise: (a) non-loop `reopened = []` (table row; y stays); (b) `if (false) waiting.push(id)` (the started x closes, `running` gets the x pair); (c) drop `n.category === 'terminal' ||` from the left filter (the finished x of `worked` closes).
+  - 29.366 clearing / waiting / not a Decision: (a) `n.notTaken !== null` in `ownNotTaken` (the other-Decision control returns y); (b) delete `if (d.outcome !== null && d.category !== 'terminal') return NOTHING` (the waiting Decision closes x); (c) drop `|| !d.isDecision` (the non-Decision x returns y, whose cause names x).
+  - 29.366 no branch: (a) `if (chosen === undefined) return NOTHING` (table row).
+  - 29.366 idempotent: (a) drop `live.has(n.id) &&` from the non-loop `reopened` filter (the re-plan of case 1 reopens the tickets the first plan closed).
+  - 29.367 blocked parent: (a) `return false` in `leavesUnderFinishedParent` (table row); (b) drop `!leaving.has(parent.id)` (the `together` leg blocks on x); (c) `parentsFirst` as `depth(b) - depth(a) || ...` (the `together` order puts x before p).
+  - 29.367 settleEvents: (a) `cause('reopened-by-flow')` for the close (table row; `parseEvent` refuses it and the kind leg fails); (b) `ctx.mintId ?? newUlid` hoisted to one `const id = mint()` outside the map (ids not unique); (c) `clientTime: new Date().toISOString()` (the `toMatchObject` leg, and 29.186's scan). The last leg (a blocked plan files nothing) cannot fail on its own: a blocked plan has no steps by construction; kept as documentation.
 
   Run (`slot-run.sh` is `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh`): `slot-run.sh wtg2-t15-red -- pnpm --filter @gisik-nokma/domain exec vitest run test/flow/settle.test.ts --maxWorkers=2 > /tmp/wtg2-t15-red.log 2>&1; tail -30 /tmp/wtg2-t15-red.log`. Expected: FAIL (`planSettle is not a function`).
 
@@ -6907,6 +7439,10 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | 29.367 | `return parent !== undefined && parent.category === 'terminal' && !leaving.has(parent.id)` becomes `return false` | the blocked-parent test |
   | 29.186 | add `const t = new Date();` to `settle.ts` | `clock-free.test.ts` names `settle.ts` |
 
+  **Prose to sweep:**
+  - This task's own `settle.ts` docblock on `SettleContext.clientTime` (Step 3 block) — "passed in so this module reads no clock": the default `mintId` is `newUlid`, which is `ulid()` (`packages/domain/src/ids.ts:31-33`) and stamps the current time into every id. Say "reads no clock for any value a reader sees (ids aside)" or make `mintId` required.
+  - Repo prose: none found (searched on the ref: `planSettle`, `settleEvents`, `SettleContext`, `not taken`, `Not taken` in `Features.md`, `docs/manual.md`, `test-cases/`, `packages/`, `apps/`; T10's `clock-free.test.ts` docblock already says "T15 adds `settle.ts`", which this task makes true).
+
   Push. DONE + REVIEW (NEEDS: T5, T8, T9, T10 merged; T8's `flowCauseSchema` member names re-read; T16 updates its `settleEvents` call with `workspaceId` and `clientTime`).
 
 ---
@@ -6961,16 +7497,25 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const settler = createFlowSettler({ pool: db.pool, ingest: { ingestAtomic: atomic }, log: (m) => logs.push(m) });
     const promoter = createFlowPromoter({ pool: db.pool, ingest: { ingestBatch: (e) => ingest.ingestBatch(e) }, log: (m) => logs.push(m) });
     ingest.onEventCommitted((e) => { void settler.onCommitted(e); void promoter.onCommitted(e); });
-    return { ingest, atomic, settler };
+    return { ingest, atomic, settler, promoter };
   }
   ```
-  - **29.368 (a), the batch:** `{ s, a, d, z } = await loopWorld(); const { atomic, settler } = rig(); const decided = await decide(db.pool, d, 'Redo'); await settler.onCommitted(decided);` Then `expect(atomic).toHaveBeenCalledTimes(1)`; every event in `atomic.mock.calls[0][0]` has `actorId` `SYSTEM_ACTOR_FLOW` and `origin` `'server'`; the `cause` of each `ticket.transitioned`/`ticket.reopened` in it is `expect.objectContaining({ kind: 'reopened-by-flow', decisionTicketId: d, outcome: 'Redo', pass: 1, decidedBy: PERSON, decisionEventId: decided.id })`. **Re-read T15's `29.364-29.367` cases (`packages/domain/test/flow-settle.test.ts`) for which steps a Redo on this shape produces and copy their expectations verbatim.**
-  - **(b), pass 2 promotes its first ticket:** after (a) settles, `await vi.waitFor(async () => expect(await stateOf(db.pool, a)).toBe('todo'))` — `a` was moved to Backlog by the flow, the promoter (T13's flow-cause trigger) saw its source `s` still terminal and filed `led-to`; `(await ledger(db.pool, a, 'ticket.transitioned')).map(causeKind)` ends with `['reopened-by-flow', 'led-to']` where `causeKind = (e) => e.payload.cause?.kind`. No `runFlowSweep` is called in this test.
+  - **29.368 (a), the batch:** `{ s, a, d, z } = await loopWorld(); const { atomic, settler } = rig(); const decided = await step(db.pool, d, 'ticket.decided', { outcome: 'Redo' }, ASSIGNEE);` (chosen by `ASSIGNEE`, not the `PERSON` who created and finished `d`, so `decidedBy` is told apart from the creator and the finisher). Re-entry leg first: `await settler.onCommitted({ ...decided, actorId: SYSTEM_ACTOR_FLOW })` and `expect(atomic).not.toHaveBeenCalled()` (the guard the cascade's own events rely on; the cascade's real events land on `a` and on `d` after `d` has left `done`, so they are 'skipped' with or without the guard and cannot show it). Then `await settler.onCommitted(decided)`. `expect(atomic).toHaveBeenCalledTimes(1)`; `const sent = atomic.mock.calls[0][0]`; `expect(sent.map((e) => [e.entity.id, e.type, (e.payload as { to?: string }).to])).toEqual([[a, 'ticket.transitioned', 'todo'], [d, 'ticket.transitioned', 'backlog']])` (T15's loop plan on this shape, worked by hand: `d -> a` is the back edge, the loop body is `{a, d}`, the finished target `a` goes to its initial state and the Decision to Backlog; neither is `closed`, so no `ticket.reopened`; parents-first then flow order puts `a` first); every event in `sent` has `actorId` `SYSTEM_ACTOR_FLOW` and `origin` `'server'`, and its `cause` `toEqual`s `{ kind: 'reopened-by-flow', decisionTicketId: d, outcome: 'Redo', pass: 1, decidedBy: ASSIGNEE, decisionEventId: decided.id }` (the six members are the whole cause `settleEvents` builds). **Re-read T15's `29.364-29.367` cases (`packages/domain/test/flow-settle.test.ts`) for which steps a Redo on this shape produces and copy their expectations verbatim.**
+  - **(b), pass 2 walks the body again** (planner ruling 2026-10-04, Q12): PS-4.2 / PS-4.6 (spec `:501`, `:505`) move the loop target straight to To do, so no `led-to` follows on `a`. After (a): `stateOf(db.pool, a)` is `'todo'` and `(await ledger(db.pool, a, 'ticket.transitioned')).map(causeKind).at(-1)` is `'reopened-by-flow'` where `causeKind = (e) => e.payload.cause?.kind` (precondition and control: the cascade, not a promotion, moved `a`); `stateOf(db.pool, d)` is `'backlog'`. Then a person finishes `a` again: `await step(db.pool, a, 'ticket.transitioned', { to: 'doing' }, PERSON); const fin = await step(db.pool, a, 'ticket.transitioned', { to: 'done' }, PERSON); await promoter.onCommitted(fin);` → `stateOf(db.pool, d)` is `'todo'` and `d`'s last transition has cause `{ kind: 'led-to', sourceTicketId: a }` (`toMatchObject`). No `runFlowSweep` is called in this test.
   - **(c), the pair:** fresh world; `Promise.all([settler.onCommitted(decided), settler.onCommitted(finishing)])` where `finishing` is the `ticket.transitioned` envelope of the Decision's move to `done` (`step` returns it; take it before `decide`). `expect(atomic).toHaveBeenCalledTimes(1)` and `(await ledger(db.pool, a, 'ticket.transitioned')).filter((e) => causeKind(e) === 'reopened-by-flow')` has length 1.
-  - **(d), repeat and control:** `await settler.settleDecision(WS, d)` again resolves `'empty'` and the ledger counts do not change. Control: a Decision with no outgoing links, decided: `settleDecision` resolves `'empty'` and `atomic` is not called.
-  - **29.369 (a), the lost settle:** `{ s, a, d } = await loopWorld()`; a rig whose settler is NOT attached (`const ingest = realIngest(db.pool)`), `await decide(db.pool, d, 'Redo')`. `runFlowSweep({ pool: db.pool, ingest, atomic, now: () => new Date(Date.now() + 120_000) })` → `{ promoted: 1, settled: 1, refused: 0 }` (the settle half runs first, then the promote half promotes `a` back; `promoted` is 1 because `a`'s source `s` is terminal); a second run → `{ promoted: 0, settled: 0, refused: 0 }`.
-  - **(b), the grace window:** the same lost-settle world with `now: () => new Date()` → `settled: 0`; the Decision is younger than 60 s. Control: with a listener-settled Decision and `now` 120 s ahead, `settled` is 0 (the plan is empty, nothing was filed).
-  - **(c), blocked then applied:** `let blocked = true; const plan = (input) => blocked ? { steps: [], blocked: { ticketId: a, reason: 'cannot reopen' }, started: [], touchesOthers: false } : planSettle(input);` `runFlowSweep({ ..., plan })` → `refused: 1, settled: 0` and a log line containing `cannot reopen`; `pendingSettle(db.pool, { plan }, WS, d)` is `true`; then `blocked = false` and the sweep gives `settled: 1`; `pendingSettle` is `false`.
+  - **(d), repeat and control** (planner ruling 2026-10-04, Q13): `await settler.settleDecision(WS, d)` again resolves `'skipped'` (the loop moved `d` to Backlog, so it is no longer a settled Decision) and the ledger counts of `a` and `d` do not change (spec `:880`, "a settle that arrives twice moves nothing the second time"). Control: a Decision whose ONLY branch is the chosen non-loop one: `d1 = addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] }); z1 = addTicket(db.pool); await lead(db.pool, d1, z1, 'Ship'); await decide(db.pool, d1, 'Ship');` → `settleDecision(WS, d1)` resolves `'empty'` and `atomic` is not called. (A Decision with no branches cannot hold an outcome, `decision.unknown-outcome`, spec `:314`, so it is not a control.)
+  - **29.369 (a), the lost settle:** `{ s, a, d } = await loopWorld()`; a rig whose settler is NOT attached (`const ingest = realIngest(db.pool)`), `await decide(db.pool, d, 'Redo')`. `runFlowSweep({ pool: db.pool, ingest, atomic: { ingestAtomic: (e) => ingest.ingestAtomic(e) }, now: () => new Date(Date.now() + 120_000) })` → `{ promoted: 0, settled: 1, refused: 0 }` (planner ruling 2026-10-04, Q12): the settle half moves `a` straight to To do (PS-4.2), so the promote half finds nothing in Backlog with a satisfied edge (`d` waits behind `a`, `z` behind the released `d`); then `stateOf(a)` is `'todo'` and `stateOf(d)` is `'backlog'`; a second run → `{ promoted: 0, settled: 0, refused: 0 }`.
+  - **(b), the grace window:** the same lost-settle world with `now: () => new Date()` → `settled: 0`; the Decision is younger than 60 s. Then the same world with `now` 120 s ahead → `settled: 1` (so the `0` above is the window, not a world with nothing to settle). Control: with a listener-settled Decision and `now` 120 s ahead, `settled` is 0 (the plan is empty, nothing was filed).
+  - **(c), blocked then applied:** `let blocked = true; const plan = (input) => blocked ? { steps: [], blocked: { ticketId: a, reason: 'parent-finished' as const }, started: [], touchesOthers: false } : planSettle(input);` `runFlowSweep({ ..., plan })` → `refused: 1, settled: 0` and a log line containing `parent-finished` and `a`'s id (the log keeps the raw code, (planner ruling 2026-10-04, Q14)); `pendingSettle(db.pool, { plan }, WS, d)` is `true`; then `blocked = false` and the sweep gives `settled: 1`; `pendingSettle` is `false`.
+
+  **Kills:**
+  - 29.368 (a) the batch: (a) delete `event.actorId === SYSTEM_ACTOR_FLOW ||` in `onCommitted` (the re-entry leg calls `ingestAtomic`); (b) `decidedBy: p.decided.actorId` → `decidedBy: SYSTEM_ACTOR_FLOW` (or the Decision's creator, `PERSON`) in `settleDecision`; (c) `decisionEventId: decisionId` in place of `p.decided.eventId` (the cause leg).
+  - 29.368 (b) pass 2: (a) T15's loop step sends the target to `'backlog'` instead of its initial state (`a`'s last cause reads `led-to`, the promoter having moved it). The `d` promotion leg guards T13 behaviour in the settled world.
+  - 29.368 (c) the pair: (a) remove the `serialised(decisionId, ...)` wrapper in `settleDecision` (both runs plan from the same world, `atomic` is called twice).
+  - 29.368 (d) repeat and control: (a) drop `node.category !== 'terminal' ||` from `plannedFor` (the released `d` is planned: PS-5.6 gives an empty plan, so the repeat resolves `'empty'`, not `'skipped'`); (b) delete `if (p.plan.steps.length === 0) return 'empty';` (the one-branch control calls `atomic` with `[]`). The ledger-count leg guards T15's idempotence.
+  - 29.369 (a) the lost settle: (a) delete `settled += 1` for `'applied'` in `settleHalf`; (b) `t.outcome IS NULL` in place of `t.outcome IS NOT NULL` in the SELECT (the Decision is never selected); (c) `if (deps.atomic === undefined)` → `if (true)` (settle half never runs).
+  - 29.369 (b) the grace window: (a) drop `last.at < $2::timestamptz - make_interval(secs => $3) AND` (the young Decision is settled, `settled: 1`); (b) `SETTLE_GRACE_SECONDS = 600` (the 120 s-ahead leg gives `settled: 0`).
+  - 29.369 (c) blocked then applied: (a) `else if (outcome === 'blocked' || ...)` → count `'blocked'` as `'applied'` (`refused: 0`); (b) `pendingSettle` returns `p.kind === 'planned' && p.plan.steps.length > 0` (drops `blocked !== null`; the blocked leg reads `false`); (c) drop the `log(...)` in the blocked branch (no `parent-finished` line).
 
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t16a -- pnpm --filter @gisik-nokma/server exec vitest run test/flow/settle.test.ts --maxWorkers=2 > /tmp/wtg2-t16a.log 2>&1; tail -40 /tmp/wtg2-t16a.log`. Expected: FAIL (`../../src/flow/settle.js` does not exist).
 
@@ -7038,7 +7583,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       try {
         const p = await plannedFor(deps, workspaceId, decisionId);
         if (p.kind === 'skipped') return 'skipped';
-        if (p.plan.blocked !== null) { log(`flow settle blocked for ${decisionId}: ${p.plan.blocked.reason}`); return 'blocked'; }
+        if (p.plan.blocked !== null) { log(`flow settle blocked for ${decisionId}: ${p.plan.blocked.reason} (${p.plan.blocked.ticketId})`); return 'blocked'; }
         if (p.plan.steps.length === 0) return 'empty';
         const clientTime = (deps.now ?? (() => new Date()))().toISOString();
         // T15's `settleEvents` returns complete submitted events (id, workspace, entity, actor, origin, clientTime).
@@ -7110,14 +7655,23 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   Add to `flow-world.ts`: `export const gatedIngest = (pool: Pool, gates = buildServerGates()) => createIngestService({ pool, evaluate: evaluateEvent, projections: buildProjectionRegistry(), gates });` (import `buildServerGates` from `../../src/gates/index.js`).
 
-  `apps/server/test/gates/decision-gates.test.ts` — a `describe` with the same `beforeEach`/`afterEach` as `promote.test.ts`; `const sub = (ticketId, type, payload, actorId = PERSON): SubmittedEvent => ({ id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: ticketId }, type, version: 1, payload, actorId, origin: 'web', clientTime: new Date().toISOString() })`; `const blockedPlan = (ticketId: string, reason: string) => () => ({ steps: [], blocked: { ticketId, reason }, started: [], touchesOthers: false })`.
-  - **29.370 (a), the cascade gate on the finishing transition:** a Decision `d` in `doing` with a downstream `z`; `gates = makeDecisionGates({ plan: blockedPlan(z, 'z is locked'), canSeeTicket: async () => true })`; `gate = gates[2]`; `await gate.check(sub(d, 'ticket.transitioned', { to: 'done' }), db.pool)` equals `{ rule: 'decision.cascade-blocked', reason: expect.stringContaining('z is locked') }`. Control: with `plan: () => ({ steps: [], blocked: null, started: [], touchesOthers: false })` it returns `null`; a transition to a non-terminal state (`{ to: 'doing' }`) returns `null`.
-  - **(b), the same for `ticket.decided`** (`gates[1]`, on a Decision already in `done`): `sub(d, 'ticket.decided', { outcome: 'Ship' })` is refused with the same rule; the plan passed to `blockedPlan` is called with a node whose `outcome` is `'Ship'` (a `vi.fn` wrapper records `input.nodes.find((n) => n.id === d)?.outcome`).
-  - **(c), the transition gate patches the node:** `plan` records the Decision node it was given for the `{ to: 'done' }` event; `category` is `'terminal'` although the stored state is `doing`.
-  - **(d), a hidden blocker is not named:** `canSeeTicket: async () => false` with `reason: 'secret title'` → the refusal's `reason` does not contain `'secret title'` and contains the generic `a step you cannot see`; with `async () => true` it does.
-  - **(e), `closeStarted`:** `gates[0]`: `sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: ['01J9GXXXXXXXXXXXXXXXXXXXXX'] })` (a well-formed id outside the flow) → `rule: 'decision.bad-close-started'`, and the `reason` contains no id. Control: `closeStarted: [z]` with `z` in the flow → `null`; no `closeStarted` or an empty array → `null`.
+  `apps/server/test/gates/decision-gates.test.ts` — a `describe` with the same `beforeEach`/`afterEach` as `promote.test.ts`; `const sub = (ticketId, type, payload, actorId = PERSON): SubmittedEvent => ({ id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: ticketId }, type, version: 1, payload, actorId, origin: 'web', clientTime: new Date().toISOString() })`; `const blockedPlan = (ticketId: string, reason: SettleBlockReason = 'parent-finished') => () => ({ steps: [], blocked: { ticketId, reason }, started: [], touchesOthers: false })` (real codes only, so the file typechecks; `import type { SettleBlockReason } from '@gisik-nokma/domain'`; planner ruling 2026-10-04, Q14).
+  - **29.370 (a), the cascade gate on the finishing transition:** a Decision `d` in `doing` (`addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing'] })`) with a downstream `z` (`lead(db.pool, d, z, 'Ship')`) and a STORED choice `decide(db.pool, d, 'Ship')` (without one the transition gate returns `null` before it plans: `TicketState.outcome` is ABSENT until the first choice, T5, and the gate's `ticket.outcome === undefined` arm settles nothing); `gates = makeDecisionGates({ plan: blockedPlan(z), canSeeTicket: async () => true })`; `gate = gates[2]`; `await gate.check(sub(d, 'ticket.transitioned', { to: 'done' }), db.pool)` equals `{ rule: 'decision.cascade-blocked', reason: expect.stringContaining(zKey) }` where `zKey` is `z`'s key as the History route prints it (planner ruling 2026-10-04, Q14). Control: with `plan: () => ({ steps: [], blocked: null, started: [], touchesOthers: false })` it returns `null`; a transition to a non-terminal state (`{ to: 'doing' }`) returns `null`.
+  - **(b), the same for `ticket.decided`** (`gates[1]`, on a Decision already in `done` that has NO stored outcome, so only the gate's patch can put `'Ship'` on the node the plan sees): `sub(d, 'ticket.decided', { outcome: 'Ship' })` is refused with the same rule; the plan passed to `blockedPlan` is called with a node whose `outcome` is `'Ship'` (a `vi.fn` wrapper records `input.nodes.find((n) => n.id === d)?.outcome`).
+  - **(c), the transition gate patches the node:** on (a)'s world, `plan` records the Decision node it was given for the `{ to: 'done' }` event; `category` is `'terminal'` although the stored state is `doing` (precondition in the same `it()`: `stateOf(db.pool, d)` is `'doing'`).
+  - **(d), a hidden blocker is not named** (planner ruling 2026-10-04, Q14): `z` created with the title `'Secret title'`; `blockedPlan(z, 'parent-finished')`. With `canSeeTicket: async () => false` the refusal's `reason` contains neither `zKey` nor `'Secret title'` and contains the generic `a step you cannot see`; with `async () => true` it contains `zKey`, `'Secret title'` and the `parent-finished` sentence (`cascadeBlockedReason('parent-finished', ...)`'s text), and never the raw code `parent-finished`.
+  - **(e), `closeStarted`:** `gates[0]`: `sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [z, '01J9GXXXXXXXXXXXXXXXXXXXXX'] })` (one id in the flow and one well-formed id outside it: with the foreign id alone, `every` and `some` both answer false, so a `some` mutant would still refuse) → `rule: 'decision.bad-close-started'`, and the `reason` contains neither id. Control: `closeStarted: [z]` with `z` in the flow → `null`; no `closeStarted` or an empty array → `null`.
   - **(f), pass-through without a query:** a `db` wrapper `const counted = (n: { v: number }) => ({ query: (...a: Parameters<typeof db.pool.query>) => { n.v += 1; return db.pool.query(...a); } }) as unknown as Queryable`. For each of the three gates, `check(sub(d, 'ticket.transitioned', { to: 'done' }, SYSTEM_ACTOR_FLOW), counted(n))` and `check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: ['x'] }, SYSTEM_ACTOR_FLOW), counted(n))` return `null` with `n.v === 0`. A person's transition of a NON-Decision ticket (`TASK`) to `done` returns `null` (this one reads one ticket row, `n.v` is 1: pins that the cheap test comes before `readFlow`). Control: the person's finishing transition of the Decision with the blocked plan IS refused (row (a)).
-  - **(g), end to end through the real door:** `ingest = gatedIngest(db.pool)`; with the real `planSettle` and the `loopWorld()` of Step 2 (export it from `flow-world.ts` instead of redefining it), a person's `ticket.decided` for `Redo` commits (`status: 'committed'`); the pair of flow-actor events the settler files afterwards (Step 2's rig with `ingest`) commits too: `(await ledger(db.pool, a, 'ticket.transitioned'))` contains a `reopened-by-flow` row and no `refused` result appears in `logs`. Fix `gate-seam.test.ts:145-156` to `['comment.added', 'comment.edited', 'ticket.field_set', 'ticket.transitioned', 'ticket.decided', 'ticket.decided', 'ticket.transitioned']` and reword the 9.229 `it` title to include the three decision gates; its explanatory comment keeps its first sentence.
+  - **(g), end to end through the real door:** `ingest = gatedIngest(db.pool)`; with the real `planSettle` and the `loopWorld()` of Step 2 (export it from `flow-world.ts` instead of redefining it), a person's `ticket.decided` for `Redo` commits (`status: 'committed'`); the pair of flow-actor events the settler files afterwards (Step 2's rig with `ingest`) commits too: `await vi.waitFor(async () => expect((await ledger(db.pool, a, 'ticket.transitioned')).map((e) => e.payload.cause?.kind)).toContain('reopened-by-flow'))` (the settler runs fire-and-forget from the commit feed, so a plain read races it), `stateOf(db.pool, d)` is `'backlog'`, and no `refused` result appears in `logs`. Fix `gate-seam.test.ts:145-156` to `['comment.added', 'comment.edited', 'ticket.field_set', 'ticket.transitioned', 'ticket.decided', 'ticket.decided', 'ticket.transitioned']` and reword the 9.229 `it` title to include the three decision gates; its explanatory comment keeps its first sentence.
+
+  **Kills:**
+  - 29.370 (a) cascade gate on the finishing transition: (a) delete `|| stateCategoryOf(def, to) !== 'terminal'` (the `{ to: 'doing' }` control is refused); (b) delete `if (plan.blocked === null) return null;` (the applicable-plan control throws on `plan.blocked.ticketId`); (c) `RULE_DECISION_CASCADE_BLOCKED` → `RULE_DECISION_BAD_CLOSE_STARTED` in `cascadeRefusal`.
+  - 29.370 (b) the decided gate: (a) drop `outcome: claim.outcome` from the node patch in `cascadeRefusal` (the recorder sees no `'Ship'`); (b) `outcome: null` passed in `cascadeOnDecidedGate` (returns `null` at `claim.outcome === null`, nothing refused).
+  - 29.370 (c) the patch: (a) drop `category: 'terminal' as const` from the node patch (the recorder sees `'active'`).
+  - 29.370 (d) hidden blocker: (a) `cascadeBlockedReason(...)` called with `visible: true` unconditionally (leaks `zKey` and `Secret title`); (b) `visible ? generic : sentence` inverted (the `async () => true` leg loses the key); (c) the reason built from the raw `plan.blocked.reason` (the visible leg reads `parent-finished`).
+  - 29.370 (e) closeStarted: (a) `ids.some(...)` in place of `ids.every(...)` (the mixed list passes); (b) append `${ids.join(', ')}` to the reason (an id appears); (c) delete the gate from `makeDecisionGates` (no refusal).
+  - 29.370 (f) pass-through: (a) delete `if (isFlowActor(event)) return null;` in `cascadeOnTransitionGate` (`n.v` > 0); (b) move the `latestWorkflowDefs` / `readFlow` read before the `ticket.typeId !== DECISION_TYPE_ID` test (the TASK transition makes `n.v` > 1).
+  - 29.370 (g) end to end and the seam list: (a) `if (plan.blocked === null)` → `if (plan.steps.length === 0)` in `cascadeRefusal` (the real Redo plan has two steps, so the person's choice is refused); (b) leave `...makeDecisionGates()` out of `buildServerGates` (the 9.229 list). Note: deleting the transition gate's flow-actor return does NOT redden (g) (the cascade moves `a`, not a Decision, and `d` to Backlog, not terminal); (f) is what kills it.
 
   Run: `slot-run.sh wtg2-t16c -- pnpm --filter @gisik-nokma/server exec vitest run test/gates --maxWorkers=2 > /tmp/wtg2-t16c.log 2>&1; tail -40 /tmp/wtg2-t16c.log`. Expected: FAIL (`decision-gates.js` missing; the seam list differs).
 
@@ -7125,7 +7679,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   `apps/server/src/gates/decision-gates.ts`:
   ```ts
-  import { DECISION_TYPE_ID, planSettle, stateCategoryOf, SYSTEM_ACTOR_FLOW, type SubmittedEvent } from '@gisik-nokma/domain';
+  import { DECISION_TYPE_ID, planSettle, stateCategoryOf, SYSTEM_ACTOR_FLOW, type SettleBlockReason, type SubmittedEvent } from '@gisik-nokma/domain';
   import type { Queryable } from '../db/queryable.js';
   import { latestDecided, settleContext } from '../flow/settle.js';
   import { FLOW_SERVER_CAP } from '../flow/promote.js';
@@ -7172,9 +7726,26 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const visible = await (opts.canSeeTicket ?? ((d, u, t) => canSee(d, u, t)))(db, event.actorId, plan.blocked.ticketId);
     return {
       rule: RULE_DECISION_CASCADE_BLOCKED,
-      reason: `This choice cannot be applied: ${visible ? plan.blocked.reason : 'a step you cannot see is blocking it'}.`,
+      reason: `This choice cannot be applied: ${visible ? cascadeBlockedReason(plan.blocked.reason, await describeTicket(db, event.workspaceId, plan.blocked.ticketId)) : 'a step you cannot see is blocking it'}.`,
     };
   }
+
+  /**
+   * The sentence for a stable block code (planner ruling 2026-10-04, Q14; spec PS-9 "the reason names the ticket"). Called
+   * only when the filer can see the ticket; the caller substitutes the generic phrase otherwise (PS-6).
+   */
+  export function cascadeBlockedReason(code: SettleBlockReason, t: { key: string; title: string }): string {
+    const name = `${t.key} ${t.title}`;
+    switch (code) {
+      case 'parent-finished': return `${name} would move back under a finished parent`;
+      case 'child-open': return `${name} would be finished while a child of it stays open`;
+      case 'outcome-has-no-branch': return `the outcome no longer has a branch (${name})`;
+      case 'no-terminal-state': return `${name}'s workflow has no finished state to close it in`;
+    }
+  }
+
+  /** Key and title of a ticket, read the way the History route names a link target (re-read `routes/ticket-history.ts` and reuse its lookup; do not compose a key here). */
+  async function describeTicket(db: Queryable, workspaceId: string, ticketId: string): Promise<{ key: string; title: string }> { /* reuse */ }
 
   function cascadeOnDecidedGate(opts: DecisionGateOptions): ServerGate {
     return {
@@ -7232,6 +7803,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | 29.370 | drop the flow-actor return in the transition gate | (f) `n.v` is not 0 and (g) refuses a cascade move |
   | 29.370 | name `plan.blocked.reason` unconditionally | (d) leaks `secret title` |
   | 29.370 | gate `closeStarted` with `some` instead of `every` | (e) lets the foreign id through |
+
+  **Prose to sweep:**
+  - `apps/server/test/gates/gate-seam.test.ts:145` — the 9.229 docblock: "`buildServerGates()` covers exactly `comment.added`, `comment.edited` (...), `ticket.field_set` and `ticket.transitioned` — and nothing else" (Step 4 rewords the `it` title at `:147` but not this docblock).
+  - `test-cases/09-editor-attachments.md:352` — case 9.229 claims the same four-type coverage; amend it the way 26.053 did ("Amended … by 29.370: two `ticket.decided` gates and a second `ticket.transitioned` gate joined").
+  - `apps/server/src/index.ts:26-27` — "`gates` switches on the server-owned refusals: an embedded attachment must be this ticket's own image, and named evidence must exist on this ticket" (now also a Decision's blocked cascade and a foreign `closeStarted`).
+  - `apps/server/src/gates/server-gate.ts:19-24` — "Gates are CONSTRUCTION-TIME and UNCONDITIONAL … they do not distinguish the client door from the internal one … nothing about which door the event arrived through changes the answer": the decision gates return `null` for `SYSTEM_ACTOR_FLOW`, an actor that files only through the internal door.
+  - T14's `apps/server/src/flow/sweep.ts` docblock over `settleHalf` (this plan, ORIG 6166-6167, a file T14 creates) — "Task 16 replaces this body; until then there is nothing to settle and it reports zero": replace the docblock with the body.
 
   Push. DONE + REVIEW (NEEDS: T15, T13, T14 and the Drafts `ingestAtomic` task merged).
 
@@ -7342,6 +7920,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.371 flow sentences: (a) `because` ignores `key === null` (returns `` `because ${key} was closed${label}` ``; the withheld and absent-`causeTicket` legs read "because null was closed"); (b) the `ticket.closed` arm tests `cause !== null` instead of `cause?.kind === 'branch-not-taken'` (the wrong-kind control reads "Closed as not taken"); (c) `causeOf` returns `{ kind, label: null }` for `led-to` (the "(Yes)" leg).
+  - 29.371 decision sentences: (a) `` `Decision revised: ${outcome} → ${from}` `` (the revision leg); (b) drop the `typeof outcome !== 'string'` guard (the `7` leg reads "Decided: 7"); (c) `if (outcome === null) return 'Cleared the decision'` without the `from` arm (the "(was Yes)" leg).
+  - 29.371 pass suffix: (a) `ctx.round >= 1` (the round-1 leg reads "Closed (pass 1)"); (b) drop `text !== event.type &&` (the raw-type leg).
+  - 29.372 historyRounds: (a) drop the `resets` set and increment on every `reopened-by-flow` event (`d`, `i`, `j` read 3, 4, 5); (b) count `led-to` causes too (`g` reads 3); (c) `const reset = event.id` (the transition `d` of the first pair reads 3).
   Append to `history-list.test.tsx`:
   ```tsx
   it('29.372 HistoryList puts "(pass n)" on a reset ticket from round 2, and leaves round 1 and the raw fallback bare', () => {
@@ -7359,6 +7942,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(screen.getByText('ticket.never_seen')).toBeInTheDocument();
   });
   ```
+  **Kills:**
+  - 29.372 HistoryList: (a) keep `describeEvent(event, ctx)` without `round` (both "(pass 2)" legs); (b) `round: 2` in place of `rounds.get(event.id)` (the round-1 "Created as Task" leg reads "Created as Task (pass 2)").
   Run (`slot-run.sh` = `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh`; build domain first, `pnpm --filter @gisik-nokma/domain build`): `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t17-ac -- pnpm --filter @gisik-nokma/app-core exec vitest run test/views/history-copy.test.ts test/views/history-list.test.tsx --maxWorkers=2 > /tmp/wtg2-t17-ac.log 2>&1; tail -30 /tmp/wtg2-t17-ac.log`. Expected: FAIL (`historyRounds` is not exported; sentences read `Closed`). Commit: `wtg2 T17: RED History sentences and rounds`.
 
 - [ ] **Step 3: History copy, rounds and the list (29.371, 29.372)**
@@ -7473,12 +8058,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   describe('29.373 History annotates a flow cause per viewer', () => {
     it('29.373 a visible ticket is keyed with the cause whole; a hidden one is null and loses its ids and people', async () => {
       const { workspaceId: WS, taskInEpicId: S, sharedTaskId: SH, hiddenTaskId: H } = read.world;
-      const TRIG = newUlid(); const DECIDER = newUlid(); const DEC_EVENT = newUlid();
+      // Two deciders: the visible close goes out WHOLE (its `decidedBy` is in the member's body by design), so the
+      // hidden reopen's decider must be a different id for the `not.toContain(DECIDER)` leg to pass on correct code.
+      const TRIG = newUlid(); const DECIDER = newUlid(); const SEEN_DECIDER = newUlid(); const DEC_EVENT = newUlid();
       const file = (type: string, payload: unknown) => makeCommitted({ workspaceId: WS, actorId: read.world.owner, entity: { kind: 'ticket', id: S }, type, payload });
       const ledVisible = file('ticket.transitioned', { to: 'doing', cause: { kind: 'led-to', sourceTicketId: SH, triggeredBy: TRIG } });
       const ledHidden = file('ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: H, label: 'Yes', triggeredBy: TRIG } });
       const reopenHidden = file('ticket.reopened', { cause: { kind: 'reopened-by-flow', decisionTicketId: H, outcome: 'No', pass: 1, decidedBy: DECIDER, decisionEventId: DEC_EVENT } });
-      const closedVisible = file('ticket.closed', { cause: { kind: 'branch-not-taken', decisionTicketId: SH, outcome: 'Yes', pass: 1, decidedBy: DECIDER, decisionEventId: DEC_EVENT } });
+      const closedVisible = file('ticket.closed', { cause: { kind: 'branch-not-taken', decisionTicketId: SH, outcome: 'Yes', pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT } });
       const plain = file('ticket.transitioned', { to: 'doing' });
       await applyCommitted(db.pool, [ledVisible, ledHidden, reopenHidden, closedVisible, plain]);
 
@@ -7494,6 +8081,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(member.byId.get(ledVisible.id)?.causeTicket).toEqual({ key: keys.get(SH) });
       expect(member.byId.get(ledVisible.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: SH, triggeredBy: TRIG });
       expect(member.byId.get(closedVisible.id)?.causeTicket).toEqual({ key: keys.get(SH) });
+      expect(member.byId.get(closedVisible.id)?.payload.cause).toMatchObject({ decisionTicketId: SH, decidedBy: SEEN_DECIDER }); // visible: whole
       expect(member.byId.get(ledHidden.id)?.causeTicket).toBeNull();
       expect(member.byId.get(ledHidden.id)?.payload.cause).toEqual({ kind: 'led-to', label: 'Yes' });
       expect(member.byId.get(reopenHidden.id)?.causeTicket).toBeNull();
@@ -7519,6 +8107,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(bare).not.toHaveProperty('causeTicket');
   });
   ```
+  **Kills:**
+  - 29.373 route annotation: (a) do not call `annotateFlowCauses` in the handler (every `causeTicket` leg); (b) annotate but skip `event.payload = { ... withholdCauseTicket(cause) }` (the exact `ledHidden` cause and `not.toContain(H)`); (c) `canSee` replaced by `true` (`ledHidden.causeTicket` is `{key}`); (d) `withholdCauseTicket` keeps `decidedBy` (the exact `reopenHidden` cause and `not.toContain(DECIDER)`); (e) set `event.causeTicket` on every event (the `plain` control).
+  - 29.373 mapHistory: (a) map a wire `null` to `{ key: null }` (the withheld leg); (b) spread `causeTicket: mapCauseTicket(...)` unconditionally (the bare leg throws or gains the key).
   Run: `slot-run.sh wtg2-t17-route -- pnpm --filter @gisik-nokma/server exec vitest run test/routes/ticket-history-causes.test.ts test/routes/ticket-history.test.ts --maxWorkers=2 > /tmp/wtg2-t17-route.log 2>&1; tail -30 /tmp/wtg2-t17-route.log`. Also `slot-run.sh wtg2-t17-map -- pnpm --filter @gisik-nokma/app-core exec vitest run test/online/mappers.test.ts --maxWorkers=2 > /tmp/wtg2-t17-map.log 2>&1; tail -30 /tmp/wtg2-t17-map.log`. Expected: FAIL (no `causeTicket`). Commit: `wtg2 T17: RED History cause annotation`.
 
   Implementation. `apps/server/src/read/history-causes.ts` (the lookup repeats typed-links T4's link-target block on purpose: `routes/ticket-history.ts:213-224` records why two routes do not share a helper that makes them agree by construction):
@@ -7596,6 +8187,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:**
+  - 29.374 rollupFor: (a) the terminal branch tallies `terminal` without `notTakenOf` (`terminal: 3`, no `notTaken`); (b) test `notTakenOf(child.closed_cause)` BEFORE the category (the open `stray` counts, `notTaken: 2`); (c) `notTaken: tally.notTaken` spread unconditionally (the cleared control gains `notTaken: 0`).
   (`JSON.stringify(null)` is the string `'null'`, which `$2::jsonb` stores as JSON null, not SQL NULL; `notTakenOf` reads both as none.) `apps/server/test/read/ticket-cards.test.ts` (uses its `created`, `world`, `fetchTicketRows`, `assembleTicketCards`):
   ```ts
   describe('29.374 the card carries notTaken and the parent counts it apart from done', () => {
@@ -7613,6 +8206,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  The single read builds its OWN `TicketRollup` (`routes/tickets.ts:506-514`, the spread Step 6 adds at `:511`), and nothing above reaches it: 25.190 compares cards with the frozen pre-T11 function over a world with no not-taken child. Add to `apps/server/test/routes/tickets-read.test.ts`, beside the partial-visibility rollup case (`:293`), `it('29.374 the single read serves notTakenChildren as the card does', ...)`: the same parent / finished / skipped world (the `closed_cause` written as above), `GET /v1/tickets/<parent>` as the owner serves `rollup` equal to `{ totalChildren: 2, terminalChildren: 1, notTakenChildren: 1, uncategorizedChildren: 0, restrictedCount: 0 }`.
+
+  **Kills:**
+  - 29.374 card: (a) drop `t.closed_cause` from `PROJ_TICKET_COLUMNS` (`skipped` loses `notTaken`); (b) drop the `notTakenChildren` spread from the card `rollup` literal (the parent rollup); (c) `notTaken: true as const` without the `notTakenOf` test (`finished` gains the key).
+  - 29.374 single read: (a) leave `routes/tickets.ts`' rollup literal without the `notTakenChildren` spread (the key is missing).
   App-core, appended to the named files (`listRowSeed` from `../helpers/seed.js`; `serverListCard`, `mapListPage`, `mapRollup` are already imported in `mappers.test.ts`; `countRows` and `fixture`/`envelope`/`TYPE_TASK`/`PROJECT` already exist in the two others):
   ```ts
   // rollup-text.test.ts
@@ -7654,7 +8252,12 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
-  (`replica-data-source.test.ts` gains `import { countRows } from '../../src/views/list-model.js';`.) Runs: `slot-run.sh wtg2-t17-q1s -- pnpm --filter @gisik-nokma/server exec vitest run test/visibility/rollup.test.ts test/read/ticket-cards.test.ts --maxWorkers=2 > /tmp/wtg2-t17-q1s.log 2>&1; tail -30 /tmp/wtg2-t17-q1s.log` and `slot-run.sh wtg2-t17-q1a -- pnpm --filter @gisik-nokma/app-core exec vitest run test/views/rollup-text.test.ts test/views/list-model.test.ts test/online/mappers.test.ts test/replica/replica-data-source.test.ts --maxWorkers=2 > /tmp/wtg2-t17-q1a.log 2>&1; tail -30 /tmp/wtg2-t17-q1a.log`. Expected: FAIL (no `notTaken`; `terminal` counts the skipped child; type errors on `notTaken`). Commit: `wtg2 T17: RED Not-taken is closed, never done`.
+  **Kills:**
+  - 29.374 formatRollup: (a) `(rollup.notTakenChildren ?? 0) >= 0` (the second leg reads "5 of 8 done, undefined not taken"); (b) push the not-taken part after the restricted part (the first leg's order).
+  - 29.374 countRows: (a) drop `&& row.notTaken !== true` (`terminal: 2` on the marked rows).
+  - 29.374 mappers: (a) `mapListRow` without the `notTaken` spread (the `t1` leg); (b) `mapRollup` without the `notTakenChildren` spread (the first `mapRollup` leg); (c) `notTakenChildren: asNumber(record['notTakenChildren'], ...)` unconditionally (the absent leg throws).
+  - 29.374 replica row: (a) `rowOf` without the `resolutionOf` spread (`skipped` has no `notTaken`, `countRows` reads 2).
+  (`replica-data-source.test.ts` gains `import { countRows } from '../../src/views/list-model.js';`.) Runs: `slot-run.sh wtg2-t17-q1s -- pnpm --filter @gisik-nokma/server exec vitest run test/visibility/rollup.test.ts test/read/ticket-cards.test.ts test/routes/tickets-read.test.ts --maxWorkers=2 > /tmp/wtg2-t17-q1s.log 2>&1; tail -30 /tmp/wtg2-t17-q1s.log` and `slot-run.sh wtg2-t17-q1a -- pnpm --filter @gisik-nokma/app-core exec vitest run test/views/rollup-text.test.ts test/views/list-model.test.ts test/online/mappers.test.ts test/replica/replica-data-source.test.ts --maxWorkers=2 > /tmp/wtg2-t17-q1a.log 2>&1; tail -30 /tmp/wtg2-t17-q1a.log`. Expected: FAIL (no `notTaken`; `terminal` counts the skipped child; type errors on `notTaken`). Commit: `wtg2 T17: RED Not-taken is closed, never done`.
 
 - [ ] **Step 6: The readers (29.374)**
 
@@ -7679,6 +8282,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   }
   ```
   `replica-data-source.ts` (`rowOf` literal, after `closed: state.closed ?? null,`): `...(resolutionOf(state) === null ? {} : { notTaken: true as const }),` with `resolutionOf` added to the existing `@gisik-nokma/domain` import (`:13-21`).
+  **Prose to sweep:** (lines on the ref; typed-links T4 edits the History route docblock first, so re-read it after that merge):
+  - `apps/server/src/routes/ticket-history.ts:9-15` — "Nine fields ... Nothing is summarised and nothing is derived": `causeTicket` is a derived field (Step 4).
+  - `apps/server/src/routes/ticket-history.ts:25-27` — "every claim-bearing field above goes out whole": a hidden flow cause now goes out without its ticket id, `triggeredBy` and `decidedBy`.
+  - `packages/app-core/src/views/history-copy.ts:185-186` — "The flag events carry no payload at all": `ticket.closed` / `ticket.reopened` now carry a `cause` and Step 3 reads it (the comment must leave the split arms; it stays true for `ticket.deleted` / `ticket.restored` only).
+  - `apps/server/src/visibility/rollup.ts:118` — "`terminal + uncategorized <= total`" (now `terminal + notTaken + uncategorized <= total`).
+  - `apps/server/src/visibility/rollup.ts:123-126` — `RollupView.terminal`: "Direct children whose `proj_tickets.state_category` is `'terminal'`" (a not-taken terminal child is no longer counted there).
+  - `packages/app-core/src/views/rollup-text.ts:4` — the docblock's format `"5 of 8 done, 2 restricted"` omits the new middle part ("4 of 8 done, 1 not taken, 2 restricted").
+
   Run the two Step 5 commands (build domain first). Expected: PASS. Then: `slot-run.sh wtg2-t17-census -- pnpm --filter @gisik-nokma/server exec vitest run test/census/terminal-category-readers.test.ts > /tmp/wtg2-t17-census.log 2>&1; tail -30 /tmp/wtg2-t17-census.log`. Expected: PASS (no new file reads the terminal category; if it lists one, classify it per T1's three definitions). Flip 29.374 ✅. Commit: `wtg2 T17: Not taken is closed, never done in every done-meaning reader`.
 
 - [ ] **Step 7: Wide runs, sweeps, push**
@@ -7755,9 +8366,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   describe('29.390 flow notification payloads', () => {
     it('29.390 both are strict, nullable where visibility can hide a member, and routed by kind', () => {
       expect(flowReadyNotificationPayloadSchema.parse(flowReady)).toEqual(flowReady);
-      expect(flowReadyNotificationPayloadSchema.parse({ ...flowReady, becauseTicketId: null, becauseTitle: null, label: null })).toBeTruthy();
+      const hiddenReady = { ...flowReady, becauseTicketId: null, becauseTitle: null, label: null };
+      expect(flowReadyNotificationPayloadSchema.parse(hiddenReady)).toEqual(hiddenReady);
       expect(flowReopenedNotificationPayloadSchema.parse(flowReopened)).toEqual(flowReopened);
-      expect(flowReopenedNotificationPayloadSchema.parse({ ...flowReopened, decisionTicketId: null, decisionTitle: null, outcome: null })).toBeTruthy();
+      const hiddenReopened = { ...flowReopened, decisionTicketId: null, decisionTitle: null, outcome: null };
+      expect(flowReopenedNotificationPayloadSchema.parse(hiddenReopened)).toEqual(hiddenReopened);
       expect(flowReadyNotificationPayloadSchema.safeParse({ ...flowReady, ticketId: '' }).success).toBe(false);
       expect(flowReadyNotificationPayloadSchema.safeParse({ ...flowReady, urgent: true }).success).toBe(false);
       expect(flowReopenedNotificationPayloadSchema.safeParse({ ...flowReopened, pass: 0 }).success).toBe(false);
@@ -7772,6 +8385,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   ```
   and change the `has exactly the five kinds` case (`:31-33`) to `has exactly the seven kinds` with the seven names in order (the two new ones last).
 
+  **Kills:**
+  - 29.390 payload schemas: (a) drop `.strict()` from `flowReadyNotificationPayloadSchema` (the `urgent` leg parses); (b) drop `.nullable()` from `becauseTicketId` (the hidden shape throws); (c) `pass: z.number().int().min(0)` (the `pass: 0` leg parses); (d) leave `'flow-reopened'` out of `notificationPayloadSchemaByKind` (`parseNotification` of the reopened row throws).
+
   `apps/server/test/notifications/store.test.ts` and `notification-preferences/store.test.ts`: copy the existing CHECK case of each file (grep `notifications_kind_check` / `muted_kinds` in them), and add beside it:
   ```ts
   it('29.391 the database stores both flow kinds and still refuses an unknown one', async () => {
@@ -7783,6 +8399,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     await expect(db.pool.query(`INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at) VALUES ('u-x', ARRAY['flow-bogus']::text[], now())`)).rejects.toThrow(/user_notification_preferences_muted_kinds_check/);
   });
   ```
+  **Kills:**
+  - 29.391 the CHECKs: (a) leave `notifications_kind_check` unchanged in the Up (the `flow-ready` INSERT rejects); (b) leave `'flow-reopened'` out of the Up's `muted_kinds` array (the second prefs INSERT rejects); (c) widen the Up's `notifications_kind_check` to `kind LIKE 'flow-%' OR ...` (the `flow-bogus` leg resolves). The Down half of the case line is pinned only by Step 7's manual `migrate:down` / `migrate:up` round trip (a recorded run, not a test).
+
   Confirm the column list of `notifications` against `1788437881385_notifications.sql:1-13` and use its `INSERT` helper if the file has one. The Down is exercised by `pnpm --filter @gisik-nokma/server migrate:down` then `migrate:up` on the scratch database in Step 7 (the repo's migration-roundtrip check, if any, covers it; read `package.json` scripts for its name).
 
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t18a -- pnpm --filter @gisik-nokma/domain exec vitest run test/notifications.test.ts > /tmp/wtg2-t18a.log 2>&1; tail -30 /tmp/wtg2-t18a.log`. Expected: FAIL (the schemas do not exist).
@@ -7863,7 +8482,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 - [ ] **Step 4: RED, the fan-out (29.392-29.396)**
 
-  `apps/server/test/notifications/flow-fanout.test.ts`. Copy the harness of `fanout.test.ts` (`:1-150`: the imports, `db`, `visible`, `canSeeTicket`, `fanout()`, `recordingTransport`, `rowsFor`) with these differences: **valid ULIDs** (the existing `KIRO = '01J9GUKR…'` contains `U`, which `ULID_REGEX` refuses, and `flowCauseSchema` parses ids): `const PERSON = '01J9GPRS000000000000000000'; const ASSIGNEE = '01J9GASN000000000000000000'; const OTHER = '01J9GOTH000000000000000000'; const SRC = '01J9GSRC000000000000000000'; const T1 = '01J9GTK1000000000000000000'; const T2 = '01J9GTK2000000000000000000'; const DEC = '01J9GDEC000000000000000000';` and a `seedTicket(ticketId, assigneeId, title, typeId = 'task', draftAuthorId: string | null = null)` whose INSERT is the copied one with `$6` for `type_id`, `$7` for `draft_author_id` and `draft_at = CASE WHEN $7 IS NULL THEN NULL ELSE now() END` (the Drafts T2 columns, `2026-10-03-drafts.md:1138-1149`; Drafts T3's `rowToTicketState` turns a non-null author into `TicketState.draft`, `2026-10-03-drafts.md:1532`, and leaves `draft` ABSENT otherwise, `:38`), plus `publishRow(ticketId)`: `UPDATE proj_tickets SET draft_author_id = NULL, draft_at = NULL WHERE ticket_id = $1`, which is what the `ticket.published` projection does to the row (Drafts 28.045). A helper builds the events with the real envelope maker:
+  `apps/server/test/notifications/flow-fanout.test.ts`. Copy the harness of `fanout.test.ts` (`:1-150`: the imports, `db`, `visible`, `canSeeTicket`, `fanout()`, `recordingTransport`, `rowsFor`; plus `inboxFor`, `:152`, and `totalNotificationRows`, `:157`) with these differences: **valid ULIDs** (the existing `KIRO = '01J9GUKR…'` contains `U`, which `ULID_REGEX` refuses, and `flowCauseSchema` parses ids): `const PERSON = '01J9GPRS000000000000000000'; const ASSIGNEE = '01J9GASN000000000000000000'; const OTHER = '01J9GTHR000000000000000000'; const SRC = '01J9GSRC000000000000000000'; const T1 = '01J9GTK1000000000000000000'; const T2 = '01J9GTK2000000000000000000'; const T3 = '01J9GTK3000000000000000000'; const DEC = '01J9GDEC000000000000000000';` and a `seedTicket(ticketId, assigneeId, title, typeId = 'task', draftAuthorId: string | null = null)` whose INSERT is the copied one with `$6` for `type_id`, `$7` for `draft_author_id` and `draft_at = CASE WHEN $7 IS NULL THEN NULL ELSE now() END` (the Drafts T2 columns, `2026-10-03-drafts.md:1138-1149`; Drafts T3's `rowToTicketState` turns a non-null author into `TicketState.draft`, `2026-10-03-drafts.md:1532`, and leaves `draft` ABSENT otherwise, `:38`), plus `publishRow(ticketId)`: `UPDATE proj_tickets SET draft_author_id = NULL, draft_at = NULL WHERE ticket_id = $1`, which is what the `ticket.published` projection does to the row (Drafts 28.045). A helper builds the events with the real envelope maker:
   ```ts
   const cause = {
     led: (over = {}) => ({ kind: 'led-to', sourceTicketId: SRC, triggeredBy: PERSON, ...over }),
@@ -7873,12 +8492,19 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   const moved = (ticketId: string, to: string, c: unknown, actorId = SYSTEM_ACTOR_FLOW) =>
     makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: ticketId }, workspaceId: WS, actorId, payload: { to, cause: c } });
   ```
-  - **29.392 (a):** `visible.add(`${ASSIGNEE}:${T1}`); visible.add(`${ASSIGNEE}:${SRC}`)`; `seedTicket(T1, ASSIGNEE, 'Write the copy')`, `seedTicket(SRC, null, 'Draft the brief')`; `const env = moved(T1, 'todo', cause.led())`; `await fanout().onCommitted(env)`. `rowsFor(ASSIGNEE)` has one row `{ kind: 'flow-ready', dedupe_key: `flow-ready:${env.id}`, workspace_id: WS, payload: { ticketId: T1, ticketTitle: 'Write the copy', becauseTicketId: SRC, becauseTitle: 'Draft the brief', label: null, eventId: env.id, clientTime: env.clientTime, serverTime: env.serverTime } }`; a labelled cause (`cause.led({ label: 'Yes' })`) stores `label: 'Yes'`. Read back through `listNotifications` (the file's `viaInbox` helper) so the strict read schema is exercised. **(b):** `onCommitted(env)` twice → still one row. Two different promotions from one source (`T1` and `T2`, same assignee) → two rows with different keys. **(c), the daemon path:** with `realIngest` and `seedFlowWorld` from `flow-world.ts` (T13): a target assigned to `ASSIGNEE` whose source was finished by `PERSON` with no listener attached; `registerDaemonListeners(ingest, { pool: db.pool, transports: [createInAppTransport(db.pool)], canSeeTicket: async () => true })`; `await runFlowSweep({ pool: db.pool, ingest })`; `listNotifications(db.pool, ASSIGNEE, {})` has one `flow-ready` row whose `becauseTicketId` is the source.
-  - **29.393:** unassigned target → `rowsFor(ASSIGNEE)` empty; `triggeredBy: ASSIGNEE` → empty; assignee without `visible` on the target → empty and **no log line**; assignee who sees the target but not `SRC` → one row with `becauseTicketId: null, becauseTitle: null, label: null` even though the cause carried `label: 'Yes'` (serialise the row and assert it does not contain `'Draft the brief'` or `'Yes'`). Control: with `SRC` visible all three are present.
-  - **29.394:** `seedTicket(T1, ASSIGNEE, 'Write the copy')`, `seedTicket(T2, OTHER, 'Review the copy')`, `seedTicket(DEC, null, 'Ship or redo', 'decision')`; `visible` for both assignees on their ticket and on `DEC`. `const a = moved(T1, 'todo', cause.reopened()); const b = moved(T2, 'backlog', cause.reopened({ decisionEventId: a.payload.cause.decisionEventId }))` (the SAME decision event): `onCommitted(a)`, `onCommitted(b)`. `rowsFor(ASSIGNEE)` has one row `payload: { ticketId: T1, ticketTitle: 'Write the copy', decisionTicketId: DEC, decisionTitle: 'Ship or redo', outcome: 'Redo', pass: 2, toBacklog: false, eventId: a.id, ... }`, `dedupe_key` `flow-reopened:${a.id}`; `rowsFor(OTHER)` has one row with `toBacklog: true`. (Different keys although the Decision event is the same; this is the mutation's red.)
-  - **29.395:** moving `DEC` itself with `cause.reopened()` (`moved(DEC, 'todo', ...)`, `DEC` assigned to `ASSIGNEE`) → nothing for anyone (NT-4). `decidedBy: ASSIGNEE` on a move of `T1` → empty (the chooser is not told). Unassigned → empty. Assignee without `T1` visibility → empty. Assignee who sees `T1` but not `DEC` → one row with `decisionTicketId: null, decisionTitle: null, outcome: null` and `pass: 2` (serialise: it contains neither `'Ship or redo'` nor `'Redo'`). Control: with `DEC` visible the three are present.
+  - **29.392 (a):** `visible.add(`${ASSIGNEE}:${T1}`); visible.add(`${ASSIGNEE}:${SRC}`)`; `seedTicket(T1, ASSIGNEE, 'Write the copy')`, `seedTicket(SRC, null, 'Draft the brief')`; `const env = moved(T1, 'todo', cause.led())`; `await fanout().onCommitted(env)`. `rowsFor(ASSIGNEE)` has one row `{ kind: 'flow-ready', dedupe_key: `flow-ready:${env.id}`, workspace_id: WS, payload: { ticketId: T1, ticketTitle: 'Write the copy', becauseTicketId: SRC, becauseTitle: 'Draft the brief', label: null, eventId: env.id, clientTime: env.clientTime, serverTime: env.serverTime } }`; a labelled cause (`cause.led({ label: 'Yes' })`) stores `label: 'Yes'`. Read back through `inboxFor(ASSIGNEE)` (`fanout.test.ts:152`, `listNotifications` underneath) so the strict read schema is exercised. **(b):** `onCommitted(env)` twice → still one row. Two different promotions from one source (`seedTicket(T2, ASSIGNEE, 'Review the copy')`, `visible.add(`${ASSIGNEE}:${T2}`)`, `moved(T2, 'todo', cause.led())`) → `rowsFor(ASSIGNEE).map((row) => row.dedupe_key).sort()` equals `[`flow-ready:${env.id}`, `flow-ready:${envT2.id}`].sort()`, `envT2` being the T2 move (two rows, each keyed on its own move). **(c), the daemon path:** with `realIngest` and `seedFlowWorld` from `flow-world.ts` (T13): a target assigned to `ASSIGNEE` whose source was finished by `PERSON` with no listener attached; `registerDaemonListeners(ingest, { pool: db.pool, transports: [createInAppTransport(db.pool)], canSeeTicket: async () => true })`; `await runFlowSweep({ pool: db.pool, ingest })`; `listNotifications(db.pool, ASSIGNEE, {})` has one `flow-ready` row whose `becauseTicketId` is the source.
+  - **29.393:** unassigned target (`seedTicket(T1, null, ...)`, `ASSIGNEE` still visible on it) → `totalNotificationRows()` is `0` (`rowsFor(ASSIGNEE)` would be empty for an unassigned ticket whatever the arm did, so it cannot fail); `T1` assigned to `ASSIGNEE` and visible, `triggeredBy: ASSIGNEE` → `rowsFor(ASSIGNEE)` empty; assignee without `visible` on the target → empty and **no log line**; assignee who sees the target but not `SRC` → one row with `becauseTicketId: null, becauseTitle: null, label: null` even though the cause carried `label: 'Yes'` (serialise the row and assert it does not contain `'Draft the brief'` or `'Yes'`). Control: with `SRC` visible all three are present.
+  - **29.394:** `seedTicket(T1, ASSIGNEE, 'Write the copy')`, `seedTicket(T2, OTHER, 'Review the copy')`, `seedTicket(DEC, null, 'Ship or redo', 'decision')`; `visible` for both assignees on their ticket and on `DEC`. `const a = moved(T1, 'todo', cause.reopened()); const b = moved(T2, 'backlog', cause.reopened({ decisionEventId: a.payload.cause.decisionEventId }))` (the SAME decision event): `onCommitted(a)`, `onCommitted(b)`. `rowsFor(ASSIGNEE)` has one row `payload: { ticketId: T1, ticketTitle: 'Write the copy', decisionTicketId: DEC, decisionTitle: 'Ship or redo', outcome: 'Redo', pass: 2, toBacklog: false, eventId: a.id, ... }`, `dedupe_key` `flow-reopened:${a.id}`; `rowsFor(OTHER)` has one row with `toBacklog: true`. Then `seedTicket(T3, ASSIGNEE, 'Check the copy')`, `visible.add(`${ASSIGNEE}:${T3}`)`, `const c = moved(T3, 'todo', cause.reopened({ decisionEventId: a.payload.cause.decisionEventId }))`, `onCommitted(c)`: `rowsFor(ASSIGNEE).map((row) => row.dedupe_key).sort()` equals `[`flow-reopened:${a.id}`, `flow-reopened:${c.id}`].sort()`. (Different keys although the Decision event is the same; this is the mutation's red. The dedupe is unique per `(user_id, dedupe_key)`, so only a second moved ticket of the SAME assignee can collide; `OTHER`'s row survives that mutant.)
+  - **29.395:** moving `DEC` itself with `cause.reopened()` (`moved(DEC, 'todo', ...)`, `DEC` assigned to `ASSIGNEE` and `visible.add(`${ASSIGNEE}:${DEC}`)`, so only the NT-4 return can stop the row) → `totalNotificationRows()` is `0` (NT-4). `decidedBy: ASSIGNEE` on a move of a visible `T1` assigned to `ASSIGNEE` → `rowsFor(ASSIGNEE)` empty (the chooser is not told). Unassigned `T1` (`ASSIGNEE` visible on it) → `totalNotificationRows()` is `0`. Assignee without `T1` visibility → empty. Assignee who sees `T1` but not `DEC` → one row with `decisionTicketId: null, decisionTitle: null, outcome: null` and `pass: 2` (serialise: it contains neither `'Ship or redo'` nor `'Redo'`). Control: with `DEC` visible the three are present.
   - **29.396:** with a visible assignee on `T1`, none of these produce a row: `moved(T1, 'done', cause.notTaken())` (a transition carrying `branch-not-taken`); `makeEnvelope({ type: 'ticket.closed', ..., payload: { cause: cause.notTaken() } })`; `ticket.decided` (`payload: { outcome: 'Redo' }`); `ticket.reopened` (`payload: { cause: cause.reopened() }`); a person's plain `ticket.transitioned` (`payload: { to: 'doing' }`) and one carrying the existing `reopened-for-child` cause. Control: `moved(T1, 'todo', cause.led())` gives one row.
-  - **29.396, the draft clause (owner ruling O2: "there should not be any notification till the ticket is published"),** one `it('29.396 a draft flow notifies nobody, its author included; once published the same moves notify')`: `visible` gets `ASSIGNEE` on `T1`, `SRC` and `DEC` (so only the new guards can stop a row); `seedTicket(T1, ASSIGNEE, 'Write the copy', 'task', ASSIGNEE)` (the assignee's OWN draft, the one person `canSee` would let through), `seedTicket(SRC, null, 'Draft the brief', 'task', ASSIGNEE)`, `seedTicket(DEC, null, 'Ship or redo', 'decision', ASSIGNEE)`. `onCommitted(moved(T1, 'todo', cause.led()))` and `onCommitted(moved(T1, 'backlog', cause.reopened()))` → `rowsFor(ASSIGNEE)` is `[]`. Then `publishRow(T1)` only, and the same two moves (new envelopes) → still `[]` (the moved ticket is published but its source and Decision are drafts). CONTROL, same `it()`: `publishRow(SRC); publishRow(DEC)` and the same two moves → `rowsFor(ASSIGNEE).map((row) => row.kind).sort()` is `['flow-ready', 'flow-reopened']`.
+  - **29.396, the draft clause (owner ruling O2: "there should not be any notification till the ticket is published"),** one `it('29.396 a draft flow notifies nobody, its author included; once published the same moves notify')`: `visible` gets `ASSIGNEE` on `T1`, `SRC` and `DEC` (so only the new guards can stop a row); `seedTicket(T1, ASSIGNEE, 'Write the copy', 'task', ASSIGNEE)` (the assignee's OWN draft, the one person `canSee` would let through), `seedTicket(SRC, null, 'Draft the brief', 'task', ASSIGNEE)`, `seedTicket(DEC, null, 'Ship or redo', 'decision', ASSIGNEE)`. `onCommitted(moved(T1, 'todo', cause.led()))` and `onCommitted(moved(T1, 'backlog', cause.reopened()))` → `totalNotificationRows()` is `0`. Then `publishRow(T1)` only, and the same two moves (new envelopes) → still `0` (the moved ticket is published but its source and Decision are drafts; this phase is the `isDraft(source / decision)` mutant's red). Then the moved-ticket phase: `publishRow(SRC); publishRow(DEC)`; `seedTicket(T2, ASSIGNEE, 'Review the copy', 'task', ASSIGNEE)` (a second OWN draft), `visible.add(`${ASSIGNEE}:${T2}`)`; the two moves on `T2` → still `0` (source and Decision now published, so only `ticket?.draft !== undefined` stops these; with `T1` as the only moved ticket that guard was never alone, because `SRC` and `DEC` were drafts in every phase where `T1` was). CONTROL, same `it()`: the same two moves on the published `T1` → `rowsFor(ASSIGNEE).map((row) => row.kind).sort()` is `['flow-ready', 'flow-reopened']`.
+
+  **Kills:**
+  - 29.392: (a) key `flow-ready` on `cause.sourceTicketId` (the T1/T2 pair collapses to one row); (b) `becauseTicketId: env.entity.id` (or `eventId: cause.sourceTicketId`) in the composed payload (the (a) row's `toEqual` reds); (c) the redelivery leg and the daemon-path leg: none, guard existing behaviour (the store's `(user_id, dedupe_key)` dedupe and T14's `registerDaemonListeners` wiring of the same fan-out).
+  - 29.393: (a) store `cause.label` / the source title without the source `canSeeTicket` test (the serialised hidden row contains `'Yes'`); (b) drop the `triggeredBy` skip (the trigger's own row appears); (c) drop the moved-ticket `canSeeTicket` test (the invisible-assignee leg gets a row).
+  - 29.394: (a) key `flow-reopened` on `cause.decisionEventId` (`T3`'s row is swallowed by `T1`'s); (b) `toBacklog: true` constant (`T1`'s row, moved to `todo`, reads `true`); (c) `pass` from a constant `1` (the row reads `pass: 1`).
+  - 29.395: (a) drop the `decisionTicketId === env.entity.id` return (the visible, assigned `DEC` reset files a row); (b) drop the `decidedBy` skip (the chooser's row appears); (c) store the Decision title without its `canSeeTicket` test (the serialised row contains `'Ship or redo'`).
+  - 29.396: (a) add `ticket.reopened` (or `ticket.closed`) to the arm (the paired reopen / the not-taken close files a row); (b) treat `branch-not-taken` like `reopened-by-flow` (the not-taken transition files a row); (c) drop `ticket?.draft !== undefined` (the `T2` own-draft phase files rows); (d) drop the `isDraft(source / decision)` half (the `publishRow(T1)`-only phase files rows).
 
   Run: `slot-run.sh wtg2-t18c -- pnpm --filter @gisik-nokma/server exec vitest run test/notifications/flow-fanout.test.ts --maxWorkers=2 > /tmp/wtg2-t18c.log 2>&1; tail -40 /tmp/wtg2-t18c.log`. Expected: FAIL (no arm; no rows).
 
@@ -8024,17 +8650,21 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     it('29.399 every kind has a payload schema and both CHECKs accept it; a planted kind is reported', async () => {
       const db = await createTestDatabase();
       try {
-        const accepted = async (table: 'notifications' | 'prefs', kind: string): Promise<boolean> => {
+        // One client for BEGIN / INSERT / ROLLBACK: `pool.query` may hand each statement a different client, so the
+        // ROLLBACK would not undo the INSERT. Returns `true` or the error message, so a refusal is told apart from any
+        // other SQL error (a catch-all `false` would let a typo in the INSERT pass the planted-kind control).
+        const accepted = async (table: 'notifications' | 'prefs', kind: string): Promise<true | string> => {
+          const client = await db.pool.connect();
           try {
-            await db.pool.query('BEGIN');
-            if (table === 'notifications') await db.pool.query(`INSERT INTO notifications (id, user_id, workspace_id, kind, dedupe_key, payload, read, created_at) VALUES ('c', 'u', 'w', $1, 'c', '{}'::jsonb, false, now())`, [kind]);
-            else await db.pool.query(`INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at) VALUES ('u', ARRAY[$1]::text[], now())`, [kind]);
+            await client.query('BEGIN');
+            if (table === 'notifications') await client.query(`INSERT INTO notifications (id, user_id, workspace_id, kind, dedupe_key, payload, read, created_at) VALUES ('c', 'u', 'w', $1, 'c', '{}'::jsonb, false, now())`, [kind]);
+            else await client.query(`INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at) VALUES ('u', ARRAY[$1]::text[], now())`, [kind]);
             return true;
-          } catch { return false; } finally { await db.pool.query('ROLLBACK'); }
+          } catch (error) { return (error as Error).message; } finally { await client.query('ROLLBACK'); client.release(); }
         };
         const kinds = [...NOTIFICATION_KINDS];
-        expect(await accepted('notifications', 'planted-kind')).toBe(false); // control first: the check can fail
-        expect(await accepted('prefs', 'planted-kind')).toBe(false);
+        expect(await accepted('notifications', 'planted-kind')).toMatch(/notifications_kind_check/); // control first: the check can fail, and fails on the CHECK
+        expect(await accepted('prefs', 'planted-kind')).toMatch(/user_notification_preferences_muted_kinds_check/);
         expect(missing([...kinds, 'planted-kind'], new Set(Object.keys(notificationPayloadSchemaByKind)))).toEqual(['planted-kind']);
         expect(missing(kinds, new Set(Object.keys(notificationPayloadSchemaByKind)))).toEqual([]);
         for (const kind of kinds) {
@@ -8046,8 +8676,21 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+
+  **Kills:**
+  - 29.397: (a) leave the two entries out of `LABELS` in `notifications-section.tsx` (`toHaveLength(7)` and the two label lookups red; `Record<NotificationKind, string>` also stops the build); (b) map `'flow-ready'`'s switch to `'flow-reopened'` in the `onChange` payload (the `mutedKinds` containing `'flow-ready'` leg reds). The server half (`listNotifications` with `mutedKinds: ['flow-ready']`, the unread count, no preferences row) is none, guards existing behaviour (the store's mute filter is kind-agnostic; it is pinned for the new kind because the CHECKs and schemas are this task's).
+  - 29.398: (a) swap the `toBacklog` leads (both `reopened` headlines red); (b) drop the `becauseTitle === null` arm (the hidden headline reads `Ready to start: null was closed`); (c) invert the `label === null` test (the plain and the `chose Yes` legs swap); (d) `notificationBody` returns `becauseTitle` for `flow-ready` (reads `Draft the brief`); (e) reuse the `assignment` paths for `flow-ready` in `PATHS` (`icons.test.tsx`'s distinctness over `NOTIFICATION_KINDS.length` reds).
+  - 29.399: (a) drop `'flow-reopened'` from the Up's `muted_kinds` CHECK (the loop's `muted_kinds check refuses flow-reopened`); (b) leave `'flow-ready'` out of `notificationPayloadSchemaByKind` (the `missing(kinds, …)` leg reads `['flow-ready']`; also caught by 29.390 (d)).
+
   The headline, body, icon and label sites are compile-enforced (`never` switches and `Record<NotificationKind, ...>`), so the census does not re-test them; the app-core pins above cover their values. Run domain, app-core and server notification suites and the census:
   `slot-run.sh wtg2-t18d -- pnpm --filter @gisik-nokma/app-core exec vitest run test/inbox test/account --maxWorkers=2 > /tmp/wtg2-t18d.log 2>&1; tail -30 /tmp/wtg2-t18d.log` then the server `test/notifications test/notification-preferences test/census test/reporting-scope-guard.test.ts` the same way (`wtg2-t18e`). Expected: PASS; flip 29.397-29.399 ✅.
+
+  **Prose to sweep:** (read on `origin/release/workflow-graph`; each goes false when the vocabulary becomes seven):
+  - `docs/manual.md:1221-1229` — "Exactly five kinds of message, and no more ... nothing can quietly add a sixth kind" and the five-item list: add the two flow messages with their sentences; then `pnpm help:generate` (`packages/app-core/src/help/content.generated.ts:7033` is generated from it) and `pnpm check:help`.
+  - `packages/app-core/src/inbox/icons.tsx:15`, `:18` and `:79-80` — "all five exist", "the five rendered `innerHTML`s ... five DISTINCT ones", "five kinds render five different icons": seven.
+  - `packages/app-core/src/inbox/inbox-view.tsx:25` — "renders a mixed five-kind fixture": seven, if the fixture is built from `PAYLOADS` (read the test first).
+  - `Features.md:2774` — "the five shipped kinds" and "the same five-kind vocabulary": seven (the Notification preferences bullet, separate from this task's new bullet).
+  - Not edited: `apps/server/migrations/1788900000000_user-notification-preferences.sql:24,32` ("five kinds today", "a FOURTH copy of the five-kind list") — a shipped migration is frozen; the new migration's own comment carries the current count.
 
   Commit: `wtg2 T18: inbox rows, preferences rows, count pins, census`.
 
@@ -8112,6 +8755,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     type EventEnvelope, type PublishedWorkflowDef, type TicketStateDeps, type TicketTypeDef,
   } from '@gisik-nokma/domain';
   import { buildMemoryContext, evaluateEvent } from '@gisik-nokma/rule-engine';
+  import { buildServerGates, makeDecisionGates } from '../../src/gates/index.js';
   import { payloadIds } from '../../src/purge/check-purged.js';
   import { BOOTSTRAP_BACKFILL_TYPES } from '../../src/sync/sync-routes.js';
   import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -8200,7 +8844,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     { id: '8.4-03', place: 'sync-routes.ts BOOTSTRAP_BACKFILL_TYPES', check: () => {
       // Contract decision 1: decided FOLDS, so it is in exactly one of the two lists, and it is the fold list.
       expect((BOOTSTRAP_BACKFILL_TYPES as readonly string[]).includes('ticket.decided')).toBe(false);
-      for (const t of ['ticket.link_added', 'ticket.transitioned', 'ticket.closed', 'ticket.reopened']) {
+      // `ticket.decided` is in the XOR loop too: dropped from TICKET_EVENT_TYPES it is in NEITHER list and this row is named
+      // (without it, the row only checked the backfill list, and the Step 4 mutation named 8.4-02 alone).
+      for (const t of ['ticket.decided', 'ticket.link_added', 'ticket.transitioned', 'ticket.closed', 'ticket.reopened']) {
         expect((TICKET_EVENT_TYPES as readonly string[]).includes(t) !== (BOOTSTRAP_BACKFILL_TYPES as readonly string[]).includes(t)).toBe(true);
       }
     } },
@@ -8224,9 +8870,11 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       mentions('apps/server/src/flow/sweep.ts', 'runFlowSweep');
       mentions('apps/server/src/app.ts', 'createFlowPromoter', 'createFlowSettler');
     } },
-    { id: '8.4-11', place: 'gates/', check: () => {
-      mentions('apps/server/src/gates/decision-gates.ts', 'decisionCascadeGate', 'decisionCloseStartedGate');
-      expect(filesWith('decisionCascadeGate', 'apps/server/src').length).toBeGreaterThanOrEqual(2); // defined AND registered
+    { id: '8.4-11', place: 'gates/ (decision-gates.ts, index.ts)', check: () => {
+      // T16's names: `makeDecisionGates()` returns [closeStartedGate, cascadeOnDecidedGate, cascadeOnTransitionGate] and
+      // `buildServerGates()` spreads it. Asserted through the imports, not a token count: no other gate inspects `ticket.decided`.
+      expect(makeDecisionGates().map((g) => g.eventType)).toEqual(['ticket.decided', 'ticket.decided', 'ticket.transitioned']);
+      expect(buildServerGates().filter((g) => g.eventType === 'ticket.decided')).toHaveLength(2); // registered
     } },
     { id: '8.4-12', place: 'projections: new columns', check: async () => {
       expect(await columns('proj_tickets')).toEqual(expect.arrayContaining(['outcome', 'passes', 'periods', 'rounds', 'started_at', 'ended_at', 'closed_cause']));
@@ -8235,12 +8883,13 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     } },
     { id: '8.4-13', place: 'purge/check-purged.ts payloadIds', check: () => {
       const [a, b, c] = [newUlid(), newUlid(), newUlid()];
-      const ids = (type: string, payload: object) => payloadIds(type, payload).map(([, id]) => id);
-      expect(ids('ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: a, triggeredBy: USER } })).toContain(a);
-      expect(ids('ticket.transitioned', { to: 'todo', cause: cause('reopened-by-flow') })).toContain(DEC);
-      expect(ids('ticket.closed', { cause: cause('branch-not-taken') })).toContain(DEC);
-      expect(ids('ticket.decided', { outcome: 'Yes', closeStarted: [b, c] })).toEqual(expect.arrayContaining([b, c]));
-      expect(ids('ticket.decided', { outcome: 'Yes' })).not.toContain(b); // control: ids come from the payload
+      // [kind, id] pairs: the purge check refuses by KIND, so a cause id filed as a 'project' would pass an id-only probe.
+      expect(payloadIds('ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: a, triggeredBy: USER } })).toContainEqual(['ticket', a]);
+      expect(payloadIds('ticket.transitioned', { to: 'todo', cause: cause('reopened-by-flow') })).toContainEqual(['ticket', DEC]);
+      expect(payloadIds('ticket.closed', { cause: cause('branch-not-taken') })).toContainEqual(['ticket', DEC]);
+      expect(payloadIds('ticket.decided', { outcome: 'Yes', closeStarted: [b, c] })).toEqual(expect.arrayContaining([['ticket', b], ['ticket', c]]));
+      // control: a choice that starts nothing names no ticket (the old `not.toContain(b)` could not fail: b was not in that payload)
+      expect(payloadIds('ticket.decided', { outcome: 'Yes' })).toEqual([]);
     } },
     { id: '8.4-14', place: 'sync-client replica.ts', check: () => {
       mentions('packages/sync-client/src/replica/replica.ts', 'FOLDING_TICKET_TYPES: readonly string[] = TICKET_EVENT_TYPES');
@@ -8256,6 +8905,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       expect(notificationPayloadSchemaByKind['flow-ready'].safeParse({ ...base, becauseTicketId: null, label: null }).success).toBe(true);
       expect(notificationPayloadSchemaByKind['flow-ready'].safeParse({ ...base, becauseTicketId: null, label: null, extra: 1 }).success).toBe(false);
       expect(notificationPayloadSchemaByKind['flow-reopened'].safeParse({ ...base, decisionTicketId: DEC, decisionTitle: 'Go?', outcome: 'Yes', pass: 2, toBacklog: false }).success).toBe(true);
+      expect(notificationPayloadSchemaByKind['flow-reopened'].safeParse({ ...base, decisionTicketId: DEC, decisionTitle: 'Go?', outcome: 'Yes', pass: 2, toBacklog: false, extra: 1 }).success).toBe(false); // strict too
     } },
     { id: 'NT3-02', place: 'notifications_kind_check', check: async () => {
       await insertNotification('flow-ready'); await insertNotification('flow-reopened');
@@ -8293,6 +8943,9 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     });
   });
   ```
+  **Kills:** (no production code in this task; each mutant is of an earlier task's code, as Step 4 lists)
+  - 29.145 the census: (a) remove `'ticket.decided'` from `TICKET_EVENT_TYPES` (rows 8.4-02 and 8.4-03, the latter through the XOR loop); (b) add `'ticket.decided'` to `BOOTSTRAP_BACKFILL_TYPES` (8.4-03); (c) drop `...makeDecisionGates()` from `buildServerGates` (8.4-11); (d) delete the `closeStarted` arm of `payloadIds`, or file a cause id as `'project'` (8.4-13); (e) drop `'flow-reopened'` from the CHECK lists (NT3-02, NT3-03); (f) delete one row from `ROWS` (the id-list leg).
+
   The `8.4-05` to `8.4-09` token probes name the strings the owning tasks put in those files (T5, T6, T8, T17, T18). If a task met a row through a generic arm and never wrote the token, `mentions` names the file; read the file, find the arm that does the job, and change the token to that arm's name in this commit. Do not delete the row.
   Run: `/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh wtg2-t19 -- pnpm --filter @gisik-nokma/server exec vitest run test/census --maxWorkers=2 > /tmp/wtg2-t19.log 2>&1; tail -40 /tmp/wtg2-t19.log`. Expected: PASS (the earlier tasks are merged). Flip 29.145 ✅.
   Commit: `wtg2 T19: the Part 2 vocabulary census`.
@@ -8324,6 +8977,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   }
   /** Repo paths named in backticks: a slash, a known extension, no glob or brace; a `:line` suffix is stripped. */
   export const pathsIn = (line: string) => [...line.matchAll(/`([\w@./-]+\.(?:ts|tsx|sql|md|css|mjs|json))(?::\d+(?:-\d+)?)?`/g)].map((m) => m[1]!).filter((p) => p.includes('/'));
+  /** `?`-marked (unverified) bullets. A function so the planted control below exercises the same code as the real check. */
+  export const unverifiedBullets = (sec: string) => sec.split('\n').filter((l) => /^- \? /.test(l));
+  /** Every Part 2 case id that has a case line, whatever its marker. */
+  export const part2CaseIds = (md: string) =>
+    md.split('\n').flatMap((l) => { const m = /^- \S+ \*\*29\.(\d{3})/.exec(l); return m !== null && inPart2(Number(m[1])) ? [`29.${m[1]}`] : []; });
+  /** The 136 ids this plan owns (Global Constraints, Catalogue): 29.120-29.170, 29.180-29.229, 29.350-29.374, 29.390-29.399; 29.171-29.179 stay free. */
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `29.${a + i}`);
+  export const PART2_IDS = [...range(120, 170), ...range(180, 229), ...range(350, 374), ...range(390, 399)];
   ```
   and the `it`:
   ```ts
@@ -8336,14 +8997,23 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     expect(bulletsOf('<!-- wtg-part2-model T4 bullet -->\n<!-- wtg-part2-model T5 bullet -->', 4)).toHaveLength(0);
     expect(pathsIn('see `apps/server/src/nowhere/ghost.ts:12` and `README` and `a/{b,c}.ts`')).toEqual(['apps/server/src/nowhere/ghost.ts']);
     expect(existsSync(join(ROOT, 'apps/server/src/nowhere/ghost.ts'))).toBe(false);
+    expect(unverifiedBullets('- ? **x** (unverified)\n- ✅ **y**')).toEqual(['- ? **x** (unverified)']); // the planted `?` bullet
+    expect(part2CaseIds('- ✅ **29.121 — x**\n- 🧪 **29.166 — y**\n- ✅ **29.050 — z**')).toEqual(['29.121', '29.166']);
 
+    // Preconditions: the real inputs are the real ones. Without them a wrong path, a renamed heading or a reformatted
+    // case line makes `openPart2Cases` and the `?` / dead-path checks pass on nothing.
+    expect(sec.startsWith('\n## 26.')).toBe(true);
+    const present = new Set(part2CaseIds(cases));
+    expect(PART2_IDS.filter((id) => !present.has(id))).toEqual([]); // every Part 2 id has a line (a later part may use 29.171-29.179)
     expect(openPart2Cases(cases)).toEqual([]);
     for (let n = 1; n <= 19; n++) expect(bulletsOf(sec, n).length, `T${n} has no Features §26 bullet`).toBeGreaterThan(0);
-    expect(sec.split('\n').filter((l) => /^- \? /.test(l))).toEqual([]);
+    expect(unverifiedBullets(sec)).toEqual([]);
     const dead = Array.from({ length: 19 }, (_, i) => bulletsOf(sec, i + 1)).flat().flatMap(pathsIn).filter((p) => !existsSync(join(ROOT, p)));
     expect(dead).toEqual([]);
   });
   ```
+  **Kills:** (this task adds no production code; its mutants are of the earlier tasks' code and of the guard functions, as Step 4 lists)
+  - 29.146 catalogue guard: (a) flip one Part 2 case line back to ❌ (`openPart2Cases(cases)` names it); (b) delete the T7 bullet below its anchor (`T7 has no Features §26 bullet`); (c) delete one Part 2 case line outright (the `PART2_IDS` precondition names it; before, a deleted line passed every leg); (d) `/^- \? /` → `/^- \?\? /` in `unverifiedBullets` (the planted `?` control).
   The path extractor deliberately skips glob and brace paths such as `flow/{promote,settle,sweep}.ts`, because they are not single files; the 8.4-10 row checks those three files by name. Expected: PASS once every task has flipped its cases and written its bullet; a RED run names the task or case. Flip 29.146 ✅.
   Commit: `wtg2 T19: the catalogue guard`.
 
@@ -8371,6 +9041,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   7. **Whole suites** in the order the memory notes require (build first; Node 22; `--maxWorkers=2`; no whole suite while a gate log is under two minutes old): domain, rule-engine, sync-client, app-core, mcp-server, web, then `apps/server` WHOLE.
   8. **Spec drift.** Re-read spec lines 454-476 and 547-560; if either table has gained or lost a row since this plan, update `ROWS` and `EXPECTED_IDS` in the same commit.
   Features: put under `<!-- wtg-part2-model T19 bullet -->` (keep the anchor line, T19 reads the bullets below it) `- ⚙️ **Part 2 vocabulary census and catalogue guard** (`apps/server/test/census/wtg-part2-census.test.ts`, `apps/server/test/tooling/wtg-part2-catalogue.test.ts`) — one table asserts every row of the model's event, projection, notification and bundle census; a guard fails while a Part 2 case is still open or a Part 2 bullet names a dead path. Cases 29.145-29.146.`
+  **Prose to sweep:** none found for this task's own change (it adds two test files and no production code; searched `census`, `ticket-vocabulary-census`, `wtg-part2-model`, `29.145`, `29.146` in `Features.md`, `test-cases/`, `docs/manual.md`, `README.md`). Step 5.1 is the sweep of every other Part 2 bullet; the stale sub-block labels in `test-cases/29-workflow-timeline-graphs.md:11-21` are T1's entries.
+
   Push. DONE + REVIEW (NEEDS: none). Report the sweep's results as a table of command, LOCAL, and result.
 
 ---
