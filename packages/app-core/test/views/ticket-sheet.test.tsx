@@ -3681,6 +3681,9 @@ describe('G — Priority, Due and Type as rows', () => {
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'estimate', value: 3 });
     for (const bad of ['2.5', '0', '366']) {
+      // Escape abandons the draft and clears the alert, so each value raises its OWN alert (no carry-over).
+      fireEvent.keyDown(input, { key: 'Escape' });
+      expect(within(row).queryByRole('alert'), `${bad}: cleared first`).toBeNull();
       fireEvent.change(input, { target: { value: bad } });
       fireEvent.blur(input);
       expect((await within(row).findByRole('alert', {}, { timeout: 4_000 })).textContent, bad).toBe('Estimate must be a whole number of days from 1 to 365.');
