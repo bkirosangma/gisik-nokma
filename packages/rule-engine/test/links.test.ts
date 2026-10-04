@@ -90,3 +90,22 @@ describe('27.046 the link check guards its own input', () => {
     expect(await evaluateEvent(link(A, 'blocks', B, 'ticket.link_removed'), world(link(A, 'blocks', B)))).toEqual(ok);
   });
 });
+
+describe('27.048 a refusal names an untitled end by its id', () => {
+  it('27.048 an end whose title is absent, empty or not a string reads by its id; control: the titled end reads by its title', async () => {
+    // No event can mint such a ticket (a birth needs a title), so the state is planted on the memory context directly.
+    const untitled = (value: unknown) => {
+      const ctx = world(link(A, 'blocks', B));
+      const a = ctx.tickets.get(A)!;
+      const claim = a.fields['title']!;
+      ctx.tickets.set(A, { ...a, fields: value === undefined ? {} : { title: { ...claim, value } } });
+      return ctx;
+    };
+    for (const value of [undefined, '', 42]) {
+      expect(await evaluateEvent(link(A, 'blocks', B), untitled(value)), String(value)).toEqual({
+        refused: true, rule: 'link.duplicate', reason: `"${A}" already blocks "Chiller".` });
+    }
+    expect(await evaluateEvent(link(A, 'blocks', B), world(link(A, 'blocks', B)))).toEqual({
+      refused: true, rule: 'link.duplicate', reason: '"Ice maker" already blocks "Chiller".' });
+  });
+});
