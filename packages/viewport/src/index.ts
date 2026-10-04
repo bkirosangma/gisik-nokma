@@ -10,3 +10,4 @@ export * from './range-plan.js';
 export * from './range-cache.js';
 export * from './dom/clock.js';
 export * from './dom/scroll-adapter.js';
+export * from './route.js';
