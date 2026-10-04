@@ -100,6 +100,7 @@ const VALID_PAYLOAD: Record<string, unknown> = {
   'ticket.link_removed': { kind: 'relates', targetId: '01J9GTKB000000000000000000' },
   'ticket.published': { projectId: '01J9GPRJ000000000000000000' },
   'ticket.discarded': {},
+  'ticket.decided': { outcome: 'Yes' },
   'comment.added': { body: {} },
   'attachment.added': { kind: 'upload', attachmentId: 'a1', filename: 'gst-return.pdf' },
   'claim.contested': { originalEvent: {}, rule: 'r', reason: 'why' },
@@ -399,5 +400,20 @@ describe('28.006 draft history sentences', () => {
     expect(describeEvent(created({ typeId: 'task' }), { typeName })).toBe('Created as Task'); // control
     expect(describeEvent(eventOf('ticket.published'))).toBe('Published');
     expect(describeEvent(eventOf('ticket.discarded'))).toBe('Discarded');
+  });
+});
+
+describe('29.137 ticket.decided in History', () => {
+  it('29.137 Decided, revised and cleared read as sentences; an empty or unreadable payload falls back to the wire name', () => {
+    const said = (payload: Record<string, unknown>) => describeEvent({ ...eventOf('ticket.decided'), payload });
+    expect(said({ outcome: 'Yes' })).toBe('Decided: Yes');
+    expect(said({ outcome: 'No', from: 'Yes' })).toBe('Decision revised: Yes → No');
+    expect(said({ outcome: null, from: 'Yes' })).toBe('Cleared the decision (was Yes)');
+    expect(said({ outcome: null })).toBe('Cleared the decision');
+    expect(said({ outcome: null, from: null })).toBe('Cleared the decision');
+    expect(said({ outcome: 'Yes', from: null })).toBe('Decided: Yes'); // a fill-in after a clear reads as a choice
+    expect(said({})).toBe('ticket.decided'); // control: no payload, the wire name
+    expect(said({ outcome: '' })).toBe('ticket.decided');
+    expect(said({ outcome: 3 })).toBe('ticket.decided');
   });
 });

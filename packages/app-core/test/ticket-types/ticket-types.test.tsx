@@ -213,7 +213,7 @@ describe('TicketTypeListScreen', () => {
     // The prototype's own strings (`desktop.dc.html:820`, `:823`, `:3150`).
     expect(screen.getByRole('heading', { name: 'Ticket types' })).toHaveClass('ticket-type-list__title');
     expect(screen.getByRole('button', { name: 'New type' })).toBeInTheDocument();
-    expect(screen.getByText('5 types. Rank orders them in every picker.')).toBeInTheDocument();
+    expect(screen.getByText('6 types. Rank orders them in every picker.')).toBeInTheDocument();
 
     // This screen's own singular handling is KEPT — the prototype writes
     // `${n} types.` unconditionally and would say "1 types." here. A second
@@ -236,17 +236,17 @@ describe('TicketTypeListScreen', () => {
     // `<ul>`, in the order rendered, with nothing between them.
     const rows = container.querySelector('.ticket-type-list__rows')!;
     const children = Array.from(rows.children);
-    expect(children).toHaveLength(5);
+    expect(children).toHaveLength(6);
     expect(children.every((child) => child.tagName === 'LI')).toBe(true);
     const rowTexts = children.map((child) => child.querySelector('.ticket-type-list__row')?.textContent ?? '');
     expect(rowTexts.every((text) => text.length > 0)).toBe(true);
     // The order is `listTicketTypes`'s own — position is what the parity keys
-    // on, so the fifth row is asserted to be the custom type rather than any of
-    // the four seeds.
-    expect(rowTexts[4]).toContain('Invoice');
-    expect(rowTexts.slice(0, 4).some((text) => text.includes('Invoice'))).toBe(false);
+    // on, so the sixth row is asserted to be the custom type rather than any of
+    // the five seeds (the Decision since wtg2 T5).
+    expect(rowTexts[5]).toContain('Invoice');
+    expect(rowTexts.slice(0, 5).some((text) => text.includes('Invoice'))).toBe(false);
     // NO "the even rows number two" assertion here, deliberately. It would be
-    // arithmetic off `toHaveLength(5)` two lines up — a control that cannot fail
+    // arithmetic off `toHaveLength(6)` two lines up — a control that cannot fail
     // independently of the assertion beside it. The parity itself is not this
     // half's to measure: it is read out of `ui.css` in
     // `packages/ui/test/tokens.test.ts`, which is the only place it can be
@@ -270,7 +270,7 @@ describe('TicketTypeListScreen', () => {
  * or a string exists in source** — that is the shape this repo keeps
  * re-finding, and the dispatch says so explicitly.
  *
- * The fixture is `4 built-ins (ranks 1–4) + Invoice (5) + Errand (6)`, in that
+ * The fixture is `5 built-ins (ranks 1–4; the Decision at 3 since wtg2 T5) + Invoice (5) + Errand (6)`, in that
  * order. It is chosen so that ONE row has a control that can actually move:
  * Invoice sits between a built-in above it and Errand below it.
  */
@@ -339,7 +339,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
 
     const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(7);
 
     const reorder = screen.getByRole('button', { name: 'Reorder Invoice' });
     expect(reorder.tagName).toBe('BUTTON');
@@ -479,7 +479,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     // presence of a row: "Invoice is somewhere on the page" is true before and
     // after a re-order, so it could not fail — found by review, and replaced.
     expect(renderedOrder(container)).toEqual(before);
-    expect(renderedOrder(container).slice(4)).toEqual(['Invoice', 'Errand']);
+    expect(renderedOrder(container).slice(builtins.length)).toEqual(['Invoice', 'Errand']);
   });
 
   /**
@@ -645,12 +645,12 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     const user = userEvent.setup();
     const { container } = renderReorderableList();
     await screen.findByText('Invoice');
-    expect(renderedOrder(container).slice(4)).toEqual(['Invoice', 'Errand']);
+    expect(renderedOrder(container).slice(builtins.length)).toEqual(['Invoice', 'Errand']);
 
     await openReorder(user, 'Invoice');
     await user.click(menuItem('Move down'));
 
-    expect(renderedOrder(container).slice(4)).toEqual(['Errand', 'Invoice']);
+    expect(renderedOrder(container).slice(builtins.length)).toEqual(['Errand', 'Invoice']);
   });
 
   /**

@@ -1,5 +1,6 @@
 import { createElement, useEffect, useId, useRef, useState } from 'react';
 import {
+  DECISION_TYPE_ID,
   DEFAULT_PRIORITY,
   DEEPEST_RANK,
   PRIORITIES,
@@ -61,7 +62,9 @@ export type TypeOption = { id: string; name: string; rank: number; workflowId: s
  * hierarchy and a root ticket is the broadest kind of work the workspace files
  * — the same "nearest kind of work" reasoning `subtaskTypeFor` uses from the
  * other direction (there the ladder is consulted downward from a parent; here
- * upward from the root).
+ * upward from the root). The built-in Decision is skipped unless it is the ONLY
+ * legal type (wtg2 T5, case 29.134): it is a peer of Task by rank and would win
+ * the id tie-break below, making every new ticket a Decision.
  *
  * Ties are broken by `id`, so the answer does not depend on the order the
  * server happened to return the ladder in. `null` when NOTHING is legal: a
@@ -72,7 +75,10 @@ export type TypeOption = { id: string; name: string; rank: number; workflowId: s
 export function defaultRootTypeFor(ladder: readonly TypeOption[]): TypeOption | null {
   const legal = ladder.filter((type) => type.rank < DEEPEST_RANK);
   if (legal.length === 0) return null;
-  return legal.reduce((best, type) =>
+  // A Decision is a peer of Task by rank and would win the id tie-break; it is chosen only when nothing else is legal.
+  const preferred = legal.filter((type) => type.id !== DECISION_TYPE_ID);
+  const candidates = preferred.length > 0 ? preferred : legal;
+  return candidates.reduce((best, type) =>
     type.rank > best.rank || (type.rank === best.rank && type.id < best.id) ? type : best,
   );
 }

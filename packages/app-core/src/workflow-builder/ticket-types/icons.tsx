@@ -1,5 +1,5 @@
 /**
- * The sixteen-name icon vocabulary for ticket types — enough to name the four
+ * The seventeen-name icon vocabulary for ticket types — enough to name the five
  * built-in seeds and the kinds of work a small workspace invents beside them
  * (open question 12: growing it is one entry in the map below).
  *
@@ -96,6 +96,8 @@ export const TYPE_ICONS = {
     { kind: 'path', d: 'M6 12h.01' },
     { kind: 'path', d: 'M18 12h.01' },
   ],
+  // The built-in Decision's glyph (workflow-timeline-graphs DC-1, wtg2 T5).
+  diamond: [{ kind: 'path', d: 'M12 2 22 12 12 22 2 12z' }],
 } as const satisfies Record<string, readonly IconShape[]>;
 
 export type TypeIconName = keyof typeof TYPE_ICONS;

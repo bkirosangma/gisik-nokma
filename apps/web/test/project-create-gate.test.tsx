@@ -449,8 +449,10 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
     // Derived from the seeds, not retyped (wtg2 T5: the fallback ladder is five, Decision last in seed order).
     expect(await typeOptionLabels(user)).toEqual(BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name));
     expect(BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name)).toEqual(['Epic', 'Story', 'Task', 'Sub-task', 'Decision']);
-    // The sentence that stops the ladder from passing itself off as the answer.
+    // The sentence that stops the ladder from passing itself off as the answer. No count since wtg2 T5 (29.134): the
+    // ladder is derived from the seeds, so a number in the sentence would go stale with the next seed.
     expect(screen.getByText(BUILTIN_LADDER_NOTICE)).toBeInTheDocument();
+    expect(BUILTIN_LADDER_NOTICE).toBe('Showing the built-in ticket types while this workspace’s own types load.');
   });
 
   it('a REFUSED types read withholds the control — the ladder does not stand in for an answer', async () => {
