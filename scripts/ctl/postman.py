@@ -544,6 +544,11 @@ def resolve_brief(tok):
 BRANCH_RE = re.compile(r"task/[A-Za-z0-9._/-]+")
 
 
+def queue_src(line):
+    """A QUEUE-dispatch line's id: the bridge's dedupe key, its shadow record's `src`, and how the parity audit finds a record's OWN line."""
+    return "queue-dispatch:" + hashlib.sha1(line.encode()).hexdigest()
+
+
 def bridge(stats):
     q, cur = os.path.join(ROOT, "QUEUE-dispatch.md"), p("cursor-queue-dispatch")
     if not os.path.exists(q): return
@@ -562,7 +567,7 @@ def bridge(stats):
         pos += len(raw); line = raw.decode("utf-8", "replace").rstrip("\n")
         mt = re.match(r"^(\d\d:\d\d) (NEXT|FIX|MERGETIP|CLOSE)(?: (.*))?$", line)
         if mt:
-            src = "queue-dispatch:" + hashlib.sha1(line.encode()).hexdigest()
+            src = queue_src(line)
             if src not in known:
                 known.add(src); handle_queue_line(line, mt.group(1), mt.group(2), (mt.group(3) or "").split(), src, stats)
         open(cur, "w").write(str(pos))
@@ -721,9 +726,15 @@ def audit_scan(stats):
 #         fix-1.md, `ctl-run-tests` with BRIEF-ctl-run-tests-fix-1.md, `ctl seats` with ctl-seats-fix-1; `T1` never with t10-… (whole words) and
 #         `ctl tipmerge` never with ctl-auto-tipmerge (contiguous); no ref words, or a record with no brief and no branch, agree with nothing.
 # A BY-ORCH verb that agrees with nothing pairs nothing and is never a MISSED (the record stays EXTRA and needs a reason).
-# EXTRA REASONS — the first that holds, over the QUEUE-dispatch.md and DISPATCH-log.md lines in the record's pairing window. A line NAMES the
-# record when its words (after the line's HH:MM time) hold the record's WHOLE brief stem or branch name as a run, or its ref words before the
-# record's verb agree (the ref rule). A line that says the hold is closed (`…; hold closed`) still says HOLD: the dispatcher held it.
+# EXTRA REASONS — the first that holds, over the QUEUE-dispatch.md and DISPATCH-log.md lines in the record's pairing window, EXCEPT the record's
+# OWN queue line: the QUEUE-dispatch line it was made from (the line whose queue_src, the bridge's src rule, is the record's src) is the request,
+# never the dispatcher's answer to it, so `FIX lane5 BRIEF-hk-1-….md (…; branch stays HELD)` holds nothing; any other queue line is evidence. A
+# line NAMES the record when its words (after the line's HH:MM time) hold the record's WHOLE brief stem or branch name as a run, or its ref words
+# before the record's verb agree (the ref rule). The phrase must stand OUTSIDE the chunks that name the record (name_cut: a whitespace-free chunk
+# of the line holding two consecutive words of its brief stem or branch name), so a name that holds the word is never its own reason:
+# `BRIEF-hk-6-held-work-shipped-fix-1.md`, `task/hk-6-held-work-shipped` and `docs/held-work.md` say no held for an hk-6 record, while a lone
+# word still counts (`…; both HELD`, `HK-6 HELD`; a one-word name has no pair). A line that says the hold is closed (`…; hold closed`) still
+# says HOLD: the dispatcher held it.
 #   held        a line that says HOLD / held and names it (`HH:MM HOLD dispatcher: FIX 4 BRIEF-x-fix-2.md …`, `HOLD batch-6 FIX 3 (not delivered…)`);
 #   no-deliver  a line that says deliver(ed) nothing / nothing delivered / nothing to deliver and names it (`ACK deliver nothing for <branch> …`);
 #   superseded  a LATER queue record to the same lane in its pairing window, with no delivery to that lane logged between them (a dispatcher
@@ -780,6 +791,14 @@ def names(text, r):
     if any(run_in(n, words(text)) for n in rec_names(r)): return True
     keys = list(D_KEY.finditer(text))
     return any(k.group(1) == r["verb"] and ref_agrees(ref_words(text[keys[i - 1].end() if i else 0:k.start()]), r) for i, k in enumerate(keys))
+
+
+def name_cut(text, r):
+    """The line with every chunk that NAMES the record blanked (EXTRA REASONS above): a whitespace-free chunk holding two consecutive words of its
+    brief stem or branch name (`BRIEF-hk-6-held-work-shipped-fix-1.md`, `task/hk-6-held-work-shipped`, `docs/held-work.md`, `HK-6`). The
+    held / HOLD / deliver-nothing phrase is looked for in the other chunks, so a name that holds the word is no reason; a lone `HELD` counts."""
+    pairs = [n[i:i + 2] for n in rec_names(r) for i in range(len(n) - 1)]
+    return re.sub(r"\S+", lambda c: " " * len(c.group()) if any(run_in(p, words(c.group())) for p in pairs) else c.group(), text)
 
 
 def clause_pairs(c, named=False):
@@ -868,7 +887,7 @@ def audit_parity(o):
             if epoch(m["ts"]) - epoch(last["ts"]) < DUP_WINDOW: dups.append("ledger #%d repeats #%d (%s → %s, same body) within %d s" % (m["id"], last["id"], kind, to, DUP_WINDOW))
             last = m
     # the dispatcher's deliveries and the orchestrator's acks
-    rd = lambda f: open(os.path.join(ROOT, f), errors="replace").read().splitlines()[-1500:] if os.path.exists(os.path.join(ROOT, f)) else []
+    rd = lambda f: open(os.path.join(ROOT, f), encoding="utf-8", errors="replace").read().splitlines()[-1500:] if os.path.exists(os.path.join(ROOT, f)) else []
     lines, qlines = rd("DISPATCH-log.md"), rd("QUEUE-dispatch.md")
     ts = verdict_times(lines); dis = []
     for i, line in enumerate(lines):
@@ -895,9 +914,9 @@ def audit_parity(o):
             else: st.append("%s: names no lane" % verb if not win else "%s lane %s: no shadow record agrees on verb + lane + ref" % (verb, win))
         orch_out.append("%s [%s]" % (line[:200], "; ".join(st) or "no NEXT/FIX/MERGETIP"))
     # EXTRA REASONS (the docblock above)
-    evid = [(t, x) for t, x in zip(ts, lines) if t is not None] + [(t, x) for t, x in zip(verdict_times(qlines), qlines) if t is not None]
+    evid = [(t, x, None) for t, x in zip(ts, lines) if t is not None] + [(t, x, queue_src(x)) for t, x in zip(verdict_times(qlines), qlines) if t is not None]
     lane_dl = [(t, win) for t, _, win, _ in dis] + [(t, win) for _, ops in by_orch for t, _, win, _ in ops if win]
-    said = lambda r, pat: any(near(r, t) and pat.search(x) and names(x, r) for t, x in evid)
+    said = lambda r, pat: any(near(r, t) and s != r["src"] and names(x, r) and pat.search(name_cut(x, r)) for t, x, s in evid)     # never its own queue line
     superseded = lambda r: any(q["epoch"] > r["epoch"] and lane(q) == lane(r) and near(r, q["epoch"])
                                and not any(w == lane(r) and r["epoch"] - 60 <= t < q["epoch"] - 60 for t, w in lane_dl) for q in pool if not q.get("refused"))
     extras = [(r, "held" if said(r, D_HELD) else "no-deliver" if said(r, D_NODEL) else "superseded" if superseded(r) else "?") for r in avail]
