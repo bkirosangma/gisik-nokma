@@ -6,14 +6,15 @@ bottleneck). Called by verbs/autopilot.sh.
   autopilot.py run  [--shadow] [--interval 60]     a pass every <interval> s, forever, under a singleton lock
 
 A pass, in this order (each seat gets at most one action, each queue item and each task row at most one seat):
-  (p) a reviewer that wrote roles/PULL-<X>.boot and is idle, box empty, 0 shells is restarted on that boot (the protocol of the
+  (p) a reviewer that wrote roles/PULL-<X>.boot and is idle, box empty, clean is restarted on that boot (the protocol of the
       controller's 30 s pull-restarter, which this replaces; a missing boot file is dropped).
-  (b) a FREE LANE (idle, box empty, 0 shells, unpushed 0, dirty 0, its last line a DONE whose REVIEW line is in QUEUE-review.md, or a
-      finished review) takes, by fluid rule A.3: an open FIX line of roles/QUEUE-autopilot.md for its pool (the controller writes
+  (b) a FREE LANE (idle, box empty, unpushed 0, dirty 0, its last line a DONE whose REVIEW line is in QUEUE-review.md — background
+      shells are then ignored —, or a finished review with 0 shells) takes, by fluid rule A.3: an open FIX line of roles/QUEUE-autopilot.md for its pool (the controller writes
       the FIX PTR: FIX briefs stay judgement work); else waits while a reviewer FIX verdict of its pool is younger than the grace and
       has no such line (FIX-WAIT); else the first row of its pool's order file whose Needs are all on the release tip; else the
-      first row it can STACK on (at most 2 unlanded levels, ONE unlanded branch). The PTR comes from scripts/ctl/make-lane-ptr.py.
-  (a) a FREE REVIEWER (idle, box empty, 0 shells, holding no open TOOK) takes the open REVIEW item the pull rule ranks first:
+      first row it can STACK on (at most 2 unlanded levels, ONE unlanded branch), at the row's own LAUNCH rung (planner R2, 14:07: the
+      order file owns rung policy, nothing is added). The PTR comes from scripts/ctl/make-lane-ptr.py.
+  (a) a FREE REVIEWER (idle, box empty, a clean worktree, holding no open TOOK; shells are not counted) takes the open REVIEW item the pull rule ranks first:
       FIX re-checks, the critical path, the oldest by (day, clock); A/B their own pool first, C either (KG wins a tie).
   (c) a free lane with nothing startable becomes a reviewer (fluid rule B) for an item that passes the independence rules.
 Every pass also logs `WARN hold >10 min with waiters` when a `ctl run-tests` slot is held past 10 min while another run waits
@@ -75,13 +76,6 @@ def wt_root():
 
 def lane_wt(n):
     return os.path.join(wt_root(), f"gisik-nokma-exec{n}")
-
-
-def bump(rung, by=1):
-    """table rung + by on the ladder; None past H++ (a flag for the planner, never a launch)."""
-    if rung not in LADDER: return None
-    i = LADDER.index(rung) + by
-    return LADDER[i] if i < len(LADDER) else None
 
 
 def minutes(hhmm):
@@ -296,18 +290,20 @@ def read(p):
 
 
 # ---------------------------------------------------------------- seat predicates (each returns None = free, else the reason)
-def seat_free(s):
+def seat_idle(s):
+    """Idle, not in copy mode, box empty. Background shells are NOT counted here (planner R1, 14:07, finding P13): a seat parked on
+    its own queued run-tests, or one that kept a finished monitor's shell, shows `sh 1` while idle; `sh 0` only added false negatives."""
     if s is None: return "no seat"
     if s.get("state") != "idle": return f"state {s.get('state')}"
     if s.get("copy_mode"): return "copy-mode"
     if s.get("box") != "empty": return "box holds text"
-    if s.get("shells"): return f"{s['shells']} shells running"
     return None
 
 
 def reviewer_free(s):
-    """seat_free + a clean worktree: `ctl restart` refuses a dirty one, and a TOOK written for a seat that never restarts sticks."""
-    why = seat_free(s)
+    """seat_idle + a clean worktree: `ctl restart` refuses a dirty one, and a TOOK written for a seat that never restarts sticks.
+    Shells are not counted (R1): the held-TOOK check (step (a)) is what makes a pick safe."""
+    why = seat_idle(s)
     if why: return why
     if s.get("dirty"): return f"dirty {s['dirty']} (ctl restart would refuse it)"
     return None
@@ -322,19 +318,23 @@ def done_of(seat):
 
 
 def lane_free(w, n):
+    """seat_idle + pushed + clean + (a DONE whose REVIEW line is queued, or a finished lane-review). 0 shells is required unless the
+    last line is that queued DONE (R1: the task is over, so a leftover monitor or a queued run-tests shell is no reason to wait)."""
     s = w.seats.get(n)
-    why = seat_free(s)
+    why = seat_idle(s)
     if why: return why
     if s.get("unpushed") != 0: return f"unpushed {s.get('unpushed')}"
     if s.get("dirty") != 0: return f"dirty {s.get('dirty')}"
     last = s.get("last") or {}
+    d = done_of(s)
+    queued = bool(d) and any(it["branch"] == d[0] and it["sha"].startswith(d[1]) for it in w.items)
+    if s.get("shells") and not queued: return f"{s['shells']} shells running"
     if last.get("text", "").startswith("CHECKPOINT reviewer idle after"):
         mine = f"lane {n} as reviewer"
         if any(t["holder"] == mine for t in w.held): return "holds an open review TOOK"
         return None
-    d = done_of(s)
     if not d: return f"last line is {last.get('kind') or 'none'}, not a DONE"
-    if not any(it["branch"] == d[0] and it["sha"].startswith(d[1]) for it in w.items): return f"DONE {d[0]} {d[1][:8]} has no REVIEW line yet"
+    if not queued: return f"DONE {d[0]} {d[1][:8]} has no REVIEW line yet"
     return None
 
 
@@ -526,8 +526,7 @@ def decide(w, log):
         pick = None
         for row, stack in cands[pool]:
             if row["branch"] in used_rows: continue
-            eff = bump(row["rung"])
-            if eff is None: log(f"FLAG {pool} {row['id']}: table rung {row['rung']} + 1 is past H++ (planner)"); continue
+            eff = row["rung"]   # the LAUNCH rung as the planner wrote it (R2): no bump here or in make-lane-ptr
             why = budget_refuses(w, eff)
             if why: log(f"SKIP lane {n} x {row['id']}: {why}"); continue
             pick = (row, stack, eff); break
@@ -643,6 +642,7 @@ class Door:
         argv = [sys.executable, os.path.join(CTL_DIR, "make-lane-ptr.py"), row["plan"], row["task"], row["rung"], "--lane", str(a["lane"]),
                 "--branch", row["branch"], "--base", base, "--id", row["id"], "--queue", ORDER[a["pool"]], "--pool", a["pool"],
                 "--needs", ",".join(row["needs"]) or "-", "--repo", self.repo, "--lanes-dir", self.w.L, "--worktree", a["wt"]]
+        if self.w.weekly is not None: argv += ["--weekly", str(self.w.weekly)]
         if a["stack"]: argv += ["--stacked-on", f"{a['stack'][0]}@{a['stack'][1]}"]
         rc, last = self.sh(*argv, timeout=30)
         ptr = last.split(" ")[0] if rc == 0 else ""
@@ -689,7 +689,7 @@ def describe(a):
     if d == "start":
         r = a["row"]; m, e = LAUNCH[a["rung"]]
         st = f" STACKED on {a['stack'][0]}@{a['stack'][1][:8]}" if a["stack"] else ""
-        return f"start: lane {a['lane']} takes {a['pool']} {r['id']} {r['branch']} (plan task {r['task']}, RUNG {a['rung']} = table {r['rung']} + 1){st}: make-lane-ptr + restart --model {m} --effort {e}"
+        return f"start: lane {a['lane']} takes {a['pool']} {r['id']} {r['branch']} (plan task {r['task']}, RUNG {a['rung']} = the row's launch rung){st}: make-lane-ptr + restart --model {m} --effort {e}"
     if d == "fix":
         m, e = LAUNCH[a["rung"]]
         return f"fix: lane {a['lane']} takes FIX {a['fix']['time']} {a['fix']['branch']} ({a['fix']['ptr']}, RUNG {a['rung']}): TOOK + restart --model {m} --effort {e}"

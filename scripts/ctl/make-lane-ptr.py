@@ -4,11 +4,12 @@ task, in the shape of the orchestrator's hand-written ones (PTR-kg-kv2-lane3.md,
 
   <plan>   the plan file, repo-relative (read AT origin/<base> with `git show`, never from a worktree)
   <task>   the plan's task number as its heading has it: `### Task <task>:` (2, 5b, ...)
-  <rung>   the TABLE rung (QUEUE-*-order.md / TIERS-model-effort.md): L M H H+. The PTR runs at the EFFECTIVE rung = table + 1
-           (owner order 2026-10-04 06:5x); H++ has no rung above it and is refused (a flag for the planner, never a launch).
+  <rung>   the LAUNCH rung, as the order file's row gives it: L M H H+ H++ (planner ruling R2, 2026-10-04 14:07: the order file
+           owns rung policy, so nothing is added here). H++ is written only under the budget guard: --weekly below 85.
   --lane N --branch B --base release/<x>   the seat, the task branch to cut, the release it is cut from
   --id ID --queue FILE --needs TEXT       the order-file row this came from (shown in the brief)
   --stacked-on BRANCH@SHA                 cut from that unlanded branch instead (fluid rule A.3, at most 2 levels; header `STACKED on`)
+  --weekly N  the weekly budget % (`ctl seats --json`); H++ needs it and below 85 (unknown or >= 85 refuses, as ctl autopilot does)
   --pool KG|WG  --worktree DIR  --repo R  --lanes-dir L  --out FILE
   --dry-run   write nothing: print the path it would write and the rung line
   --print     write nothing: print the whole brief
@@ -21,12 +22,6 @@ import argparse, os, re, subprocess, sys, time
 LADDER = ["L", "M", "H", "H+", "H++"]
 LAUNCH = {"L": ("sonnet", "medium"), "M": ("sonnet", "high"), "H": ("opus", "high"), "H+": ("opus", "xhigh"), "H++": ("opus", "max")}
 SECTIONS = ("Global Constraints", "Review Focus", "File structure", "Planner rulings")
-
-
-def effective(table):
-    """The rung a task launches at: one above its table rung. None for H++ (and for anything not on the ladder)."""
-    if table not in LADDER or table == LADDER[-1]: return None
-    return LADDER[LADDER.index(table) + 1]
 
 
 def fail(why):
@@ -65,15 +60,17 @@ def main(argv):
     ap.add_argument("plan"); ap.add_argument("task"); ap.add_argument("rung")
     ap.add_argument("--lane", required=True, type=int); ap.add_argument("--branch", required=True); ap.add_argument("--base", required=True)
     ap.add_argument("--id", default=None); ap.add_argument("--queue", default=None); ap.add_argument("--needs", default=None)
-    ap.add_argument("--stacked-on", default=None); ap.add_argument("--pool", default=None)
+    ap.add_argument("--stacked-on", default=None); ap.add_argument("--pool", default=None); ap.add_argument("--weekly", type=int, default=None)
     ap.add_argument("--worktree", default=None); ap.add_argument("--repo", default=os.getcwd())
     ap.add_argument("--lanes-dir", default=os.environ.get("CTL_LANES_DIR") or "/Users/kiro/my_projects/gisik-nokma-lanes")
     ap.add_argument("--out", default=None); ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--print", action="store_true")
     a = ap.parse_args(argv)
     if not re.fullmatch(r"release/[A-Za-z0-9._-]+", a.base): fail(f"--base {a.base} is not release/<name>")
     if not re.fullmatch(r"task/[A-Za-z0-9._/-]+", a.branch): fail(f"--branch {a.branch} is not task/<name>")
-    eff = effective(a.rung)
-    if eff is None: fail(f"table rung {a.rung!r} has no rung above it on {' '.join(LADDER)} (H++ goes to the planner as a flag)")
+    if a.rung not in LADDER: fail(f"rung {a.rung!r} is not on {' '.join(LADDER)}")
+    if a.rung == "H++" and (a.weekly is None or a.weekly >= 85):
+        fail(f"rung H++ needs --weekly below 85 (is {a.weekly if a.weekly is not None else 'unknown'}): the budget guard")
+    eff = a.rung
     model, effort = LAUNCH[eff]
     stack = None
     if a.stacked_on:
@@ -108,7 +105,7 @@ def main(argv):
     reads = ", ".join([f"the header (lines 1-{min(s - 1, 22)})"] + first + [f'"### Task {a.task}" lines {s}-{e} (NOT the whole file)'])
     case_line = (f"Re-grep case ids {cases} on EVERY live origin tip (release/*, task/*) and say what it printed; " if cases else
                  "The heading names no case range: take the plan's ids, re-grepped on EVERY live origin tip (release/*, task/*); ")
-    txt = f"""RUNG: {eff} ({model.capitalize()}/{effort}) = table {a.rung} + 1 (owner order 07:00). Launched with `ctl restart --model {model} --effort {effort}` by ctl autopilot. You are exec lane {a.lane} (window {a.lane}, worktree {wt}) on gisik-nokma, in a FRESH session{pool}. Task: {a.id or name} = {a.plan}, TASK {a.task} - "{title}", from {row}. {cut}
+    txt = f"""RUNG: {eff} ({model.capitalize()}/{effort}) = the order row's launch rung (planner ruling R2, 14:07). Launched with `ctl restart --model {model} --effort {effort}` by ctl autopilot. You are exec lane {a.lane} (window {a.lane}, worktree {wt}) on gisik-nokma, in a FRESH session{pool}. Task: {a.id or name} = {a.plan}, TASK {a.task} - "{title}", from {row}. {cut}
 {needs}
 Read in FULL first: {L}/STEPS-common-2026-10-03.md (PRE-REVIEW BATTERY, HANDOFF FILE, LIGHT TESTS PER TASK){', ' + L + '/' + a.queue if a.queue else ''}, and from {a.plan} AT origin/{a.base}: {reads}, plus the spec the plan cites. Do the steps exactly as written.
 {case_line}catalogue lines go below your own task anchors only; Features.md + test-cases in the SAME change set; new cases start at ❌ and flip in the covering commit.
