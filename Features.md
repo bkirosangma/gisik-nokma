@@ -3843,6 +3843,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 ### Part 2: the model
 
 <!-- wtg-part2-model T1 bullet -->
+- ⚙️ **Part 2 pre-flight** (wtg2 T1; `apps/server/src/tools/wtg-preflight.ts`, `pnpm --filter @gisik-nokma/server run wtg:preflight`) — a READ ONLY report of custom fields that would shadow the new built-ins (ledger events, type rows, claims), existing `decision` types, workflows whose initial state is terminal; exit 1 on a shadow. A source-walking census (`apps/server/test/census/terminal-category-readers.test.ts`) classifies every reader of the terminal category. Cases 29.147-29.152.
 <!-- wtg-part2-model T2 bullet -->
 <!-- wtg-part2-model T3 bullet -->
 <!-- wtg-part2-model T4 bullet -->
