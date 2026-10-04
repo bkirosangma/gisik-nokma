@@ -8,6 +8,7 @@ import { checkTicketTypeDefined } from './checks/ticket-type.js';
 import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import { checkTicketClosed, checkTicketReopened } from './checks/close.js';
 import { checkTicketRanked } from './checks/rank.js';
+import { checkTicketLink } from './checks/links.js';
 import { checkTicketDeleted, checkTicketLive, checkTicketRestored } from './checks/deletion.js';
 import { checkMembershipGranted, checkMembershipRevoked } from './checks/membership.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
@@ -73,6 +74,10 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
       return checkMembershipGranted(env, ctx);
     case 'membership.revoked':
       return checkMembershipRevoked(env, ctx);
+    // Typed links (spec A): rules 1–5 and `link.absent`. Workflow rules do not react to links.
+    case 'ticket.link_added':
+    case 'ticket.link_removed':
+      return checkTicketLink(env, ctx);
     default:
       return { refused: false };
   }
