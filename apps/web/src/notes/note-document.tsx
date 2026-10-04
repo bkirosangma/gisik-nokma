@@ -11,7 +11,9 @@ import {
   TicketSheet,
   actorLabelFrom,
   UNKNOWN_PERSON,
+  LinkedFromSection,
   classifyBatch,
+  linkedFromHref,
   makeSubmittedFactory,
   mentionCandidatesOf,
   restoreSeeds,
@@ -113,6 +115,39 @@ export function markNoteAsNew(noteId: string): void {
  * draws the same frozen sentence My Work draws, for the same reason: a 404
  * that could mean "gone" or "not yours" must not guess which.
  */
+
+/**
+ * "Linked from" on a note (Knowledge Graph spec B §3.1). Its own component, not a
+ * query in `NoteDocumentBody`: the body learns the note's workspace only once the
+ * note has loaded, and its early returns come before this mount, so a hook there
+ * would have no workspace to ask with on the first render.
+ */
+function NoteLinkedFrom({
+  dataSource,
+  workspaceId,
+  noteId,
+  nameOf,
+  onNavigate,
+}: {
+  dataSource: DataSource;
+  workspaceId: string;
+  noteId: string;
+  nameOf: (userId: string) => string;
+  onNavigate: (href: string) => void;
+}) {
+  const linkedFrom = useLiveQuery(dataSource, workspaceId, `${noteId}:linked-from`, () =>
+    dataSource.query.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }),
+  );
+  return (
+    <LinkedFromSection
+      page={linkedFrom}
+      loadMore={(cursor) => dataSource.query.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }, cursor)}
+      hrefOf={(row) => linkedFromHref(row, ticketRefHrefIn(workspaceId))}
+      nameOf={nameOf}
+      onNavigate={onNavigate}
+    />
+  );
+}
 function NoteDocumentBody({
   noteId,
   workspaces,
@@ -817,6 +852,17 @@ function NoteDocumentBody({
           <NoteEditorBand label="Loading the editor" readOnly={!editing} />
         )}
       </div>
+
+      {/* "Linked from" (Knowledge Graph spec B §3.1): in the document flow, desktop and phone.
+          The page's only side column is the `On this page` TOC (notes-page.tsx), empty on a phone;
+          spec C's tabbed side panel is where this moves. */}
+      <NoteLinkedFrom
+        dataSource={dataSource}
+        workspaceId={note.workspaceId}
+        noteId={note.noteId}
+        nameOf={nameOf}
+        onNavigate={(href) => router.push(href)}
+      />
 
       <NoteComments
         workspaceId={note.workspaceId}
