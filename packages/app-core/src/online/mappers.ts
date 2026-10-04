@@ -1,5 +1,5 @@
 import type { GroupRow } from '@gisik-nokma/domain';
-import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
+import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, TICKET_LINK_KINDS, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
   DeletedItem,
@@ -14,6 +14,8 @@ import type {
   Priority,
   PurgedRef,
   StateCategory,
+  TicketLink,
+  TicketLinkKind,
   TicketState,
   TicketTypeDef,
   VisibilityMode,
@@ -46,6 +48,7 @@ import type {
   SavedFilter,
   SearchHit,
   TicketHistoryEvent,
+  TicketLinkView,
   TicketListView,
   TicketRead,
   TicketVisibility,
@@ -324,6 +327,32 @@ function asListColumnIds(value: unknown, path: string): ListColumnId[] {
     }
     return id as ListColumnId;
   });
+}
+
+/** A typed link's kind, refused by name when it is not one of `TICKET_LINK_KINDS` (spec A §2.1). */
+function asTicketLinkKind(value: unknown, path: string): TicketLinkKind {
+  const text = asString(value, path);
+  if (!(TICKET_LINK_KINDS as readonly string[]).includes(text)) {
+    throw new MappingError(path, `one of ${TICKET_LINK_KINDS.join('/')}`);
+  }
+  return text as TicketLinkKind;
+}
+
+/**
+ * `ticketState.links`: the folded OUTBOUND links, which the detail read serves
+ * filtered to targets this viewer can see (typed-links T4). Absent on the wire
+ * when none remain, and absent here too when the wire sends none or `[]`: the
+ * domain's absent-not-empty rule (`TicketState.links?`). Present but not an
+ * array is refused by name.
+ */
+function mapTicketStateLinks(value: unknown, path: string): { links?: TicketLink[] } {
+  if (value === undefined) return {};
+  const links = asArray(value, path).map((entry, index) => {
+    const at = `${path}[${index}]`;
+    const link = asRecord(entry, at);
+    return { kind: asTicketLinkKind(link['kind'], `${at}.kind`), targetId: asString(link['targetId'], `${at}.targetId`) };
+  });
+  return links.length > 0 ? { links } : {};
 }
 
 function asStateCategory(value: unknown, path: string): StateCategory {
@@ -797,6 +826,15 @@ export function mapHistory(raw: unknown): TicketHistoryEvent[] {
       clientTime: asString(event['clientTime'], `${path}.clientTime`),
       serverTime: asString(event['serverTime'], `${path}.serverTime`),
       seq: asNumber(event['seq'], `${path}.seq`),
+      // Link events only (typed-links T4): `null` is a withheld target, distinct from an absent label.
+      ...(event['linkTarget'] === undefined
+        ? {}
+        : {
+            linkTarget:
+              event['linkTarget'] === null
+                ? null
+                : { key: asStringOrNull(asRecord(event['linkTarget'], `${path}.linkTarget`), 'key', `${path}.linkTarget.key`) },
+          }),
     };
   });
 }
@@ -2057,6 +2095,7 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // against the replica either, but `closed` — the field it is a flag beside
     // — is strict, and the two are read by the same surfaces.
     deleted: mapClosed(record['deleted'], `${path}.deleted`),
+    ...mapTicketStateLinks(record['links'], `${path}.links`),
   };
 }
 
@@ -2140,8 +2179,11 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  * false.** `visibility.set` carries `userIds` in its own payload
  * (`packages/domain/src/events/visibility.ts:36`), and the history read serves
  * payloads verbatim: `toHistoryEvent` maps `payload: row.payload` with no
- * redaction (`routes/ticket-history.ts:176-194`), and `/events` does the same
- * (`routes/tickets.ts:519-527`). **This is not a leak to close.** The route's own
+ * redaction (`routes/ticket-history.ts`), and `/events` does the same
+ * (`routes/tickets.ts`), with one per-viewer exception on both that is not this
+ * one: a link's other end the viewer cannot see goes out `null` (typed-links
+ * T4/T4b, spec A §2.4, `visibility/withhold-link-targets.ts`). **This is not a
+ * leak to close.** The route's own
  * allow-list docblock draws the line and says which way to cut it — *"Those are
  * PROVENANCE — an attributed claim somebody made ... Cut derived state; never cut
  * a claim."* What is cut is the resolved COLUMN; what is served is the event that
@@ -2827,6 +2869,34 @@ function noteSummaryOf(row: Record<string, unknown>, path: string): NoteSummary 
     createdAt: asString(row['createdAt'], `${path}.createdAt`),
     updatedAt: asString(row['updatedAt'], `${path}.updatedAt`),
   };
+}
+
+/**
+ * `GET /v1/workspaces/:ws/tickets/:id/links` → `TicketLinkView[]` (typed-links
+ * T4). Field by field, like `mapNoteSummaries`: a kind outside
+ * `TICKET_LINK_KINDS` or a direction other than `out`/`in` is a `MappingError`
+ * naming the path, never a row drawn under a reading nobody defined.
+ */
+export function mapTicketLinks(raw: unknown): TicketLinkView[] {
+  const record = asRecord(raw, 'links');
+  return asArray(record['links'], 'links.links').map((entry, index) => {
+    const path = `links.links[${index}]`;
+    const row = asRecord(entry, path);
+    const direction = asString(row['direction'], `${path}.direction`);
+    if (direction !== 'out' && direction !== 'in') throw new MappingError(`${path}.direction`, 'one of out/in');
+    const ticket = asRecord(row['ticket'], `${path}.ticket`);
+    return {
+      kind: asTicketLinkKind(row['kind'], `${path}.kind`),
+      direction,
+      ticket: {
+        id: asString(ticket['id'], `${path}.ticket.id`),
+        projectId: asString(ticket['projectId'], `${path}.ticket.projectId`),
+        key: asStringOrNull(ticket, 'key', `${path}.ticket.key`),
+        title: asString(ticket['title'], `${path}.ticket.title`),
+        stateCategory: asStateCategory(ticket['stateCategory'], `${path}.ticket.stateCategory`),
+      },
+    };
+  });
 }
 
 /** `{ notes: [...] }` — the list reads and the per-ticket read. */

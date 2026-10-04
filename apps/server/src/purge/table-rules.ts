@@ -139,6 +139,11 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
   oauth_refresh_tokens: { rule: 'not-entity-bearing', why: 'A person’s refresh token.' },
   user_notification_preferences: { rule: 'not-entity-bearing', why: 'A person’s muted kinds.' },
   proj_ticket_comments: { rule: 'erase', by: ['workspace_id', 'ticket_id'], why: 'Comment bodies.' },
+  proj_ticket_links: {
+    rule: 'erase',
+    by: ['workspace_id', 'source_id', 'target_id'],
+    why: 'Typed links (Knowledge Graph spec A). A row naming an erased ticket at EITHER end goes with it; the projection never re-inserts one (purged registry).',
+  },
   proj_notes: {
     rule: 'rederive',
     by: ['workspace_id', 'note_id', 'home_project_id'],
