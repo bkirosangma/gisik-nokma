@@ -1,5 +1,7 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { isTicketLinkEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { keysForAncestors } from '../read/ancestry.js';
 import { canSee } from '../visibility/can-see.js';
 import { NOT_FOUND_BODY } from './tickets.js';
 
@@ -10,9 +12,12 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * the claim itself (`type`, `version`, `payload`), who made it (`actorId`),
  * where from (`origin`), when they say it happened and when we received it
  * (`clientTime`, `serverTime`), and where it sits in this entity's own history
- * (`seq`). Nothing is summarised and nothing is derived — spec §3's exception
- * is that the history view IS the ledger, filtered, and a field this route
- * computed would make it something else.
+ * (`seq`). Nothing is summarised, and nothing is derived but ONE field — spec
+ * §3's exception is that the history view IS the ledger, filtered, and a field
+ * this route computed would make it something else. The one exception is the
+ * tenth, `linkTarget`, on link events only (typed-links T4, spec A §2.4): the
+ * other end's key, or `null` when this viewer cannot see it. Its own docblock
+ * below says why it is derived here.
  *
  * ## What is deliberately NOT here, and why that is not a redaction
  *
@@ -24,7 +29,9 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * from this ticket's own history and belongs to the sync surface that resumes
  * by it. Provenance is untouched — spec §6's rule is that a claim is never
  * redacted from someone entitled to the state, and every claim-bearing field
- * above goes out whole.
+ * above goes out whole, with ONE exception: a link event's `payload.targetId`
+ * is withheld (`null`) when this viewer cannot see the target (spec A §2.4,
+ * see `linkTarget`).
  */
 export type TicketHistoryEvent = {
   id: string;
@@ -36,6 +43,14 @@ export type TicketHistoryEvent = {
   clientTime: string;
   serverTime: string;
   seq: number;
+  /**
+   * Link events only (spec A §2.4): the one derived field this route serves.
+   * `{ key }` names a target this viewer can see; `null` is a target they
+   * cannot, and then the payload's `targetId` is withheld too, which is the
+   * spec's rule overriding "every claim-bearing field goes out whole" for one
+   * id, the other end's. Absent on every other event type.
+   */
+  linkTarget?: { key: string | null } | null;
 };
 
 /**
@@ -306,7 +321,40 @@ export function registerTicketHistoryRoute(
         [id, paging.afterSeq, paging.limit],
       );
 
-      return { ticketId: id, events: rows.map(toHistoryEvent) };
+      const events = rows.map(toHistoryEvent);
+      // Label link events (spec A §2.4): a visible target's key, or `null` and
+      // the id withheld from the payload. A page is at most `MAX_LIMIT` events,
+      // so the per-target loop is bounded.
+      const linkTargets = [
+        ...new Set(
+          events
+            .filter((e) => isTicketLinkEvent(e.type))
+            .map((e) => (e.payload as { targetId?: unknown }).targetId)
+            .filter((t): t is string => typeof t === 'string'),
+        ),
+      ];
+      if (linkTargets.length > 0) {
+        const { rows: owners } = await deps.pool.query<{ ticket_id: string; workspace_id: string; project_id: string }>(
+          'SELECT ticket_id, workspace_id, project_id FROM proj_tickets WHERE ticket_id = ANY($1::text[])',
+          [linkTargets],
+        );
+        const visible = new Map<string, string | null>();
+        for (const o of owners) {
+          if (!(await canSee(deps.pool, request.currentUserId, o.ticket_id))) continue;
+          const keys = await keysForAncestors(deps.pool, o.workspace_id, [{ ticketId: o.ticket_id, projectId: o.project_id }]);
+          visible.set(o.ticket_id, keys.get(o.ticket_id) ?? null);
+        }
+        for (const e of events) {
+          if (!isTicketLinkEvent(e.type)) continue;
+          const p = e.payload as { kind: string; targetId: string };
+          if (visible.has(p.targetId)) e.linkTarget = { key: visible.get(p.targetId)! };
+          else {
+            e.linkTarget = null;
+            e.payload = { kind: p.kind, targetId: null };
+          }
+        }
+      }
+      return { ticketId: id, events };
     },
   );
 }

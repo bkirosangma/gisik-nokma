@@ -11,6 +11,7 @@ import { insertEvent, readEntityEvents } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
 import { buildLedgerDeps } from '../../src/sync/ledger-deps.js';
 import { runSnapshotPass, startSnapshotWriter } from '../../src/sync/snapshot-writer.js';
+import { BOOTSTRAP_BACKFILL_TYPES } from '../../src/sync/sync-routes.js';
 import { makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
@@ -644,5 +645,32 @@ describe('buildLedgerDeps', () => {
     expect(depsWs1.getWorkflow(WORKFLOW_KEY)?.id).toBe(WORKFLOW_KEY);
     expect(depsWs1.getTicketType(TYPE_KEY)?.id).toBe(TYPE_KEY);
     expect(depsWs1.getWorkflow('wf-a')).toBeUndefined();
+  });
+});
+
+describe('27.064 a snapshot of a linked ticket carries its links; link events fold, so they are not backfilled', () => {
+  it('27.064 the snapshot state holds links exactly, and BOOTSTRAP_BACKFILL_TYPES holds neither link type; control: comment.added is backfilled', async () => {
+    const LINKED = newUlid();
+    const TARGET = newUlid();
+    await seed([
+      ticketEvent('ticket.created', { typeId: TYPE_KEY, projectId: PROJECT, parentId: null, title: 'Linked' }, LINKED),
+      ticketEvent('ticket.link_added', { kind: 'blocks', targetId: TARGET }, LINKED),
+    ]);
+
+    const { written } = await runSnapshotPass(db.pool, { minEvents: 0 });
+
+    expect(written).toContainEqual({ entityId: LINKED, seq: 2 });
+    const client = await db.pool.connect();
+    try {
+      const snapshot = await readLatestSnapshot(client, 'ticket', LINKED);
+      expect(snapshot?.seq).toBe(2);
+      expect((snapshot?.state as TicketState).links).toEqual([{ kind: 'blocks', targetId: TARGET }]);
+    } finally {
+      client.release();
+    }
+    const backfilled = BOOTSTRAP_BACKFILL_TYPES as readonly string[];
+    expect(backfilled).not.toContain('ticket.link_added');
+    expect(backfilled).not.toContain('ticket.link_removed');
+    expect(backfilled).toContain('comment.added'); // control: 12.115's backfilled member
   });
 });

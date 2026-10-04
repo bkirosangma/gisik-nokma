@@ -42,6 +42,7 @@ import type {
   RosterMember,
   SearchHit,
   TicketHistoryEvent,
+  TicketLinkView,
   TicketListView,
   TicketRead,
   UserPreferences,
@@ -385,6 +386,12 @@ export type DataSourceQuery = {
   getDeletedNotes(workspaceId: string): Promise<NoteSummary[]>;
   getNote(workspaceId: string, noteId: string): Promise<NoteDetail | null>;
   getNotesForTicket(workspaceId: string, ticketId: string): Promise<NoteSummary[]>;
+  /**
+   * One ticket's typed links, both directions, only those whose other end this
+   * viewer can see and is live (typed-links T4; spec A §2.4). No count of the
+   * rest. A ticket the viewer cannot see, or this device never received, is `[]`.
+   */
+  getTicketLinks(workspaceId: string, ticketId: string): Promise<TicketLinkView[]>;
   getNoteComments(workspaceId: string, noteId: string): Promise<NoteComment[]>;
   getNoteHistory(workspaceId: string, noteId: string): Promise<NoteVersion[]>;
   getNoteVersion(workspaceId: string, noteId: string, eventId: string): Promise<unknown | null>;

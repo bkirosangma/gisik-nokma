@@ -1531,3 +1531,43 @@ describe('13.1465 boardHierarchyOf — the offline board draws parent/epic, dele
     expect(epicId).not.toBe(taskId);
   });
 });
+
+describe('27.061 typed links offline: both directions from confirmed state', () => {
+  it('27.061 getTicketLinks answers out then in, skipping a never-received and a trashed other end, keys null', async () => {
+    const { ds, replica } = await fixture();
+    const [A, B, C] = [newUlid(), newUlid(), newUlid()];
+    const M = newUlid(); // a real-shaped ULID this replica never received
+    const titles: Record<string, string> = { [A]: 'Chiller', [B]: 'Ice maker', [C]: 'Cold room' };
+    for (const id of [A, B, C]) {
+      await replica.applyServerItem(
+        envelope({ kind: 'ticket', id }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: titles[id] }),
+      );
+    }
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: B }, 'ticket.transitioned', { to: 'doing' }));
+    const link = (source: string, kind: string, targetId: string) =>
+      replica.applyServerItem(envelope({ kind: 'ticket', id: source }, 'ticket.link_added', { kind, targetId }));
+    await link(A, 'blocks', B);
+    await link(C, 'relates', A);
+    await link(A, 'duplicates', M);
+    // N4b (AMEND p11): a link that does not touch A, seeded before the first exact leg.
+    await link(B, 'blocks', C);
+
+    const ticketOf = (id: string, stateCategory: string) => ({ id, projectId: PROJECT, key: null, title: titles[id], stateCategory });
+    expect(await ds.query.getTicketLinks(WS, A)).toEqual([
+      { kind: 'blocks', direction: 'out', ticket: ticketOf(B, 'active') },
+      { kind: 'relates', direction: 'in', ticket: ticketOf(C, 'open') },
+    ]);
+    // N4b control: C's own links read both directions (out before in).
+    expect((await ds.query.getTicketLinks(WS, C)).map((l) => [l.kind, l.direction, l.ticket.id])).toEqual([
+      ['relates', 'out', A],
+      ['blocks', 'in', B],
+    ]);
+    // N4a (AMEND p11): an id this device never received.
+    expect(await ds.query.getTicketLinks(WS, M)).toEqual([]);
+
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: B }, 'ticket.deleted', {}));
+    expect(await ds.query.getTicketLinks(WS, A)).toEqual([{ kind: 'relates', direction: 'in', ticket: ticketOf(C, 'open') }]);
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: C }, 'ticket.deleted', {}));
+    expect(await ds.query.getTicketLinks(WS, A)).toEqual([]);
+  });
+});

@@ -342,6 +342,15 @@ beforeAll(async () => {
     type: 'ticket.field_set',
     payload: { fieldId: 'dueDate', value: { date: tomorrow } },
   });
+  // A typed link from the PARENT to the child (typed-links T4), so the parent's
+  // Links read carries the child's title as its other end: without it,
+  // `getTicketLinks` would be a non-carrier and its row vacuous.
+  await post({
+    workspaceId,
+    entity: { kind: 'ticket', id: parentId },
+    type: 'ticket.link_added',
+    payload: { kind: 'relates', targetId: childId },
+  });
 
   // THE SECOND PARENT PAIR — see `parent2Id`. A parent that keeps a row.
   parent2Id = newUlid();
@@ -489,6 +498,9 @@ type AbsenceDecision =
   | 'getDeletedNotes'
   | 'getNote'
   | 'getNotesForTicket'
+  // Typed links T4. A carrier: the parent's Links read names the child as its
+  // other end, so a deleted child must drop out of it.
+  | 'getTicketLinks'
   | 'getNoteComments'
   | 'getNoteHistory'
   | 'getNoteVersion'
@@ -699,6 +711,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
    * plainly rather than dressed up: the same honesty `getTicketAttachments`'
    * row uses.
    */
+  getTicketLinks: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'Read on the PARENT, whose link names the child: `read/ticket-links.ts` joins the OTHER end through `LIVE_TICKET_WHERE`, so a trashed end drops the row (27.051) while the link itself stays stored.',
+  },
   getNoteComments: { verdict: 'excluded', carries: false },
   getNoteHistory: { verdict: 'excluded', carries: false },
   getNoteVersion: { verdict: 'excluded', carries: false },
@@ -764,6 +781,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getDeletedNotes: () => ds.getDeletedNotes(workspaceId),
     getNote: () => ds.getNote(workspaceId, noteId),
     getNotesForTicket: () => ds.getNotesForTicket(workspaceId, childId),
+    getTicketLinks: () => ds.getTicketLinks(workspaceId, parentId),
     getNoteComments: () => ds.getNoteComments(workspaceId, noteId),
     getNoteHistory: () => ds.getNoteHistory(workspaceId, noteId),
     getNoteVersion: () => ds.getNoteVersion(workspaceId, noteId, newUlid()),
@@ -844,8 +862,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // Plan 3 of 6 added `searchNotes`; 24 until the trash series (Plan 1) added
   // `getDeletedItems`; 25 until trash Plan 3 added `purgedAmong`; 26 until
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
-  // Task 7 (22.123) added `getGroups`.
-  expect(MEMBERS).toHaveLength(28);
+  // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
+  // `getTicketLinks`.
+  expect(MEMBERS).toHaveLength(29);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

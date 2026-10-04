@@ -990,3 +990,56 @@ describe('S6 — the same batch twice: idempotent to the byte', () => {
     await expectCurrent(b);
   });
 });
+
+describe('S7 — typed links: add, a reverse refused at the server, remove; the replica holds the server state, links included', () => {
+  /**
+   * 27.062 (typed-links T4). A links T1 blocks T2 while B, offline and not yet
+   * told, files T2 blocks T1. B's local pre-check passes (B's replica holds no
+   * link), and the server, which holds T1 blocks T2 by then, contests it
+   * `link.reverse`. A then removes the link. After every step the replica's
+   * TicketState equals the server's `rowToTicketState` (`projTicket`), so the
+   * fold of both link events and the projection's `links` column agree.
+   */
+  it('27.062 — links fold the same on the server and both replicas, through add, a contested reverse, and remove', async () => {
+    const { ticketId: T1 } = await seedSharedTicket();
+    const { ticketId: T2 } = await seedSharedTicket();
+
+    // B, offline and unaware of A's link, files the reverse.
+    const reverse = ticketEvent(USER_B, T2, 'ticket.link_added', { kind: 'blocks', targetId: T1 });
+    expect(await b.submit(reverse)).toEqual({ status: 'pending', eventId: reverse.id });
+
+    // Step 1: A links T1 blocks T2.
+    const add = ticketEvent(USER_A, T1, 'ticket.link_added', { kind: 'blocks', targetId: T2 });
+    expect(await a.submit(add)).toEqual({ status: 'pending', eventId: add.id });
+    await a.goOnline();
+    await a.syncDown();
+    expect((await h.projTicket(T1))?.links).toEqual([{ kind: 'blocks', targetId: T2 }]); // precondition: the comparison holds a link
+    expect((await a.replica.getTicket(T1))?.confirmed).toEqual(await h.projTicket(T1));
+
+    // Step 2: B's reverse reaches the server, which refuses it as a contest.
+    await b.goOnline();
+    await a.syncDown();
+    await b.syncDown();
+    const contest = contestFor(await h.contests(), reverse.id);
+    expect(contest).toMatchObject({
+      ticket_id: T2,
+      claimant_id: USER_B,
+      rule: 'link.reverse',
+      reason: `"${SHARED_TITLE}" already blocks "${SHARED_TITLE}".`,
+    });
+    expect('links' in ((await h.projTicket(T2)) ?? {})).toBe(false); // the refused claim moved nothing
+    await expectReplicasConverged(T1);
+    await expectReplicasConverged(T2);
+
+    // Step 3: A removes the link.
+    const remove = ticketEvent(USER_A, T1, 'ticket.link_removed', { kind: 'blocks', targetId: T2 });
+    expect(await a.submit(remove)).toEqual({ status: 'pending', eventId: remove.id });
+    await a.goOnline();
+    await a.syncDown();
+    await b.syncDown();
+    expect('links' in ((await h.projTicket(T1)) ?? {})).toBe(false);
+    await expectReplicasConverged(T1);
+    await expectCurrent(a);
+    await expectCurrent(b);
+  });
+});
