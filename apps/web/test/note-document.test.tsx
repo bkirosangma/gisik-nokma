@@ -350,6 +350,17 @@ describe('27.152-27.153 the note document draws Linked from between its body and
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(screen.queryByTestId('linked-from')).toBeNull();
+    cleanup();
+
+    // "Show all" on the note asks the same read for this note, with the cursor.
+    const paged = vi.fn(async (_ws: string, _target: unknown, cursor?: string) =>
+      cursor === '9' ? { total: 2, items: [LINKED[1]!], nextCursor: null } : { total: 2, items: [LINKED[0]!], nextCursor: '9' },
+    );
+    renderDocument({ getLinkedFrom: paged, getNoteComments: async () => [] });
+    const more = await screen.findByTestId('linked-from');
+    await userEvent.setup().click(within(more).getByRole('button', { name: 'Show all 2' }));
+    await waitFor(() => expect(within(more).getAllByRole('listitem')).toHaveLength(2));
+    expect(paged).toHaveBeenLastCalledWith(WS_A, { kind: 'note', id: NOTE }, '9');
   });
 
   it('27.153 a note-comment row pushes /notes/<id>#comment-<cid>; a ticket row pushes the path ticketRefHrefIn gives', async () => {

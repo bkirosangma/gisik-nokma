@@ -98,7 +98,7 @@ describe('27.147 "Show all N" pages the rest from the same read', () => {
       cursor === '100' ? { total: 22, nextCursor: '50', items: [row(20)] }
       : cursor === '50' ? { total: 22, nextCursor: null, items: [row(21)] }
       : { total: 22, nextCursor: null, items: [] });
-    render(<LinkedFromSection {...props(live(first), { loadMore })} />);
+    const { rerender, unmount } = render(<LinkedFromSection {...props(live(first), { loadMore })} />);
     expect(screen.getAllByRole('listitem')).toHaveLength(20);
     expect(screen.getByRole('heading').textContent).toBe('Linked from22'); // the count is the TOTAL, not the rows drawn
     await userEvent.click(screen.getByRole('button', { name: 'Show all 22' }));
@@ -106,6 +106,23 @@ describe('27.147 "Show all N" pages the rest from the same read', () => {
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(22));
     expect(loadMore.mock.calls.map((c) => c[0])).toEqual(['100', '50']);
     expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
+
+    // A reload (a NEW first page) starts over: the rows paged in under the old page are not drawn under the new one.
+    const reloaded = { total: 22, nextCursor: '100', items: Array.from({ length: 20 }, (_, i) => row(i + 100)) };
+    rerender(<LinkedFromSection {...props(live(reloaded), { loadMore })} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(20);
+    expect(screen.getByRole('button', { name: 'Show all 22' })).toBeTruthy();
+    unmount();
+
+    // While the rest is loading the button is disabled, so a second click cannot start a second walk.
+    const pending = vi.fn(() => new Promise<LinkedFromPage>(() => undefined));
+    render(<LinkedFromSection {...props(live(first), { loadMore: pending })} />);
+    const button = screen.getByRole('button', { name: 'Show all 22' });
+    expect(button).not.toBeDisabled();
+    await userEvent.click(button);
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(pending).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -120,13 +137,19 @@ describe('27.148 a failed read says so, in one line', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     unmount();
     // "Show all" failing is the same one line, under the rows already drawn.
-    const loadMore = vi.fn(async () => {
-      throw new Error('answered 502');
-    });
+    const loadMore = vi
+      .fn<(cursor: string) => Promise<LinkedFromPage>>()
+      .mockRejectedValueOnce(new Error('answered 502'))
+      .mockResolvedValue({ total: 2, items: [row(2)], nextCursor: null });
     render(<LinkedFromSection {...props(live({ total: 2, items: [row(1)], nextCursor: '9' }), { loadMore })} />);
     await userEvent.click(screen.getByRole('button', { name: 'Show all 2' }));
     expect((await screen.findByRole('alert')).textContent).toBe('The rest could not be read: answered 502.');
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    // The button is usable again, and a retry that answers clears the line.
+    expect(screen.getByRole('button', { name: 'Show all 2' })).not.toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Show all 2' }));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 
@@ -211,6 +234,7 @@ describe('27.150 the sheet scrolls to #comment-<id> once the thread arrives, onc
     const { unmount } = render(sheet(source));
     await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
     expect(scroll.mock.contexts[0]).toBe(document.getElementById('comment-c1'));
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' });
     act(() => source.pushStreamItem(EVENT_FRAME));
     // Precondition: the thread was read TWICE, so the effect has had its second chance.
     await waitFor(() => expect(getTicketComments).toHaveBeenCalledTimes(2));
@@ -232,6 +256,17 @@ describe('27.150 the sheet scrolls to #comment-<id> once the thread arrives, onc
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(scroll).not.toHaveBeenCalled();
+    cleanup();
+
+    // A comment hash naming no comment in the thread scrolls nothing and breaks nothing: the thread is still drawn.
+    window.location.hash = '#comment-zz';
+    render(sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getTicketComments: vi.fn(async () => [comment('c1')]) })));
+    await screen.findByTestId('comment-c1');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.getByTestId('comment-c1')).toBeTruthy();
+    expect(scroll).not.toHaveBeenCalled();
   });
 });
 
@@ -248,5 +283,16 @@ describe('27.151 a Linked from row on the sheet navigates through the sheet’s 
     const section = await screen.findByTestId('linked-from');
     await userEvent.click(within(section).getByRole('link'));
     expect(onNavigate.mock.calls).toEqual([['/t/S3#comment-C9']]);
+  });
+
+  it('27.151 the sheet\'s Show all asks the same read for this ticket with the cursor', async () => {
+    const getLinkedFrom = vi.fn(async (_ws: string, _target: unknown, cursor?: string) =>
+      cursor === '9' ? { total: 2, items: [row(4)], nextCursor: null } : { total: 2, items: [commentRow], nextCursor: '9' },
+    );
+    render(sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getLinkedFrom })));
+    const section = await screen.findByTestId('linked-from');
+    await userEvent.click(within(section).getByRole('button', { name: 'Show all 2' }));
+    await waitFor(() => expect(within(section).getAllByRole('listitem')).toHaveLength(2));
+    expect(getLinkedFrom).toHaveBeenLastCalledWith(WS, { kind: 'ticket', id: TICKET }, '9');
   });
 });
