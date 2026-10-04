@@ -143,6 +143,8 @@ Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpow
 - ✅ **27.151 — a Linked from row on the sheet navigates through the sheet's own `resolveTicketHref` and `onNavigate`: a comment on ticket S3 calls `onNavigate('/t/S3#comment-C9')`.** (`packages/app-core/test/views/linked-from-section.test.tsx`)
 - ✅ **27.152 — the note document asks `getLinkedFrom(ws, { kind: 'note', id })` and draws the section after the note's body (`note-editor`) and before its comment thread;** control: the empty page draws none. (`apps/web/test/note-document.test.tsx`)
 - ✅ **27.153 — on the note, a row navigates through the router: a comment on another note to `/notes/<id>#comment-<cid>`, a ticket to the path `ticketRefHrefIn` gives.** (`apps/web/test/note-document.test.tsx`)
+- ✅ **27.154 — the manual's §15 "Linked from" paragraph describes the section (where it sits, what a row shows, comment rows open scrolled to the comment, only what you can see is listed and counted, Show all past twenty, absent when nothing links), and the old "no list … showing what else links to it" bullet is gone;** guarded by `check:help` keeping the generated help in step with the manual. (`packages/app-core/test/views/linked-from-section.test.tsx`)
+- 27.155–27.164 reserved, unused (T3).
 <!-- KG-B T4 -->
 
 ## 27.3 Knowledge Graph view (spec C, 27.200–27.349)

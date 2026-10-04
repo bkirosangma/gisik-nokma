@@ -10758,6 +10758,51 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " — the same as pressing Attach note yourself. Referencing a note inside the note's own comments does not attach anything anywhere."
                   }
                 ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Linked from."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " A ticket and a note each show what links to them: under the ticket's Notes, and under a note's text, a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Linked from"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " list names every ticket, note and comment that chips or links to it, with the sentence it sits in and the reference highlighted. Click a row to open it; a comment opens its ticket or note scrolled to the comment. Only what "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " can see is listed, and the number beside the heading counts only those. Past twenty, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " loads the rest. A plain "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "GN-142"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " typed as text is not a link — only a chip is. Nothing to list, no list."
+                  }
+                ]
               }
             ]
           },
@@ -10901,12 +10946,6 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": "Meaning search understands English only; a Garo-tuned model is a planned follow-up, not built."
-                    }
-                  ],
-                  [
-                    {
-                      "kind": "text",
-                      "text": "There is no list on a note or a ticket showing what else links to it."
                     }
                   ]
                 ]
