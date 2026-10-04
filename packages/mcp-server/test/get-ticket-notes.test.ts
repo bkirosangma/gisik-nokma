@@ -89,6 +89,10 @@ describe('get_ticket and the notes attached to the ticket', () => {
     await expect(tool(odd.session).handler({ workspaceId: WS, ticketId: T })).rejects.toThrow(unread('the answer was not a list of notes'));
     // An empty (null) body is not a list either, and is said so (not a TypeError).
     await expect(tool(world(null).session).handler({ workspaceId: WS, ticketId: T })).rejects.toThrow(unread('the answer was not a list of notes'));
+    // `notes` present but not a list (an object, a string) is refused with the same sentence, not a TypeError from `.map`.
+    for (const notes of [{}, 'x']) {
+      await expect(tool(world({ notes }).session).handler({ workspaceId: WS, ticketId: T })).rejects.toThrow(unread('the answer was not a list of notes'));
+    }
     // A failure that is not an Error is still named.
     await expect(tool(world(() => { throw 'socket hang up'; }).session).handler({ workspaceId: WS, ticketId: T })).rejects.toThrow(unread('socket hang up'));
     // CONTROL, same `it`: an honest empty list is answered as one.
