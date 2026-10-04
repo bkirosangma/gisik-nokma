@@ -157,7 +157,7 @@ describe('close_tickets (package)', () => {
     expect(((await closeWith(two.session, ['T2', 'T1'])) as { wouldChange: string }).wouldChange).toBe(`Closes 2 tickets: CCSO-9 "Rate limits" and CCSO-4 "Fix login". ${DECIDES}`);
     // Only "not found" is named "one you cannot see": any other failed read (a 500) reaches the caller as it came, and nothing is sent.
     const broken = recordingSession({ routes: { ...routes(), [`GET /v1/workspaces/${WS}/tickets/T2`]: () => { throw new HttpError(500, { error: 'boom' }); } } });
-    await expect(closeWith(broken.session, ['T1', 'T2'])).rejects.toThrow(new Error('gisik-nokma answered 500'));
+    await expect(closeWith(broken.session, ['T1', 'T2'])).rejects.toThrow(new HttpError(500, { error: 'boom' })); // untouched: status and body as they came
     expect(sent(broken.requests)).toEqual([]);
   });
 });
