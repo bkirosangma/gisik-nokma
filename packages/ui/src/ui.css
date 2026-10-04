@@ -9579,6 +9579,94 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   z-index: 1;
 }
 
+/* WTG4 T2: the Timeline graph painter (WTG Part 4 T2; `packages/app-core/src/timeline-graph/painter.tsx`; cases 29.301,
+   29.303). The painter places every primitive in content px (left, top, width and height from its bounds), so nothing
+   here sizes a bar along the axis. The scroller is Part 1's ScrollAdapter element (`overflow: auto`) and the canvas its
+   FIRST child, the surface it scrolls. `overscroll-behavior: contain` keeps a wheel or a touch drag that reaches the
+   scroller's end from scrolling the page (29.301 measures it in the browser); touch keeps native panning (VP-2), so no
+   `touch-action: none`.
+   Bars speak the state chips' colour language: done is the terminal category, in progress the active one, not started
+   the open one, each lettered in `textInverted` (CONTRAST_PAIRS, 4.5; the fills clear 3:1 on surface and surfaceRaised).
+   A ghost is a pale fill with a dashed edge and full-contrast text, never reduced opacity (spec §13). The pin after the
+   key, the lit set (`data-dim`), drafts and passes (`data-pass-rank`) are styled by the tasks that draw them (T5 to T7).
+   Placed ABOVE the loading placeholders, not at the sheet's end: that block must stay last (25.019). Later WTG4 Tn blocks
+   go after this block's end marker. */
+.gn-tlg-scroller { position: relative; overflow: auto; overscroll-behavior: contain; }
+.gn-tlg-canvas { position: relative; }
+.gn-tlg-bar,
+.gn-tlg-diamond,
+.gn-tlg-connector,
+.gn-tlg-heading,
+.gn-tlg-strip,
+.gn-tlg-today,
+.gn-tlg-weekend { position: absolute; box-sizing: border-box; }
+.gn-tlg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  column-gap: 4px;
+  height: 28px;
+  margin: 0;
+  /* 6 px a side: E11's MIN_BAR_PX (12) is twice this. */
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 12px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gn-tlg-bar[data-style='done'] { background: var(--gn-category-terminal); color: var(--gn-text-inverted); }
+.gn-tlg-bar[data-style='active'] { background: var(--gn-category-active); color: var(--gn-text-inverted); }
+.gn-tlg-bar[data-style='planned'] { background: var(--gn-category-open); color: var(--gn-text-inverted); }
+.gn-tlg-bar[data-style='ghost'] { background: var(--gn-surface-sunken); border: 1px dashed var(--gn-border-strong); color: var(--gn-text); }
+.gn-tlg-bar[aria-pressed='true'],
+.gn-tlg-bar:focus-visible,
+.gn-tlg-diamond[aria-pressed='true'],
+.gn-tlg-diamond:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+.gn-tlg-key { font-weight: 600; }
+/* A bar narrower than its key shows the key after its end, KEY_GAP_PX (4 px) out, in the canvas's text colour (TG-11, E10). */
+.gn-tlg-key[data-outside='true'] { position: absolute; left: calc(100% + 4px); color: var(--gn-text); }
+/* A long bar (150 px or more) carries its title on a second line, ellipsised (spec §13). */
+.gn-tlg-title { flex: 0 0 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gn-tlg-chip { padding: 0 4px; border-radius: 4px; background: var(--gn-surface); color: var(--gn-text); }
+/* The paper pin, 12 px, 6 px in from the bar's end (the bar's own padding). */
+.gn-tlg-pin { flex: none; width: 12px; height: 12px; margin-left: auto; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; }
+.gn-tlg-diamond {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  line-height: 12px;
+  color: var(--gn-text-inverted);
+  cursor: pointer;
+}
+/* The shape is a pseudo-element so the `revised` mark beside it is not clipped. */
+.gn-tlg-diamond::before { content: ''; position: absolute; inset: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); background: var(--gn-category-open); }
+.gn-tlg-diamond[data-style='done']::before { background: var(--gn-category-terminal); }
+.gn-tlg-diamond[data-style='active']::before { background: var(--gn-category-active); }
+.gn-tlg-diamond > .gn-tlg-mark { position: relative; }
+.gn-tlg-revised { position: absolute; left: calc(100% + 4px); color: var(--gn-text-muted); white-space: nowrap; }
+.gn-tlg-connector { border-top: 2px solid var(--gn-border-strong); pointer-events: none; }
+.gn-tlg-connector[data-dashed='true'] { border-top-style: dashed; }
+.gn-tlg-heading { display: flex; align-items: center; padding: 0 12px; font-size: 13px; font-weight: 600; color: var(--gn-text); background: var(--gn-surface); border-bottom: 1px solid var(--gn-border); }
+.gn-tlg-strip { display: flex; align-items: center; padding: 0 8px; font-size: 11px; color: var(--gn-text-muted); background: var(--gn-surface-sunken); }
+.gn-tlg-today { border-left: 2px solid var(--gn-accent-edge); pointer-events: none; }
+.gn-tlg-today > span { position: absolute; top: 0; left: 4px; font-size: 11px; color: var(--gn-text-accent); }
+/* Part 1's weekend tint (`timelineWeekend`, T9), the one the continuous Timeline view draws. */
+.gn-tlg-weekend { background: var(--gn-timeline-weekend); pointer-events: none; }
+.gn-tlg-edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.gn-tlg-edge { fill: none; stroke: var(--gn-text-muted); stroke-width: 1.5; }
+.gn-tlg-edges [data-kind='blocks'] .gn-tlg-edge { stroke-dasharray: 4 3; }
+.gn-tlg-edge-label { font-size: 11px; fill: var(--gn-text-muted); }
+/* WTG4 T2 end */
+
 /* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
    Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.
    The keyframe lives beside its ONE consumer (the header's rule for keyframes).
