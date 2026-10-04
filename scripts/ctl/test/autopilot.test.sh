@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2129 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
+# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2131 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
 # Nothing here reads or writes the live pipeline: a SCRATCH lanes root (CTL_LANES_DIR), a scratch origin + repo (CTL_AUTOPILOT_REPO),
 # a seats fixture (CTL_AUTOPILOT_SEATS_CMD), a stub `ctl` that logs its argv (CTL_AUTOPILOT_CTL), a stub make-reviewer-boot.py, a fixed
 # clock, and a PATH-front `tmux` shim that logs every call. A guard case has its CONTROL in the same check: the same world with the one
@@ -145,19 +145,20 @@ world; seat 3 state=idle shells=0 box=empty unpushed=0 dirty=0 branch=task/old3 
 check "13.2121 a lane whose DONE has NO REVIEW line in QUEUE-review.md yet (it printed DONE but did not queue it) is not restarted; CONTROL in the same check: with the REVIEW line it starts" \
   'printf "%s" "$a" | grep -q "SKIP lane 3: DONE task/old3 ab12cd34 has no REVIEW line yet" && ! printf "%s" "$a" | grep -q WOULD && would "start: lane 3"'
 world; freelane 3; printf '%s\t10:00\t3\tSTART\ttask/x\tx\n' $((NOW - 60)) > "$R/AUTOPILOT-ledger.tsv"; ap; a=$out
-world; freelane 3; printf '%s\t10:00\t3\tSTART\ttask/x\tx\n' $((NOW - 400)) > "$R/AUTOPILOT-ledger.tsv"; ap
-check "13.2122 COOLDOWN: a window the autopilot acted on 60 s ago is left alone (a restarted seat takes ~30 s to show busy); CONTROL in the same check: 400 s ago it acts" \
-  'printf "%s" "$a" | grep -q "SKIP lane 3: cooldown (60s" && ! printf "%s" "$a" | grep -q WOULD && would "start: lane 3"'
+world; freelane 3; printf '%s\t10:00\t3\tSTART\ttask/x\tx\n' $((NOW - 179)) > "$R/AUTOPILOT-ledger.tsv"; ap; b=$out
+world; freelane 3; printf '%s\t10:00\t3\tSTART\ttask/x\tx\n' $((NOW - 180)) > "$R/AUTOPILOT-ledger.tsv"; ap
+check "13.2122 COOLDOWN: a window the autopilot acted on 60 s ago, or 179 s ago, is left alone (a restarted seat takes ~30 s to show busy); CONTROL in the same check: 180 s ago (the line) it acts" \
+  'printf "%s" "$a" | grep -q "SKIP lane 3: cooldown (60s" && printf "%s" "$b" | grep -q "SKIP lane 3: cooldown (179s" && ! printf "%s%s" "$a" "$b" | grep -q WOULD && would "start: lane 3"'
 
 # ================================================================ independence (fluid rule B)
 world; order; freelane 3; item1 3; ap; a=$out; world; order; freelane 3; item1 1; ap
 check "13.2110 a SELF-REVIEW is refused: lane 3 has nothing startable and the only open item is lane 3's own (lane=3) -> SKIP self-review, IDLE lane 3; CONTROL in the same check: the same item from lane 1 -> WOULD review: lane 3 takes it" \
   'printf "%s" "$a" | grep -q "SKIP lane 3 x task/rev1 ${REV1:0:8}: self-review (own work)" && ! printf "%s" "$a" | grep -q "WOULD review" && would "review: lane 3 gisik:3 takes 09:10 task/rev1"'
-world; order; freelane 3 branch=task/own; rq "09:15 REVIEW task/onown $ONOWN base=origin/task/own@${OWN:0:8} brief=PTR-x.md lane=1 (stacked on own)"; ap; a=$out
+world; order; freelane 3 branch=task/own; rq "09:15 REVIEW task/rev2 $REV2 base=origin/task/own@${OWN:0:8} brief=PTR-x.md lane=1 (stacked on own by its base line; its head does not contain own)"; ap; a=$out
 world; order; freelane 3 branch=task/own; rq "09:15 REVIEW task/onown $ONOWN base=origin/release/knowledge-graph brief=PTR-x.md lane=1 (base line says release)"; ap; b=$out
 world; order; freelane 3; rq "09:15 REVIEW task/onown $ONOWN base=origin/release/knowledge-graph brief=PTR-x.md lane=1 (x)"; ap
 check "13.2111 a branch STACKED on the reviewer's own task is refused: lane 3 (on task/own) and an item whose base= is origin/task/own@… -> stacked on own; the same item whose base line says release but whose head CONTAINS own's unlanded head -> refused by ancestry; CONTROL in the same check: a lane that does not own task/own takes that item" \
-  'printf "%s" "$a" | grep -q "SKIP lane 3 x task/onown ${ONOWN:0:8}: stacked on own task/own" && printf "%s" "$b" | grep -q "stacked on own task/own (contains its unlanded head)" && ! printf "%s%s" "$a" "$b" | grep -q "WOULD review" && would "review: lane 3 gisik:3 takes 09:15 task/onown"'
+  'printf "%s" "$a" | grep -q "SKIP lane 3 x task/rev2 ${REV2:0:8}: stacked on own task/own$" && printf "%s" "$b" | grep -q "stacked on own task/own (contains its unlanded head)" && ! printf "%s%s" "$a" "$b" | grep -q "WOULD review" && would "review: lane 3 gisik:3 takes 09:15 task/onown"'
 world; order; freelane 3 branch=task/onown; rq "09:15 REVIEW task/own $OWN base=origin/release/knowledge-graph brief=PTR-x.md lane=1 (x)" "09:16 REVIEW task/onown $ONOWN base=origin/task/own@${OWN:0:8} brief=PTR-y.md lane=3 (mine)"; ap; a=$out
 check "13.2111 the reverse: a branch the reviewer's OWN task stacks on is refused (own task/onown's REVIEW base cites task/own); CONTROL: the 13.2111 world above took an unrelated item" \
   'printf "%s" "$a" | grep -q "SKIP lane 3 x task/own ${OWN:0:8}: own task/onown stacks on it" && ! printf "%s" "$a" | grep -q "WOULD review: lane 3 gisik:3 takes 09:15 task/own"'
@@ -172,9 +173,11 @@ check "13.2112 a STALE sha (origin/task/rev1 is not the REVIEW line's sha: the l
   'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV2:0:8}: stale: origin/task/rev1 is ${REV1:0:8}" && ! printf "%s" "$a" | grep -q WOULD'
 world; rq "09:50 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; freerev 10; ap; a=$out
 world; rq "09:30 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; seat 10 state=busy; ap; d=$out
+world; rq "09:40 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; seat 10 state=busy; ap; e=$out
+world; rq "09:39 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; seat 10 state=busy; ap; f=$out
 world; rq "09:10 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 needs-tip (x)"; freerev 7; ap; b=$out
 check "13.2119 an item ADDRESSED to reviewer C (\`… reviewer C)\` at the end) is skipped by A for its first 20 min (10 min old) and taken by C; a needs-tip item is skipped; CONTROL in the same check: C takes the addressed one, and at 30 min old (C busy) A takes it (live 09:42: C took B's item after 28 min)" \
-  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: addressed to reviewer C (10 min" && printf "%s" "$a" | grep -q "WOULD review: C gisik:10 takes 09:50 task/rev1" && printf "%s" "$b" | grep -q "needs-tip" && ! printf "%s" "$b" | grep -q WOULD && printf "%s" "$d" | grep -q "WOULD review: A gisik:7 takes 09:30 task/rev1"'
+  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: addressed to reviewer C (10 min" && printf "%s" "$a" | grep -q "WOULD review: C gisik:10 takes 09:50 task/rev1" && printf "%s" "$b" | grep -q "needs-tip" && ! printf "%s" "$b" | grep -q WOULD && printf "%s" "$d" | grep -q "WOULD review: A gisik:7 takes 09:30 task/rev1" && printf "%s" "$e" | grep -q "addressed to reviewer C (20 min" && ! printf "%s" "$e" | grep -q WOULD && printf "%s" "$f" | grep -q "WOULD review: A gisik:7 takes 09:39 task/rev1"'
 
 G push -q origin "$KG:refs/heads/task/landed" 2>/dev/null; G fetch -q origin
 world; rq "09:10 REVIEW task/landed $KG base=origin/release/knowledge-graph brief=PTR-l.md lane=3 (its sha is on the KG tip)"; item1 1; freerev 7; ap
@@ -182,8 +185,11 @@ check "13.2128 an item whose sha is ALREADY on a release tip or main (landed, it
   'said "SKIP reviewer A x task/landed ${KG:0:8}: already landed (on origin/release/knowledge-graph)" && would "review: A gisik:7 takes 09:10 task/rev1" && ! said "WOULD review: A gisik:7 takes 09:10 task/landed"'
 world; rq "21:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday)" "08:00 NOTE the next day"; freerev 7; ap; a=$out
 world; rq "23:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday, later)" "08:00 NOTE the next day"; freerev 7; ap
+world; rq "22:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (exactly 12 h)" "08:00 NOTE the next day"; freerev 7; ap; b=$out
+world; rq "21:59 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (12 h 1 min)" "08:00 NOTE the next day"; freerev 7; ap; c7=$out
+world; rq "23:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday, later)" "08:00 NOTE the next day"; freerev 7; ap
 check "13.2129 an item OLDER than 12 h is the controller's call, never a pull: a 21:00 line followed by the next day's 08:00 line is 13 h old at 10:00 (the queue has no dates: a time > 6 h below the previous line's is the next day) -> skipped; CONTROL in the same check: a 23:00 line (11 h old) is taken" \
-  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: older than 12 h (13 h)" && ! printf "%s" "$a" | grep -q WOULD && would "review: A gisik:7 takes 23:00 task/rev1"'
+  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: older than 12 h (13 h)" && ! printf "%s" "$a" | grep -q WOULD && printf "%s" "$c7" | grep -q "older than 12 h (12 h)" && printf "%s" "$b" | grep -q "WOULD review: A gisik:7 takes 22:00 task/rev1" && would "review: A gisik:7 takes 23:00 task/rev1"'
 
 # ================================================================ the pull order
 world; seat 7 state=busy; seat 9 state=busy; freerev 10
@@ -222,16 +228,23 @@ check "13.2115 a FIX goes FIRST: an open \`FIX KG <PTR> task/rev1\` line in role
   'printf "%s" "$a" | grep -q "WOULD fix: lane 3 takes FIX 09:30 task/rev1 (PTR-rev1-fix-1-lane3.md, RUNG H+): TOOK + restart --model opus --effort xhigh" && ! printf "%s" "$a" | grep -q "WOULD start" && would "start: lane 3 takes KG KV4"'
 world; freelane 3; rq "09:40 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "09:50 DONE 09:40 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"; ap; a=$out
 world; freelane 3; rq "09:30 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "09:40 DONE 09:30 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"; ap
+b=$out; world; freelane 3; rq "09:44 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "09:46 DONE 09:44 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"; ap; c8=$out
+world; freelane 3; rq "09:44 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "09:45 DONE 09:44 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"; ap; out=$b
 check "13.2115 FIX-WAIT: a reviewer FIX verdict of the lane's pool 10 min old with no QUEUE-autopilot FIX line holds the free lane (WAIT lane 3, no start); CONTROL in the same check: 20 min old (past the 15-min grace) -> the lane takes new work" \
-  'printf "%s" "$a" | grep -q "WAIT lane 3: FIX verdict 09:50 task/rev1 (10 min old)" && ! printf "%s" "$a" | grep -q WOULD && would "start: lane 3 takes KG KV4"'
+  'printf "%s" "$a" | grep -q "WAIT lane 3: FIX verdict 09:50 task/rev1 (10 min old)" && ! printf "%s" "$a" | grep -q WOULD && printf "%s" "$c8" | grep -q "WAIT lane 3: FIX verdict 09:46 task/rev1 (14 min old)" && would "start: lane 3 takes KG KV4" && ap && would "start: lane 3 takes KG KV4"'
 
 # ================================================================ budget, one-per-pass, no block
 world; freelane 3; seat 10 weekly=96; ap; a=$out; world; freelane 3; order 'KV4 H+ docs/plan.md 2 task/kv4 path:packages/kg'; seat 10 weekly=86; ap; b=$out
 world; freelane 3; order 'KV4 H+ docs/plan.md 2 task/kv4 path:packages/kg'; seat 10 weekly=null; ap; c6=$out
+world; freelane 3; seat 10 weekly=95; ap; d=$out; world; freelane 3; order 'KV4 H+ docs/plan.md 2 task/kv4 path:packages/kg'; seat 10 weekly=85; ap; e=$out
+world; freelane 3; seat 10 weekly=94; ap; f=$out
 world; freelane 3; order 'KV4 H+ docs/plan.md 2 task/kv4 path:packages/kg'; seat 10 weekly=84; ap
 check "13.2120 BUDGET: weekly 96% -> no lane launch at all; weekly 86% -> no H++ launch (table H+ + 1), and weekly unknown -> no H++ either; CONTROL in the same check: weekly 84% launches the H++ task with opus/max" \
-  'printf "%s" "$a" | grep -q "budget: weekly 96% >= 95" && printf "%s" "$b" | grep -q "budget: H++ needs weekly < 85% (is 86)" && printf "%s" "$c6" | grep -q "budget: H++ needs weekly < 85% (is unknown)" && ! printf "%s%s%s" "$a" "$b" "$c6" | grep -q "WOULD start" && would "start: lane 3 takes KG KV4 task/kv4 .plan task 2, RUNG H\\+\\+ = table H\\+ \\+ 1.: make-lane-ptr \\+ restart --model opus --effort max"'
+  'printf "%s" "$a" | grep -q "budget: weekly 96% >= 95" && printf "%s" "$b" | grep -q "budget: H++ needs weekly < 85% (is 86)" && printf "%s" "$c6" | grep -q "budget: H++ needs weekly < 85% (is unknown)" && printf "%s" "$d" | grep -q "budget: weekly 95% >= 95" && printf "%s" "$e" | grep -q "is 85)" && ! printf "%s%s%s%s%s" "$a" "$b" "$c6" "$d" "$e" | grep -q "WOULD start" && printf "%s" "$f" | grep -q "WOULD start: lane 3 takes KG KV4" && would "start: lane 3 takes KG KV4 task/kv4 .plan task 2, RUNG H\\+\\+ = table H\\+ \\+ 1.: make-lane-ptr \\+ restart --model opus --effort max"'
 world; freelane 3; freelane 4; ap; a=$out; world; freelane 3; freelane 4; order 'KV4 M docs/plan.md 2 task/kv4 path:packages/kg' 'KV5 M docs/plan.md 2 task/kv5 path:packages/kg'; ap
+keep=$out; world; freerev 7; freerev 10; item1 3; ap; one_item=$out; out=$keep   # the two-row world of the next check stays in $out
+check "13.2126 ONE item per pass: reviewers A and C free and ONE KG item -> exactly one review (A, own pool first); CONTROL: 13.2119 POOLS gave two items to two seats" \
+  '[ "$(printf "%s\n" "$one_item" | grep -c "WOULD review")" = 1 ] && printf "%s" "$one_item" | grep -q "WOULD review: A gisik:7 takes 09:10 task/rev1"'
 check "13.2126 ONE row per lane per pass: two free KG lanes and one startable row -> one start (lane 3) and lane 4 is IDLE; CONTROL in the same check: with two rows each lane gets its own" \
   'printf "%s" "$a" | grep -q "WOULD start: lane 3 takes KG KV4" && [ "$(printf "%s\n" "$a" | grep -c "WOULD start")" = 1 ] && would "start: lane 3 takes KG KV4" && would "start: lane 4 takes KG KV5"'
 world; freelane 3; printf '# KG order\n| 1 | TL2 projection | H | TL1 ✓ |\n' > "$L/QUEUE-kg-order.md"; ap; a=$out; world; freelane 3; ap
@@ -239,8 +252,30 @@ check "13.2127 an order file WITHOUT the \`\`\`autopilot block (today's prose ta
   'printf "%s" "$a" | grep -q "has no \`\`\`autopilot block rows" && ! printf "%s" "$a" | grep -q "WOULD start" && would "start: lane 3 takes KG KV4" && order "KV4 Q docs/plan.md 2 task/kv4 -" && ap && said "needs-unparsed" && ! said "WOULD start"'
 world; freelane 3; order 'KV4 M docs/plan.md 2 task/rev1 path:packages/kg'; ap; a=$out
 world; freelane 3; order 'KV4 M docs/plan.md 2 task/kv4 path:packages/kg'; printf 'Branch `task/kv4` cut from origin/release/knowledge-graph\n' > "$L/PTR-kv4-by-hand.md"; ap; b=$out
-check "13.2126 a row already TAKEN is not started: its branch is on origin, or a hand-written PTR from the last 24 h names it (the controller started it by hand); CONTROL: the plain world starts it (13.2108)" \
-  '! printf "%s%s" "$a" "$b" | grep -q "WOULD start"'
+world; freelane 3; order 'KV4 M docs/plan.md 2 task/kv4 path:packages/kg'; rq "09:05 REVIEW task/kv4 $REV1 base=origin/release/knowledge-graph brief=PTR-k.md lane=4 (deleted branch, line left)"; ap; c9=$out
+world; freelane 3; order 'KV4 M docs/plan.md 2 task/kv4 path:packages/kg'; seat 4 branch=task/kv4; ap; d=$out
+world; freelane 3; order 'KV4 M docs/plan.md 2 task/kv4 path:packages/kg'; printf '%s\t09:00\t4\tSTART\ttask/kv4\tKV4\n' $((NOW - 3600)) > "$R/AUTOPILOT-ledger.tsv"; ap; e=$out
+check "13.2126 a row already TAKEN is not started, each leg alone: its branch is on origin; a hand-written PTR from the last 24 h names it (the controller started it by hand); it has a REVIEW line; a seat is on it; the ledger shows the autopilot started it; CONTROL: the plain world starts it (13.2108)" \
+  '( for o in "$a" "$b" "$c9" "$d" "$e"; do printf "%s" "$o" | grep -q "WOULD start" && exit 1; done; exit 0 )'
+
+world; order; seat 3 state=idle shells=0 box=empty unpushed=0 dirty=0 branch=null "last=CHECKPOINT:CHECKPOINT reviewer idle after task/zzz 12345678"; rq "09:20 TOOK 09:00 task/zzz 12345678 (lane 3 as reviewer, autopilot, FULL)"; item1 1; ap; a=$out
+rq "09:40 DONE 09:00 READY task/zzz 12345678 (lane 3 as reviewer; REVIEW-zzz.md)"; ap
+check "13.2130 a LANE serving as a reviewer (its last line \`CHECKPOINT reviewer idle after …\`) that still holds its open TOOK is not restarted; CONTROL in the same check: after its DONE (\`lane 3 as reviewer\`) it is free again and, with nothing startable, takes the next item" \
+  'printf "%s" "$a" | grep -q "SKIP lane 3: holds an open review TOOK" && ! printf "%s" "$a" | grep -q WOULD && would "review: lane 3 gisik:3 takes 09:10 task/rev1"'
+race() { world; item1 1; freerev 7; python3 - "$AP" "$1" <<'PY'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("ap", sys.argv[1]); ap = importlib.util.module_from_spec(spec); spec.loader.exec_module(ap)
+L = os.environ["CTL_LANES_DIR"]; w = ap.World(L, os.environ["CTL_AUTOPILOT_REPO"], ap.seats_now(), ap.env_now())
+log = lambda m: print(m)
+acts = [a for a in ap.decide(w, lambda m: None) if a["do"] == "review"]
+assert len(acts) == 1, acts
+if sys.argv[2] == "race":   # another seat writes its TOOK between the decision and the door
+    open(os.path.join(L, "roles", "QUEUE-review.md"), "a").write("10:00 TOOK 09:10 task/rev1 %s (reviewer C, pull, FULL)\n" % acts[0]["item"]["sha"][:8])
+ap.Door(w, False, log, os.environ["CTL_AUTOPILOT_REPO"]).act(acts[0])
+PY
+}
+check "13.2131 the TOOK is written under the reviewers' mkdir lock with a RE-CHECK inside it: when another seat TOOK the item between the decision and the door, the autopilot appends nothing and restarts nobody (NOT TAKEN … taken by another seat); CONTROL in the same check: without the race it appends its TOOK and calls ctl restart; the lock dir is gone afterwards either way" \
+  'o=$(race race) && printf "%s" "$o" | grep -q "NOT TAKEN task/rev1: taken by another seat" && [ ! -e "$T/ctl.log" ] && [ "$(grep -c " TOOK 09:10 task/rev1" "$R/QUEUE-review.md")" = 1 ] && [ ! -e "$R/.queue.lock.d" ] && o=$(race none) && grep -q "(reviewer A, autopilot, FULL)" "$R/QUEUE-review.md" && grep -q "^restart 7 " "$T/ctl.log" && [ ! -e "$R/.queue.lock.d" ]'
 
 # ================================================================ PULL protocol
 world; freerev 9; echo "$R/BOOT-x.md" > "$R/PULL-B.boot"; echo boot > "$R/BOOT-x.md"; ap; a=$out; seat 9 shells=1; ap; b=$out
