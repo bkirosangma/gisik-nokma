@@ -168,6 +168,17 @@ describe('29.356 / 29.357 passes', () => {
     const s2 = applyTicketEvent(released, decided('Yes', { actorId: B, serverTime: T2 }), deps);
     expect(s2.outcome).toBe('Yes');
     expect(s2.passes).toEqual([s1.passes?.[0], { pass: 2, outcome: 'Yes', by: B, at: T2, revisions: [] }]);
+    // a revision and a clear of pass 2 touch pass 2 only: pass 1 is never rewritten
+    const s3 = applyTicketEvent(s2, decided('No', { from: 'Yes', actorId: A, serverTime: T3 }), deps);
+    expect(s3.passes).toEqual([s1.passes?.[0], { pass: 2, outcome: 'No', by: B, at: T2, revisions: [{ from: 'Yes', to: 'No', by: A, at: T3 }] }]);
+    const s4 = applyTicketEvent(s3, decided(null, { from: 'No', actorId: B, serverTime: T4 }), deps);
+    expect(s4.passes?.[0]).toEqual(s1.passes?.[0]);
+    expect(s4.passes?.[1]?.revisions.at(-1)).toEqual({ from: 'No', to: null, by: B, at: T4 });
+    // and the whole list: the clear lands on pass 2's own record (number, opener, both revisions), not on a revised copy of pass 1 in slot 2
+    expect(s4.passes).toEqual([
+      s1.passes?.[0],
+      { pass: 2, outcome: null, by: B, at: T2, revisions: [{ from: 'Yes', to: 'No', by: A, at: T3 }, { from: 'No', to: null, by: B, at: T4 }] },
+    ]);
     expect(releaseOutcome(born)).toBe(born); // control: nothing to release returns the same object
   });
 });
