@@ -41,6 +41,9 @@ async function projectRaw(workspaceId: string, d: Def): Promise<void> {
 async function claimRaw(workspaceId: string, fieldId: string): Promise<void> {
   await appendTestEvent(db.pool, testEnvelope({ workspaceId, actorId: ACTOR, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.field_set', payload: { fieldId, value: '3 hours' } }));
 }
+async function workspaceCreatedRaw(workspaceId: string): Promise<void> {
+  await appendTestEvent(db.pool, testEnvelope({ workspaceId, actorId: ACTOR, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'W' } }));
+}
 async function workflowRaw(workspaceId: string, workflowId: string, version: number, initialStateId: string): Promise<void> {
   const states = [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }];
   await db.pool.query(
@@ -64,8 +67,16 @@ describe('29.147 shadow detector', () => {
     await defineRaw(clean, def('task', { fields: [num('estimates'), num('Estimate'), num('rework')] }));
     await projectRaw(clean, def('task', { fields: [num('estimates'), num('Estimate'), num('rework')] }));
     await claimRaw(clean, 'Estimate'); // the claim source gets its own near miss, so a case-folding claims query is caught too
+    // A non-claim event whose payload happens to carry a fieldId is not a claim; a ticket-type.defined whose fields is not an array (a legacy
+    // payload) must not make the ledger query throw.
+    await appendTestEvent(db.pool, testEnvelope({ workspaceId: clean, actorId: ACTOR, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.reopened', payload: { fieldId: 'estimate' } }));
+    await defineRaw(clean, { ...def('legacy'), fields: 'none' as never });
+    await workspaceCreatedRaw(dirty);
+    await workspaceCreatedRaw(clean);
 
-    const { shadows } = await wtgPreflight(db.pool);
+    const { shadows, database, workspaces } = await wtgPreflight(db.pool);
+    expect(workspaces).toBe(2); // counted from workspace.created events: the two planted above
+    expect(database).toBe(((await db.pool.query<{ d: string }>('SELECT current_database() AS d')).rows[0] as { d: string }).d);
     expect(shadows).toContainEqual({ source: 'ledger-definition', workspaceId: dirty, typeId: 'invoice', fieldId: 'estimate', eventId });
     expect(shadows).toContainEqual({ source: 'type-projection', workspaceId: dirty, typeId: 'invoice', fieldId: 'estimate' });
     expect(shadows).toContainEqual({ source: 'field-claim', workspaceId: dirty, fieldId: 'estimate', claims: 1 });
@@ -86,9 +97,12 @@ describe('29.148 existing decision types', () => {
     await projectRaw(b, def('task', { workflowId: 'wf-b1' }));
     await projectRaw(b, def('decision', { rank: 5, workflowId: 'wf-b2' }));
     await projectRaw(c, def('task'));
+    const d2 = newUlid();
+    await projectRaw(d2, def('decision', { rank: 2, workflowId: 'wf-d2' })); // no task type: taskWorkflowId is null; rank 2 is below the seed, not equal to it
     const { decisionTypes } = await wtgPreflight(db.pool);
     expect(decisionTypes).toContainEqual({ workspaceId: a, name: 'Decision', rank: 3, workflowId: 'wf-a', taskWorkflowId: 'wf-a', rankMatchesSeed: true, sameWorkflowAsTask: true });
     expect(decisionTypes).toContainEqual({ workspaceId: b, name: 'decision', rank: 5, workflowId: 'wf-b2', taskWorkflowId: 'wf-b1', rankMatchesSeed: false, sameWorkflowAsTask: false });
+    expect(decisionTypes).toContainEqual({ workspaceId: d2, name: 'decision', rank: 2, workflowId: 'wf-d2', taskWorkflowId: null, rankMatchesSeed: false, sameWorkflowAsTask: false });
     expect(decisionTypes.some((d) => d.workspaceId === c)).toBe(false);
   });
 });
@@ -114,15 +128,26 @@ describe('29.151 report, exit code, read-only', () => {
   it('29.151 prints every finding, exits 1 only for shadows, and the CLI transaction cannot write', async () => {
     const clean: WtgPreflightReport = { database: 'x', workspaces: 3, shadows: [], decisionTypes: [], terminalInitialWorkflows: [] };
     expect(wtgPreflightExitCode(clean)).toBe(0);
-    expect(formatWtgPreflight(clean)).toContain('shadowing custom fields: none');
+    const cleanText = formatWtgPreflight(clean);
+    expect(cleanText).toContain('wtg-preflight: database x (3 workspaces)');
+    expect(cleanText).toContain('shadowing custom fields: none');
+    expect(cleanText).toContain("existing 'decision' types: none");
+    expect(cleanText).toContain('workflows with a terminal initial state: none');
     const warn = {
       ...clean,
-      decisionTypes: [{ workspaceId: 'W2', name: 'Decision', rank: 5, workflowId: 'wf', taskWorkflowId: 'wf', rankMatchesSeed: false, sameWorkflowAsTask: true }],
+      decisionTypes: [
+        { workspaceId: 'W2', name: 'Decision', rank: 5, workflowId: 'wf', taskWorkflowId: 'wf', rankMatchesSeed: false, sameWorkflowAsTask: true },
+        { workspaceId: 'W5', name: 'Decision', rank: 3, workflowId: 'wf2', taskWorkflowId: null, rankMatchesSeed: true, sameWorkflowAsTask: false },
+      ],
       terminalInitialWorkflows: [{ workspaceId: 'W3', workflowId: 'wf-shipped', version: 2, initialStateId: 'shipped', boundTypes: 1 }],
     };
     expect(wtgPreflightExitCode(warn)).toBe(0); // both warning kinds present, still 0
-    expect(formatWtgPreflight(warn)).toContain('W2');
-    expect(formatWtgPreflight(warn)).toMatch(/W3 workflow wf-shipped v2/); // a terminal-initial finding is printed too
+    const warnText = formatWtgPreflight(warn);
+    expect(warnText).toContain("existing 'decision' types: 2 (T7 adopts them)");
+    expect(warnText).toContain('W2 "Decision" rank 5 (NOT 3: no edit after T5) workflow wf\n'); // a seed-rank-mismatch is flagged, a matching workflow is not annotated
+    expect(warnText).toContain('W5 "Decision" rank 3 workflow wf2 (task uses none)'); // a matching rank is not flagged; a differing task workflow is
+    expect(warnText).toContain('workflows with a terminal initial state: 1 (promotion skips them)');
+    expect(warnText).toMatch(/W3 workflow wf-shipped v2 initial "shipped" \(1 bound types\)/); // a terminal-initial finding is printed too
     const blocked = {
       ...clean,
       shadows: [
@@ -131,15 +156,22 @@ describe('29.151 report, exit code, read-only', () => {
       ],
     };
     expect(wtgPreflightExitCode(blocked)).toBe(1);
-    expect(formatWtgPreflight(blocked)).toMatch(/field-claim\s+W1.*estimate/);
+    expect(wtgPreflightExitCode({ ...clean, shadows: blocked.shadows.slice(0, 1) })).toBe(1); // one shadow is enough
+    expect(formatWtgPreflight(blocked)).toContain('shadowing custom fields: 2 (BLOCKS wtg2 T4)');
+    expect(formatWtgPreflight(blocked)).toMatch(/field-claim\s+W1 field estimate \(2 claims\)/);
     expect(formatWtgPreflight(blocked)).toMatch(/ledger-definition\s+W4 type invoice field waitForAll \(event EV1\)/); // the event id the owner needs
     await expect(inReadOnlyTransaction(db.pool, (tx) => tx.query(`INSERT INTO proj_workspaces (workspace_id) VALUES ('w-ro')`))).rejects.toThrow(/read-only transaction/);
     await db.pool.query(`INSERT INTO proj_workspaces (workspace_id) VALUES ($1)`, [newUlid()]); // control
+    expect(db.pool.totalCount - db.pool.idleCount).toBe(0); // the read-only client went back to the pool
     // The CLI's own wiring (planner ruling 2026-10-04, Q2): a spawned CLI cannot observe read-only-ness, so the
     // source is read. Control: the same pattern does not match the direct call a broken main() would make.
     const wiring = /inReadOnlyTransaction\(pool, wtgPreflight\)/;
     const cli = readFileSync(fileURLToPath(new URL('../../src/tools/wtg-preflight.ts', import.meta.url)), 'utf8');
     expect(cli.slice(cli.indexOf('async function main'))).toMatch(wiring);
     expect('const report = await wtgPreflight(pool);').not.toMatch(wiring); // control
+    // The exit code reaches the process: a CLI that printed a shadow and exited 0 would let the owner read "go".
+    const exitWiring = /process\.exitCode = wtgPreflightExitCode\(report\)/;
+    expect(cli.slice(cli.indexOf('async function main'))).toMatch(exitWiring);
+    expect('process.exitCode = 0;').not.toMatch(exitWiring); // control
   });
 });

@@ -85,7 +85,17 @@ describe('29.150 terminal-category readers', () => {
     writeFileSync(join(dir, 'src', 'planted.ts'), "export const done = (t: { state_category: string }) => t.state_category === 'terminal';\n");
     writeFileSync(join(dir, 'src', 'docblock.ts'), "// a 'terminal' mention in a comment\n/**\n * 'terminal' in a docblock\n */\nexport const x = 1;\n");
     writeFileSync(join(dir, 'src', 'planted.test.ts'), "const a = 'terminal';\n");
-    expect([...scanTerminalReaders(dir, ['src']).keys()]).toEqual(['src/planted.ts']);
+    writeFileSync(join(dir, 'src', 'inline.ts'), "/* 'terminal' in an inline block comment */\nexport const y = 2;\n");
+    // Every skipped directory and file kind, and an extension the walk does not read, each holding a mention the scan must not report.
+    for (const skipped of ['node_modules', 'dist', 'test', 'tests', 'e2e', '.next']) {
+      mkdirSync(join(dir, 'src', skipped));
+      writeFileSync(join(dir, 'src', skipped, 'x.ts'), "const a = 'terminal';\n");
+    }
+    writeFileSync(join(dir, 'src', 'editor.generated.ts'), "const a = 'terminal';\n");
+    writeFileSync(join(dir, 'src', 'notes.md'), "state 'terminal'\n");
+    writeFileSync(join(dir, 'src', 'query.sql'), "SELECT 1 WHERE state_category = 'terminal';\n");
+    writeFileSync(join(dir, 'src', 'cell.tsx'), "export const C = (s: string) => s === 'terminal';\n");
+    expect([...scanTerminalReaders(dir, ['src']).keys()].sort()).toEqual(['src/cell.tsx', 'src/planted.ts', 'src/query.sql']);
 
     const found = scanTerminalReaders(ROOT, SCAN_DIRS);
     expect([...found.keys()].sort()).toEqual(Object.keys(TERMINAL_READERS).sort());
