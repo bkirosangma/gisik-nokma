@@ -13,6 +13,12 @@ function expectFramed(items: readonly FitItem[], vp: { width: number; height: nu
     expect(sy - o.t).toBeGreaterThanOrEqual(8 + topPx - 0.5);
     expect(sy + o.b).toBeLessThanOrEqual(vp.height - 8 + 0.5);
   }
+  // tight on the bounding axis: the fit does not zoom out further than it must
+  const slack = Math.min(...items.flatMap((o) => {
+    const sx = (o.x - f.cx) * k + vp.width / 2, sy = (o.y - f.cy) * k + vp.height / 2;
+    return [sx - o.l - 8, vp.width - 8 - (sx + o.r), sy - o.t - 8 - topPx, vp.height - 8 - (sy + o.b)];
+  }));
+  expect(slack, `${vp.width}x${vp.height}`).toBeLessThan(0.5);
   return f.ratio;
 }
 
@@ -23,6 +29,7 @@ describe('the fit (port of computeFit, knowledge-graph-sigma.html:854-861)', () 
     const vp = { width: 800, height: 500 };
     const ratio = expectFramed(items, vp, TOP_PX.desktop); // width-bound
     expectFramed(items, { width: 1200, height: 400 }, TOP_PX.desktop); // height-bound: the top bar decides
+    expectFramed(items, { width: 1600, height: 300 }, TOP_PX.desktop); // height-bound (the amendment's viewport)
     // a phone: the centre card (key + 22-character title, §3.3), hop 1 as key-only taps on the phone ellipse, the fog ring
     const at = (deg: number) => ({ x: 150 * Math.cos((deg * Math.PI) / 180), y: 170 * Math.sin((deg * Math.PI) / 180) });
     const phone = fitItemsFor(
@@ -48,6 +55,8 @@ describe('the fit (port of computeFit, knowledge-graph-sigma.html:854-861)', () 
     // the centre: 6 × 8.4 px of key vs 27 × 6.9 px of title, + 34; half each side + 8; the title's height above and below
     expect(withFog[0]!.l).toBeCloseTo((27 * 6.9 + 34) / 2 + 8, 9);
     expect(withFog[0]).toEqual({ x: 0, y: 0, l: withFog[0]!.l, r: withFog[0]!.l, t: 30, b: 30 });
+    expect(withFog[5]).toEqual({ x: 0, y: 290 * 0.9, l: 4, r: 4, t: 4, b: 4 }); // the VERTICAL radius is the second one
+    expect(withFog[0]!.r).toBeCloseTo((27 * 6.9 + 34) / 2 + 8, 9);
     expect(withFog[1]).toEqual({ x: 300, y: 0, l: 43, r: 43, t: 18, b: 42 }); // a labelled person: label below
     expect(withFog[2]).toEqual({ x: 0, y: 185, l: 16, r: 6 * 7 + 34, t: 14, b: 14 });
     expect(withFog.slice(3)).toEqual([

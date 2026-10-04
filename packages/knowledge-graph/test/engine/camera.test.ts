@@ -25,6 +25,7 @@ describe('the camera spring (port of loop/zoomAt/settle/panBy, knowledge-graph-s
     expect(TAU_MS).toBe(85);
     const a = { x: 0, y: 0, ratio: 1 }, b = { x: 1, y: 0, ratio: 1 };
     expect(run(a, b, 300).s.x).toBeGreaterThan(0.95);
+    expect(run(a, b, 150).s.x).toBeLessThan(0.95); // "ABOUT 300 ms": 160 ms of 85 ms τ is 0.85; a faster τ (40 ms → 0.98) fails here
     const done = run(a, b, 5000);
     expect(done.settled).toBe(true);
     expect(done.s).toEqual(b);
@@ -52,8 +53,8 @@ describe('the camera spring (port of loop/zoomAt/settle/panBy, knowledge-graph-s
     const a = { x: 0, y: 0, ratio: 4 }, b = { x: 0, y: 0, ratio: 1 };
     const k = 1 - Math.exp(-16 / TAU_MS);
     expect(springStep(a, b, 16, false).state.ratio).toBeCloseTo(4 * Math.pow(1 / 4, k), 12);
-    // the dt at which the spring is half way (a = 0.5): 4 → 1 passes 2 (√(4·1)), not 2.5 ((4 + 1) / 2)
-    expect(springStep(a, b, -TAU_MS * Math.log(0.5), false).state.ratio).toBeCloseTo(2, 12);
+    // the control the title names: at a = 1/2 (dt = τ·ln 2) the ratio is the geometric mean 2, not the arithmetic 2.5
+    expect(springStep(a, b, TAU_MS * Math.LN2, false).state.ratio).toBeCloseTo(2, 9);
   });
 
   it('27.244 limits 0.5×–4× of the fit; past one, a soft zoom rubber-bands with power 0.3; control: inside the range nothing changes', () => {

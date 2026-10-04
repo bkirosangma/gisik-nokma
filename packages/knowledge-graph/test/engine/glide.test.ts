@@ -13,6 +13,7 @@ describe('glide (port of glide, knowledge-graph-sigma.html:890-895) and coast (s
     expect(half.positions.get('a')).toEqual({ x: 87.5, y: 0 });
     expect(half.positions.get('s')).toBe(to.get('s')); // the same point: the adapter skips it, so its edges never flash
     expect(half.positions.get('n')).toEqual({ x: 7, y: 8 }); // no old place: it does not fly in
+    expect(glideFrame(new Map([['v', { x: 3, y: 0 }]]), new Map([['v', { x: 3, y: 40 }]]), 160, false).positions.get('v')).toEqual({ x: 3, y: 35 }); // straight down still tweens
     expect([...half.positions.keys()]).toEqual(['a', 's', 'n']); // an item that left is not drawn
     expect(half.done).toBe(false);
     expect(glideFrame(from, to, 319, false).done).toBe(false);
@@ -26,6 +27,7 @@ describe('glide (port of glide, knowledge-graph-sigma.html:890-895) and coast (s
     const moving = [{ t: 0, x: 0, y: 0 }, { t: 50, x: 50, y: 0 }, { t: 100, x: 100, y: 0 }];
     expect(coastOffset(moving, 100)).toEqual({ x: 300, y: 0 }); // 1 px/ms × 300 ms
     expect(coastOffset([...moving, { t: 200, x: 100, y: 0 }], 200)).toEqual({ x: 0, y: 0 });
+    expect(coastOffset(moving, 150)).toEqual({ x: 0, y: 0 }); // the OTHER "stopped" arm: no new sample, but the pointer rested 50 ms
     // speeding up: only the last 100 ms count (t 0 → 100: 1 px/ms across, 0.5 px/ms down), not t −50 nor only t 50 → 100
     const speeding = [{ t: -50, x: -500, y: 0 }, { t: 0, x: 0, y: 0 }, { t: 50, x: 10, y: 5 }, { t: 100, x: 100, y: 50 }];
     expect(coastOffset(speeding, 100)).toEqual({ x: 300, y: 150 });
