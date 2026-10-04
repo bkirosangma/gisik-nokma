@@ -2,6 +2,7 @@
 # ctl run-tests [--repo W] [--label L] [--dry-run] -- <command…> — run a vitest / tsc / build command through the machine-wide test semaphore
 # (sem.sh), its WHOLE output in a log file, and print at most 30 lines: the counts, the first failure's name and assertion, the log path and the
 # exit code. The verb's own exit code is the command's, never masked; 75 = no slot within CTL_SEM_MAX_WAIT (the command was not run).
+# A command that runs Playwright for knowledge-graph-browser / flow-graph-browser gets a free KG_PW_PORT / FG_PW_PORT of its own (verbs/pw-ports.py; 13.2281-13.2285).
 # ctl_ok / ctl_fail exit 0 / 1, so this verb prints its own last line (OK|FAIL run-tests …) and exits with the real code.
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
