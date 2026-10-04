@@ -86,6 +86,8 @@ describe('29.150 terminal-category readers', () => {
     writeFileSync(join(dir, 'src', 'docblock.ts'), "// a 'terminal' mention in a comment\n/**\n * 'terminal' in a docblock\n */\nexport const x = 1;\n");
     writeFileSync(join(dir, 'src', 'planted.test.ts'), "const a = 'terminal';\n");
     writeFileSync(join(dir, 'src', 'inline.ts'), "/* 'terminal' in an inline block comment */\nexport const y = 2;\n");
+    // A reader after skipped comment lines reports its OWN line number (T17's work list is these numbers, not just the file names).
+    writeFileSync(join(dir, 'src', 'third.ts'), "// c\n/* 'terminal' c */\nexport const t = 'terminal';\n");
     // Every skipped directory and file kind, and an extension the walk does not read, each holding a mention the scan must not report.
     for (const skipped of ['node_modules', 'dist', 'test', 'tests', 'e2e', '.next']) {
       mkdirSync(join(dir, 'src', skipped));
@@ -102,7 +104,10 @@ describe('29.150 terminal-category readers', () => {
     writeFileSync(join(dir, 'src', 'list.ts'), "export const m = { terminal: ['done'] };\n");
     writeFileSync(join(dir, 'src', 'cap.ts'), 'export const k = { terminal: Done };\n');
     // A listed directory that does not exist is skipped, not a crash (a package that was removed).
-    expect([...scanTerminalReaders(dir, ['src', 'missing']).keys()].sort()).toEqual(['src/cap.ts', 'src/cell.tsx', 'src/dot.ts', 'src/kids.ts', 'src/list.ts', 'src/planted.ts', 'src/query.sql', 'src/snake.sql']);
+    const scan = scanTerminalReaders(dir, ['src', 'missing']);
+    expect([...scan.keys()].sort()).toEqual(['src/cap.ts', 'src/cell.tsx', 'src/dot.ts', 'src/kids.ts', 'src/list.ts', 'src/planted.ts', 'src/query.sql', 'src/snake.sql', 'src/third.ts']);
+    expect(scan.get('src/third.ts')).toEqual([3]);
+    expect(scan.get('src/planted.ts')).toEqual([1]);
 
     const found = scanTerminalReaders(ROOT, SCAN_DIRS);
     expect([...found.keys()].sort()).toEqual(Object.keys(TERMINAL_READERS).sort());

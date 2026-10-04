@@ -161,13 +161,17 @@ describe('29.151 report, exit code, read-only', () => {
       shadows: [
         { source: 'field-claim' as const, workspaceId: 'W1', fieldId: 'estimate', claims: 2 },
         { source: 'ledger-definition' as const, workspaceId: 'W4', typeId: 'invoice', fieldId: 'waitForAll', eventId: 'EV1' },
+        { source: 'type-projection' as const, workspaceId: 'W6', typeId: 'bug', fieldId: 'reworkEstimate' },
       ],
     };
     expect(wtgPreflightExitCode(blocked)).toBe(1);
     expect(wtgPreflightExitCode({ ...clean, shadows: blocked.shadows.slice(0, 1) })).toBe(1); // one shadow is enough
-    expect(formatWtgPreflight(blocked)).toContain('shadowing custom fields: 2 (BLOCKS wtg2 T4)');
+    expect(formatWtgPreflight(blocked)).toContain('shadowing custom fields: 3 (BLOCKS wtg2 T4)');
     expect(formatWtgPreflight(blocked)).toMatch(/field-claim\s+W1 field estimate \(2 claims\)/);
     expect(formatWtgPreflight(blocked)).toMatch(/ledger-definition\s+W4 type invoice field waitForAll \(event EV1\)/); // the event id the owner needs
+    // A type-projection line has no event to name: it ends at the field id. Control: the ledger-definition line above DOES carry its event.
+    expect(formatWtgPreflight(blocked)).toMatch(/type-projection\s+W6 type bug field reworkEstimate$/m);
+    expect(formatWtgPreflight(blocked)).not.toContain('(event undefined)');
     await expect(inReadOnlyTransaction(db.pool, (tx) => tx.query(`INSERT INTO proj_workspaces (workspace_id) VALUES ('w-ro')`))).rejects.toThrow(/read-only transaction/);
     await db.pool.query(`INSERT INTO proj_workspaces (workspace_id) VALUES ($1)`, [newUlid()]); // control
     expect(db.pool.totalCount - db.pool.idleCount).toBe(0); // the read-only client went back to the pool
