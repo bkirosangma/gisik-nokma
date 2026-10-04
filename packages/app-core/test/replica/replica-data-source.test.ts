@@ -488,7 +488,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 ELEVEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 27.141 FOURTEEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -535,6 +535,9 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['getWorkspaceSettings', () => ds.query.getWorkspaceSettings(WS)],
       ['getPreferences', () => ds.query.getPreferences(WS)],
       ['putPreferences', () => ds.query.putPreferences(WS, { version: 1, projects: {}, savedFilters: [] })],
+      // Added by Knowledge Graph B (case 27.141), LAST because REPLICA_GAPS gained the key last: the local
+      // store holds no reference index, and an empty page would claim nothing links here.
+      ['getLinkedFrom', () => ds.query.getLinkedFrom(WS, { kind: 'ticket', id: newUlid() })],
     ];
     const names: string[] = [];
     for (const [name, call] of refusals) {
@@ -563,9 +566,9 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         // property this line holds is that the owner is a NAMED plan the client
         // must change — widening the set to the plans that will actually do the
         // work keeps the property; hard-coding any one of them would have made
-        // the sentence false for the others. Prefixes and groups Task 7 added the FOURTH, for `getGroups`.
+        // the sentence false for the others. Prefixes and groups Task 7 added the FOURTH, for `getGroups`. The Knowledge Graph series (specs A–E) added the FIFTH, naming the spec letter that does the work.
         expect(absence.owner, `${name}: ${absence.field}`).toMatch(
-          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan): /,
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan|Knowledge Graph spec [A-E]): /,
         );
       }
       names.push(name);
@@ -581,7 +584,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
   /**
    * 19.071 — the trash series' own witness that `getDeletedItems` is among the
    * refusals, matching 18.038's relationship to 12.185: that case is the
-   * ENUMERATION (it already walks `getDeletedItems` as one of the ELEVEN), this
+   * ENUMERATION (it already walks `getDeletedItems` as one of its refusals), this
    * is the plan that minted the read naming its own case id against it.
    *
    * **The brief's own suggested control — "`getMyWorkspaces` resolves" — does
@@ -612,7 +615,8 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
    * `REPLICA_GAPS`), and this is the notes series' own witness that the seven
    * note reads are among them. A case id belongs to the plan that mints it, and
    * 12.185 cannot cite 18.038 for the same reason it cannot cite any other
-   * later plan's id.
+   * later plan's id. (27.141 is in 12.185's title on purpose: Knowledge Graph B
+   * pins its `getLinkedFrom` entry with that same `it` rather than a second pass.)
    *
    * The CONTROL is in the same `it` because a rejection list on its own is
    * satisfied by a source that rejects everything: `getTicketTypes` resolves.
