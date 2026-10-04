@@ -81,7 +81,7 @@ const OTHER = newUlid();
  * replica produces after a workspace switch on a shared device.
  *
  * The member is deliberately NOT seeded into `WS_B`, and that is not an
- * oversight: the entity↔workspace guard runs INSIDE `commitOne` before
+ * oversight: the entity↔workspace guard runs INSIDE `commitInTx` before
  * `checkPermission` (`ingest-service.ts`, the `readEntityHead` block sits above
  * the gate), which is exactly why this refusal reaches `contest()` at all.
  */

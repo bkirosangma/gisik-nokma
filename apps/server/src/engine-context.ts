@@ -153,7 +153,7 @@ async function readMembershipState(
  * ## Where tenancy comes from, and why an actor cannot choose it
  *
  * This factory takes a client and NOT a workspace, deliberately: it is built
- * once per event inside `commitOne` and the workspace a lookup must be asked
+ * once per event inside `commitInTx` (`commitOne`'s and `atomic`'s shared body) and the workspace a lookup must be asked
  * inside is a property of the EVENT, not of the connection. So the two lookups
  * that resolve an actor-supplied id take a `TenantScope` and every check passes
  * `env` (controller ruling P14). `env.workspaceId` is not the actor's to choose:

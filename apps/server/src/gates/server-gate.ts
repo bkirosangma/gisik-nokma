@@ -8,7 +8,8 @@ export type GateRefusal = { rule: string; reason: string };
  * table) and therefore cannot live in the pure shared rule engine. Gates run
  * INSIDE the ingest transaction — after the rule engine accepts, before the
  * append — reading through the transaction client, so they judge the same
- * consistent world the append is about to join. They live in `commitOne`
+ * consistent world the append is about to join. They live in `commitInTx` (the
+ * body `commitOne` and the atomic set share)
  * rather than in a route, so every ingest path passes through them: `POST
  * /v1/events` today (proven at the client door in
  * `test/gates/gate-seam.test.ts`), and Plan 10's `POST /v1/sync` when it is
