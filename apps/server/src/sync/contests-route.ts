@@ -276,7 +276,10 @@ export function registerContestsRoute(
         // still renders."*). The reason is the FAQ's: a contest is an event
         // that CITES the ticket — *"Its history is retained, because other
         // events cite it"* — and this roster is gated per row by `canSee`,
-        // which is the whole audience decision here. The consequence is named
+        // which is the whole audience decision here (one rewrite rides on it:
+        // a contested LINK claim whose target this viewer cannot see is served
+        // with that target withheld and the gate's cause, typed-links T4b,
+        // `withholdContest` below). The consequence is named
         // rather than left to be found: the deleted ticket's TITLE travels with
         // the contest, because the title is joined from `proj_tickets.fields`
         // and `canSee` knows nothing about deletion.

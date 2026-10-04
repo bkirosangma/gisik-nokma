@@ -12,6 +12,27 @@ import { canSee } from './can-see.js';
  * is the read door's: the detail read serves a restricted parent's id
  * (`parent: {kind:'restricted', id}`), and it withholds a link's.
  * See `visible-events-for.ts`, "What the filter does NOT hide".
+ *
+ * The doors: `GET …/tickets/:id/events` and the detail read
+ * (`routes/tickets.ts`), the stream's ticket arm (`visible-events-for.ts`),
+ * both bootstraps (`sync/sync-routes.ts`'s `bootstrapTicket`), History
+ * (`routes/ticket-history.ts`) and `GET /v1/contests` (`sync/contests-route.ts`).
+ * A served-withheld link event folds to nothing on the client
+ * (`isWithheldLinkEvent` in the domain's `foldTicketEvent`).
+ *
+ * ## Residuals, each with an owner
+ *
+ * - **Widening staleness** (owner ruling Q1 = (a), 2026-10-04). The replica
+ *   dedupes by id and never rewrites a held event, and a held source is not
+ *   re-pulled. So when a hidden target later becomes visible, the offline
+ *   Links section lacks that link until the next full re-bootstrap. Online
+ *   reads are correct. Owner: TL4c widening refresh (post-KG-release).
+ * - **Narrowing.** A device keeps an id it already held when the target is
+ *   later hidden. Not a disclosure: it was told when it could see it
+ *   (the reconcile reasoning). Owner: none (accepted).
+ * - **The claimant's own copies** keep the original cause: `my-work` and the
+ *   stored contest notification are claimant-only, and the claimant passed
+ *   `canSee(target)` at the gate. Owner: none (accepted).
  */
 export type TargetSight = (targetId: string) => Promise<boolean>;
 

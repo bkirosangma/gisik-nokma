@@ -433,6 +433,13 @@ async function nowInvisibleTicketsInScope(
  * and id, nothing else. Redacting it here and not there would be two answers to
  * one question.
  *
+ * A link's other end is the exception, by the same rule (typed-links T4b, spec
+ * A §2.4): the read door withholds a link whose target this user cannot see,
+ * where it serves a restricted parent's id. So the ticket arm yields such a
+ * link event with `targetId: null`, and a contest of such a claim with the
+ * gate's cause, at the same `seq` and `workspaceSeq` (`withhold-link-targets.ts`,
+ * with the READER's sight). Each id follows its own read door.
+ *
  * ## Determinism
  *
  * No clock, locale or random source is read, and no caller can make one be

@@ -274,7 +274,7 @@ export type LedgerRow = {
 /**
  * A ledger row on the wire. Every field of the stored event, unchanged.
  *
- * ## There is no redacting path, and that is the point
+ * ## This serializer has no redacting path, and that is the point
  *
  * Provenance is never withheld from someone entitled to the state (spec §6).
  * `actor_id` goes out even when the actor shares no project — indeed no
@@ -282,6 +282,15 @@ export type LedgerRow = {
  * client/server skew the product reports stays visible. There is deliberately
  * no second serializer here that "anonymizes": a redacting path that exists is
  * a path something can drift into.
+ *
+ * ONE fact is withheld per viewer, at the door and not here (typed-links T4b,
+ * spec A §2.4, owner ruling Q2 2026-10-04): a link event whose other end this
+ * viewer cannot see goes out with `targetId: null`, and a contest of such a
+ * claim with the gate's cause, because a `link.reverse` reason names the hidden
+ * ticket's title. The claim is not cut: the event, its id, type, actor, origin,
+ * both clocks and seq all go out. Only the other end's id and a contest's cause
+ * are withheld, by `visibility/withhold-link-targets.ts`, which the `/events`
+ * handler applies to this function's output.
  *
  * Both instants are rendered with `.toISOString()` rather than left to the JSON
  * serializer, for the reason `sync/contests-route.ts` gives at the same spot:

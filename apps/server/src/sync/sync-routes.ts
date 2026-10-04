@@ -198,6 +198,12 @@ export type BootstrapResponse = {
  * exporting beats reimplementing for a second reason that is not obvious:
  * closure 4 populates the snapshot's provenance block INSIDE this function, so
  * a caller that reimplements the body would silently serve tickets without it.
+ * The rig's restatement did exactly that until typed-links T4b deleted it.
+ *
+ * **The payload is per viewer** (typed-links T4b, spec A §2.4): `sees` is the
+ * caller's `targetSight`, and a link whose target that viewer cannot see is
+ * withheld from the snapshot's `state.links` (`withholdLinks`) and from every
+ * event, the backfilled contests included (`withholdEvent`).
  */
 export async function bootstrapTicket(client: PoolClient, ticketId: string, sees: TargetSight): Promise<BootstrapTicket> {
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);

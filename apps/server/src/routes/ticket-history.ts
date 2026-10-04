@@ -32,7 +32,11 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * redacted from someone entitled to the state, and every claim-bearing field
  * above goes out whole, with ONE exception: a link event's `payload.targetId`
  * is withheld (`null`) when this viewer cannot see the target (spec A §2.4,
- * see `linkTarget`).
+ * see `linkTarget`), and a contest of such a link claim goes out with that
+ * payload withheld and the gate's cause in place of its own, because a
+ * `link.reverse` reason names the hidden ticket's title (typed-links T4b). The
+ * claim is not cut: only the other end's id and the contest's cause are
+ * withheld, per viewer (`visibility/withhold-link-targets.ts`).
  */
 export type TicketHistoryEvent = {
   id: string;
