@@ -274,6 +274,9 @@ it('28.095 publish reaches the readers: an online reader is sent a reach-granted
   await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: child, parentId: parent, workflowId, draftBy: author });
   await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: twin, workflowId, createdBy: author });
   const edit = await record(ticketEvent(ws, 'ticket.field_set', parent, { fieldId: 'title', value: 'drafted' }, author));
+  // a reach-grant TRIGGER on the draft before the publish (the owner's ruling: probe the grant for a leak): the draft
+  // is assigned to the online reader, and still nothing about it may reach them until the publish
+  const assign = await recordFull(ticketEvent(ws, 'ticket.assigned', parent, { assigneeId: online }, author));
   const twinEdit = await record(ticketEvent(ws, 'ticket.field_set', twin, { fieldId: 'title', value: 'twin edited' }, author));
 
   // BEFORE the publish: the stream is live for both readers (the twin's edit) and says nothing of the draft
@@ -281,6 +284,8 @@ it('28.095 publish reaches the readers: an online reader is sent a reach-granted
     const items = await collect(viewer, ws, 0);
     expect(idsOf(items), name).toContain(twinEdit.id);
     expect(idsOf(items), name).not.toContain(edit.id);
+    expect(idsOf(items), name).not.toContain(assign.id);
+    expect(idsOf(items), name).not.toContain(`reach-granted:${parent}`); // the assignment granted nothing
     expect(entityIds(items), name).not.toContain(parent);
     expect(idsOf(items).join('|'), name).not.toContain(parent);
   }
@@ -289,13 +294,14 @@ it('28.095 publish reaches the readers: an online reader is sent a reach-granted
 
   // the online reader's cursor ran past the drafting: a notice, then the event
   const onlineIds = idsOf(await collect(online, ws, twinEdit.workspaceSeq));
-  expect(onlineIds).toContain(`reach-granted:${parent}`);
+  expect(onlineIds.filter((id) => id === `reach-granted:${parent}`)).toHaveLength(1); // once, at the publish
   expect(onlineIds.indexOf(`reach-granted:${parent}`)).toBeLessThan(onlineIds.indexOf(published.id));
   expect(onlineIds.join('|')).not.toContain(child); // the child is still a draft: not named
 
   // the away reader's cursor is at the start: the ordinary stream carries everything, in order
   const awayIds = idsOf(await collect(away, ws, 0));
-  expect(awayIds).toEqual(expect.arrayContaining([edit.id, published.id]));
-  expect(awayIds.indexOf(edit.id)).toBeLessThan(awayIds.indexOf(published.id));
+  expect(awayIds).toEqual(expect.arrayContaining([edit.id, assign.id, published.id]));
+  expect(awayIds.indexOf(edit.id)).toBeLessThan(awayIds.indexOf(assign.id));
+  expect(awayIds.indexOf(assign.id)).toBeLessThan(awayIds.indexOf(published.id));
   expect(awayIds.join('|')).not.toContain(child);
 });

@@ -129,6 +129,15 @@ describe('28.108 the gate parameter', () => {
     const ghost = newUlid();
     expect(await discardDraft(shared.pool, ghost, deps())).toEqual(skipped(ghost, 'not-found'));
     expect(await ticketRows(shared, w.S)).toBe(1);
+    // a draft flagged discarded with NO ticket.discarded in its stream is a corrupted projection: the gate fails the
+    // erasure (the sweep alerts and retries) rather than invent who discarded it, and nothing is erased
+    await shared.pool.query('UPDATE proj_tickets SET draft_discarded = true WHERE ticket_id = $1', [w.S]);
+    await expect(discardDraft(shared.pool, w.S, deps())).rejects.toThrow(
+      `draft ${w.S} is flagged discarded but its ticket.discarded event is missing`,
+    );
+    expect(await ticketRows(shared, w.S)).toBe(1);
+    expect(await scan(shared.pool, [w.S])).not.toHaveProperty(['purged_entities.entity_id']);
+    await shared.pool.query('UPDATE proj_tickets SET draft_discarded = NULL WHERE ticket_id = $1', [w.S]);
 
     await applyCommitted(shared.pool, [discard(w, w.D)]);
     // the DEFAULT gate is the trash gate, unchanged: no mark, so no erasure
