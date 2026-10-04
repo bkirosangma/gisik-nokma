@@ -13,10 +13,24 @@ import type { ClientIngest } from '../ingest/ingest-service.js';
 import { checkPermission, NAMED_PERSON_NOT_IN_WORKSPACE_REASON } from '../permissions/check-permission.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
+import { isOpenableDraft } from '../visibility/can-open.js';
 import type { ServerAppend } from './invites.js';
 
 /** The refusal for a `userId` that is no account at all (case 6.215). */
 export const NO_ACCOUNT_REASON = 'That person has no account.';
+/** Drafts spec R8: a draft is private to its author, so there is nobody to bring in to see it. */
+export const DRAFT_NO_OUTSIDERS_RULE = 'draft.no-outsiders';
+export const DRAFT_NO_OUTSIDERS_REASON = 'Publish the ticket before inviting someone from outside';
+
+/** A `ticket.created` that is born a draft (the payload's `draft` flag; a malformed payload is the ingest door's to refuse). */
+function isDraftBirth(event: SubmittedEvent): boolean {
+  return (
+    event.type === 'ticket.created' &&
+    typeof event.payload === 'object' &&
+    event.payload !== null &&
+    (event.payload as { draft?: unknown }).draft === true
+  );
+}
 export const PEOPLE_RULE = 'people.outsider';
 export const OUTSIDER_EVENT_MISMATCH_MESSAGE =
   'The claim must be your own ticket.created or ticket.assigned in this workspace, naming this person as the assignee.';
@@ -178,6 +192,16 @@ export function registerPeopleRoutes(
       if (preflight !== null && !needsGrant) {
         return reply.status(422).send({
           result: { status: 'refused', eventId: event.id, rule: preflight.rule, reason: preflight.reason } satisfies IngestResult,
+        });
+      }
+      // Drafts (spec 1, R8): nobody from outside is pulled into a draft, whether or not they need a guest grant. Anyone
+      // but the author has already been answered as for an unknown ticket by the preflight above, so what reaches
+      // this line is the author's own act, and refusing it BEFORE the grant means no guest is added and then removed.
+      if (isDraftBirth(event) || (event.type === 'ticket.assigned' && (await isOpenableDraft(deps.pool, callerId, event.entity.id)))) {
+        return reply.status(422).send({
+          result: {
+            status: 'refused', eventId: event.id, rule: DRAFT_NO_OUTSIDERS_RULE, reason: DRAFT_NO_OUTSIDERS_REASON,
+          } satisfies IngestResult,
         });
       }
 

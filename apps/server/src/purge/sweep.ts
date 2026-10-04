@@ -3,13 +3,16 @@ import { purgeDueAt, type LifecycleKind } from '@gisik-nokma/domain';
 import type { ErrorAlerter } from '../alerts/error-alerter.js';
 import type { ObjectStore } from '../attachments/object-store.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
+import { discardDraft, pendingDraftDiscards } from './discard-draft.js';
 import { deletePendingObjects } from './pending-objects.js';
 import { purgeItem, type PurgeOutcome, type PurgeTarget } from './purge-item.js';
 
 /**
  * The permanent-delete sweep (trash series Plan 2; spec §5.1, §7), modelled on
  * `../auto-close/sweep.ts` and hosted on the backup worker's scheduler
- * (`../ops/backup-daemon-main.ts`, job `purge`).
+ * (`../ops/backup-daemon-main.ts`, job `purge`). The sweep also erases
+ * discarded drafts (`./discard-draft.ts`), the safety net for the hook
+ * `buildApp` registers.
  */
 
 /** Parents first: a workspace purge takes its projects; a project its tickets and notes. */
@@ -24,11 +27,14 @@ export type PurgeSweepDeps = {
   log?: (message: string, error?: unknown) => void;
   /** Test seam: the per-item purge. Defaults to `purgeItem`. */
   purge?: typeof purgeItem;
+  /** Test seam: the erasure of one discarded draft. Defaults to `discardDraft`. */
+  discard?: typeof discardDraft;
 };
 
 export type PurgeSweepReport = {
   candidates: number;
   purged: number;
+  drafts: number;
   skipped: number;
   failed: number;
   objectsDeleted: number;
@@ -94,6 +100,7 @@ export async function runPurgeSweep(deps: PurgeSweepDeps): Promise<PurgeSweepRep
   const report: PurgeSweepReport = {
     candidates: targets.length,
     purged: 0,
+    drafts: 0,
     skipped: 0,
     failed: 0,
     objectsDeleted: 0,
@@ -122,6 +129,30 @@ export async function runPurgeSweep(deps: PurgeSweepDeps): Promise<PurgeSweepRep
       report.objectsDeleted += outcome.objectsDeleted;
     } else {
       report.skipped += 1;
+    }
+  }
+
+  // Discarded drafts (drafts spec R16): the safety net for the post-commit hook. A draft has no mark and no delay,
+  // so it is erased the first time a sweep sees the flag. Counted apart from `purged`/`candidates`, which stay the
+  // trash's; a failure counts in `failed` and is alerted under its own context, like the loop above.
+  const discard = deps.discard ?? discardDraft;
+  for (const ticketId of await pendingDraftDiscards(deps.pool)) {
+    try {
+      const outcome = await discard(deps.pool, ticketId, { projections: deps.projections, store: deps.store, now });
+      if (outcome.status === 'purged') {
+        report.drafts += 1;
+        report.objectsDeleted += outcome.objectsDeleted;
+      } else {
+        report.skipped += 1;
+      }
+    } catch (error) {
+      report.failed += 1;
+      log(`draft erasure failed for ticket ${ticketId}`, error);
+      try {
+        await deps.alerter.notify(`draft-discard:${ticketId}`, error);
+      } catch (notifyError) {
+        log('purge alerter failed', notifyError);
+      }
     }
   }
 

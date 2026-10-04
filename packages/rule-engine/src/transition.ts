@@ -149,10 +149,11 @@ export async function evaluateTicketTransitioned(
   // named a number every view reported as zero, and from the product's UI the
   // parent could never be finished. The same boundary read as `closed` above:
   // `deleted?` is optional on the domain type.
+  // A DRAFT child is not open work either (drafts spec; `checks/close.ts`).
   if (toState.category === 'terminal') {
     const children = await ctx.getChildrenStates(ticket.id);
     const openCount = children.filter(
-      (child) => child.stateCategory !== 'terminal' && (child.deleted ?? null) === null,
+      (child) => child.stateCategory !== 'terminal' && (child.deleted ?? null) === null && child.draft === undefined,
     ).length;
     if (openCount > 0) {
       return {

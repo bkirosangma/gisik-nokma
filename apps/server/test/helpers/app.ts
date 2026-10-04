@@ -7,6 +7,7 @@ import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import type { ObjectStore } from '../../src/attachments/object-store.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
+import { discardDraft } from '../../src/purge/discard-draft.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import type { ErrorAlerter } from '../../src/alerts/error-alerter.js';
 import type { InviteMailer } from '../../src/invites/invite-mailer.js';
@@ -129,6 +130,14 @@ export type BuildTestAppOverrides = {
   inviteMailer?: InviteMailer;
   /** The error alerter (`BuildAppOptions.alerter`); absent is the no-op one. */
   alerter?: ErrorAlerter;
+  /**
+   * `AppDeps.onDraftDiscarded` (drafts T5). Undefined wires the REAL erasure (`discardDraft` over this app's own
+   * projections and store), which is what `src/index.ts` does; `null` supplies nothing, so the app registers no
+   * listener (28.107); a function replaces it.
+   */
+  onDraftDiscarded?: ((ticketId: string) => Promise<void>) | null;
+  /** Called with the assembled ingest BEFORE `buildApp` subscribes to it, so a test can count or spy on the listeners (28.107). */
+  observeIngest?: (ingest: IngestService) => void;
 };
 
 /**
@@ -167,11 +176,14 @@ export function buildTestApp(
     // The browser's origin, so better-auth trusts the product's own client.
     webOrigin: 'http://localhost:3001',
   });
+  const projections = overrides.projections ?? buildProjectionRegistry();
+  const store = overrides.store ?? createObjectStoreFromEnv({});
   const ingest = createIngestService({
     pool: db.pool,
     evaluate: evaluateEvent,
-    projections: overrides.projections ?? buildProjectionRegistry(),
+    projections,
   });
+  overrides.observeIngest?.(ingest);
   const app = buildApp(
     {
       db: db.pool,
@@ -192,7 +204,16 @@ export function buildTestApp(
       // Defaulted HERE rather than left to `buildApp`, because `AppDeps.store`
       // is required and deliberately so — see its docblock. This helper owns
       // the cheap honest default for the ~sixty test files that never upload.
-      store: overrides.store ?? createObjectStoreFromEnv({}),
+      store,
+      // The draft erasure (drafts T5), wired for every assembled app the way `src/index.ts` wires it, so any suite
+      // can discard a draft end to end; `null` opts out (28.107 counts the listener).
+      onDraftDiscarded:
+        overrides.onDraftDiscarded === null
+          ? undefined
+          : (overrides.onDraftDiscarded ??
+            (async (ticketId) => {
+              await discardDraft(db.pool, ticketId, { projections, store, now: new Date() });
+            })),
     },
     overrides.logStream === undefined
       ? { security: overrides.security, alerter: overrides.alerter }

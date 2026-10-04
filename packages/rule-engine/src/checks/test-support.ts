@@ -114,3 +114,32 @@ export function createdIn(
     payload: { typeId, projectId, parentId: null, title: `ticket ${id.slice(4, 8)}` },
   });
 }
+
+/** The author of every draft in the draft suites, and a second person who is not (drafts T5). */
+export const AUTHOR = '01J9GATHR00000000000000000';
+export const OTHER = '01J9GPEER00000000000000000';
+
+/**
+ * A DRAFT's `ticket.created` (drafts spec §2.2): `draft: true`, born in the Backlog, filed by `actorId`, who
+ * becomes its author in the reducer (`draft.authorId = env.actorId`).
+ */
+export function draftCreated(
+  id: string,
+  typeId: string,
+  parentId: string | null,
+  actorId: string = AUTHOR,
+  projectId: string = PROJECT,
+): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.created',
+    entity: { kind: 'ticket', id },
+    workspaceId: WS,
+    actorId,
+    payload: { typeId, projectId, parentId, title: `draft ${id.slice(4, 8)}`, start: 'backlog', draft: true },
+  });
+}
+
+/** Any ticket-scoped event on `id`, filed by `actorId`. */
+export function onTicket(id: string, type: string, payload: unknown, actorId: string = AUTHOR): EventEnvelope {
+  return makeEnvelope({ type, entity: { kind: 'ticket', id }, workspaceId: WS, actorId, payload });
+}

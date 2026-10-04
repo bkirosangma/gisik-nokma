@@ -82,8 +82,8 @@ export function problems(table: Record<string, Counts>, scanned: Record<string, 
  * (errata E1) is not a row: its draft arm reads the ledger, not `proj_tickets`; 28.068 is its guard.
  */
 const CENSUS: Record<string, Site> = {
-  'auto-close/sweep.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: "the candidate query ANDs LIVE_TICKET_WHERE; C7 adds 'ticket.published' to the entered-state read (:181); the NOT EXISTS child clause moves in T5" },
-  'notifications/fanout.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "every recipient is gated by canSeeTicket (:85), so no draft notice leaves the author's hands; the publish arm is T5" },
+  'auto-close/sweep.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: "the candidate query ANDs LIVE_TICKET_WHERE; C7 adds 'ticket.published' to the entered-state read (:181); the NOT EXISTS child clause excludes draft children (28.096)" },
+  'notifications/fanout.ts': { tickets: 0, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B'], why: "every recipient is gated by canSeeTicket (:85), so no draft notice leaves the author's hands; the publish arm tells the assignee and the mentioned people once, through the same gate" },
   'notifications/sweep.ts': { tickets: 3, visibility: 0, canSee: 1, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: "the due and stale queries AND LIVE_TICKET_WHERE; C7 adds 'ticket.published' to the entered-state read (:259)" },
   'permissions/check-lifecycle.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'engine: the project id of the ticket a lifecycle mark names; no viewer' },
   'permissions/check-permission.ts': { tickets: 0, visibility: 0, canSee: 2, resolved: 0, getResolved: 1, groups: ['B', 'D', 'E'], why: 'canSee at :1573 (note create-with-ticket, closed by A) and :1602 (the note.attached gate, G11 in T9); G1 is ticketAccess now (28.084 counts it); getResolvedVisibility at :1718 is the visibility.set authority read, behind G1' },
@@ -91,9 +91,10 @@ const CENSUS: Record<string, Site> = {
   'projections/proj-visibility.ts': { tickets: 0, visibility: 7, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the projection itself; T3 writes draft_author_id here' },
   'projections/rollups.ts': { tickets: 7, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['C'], why: 'C1: recomputeParent and recomputeProject count children' },
   'projections/tickets.ts': { tickets: 4, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: "the projection and the engine's by-id readers; they must see drafts (R40)" },
+  'purge/discard-draft.ts': { tickets: 2, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the draft gate reads the discard flag and pendingDraftDiscards lists flagged rows; both are the erasure itself, no viewer' },
   'purge/erasure.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'erasure set and table rules; no viewer' },
   'purge/purge-item.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the purge transaction; no viewer' },
-  'purge/sweep.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the scheduled purge; T5 adds the draft arm' },
+  'purge/sweep.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['E'], why: 'the scheduled purge; its draft arm reads no table itself, it calls purge/discard-draft.ts' },
   'read/ancestry.ts': { tickets: 1, visibility: 1, canSee: 0, resolved: 0, getResolved: 0, groups: ['B'], why: 'ancestor chain through visibleTicketsWhere and LIVE_TICKET_WHERE; no legal ledger holds a published ticket under a draft (R4)' },
   'read/deleted-items.ts': { tickets: 3, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['B', 'C'], why: 'C3: containedCount; the listing at :178 reads soft-deleted rows, which a draft never is' },
   'read/drafts.ts': { tickets: 1, visibility: 0, canSee: 0, resolved: 0, getResolved: 0, groups: ['D'], why: 'G8: listMyDrafts reads the caller\'s own drafts by draft_author_id = viewer; no other reader may call it with another id (28.084 lists its callers)' },

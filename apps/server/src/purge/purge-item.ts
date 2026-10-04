@@ -23,7 +23,7 @@ export type PurgeDeps = {
   now: Date;
 };
 
-export type PurgeSkipReason = 'already-purged' | 'not-found' | 'not-marked' | 'not-due';
+export type PurgeSkipReason = 'already-purged' | 'not-found' | 'not-marked' | 'not-due' | 'not-discarded';
 
 export type PurgeOutcome =
   | {
@@ -44,7 +44,7 @@ const LOCATE: Record<LifecycleKind, string> = {
   note: 'SELECT workspace_id, purge_marked_at, purge_marked_by FROM proj_notes WHERE note_id = $1',
 };
 
-type Located = { workspaceId: string; markedAt: string | null; markedBy: string | null };
+export type Located = { workspaceId: string; markedAt: string | null; markedBy: string | null };
 
 async function locate(db: PoolClient, target: PurgeTarget): Promise<Located | null> {
   const { rows } = await db.query<{
@@ -91,14 +91,37 @@ type Committed =
   | { status: 'skipped'; reason: PurgeSkipReason }
   | { status: 'erased'; workspaceId: string; erased: number; tombstoneId: string; keys: string[] };
 
+/** Who and when the erasure is recorded as having been decided (the tombstone's `markedBy` and `markedAt`), or why this item is not erasable yet. */
+export type PurgeGateVerdict = { ok: true; markedBy: string; markedAt: string } | { ok: false; reason: PurgeSkipReason };
+
+/**
+ * The question `purgeItem` asks UNDER the workspace and entity locks before it deletes anything: may this item be
+ * erased now? The trash gate (`markedAndDue`) is the default; a discarded draft has its own (`discard-draft.ts`).
+ * It runs on the transaction's client, so what it reads is what the erasure will act on.
+ */
+export type PurgeGate = (client: PoolClient, target: PurgeTarget, item: Located, now: Date) => Promise<PurgeGateVerdict>;
+
+/** The trash series' gate, unchanged: marked by someone, and the 15-day delay has passed. */
+export const markedAndDue: PurgeGate = async (_client, _target, item, now) => {
+  if (item.markedAt === null || item.markedBy === null) return { ok: false, reason: 'not-marked' };
+  if (Date.parse(purgeDueAt(item.markedAt)) > now.getTime()) return { ok: false, reason: 'not-due' };
+  return { ok: true, markedBy: item.markedBy, markedAt: item.markedAt };
+};
+
 /**
  * Permanently erases one item (trash series Plan 2; spec §5.2–§5.6). One
  * transaction for everything but the object store; see this plan's Task 5 for
  * why each step sits where it does. Skips — never erases — an item that is
- * already erased, gone, unmarked or not yet due, re-reading the mark UNDER the
- * workspace lock so an unmark that committed first is honoured.
+ * already erased, gone, or refused by `gate` (by default: unmarked or not yet
+ * due), re-reading the mark UNDER the workspace lock so an unmark that
+ * committed first is honoured.
  */
-export async function purgeItem(pool: Pool, target: PurgeTarget, deps: PurgeDeps): Promise<PurgeOutcome> {
+export async function purgeItem(
+  pool: Pool,
+  target: PurgeTarget,
+  deps: PurgeDeps,
+  gate: PurgeGate = markedAndDue,
+): Promise<PurgeOutcome> {
   const committed = await inTransaction<Committed>(pool, async (client) => {
     if (await isPurged(client, target)) return { status: 'skipped', reason: 'already-purged' };
     const first = await locate(client, target);
@@ -107,8 +130,8 @@ export async function purgeItem(pool: Pool, target: PurgeTarget, deps: PurgeDeps
     await lockEntity(client, target.kind, target.id);
     const item = await locate(client, target);
     if (item === null) return { status: 'skipped', reason: 'not-found' };
-    if (item.markedAt === null || item.markedBy === null) return { status: 'skipped', reason: 'not-marked' };
-    if (Date.parse(purgeDueAt(item.markedAt)) > deps.now.getTime()) return { status: 'skipped', reason: 'not-due' };
+    const verdict = await gate(client, target, item, deps.now);
+    if (!verdict.ok) return { status: 'skipped', reason: verdict.reason };
 
     // BEFORE anything is deleted: the deleted rows may hold the workspace's
     // highest workspace_seq, and MAX+1 afterwards would re-issue a stream
@@ -141,7 +164,7 @@ export async function purgeItem(pool: Pool, target: PurgeTarget, deps: PurgeDeps
       entity: { kind: target.kind, id: target.id },
       type: 'purge.completed',
       version: 1,
-      payload: purgeCompletedPayload.parse({ kind: target.kind, markedBy: item.markedBy, markedAt: item.markedAt }),
+      payload: purgeCompletedPayload.parse({ kind: target.kind, markedBy: verdict.markedBy, markedAt: verdict.markedAt }),
       actorId: SYSTEM_ACTOR_PURGE,
       origin: 'server',
       clientTime: at,

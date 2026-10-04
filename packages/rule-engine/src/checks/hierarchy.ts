@@ -1,4 +1,4 @@
-import type { EventEnvelope, TicketState } from '@gisik-nokma/domain';
+import type { EventEnvelope, TicketState, TicketTypeDef } from '@gisik-nokma/domain';
 import { DEEPEST_RANK, isCreatableState, label, ticketCreatedPayload, ticketReparentedPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
@@ -19,7 +19,11 @@ import {
  *   already exists → unknown type → workflow undefined → state not creatable
  *     → (root) deepest-rank rule
  *     → unknown parent (a parent in another WORKSPACE is one of these)
+ *     → a DRAFT parent (drafts T5, `draftParentVerdict`) → deleted parent
  *     → cross-project → parent's type unknown → rank → parent-terminal
+ *
+ * Everything from the deepest-rank rule on is `checkParentPlacement` below,
+ * factored out (drafts T5) so a `ticket.published` asks the same questions.
  *
  * State-not-creatable (starting-status design, 2026-09-23) sits directly after
  * the workflow resolves and BEFORE every parent branch: `isCreatableState` is
@@ -111,7 +115,50 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
     return refuse('workflow.state-not-creatable', workflowStateNotCreatableRefusal(label(workflow, p.stateId)));
   }
 
-  if (p.parentId === null) {
+  return checkParentPlacement(env, ctx, {
+    parentId: p.parentId,
+    projectId: p.projectId,
+    type,
+    placed: p.draft === true ? 'draft' : 'ticket',
+  });
+}
+
+/**
+ * What is being placed under a parent: a DRAFT (creation or reparent of a draft), an ordinary TICKET (created or
+ * moved), or a draft being PUBLISHED (drafts spec R3, R4, R11). The three differ only in what a draft parent means.
+ */
+export type PlacedAs = 'draft' | 'ticket' | 'publishing';
+
+/**
+ * What a parent that is a draft means for the thing placed under it (drafts spec R3, R4, R11), or `null` when the
+ * parent is not a draft. Compared by AUTHOR first: another person's draft and a discarded one "do not exist" for
+ * the actor, in the same sentence a missing parent gets (R3's reason: no oracle), and only the actor's OWN live
+ * draft is a real parent, for a DRAFT placed under it. A published ticket's own stream never names a draft (R4,
+ * owner ruling O1: "just no parent"), so it gets the missing-parent sentence too; the draft-side `childId` form
+ * (T6) is how a published ticket is given a draft parent. A publish must wait for its parent
+ * (`draft.parent-unpublished`, R11).
+ */
+export function draftParentVerdict(parent: TicketState, actorId: string, placed: PlacedAs): Refusal | null {
+  if (parent.draft === undefined) return null;
+  if (parent.draft.discarded === true || parent.draft.authorId !== actorId) return refuse('hierarchy.unknown-parent');
+  if (placed === 'draft') return null;
+  if (placed === 'publishing') return refuse('draft.parent-unpublished');
+  return refuse('hierarchy.unknown-parent');
+}
+
+/**
+ * The placement half of `ticket.created`, factored out so a PUBLISH asks exactly the same questions (drafts spec
+ * R10: "the same function `checkTicketCreated` calls; factor it out; do not copy it"). In order: the root-rank
+ * rule, then the parent (unknown, a draft, deleted, another project, an unreadable type, rank, finished).
+ * `checkTicketCreated`'s docblock above gives the order and the reason for each step; nothing moved but the code.
+ */
+export async function checkParentPlacement(
+  env: EventEnvelope,
+  ctx: EngineContext,
+  args: { parentId: string | null; projectId: string; type: TicketTypeDef; placed: PlacedAs },
+): Promise<Accept | Refusal> {
+  const { parentId, projectId, type, placed } = args;
+  if (parentId === null) {
     // Owner decision (2026-08-20): the parent requirement follows the RANK, not
     // the built-in id — the built-in sub-task and any custom type an admin
     // defines at that rank or below it all carry it.
@@ -144,8 +191,10 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // confirmed to the actor that the id exists somewhere they cannot see. The
   // ingest door's tenancy check does not cover this: it guards the event's own
   // entity, never the parent the payload names.
-  const parent = await getTicketState(ctx, p.parentId);
+  const parent = await getTicketState(ctx, parentId);
   if (!parent || parent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+  const draftVerdict = draftParentVerdict(parent, env.actorId, placed);
+  if (draftVerdict !== null) return draftVerdict;
   // A SOFT-DELETED parent is refused here, after tenancy and before anything
   // about its shape (E6-4). The reader serves deleted rows by design and hands
   // callers the live-only predicate; this is the create path taking it. Ahead
@@ -154,7 +203,7 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // is the one they can act on. Same boundary read as `closed`: `deleted?` is
   // optional on the domain type.
   if ((parent.deleted ?? null) !== null) return refuse('hierarchy.parent-deleted');
-  if (parent.projectId !== p.projectId) return refuse('hierarchy.cross-project');
+  if (parent.projectId !== projectId) return refuse('hierarchy.cross-project');
 
   // The PARENT's type, and the parent is the subject of the refusal. This used
   // to answer `ticket.unknown-type` — "This ticket's type is not defined in
@@ -200,7 +249,8 @@ const MAX_ANCESTOR_HOPS = 1000;
  *   unknown ticket → unknown type
  *     → (to root) deepest-rank rule
  *     → self/cycle → unknown parent (a parent in another WORKSPACE is one of
- *       these) → cycle by ancestry
+ *       these) → a DRAFT parent (drafts T5, `draftParentVerdict`) → deleted
+ *       parent → cycle by ancestry
  *     → cross-project → parent's type unknown → rank → parent-terminal
  *
  * **A LOOP IS NAMED AS A LOOP even when rank or project is also violated.** The
@@ -280,6 +330,10 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   // names.
   const newParent = await getTicketState(ctx, p.newParentId);
   if (!newParent || newParent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+  // Drafts (spec 1, R3, R4, owner ruling O1): a draft may move under its author's own draft; a published ticket's
+  // own stream never names a draft (`hierarchy.unknown-parent`; the draft-side `childId` form is T6's).
+  const draftVerdict = draftParentVerdict(newParent, env.actorId, ticket.draft === undefined ? 'ticket' : 'draft');
+  if (draftVerdict !== null) return draftVerdict;
   // The reparent path taking the same live-only predicate as the create path
   // above (E6-4), in the same position: after tenancy, before the cycle walk
   // and everything about the parent's shape. A move onto a deleted parent

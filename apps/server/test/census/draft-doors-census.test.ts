@@ -36,6 +36,7 @@ const DOORS: Record<string, Partial<Calls>> = {
   'permissions/check-permission.ts': { ticketAccess: 1 }, // G1
   'read/drafts.ts': { holdsDraftRights: 1 }, // listMyDrafts holds each row to R18, the same function the doors use
   'routes/drafts.ts': { listMyDrafts: 2 }, // G8, both reads
+  'routes/people.ts': { isOpenableDraft: 1 }, // R8 (drafts T5): the outsider door refuses an assignment on the caller's own draft
   'routes/tickets.ts': { canOpen: 3 }, // G7: the detail read, the parent crumb, the epic walk
   'sync/contests-route.ts': { canOpen: 1 }, // G6
   'sync/reconcile-route.ts': { canOpen: 1 }, // G5
