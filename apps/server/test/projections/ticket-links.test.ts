@@ -3,7 +3,7 @@
  * Cases 27.020–27.022 (`test-cases/27-knowledge-graph.md` §27.1). One database per file, as `seedNotesFixture` demands.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedNotesFixture, type NotesFixture } from '../helpers/notes-fixture.js';
@@ -28,7 +28,7 @@ async function newTicket(title: string): Promise<string> {
   return id;
 }
 
-const link = (type: 'ticket.link_added' | 'ticket.link_removed', source: string, kind: string, target: string, extra: { actorId?: string; origin?: string } = {}) =>
+const link = (type: 'ticket.link_added' | 'ticket.link_removed', source: string, kind: string, target: string, extra: { actorId?: string; origin?: LedgerEvent['origin'] } = {}) =>
   makeCommitted({ workspaceId: f.WS, actorId: extra.actorId ?? f.ids.owner, entity: { kind: 'ticket', id: source }, type, payload: { kind, targetId: target }, ...(extra.origin ? { origin: extra.origin } : {}) });
 
 const ticketEvent = (type: 'ticket.deleted' | 'ticket.restored', id: string) =>
