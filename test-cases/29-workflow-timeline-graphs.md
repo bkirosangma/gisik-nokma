@@ -63,6 +63,30 @@ Parts 2 to 5 each own ONE anchor below, seeded here so the sub-sections always s
 
 <!-- wtg-part2-model -->
 
+## 29.2 Part 2: the model
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`. Ids by task: the Global Constraints "Catalogue" line. `29.171`-`29.179` stay free. Ids follow this per-task split, not the sub-block subjects in the table above (planner ruling 2026-10-04, Q1).
+
+<!-- wtg-part2-model T1 -->
+<!-- wtg-part2-model T2 -->
+<!-- wtg-part2-model T3 -->
+<!-- wtg-part2-model T4 -->
+<!-- wtg-part2-model T5 -->
+<!-- wtg-part2-model T6 -->
+<!-- wtg-part2-model T7 -->
+<!-- wtg-part2-model T8 -->
+<!-- wtg-part2-model T9 -->
+<!-- wtg-part2-model T10 -->
+<!-- wtg-part2-model T11 -->
+<!-- wtg-part2-model T12 -->
+<!-- wtg-part2-model T13 -->
+<!-- wtg-part2-model T14 -->
+<!-- wtg-part2-model T15 -->
+<!-- wtg-part2-model T16 -->
+<!-- wtg-part2-model T17 -->
+<!-- wtg-part2-model T18 -->
+<!-- wtg-part2-model T19 -->
+
 <!-- wtg-part3-workflow-graph -->
 
 <!-- WTG4 -->

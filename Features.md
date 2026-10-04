@@ -3840,6 +3840,28 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 <!-- wtg-part2-model bullets -->
 
+### Part 2: the model
+
+<!-- wtg-part2-model T1 bullet -->
+<!-- wtg-part2-model T2 bullet -->
+<!-- wtg-part2-model T3 bullet -->
+<!-- wtg-part2-model T4 bullet -->
+<!-- wtg-part2-model T5 bullet -->
+<!-- wtg-part2-model T6 bullet -->
+<!-- wtg-part2-model T7 bullet -->
+<!-- wtg-part2-model T8 bullet -->
+<!-- wtg-part2-model T9 bullet -->
+<!-- wtg-part2-model T10 bullet -->
+<!-- wtg-part2-model T11 bullet -->
+<!-- wtg-part2-model T12 bullet -->
+<!-- wtg-part2-model T13 bullet -->
+<!-- wtg-part2-model T14 bullet -->
+<!-- wtg-part2-model T15 bullet -->
+<!-- wtg-part2-model T16 bullet -->
+<!-- wtg-part2-model T17 bullet -->
+<!-- wtg-part2-model T18 bullet -->
+<!-- wtg-part2-model T19 bullet -->
+
 <!-- wtg-part3-workflow-graph bullets -->
 
 <!-- WTG4 bullets -->
