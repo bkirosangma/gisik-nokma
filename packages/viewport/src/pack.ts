@@ -1,7 +1,8 @@
 /**
  * Row packing (spec PK-1 to PK-6). Within one lane an item is a SET of day intervals (its segments); items are sorted by
  * (first segment start, key, id) and each goes into the FIRST row where none of its segments shares a day with a segment
- * already there. Adjacent days do not overlap, so "the next can stand side by side".
+ * already there. Adjacent days do not overlap, so "the next can stand side by side", counted in DRAWN days: a bar narrower than
+ * `MIN_BAR_PX` covers the days its floored width reaches (ERRATA E11, `footprintOf`).
  *
  * PURE and deterministic: the result is a function of the items and `ppd` only. No clock, no DOM; the text measurement
  * that gives a key label its width is INJECTED (`labelPx`).
@@ -53,7 +54,7 @@ export function naturalKeyCompare(a: string, b: string): number {
   return comparePartLists(keyPartsOf(a), keyPartsOf(b));
 }
 
-/** The gap in px between a bar's end and a key drawn outside it. `ui.css` `.gn-timeline__key--outside` draws at this gap (pinned, 29.055). */
+/** The gap in px between a bar's drawn end and a key drawn outside it. `ui.css` `.gn-timeline__key--outside` draws at this gap (pinned, 29.055). */
 export const KEY_GAP_PX = 4;
 
 /**
@@ -65,13 +66,34 @@ export function keyOutside(barPx: number, keyPx: number): boolean {
 }
 
 /**
+ * A bar's padding on each side in px (`ui.css` `.gn-timeline__bar`, `padding: 2px 6px`; pinned, 29.056). A bar is never
+ * drawn narrower than its two paddings, so `MIN_BAR_PX` is the narrowest bar on screen (ERRATA E11).
+ */
+export const BAR_PAD_PX = 6;
+export const MIN_BAR_PX = 2 * BAR_PAD_PX;
+
+/**
+ * E11: the width in px a bar of `days` days is DRAWN at `ppd` px per day: its days, but never under `MIN_BAR_PX`. The ONE
+ * definition: the packer reserves this width and the Timeline view decides an outside key on it (`ui.css` floors the bar's
+ * `width` at the same 12 px), so a one-day bar at the Month preset (8 px per day, drawn 12 px) is not packed as 8 px.
+ */
+export function barPx(days: number, ppd: number): number {
+  return Math.max(days * ppd, MIN_BAR_PX);
+}
+
+/**
  * PK-4: a bar shorter than its label shows the key just outside its END, so the label is part of the footprint: the bar,
- * then `KEY_GAP_PX` and the label, counted from the bar's last day (ERRATA E10: the first formula counted the label from
- * the START, so a short bar's outside key ran over the next bar in its row). A bar that holds its key is its own footprint.
+ * then `KEY_GAP_PX` and the label, counted from the bar's last DRAWN day (ERRATA E10: the first formula counted the label
+ * from the start, so a short bar's outside key ran over the next bar in its row). E11: the bar's drawn end is its start plus
+ * the days `barPx` covers, so a bar narrower than `MIN_BAR_PX` reaches into the next day(s) even with no key. A bar that
+ * holds its key is its own drawn footprint. `ppd` is a packing scale (a power of two, `packScale`), so `days * ppd / ppd` is
+ * exactly `days` and a bar at least `MIN_BAR_PX` wide ends on its own last day.
  */
 export function footprintOf(seg: Seg, labelPx: number, ppd: number): Seg {
-  if (!keyOutside((seg.end - seg.start + 1) * ppd, labelPx)) return { start: seg.start, end: seg.end };
-  return { start: seg.start, end: seg.end + Math.ceil((KEY_GAP_PX + labelPx) / ppd) };
+  const drawnPx = barPx(seg.end - seg.start + 1, ppd);
+  const drawnEnd = seg.start + Math.ceil(drawnPx / ppd) - 1;
+  if (!keyOutside(drawnPx, labelPx)) return { start: seg.start, end: drawnEnd };
+  return { start: seg.start, end: drawnEnd + Math.ceil((KEY_GAP_PX + labelPx) / ppd) };
 }
 
 /** Sorted by start, overlapping segments merged (one item's own footprints may overlap each other). */

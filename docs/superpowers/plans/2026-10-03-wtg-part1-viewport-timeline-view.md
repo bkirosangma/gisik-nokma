@@ -12084,8 +12084,8 @@ export function emptyAnchors(md: string, kind: 'cases' | 'bullet'): string[] {
 }
 
 const range = (a: number, b: number): string[] => Array.from({ length: b - a + 1 }, (_, i) => `29.${String(a + i).padStart(3, '0')}`);
-/** Part 1's allocation (file 29's "Ids by task" line): T1-T13 own these 85 ids; the gaps stay free for follow-ups. */
-const PART1_IDS: readonly string[] = [...range(1, 16), ...range(20, 25), ...range(30, 54), ...range(65, 67), ...range(80, 87), ...range(93, 119)];
+/** Part 1's allocation (file 29's "Ids by task" line): T1-T13 own these 85 ids, plus the E11 follow-up's 29.056-29.057 and 29.089 (88); the gaps stay free for follow-ups. */
+const PART1_IDS: readonly string[] = [...range(1, 16), ...range(20, 25), ...range(30, 54), ...range(56, 57), ...range(65, 67), ...range(80, 87), ...range(89, 89), ...range(93, 119)];
 
 /** The allocated ids with no id line at all (a deleted line is neither pending nor closed, so `notClosed` cannot see it). */
 function missingIds(lines: readonly IdLine[]): string[] {
