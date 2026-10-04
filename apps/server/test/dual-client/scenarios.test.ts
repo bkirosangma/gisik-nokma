@@ -4,6 +4,7 @@ import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
 import { TICKET_NOT_VISIBLE_REASON } from '../../src/permissions/check-permission.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
 import { VISIBILITY_REFUSAL_RULE } from '../../src/sync/sync-service.js';
+import { targetSight, withholdLinks } from '../../src/visibility/withhold-link-targets.js';
 import {
   createHarness,
   HARNESS_SUB_TASK_TYPE_ID,
@@ -1041,5 +1042,67 @@ describe('S7 — typed links: add, a reverse refused at the server, remove; the 
     await expectReplicasConverged(T1);
     await expectCurrent(a);
     await expectCurrent(b);
+  });
+});
+
+describe('S8 — typed links T4b: a link target hidden from A is withheld from everything A holds', () => {
+  const HIDDEN_TITLE = 'Payroll review — keep private';
+
+  /** Every row of every table this device's store holds, serialised: the haystack the 27.089 scans search. */
+  async function rowsHeldBy(client: HarnessClient): Promise<string> {
+    const tables = (await client.storage.all("SELECT name FROM sqlite_master WHERE type = 'table'")).map((r) => String(r['name']));
+    const rows: unknown[] = [];
+    for (const table of tables) rows.push(...(await client.storage.all(`SELECT * FROM "${table}"`)));
+    return JSON.stringify(rows);
+  }
+
+  /**
+   * 27.089 (typed-links T4b). The admin creates H visible to the admin alone
+   * (both claims commit before A syncs, so A's stream never meets H), then
+   * links T1 blocks H and T1 relates T2. A's confirmed T1 must equal what the
+   * detail read serves A (`withholdLinks(projTicket(T1), sight(A))`), and no
+   * row A holds may name H: after the stream, after a snapshot pass, and in a
+   * FRESH client whose bootstrap carries the snapshot. `expectConverged` is not
+   * used: its legs compare readers of different sight.
+   */
+  it('27.089 — A holds T1 as served to A and no row naming H, through the stream, a snapshot pass and a fresh bootstrap; control: the admin holds H', async () => {
+    const { ticketId: T1 } = await seedSharedTicket();
+    const { ticketId: T2 } = await seedSharedTicket();
+    const H = newUlid();
+    await commitInteractive(
+      USER_ADMIN,
+      ticketEvent(USER_ADMIN, H, 'ticket.created', { typeId: TASK_TYPE_ID, projectId: h.projectId, parentId: null, title: HIDDEN_TITLE }),
+    );
+    await commitInteractive(USER_ADMIN, ticketEvent(USER_ADMIN, H, 'visibility.set', { ticketId: H, mode: 'explicit', userIds: [USER_ADMIN] }));
+    await commitInteractive(USER_ADMIN, ticketEvent(USER_ADMIN, T1, 'ticket.link_added', { kind: 'blocks', targetId: H }));
+    await commitInteractive(USER_ADMIN, ticketEvent(USER_ADMIN, T1, 'ticket.link_added', { kind: 'relates', targetId: T2 }));
+    await a.syncDown();
+
+    const server = await h.projTicket(T1);
+    expect(server?.links).toEqual([
+      { kind: 'blocks', targetId: H },
+      { kind: 'relates', targetId: T2 },
+    ]); // precondition: the server holds both
+    const servedToA = await withholdLinks(server!, targetSight(h.pool, USER_A));
+    expect(servedToA.links).toEqual([{ kind: 'relates', targetId: T2 }]);
+
+    const expectWithheld = async (client: HarnessClient, label: string) => {
+      expect((await client.replica.getTicket(T1))?.confirmed, label).toEqual(servedToA);
+      const held = await rowsHeldBy(client);
+      expect(held, label).toContain(T2); // control: the scan reads link payloads and states
+      expect(held, label).not.toContain(H);
+      expect(held, label).not.toContain(HIDDEN_TITLE);
+    };
+    await expectWithheld(a, 'A after the stream');
+
+    await h.snapshotPass();
+    await a.syncDown();
+    await expectWithheld(a, 'A after a snapshot pass');
+    await expectWithheld(await h.client(USER_A), 'a FRESH client of A, bootstrapped from the snapshot');
+
+    // control: the admin's fresh client holds H, and T1 whole
+    const admin = await h.client(USER_ADMIN);
+    expect((await admin.replica.getTicket(T1))?.confirmed).toEqual(server);
+    expect(await rowsHeldBy(admin)).toContain(H);
   });
 });
