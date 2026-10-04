@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { KEY_GAP_PX, footprintOf, keyOutside, maxOverlap, naturalKeyCompare, packLane, packLaneBy, type PackItem, type Seg } from '../src/index.js';
+import { BAR_PAD_PX, KEY_GAP_PX, MIN_BAR_PX, barPx, footprintOf, keyOutside, maxOverlap, naturalKeyCompare, packLane, packLaneBy, type PackItem, type Seg } from '../src/index.js';
 
 /** A small seeded generator so a failing seed can be replayed. */
 const rng = (seed: number) => () => {
@@ -211,8 +211,8 @@ describe('29.053 the label is part of the footprint', () => {
     expect(packLane([g, c], { ppd: 16, labelPx: (item, i) => (item.id === 'g' && i === 0 ? 70 : 0) }).rows).toBe(1);
   });
 
-  it('29.053 the packing scale is injected: at 8 px/day the same label and its gap are 10 days, so the footprint is wider (the bucket rule is applied by the caller via packScale)', () => {
-    expect(footprintOf({ start: 0, end: 0 }, 70, 8)).toEqual({ start: 0, end: 10 });
+  it('29.053 the packing scale is injected: at 8 px/day the same label and its gap are 10 days after the bar\'s drawn end (a one-day bar is drawn 12 px, days 0-1, E11), so the footprint is wider (the bucket rule is applied by the caller via packScale)', () => {
+    expect(footprintOf({ start: 0, end: 0 }, 70, 8)).toEqual({ start: 0, end: 11 });
   });
 });
 
@@ -250,6 +250,70 @@ describe('29.055 an outside key is counted from the bar END, where it is drawn',
     expect(packLane([a, b], { ppd: 8, labelPx: (item) => (item.id === 'a' ? 40 : 0) }).rows).toBe(1);
     expect(footprintOf({ start: 0, end: 4 }, 41, 8)).toEqual({ start: 0, end: 10 });
     expect(packLane([a, b], { ppd: 8, labelPx: (item) => (item.id === 'a' ? 41 : 0) }).rows).toBe(2);
+  });
+});
+
+/**
+ * 29.056 / 29.057 — ERRATA E11: a bar is never drawn narrower than its two 6 px paddings (`MIN_BAR_PX`, 12 px; `ui.css`
+ * floors the bar's width there), so at the Month preset (8 px per day) a one-day bar is drawn 12 px, a day and a half. The
+ * packer counted it as 8 px, so the next day's bar shared its row and the two overlapped on screen. Every leg is two bars in
+ * one row where the SECOND bar's day decides.
+ */
+describe('29.056 a bar is packed at the width it is drawn, never under MIN_BAR_PX', () => {
+  it('29.056 one floor and one width: BAR_PAD_PX is 6, MIN_BAR_PX is 12, and barPx is the days\' width floored there', () => {
+    expect(BAR_PAD_PX).toBe(6);
+    expect(MIN_BAR_PX).toBe(12);
+    expect(barPx(1, 8)).toBe(12);
+    expect(barPx(1, 12)).toBe(12);
+    expect(barPx(2, 8)).toBe(16);
+    expect(barPx(1, 16)).toBe(16);
+  });
+
+  it('29.056 a keyless one-day bar on day 10 at 8 px/day is drawn over day 11, so a bar on day 11 takes a second row and one on day 12 shares; control: at 16 px/day the one day holds its 12 px and the day-11 bar shares', () => {
+    const a: PackItem = { id: 'a', key: null, segments: [{ start: 10, end: 10 }] };
+    const at = (day: number): PackItem => ({ id: 'b', key: null, segments: [{ start: day, end: day + 1 }] });
+    expect(footprintOf({ start: 10, end: 10 }, 0, 8)).toEqual({ start: 10, end: 11 });
+    expect(packLane([a, at(11)], { ppd: 8 }).rows).toBe(2);
+    expect(packLane([a, at(12)], { ppd: 8 }).rows).toBe(1);
+    // CONTROL: one day at 16 px/day is wider than the floor, so the bar is its own day.
+    expect(footprintOf({ start: 10, end: 10 }, 0, 16)).toEqual({ start: 10, end: 10 });
+    expect(packLane([a, at(11)], { ppd: 16 }).rows).toBe(1);
+  });
+
+  it('29.056 a bar wider than the floor keeps its own days: a keyless three-day bar at 8 px/day (24 px) ends on day 2, so a bar on day 2 takes a second row and one on day 3 shares', () => {
+    const a: PackItem = { id: 'a', key: null, segments: [{ start: 0, end: 2 }] };
+    const at = (day: number): PackItem => ({ id: 'b', key: null, segments: [{ start: day, end: day }] });
+    expect(footprintOf({ start: 0, end: 2 }, 0, 8)).toEqual({ start: 0, end: 2 });
+    expect(packLane([a, at(2)], { ppd: 8 }).rows).toBe(2);
+    expect(packLane([a, at(3)], { ppd: 8 }).rows).toBe(1);
+  });
+
+  it('29.056 the drawn days round UP: at 5 px/day a one-day bar\'s 12 px cover 2.4 days, so it reaches day 2 (3 days); at 4 px/day exactly 3 days, days 0-2', () => {
+    expect(footprintOf({ start: 0, end: 0 }, 0, 5)).toEqual({ start: 0, end: 2 });
+    expect(footprintOf({ start: 0, end: 0 }, 0, 4)).toEqual({ start: 0, end: 2 });
+  });
+
+  it('29.056 the key is decided on the drawn width: a 10 px key fits a one-day bar drawn 12 px at 8 px/day, so the bar is its drawn days 0-1 and a bar on day 2 shares; control: a 13 px key is outside and reserves days 0-4 (1 + ceil((4 + 13) / 8))', () => {
+    const a: PackItem = { id: 'a', key: 'GN-1', segments: [{ start: 0, end: 0 }] };
+    const b: PackItem = { id: 'b', key: 'GN-2', segments: [{ start: 2, end: 3 }] };
+    expect(footprintOf({ start: 0, end: 0 }, 10, 8)).toEqual({ start: 0, end: 1 });
+    expect(packLane([a, b], { ppd: 8, labelPx: (item) => (item.id === 'a' ? 10 : 0) }).rows).toBe(1);
+    expect(footprintOf({ start: 0, end: 0 }, 12, 8)).toEqual({ start: 0, end: 1 });
+    expect(footprintOf({ start: 0, end: 0 }, 13, 8)).toEqual({ start: 0, end: 4 });
+    expect(packLane([a, b], { ppd: 8, labelPx: (item) => (item.id === 'a' ? 13 : 0) }).rows).toBe(2);
+  });
+});
+
+describe('29.057 an outside key is counted from the bar\'s DRAWN end', () => {
+  it('29.057 a keyed one-day bar at 8 px/day with a 40 px key: drawn days 0-1, then ceil((4 + 40) / 8) = 6 days, so days 0-7: a bar on day 7 takes a second row and one on day 8 shares; control: no key and the day-2 bar shares', () => {
+    const a: PackItem = { id: 'a', key: 'GN-1', segments: [{ start: 0, end: 0 }] };
+    const at = (day: number): PackItem => ({ id: 'b', key: 'GN-2', segments: [{ start: day, end: day + 1 }] });
+    const keyed = { ppd: 8, labelPx: (item: PackItem) => (item.id === 'a' ? 40 : 0) };
+    expect(footprintOf({ start: 0, end: 0 }, 40, 8)).toEqual({ start: 0, end: 7 });
+    // Day 7 is past the key counted from the bar's LAST DAY (day 0: days 0-6) and inside it counted from the drawn end.
+    expect(packLane([a, at(7)], keyed).rows).toBe(2);
+    expect(packLane([a, at(8)], keyed).rows).toBe(1);
+    expect(packLane([a, at(2)], { ppd: 8 }).rows).toBe(1);
   });
 });
 
