@@ -115,8 +115,9 @@ describe('29.051 multi-segment items', () => {
     expect(packLane([a, early], { ppd: 16 }).rows).toBe(1);
     expect(packLane([a, early], labelled).rows).toBe(2);
     // The HULL: b on day 5 sits inside the swollen footprint, after the swallowed segment, so the segment search reaches
-    // [0-9] and refuses b merged or not. Left unmerged, the hull ends where the swallowed segment ends (day 3), b fits
-    // beside it, and packLane takes the hull's 1 row. Control: without the label b fits after a.
+    // [0-9] and refuses b merged or not. Merged, a has one footprint and packLane never builds the hull; left unmerged, the
+    // hull ends where the swallowed segment ends (day 3), b fits beside it, and packLane takes the hull's 1 row. Control:
+    // without the label b fits after a.
     const late: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 5, end: 5 }] };
     expect(packLane([a, late], { ppd: 16 }).rows).toBe(1);
     expect(packLane([a, late], labelled).rows).toBe(2);
