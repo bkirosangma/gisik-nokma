@@ -100,7 +100,7 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 - ✅ **29.101 — one line, aria-hidden, at today's day number; a different prop moves it; an invalid day draws none.** (`packages/app-core/test/timeline/timeline-view.test.tsx`)
 - 🟡 **29.102 — with a measured width the mounted bars are the viewport and one viewport either side; with none (jsdom, a hidden tab) every bar is mounted | a view that re-renders without new data re-renders none of its bars | the bar is a React.memo component imported from react, so a moving / resting flip of the view does not re-render 2,000 bars (measured: a 33 ms stall without it, 9.4 ms with); control: the scan finds a planted un-memoised bar | re-rendering the view with the same tickets, today and handlers draws no bar again (the pan loop re-renders the view on every moving / resting flip); control: a changed ticket list does draw them again.** (`packages/app-core/test/timeline/timeline-view.test.tsx`) 🟡 in T9 (planner ruling 2026-10-04): the mount legs and the `memo` source scan are covered; the render-count leg ("re-rendering the view with the same tickets … draws no bar again") lands in Part 1 T12, which flips this case to ✅.
 - ✅ **29.103 — the claim list sits in the bar's row, outside the bar, with the model's label; a bar with none has no list.** (`packages/app-core/test/timeline/timeline-view.test.tsx`)
-- ✅ **29.104 — 24.121 no CONTRAST_PAIRS row names fieldRim; the roster is 53 (56 minus the four, plus one for the weekend tint, 29.104) | the weekend tint is one opaque role whose day numbers clear 4.5:1 in every style and theme | the role is declared, opaque and exported; textMuted on it is a declared pair at 4.5; control: a translucent tint would fail the opaque check.** (`packages/ui/test/neo-hk4-field-rim.test.ts`, `packages/ui/test/timeline-continuous.test.ts`)
+- ✅ **29.104 — 24.121 no CONTRAST_PAIRS row names fieldRim; the roster is 56 (56 minus the four, plus one for the weekend tint, 29.104, plus three for the Timeline graph bar text, 29.303) | the weekend tint is one opaque role whose day numbers clear 4.5:1 in every style and theme | the role is declared, opaque and exported; textMuted on it is a declared pair at 4.5; control: a translucent tint would fail the opaque check.** (`packages/ui/test/neo-hk4-field-rim.test.ts`, `packages/ui/test/timeline-continuous.test.ts`)
 - ✅ **29.105 — no Earlier / Later, SHIFT_DAYS, weeksCount, anchor option or week-column grid remains in the timeline source or in ui.css; control: the scan finds a planted one.** (`packages/app-core/test/timeline/timeline-view.test.tsx`)
 - ✅ **29.106 — the Timeline stylesheet is the continuous canvas: one scroller, packed 28 px bars, no paging | the canvas scrolls and contains its overscroll; the bar is 28 px on a 40 px pitch; the axis is sticky; rows are transparent to layout | nothing of the paged grid survives: no weeks band, no header grid, no zebra, no clipped edges, no phone arm for the timeline | the Today pill keeps the quiet nav treatment; reduced motion stops the re-pack glide.** (`packages/ui/test/timeline-continuous.test.ts`)
 - ✅ **29.107 — the Timeline carries the classes its scroller and its portrait rules key on | .gn-timeline > toolbar + stage > canvas > surface > axis, and under a lane the .gn-timeline__row wrappers (21.113, retitled: the week band and the column template are gone).** (`packages/app-core/test/views/phone-project-views-hooks.test.tsx`)
@@ -167,5 +167,29 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpow
 <!-- wtg-part3-workflow-graph -->
 
 <!-- WTG4 -->
+
+## 29.4 Part 4 — The Timeline graph and Home's Timeline (29.290–29.349)
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part4-timeline-graph-home.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md` §11–13. Ids tile 29.290–29.349: T1 290–299 · T2 300–303 · T3 304–307 · T4 308–312 · T5 313–326 · T6 327–334 · T7 335–349.
+
+<!-- WTG4 T1 -->
+
+<!-- WTG4 T2 -->
+- ❌ **29.300 — desktop pan, Home-shaped:** 10,000 index entries over 120 rows (34 px lane headings, 40 px row pitch, 28 px bars, 24 px per day), at most 1,200 mounted bars, a continuous pan of 10 viewports at one viewport per second on a 1440 x 900 window runs at >= 60 fps with the worst frame <= 20 ms and ZERO frames painted with a bar inside the scroller's visible box missing from the DOM. Gated (`TLG_GPU=1`: headless Chromium has no GPU, so the owner or a GPU runner sets it); the line quoted is LOCAL with the machine named. Control: the same scene mounted WITHOUT the windowing (every bar) misses the bar, which proves the scene is heavy enough to measure.
+- ✅ **29.301 — Pixel 7 proxy (412 x 915 at DPR 2.625, 4x CPU throttle, touch):** the phone scene mounts close to 600 bars and never more than 600; over a 10-viewport pan it holds >= 30 fps with the worst frame <= 50 ms and zero frames short of the view; page `scrollY` is unchanged after the pan, and after a wheel and a touch drag over the scroller held at its end (`overscroll-behavior: contain` stops the chain); control: the same wheel over the strip below the scroller scrolls the page. Runs on the default browser project.
+- 🟡 **29.302 — real phone:** the same Home-shaped scene on the owner's phone holds >= 30 fps with the worst frame <= 50 ms. Manual (owner taps Run; the numbers are quoted in the commit that flips this line), because no emulator reproduces a phone's GPU. Owner phone, 2026-10-05: 58.5 fps, worst frame 33.8 ms (the bar is 50 ms: PASSES), at most 397 bars on the page, 0 frames short of the view; phone scene 11,000 bars, viewport 360x579 px, run on the painter head 66beecd3.
+- ✅ **29.303 — the painter mounts only what is near the view:** with 10,000 draws the index returns the primitives whose bounds touch `[view − overscan, view + overscan]` (a shared edge counts) and no others; an item spanning several buckets is returned once; moving the view by less than a bucket changes no mounted id (no React churn), moving it by more mounts the new ids and unmounts the old; selection and pick work on a mounted primitive; the painter's DOM carries no `aria` name Earlier, Later, Previous or Next; once the view stops, the deferred window has caught up EXACTLY (the mounted id set equals exactly the draws touching the final window: in jsdom, and in the browser after the 29.301 pan, where the expected set is a brute-force scan of the draw list, with zero frames short); a ticket whose title or state changes repaints in the same DOM node during the same pan session (the memoised primitives still see a changed draw) while a neighbour keeps its text; control: the same view with overscan 0 returns fewer. Mutation: build buckets from `x0` only → a long bar vanishes at the window's right edge and the span assertion reds.
+
+<!-- WTG4 T3 -->
+
+<!-- WTG4 T4 -->
+
+<!-- WTG4 T5 -->
+
+<!-- WTG4 T6 -->
+
+<!-- WTG4 T7 -->
+
+<!-- WTG4 end -->
 
 <!-- wtg-part5-mcp -->
