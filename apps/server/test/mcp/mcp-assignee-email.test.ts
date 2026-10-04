@@ -6,7 +6,7 @@ import { buildEmailWorld, type EmailWorld, type Person } from './helpers/email-w
 import { event, mustCommit } from './helpers/sweep2.js';
 
 /**
- * MCP sweep 2 T7, hosted half of cases 14.640-14.650 and 14.652 (the package half is `assignee-email.test.ts`).
+ * MCP sweep 2 T7, hosted half of cases 14.640-14.642, 14.645-14.650 and 14.652 (the package half is `assignee-email.test.ts`).
  * Every call is a `tools/call` on `POST /mcp` against the real app and database. Run LOCALLY.
  */
 let db: TestDatabase;
