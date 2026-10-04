@@ -16,7 +16,7 @@ step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- t
 step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
 step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
 step "harness suite (CTL_TEST_ONLY: one case runs one, no match is red, no filter runs all; every suite wired)" "bash '$HERE/test/harness.test.sh'"
-# The mutate suite runs real Stryker on a scratch fixture repo (three runs, ~1 min) through a private semaphore dir.
+# The mutate suite runs real Stryker on a scratch fixture repo (four runs, ~1 min) through a private semaphore dir.
 step "mutate suite (ranges, filter, custom pre-step, reconcile, control, skips, signals, split, exit codes, real Stryker legs)" "bash '$HERE/test/mutate.test.sh'"
 step "mutate refuses an unknown argument (exit 2)" "out=\$('$HERE/ctl' mutate --nope 2>&1); [ \$? -eq 2 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
 # The postman suite builds a scratch tmux session with fake panes and a scratch ledger (never a live seat; ~3.5 min).

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The fake behind mutate.test.sh's run-tests shim: answers `vitest list --json=F` with 3 tests in test/calc.test.ts, `stryker run CONF` with a
 report holding one BooleanLiteral flip per injected `false` token of the file in place (FAKE_MODE flips-dup: each twice, the second as a
-ConditionalExpression; flips-missing: the last token's flip left out; control-short: 1 test instead of 3), and `vitest run` with exit 1."""
+ConditionalExpression; flips-missing: the last token's flip left out; control-short: 1 test instead of 3; bad-report: a report that is not
+JSON), and `vitest run` with exit 1. Every Stryker config it is handed is kept beside it as conf.json (13.2254 reads it)."""
 import json, os, re, sys
 mode = os.environ.get('FAKE_MODE', 'flips-dup')
 argv = sys.argv[1:]
@@ -13,6 +14,10 @@ if len(argv) >= 2 and argv[1].endswith('vitest.mjs') and 'list' in argv:
 if len(argv) >= 2 and argv[1].endswith('vitest.mjs') and 'run' in argv:
     sys.exit(1)
 conf = json.load(open(argv[-1]))
+json.dump(conf, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conf.json'), 'w'))
+if mode == 'bad-report':
+    open(conf['jsonReporter']['fileName'], 'w').write('{"files": ')
+    sys.exit(0)
 rel = conf['mutate'][0].split(':')[0]
 if os.environ.get('FAKE_FAIL_FILE') and rel.endswith(os.environ['FAKE_FAIL_FILE']):
     sys.exit(3)

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229).
-# Scratch git repos only (mktemp; never a worktree of this repo). The real-Stryker legs (13.2206–13.2208) link the checkout's own
-# @stryker-mutator, vitest and typescript into the scratch repo and run through a PRIVATE semaphore dir (CTL_SEM_DIR), so the suite,
-# itself run inside one slot-run, never waits on a second machine slot. Every other leg replaces run-tests with a recording shim.
+# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2255).
+# Scratch git repos only (mktemp; never a worktree of this repo). The four real-Stryker legs (13.2206–13.2208 and the real 13.2216) link the
+# checkout's own @stryker-mutator, vitest and typescript into the scratch repo and run through a PRIVATE semaphore dir (CTL_SEM_DIR), so the
+# suite, itself run inside one slot-run, never waits on a second machine slot; so does 13.2250's real run-tests queue. Every other leg replaces
+# run-tests with a recording shim.
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -16,7 +17,7 @@ fails=0
 G=/usr/bin/git
 T="$(mktemp -d "${TMPDIR:-/tmp}/ctl-mutate-test.XXXXXX")"
 LISTENER=""
-cleanup() { [ -n "$LISTENER" ] && kill "$LISTENER" 2>/dev/null; for f in "$T"/*.fake/fake.pid; do [ -f "$f" ] && kill -TERM -- "-$(ps -o pgid= -p "$(cat "$f")" 2>/dev/null | tr -d ' ')" 2>/dev/null; done; rm -rf "$T"; }
+cleanup() { [ -n "$LISTENER" ] && kill "$LISTENER" 2>/dev/null; for f in "$T"/*.fake/inner.pid; do [ -f "$f" ] && kill -KILL -- "-$(cat "$f")" 2>/dev/null; done; for f in "$T"/*.fake/fake.pid; do [ -f "$f" ] && kill -TERM -- "-$(ps -o pgid= -p "$(cat "$f")" 2>/dev/null | tr -d ' ')" 2>/dev/null; done; rm -rf "$T"; }
 trap cleanup EXIT
 export CTL_LOG_DIR="$T/logs" CTL_SEM_DIR="$T/sem"
 real() { cd "$REPO" && python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
@@ -34,30 +35,40 @@ mkrepo() {
   ln -s "$REPO/node_modules/@stryker-mutator" "$d/node_modules/@stryker-mutator"
   ln -s "$VITEST" "$d/node_modules/vitest"; ln -s "$TSC" "$d/node_modules/typescript"
 }
-# the recording run-tests shim (sleep mode: DIR.fake/ready once its setup and TERM trap are in place), in DIR.fake (outside the repo: the verb checks the repo's git status): FAKE_MODE fail | sleep | flips-dup |
-# flips-missing | control-short (fake_report.py)
+# the recording run-tests shim (sleep mode: DIR.fake/ready once its setup and TERM trap are in place), in DIR.fake (outside the repo: the verb checks the repo's git status): FAKE_MODE fail | sleep | queued |
+# backup-left | flips-dup | flips-missing | control-short | bad-report (fake_report.py). The verb's command is `<python> mutate.py watchdog <secs> <dir> -- <the run>`: the shim
+# keeps the watchdog (it runs INSIDE the slot) and fakes only the run. FAKE_REAL_RUN_TESTS=<ctl>: the faked run goes through the REAL run-tests (a real queue).
 mkfake() {
   mkdir -p "$1.fake"
   cat > "$1.fake/fake-run-tests" <<'SH'
 #!/usr/bin/env bash
 d="$(dirname "$0")"; echo "$*" >> "$d/calls"; echo $$ > "$d/fake.pid"
-shift 2; [ "$1" = -- ] && shift
+label="$2"; shift 2; [ "$1" = -- ] && shift
+wd=(); all=("$@"); i=0
+while [ "$i" -lt "${#all[@]}" ]; do if [ "${all[$i]}" = -- ]; then wd=("${all[@]:0:$((i + 1))}"); set -- "${all[@]:$((i + 1))}"; break; fi; i=$((i + 1)); done
+job=""
+trap 'echo "run-tests TERM" >> "$d/signals"; [ -n "$job" ] && { kill -TERM "$job" 2>/dev/null; wait "$job"; }; exit 143' TERM   # as run-tests stops its job on TERM (and waits for it)
 case "${FAKE_MODE:-ok}" in
   fail) echo "queue wait: 0s"; echo "log: $d/fake.log"; exit 3;;
+  queued) : > "$d/ready"; sleep "${FAKE_SLEEP:-60}" & job=$!; wait "$job"; exit 0;;   # still waiting for a slot: the command never starts
   sleep|backup-left) : > stryker-setup-0.js   # as the vitest runner does (inPlace: in the package); the trap must remove it
     # as a Stryker stopped mid-run leaves things: test/calc.test.ts rewritten in place, its original in <tempDirName>/backup-x/
     td="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tempDirName"])' "${@: -1}")"
     mkdir -p "$td/backup-x/test" "$td/backup-x/src"; cp test/calc.test.ts "$td/backup-x/test/calc.test.ts"; printf '// @ts-nocheck\n' >> test/calc.test.ts
     cp src/calc.ts "$td/backup-x/src/calc.ts"   # Stryker's "original" of the mutated file is the verb's INJECTED copy: the verb's own backup must win
     [ "$FAKE_MODE" = backup-left ] && { echo "queue wait: 0s"; echo "log: $d/fake.log"; exit 1; }
-    trap 'echo TERM >> "$d/signals"; exit 143' TERM; : > "$d/ready"; sleep "${FAKE_SLEEP:-60}" & wait $!; echo "queue wait: 0s"; exit 0;;
+    : > "$d/ready"
+    ${wd[@]+"${wd[@]}"} bash -c 'echo $$ > "$0/inner.pid"; trap "echo \"command TERM\" >> \"\$0/signals\"; exit 143" TERM; sleep "$1" & wait $!' "$d" "${FAKE_SLEEP:-60}" & job=$!
+    wait "$job"; rc=$?; echo "queue wait: 0s"; echo "log: $d/fake.log"; exit "$rc";;
 esac
+[ -n "${FAKE_REAL_RUN_TESTS:-}" ] && exec "$FAKE_REAL_RUN_TESTS" run-tests --label "$label" -- ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
 echo "queue wait: 0s"; echo "log: $d/fake.log"
-exec python3 "$d/fake_report.py" "$@"
+exec ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
 SH
   cp "$FX/fake_report.py" "$1.fake/fake_report.py"; chmod +x "$1.fake/fake-run-tests"
 }
 mut() { ( cd "$1" && CTL_MUTATE_RUN_TESTS="$1.fake/fake-run-tests" CTL_MUTATE_PG_PORT="${PGPORT_CLOSED}" "$CTL" mutate --repo "$1" --base HEAD~1 "${@:2}" 2>&1 ); }
+mdof() { echo "$CTL_LOG_DIR/mutate-$($G -C "$1" branch --show-current | tr / +)-$($G -C "$1" rev-parse HEAD | cut -c1-8).md"; }   # the verb's report file
 clean_tree() { [ -z "$($G -C "$1" status --porcelain --untracked-files=all)" ] && ! ls -d "$1"/packages/calc/.stryker-tmp* >/dev/null 2>&1; }
 committed() { $G -C "$1" diff --quiet HEAD -- packages/calc/src/calc.ts; }
 PGPORT_CLOSED="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')"
@@ -152,12 +163,13 @@ sig_ok() { local sig="$1" want="$2" vp n=0 rc; rm -f "$R1.fake/fake.pid" "$R1.fa
   [ -f "$R1.fake/ready" ] || { echo "       (precondition: the shim never reached its sleep in 60 s; the verb said: $(tail -2 "$R1.fake/sig.out" | tr '\n' ' ' | cut -c1-200))"; kill "-$sig" "$vp"; wait "$vp"; return 1; }
   grep -q 'false ? 2000' "$R1/packages/calc/src/calc.ts" && [ -f "$R1/packages/calc/stryker-setup-0.js" ] && grep -q '@ts-nocheck' "$R1/packages/calc/test/calc.test.ts" || { echo "       (precondition: calc.ts is not injected, or no setup file, or no Stryker in-place edit, during the run)"; return 1; }
   kill "-$sig" "$vp"; wait "$vp"; rc=$?
-  [ $rc -eq "$want" ] && committed "$R1" && clean_tree "$R1" && grep -q TERM "$R1.fake/signals" && ! kill -0 "$(cat "$R1.fake/fake.pid")" 2>/dev/null; }
+  [ $rc -eq "$want" ] && committed "$R1" && clean_tree "$R1" && grep -qx 'run-tests TERM' "$R1.fake/signals" && ! kill -0 "$(cat "$R1.fake/fake.pid")" 2>/dev/null; }
 check "13.2215 SIGINT mid-run (the injected calc.ts in place: precondition checked): exit 130, calc.ts restored, a file Stryker rewrote in place put back from its backup-*/, no Stryker temp dir and no new stryker-setup-<n>.js, git status unchanged, the running run-tests got TERM" 'sig_ok INT 130'
 check "13.2216 SIGTERM mid-run: exit 143, the same restore" 'sig_ok TERM 143'
 watchdog_ok() { local out rc; rm -f "$R1.fake/signals"; out="$(FAKE_MODE=sleep FAKE_SLEEP=5 CTL_MUTATE_MAX_SECS=1 mut "$R1")"; rc=$?
-  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "passed 1 s and was stopped" && grep -q TERM "$R1.fake/signals" && clean_tree "$R1" && committed "$R1"; }
-check "13.2217 a slot-run over CTL_MUTATE_MAX_SECS is stopped (TERM to run-tests) and is exit 2; CONTROL 13.2218 below" 'watchdog_ok'
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): mutate-1-calc.ts: the slot-run passed 1 s in its slot and was stopped (P10: no slot-run over 10 min; the file needs a smaller split) (the other files" \
+  && grep -qx 'command TERM' "$R1.fake/signals" && ! grep -q 'run-tests TERM' "$R1.fake/signals" && clean_tree "$R1" && committed "$R1"; }
+check "13.2217 a command that holds its slot past CTL_MUTATE_MAX_SECS is stopped by the watchdog INSIDE the slot (TERM to the command's group, run-tests itself untouched) and is exit 2; CONTROL 13.2218 below" 'watchdog_ok'
 under_ok() { local out rc; out="$(FAKE_MODE=flips-dup FAKE_SLEEP=0 CTL_MUTATE_MAX_SECS=10 mut "$R1")"; rc=$?; [ $rc -eq 1 ]; }
 check "13.2218 CONTROL for 13.2217: a run under the cap completes (exit 1, its survivors); the defaults are pinned: 600 s per slot-run and 300 mutants per run" \
   'under_ok && [ "$(grep -c "env_int(.CTL_MUTATE_MAX_SECS., 600)" "$PY")" = 1 ] && [ "$(grep -c "env_int(.CTL_MUTATE_SPLIT., 300)" "$PY")" = 1 ]'
@@ -184,6 +196,72 @@ partial_ok() { local out rc; out="$(FAKE_MODE=flips-dup FAKE_FAIL_FILE=small.ts 
 check "13.2228 one file's tool failure does not drop the others: small.ts fails (TOOL-FAILURE listed), big.ts's table row and survivors are still reported, and the sweep exits 2" 'partial_ok'
 check "13.2229 wiring: ctl help lists mutate, selftest.sh runs this suite and the harness suite as live steps, and the verb resolves Stryker from the --repo root, never from this checkout" \
   '"$CTL" help | grep -q "^  mutate \[--base REF\]" && grep -q "^step \"mutate suite" "$HERE/verbs/selftest.sh" && grep -q "^step \"harness suite" "$HERE/verbs/selftest.sh" && [ "$(grep -c "os.path.join(repo, .node_modules., .@stryker-mutator., .core., .bin., .stryker.js.)" "$PY")" = 1 ]'
+
+# ---- FIX 1 (13.2250–13.2255): the cap counts slot time, a crash is exit 2, the Stryker config, a custom on a range's last line ----
+queue_ok() { local hp n=0 out rc md rt w; rm -f "$T/held"
+  CTL_TEST_SLOTS=1 CTL_SEM_SAMPLE_SECS=1 CTL_SEM_POLL_SECS=1 "$CTL" run-tests --label holder -- bash -c ": > '$T/held'; sleep 9" > "$T/holder.out" 2>&1 & hp=$!
+  while [ ! -f "$T/held" ] && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done
+  [ -f "$T/held" ] || { echo "       (precondition: the holder never got the private slot: $(tail -1 "$T/holder.out"))"; wait "$hp"; return 1; }
+  out="$(FAKE_MODE=flips-dup FAKE_REAL_RUN_TESTS="$CTL" CTL_TEST_SLOTS=1 CTL_SEM_SAMPLE_SECS=1 CTL_SEM_POLL_SECS=1 CTL_MUTATE_MAX_SECS=3 mut "$R1")"; rc=$?; wait "$hp"
+  md="$(mdof "$R1")"; rt="$([ -f "$md" ] && sed -n 's/^- stryker run 1 .*, log \(.*\)$/\1/p' "$md")"
+  w="$([ -f "$rt" ] && sed -n 's/^# queue wait: \([0-9]*\)s.*/\1/p' "$rt")"
+  [ "${w:-0}" -ge 4 ] || { echo "       (precondition: the Stryker slot-run waited ${w:-?} s for its slot, not more than the 3 s cap; rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-160))"; return 1; }
+  [ $rc -eq 1 ] && printf '%s\n' "$out" | grep -q "SURVIVOR packages/calc/src/calc.ts:3  custom:numeric  200 → 2000" && ! printf '%s\n' "$out" | grep -q "TOOL-FAILURE" \
+  && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate 2 survivors to triage" && clean_tree "$R1" && committed "$R1"; }
+check "13.2250 the cap counts SLOT time, not the queue wait: a private semaphore's only slot held 9 s, a run that waits longer than CTL_MUTATE_MAX_SECS=3 for it (precondition: its run-tests log says so) and then finishes under the cap is its real result, exit 1 with its survivors, never a tool failure (CONTROL: 13.2217 still stops a run that overruns IN its slot)" 'queue_ok'
+backstop_ok() { local out rc
+  rm -f "$R1.fake/signals"; out="$(FAKE_MODE=queued FAKE_SLEEP=20 CTL_MUTATE_BACKSTOP_SECS=2 mut "$R1")"; rc=$?
+  [ $rc -eq 2 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "FAIL mutate tool failure: mutate-1-calc.ts: no test slot within 2 s (still queued when the backstop fired); nothing was run" ] \
+  && grep -qx 'run-tests TERM' "$R1.fake/signals" && clean_tree "$R1" || { echo "       (queued: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }
+  rm -f "$R1.fake/signals"; out="$(FAKE_MODE=sleep FAKE_SLEEP=20 CTL_MUTATE_MAX_SECS=60 CTL_MUTATE_BACKSTOP_SECS=2 mut "$R1")"; rc=$?
+  [ $rc -eq 2 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "FAIL mutate tool failure in 1 file(s): mutate-1-calc.ts: the slot-run was still running 2 s after it was queued and was stopped (its watchdog did not stop it at 60 s) (the other files: 0 survivors; log $(mdof "$R1"))" ] \
+  && grep -qx 'command TERM' "$R1.fake/signals" && clean_tree "$R1" && committed "$R1" || { echo "       (started: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-240))"; return 1; }
+  [ "$(grep -c "env_int(.CTL_MUTATE_BACKSTOP_SECS., max_secs + env_int(.CTL_SEM_MAX_WAIT., 1800) + GRACE + 60)" "$PY")" = 1 ]; }
+check "13.2251 the backstop (CTL_MUTATE_BACKSTOP_SECS): a run still QUEUED when it fires is 'no test slot within 2 s … nothing was run' (exit 2, never 'a smaller split'), a run that got its slot and outlived it is 'its watchdog did not stop it' (exit 2, its command stopped); the default is pinned: the cap + CTL_SEM_MAX_WAIT (1800) + GRACE + 60" 'backstop_ok'
+wd_ok() { local W="$T/wd" rc out wp n=0; rm -rf "$W"; mkdir -p "$W/a" "$W/b" "$W/c" "$W/d"
+  python3 "$PY" watchdog 30 "$W/a" -- bash -c 'exit 3'; rc=$?
+  [ $rc -eq 3 ] && [ -f "$W/a/started" ] && [ ! -f "$W/a/stopped" ] || { echo "       (passthrough: rc $rc)"; return 1; }
+  out="$(python3 - "$PY" "$W/b" <<'PY'
+import subprocess, sys, time
+py, d = sys.argv[1], sys.argv[2]
+r = subprocess.run(['python3', py, 'watchdog', '1', d, '--', 'bash', '-c', 'trap "" TERM; echo $$ > "$0/pid"; sleep 30', d], capture_output=True, text=True)
+end = time.time()
+st, sp = float(open(f'{d}/started').read()), float(open(f'{d}/stopped').read())
+ok = r.returncode == 124 and 1.0 <= sp - st < 1.9 and 2.9 <= end - sp < 3.9 and r.stdout == 'mutate watchdog: the command passed 1 s in its slot; stopping its process group\n'
+print('ok' if ok else f'rc {r.returncode}, started->stopped {sp - st:.2f} s, stopped->exit {end - sp:.2f} s, stdout {r.stdout!r}')
+PY
+)"
+  [ "$out" = ok ] && ! kill -0 "$(cat "$W/b/pid")" 2>/dev/null || { echo "       (over the cap, TERM ignored: ${out:-no output})"; return 1; }
+  python3 "$PY" watchdog 60 "$W/c" -- bash -c 'echo $$ > "$0/pid"; trap "echo TERM > \"\$0/got\"; exit 143" TERM; sleep 30 & wait $!' "$W/c" & wp=$!
+  while [ ! -f "$W/c/pid" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done
+  kill -TERM "$wp"; wait "$wp"; rc=$?
+  [ $rc -eq 143 ] && grep -qx TERM "$W/c/got" && [ ! -f "$W/c/stopped" ] && ! kill -0 "$(cat "$W/c/pid")" 2>/dev/null || { echo "       (TERM to the watchdog: rc $rc)"; return 1; }
+  python3 "$PY" watchdog 60 "$W/d" -- bash -c 'trap "" TERM; echo $$ > "$0/pid"; sleep 30' "$W/d" & wp=$!; n=0
+  while [ ! -f "$W/d/pid" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done
+  kill -TERM "$wp"; sleep 0.5; kill -TERM "$wp" 2>/dev/null; wait "$wp"; rc=$?
+  [ $rc -eq 143 ] && ! kill -0 "$(cat "$W/d/pid")" 2>/dev/null || { echo "       (a second TERM while stopping: rc $rc)"; return 1; }; }
+check "13.2252 the watchdog: the command's exit code passes through (3) and <dir>/started is written; past SECS (started->stopped in [1.0, 1.9) s for SECS 1) a command that IGNORES TERM is KILLed GRACE (3) s after the TERM (stopped->exit in [2.9, 3.9) s; exit 124; stdout exactly 'mutate watchdog: the command passed 1 s in its slot; stopping its process group'; the command gone); a TERM to the watchdog itself reaches the command's group (exit 143, the command got TERM and is gone); a second TERM while it stops a TERM-ignoring command does not cancel the KILL (exit 143, the command gone)" 'wd_ok'
+crash_ok() { local out rc; out="$(FAKE_MODE=bad-report mut "$R1")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure: JSONDecodeError: Expecting value" && clean_tree "$R1" && committed "$R1"; }
+check "13.2253 a crash is a tool failure, never 'survivors': a report that is not JSON (run-tests exit 0) is exit 2 with 'FAIL mutate tool failure: JSONDecodeError: …' as the last line, and the tree is clean" 'crash_ok'
+conf_ok() { rm -f "$R1.fake/conf.json"; FAKE_MODE=flips-dup mut "$R1" > /dev/null; python3 - "$R1.fake/conf.json" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+want = {'testRunner': 'vitest', 'coverageAnalysis': 'perTest', 'concurrency': 2, 'timeoutMS': 10000, 'incremental': False, 'ignoreStatic': False,
+        'inPlace': True, 'cleanTempDir': 'always', 'disableTypeChecks': False}
+got = {k: c.get(k, 'MISSING') for k in want}
+assert got == want and all(type(got[k]) is type(want[k]) for k in want), got
+assert c['vitest']['related'] is True and c['mutate'] == ['src/calc.ts:2-6'], (c['vitest'], c['mutate'])
+PY
+}
+check "13.2254 the generated Stryker config, as run-tests is handed it: concurrency 2 (one slot's worth of workers), coverageAnalysis perTest, timeoutMS 10000, incremental false, ignoreStatic false, inPlace true, cleanTempDir always, disableTypeChecks false, vitest.related true, mutate = the changed range" 'conf_ok'
+R7="$T/r7"; mkrepo "$R7"; mkfake "$R7"; python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); assert s.count("LIMIT = 200;")==1; open(p,"w").write(s.replace("LIMIT = 200;", "LIMIT = 250;"))' "$R7/packages/calc/src/calc.ts"; $G -C "$R7" commit -q -am one-line
+lastline_ok() { local out rc; out="$(FAKE_MODE=flips-dup mut "$R7")"; rc=$?
+  printf '%s\n' "$out" | grep -q "file packages/calc/src/calc.ts: ranges 3-3;" || { echo "       (precondition: the change is not the one-line range 3-3)"; return 1; }
+  [ $rc -eq 1 ] && [ "$(printf '%s\n' "$out" | grep -c '^  SURVIVOR')" -eq 2 ] && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/calc.ts:3  custom:numeric  250 → 2500" \
+  && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/calc.ts:3  custom:numeric  250 → 25" && ! printf '%s\n' "$out" | grep -q "BooleanLiteral" \
+  && grep -q "custom injected 2 == counted 2" "$(mdof "$R7")" && clean_tree "$R7"; }
+check "13.2255 a custom literal on the LAST (and first) line of its range, a one-line hunk (3-3), is assigned to its run: reported as custom:numeric 250 → 2500 and → 25, never as a plain 'BooleanLiteral false → true' row (injected 2 == counted 2)" 'lastline_ok'
 
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"

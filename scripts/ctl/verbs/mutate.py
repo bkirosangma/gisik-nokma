@@ -5,10 +5,13 @@ Called by mutate.sh, which owns the trap: every file this script overwrites is f
 $CTL_MUTATE_TMP/manifest (`restore<TAB>path<TAB>backup`, `rmdir<TAB>path`), so the wrapper can put the worktree back on ANY exit,
 SIGINT and SIGTERM included. This script restores after each run as well; the wrapper's pass is the one that cannot be skipped.
 
-Exit codes: 0 no survivor, 1 survivors (triage expected), 2 a tool failure (nothing is ever reported green on a failure).
+Exit codes: 0 no survivor, 1 survivors (triage expected), 2 a tool failure, any crash of this script included (nothing is ever reported
+green on a failure, and a traceback never passes for 1).
 Seams (tests): CTL_MUTATE_RUN_TESTS (the run-tests command), CTL_MUTATE_SPLIT (300 mutants per run), CTL_MUTATE_MAX_SECS (600 s per
-slot-run), CTL_MUTATE_PG_HOST / CTL_MUTATE_PG_PORT (the test Postgres, 127.0.0.1:54329), CTL_MUTATE_INJECT_FAIL (mutate-ast.mjs).
-Hidden sub-commands for the unit legs: `ranges <diff-file>`, `filter <path>...`, `reconcile <plan-json> <report-json>`.
+slot-run, counted from the moment the command holds its slot), CTL_MUTATE_BACKSTOP_SECS (slot_run's outer timeout, default backstop_secs),
+CTL_MUTATE_PG_HOST / CTL_MUTATE_PG_PORT (the test Postgres, 127.0.0.1:54329), CTL_MUTATE_INJECT_FAIL (mutate-ast.mjs).
+Hidden sub-commands: `watchdog <secs> <dir> -- <cmd>...` (slot_run's wrapper inside the slot), and for the unit legs `ranges <diff-file>`,
+`filter <path>...`, `reconcile <plan-json> <report-json>`.
 """
 import glob
 import json
@@ -20,7 +23,9 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
+import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CTL = os.path.join(os.path.dirname(HERE), 'ctl')
@@ -283,14 +288,83 @@ def run_tests_cmd():
     return shlex.split(raw) if raw else ['bash', CTL, 'run-tests']
 
 
+GRACE = 3  # s from the watchdog's TERM to its KILL of the command's group: under run-tests' own 5 s (stop_child), so run-tests never KILLs the watchdog first
+
+
+class Interrupted(Exception):
+    """The watchdog got TERM (run-tests stopping its job; nothing in ctl sends it INT): stop the command's group, then exit 128 + the signal."""
+
+
+def stop_group(p):
+    """TERM to P's process group, KILL GRACE s later (a command that ignores TERM, or a straggler worker), then reap P."""
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    try:
+        os.killpg(p.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        p.wait(timeout=GRACE)
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(p.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    p.wait()
+
+
+def watchdog(argv):
+    """`watchdog <secs> <dir> -- <cmd>...`: the command slot_run hands to run-tests, which starts it only once it HOLDS a slot, so the cap
+    counts slot time and never the queue wait (CTL_SEM_MAX_WAIT, up to 1800 s, a gate first). Runs CMD in its own process group and stops
+    that group after SECS (TERM, KILL after GRACE s); a TERM to the watchdog itself is passed on to the group the same way.
+    <dir>/started: the command got its slot; <dir>/stopped: SECS passed (each holds its epoch time). -> CMD's exit code; 124 when
+    stopped, 128 + the signal when interrupted."""
+    secs, d, cmd = int(argv[0]), argv[1], argv[3:]
+
+    def interrupted(sig, _frame):
+        raise Interrupted(sig)
+
+    signal.signal(signal.SIGTERM, interrupted)
+    p = None
+    try:
+        write(os.path.join(d, 'started'), f'{time.time():.3f}\n')
+        p = subprocess.Popen(cmd, process_group=0)
+        return p.wait(timeout=secs)
+    except subprocess.TimeoutExpired:
+        write(os.path.join(d, 'stopped'), f'{time.time():.3f}\n')
+        print(f'mutate watchdog: the command passed {secs} s in its slot; stopping its process group', flush=True)
+        stop_group(p)
+        return 124
+    except Interrupted as e:
+        if p is not None:
+            stop_group(p)
+        return 128 + e.args[0]
+
+
+def backstop_secs(max_secs):
+    """slot_run's outer timeout, a backstop only: the slot cap, the longest queue wait run-tests allows (CTL_SEM_MAX_WAIT, sem.sh), the
+    watchdog's GRACE, and a margin for run-tests' last poll and probes. Only a run still queued, or a watchdog that failed, reaches it."""
+    return env_int('CTL_MUTATE_BACKSTOP_SECS', max_secs + env_int('CTL_SEM_MAX_WAIT', 1800) + GRACE + 60)
+
+
 def slot_run(label, cwd, cmd, max_secs):
-    """One ctl run-tests call (one slot). -> (rc, slot_secs, log). A run longer than max_secs is stopped (TERM to run-tests, which
-    stops its whole process group) and is a tool failure: P10's 10-minute rule is never broken quietly."""
-    argv = run_tests_cmd() + ['--label', label, '--'] + cmd
+    """One ctl run-tests call (one slot). -> (rc, slot_secs, log). The command runs under `watchdog`, INSIDE the slot: past max_secs of slot
+    time it is stopped and this is a tool failure (P10's 10-minute rule is never broken quietly); the queue wait before the slot is not
+    counted. A run still queued at the backstop is NoSlot, never "a smaller split"."""
+    d = tempfile.mkdtemp(prefix='watchdog-', dir=os.environ.get('CTL_MUTATE_TMP') or None)
+    try:
+        return slot_run_in(label, cwd, cmd, max_secs, d)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def slot_run_in(label, cwd, cmd, max_secs, d):
+    argv = run_tests_cmd() + ['--label', label, '--', sys.executable, os.path.abspath(__file__), 'watchdog', str(max_secs), d, '--'] + cmd
+    backstop = backstop_secs(max_secs)
     t0 = time.time()
     p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
-        out, _ = p.communicate(timeout=max_secs)
+        out, _ = p.communicate(timeout=backstop)
     except subprocess.TimeoutExpired:
         p.send_signal(signal.SIGTERM)
         try:
@@ -298,7 +372,11 @@ def slot_run(label, cwd, cmd, max_secs):
         except subprocess.TimeoutExpired:
             p.kill()
             p.communicate()
-        raise ToolFailure(f'{label}: the slot-run passed {max_secs} s and was stopped (P10: no slot-run over 10 min; the file needs a smaller split)')
+        if not os.path.exists(os.path.join(d, 'started')):
+            raise NoSlot(f'{label}: no test slot within {backstop} s (still queued when the backstop fired); nothing was run')
+        raise ToolFailure(f'{label}: the slot-run was still running {backstop} s after it was queued and was stopped (its watchdog did not stop it at {max_secs} s)')
+    if os.path.exists(os.path.join(d, 'stopped')):
+        raise ToolFailure(f'{label}: the slot-run passed {max_secs} s in its slot and was stopped (P10: no slot-run over 10 min; the file needs a smaller split)')
     wall = time.time() - t0
     m = re.search(r'queue wait: (\d+)s', out or '')
     wait = int(m.group(1)) if m else 0
@@ -621,6 +699,8 @@ class Args:
 
 
 def main(argv):
+    if argv and argv[0] == 'watchdog':
+        return watchdog(argv[1:])
     if argv and argv[0] == 'ranges':
         print(json.dumps(parse_ranges(open(argv[1]).read()), sort_keys=True))
         return 0
@@ -665,6 +745,11 @@ def main(argv):
         return code
     except ToolFailure as e:
         print(f'FAIL mutate tool failure: {e}')
+        return 2
+    except Exception as e:  # a crash (a malformed report, a KeyError): Python's own exit 1 would read as "survivors", so it is a tool failure
+        traceback.print_exc()
+        sys.stderr.flush()
+        print(f'FAIL mutate tool failure: {type(e).__name__}: {e}')
         return 2
 
 
