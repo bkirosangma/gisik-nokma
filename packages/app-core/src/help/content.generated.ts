@@ -6086,11 +6086,27 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The same idea stretched sideways over weeks, moving four weeks at a time with "
+                    "text": "The same idea stretched sideways, as one continuous chart with no pages: drag, swipe or scroll to move through time, press "
                   },
                   {
                     "kind": "bold",
-                    "text": "Earlier"
+                    "text": "Today"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to glide back to it, and use the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Day"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Week"
                   },
                   {
                     "kind": "text",
@@ -6098,11 +6114,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "Later"
+                    "text": "Month"
                   },
                   {
                     "kind": "text",
-                    "text": ". A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by rather than at the end of its week. A thin line marks today in every row."
+                    "text": " switch (or Ctrl and scroll, or a pinch) to zoom about the spot you point at. The arrow keys move a week at a time. A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by. A thin line marks today. Tickets that share a day are stacked in rows, and each bar shows its ticket's key."
                   }
                 ]
               },
@@ -15498,7 +15514,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The Calendar is a month grid; the Timeline is the same idea stretched sideways over weeks, moving four weeks at a time. Both draw a bar only when a ticket has "
+                    "text": "The Calendar is a month grid; the Timeline is the same idea stretched sideways as one continuous chart you scroll and zoom, with no pages. Both draw a bar only when a ticket has "
                   },
                   {
                     "kind": "bold",
