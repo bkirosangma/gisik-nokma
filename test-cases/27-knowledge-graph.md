@@ -5,7 +5,7 @@
 
 | Block | Spec | Plan |
 |---|---|---|
-| 27.001–27.079 | A, typed links | `2026-10-03-typed-links.md`: T1 27.001–27.019 · T2 27.020–27.034 · T3 27.035–27.049 · T4 27.050–27.064 · T5 27.065–27.079 |
+| 27.001–27.094 | A, typed links | `2026-10-03-typed-links.md`: T1 27.001–27.019 · T2 27.020–27.034 · T3 27.035–27.049 · T4 27.050–27.064 · T5 27.065–27.079 · T4b 27.080–27.094 (added 2026-10-04) |
 | 27.100–27.179 | B, reference index and backlinks | `2026-10-03-reference-index.md` |
 | 27.200–27.349 | C, Knowledge Graph view | `2026-10-03-knowledge-graph-view.md` |
 | 27.400–27.549 | D, MCP graph query and semantic layer | `2026-10-03-mcp-graph-semantic-layer.md` |
@@ -29,6 +29,18 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 <!-- A T2 -->
 <!-- A T3 -->
 <!-- A T4 -->
+<!-- A T4b -->
+- ❌ **27.080 — a link event served with its target withheld (`targetId: null`) folds to the unchanged state through `foldTicketEvent` (add and remove), and `applyTicketEvent` refuses it by name;** control: the same event with a real target folds into `links`, and `isWithheldLinkEvent` is false for a non-link event whose payload has `targetId: null`.
+- ❌ **27.081 — `withholdEvent` serves a link event whose target the viewer cannot see as `{kind, targetId: null}`, byte-identical for a hidden target and a never-minted one, and a `claim.contested` wrapping such a claim with its embedded payload withheld and its cause rewritten to `permission.visibility` / "The other ticket does not exist in this workspace, or you cannot see it." (no id, no title);** control: the owner's copies, a link to a ticket the member sees, a contest wrapping a visible-target link, and a non-link event all come back as the same reference.
+- ❌ **27.082 — `withholdLinks` keeps only visible targets, drops the key when none remain, and `targetSight` asks `canSee` once per distinct target;** control: the owner's state is returned whole.
+- ❌ **27.083 — `GET …/tickets/:id/events` serves a member the link event to a hidden target withheld (`targetId: null`) at its own `seq`, the member's event ids and seqs for S equal History's for S, and the response carries no trace of the id;** control: the owner gets the id.
+- ❌ **27.084 — the stream (`visibleEventsFor`) yields the member the withheld envelope at the same `seq` and `workspaceSeq` as the owner's, so the member's list of S's seqs equals the owner's (no gap);** control: the owner's envelope carries the id.
+- ❌ **27.085 — bootstrap, workspace and per-ticket, serves the member S's snapshot `state.links` without the hidden target, its tail link events withheld, and its backfilled link contest with the rewritten cause; nothing in either body contains H or H's title;** control: the owner's bodies contain H.
+- ❌ **27.086 — History serves a contest wrapping a hidden-target link claim with the rewritten cause and a withheld embedded payload;** control: the owner's History serves it whole.
+- ❌ **27.087 — `GET /v1/contests` serves the member the same rewritten contest, with no id and no title;** control: a contest whose link target the member sees is served whole, and the owner's roster is whole.
+- ❌ **27.088 — the replica applies a withheld `link_added` and a withheld `link_removed` from the stream without stalling: both are stored at their seqs, the ticket's confirmed state has no `links` key, and the cursor advances past both;** control: a visible `link_added` in the same run folds into `links`.
+- ❌ **27.089 — the dual-client rig, a target hidden from client A: after the admin links T1 blocks H and T1 relates T2, A's confirmed T1 equals A's served detail state (`withholdLinks(projTicket(T1), sight(A))`: `links: [relates T2]`), and no row A holds (events, snapshots, contests, tickets) contains H; the same after a snapshot pass and a FRESH client's bootstrap;** control: the admin's client holds H and equals `projTicket(T1)` whole; 27.062 is unchanged.
+- ❌ **27.090 — offline History labels a withheld link event `linkTarget: null`, so `describeEvent` reads "a ticket you can't see";** control: a link event with a real target carries no `linkTarget` key.
 <!-- A T5 -->
 
 ## 27.2 Reference index and "Linked from" (spec B, 27.100–27.179)

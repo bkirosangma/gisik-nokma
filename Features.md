@@ -3755,6 +3755,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- A T2 bullet -->
 <!-- A T3 bullet -->
 <!-- A T4 bullet -->
+<!-- A T4b bullet -->
 <!-- A T5 bullet -->
 
 ### Reference index and "Linked from" (spec B)
