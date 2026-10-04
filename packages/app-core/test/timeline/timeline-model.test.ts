@@ -632,8 +632,8 @@ describe('11.58 custom date claims ride along and change no geometry (owner sign
     const row = onlyRow(model([withCustom]));
     expect(row.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug, Anselma's claim"]);
     expect(row.customClaims[0]!.claim.fieldId).toBe('filed-on');
-    // 24 Aug and 28 Aug are both in the 24-30 week: one column, untouched by
-    // the 26 Aug claim.
+    // The bar runs from the 24 Aug claim to the 28 Aug one, untouched by the
+    // 26 Aug claim between them.
     expect([row.startDay, row.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-08-28')]);
     expect(row.provenance).toBe("starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
   });
@@ -752,16 +752,20 @@ describe('11.59 filters narrow rows and side list alike', () => {
  * `emptyCopy` and (then) three sentences for exactly this failure; the timeline had
  * no such field at all.
  *
- * The window miss is the case the component cannot reconstruct: Task 11's
- * props carry `tickets`, `filter` and `laneEpicId` and nothing about the
+ * The window miss was the case the component could not reconstruct: Task 11's
+ * props carried `tickets`, `filter` and `laneEpicId` and nothing about the
  * window.
  *
- * ⚠ **THE BLOCK IS NOW ABOUT TWO SENTENCES, NOT THREE** (2026-09-20): the
+ * ⚠ The block became about two sentences, not three, on 2026-09-20: the
  * sentence for the narrowing case was deleted on the owner's ruling and its
- * arm falls through to `TIMELINE_EMPTY_COPY`. The guard it steered by is kept,
- * and the tests below are re-aimed at the outcomes the remaining two sentences
- * still distinguish. The distinct-count assertion records the collapse rather
- * than hiding it.
+ * arm fell through to `TIMELINE_EMPTY_COPY`.
+ *
+ * ⚠ **THE BLOCK IS NOW ABOUT ONE SENTENCE** (Workflow and Timeline graphs
+ * Part 1 T9, 29.095): one continuous axis has no window, so there is no window
+ * miss, no window sentence and no `narrowedAway` guard; dated work far away is
+ * DRAWN. Every empty model says `TIMELINE_EMPTY_COPY`, which names the
+ * narrowings, and the distinct-count assertion records that the empties are one
+ * model rather than hiding it.
  */
 describe('11.61 the empty timelines (one sentence since the window went: 29.095)', () => {
   function assigned(assigneeId: string, title: string, start?: string, due?: string): TicketDatesInput {

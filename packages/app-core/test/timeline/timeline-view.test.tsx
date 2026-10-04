@@ -23,7 +23,9 @@ import { dayNumberOf, isoDayOf } from '../../src/timeline/timeline-days.js';
 import { TimelineView } from '../../src/timeline/timeline-view.js';
 
 /**
- * 11.73–11.82 — `TimelineView`, the week columns over Task 10's landed model.
+ * 11.73–11.81 and 29.097–29.105 — `TimelineView`, one continuous day axis over
+ * the model (11.74, 11.79 and 11.82 retired with the week columns in Workflow
+ * and Timeline graphs Part 1 T9).
  *
  * THE EXPECTED STRINGS ARE NEVER HAND-TYPED. Every label, note and empty
  * sentence is composed by importing the function or constant the model uses,
@@ -39,14 +41,16 @@ import { TimelineView } from '../../src/timeline/timeline-view.js';
  * were witnessed in one direction only. The recorded failure class on this
  * branch is a thing asserted present-when-expected and never absent-when-not,
  * so nothing detects OVER-firing: a `data-pending` hard-coded to `'true'`, an
- * aside rendered over an empty list, a clipped marker on a bar that fits.
+ * aside rendered over an empty list, a clipped marker on a bar that fits (the
+ * marker went with the window in Part 1 T9).
  * Those three were covered from the start. These were not, and each is now
  * pinned at the site named beside it:
  *
  * - the side entry's custom-claim list, whose twin on the ROW was witnessed
  *   both ways while the identical conditional here was not (11.80);
  * - the title column's own text, reached by every other assertion through
- *   some OTHER element, so emptying it left the whole suite green (11.79);
+ *   some OTHER element, so emptying it left the whole suite green (11.79,
+ *   retired with the title column in Part 1 T9);
  * - `laneEpicId`, forwarded to the model and passed by no test at all (11.81).
  *
  * A conditional is only witnessed here when a MIXED fixture renders both
@@ -101,9 +105,9 @@ function ticket(
 }
 
 /**
- * A Sunday. `mondayOnOrBefore` puts the window's first column on 2026-08-17,
- * so week 0 is 17 Aug and the eighth (default) column starts 5 Oct, closing
- * inclusively on 11 Oct.
+ * A Sunday: the today line's day (29.101) and the day the scroller opens on.
+ * There is no window and no first column (Part 1 T9), so no fixture date can
+ * fall off the chart.
  */
 const TODAY = '2026-08-23';
 /** The state word the description leads with for the fixture's `active` state (TG-14: status is never colour alone). */
@@ -766,13 +770,13 @@ describe('11.80 custom date claims sit beside the ticket, never across the weeks
     );
   }
 
-  it("renders the claim under its own field name, in the title column and not inside the bar", () => {
+  it("renders the claim under its own field name, in the bar's row and not inside the bar", () => {
     const { container } = renderTimeline([filed()]);
     const claim = screen.getByText(customLabel('Filed on', '2026-08-26', 'user_anselma'));
     expect(claim).toHaveAttribute('data-field-id', 'filed-on');
     expect(claim.closest('.gn-timeline__row')).not.toBeNull();
-    // The list is beside the ticket, never a cell in the week grid: it is not
-    // inside the bar, and the bar is the only thing this row puts on a column.
+    // The list is beside the ticket, a callout in the bar's row (TV-2): it is
+    // not inside the bar, so the bar's own text stays the key and the title.
     expect(claim.closest('.gn-timeline__bar')).toBeNull();
     expect(container.querySelectorAll('[data-custom-claims]')).toHaveLength(1);
   });

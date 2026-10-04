@@ -854,7 +854,7 @@ fixed ("Keep the Group-by / Columns wiring untouched... this is a restyle, not a
 draws this as a `<tr>` spanning the table's own columns; this product's architecture already renders one
 grouping's rows as a SEPARATE `<table>` per section (`apps/web/test/list-prefs-wiring.test.tsx` proves the
 wiring this shape depends on), so there is no in-table row to restyle. `trayBg`/`trayShadow` →
-`--gn-surface-sunken`/`--gn-shadow-sunken`, the same pair Task 11's `.gn-timeline__weeks` uses for
+`--gn-surface-sunken`/`--gn-shadow-sunken`, the same pair Task 11's `.gn-timeline__weeks` used (until Workflow and Timeline graphs Part 1 T9 retired it) for
 identical prototype vocabulary — cited forward at the time it was written, confirmed still true by
 re-reading `ui.css` after both tasks landed.
 
@@ -941,7 +941,7 @@ inline `paddingLeft` on the inner `.gn-list__title-cell` span, since `depth` is 
 uneditable one, closing the "not pixel-exact" caveat `13.475` recorded.
 
 No new token role: `--gn-text-muted` (label2) and `--gn-surface-sunken` (trayBg) on the header cell are
-the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1939-1942`); `--gn-fill-quaternary` (fill4) on
+the SAME pair `.gn-timeline__weeks` used (`ui.css:1939-1942` then; the rule was retired by Workflow and Timeline graphs Part 1 T9); `--gn-fill-quaternary` (fill4) on
 the zebra row is already declared and consumed elsewhere. The two new length-only rules (`min-width:820px`
 on `.gn-list__table`, `min-width:260px` on `.gn-list__table-cell--title`) are plain literals — this file
 has no length-token axis (`radiusVariableName` names only `card`/`control`), matching how every other
@@ -1924,7 +1924,7 @@ screen back toward a prototype that never had it — the second half of the find
 **The finding, filed twice from two sides: round 2 `E4-15`** (MINOR — "the class HAS a rule, and the rule
 forgot the border") **and `P35`** (MINOR, `r2 NEW` phase 2 — the same rule, reached by asking whether a
 matched selector block means a fully-styled control). `.gn-timeline__nav` — the three Earlier / Today /
-Later buttons — declared a radius, a background, a colour, a font, padding and a cursor, **and no
+Later buttons (Today alone since Workflow and Timeline graphs Part 1 T9) — declared a radius, a background, a colour, a font, padding and a cursor, **and no
 `border`**, so the user agent's `2px outset rgb(0,0,0)` survived the rule: measured with the product's own
 `background: rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`. **This is outside round 1's
 `P1` population by construction** — P1 selected classes with ZERO matching selector blocks, and this one

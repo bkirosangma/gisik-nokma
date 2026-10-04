@@ -110,7 +110,7 @@ export type TimelineModel = {
    * **The second arm is gone (continuous axis, 2026-10-03, TV-9).** There used to be a sentence for work that was
    * fully dated and sat outside the eight weeks; on one continuous axis every dated bar is drawn and reachable by
    * panning, so "outside the window" is no longer a state of the data. What replaces it is the VIEW's "Nothing in
-   * view" pill with its jump controls, which needs the viewport and so cannot be a model answer. The `narrowedAway`
+   * view" pill with its jump controls (Part 1 T11, 29.108), which needs the viewport and so cannot be a model answer. The `narrowedAway`
    * guard that picked between the two sentences went with the arm it chose between.
    */
   emptyCopy: string | null;

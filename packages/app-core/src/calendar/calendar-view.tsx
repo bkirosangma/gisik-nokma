@@ -449,7 +449,8 @@ export function CalendarView(props: CalendarViewProps) {
         a month with few events shows blank tray below its last week rather
         than six evenly taller rows. DECLARED DIVERGENCE from the prototype's
         own single-grid vocabulary, the same shape `.gn-list__section-title`
-        and `.gn-timeline__weeks` already declare for the identical reason.
+        declares for the identical reason (as `.gn-timeline__weeks` did until
+        Workflow and Timeline graphs Part 1 retired the week grid).
       */}
       {/*
         P20: the APG calendar-grid pattern's four roles, added as attributes
