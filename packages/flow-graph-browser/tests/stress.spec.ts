@@ -38,10 +38,10 @@ test('29.003 the product\'s own Timeline view at 2,000 dated tickets: panned and
   console.log(`fg-stress view (LOCAL, headless): ${JSON.stringify({ pan: r.pan, clickToSettleMs: r.clickToSettleMs })}`);
   expect(await page.locator('.gn-timeline').count()).toBe(1);
   expect(r.pan.frames).toBeGreaterThan(5);
-  // CONTROL, same test: the shipped grid really has a Later button (its glyph is aria-hidden, so the accessible name is the word).
-  expect(await page.locator('#host').getByRole('button', { name: 'Later', exact: true }).count()).toBe(1);
-  // Click-to-settle was measured, and on Later, not Today: the button's textContent is `Later›`, so an exact-text match
-  // misses it and falls through to Today. T9 retires Later (VP-10) and must re-point this assertion to Today.
+  // CONTROL, same test: the view's one movement button is Today. T1 measured the paged grid's Later; T9 (Workflow and
+  // Timeline graphs Part 1, VP-10) retired Earlier and Later, so the control and the click-to-settle are re-pointed to Today.
+  expect(await page.locator('#host').getByRole('button', { name: 'Today', exact: true }).count()).toBe(1);
+  expect(await page.locator('#host').getByRole('button', { name: 'Later', exact: true }).count()).toBe(0);
   expect(typeof r.clickToSettleMs).toBe('number');
-  expect(await page.evaluate(() => (window as unknown as { __stressClicked?: string | null }).__stressClicked)).toBe('Later');
+  expect(await page.evaluate(() => (window as unknown as { __stressClicked?: string | null }).__stressClicked)).toBe('Today');
 });

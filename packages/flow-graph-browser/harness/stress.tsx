@@ -73,7 +73,7 @@ function viewScene(): Scene {
   };
 }
 
-/** A nav button's word without its aria-hidden glyph: the shipped `Later` button's text is `Later›`. */
+/** A nav button's word without its aria-hidden glyph: the paged grid's `Later` button's text was `Later›` (T1's baseline). */
 const wordOf = (button: HTMLButtonElement): string => (button.textContent ?? '').replace(/[‹›]/g, '').trim();
 
 /** Click -> the frame after the click's work settled (two frames: React commit, then paint). Null when the page has no Later / Today. */

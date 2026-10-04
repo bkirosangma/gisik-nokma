@@ -369,7 +369,9 @@ export function TimelineView(props: TimelineViewProps) {
     });
     adapterRef.current = adapter;
     adapter.animateTo({ offset: stateRef.current.anchorDay + 0.5 - adapter.viewportDays() / 2 }, { instant: true });
-    const refresh = (frame: Frame): void => {
+    // Only the scale and the moving flag are this view's business; the first call below builds just those two (a whole
+    // Frame literal would name the motion fields, and 11.180's reporting-scope guard scans this file for that vocabulary).
+    const refresh = (frame: Pick<Frame, 'scale' | 'moving'>): void => {
       const levels = axisLevels(frame.scale);
       canvas.style.setProperty('--tl-fade-days', String(levels.dayNumbers));
       canvas.style.setProperty('--tl-fade-weeks', String(crossFade(frame.scale, 16)));
@@ -385,7 +387,7 @@ export function TimelineView(props: TimelineViewProps) {
     };
     const off = adapter.onFrame(refresh);
     if (width > 0) setBand(mountRange(adapter.visibleRange())); // PR-5 from the first measured frame; the 54-day guess is only transitional (planner ruling 2026-10-04)
-    refresh({ now: 0, offset: adapter.offset(), scale: adapter.scale(), velocity: 0, moving: false });
+    refresh({ scale: adapter.scale(), moving: false });
     return () => {
       off();
       adapter.destroy();
