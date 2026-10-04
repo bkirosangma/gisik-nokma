@@ -21,20 +21,25 @@ export type FieldChoice = { id: string; name: string; source: string };
  *   silently gates nothing, which is the failure mode `adviseWorkflowDef`
  *   exists to warn about. **An option that can only produce a dead rule is
  *   worse than an absent one.**
- * - **The four that remain can all be genuinely unset**, so a rule on any of
- *   them can actually refuse: a title can be blank, a description absent, and
- *   either date claim can be cleared.
+ * - **`waitForAll` is EXCLUDED** (wtg2 T4, spec ES-2): it is optional, but a
+ *   gate on `true` is meaningless as a require-field (a rule on a switch would
+ *   force every move to turn it on).
+ * - **The six that remain can all be genuinely unset**, so a rule on any of
+ *   them can actually refuse: a title can be blank, a description absent,
+ *   either date claim can be cleared, and so can either estimate.
  *
  * `test/workflow-builder/summaries.test.ts` pins the difference as a SET
- * DIFFERENCE against `BUILTIN_FIELD_IDS` (case `3.972`), so a new built-in
- * forces the question and a well-meaning "fix" that puts `priority` back
- * reddens rather than shipping.
+ * DIFFERENCE against `BUILTIN_FIELD_IDS` (case `3.972`, which names both
+ * exclusions), so a new built-in forces the question and a well-meaning "fix"
+ * that puts `priority` or `waitForAll` back reddens rather than shipping.
  */
 export const BUILTIN_FIELD_CHOICES: readonly FieldChoice[] = [
   { id: 'title', name: 'Title', source: 'Built-in' },
   { id: 'description', name: 'Description', source: 'Built-in' },
   { id: 'dueDate', name: 'Due date', source: 'Built-in' },
   { id: 'startDate', name: 'Start date', source: 'Built-in' },
+  { id: 'estimate', name: 'Estimate', source: 'Built-in' },
+  { id: 'reworkEstimate', name: 'Rework estimate', source: 'Built-in' },
 ];
 
 /**

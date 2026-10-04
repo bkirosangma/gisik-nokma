@@ -98,7 +98,10 @@ describe('14.451 update_ticket', () => {
     await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { title: 'x' } })).rejects.toThrow(
       '"title" is a built-in field: use the title argument',
     );
-    expect(f.batches, 'refusals send nothing').toHaveLength(1);
+    for (const id of ['estimate', 'reworkEstimate', 'waitForAll']) {
+      await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { [id]: 3 } })).rejects.toThrow(`"${id}" is a built-in field and cannot be set through fields`);
+    }
+    expect(f.batches, '29.163 refusals send nothing').toHaveLength(1);
     await tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, title: 'Only' }); // control
     expect(f.batches[1]).toHaveLength(1);
     expect(f.batches[1]![0]).toMatchObject({ type: 'ticket.field_set', payload: { fieldId: 'title', value: 'Only' } });

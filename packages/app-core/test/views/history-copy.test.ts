@@ -268,6 +268,20 @@ describe('3.973 history copy — the field_set sentence', () => {
   });
 });
 
+describe('29.161 history copy — the flow built-ins read by name', () => {
+  it('29.161 estimate, rework estimate and wait-for-all sentences; priority and custom fields unchanged', () => {
+    const set = (fieldId: string, value: unknown) => describeEvent({ ...eventOf('ticket.field_set'), payload: { fieldId, value } });
+    expect(set('estimate', 3)).toBe('Set Estimate to 3 days');
+    expect(set('estimate', 1)).toBe('Set Estimate to 1 day');
+    expect(set('estimate', null)).toBe('Cleared Estimate');
+    expect(set('reworkEstimate', 2)).toBe('Set Rework estimate to 2 days');
+    expect(set('waitForAll', true)).toBe('Turned on Wait for all incoming');
+    expect(set('waitForAll', null)).toBe('Turned off Wait for all incoming');
+    expect(set('priority', 'P1')).toBe('Set priority to P1'); // control
+    expect(set('region', 'North')).toBe('Set region to North');
+  });
+});
+
 describe('26.117 comment edits and deletions are narrated, never echoed', () => {
   const ev = (type: string, payload: unknown): TicketHistoryEvent => ({
     ...eventOf(type),
