@@ -1068,9 +1068,11 @@ the legend switches, because those live only in this view.
 
 ### Timeline
 
-The same idea stretched sideways over weeks, moving four weeks at a time with **Earlier** and
-**Later**. A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by
-rather than at the end of its week. A thin line marks today in every row.
+The same idea stretched sideways, as one continuous chart with no pages: drag, swipe or scroll to move
+through time, press **Today** to glide back to it, and use the **Day**, **Week** and **Month** switch (or
+Ctrl and scroll, or a pinch) to zoom about the spot you point at. The arrow keys move a week at a time.
+A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by. A thin line
+marks today. Tickets that share a day are stacked in rows, and each bar shows its ticket's key.
 
 Anything with only one date, no dates, or a contradiction goes into a list beside the chart headed
 *"Not on the timeline yet"*, with a count. The sentence under the heading says what to do: *"These

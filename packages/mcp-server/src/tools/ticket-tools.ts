@@ -7,7 +7,7 @@ import { markdownBody, MARKDOWN_SYNTAX_HELP } from './markdown-io.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
 import { readOrNotFound } from './reads.js';
-import { envelopeFor, submitBatch, submitOne } from './submit.js';
+import { envelopeFor, submitBatch, submitBatchByIndex, submitOne, type EventResult } from './submit.js';
 
 export type TicketDetailWire = {
   key: string | null;
@@ -22,11 +22,13 @@ const BUILT_IN = new Set(['title', 'description', 'priority', 'startDate', 'dueD
 const FLOW_BUILT_IN = new Set(['estimate', 'reworkEstimate', 'waitForAll']);
 const enc = encodeURIComponent;
 
+export const TICKET_NOT_FOUND = 'ticket not found or not visible to you';
+
 export async function readTicket(session: Session, workspaceId: string, ticketId: string): Promise<TicketDetailWire> {
   try {
     return (await session.get(`/v1/workspaces/${enc(workspaceId)}/tickets/${enc(ticketId)}`)) as TicketDetailWire;
   } catch (error) {
-    if (error instanceof HttpError && error.status === 404) throw new Error('ticket not found or not visible to you');
+    if (error instanceof HttpError && error.status === 404) throw new Error(TICKET_NOT_FOUND);
     throw error;
   }
 }
@@ -71,6 +73,26 @@ function historyLine(e: { id: string; type: string; payload: Record<string, unkn
     eventId: e.id, type: e.type, actorId: e.actorId, origin: e.origin, serverTime: e.serverTime, payload: redactedPayload(e.type, e.id, e.payload),
     ...(e.linkTarget === undefined ? {} : { linkTarget: e.linkTarget }),
   };
+}
+
+const closeManyShape = {
+  workspaceId: id,
+  ticketIds: z.array(id).min(1).max(100),
+  // A string or a number, and NOT `.int()`: 3.5 must reach the preview, not a schema error (CT-9).
+  confirm_count: z.union([z.string(), z.number()]).optional(),
+};
+const CLOSE_OUTCOME_UNKNOWN =
+  'gisik-nokma did not report what happened to every ticket, so which ones closed is unknown. Do not assume any closed or any left open; read them again with list_tickets before doing anything else';
+
+/** "a, b and c"; "a"; "". */
+function inWords(items: string[]): string {
+  return items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+function closeRow(ticketId: string, r: EventResult) {
+  if (r.status === 'committed') return { ticketId, status: 'closed' as const, eventId: r.eventId, seq: r.seq };
+  if (r.status === 'refused') return { ticketId, status: 'refused' as const, rule: r.rule, reason: r.reason };
+  return { ticketId, status: 'invalid' as const, code: r.code, message: r.message };
 }
 
 export function ticketTools(session: Session): ToolDefinition[] {
@@ -127,6 +149,44 @@ export function ticketTools(session: Session): ToolDefinition[] {
         return { results: await submitBatch(session, events) };
       },
     })),
+    {
+      name: 'close_tickets',
+      description:
+        'Close several tickets at once (1-100 ticketIds), as the List view\'s Bulk close does: one close per ticket, each decided by the product\'s own rules ' +
+        '(a ticket closes only from a terminal state, and not while it has open children). Two calls: without confirm_count you get a preview that names every ' +
+        'ticket and nothing changes; repeat the call with confirm_count set to the number of tickets to close them. The answer lists every ticket as closed or ' +
+        'refused (with the product\'s reason); a refused ticket stays open and the rest are still closed. Undo with reopen_ticket.',
+      inputSchema: closeManyShape,
+      handler: async (args) => {
+        const a = z.object(closeManyShape).parse(args);
+        const repeated = a.ticketIds.find((ticketId, i) => a.ticketIds.indexOf(ticketId) !== i);
+        if (repeated !== undefined) throw new Error(`ticketIds lists ${repeated} more than once; list each ticket once`);
+        const count = a.ticketIds.length;
+        // The count binds the SIZE of the batch, not its members: a different list of the same length is a new batch the caller chose (spec §5.7).
+        const preview = await confirmOrPreview(String(count), a.confirm_count === undefined ? undefined : String(a.confirm_count), async () => {
+          const named: string[] = [];
+          for (const ticketId of a.ticketIds) {
+            try {
+              const ticket = await readTicket(session, a.workspaceId, ticketId);
+              named.push(`${ticket.key ?? ticketId} "${ticket.title}"`);
+            } catch (error) {
+              // Hidden and missing look the same on purpose (no existence oracle).
+              if (error instanceof Error && error.message === TICKET_NOT_FOUND) named.push(`one you cannot see (${ticketId})`);
+              else throw error;
+            }
+          }
+          return {
+            sentence: `Closes ${count} ticket${count === 1 ? '' : 's'}: ${inWords(named)}. The server decides each close; a ticket that is not in a terminal state, or has open children, will be refused and left open.`,
+            counts: { tickets: count },
+          };
+        }, 'confirm_count');
+        if (preview !== null) return preview;
+        const events = a.ticketIds.map((ticketId) => envelopeFor(session, a.workspaceId, { kind: 'ticket', id: ticketId }, 'ticket.closed', {}));
+        const results = await submitBatchByIndex(session, events, CLOSE_OUTCOME_UNKNOWN);
+        const rows = a.ticketIds.map((ticketId, i) => closeRow(ticketId, results[i]!));
+        return { closed: rows.filter((r) => r.status === 'closed').length, refused: rows.filter((r) => r.status !== 'closed').length, results: rows };
+      },
+    },
     {
       name: 'delete_ticket',
       description: 'Move a ticket to Deleted items (restorable for 15 days with restore_ticket). confirm_name must be the ticket KEY (e.g. CCSO-4); without it you get a preview and nothing changes.',

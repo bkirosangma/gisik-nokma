@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildCalendarModel } from '../../src/calendar/calendar-model.js';
+import { dayNumberOf } from '../../src/timeline/timeline-days.js';
 import { buildTimelineModel } from '../../src/timeline/timeline-model.js';
 import { monthGridWeeks } from '../../src/claims/dates.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
@@ -127,13 +128,15 @@ describe('11.48 the calendar view-model reads no clock — proved by varying the
 /**
  * 11.60 — the timeline view-model, held to the same standard, and the reason
  * it needs its own case rather than riding the calendar's: the calendar only
- * ever COMPARES day strings, while the timeline divides a millisecond
- * difference to get a week index. That arithmetic is where a device getter
- * would place the same claim in a different column depending on who is
- * looking, and it is the only place in this surface that does any.
+ * ever COMPARES day strings, while the timeline turns a claimed day into a
+ * day NUMBER (`dayNumberOf`, a millisecond difference divided by a day). That
+ * arithmetic is where a device getter would place the same claim on a
+ * different day depending on who is looking, and it is the only place in this
+ * surface that does any. (The week index it used to divide into is gone with
+ * the week columns; the day number is what the continuous axis is made of.)
  */
 describe('11.60 the timeline view-model reads no clock either', () => {
-  it('the whole model — weeks, bars, side list — is byte-identical in every zone', () => {
+  it('the whole model — day numbers, extent, side list — is byte-identical in every zone', () => {
     const inputs = [
       ticket(
         {
@@ -147,20 +150,19 @@ describe('11.60 the timeline view-model reads no clock either', () => {
     ];
     const models = ZONES.map((zone) =>
       underZone(zone, () =>
-        JSON.stringify(buildTimelineModel(inputs, { anchor: '2026-08-23', userName })),
+        JSON.stringify(buildTimelineModel(inputs, { today: '2026-08-23', userName })),
       ),
     );
     expect(new Set(models).size).toBe(1);
-    // The window's two edge days really rendered — an empty model must not
-    // pass this by being empty, and both ends are where a zone shift lands.
-    expect(models[0]).toContain('2026-08-17');
-    expect(models[0]).toContain('2026-10-11');
-    // And the arithmetic actually ran: an unclipped span across all 8 columns.
-    expect(models[0]).toContain('"fromWeek":0');
-    expect(models[0]).toContain('"toWeek":7');
+    // The span's two edge days really rendered, as day numbers (20682 = 2026-08-17, 20737 = 2026-10-11) — an empty model
+    // must not pass this by being empty, and both ends are where a zone shift lands.
+    expect(models[0]).toContain(`"startDay":${dayNumberOf('2026-08-17')}`);
+    expect(models[0]).toContain(`"endDay":${dayNumberOf('2026-10-11')}`);
+    expect(dayNumberOf('2026-10-11') - dayNumberOf('2026-08-17')).toBe(55);
+    expect(models[0]).toContain(`"todayDay":${dayNumberOf('2026-08-23')}`);
   });
 
-  it('the week a claim falls in is the same week in every zone, on the Sunday|Monday seam', () => {
+  it('a claimed day is the same day number in every zone, on the Sunday|Monday seam', () => {
     const seam = ZONES.map((zone) =>
       underZone(zone, () => {
         const model = buildTimelineModel(
@@ -171,12 +173,14 @@ describe('11.60 the timeline view-model reads no clock either', () => {
               dueDate: claimField({ date: '2026-08-23' }),
             }),
           ],
-          { anchor: '2026-08-23', userName },
+          { today: '2026-08-23', userName },
         );
-        return model.groups[0]?.rows[0]?.bar.fromWeek;
+        return model.groups[0]?.rows[0]?.startDay;
       }),
     );
-    expect(seam).toEqual([0, 0, 0, 0]);
+    expect(seam).toEqual(ZONES.map(() => dayNumberOf('2026-08-23')));
+    // CONTROL: the Monday after is the next number, so the seam is a real boundary and not one day for everything.
+    expect(dayNumberOf('2026-08-24')).toBe(dayNumberOf('2026-08-23') + 1);
   });
 });
 

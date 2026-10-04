@@ -4,7 +4,7 @@ import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns
 
 /**
  * The web app on phones, Plan Task 8 — the project page's other views (§21.8): the project header and
- * view tabs (21.110), List / Backlog (21.111), Calendar (21.112) and Timeline (21.113). 21.114 (the four
+ * view tabs (21.110), List / Backlog (21.111), Calendar (21.112). The Timeline's case, 21.113, was retired with the paged grid by Workflow and Timeline graphs Part 1 (29.106 pins the continuous canvas's stylesheet, 29.107 its structure). 21.114 (the four
  * views at 360 / 412 / 440, no page overflow, scrollers scroll) is a browser case and stays 🧪.
  *
  * Every phone rule sits inside the existing 40rem arm (FD1) and AFTER the base rule it overrides — equal
@@ -233,37 +233,6 @@ describe('21.112 Calendar: on a phone the month grid FITS the card (F-4, 2026-10
     expect(valueOf(ruleExactly(ui, '.gn-calendar__grid'), 'overflow-x')).toBeNull();
     expect(valueOf(ruleExactly(ui, '.gn-calendar__days'), 'grid-template-columns')).toBe('repeat(7, 1fr)');
     expect(valueOf(ruleExactly(ui, '.gn-calendar__header'), 'flex-wrap')).toBeNull();
-  });
-});
-
-describe('21.113 Timeline: the weeks band scrolls inside its track; the page does not', () => {
-  it('21.113 the timeline is the scroller; its week band and rows keep a 40rem floor and a narrower title column; the toolbar wraps and stays in view', () => {
-    const track = ruleExactly(ui, '.gn-timeline', PHONE);
-    expect(valueOf(track, 'overflow-x')).toBe('auto');
-    expect(valueOf(track, 'max-width')).toBe('100%');
-    expect(valueOf(track, 'min-width')).toBe('0');
-    expect(valueOf(track, 'overscroll-behavior-x')).toBe('contain');
-    const bands = ruleExactly(ui, ['.gn-timeline__weeks', '.gn-timeline__row'], PHONE);
-    expect(valueOf(bands, 'min-width')).toBe('40rem');
-    expect(valueOf(bands, 'grid-template-columns')).toBe('9rem var(--timeline-week-columns)');
-    const header = ruleExactly(ui, '.gn-timeline__header', PHONE);
-    expect(valueOf(header, 'flex-wrap')).toBe('wrap');
-    expect(valueOf(header, 'position')).toBe('sticky');
-    expect(valueOf(header, 'left')).toBe('0');
-    after(ui, ['.gn-timeline']);
-    after(ui, ['.gn-timeline__header']);
-    after(ui, ['.gn-timeline__weeks', '.gn-timeline__row'], [
-      ['.gn-timeline__weeks', '.gn-timeline__row'],
-      ['.gn-timeline__weeks'],
-      ['.gn-timeline__row'],
-    ]);
-
-    // CONTROL — desktop unchanged: no scroller on the timeline, the 14.375rem title column, no floor.
-    const base = ruleExactly(ui, '.gn-timeline');
-    expect(valueOf(base, 'overflow-x')).toBeNull();
-    const desktopBands = ruleExactly(ui, ['.gn-timeline__weeks', '.gn-timeline__row']);
-    expect(valueOf(desktopBands, 'grid-template-columns')).toBe('14.375rem var(--timeline-week-columns)');
-    expect(valueOf(desktopBands, 'min-width')).toBeNull();
   });
 });
 
