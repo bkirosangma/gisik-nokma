@@ -20,8 +20,8 @@ afterAll(async () => {
 });
 
 describe('28.115 projection and rebuild', () => {
-  it('keys a from-form row by its source, deletes exactly that row, survives the publish and rebuilds clean; CONTROL: a plain row is keyed by the entity', async () => {
-    const [s, s2, d] = [newUlid(), newUlid(), newUlid()];
+  it('keys a from-form row by its source, deletes exactly that row, survives the publish under the re-file and rebuilds clean; CONTROL: a plain row is keyed by the entity', async () => {
+    const [s, s2, d] = [newUlid(), newUlid(), newUlid()].sort(); // s < d: the removal leg below needs S's stream replayed first
     await w.published(s);
     await w.published(s2);
     await w.draft(d);
@@ -41,15 +41,27 @@ describe('28.115 projection and rebuild', () => {
     expect(await w.send('member', 'ticket.link_removed', d, { kind: 'relates', targetId: d, from: s })).toMatchObject({ status: 'committed' });
     expect((await w.linkRows(d)).map((r) => [r.source_id, r.target_id, r.kind])).toEqual([[s, d, 'blocks'], [d, s2, 'blocks']]);
 
-    const seqBefore = (await w.linkRows(d)).map((r) => r.seq);
+    const plainSeq = (await w.linkRows(d)).find((r) => r.source_id === d)?.seq;
     expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
-    // the row survives, with its first provenance; the re-file's plain event inserted nothing new
-    expect((await w.linkRows(d)).map((r) => [r.source_id, r.target_id, r.kind, r.seq])).toEqual([
-      [s, d, 'blocks', seqBefore[0]], [d, s2, 'blocks', seqBefore[1]],
+    // the row survives and the re-file on S's stream takes it over: its seq and actor, one row per key
+    const [refile] = await w.linkEventsOn(s);
+    expect(refile?.payload).toEqual({ kind: 'blocks', targetId: d });
+    expect((await w.linkRows(d)).map((r) => [r.source_id, r.target_id, r.kind, r.seq, r.created_by])).toEqual([
+      [d, s2, 'blocks', plainSeq, member], [s, d, 'blocks', refile?.seq, member],
     ]);
     const after = await w.stateOf('member', d);
     expect(after.ticketState.links).toEqual([{ kind: 'blocks', targetId: s2 }]); // no `from` entry survives
-    const report = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() });
-    expect(report).toEqual({ clean: true, diffs: [] });
+    expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
+
+    // Removed after the publish: the rebuild replays stream by stream (`readLedger`), S's first here, so D's from-form
+    // add comes AFTER S's removal and must not bring the row back. Precondition pinned, or the leg passes either way.
+    const order = await db.pool.query<{ entity_id: string }>(
+      'SELECT DISTINCT entity_kind, entity_id FROM events WHERE entity_id = ANY($1) ORDER BY entity_kind, entity_id',
+      [[s, d]],
+    );
+    expect(order.rows.map((r) => r.entity_id)).toEqual([s, d]);
+    expect(await w.send('owner', 'ticket.link_removed', s, { kind: 'blocks', targetId: d })).toMatchObject({ status: 'committed' });
+    expect((await w.linkRows(d)).map((r) => [r.source_id, r.target_id, r.kind])).toEqual([[d, s2, 'blocks']]);
+    expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
   });
 });
