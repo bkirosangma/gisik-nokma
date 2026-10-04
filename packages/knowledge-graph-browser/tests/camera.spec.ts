@@ -19,7 +19,7 @@ async function trackPeak(page: Page): Promise<() => Promise<number>> {
   return () => page.evaluate(() => (window as unknown as { __peak: number }).__peak);
 }
 
-test('27.272 trap 7: a notched wheel over the graph zooms about the pointer and never scrolls the page; control: the same wheel outside the graph scrolls it', async ({ page }) => {
+test('27.272 trap 7: a notched wheel over the graph zooms about the pointer by its own amount, anchors a mid-glide notch on the target camera and never scrolls the page; control: the same wheel outside the graph scrolls it', async ({ page }) => {
   await openAdapter(page);
   const s = await stageAt(page);
   const at = { x: s.left + s.width * 0.3, y: s.top + s.height * 0.35 };
@@ -38,6 +38,26 @@ test('27.272 trap 7: a notched wheel over the graph zooms about the pointer and 
   expect((await camera(page)).ratio).toBeLessThan(r0 * 0.75);
   expect(Math.hypot(g1.x - g0.x, g1.y - g0.y)).toBeLessThan(2); // the point under the cursor stayed put
   expect((await frames(page)) - f0).toBeGreaterThanOrEqual(8); // it eased, it did not jump
+  // the amount: a notch of deltaY -100 is exp(0.0022 × 100) (`engine/wheel.ts`); Sigma's own fixed-step zoom, left
+  // uncancelled, would add to it
+  expect(Math.abs((await camera(page)).ratio / (r0 / Math.exp(3 * 0.22)) - 1)).toBeLessThan(0.01);
+  // trap 8's anchor: a notch that lands mid-glide anchors on the TARGET camera, so two notches at two points end on the
+  // same camera whether the camera rested between them or not
+  const twoNotches = async (rest: boolean) => {
+    await page.evaluate(() => window.__kg.renderer.setCamera('fit', { instant: true }));
+    await still(page);
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.wheel(0, -100);
+    if (rest) await still(page);
+    await page.mouse.move(at.x + 260, at.y + 120);
+    await page.mouse.wheel(0, -100);
+    await still(page);
+    return camera(page);
+  };
+  const rested = await twoNotches(true), quick = await twoNotches(false);
+  expect(quick.ratio).toBeCloseTo(rested.ratio, 6);
+  expect(quick.x).toBeCloseTo(rested.x, 6);
+  expect(quick.y).toBeCloseTo(rested.y, 6);
   // control: three wheels over the page OUTSIDE the graph do scroll it (downwards: at scrollY 0 an upward wheel has nowhere to go)
   const below = await page.evaluate(() => {
     const r = document.getElementById('below')!.getBoundingClientRect();
@@ -146,7 +166,7 @@ test('27.280 selection keeps the view, and the selected card wears the selection
   expect(Math.abs((await camera(page)).ratio / fit - 1)).toBeLessThan(0.01);
 });
 
-test('27.281 the glide: a new centre tweens the items while the frame (the normalisation) stays fixed; an item that keeps its place never moves; control: an item that moves passes through intermediate positions', async ({ page }) => {
+test('27.281 the glide: a new centre tweens the items while the frame (the normalisation) stays fixed, through a resize too; an item that keeps its place never moves; control: an item that moves passes through intermediate positions', async ({ page }) => {
   await openAdapter(page);
   // note n7, chosen by machine: the only fixture centres under which an item keeps its exact layout place are n7 (n1)
   // and n6 (n3); under the plan's t133 every item moves, so the "never moves" leg would hold of nothing
@@ -185,6 +205,13 @@ test('27.281 the glide: a new centre tweens the items while the frame (the norma
   const between = (v: number, a: number, b: number) => v > Math.min(a, b) && v < Math.max(a, b);
   const mid = r.frames.filter((f) => f[moved] && (between(f[moved]!.x, r.start[moved]!.x, r.end[moved]!.x) || between(f[moved]!.y, r.start[moved]!.y, r.end[moved]!.y)));
   expect(mid.length).toBeGreaterThanOrEqual(3); // control: it eased over several frames (the plan's "frames ≥ 10" in 340 ms, `sigtest.cjs`)
+  // the frame is the config's own box, not the stage: with `autoRescale: false` and no custom box, Sigma frames by the
+  // stage size, which holds still above, so only a resize can tell the two apart
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await still(page);
+  const n2 = await page.evaluate(() => window.__kg.probe!.normalise({ x: 100, y: 100 }));
+  expect(Math.abs(n2.x - r.n0.x)).toBeLessThan(1e-9);
+  expect(Math.abs(n2.y - r.n0.y)).toBeLessThan(1e-9);
 });
 
 test('27.284 reduced motion: a zoom lands in one frame and a new centre lands without intermediate positions; control: without it the same zoom takes 8 frames or more', async ({ page }) => {

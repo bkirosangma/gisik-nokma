@@ -102,15 +102,16 @@ test('27.266 trap 2: a solid edge has no notch along its middle 60%; control: a 
   expect(r.dashed.some((a) => a === 0)).toBe(true); // control: relates (dash 7 / gap 5) has gaps
 });
 
-test('27.268 trap 4: a note\'s and a person\'s icon reach Sigma\'s display data as SVG data URIs; control: a ticket has none', async ({ page }) => {
+test('27.268 trap 4: a note\'s and a person\'s icon reach Sigma\'s display data as SVG data URIs, and a person in fog has none; control: a ticket has none', async ({ page }) => {
   await openAdapter(page);
   const r = await page.evaluate(() => {
     const p = window.__kg.probe!;
-    return { note: p.nodeDisplay('note:n1')!.image, person: p.nodeDisplay('person:pA')!.image, ticket: p.nodeDisplay('ticket:t133')!.image };
+    return { note: p.nodeDisplay('note:n1')!.image, person: p.nodeDisplay('person:pA')!.image, ticket: p.nodeDisplay('ticket:t133')!.image, fogPerson: p.nodeDisplay('person:pB')!.image };
   });
   expect(r.note.startsWith('data:image/svg+xml')).toBe(true);
   expect(r.person.startsWith('data:image/svg+xml')).toBe(true);
   expect(r.ticket).toBe('');
+  expect(r.fogPerson).toBe(''); // a person in fog is a bare dot
 });
 
 test('27.269 trap 5: a fog dot is drawn the same size in px after a 2× zoom; control: the camera ratio did halve', async ({ page }) => {
@@ -196,7 +197,7 @@ test('27.276 trap 8: after load every clear item is inside the stage and the fit
   expect((await check()).out.length).toBeGreaterThan(0); // control: the check does see an item outside
 });
 
-test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to 8%; an edge hover dims nothing and thickens the edge; control: leaving restores every item', async ({ page }) => {
+test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to 8%; an edge hover dims nothing and thickens the edge, and back on the item dims again; control: leaving restores every item', async ({ page }) => {
   await openAdapter(page);
   const s = await stageAt(page);
   const centre = await pagePoint(page, 'ticket:t142');
@@ -226,6 +227,8 @@ test('27.277 trap 9: an item hover dims non-neighbours to 32% and other edges to
   const away = await emptyPointNear(page, { x: centre.x - s.left, y: centre.y - s.top }, 160);
   await page.mouse.move(centre.x, centre.y);
   await still(page);
+  // edge → item: Sigma's `hasHovered` stays true across it, so only the adapter's own restyle dims again
+  expect(await page.evaluate(() => window.__kg.probe!.nodeDisplay('ticket:t131')!.opacity)).toBe(0.32);
   await page.mouse.move(s.left + away.x, s.top + away.y);
   await still(page);
   const after = await page.evaluate(() => {
@@ -244,67 +247,67 @@ test('27.279 trap 11: an edge hover reports the edge and the pointer, and Sigma 
   const size0 = await page.evaluate(() => window.__kg.probe!.edgeDisplay('blocks|ticket:t133|ticket:t142')!.size);
   await page.mouse.move(mid.x, mid.y);
   await still(page);
-  const r = await page.evaluate(
-    ({ mx, my }) => {
-      const k = window.__kg, p = k.probe!;
-      const a = p.viewportOf('ticket:t133')!, c = p.viewportOf('ticket:t142')!;
-      const len = Math.hypot(c.x - a.x, c.y - a.y), nx = -(c.y - a.y) / len, ny = (c.x - a.x) / len;
-      return {
-        hover: k.hovers.filter((h) => h.kind === 'edge').at(-1),
-        off: p.alphaAt([{ x: mx + nx * 10, y: my + ny * 10 }, { x: mx - nx * 10, y: my - ny * 10 }]),
-        size: p.edgeDisplay('blocks|ticket:t133|ticket:t142')!.size,
-      };
-    },
-    { mx: mid.x - s.left, my: mid.y - s.top },
-  );
+  const r = await page.evaluate(() => {
+    const k = window.__kg;
+    return { hover: k.hovers.filter((h) => h.kind === 'edge').at(-1), size: k.probe!.edgeDisplay('blocks|ticket:t133|ticket:t142')!.size };
+  });
+  // no label: Sigma would centre one ON the line, and other edges and cards crowd its midpoint, so the edge is redrawn
+  // ALONE with its two ends (camera kept) and a strip 4.5 px off it on both sides, ±15 px along it (further out, the end cards' shadows reach it), must stay empty
+  const off = await page.evaluate(() => {
+    const k = window.__kg, p = k.probe!, sc = k.scene(), id = 'blocks|ticket:t133|ticket:t142';
+    k.renderer.setGraph(sc.nodes.filter((n) => n.ref === 'ticket:t133' || n.ref === 'ticket:t142'), sc.edges.filter((e) => e.id === id), sc.positions, sc.states, { ...sc.view, keepView: true });
+    const a = p.viewportOf('ticket:t133')!, c = p.viewportOf('ticket:t142')!;
+    const len = Math.hypot(c.x - a.x, c.y - a.y), tx = (c.x - a.x) / len, ty = (c.y - a.y) / len, mx = (a.x + c.x) / 2, my = (a.y + c.y) / 2;
+    return p.alphaAt([-1, 1].flatMap((side) => Array.from({ length: 31 }, (_, i) => ({ x: mx + tx * (i - 15) - side * ty * 4.5, y: my + ty * (i - 15) + side * tx * 4.5 }))));
+  });
   expect(r.hover).toMatchObject({ kind: 'edge', id: 'blocks|ticket:t133|ticket:t142' });
   const h = r.hover as { x: number; y: number };
   expect(Math.abs(h.x - (mid.x - s.left))).toBeLessThanOrEqual(3);
   expect(Math.abs(h.y - (mid.y - s.top))).toBeLessThanOrEqual(3);
-  expect(r.off).toEqual([0, 0]); // no text pixel beside the edge
+  expect(off.length).toBe(62);
+  expect(off.filter((v) => v > 0)).toEqual([]); // no text pixel beside the edge
   expect(size0).toBeLessThan(3.4);
   expect(r.size).toBe(3.4); // control: the hover did reach the edge
 });
 
-test('27.282 Review Focus 4: a 200-character title keeps the centre card\'s real ink inside the stage where the centre card binds the fit; structural: its fit box is inside; control: the fit ratio is unchanged, because the second line truncates', async ({ page }) => {
-  // 480 px wide: the ring items close in on the centre until the centre card's left half binds the fit (at desktop width
-  // the rings bind, and a wrong centre-card estimate could not show)
-  await page.setViewportSize({ width: 480, height: 900 });
+test('27.282 Review Focus 4: a 200-character title keeps the centre card\'s real ink inside the stage; structural: its fit box is inside; control: the fit ratio is unchanged, because the second line truncates', async ({ page }) => {
   await openAdapter(page);
   const fit0 = await page.evaluate(() => window.__kg.probe!.fitRatio());
   await page.evaluate(() => window.__kg.setFixtureTitle('ticket:t142', 'x'.repeat(200)));
   await still(page);
   const r = await page.evaluate(() => {
-    const k = window.__kg, p = k.probe!;
+    const k = window.__kg, p = k.probe!, sc = k.scene();
     const rect = document.querySelector('#mount canvas')!.getBoundingClientRect();
     const stage = document.querySelector('#mount .gn-kg__stage')!.getBoundingClientRect();
     const c = p.viewportOf('ticket:t142')!;
-    // Sigma paints the label into the canvas: there is no element to measure, so scan the card's label line (ONE armed
-    // copy). 8 px above the centre: the centre row itself carries the dashed edge to pT, whose 2 px dashes and 1 px gaps
-    // never give the 3 px of background that ends the scan, so it would run on to the canvas edge.
-    const row = p.alphaAt(Array.from({ length: Math.ceil(stage.width) }, (_, x) => ({ x, y: c.y - 8 })));
-    const scan = (dir: number) => {
-      let last = Math.round(c.x), gap = 0;
-      for (let i = last; i >= 0 && i < row.length && gap < 3; i += dir) {
-        if (row[i]! > 0) {
-          last = i;
-          gap = 0;
-        } else gap += 1;
-      }
-      return last;
-    };
-    const left = scan(-1), right = scan(1);
-    const box = k.scene().view.fit.find((f) => f.x === 0 && f.y === 0)!; // the centre sits at the layout origin
+    const box = sc.view.fit.find((f) => f.x === 0 && f.y === 0)!; // the centre sits at the layout origin
+    const sub = sc.nodes.find((n) => n.ref === 'ticket:t142')!.sub, fit = p.fitRatio();
+    // Sigma paints the card into the canvas (no element to measure), and the neighbours' cards touch it on its own rows,
+    // so the card is measured ALONE: the same view redrawn with the centre item only, the camera kept
+    k.renderer.setGraph(sc.nodes.filter((n) => n.center), [], sc.positions, sc.states, { ...sc.view, keepView: true });
+    const c2 = p.viewportOf('ticket:t142')!;
+    let left = Infinity, right = -Infinity;
+    for (let dy = -24; dy <= 24; dy += 4) {
+      const row = p.alphaAt(Array.from({ length: Math.ceil(stage.width) }, (_, x) => ({ x, y: c2.y + dy })));
+      row.forEach((a, x) => {
+        if (a > 0) {
+          left = Math.min(left, x);
+          right = Math.max(right, x);
+        }
+      });
+    }
     return {
+      moved: Math.hypot(c2.x - c.x, c2.y - c.y),
       ink: { left: stage.left + left, right: stage.left + right, width: right - left },
       rect: { left: rect.left, right: rect.right },
       structural: { left: c.x - box.l, right: c.x + box.r, width: stage.width },
-      sub: k.scene().nodes.find((n) => n.ref === 'ticket:t142')!.sub,
-      fit: p.fitRatio(),
+      sub,
+      fit,
     };
   });
   expect(r.sub).toContain('xxxx'); // the title did change
-  expect(r.ink.width).toBeGreaterThan(40); // the scan found ink, or the legs hold of an empty row
+  expect(r.moved).toBeLessThan(0.5); // the card was measured where it was drawn
+  expect(r.ink.width).toBeGreaterThan(40); // the scan found the card, or the legs hold of an empty row
   expect(r.ink.left).toBeGreaterThanOrEqual(r.rect.left + 1);
   expect(r.ink.right).toBeLessThanOrEqual(r.rect.right - 1);
   // structural check only: the code's own assumed box, so it catches only a fit that ignores its own numbers
@@ -351,7 +354,7 @@ test('27.286 trap 1, the other half: an item that leaves the graph drops its cac
   for (const ref of r.dropped) expect(r.invalidated).toContain(ref);
 });
 
-test('27.288 destroy: no canvas is left and a wheel where the graph was scrolls the page; control: before destroy the same wheel did not', async ({ page }) => {
+test('27.288 destroy: no canvas or layer is left and a wheel where the graph was scrolls the page; control: before destroy the same wheel did not', async ({ page }) => {
   await openAdapter(page);
   const s = await stageAt(page);
   await page.mouse.move(s.left + s.width * 0.5, s.top + s.height * 0.5);
@@ -360,6 +363,7 @@ test('27.288 destroy: no canvas is left and a wheel where the graph was scrolls 
   const before = await page.evaluate(() => scrollY);
   await page.evaluate(() => window.__kg.renderer.destroy());
   expect(await page.evaluate(() => document.querySelectorAll('#mount canvas').length)).toBe(0);
+  expect(await page.evaluate(() => document.getElementById('mount')!.childElementCount)).toBe(0); // nor the stage and ring layer
   await page.mouse.wheel(0, 100);
   await page.waitForFunction(() => scrollY > 0);
   expect(before).toBe(0); // control

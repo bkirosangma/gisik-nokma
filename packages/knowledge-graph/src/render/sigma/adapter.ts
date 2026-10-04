@@ -181,7 +181,7 @@ export const createSigmaRenderer: CreateRenderer = () => {
         );
         if (!done) glideRaf = requestAnimationFrame(step);
       };
-      step(opts.reduceMotion() ? t0 + 1e9 : t0);
+      step(t0); // reduced motion lands in this first step: `glideFrame` returns the targets when `reduce`
       if (firstGraph) {
         firstGraph = false;
         fitPending = true; // the first fit waits for the first afterRender
