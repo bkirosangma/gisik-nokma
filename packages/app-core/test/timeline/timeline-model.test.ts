@@ -809,6 +809,11 @@ describe('11.61 the empty timelines (one sentence since the window went: 29.095)
     ].map((m) => JSON.stringify(m));
     expect(new Set(serialised).size).toBe(1);
     expect(JSON.stringify(model(inWindow()))).not.toBe(serialised[0]);
+    // The one sentence, EXACTLY (planner P20 class 2d: every other leg compares against the constant, so a reworded
+    // constant would pass them all). "Off this chart", never "off these weeks": there are no weeks to be kept off.
+    expect(model([]).emptyCopy).toBe(
+      'No claimed dates are here to draw. Undated work is absent, not estimated. The timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off this chart without dropping it: your filter, closed tickets being hidden, or an epic, which is drawn in the List and not here.',
+    );
   });
 
   it('a timeline with anything on it has no empty sentence at all', () => {
