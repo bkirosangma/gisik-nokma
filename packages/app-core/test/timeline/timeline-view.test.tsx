@@ -759,7 +759,7 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     expect(comparisons('const outside = measure(row.key) > barPx;')).toBe(1);
   });
 
-  it('29.055 the view packs with the key width it measures: GN-13 (jsdom: 5 x 6.5 + 12 = 45 px) on a one-day bar reserves days 0-4 at the Week bucket (16 px/day), so a bar on day 4 takes a second row and one on day 5 shares; a 9-character key (71 px) sits inside a 3-day bar (72 px at 24 px/day)', () => {
+  it('29.055 the view packs with the key width it measures: GN-13 (jsdom: 5 x 6.5 + 12 = 45 px) on a one-day bar reserves days 0-4 at the Week bucket (16 px/day), so a bar on day 4 takes a second row and one on day 5 shares; a 9-character key (71 px) sits inside a 3-day bar (72 px at 24 px/day); an 8-character key (64 px) exactly fills a 4-day bar at 16 px/day, so a bar on the next day shares its row', () => {
     // The premise: jsdom has no OffscreenCanvas, so the view measures with its 6.5 px per character estimate.
     expect(typeof OffscreenCanvas).toBe('undefined');
     const keyedBar = (title: string, key: string, start: string, due: string): TicketDatesInput => ({
@@ -773,6 +773,11 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     document.body.innerHTML = '';
     renderTimeline([keyedBar('Short', 'GN-13', '2026-08-24', '2026-08-24'), keyedBar('Day five', 'GN-15', '2026-08-29', '2026-08-30')]);
     expect(rowOf('Day five')).toBe('0');
+    document.body.innerHTML = '';
+    // 8 x 6.5 + 12 = 64 px = 4 days x 16 px/day: the key fits, so the bar is its own footprint and day 4 is free
+    // (one px more of padding, 65 px, would put the key outside and reserve days 0-8)
+    renderTimeline([keyedBar('Four days', 'GN-12345', '2026-08-24', '2026-08-27'), keyedBar('Next day', 'GN-16', '2026-08-28', '2026-08-29')]);
+    expect(rowOf('Next day')).toBe('0');
     document.body.innerHTML = '';
     // 9 x 6.5 + 12 = 70.5, so 71 px: a 72 px bar holds it (alone in its lane, so its packing footprint disturbs nothing)
     const { container } = renderTimeline([keyedBar('Three days', 'GN-123456', '2026-08-24', '2026-08-26')]);
