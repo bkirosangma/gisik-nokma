@@ -41,6 +41,8 @@ function fakeIngest(): IngestService {
   return {
     ingestBatch: async () => [],
     ingestClientBatch: async () => [],
+    ingestAtomic: async () => ({ status: 'committed', results: [] }),
+    ingestClientAtomic: async () => ({ status: 'committed', results: [] }),
     onEventCommitted: () => () => {},
   };
 }
@@ -283,6 +285,12 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       'decline a workspace invitation (by id)',
       '/v1/me/invitations/01JI0000000000000000000000/decline',
       '/v1/me/invitations/:inviteId/decline',
+      'POST',
+    ],
+    [
+      'the draft SET publish (drafts T5b)',
+      '/v1/workspaces/01JQ0000000000000000000000/drafts/publish',
+      '/v1/workspaces/:workspaceId/drafts/publish',
       'POST',
     ],
   ];

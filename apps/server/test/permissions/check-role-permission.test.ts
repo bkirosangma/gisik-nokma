@@ -505,7 +505,7 @@ function ingestService(): IngestService {
  * Hands out real clients, but refuses to hand out a SECOND one while the first
  * is still checked out — with a named error rather than a hang.
  *
- * This exists to pin one line: `commitOne` passes the gate `client`, the ingest
+ * This exists to pin one line: `commitInTx` passes the gate `client`, the ingest
  * transaction's own connection, and not `deps.pool`. The pool version compiles,
  * and every other test in this repository passes under it, because a healthy
  * pool simply hands out a second connection and the read returns the same rows.
@@ -1005,7 +1005,7 @@ describe('the gate at the client door — refusals before the rule engine', () =
     // "Before the engine" is the load-bearing half, and two independent things
     // pin it: the REASON above is the gate's and not `workflow-version`, and
     // the engine was never asked at all. Mutation: move the gate below
-    // `deps.evaluate` in `commitOne` — the reason becomes the engine's and this
+    // `deps.evaluate` in `commitInTx` — the reason becomes the engine's and this
     // line goes red too.
     expect(evaluated).not.toContain(event.id);
   });
@@ -1279,7 +1279,7 @@ describe('the gate at the client door — refusals before the rule engine', () =
       actorId: member,
     });
 
-    // Mutation: `{ db: deps.pool, ... }` at the gate call site in `commitOne`.
+    // Mutation: `{ db: deps.pool, ... }` at the gate call site in `commitInTx`.
     // This then rejects with the planted error above instead of committing —
     // verified by running it, and verified for the MECHANISM and not only the
     // colour: the planted sentence appears in the mutated run's output and
