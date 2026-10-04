@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { NOTE_PERMISSION_RULE } from '../../src/permissions/check-permission.js';
+import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
+import { attachedTicketsByNote } from '../../src/read/notes.js';
 import { purgeItem, type PurgeGate } from '../../src/purge/purge-item.js';
 import { visibleEventsFor, type ReachGrantedInstruction, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { door } from '../helpers/door.js';
@@ -84,6 +86,14 @@ describe('28.186 a note linked to a draft is the author\'s alone (R66, Q16)', ()
     // The author's own view includes their draft (planner ruling 2026-10-04, T9-Q2): `GET /v1/notes/:id` lists it
     // for the author, and the loop below shows the same read lists nothing for the owner and the admin.
     expect(author.attached).toEqual([d]);
+    // ...and that ruling is scoped to the detail read: the workspace notes list names no draft, the author's included.
+    const listedAttached = async (role: ReadRole): Promise<string[] | undefined> =>
+      (
+        (await read.app.inject({ method: 'GET', url: `/v1/workspaces/${WS()}/notes`, headers: read.authOf(role) })).json() as {
+          notes: Array<{ noteId: string; attachedTickets: Array<{ ticketId: string }> }>;
+        }
+      ).notes.find((x) => x.noteId === n)?.attachedTickets.map((t) => t.ticketId);
+    expect(await listedAttached('member')).toEqual([]);
 
     for (const role of ['owner', 'admin'] as const) {
       const seen = await surfaces(role, n, d);
@@ -99,6 +109,22 @@ describe('28.186 a note linked to a draft is the author\'s alone (R66, Q16)', ()
       const seen = await surfaces(role, n, d);
       expect(seen, role).toEqual({ ...full, listed: [n], attached: [d] });
     }
+    expect(await listedAttached('member')).toEqual([d]); // CONTROL: published, the workspace list names it
+  });
+
+  it("28.186 the detail read lists an own draft only while its author holds R18 (holdsDraftRights); CONTROL: the author's own role lists it", async () => {
+    const d = newUlid();
+    await draft(d);
+    const n = await note('member');
+    expect(await attach('member', n, d)).toMatchObject({ status: 'committed' });
+    const member = read.userIds.member;
+    const eff = await resolveEffectiveRole(db.pool, member, WS());
+    const listedFor = async (as: typeof eff) =>
+      ((await attachedTicketsByNote(db.pool, as, member, WS(), [n], { ownDrafts: true })).get(n) ?? []).map((t) => t.ticketId);
+    expect(await listedFor(eff)).toEqual([d]); // CONTROL
+    // R18's project half: the same author without the draft's project. Its role half: the same author as a guest.
+    expect(await listedFor({ ...eff, projects: new Map() })).toEqual([]);
+    expect(await listedFor({ ...eff, workspaceRole: 'guest' })).toEqual([]);
   });
 
   // Planner ruling 2026-10-04 (T9-Q1, the owner's no-trace ruling): what was withheld stays withheld after a discard.

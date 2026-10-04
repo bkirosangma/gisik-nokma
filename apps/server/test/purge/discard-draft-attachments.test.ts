@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, PURGED_ITEM_LABEL } from '@gisik-nokma/domain';
 import { LocalDiskStore } from '../../src/attachments/local-disk-store.js';
 import { ObjectNotFoundError } from '../../src/attachments/object-store.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
@@ -12,22 +12,25 @@ import { deletePendingObjects } from '../../src/purge/pending-objects.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { applyCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { doc, ev, insertAttachment, noteCreated, projectCreated, recordingStore, seedWorkspace, text, TYPE_ID, ticketCreated, type Base } from './world.js';
+import { doc, ev, insertAttachment, noteCreated, projectCreated, recordingStore, seedWorkspace, text, TYPE_ID, ticketCreated, ticketRef, type Base } from './world.js';
 
 /** Drafts T9: what a discard does to the attachments uploaded from the draft and to the notes linked to it (28.183 to 28.185). */
 const AUTHOR = newUlid();
 const NOW = new Date('2026-10-04T06:00:00.000Z');
 
 type World = Base & {
-  P: string; D: string; C: string; PUB: string; N: string;
+  P: string; D: string; C: string; PUB: string; N: string; N2: string;
   keys: { d: string; c: string; pub: string; n: string };
   noteTitle: string;
 };
 
-/** A draft D with a sub-draft C and an attachment each, a published ticket PUB with one, and a note N linked to D with its own attachment. */
+/**
+ * A draft D with a sub-draft C and an attachment each, a published ticket PUB with one, a note N linked to D with its own
+ * attachment, and a note N2 whose body chips D and then PUB (the erasure's survivor re-derive has a snippet to fix).
+ */
 async function build(db: TestDatabase): Promise<World> {
   const base = await seedWorkspace(db.pool);
-  const [P, D, C, PUB, N] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+  const [P, D, C, PUB, N, N2] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
   const ids = { d: newUlid(), c: newUlid(), pub: newUlid(), n: newUlid() };
   const keys = {
     d: `w/${base.WS}/a/${ids.d}`, c: `w/${base.WS}/a/${ids.c}`, pub: `w/${base.WS}/a/${ids.pub}`, n: `w/${base.WS}/a/${ids.n}`,
@@ -42,13 +45,17 @@ async function build(db: TestDatabase): Promise<World> {
     draft(C, D, 'Quokka sub-draft'),
     noteCreated(base, N, { title: noteTitle, homeProjectId: '', scope: { mode: 'workspace' }, body: doc(text('the note body survives')) }),
     ev(base, 'note', N, 'note.attached', { ticketId: D }),
+    noteCreated(base, N2, {
+      title: 'Chips', homeProjectId: '', scope: { mode: 'workspace' },
+      body: doc(ticketRef(D, P, '', 'Quokka draft'), text(' and '), ticketRef(PUB, P, 'DR-1', 'Published control')),
+    }),
   ]);
   await insertAttachment(db.pool, base, ids.d, { ticketId: D }, 'draft.pdf', keys.d);
   await insertAttachment(db.pool, base, ids.c, { ticketId: C }, 'sub-draft.pdf', keys.c);
   await insertAttachment(db.pool, base, ids.pub, { ticketId: PUB }, 'published.pdf', keys.pub);
   await insertAttachment(db.pool, base, ids.n, { noteId: N }, 'note.pdf', keys.n);
   await applyCommitted(db.pool, [ev(base, 'ticket', D, 'ticket.discarded', {}, AUTHOR)]);
-  return { ...base, P, D, C, PUB, N, keys, noteTitle };
+  return { ...base, P, D, C, PUB, N, N2, keys, noteTitle };
 }
 
 async function putAll(store: LocalDiskStore, keys: string[]): Promise<void> {
@@ -135,6 +142,18 @@ describe('28.185 a linked note survives', () => {
     const note = await shared.pool.query<{ title: string; body: unknown }>('SELECT title, body FROM proj_notes WHERE note_id = $1', [w.N]);
     expect(note.rows).toEqual([{ title: w.noteTitle, body: doc(text('the note body survives')) }]);
     expect((await shared.pool.query('SELECT 1 FROM attachments WHERE note_id = $1', [w.N])).rows).toHaveLength(1);
+    expect(await verifyProjections({ pool: shared.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
+  });
+
+  it("28.185 a note that chipped the draft keeps its other reference, which now reads Deleted item for the draft (the survivor re-derive); CONTROL: before the discard the draft's chip is a row of its own", async () => {
+    const w = await build(shared);
+    const refs = async () =>
+      (await shared.pool.query<{ target_id: string; snippet: string }>('SELECT target_id, snippet FROM proj_references WHERE source_id = $1 ORDER BY ordinal', [w.N2])).rows;
+    expect((await refs()).map((r) => r.target_id)).toEqual([w.D, w.PUB]); // CONTROL
+
+    await discardDraft(shared.pool, w.D, { projections: buildProjectionRegistry(), store: recordingStore(), now: NOW });
+
+    expect(await refs()).toEqual([{ target_id: w.PUB, snippet: `${PURGED_ITEM_LABEL} and [[DR-1 Published control]]` }]);
     expect(await verifyProjections({ pool: shared.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
   });
 });
