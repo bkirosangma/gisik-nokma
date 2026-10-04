@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235 and 13.2280-13.2285, test-cases/13-deploy-and-ops.md);
+# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235 and 13.2280-13.2286, test-cases/13-deploy-and-ops.md);
 # run by `ctl selftest`. Every case id starts its check's name. No real load is needed: `memory_pressure`, `sysctl` and `vm_stat` are PATH
 # stubs that read files, the clock is a file (CTL_SEM_CLOCK_FILE: a sleep advances it and runs CTL_SEM_SLEEP_HOOK, so a wait of minutes costs
 # no real time), and a slot is "held" by planting its directory with a live pid. Two cases (13.1767, 13.1774) use the REAL clock and real
@@ -263,7 +263,7 @@ pr p1 > "$fx/p1.out" & q1=$!; pr p2 > "$fx/p2.out" & q2=$!; sleep 1; pr p3 > "$f
 check "13.1774 two runs overlap, a third (CTL_TEST_SLOTS=2 default) waits ≥ 2 s for one to finish and logs that wait" 's1=$(cat "$fx/p1.start"); s2=$(cat "$fx/p2.start"); s3=$(cat "$fx/p3.start"); e1=$(cat "$fx/p1.end"); e2=$(cat "$fx/p2.end"); [ "$s2" -lt "$e1" ] && [ "$s3" -ge "$e1" -o "$s3" -ge "$e2" ] && w=$(sed -n "s/^queue wait: \([0-9]*\)s.*/\1/p" "$fx/p3.out") && [ "$w" -ge 2 ] && grep -q "waited for: slots" "$fx/p3.out"'
 
 
-# --- Playwright ports (13.2280-13.2285): the gate runs the browser packages on 3291 / 3292, every other Playwright run on a FREE port of its own ---
+# --- Playwright ports (13.2280-13.2286): the gate runs the browser packages on 3291 / 3292, every other Playwright run on a FREE port of its own ---
 check "13.2280 ctl gate --dry-run names the Playwright ports it exports: KG_PW_PORT=3291 FG_PW_PORT=3292" 'reset; gate_run --dry-run | grep -q "^DRY: GATE_MODE=fresh KG_PW_PORT=3291 FG_PW_PORT=3292 "'
 reset; rm -f "$fx/ports"; gate_run >/dev/null
 check "13.2280 the REAL gate run puts KG_PW_PORT=3291 and FG_PW_PORT=3292 in the environment gate.sh (and so turbo) starts with" '[ "$(cat "$fx/ports" 2>/dev/null)" = "3291 3292" ]'
@@ -312,12 +312,24 @@ for fam in 6 4; do
 done
 reset; rm -f "$fx/ran"; nofree=$(CTL_PW_PORT_COUNT=1 rt --label pwx -- sh -c ': > "$1" # playwright' x "$fx/ran"); nofreerc=$?; nofreed=$(CTL_PW_PORT_COUNT=1 rt --dry-run -- sh -c ': # playwright')
 check "13.2285 with fewer than two free ports the run FAILS (rc 1) and the command is not run; its --dry-run fails too" '[ $nofreerc -eq 1 ] && [ ! -e "$fx/ran" ] && printf "%s" "$nofree" | tail -1 | grep -q "^FAIL run-tests pwx no free Playwright ports" && printf "%s" "$nofreed" | tail -1 | grep -q "^FAIL run-tests no free Playwright ports"'
+reset; rm -f "$fx/pw1.out"; rt_real --label pw0 -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null
+check "13.2282 CONTROL: with nothing held a lone run gets the range's first two ports" '[ "$(cat "$fx/pw1.out")" = "$pwbase $((pwbase+1))" ]'
 reset; rm -f "$fx/pw1.out"; KG_PW_PORT=4999 rt_real --label pwk -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null; read -r kp fp < "$fx/pw1.out"
 check "13.2283 a KG_PW_PORT the caller exported is kept (FG still picked inside the range)" '[ "$kp" = 4999 ] && [ "$fp" -ge "$pwbase" ] && [ "$fp" -lt $((pwbase+100)) ]'
 reset; rm -f "$fx/pw1.out"; rt_real --label pwn -- sh -c 'echo "${KG_PW_PORT:-unset} ${FG_PW_PORT:-unset}" > "$1"' x "$fx/pw1.out" >/dev/null
 check "13.2283 a command that names neither Playwright, a *-graph-browser package nor turbo runs with its environment untouched" '[ "$(cat "$fx/pw1.out")" = "unset unset" ]'
 reset; pwlog=$(rt_real --label pws -- sh -c 'true # playwright' | tr "\n" "~")
 check "13.2284 the summary names the ports it picked (one line, after the queue wait) and the log header records them" 'printf "%s" "$pwlog" | grep -q "queue wait[^~]*~ports: KG_PW_PORT=[0-9]* FG_PW_PORT=[0-9]*~" && grep -q "^# ports: KG_PW_PORT=" "$(ls -t "$CTL_LOG_DIR"/run-tests-*.log | head -1)"'
+
+# turbo's strict env mode drops a variable the task did not declare: the gate's KG_PW_PORT must be a pass-through of the browser task (and a pass-through is not hashed)
+turbo="$(cd "$HERE/../.." && pwd)/node_modules/.bin/turbo"
+tport() { ( cd "$HERE/../.." && KG_PW_PORT="$1" "$turbo" run test --filter=@gisik-nokma/knowledge-graph-browser --dry=json 2>/dev/null | python3 -c '
+import json, sys
+t = [x for x in json.load(sys.stdin)["tasks"] if x["taskId"] == "@gisik-nokma/knowledge-graph-browser#test"][0]
+print(t["hash"], " ".join(t["environmentVariables"]["specified"].get("passThroughEnv") or []))' ); }
+t1=$(tport 3291); t2=$(tport 3555)
+check "13.2286 turbo hands KG_PW_PORT to knowledge-graph-browser#test as a pass-through variable" '[ -x "$turbo" ] && [ "${t1#* }" = KG_PW_PORT ]'
+check "13.2286 …and a pass-through is not hashed: the task hash is the same under two different ports (an \`env\` entry would split the cache per port)" '[ -n "${t1%% *}" ] && [ "${t1%% *}" = "${t2%% *}" ]'
 unset CTL_PW_PORT_BASE
 
 rm -rf "$bare" "$gr"

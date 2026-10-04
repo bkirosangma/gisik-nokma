@@ -835,10 +835,11 @@ Block `13.2230`–`13.2239` for `task/ctl-sem-gate-slot` (planner 2026-10-04, pr
 
 - 13.2280 🧪 `ctl gate` exports `KG_PW_PORT=3291` and `FG_PW_PORT=3292`: its `--dry-run` line names both, the REAL gate run's environment (what `gate.sh`, and so turbo, starts with) carries them, and a port the caller exported (3191 / 3192) does not leak in
 - 13.2281 🧪 Two CONCURRENT `ctl run-tests` of a Playwright command (two slots) get four DIFFERENT ports (a KG port is not the other run's FG port either), all inside the range, never 3191 / 3291 / 3192 / 3292; a `--dry-run` names ports inside the range and a command with no Playwright in it names none; each trigger alone (the word `playwright`, `turbo`, a `*-graph-browser` package in the command or as the directory) is enough. (A dry-run holds no slot, so two dry-runs cannot reserve against each other: the concurrency leg uses real runs.)
-- 13.2282 🧪 A HELD port is skipped: with the range's first port listened on (IPv6 and IPv4, one run each) the run gets KG >= base+1 and another FG, and its `--dry-run` names base+1
+- 13.2282 🧪 A HELD port is skipped (CONTROL: with nothing held a lone run gets the range's first two ports): with the range's first port listened on (IPv6 and IPv4, one run each) the run gets KG >= base+1 and another FG, and its `--dry-run` names base+1
 - 13.2283 🧪 A `KG_PW_PORT` the caller exported is kept; a command naming neither Playwright, a `*-graph-browser` package nor turbo runs with its environment untouched (CONTROL for 13.2281)
 - 13.2284 🧪 The summary prints `ports: KG_PW_PORT=… FG_PW_PORT=…` right after the queue wait, and the log header records them
 - 13.2285 🧪 With fewer than two free ports in the range (`CTL_PW_PORT_COUNT=1`) the run FAILS (`FAIL run-tests <label> no free Playwright ports — nothing was run`, rc 1) and the command is not run; its `--dry-run` fails too
+- 13.2286 🧪 turbo's strict env mode would drop the gate's port: `turbo run test --filter=@gisik-nokma/knowledge-graph-browser --dry=json` lists `KG_PW_PORT` as a pass-through variable of that task, and the task hash is identical under two different ports (a pass-through is not hashed; an `env` entry would split the cache per port)
 
 ## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
 
