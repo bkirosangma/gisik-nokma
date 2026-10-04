@@ -55,8 +55,10 @@ describe('29.009 momentum', () => {
     const moving = [0, 20, 40, 60, 80].map((t) => ({ t, x: t * 2 })); // 2 px/ms = 2000 px/s
     expect(releaseVelocity(moving, 80)).toBeCloseTo(2000, 6);
     expect(releaseVelocity(moving, 400)).toBe(0); // rested 320 ms
-    const old = [{ t: 0, x: 0 }, { t: 10, x: 1000 }, { t: 100, x: 1100 }, { t: 140, x: 1140 }, { t: 180, x: 1180 }];
+    // t = 90 is 90 ms old: outside the 80 ms window, inside a 120 ms one
+    const old = [{ t: 0, x: 0 }, { t: 10, x: 1000 }, { t: 90, x: 0 }, { t: 100, x: 1100 }, { t: 140, x: 1140 }, { t: 180, x: 1180 }];
     expect(releaseVelocity(old, 180)).toBeCloseTo(1000, 6); // only t >= 100 counts: 1 px/ms
+    expect(releaseVelocity([...moving, { t: 120, x: 0 }], 80)).toBeCloseTo(2000, 6); // a sample after `now` is not in the window
     expect(releaseVelocity([{ t: 5, x: 3 }], 5)).toBe(0);
   });
 

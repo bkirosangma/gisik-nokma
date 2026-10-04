@@ -48,6 +48,7 @@ describe('29.012 limits, presets and the packing scale', () => {
   it('29.012 the packing scale is the lower bound of the power-of-two bucket; it changes only across a bucket edge; control: 15.99 and 16 differ', () => {
     expect([4, 7.9, 8, 15.99, 16, 31, 32, 63, 64, 96].map(packScale)).toEqual([4, 4, 8, 8, 16, 16, 32, 32, 64, 64]);
     expect(packScale(15.99)).not.toBe(packScale(16));
+    expect(packScale(128)).toBe(64); // the bucket never passes 64
   });
 });
 
@@ -57,6 +58,8 @@ describe('29.013 the wheel', () => {
     expect(wheelIntent(w({ ctrlKey: true, deltaY: 10 }))).toEqual({ kind: 'zoom', factor: Math.exp(-10 * 0.012) });
     expect(wheelIntent(w({ deltaY: 100 }))).toEqual({ kind: 'zoom', factor: Math.exp(-100 * 0.0022) });
     expect(wheelIntent(w({ deltaX: 3, deltaY: 12 }))).toEqual({ kind: 'pan', dx: 3, dy: 12 });
+    expect(wheelIntent(w({ deltaY: 40 }))).toEqual({ kind: 'zoom', factor: Math.exp(-40 * 0.0022) }); // 40 px is a notch
+    expect(wheelIntent(w({ deltaY: 40.5 }))).toEqual({ kind: 'pan', dx: 0, dy: 40.5 }); // a fractional delta is a trackpad
     expect(wheelIntent(w({ deltaMode: 1, deltaY: 3 }))).toEqual({ kind: 'zoom', factor: Math.exp(-48 * 0.0022) });
     expect(wheelZoomFactor(w({ ctrlKey: true, deltaY: 10 }))).toBe(Math.exp(-10 * 0.012));
     expect(wheelZoomFactor(w({ ctrlKey: true, deltaMode: 1, deltaY: 1 }))).toBe(Math.exp(-16 * 0.012));
