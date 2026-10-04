@@ -690,33 +690,62 @@ def audit_scan(stats):
 #   duplicate a surplus shadow record: the same queue src twice, the same ledger id twice, or two ledger messages to one seat with the same kind
 #             and body within CTL_POSTMAN_DUP_WINDOW (10 min);                                                     -> exit 1
 #   extra     a shadow queue delivery the dispatcher never logged (the orchestrator did it directly, or the line was held); informational.
-# A DISPATCH-log line is free text. It counts as ONE delivery per (NEXT|FIX|MERGETIP, lane) pair named in a clause (split on ';') that says
-# delivered/sent and none of not delivered / nothing delivered / held / HOLD / skipped / refused / cancelled; the exact form
-# `HH:MM DELIVERED <VERB> <lane> ...` is always read. A line that names a verb and says delivered/sent but yields no pair is printed as UNPARSED.
+#   by-orch   a DISPATCH-log line that says the orchestrator delivered it (see below); informational, pairs nothing.
+# Condition A counts QUEUE deliveries only (the shadow's queue records, the ones the dispatcher's log is compared with); the ledger records
+# (seats' own `ctl post` messages, which the dispatcher never carried) are counted beside them but not toward it. `--window N` = the last N
+# queue deliveries.
+# A DISPATCH-log line is free text. The exact form `HH:MM DELIVERED <VERB> <lane> ...` is always read as one delivery. Any other line is cut
+# into clauses at ';' and at a sentence end ('. ' / '! ' / '? '); a clause counts only if it says delivered/sent and none of not delivered /
+# nothing delivered / held / HOLD / skipped / refused / cancelled / withdrawn, and a clause that says delivered BY the orchestrator is not a
+# dispatcher delivery (the orchestrator restarts a lane of its choosing, so its lane is no evidence for the queue line's): it is printed as
+# BY-ORCH and pairs nothing. In a counted clause each NEXT / FIX / MERGETIP names its lane, first match wins:
+#   1. `VERB lane N` / `VERB laneN`;  2. `to lane N` / `to lanes N,M` / `(lane N)` / `delivered|sent lane N` after the verb, before the next
+#   queue verb (NEXT FIX MERGETIP NOTE CLOSE REVIEW HOLD); 3. `lane N` just before it (`lane 3 U-T11b FIX 1`, `sent lane 1 the P-T10 MERGETIP`);
+#   4. only when no lane is named for it, the number right after the verb (`NEXT 4`, `MERGETIP 5`).
+# So in `T9 FIX 1 pointer to lane3` the 1 is the fix ROUND and the lane is 3. A verb right after `into` (folded into another delivery) or
+# followed by `already` (`FIX 1 already DONE`) is skipped; `to lanes 1-5` (a range) names no lane. A counted clause whose verb gets no lane is printed as UNPARSED.
 DELIVER_VERBS = ("NEXT", "FIX", "MERGETIP")
 AUDIT_TOL = int(os.environ.get("CTL_POSTMAN_AUDIT_TOL", "2700"))
 DUP_WINDOW = int(os.environ.get("CTL_POSTMAN_DUP_WINDOW", "600"))
 D_G0 = re.compile(r"^\d\d:\d\d DELIVERED (NEXT|FIX|MERGETIP) (?:lane\s*)?([0-9]{1,2})\b")
-D_PAIR = re.compile(r"\b(NEXT|FIX|MERGETIP)\s+(?:lane\s*)?([0-9]{1,2})\b")
-D_REV = re.compile(r"\b(?:delivered|sent)\b.*?\b(NEXT|FIX|MERGETIP)\b.*?\blane\s*([0-9]{1,2})\b")
+D_KEY = re.compile(r"\b(NEXT|FIX|MERGETIP|NOTE|CLOSE|REVIEW|HOLD)\b")
+D_VLANE = re.compile(r"\s*lane\s*([0-9]{1,2})\b")
+D_TO = re.compile(r"(?:\b(?:to|delivered|sent)\s+lanes?\s*|\(lane\s*)([0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*)(?![-0-9])")
+D_PRE = re.compile(r"\blane\s*([0-9]{1,2})\s+(?:[A-Za-z0-9._/-]+\s+){0,2}$")
+D_VNUM = re.compile(r"\s+([0-9]{1,2})\b")
+D_INTO = re.compile(r"\binto\s+$")
+D_ALREADY = re.compile(r"^\s*(?:[0-9]{1,2}\s+)?already\b")
 D_POS = re.compile(r"\b(?:delivered|sent)\b")
-D_NEG = re.compile(r"not delivered|nothing delivered|nothing to deliver|deliver nothing|not sent|\bheld\b|\bHELD\b|\bHOLD\b|skipped|refused|cancelled", re.I)
+D_NEG = re.compile(r"not delivered|nothing delivered|nothing to deliver|deliver nothing|not sent|\bheld\b|\bHOLD\b|skipped|refused|cancelled|withdrawn", re.I)
+D_ORCH = re.compile(r"\bby (?:the )?orchestrator\b", re.I)
+
+
+def clause_pairs(c):
+    """-> [(verb, lane or None)] for one counted clause (rules 1-4 above)."""
+    keys, out = list(D_KEY.finditer(c)), []
+    for i, k in enumerate(keys):
+        pre = c[keys[i - 1].end() if i else 0:k.start()]
+        seg = c[k.end():keys[i + 1].start() if i + 1 < len(keys) else len(c)]
+        if k.group(1) not in DELIVER_VERBS or D_INTO.search(pre) or D_ALREADY.match(seg): continue
+        mv, mt, mp, mn = D_VLANE.match(seg), D_TO.search(seg), D_PRE.search(pre), D_VNUM.match(seg)
+        lanes = [mv.group(1)] if mv else re.findall(r"[0-9]{1,2}", mt.group(1)) if mt else [mp.group(1)] if mp else [mn.group(1)] if mn else [None]
+        out += [(k.group(1), n) for n in lanes]
+    return out
 
 
 def parse_dispatch_line(line):
-    """-> (pairs [(verb, lane)], unparsed bool) for one DISPATCH-log line."""
+    """-> (pairs [(verb, lane)], unparsed bool, by_orchestrator bool) for one DISPATCH-log line."""
     m0 = D_G0.match(line)
-    if m0: return [(m0.group(1), m0.group(2))], False
-    pairs, cand = [], False
-    for clause in re.split(r";", line[6:]):
+    if m0: return [(m0.group(1), m0.group(2))], False, False
+    pairs, cand, orch = [], False, False
+    for clause in re.split(r";|(?<=[.!?])\s+", line[6:]):
         if not D_POS.search(clause) or D_NEG.search(clause): continue
-        found = D_PAIR.findall(clause)
-        if not found:
-            mr = D_REV.search(clause)
-            if mr: found = [mr.groups()]
-        pairs += found
-    if not pairs and D_POS.search(line) and re.search(r"\b(NEXT|FIX|MERGETIP)\b", line) and not D_NEG.search(line): cand = True
-    return pairs, cand
+        if D_ORCH.search(clause):
+            orch = orch or bool(D_KEY.search(clause)); continue
+        for verb, lane in clause_pairs(clause):
+            if lane is None: cand = True
+            else: pairs.append((verb, lane))
+    return pairs, cand and not pairs, orch
 
 
 def parse_when(v):
@@ -740,16 +769,16 @@ def audit_parity(o):
     queue = [r for r in recs if r.get("origin") == "queue"]
     lrecs = [r for r in recs if r.get("origin") == "ledger"]
     base = next((r["upto"] for r in recs if r.get("origin") == "baseline"), 0)
-    deliveries = sorted([r for r in queue if r["verb"] in DELIVER_VERBS and not r.get("refused")] + lrecs, key=lambda r: r["epoch"])
+    deliveries = sorted([r for r in queue if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])     # condition A's unit
     since, desc = 0.0, "all shadow records"
     try:
         if "--window" in o:
             n = int(o["--window"]); assert n > 0
-            since = deliveries[-n]["epoch"] if len(deliveries) >= n else 0.0; desc = "last %d deliveries" % n
+            since = deliveries[-n]["epoch"] if len(deliveries) >= n else 0.0; desc = "last %d queue deliveries" % n
         elif "--since" in o: since = parse_when(o["--since"]); desc = "since %s" % o["--since"]
     except (ValueError, AssertionError) as e: fail("postman", "audit: %s" % (e if str(e) else "--window needs a positive number"))
     inw = lambda r: r["epoch"] >= since
-    missed, dups, extras, matched, unparsed = [], [], [], [], []
+    missed, dups, extras, matched, unparsed, by_orch = [], [], [], [], [], []
     # duplicates among shadow records
     seen = {}
     for r in queue:
@@ -781,9 +810,10 @@ def audit_parity(o):
     ts = verdict_times(lines); dis = []
     for i, line in enumerate(lines):
         if ts[i] is None or ts[i] < since - 60: continue
-        pairs, cand = parse_dispatch_line(line)
+        pairs, cand, orch = parse_dispatch_line(line)
         for verb, win in pairs: dis.append((ts[i], verb, str(int(win)), line))
         if cand: unparsed.append(line)
+        if orch: by_orch.append(line)
     avail = sorted([r for r in pool if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])
     refused = [r for r in pool if r.get("refused")]
     for t, verb, win, line in sorted(dis):
@@ -793,15 +823,16 @@ def audit_parity(o):
             why = next((" (the bridge refused it: %s)" % r["refused"] for r in refused if r["verb"] == verb and str(r["win"]).lstrip("0") == win.lstrip("0") and abs(t - r["epoch"]) <= AUDIT_TOL), "")
             missed.append("%s %s: the dispatcher delivered it, no shadow delivery to pair with%s — %s" % (verb, win, why, line[:160]))
     extras = ["%s %s %s %s (no dispatcher delivery logged)" % (r["line_time"], r["verb"], r["win"], r.get("ref") or "") for r in avail]
-    n_in = sum(1 for r in deliveries if inw(r))
+    n_in, n_led = sum(1 for r in deliveries if inw(r)), sum(1 for r in lrecs if inw(r))
     for x in matched: print("MATCHED   %s %s (shadow %s) = %s" % (x[0]["verb"], x[0]["win"], x[0]["ts"], x[1][:110]))
     for x in missed: print("MISSED    " + x)
     for x in dups: print("DUPLICATE " + x)
     for x in extras: print("EXTRA     " + x)
     for x in unparsed: print("UNPARSED  " + x[:200])
-    print("window: %s; shadow deliveries in it: %d (condition A needs >= 20: %s)" % (desc, n_in, "met" if n_in >= 20 else "NOT met"))
+    for x in by_orch: print("BY-ORCH   " + x[:200])
+    print("window: %s; shadow queue deliveries in it: %d (condition A needs >= 20: %s); ledger records beside them: %d" % (desc, n_in, "met" if n_in >= 20 else "NOT met", n_led))
     print("POSTMAN AUDIT %s %d/%d/%d" % (desc, len(matched), len(missed), len(dups)))
-    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed))
+    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d by_orchestrator=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed), len(by_orch))
     if missed or dups: fail("postman", "audit parity %s" % tail)
     ok("postman", "audit parity %s" % tail)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991 and 13.2040–. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059 and 13.2070–. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -164,6 +164,11 @@ reset; mkseat exec3 idle; pm post exec3 --kind fix --text "old" --from main >/de
 pm post exec3 --kind fix --text "new" --from main >/dev/null 2>&1; spm postman once --shadow >/dev/null 2>&1
 check "13.2046 run --shadow: exits 0 after its passes and leaves no daemon pid; messages already in the ledger at the first shadow pass are baseline (never replayed); CONTROL in the same check: a message posted after it IS logged" \
   '[ "$rc" = 0 ] && [ ! -e "$R/postman/daemon.pid" ] && [ "$(sjson "[x[\"upto\"] for x in r if x[\"origin\"]==\"baseline\"]")" = "[1]" ] && [ "$(sjson "[x[\"id\"] for x in r if x[\"origin\"]==\"ledger\"]")" = "[2]" ] && [ ! -s "$TL2" ]'
+# N2: a restart marker written BEFORE a --shadow pass must survive it — restarts() acks (closes) real messages, a seat-visible write
+reset; mkseat exec3 idle; pm post exec3 --kind fix --text "before the restart" --from main >/dev/null 2>&1; NOW=$((NOW+10)); pm postman restarted exec3 >/dev/null 2>&1; NOW=$((NOW+10)); : > "$TL2"
+mk_before="$(ls "$R/postman/restarts" 2>/dev/null)"; spm postman once --shadow >/dev/null 2>&1
+check "13.2056 --shadow runs no restart supersede (mutant N2): with a restart marker for exec3 and an open message to it posted before the marker, a --shadow pass writes no ack file, the message stays open, the marker stays, the ledger gains no note and the tmux shim logged no write; CONTROL in the same check: the next LIVE pass cancels it (an ack file marked cancelled, the marker consumed, one note to main)" \
+  '[ "$mk_before" = exec3 ] && [ ! -e "$R/postman/acks/1" ] && [ -f "$R/postman/restarts/exec3" ] && [ "$(ledger_n)" = 1 ] && [ ! -s "$TL2" ] && pm postman once >/dev/null 2>&1 && grep -q " cancelled cancelled-by-restart" "$R/postman/acks/1" && [ ! -e "$R/postman/restarts/exec3" ] && [ "$(count_kind note main)" = 1 ]'
 
 # ───────────────────────────── delivery state machine ─────────────────────────────
 reset; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
@@ -195,8 +200,8 @@ NOW=$((NOW+1300)); pm_noage postman once >/dev/null 2>&1
 check "13.1972 …the page is not repeated while the message stays open" '[ "$(rec_n exec3)" = 5 ] && [ "$(count_kind page main)" = 1 ]'
 reset; mkseat main mute; pm post main --kind fix --text "go" --from exec3 >/dev/null 2>&1; pm_noage postman once >/dev/null 2>&1
 for dt in 200 620 1220 5; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done     # the last pass delivers the page the 4th try posted to the planner
-check "13.1948 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file" \
-  '[ "$(count_kind page planner)" = 1 ] && grep -q "⚑ POSTMAN" "$N" && grep -q "#1" "$N"'
+check "13.1948 page chain: an unreachable main pages the planner (inbox) AND appends exactly ONE ⚑ line to the notes file (the page's own flag on delivery; a second write beside the page — mutant N10 — is red)" \
+  '[ "$(count_kind page planner)" = 1 ] && [ "$(grep -c "⚑ POSTMAN" "$N")" = 1 ] && grep -q "#1" "$N"'
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; sleep 4
 NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1; sleep 4; p1="$(count_kind page main)"; NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1
 check "13.1980 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min" '[ "$p1" = 0 ] && [ "$(count_kind page main)" = 1 ]'
@@ -291,6 +296,13 @@ nt_round() { # F13: a needs-tip verdict for task/n; MODE 1 = a mergetip message 
   NOW=$((T0+360)); pm postman audit 2>&1; }
 check "13.1990 ctl postman audit (on demand): a needs-tip verdict is satisfied by a mergetip message with that ref; CONTROL in the same check: a fix message with that ref does NOT satisfy it (exit 1, named)" \
   '{ o="$(nt_round 1)"; [ $? = 0 ]; } && { o="$(nt_round 0)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*task/n"'
+g_round() { # MODE same|other|verb → a QUEUE-dispatch line bridged to a note (FIX for task/foo-bar | FIX for task/other | MERGETIP for task/foo-bar) and a reviewer FIX verdict for task/foo-bar in the same pass, then a pass after the grace
+  bridge_reset; QR="$R/QUEUE-review.md"; : > "$QR"; pm postman once >/dev/null 2>&1; local t; t="$(date -r $NOW +%H:%M)"
+  case "$1" in same) printf '%s FIX 4 %s (task/foo-bar c28ca5cf)\n' "$t" "$T/BRIEF-b.md";; other) printf '%s FIX 4 %s (task/other c28ca5cf)\n' "$t" "$T/BRIEF-b.md";; verb) printf '%s MERGETIP 4 task/foo-bar base=release/x\n' "$t";; esac >> "$Q"
+  printf '%s DONE %s FIX task/foo-bar c28ca5cf (F1) reviewer A\n' "$t" "$t" >> "$QR"
+  pm postman once >/dev/null 2>&1; NOW=$((NOW+700)); pm postman once >/dev/null 2>&1; }
+check "13.2057 mechanism g counts a BRIDGED queue note (mutant N11): a reviewer FIX verdict for task/foo-bar plus the bridge's FIX note with ref task/foo-bar → no audit note after the grace (the ledger holds only the bridge's note) and on-demand 'ctl postman audit' exits 0; CONTROL in the same check: a bridged FIX note for ANOTHER branch, and a bridged MERGETIP note for the SAME branch, each leave the verdict unmatched (an audit note after the grace, on-demand exit 1 naming task/foo-bar)" \
+  'g_round same && [ "$(count_kind note main)" = 1 ] && [ "$(jget 1 ref)" = task/foo-bar ] && pm postman audit >/dev/null 2>&1 && g_round other && [ "$(count_kind note main)" = 2 ] && { o="$(pm postman audit 2>&1)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*task/foo-bar" && g_round verb && [ "$(jget 1 ref)" = task/foo-bar ] && [ "$(count_kind note main)" = 2 ] && { o="$(pm postman audit 2>&1)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*task/foo-bar"'
 
 # ───────────────────────────── the shadow parity audit (ctl postman audit --parity | --since | --window) ─────────────────────────────
 # Fixtures are written straight into postman/shadow.jsonl and DISPATCH-log.md (the audit is a pure function of those files and the ledger).
@@ -310,14 +322,14 @@ check "13.2049 audit --parity DUPLICATE: the same QUEUE line recorded twice (one
   '{ o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^DUPLICATE queue line .* FIX 2 recorded 2 times" && au_reset && au_q FIX 2 600 a "" && au_q FIX 2 590 b "" && au_d 540 "FIX 2 x delivered to lane 2" && au_d 530 "FIX 2 y delivered to lane 2" && au --parity >/dev/null'
 reset; mkdir -p "$R/postman"; pm postman once --shadow >/dev/null 2>&1; printf 'x\n' > "$T/BRIEF-dup.md"
 pm post exec3 --kind fix --body "$T/BRIEF-dup.md" --from reviewerA >/dev/null 2>&1; NOW=$((NOW+60)); pm post exec3 --kind fix --body "$T/BRIEF-dup.md" --from reviewerA >/dev/null 2>&1; pm postman once --shadow >/dev/null 2>&1
-check "13.2050 audit --parity (ledger leg): two ledger messages to one seat with the same kind and body within 10 min are a DUPLICATE (exit 1) — and a ledger message the shadow run never recorded is MISSED (exit 1); CONTROL in the same check: distinct bodies, each recorded, exit 0" \
-  '{ o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^DUPLICATE ledger #2 repeats #1" && pm post exec3 --kind fix --text "unrecorded" --from reviewerA >/dev/null 2>&1 && { o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    ledger #3" && reset && mkdir -p "$R/postman" && pm postman once --shadow >/dev/null 2>&1 && pm post exec3 --kind fix --text "one" --from reviewerA >/dev/null 2>&1 && pm post exec3 --kind fix --text "two" --from reviewerA >/dev/null 2>&1 && pm postman once --shadow >/dev/null 2>&1 && au --parity >/dev/null'
+check "13.2050 audit --parity (ledger leg): two ledger messages to one seat with the same kind and body within 10 min are a DUPLICATE (exit 1) — and a ledger message the shadow run never recorded is MISSED (exit 1); CONTROL in the same check: distinct bodies, each recorded, exit 0 — and those 2 ledger records are printed BESIDE condition A's queue count (0), never in it" \
+  '{ o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^DUPLICATE ledger #2 repeats #1" && pm post exec3 --kind fix --text "unrecorded" --from reviewerA >/dev/null 2>&1 && { o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    ledger #3" && reset && mkdir -p "$R/postman" && pm postman once --shadow >/dev/null 2>&1 && pm post exec3 --kind fix --text "one" --from reviewerA >/dev/null 2>&1 && pm post exec3 --kind fix --text "two" --from reviewerA >/dev/null 2>&1 && pm postman once --shadow >/dev/null 2>&1 && o="$(au --parity)" && printf "%s" "$o" | grep -q "shadow queue deliveries in it: 0 (condition A needs >= 20: NOT met); ledger records beside them: 2"'
 au_reset; au_q FIX 2 600 s1 ""; au_q NEXT 3 500 s2 ""; au_d 540 "FIX 2 x delivered to lane 2"
 check "13.2051 audit --parity EXTRA: a shadow delivery the dispatcher never logged (the orchestrator did it directly) is listed EXTRA and does NOT fail the audit (exit 0); CONTROL in the same check: an extra never hides a miss — adding a dispatcher MERGETIP to the SAME lane as the extra NEXT (a different verb never pairs) exits 1 with the extra still listed and the MERGETIP MISSED" \
   '{ o="$(au --parity)"; [ $? = 0 ]; } && printf "%s" "$o" | grep -q "^EXTRA     .*NEXT 3" && printf "%s" "$o" | tail -1 | grep -q "matched=1 missed=0 duplicate=0 extra=1" && au_d 100 "MERGETIP 3 q delivered" && { o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^EXTRA     .*NEXT 3" && printf "%s" "$o" | grep -q "^MISSED    MERGETIP 3"'
 au_reset; au_d 5000 "FIX 5 old-miss delivered to lane 5"; for k in 1 2 3; do au_q FIX 2 $((900-k*100)) "s$k" ""; au_d $((880-k*100)) "FIX 2 r$k delivered to lane 2"; done
-check "13.2052 audit windows: --window 2 looks at the last two shadow deliveries only and --since T at records from T on, so an old miss outside the window does not fail them (exit 0, the deliveries count is printed and condition A is reported NOT met under 20); CONTROL in the same check: the same fixture over the whole log (--parity, --window 3 reaching back to it is NOT needed) exits 1; --since and --window together are refused" \
-  '{ o="$(au --window 2)"; [ $? = 0 ]; } && printf "%s" "$o" | grep -q "^window: last 2 deliveries; shadow deliveries in it: 2 (condition A needs >= 20: NOT met)" && au --since $((NOW-1000)) >/dev/null && { o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    FIX 5" && { au --window 2 --since 12:00 >/dev/null; [ $? = 1 ]; } && { au --window 0 >/dev/null; [ $? = 1 ]; } && { au --since garbage >/dev/null; [ $? = 1 ]; }'
+check "13.2052 audit windows: --window 2 looks at the last two shadow QUEUE deliveries only and --since T at records from T on, so an old miss outside the window does not fail them (exit 0, the queue-delivery count — condition A's unit — and the ledger records beside it are printed, condition A NOT met under 20); CONTROL in the same check: the same fixture over the whole log (--parity, --window 3 reaching back to it is NOT needed) exits 1; --since and --window together are refused" \
+  '{ o="$(au --window 2)"; [ $? = 0 ]; } && printf "%s" "$o" | grep -q "^window: last 2 queue deliveries; shadow queue deliveries in it: 2 (condition A needs >= 20: NOT met); ledger records beside them: 0" && au --since $((NOW-1000)) >/dev/null && { o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    FIX 5" && { au --window 2 --since 12:00 >/dev/null; [ $? = 1 ]; } && { au --window 0 >/dev/null; [ $? = 1 ]; } && { au --since garbage >/dev/null; [ $? = 1 ]; }'
 au_reset
 for i in 1 2 3 4 5; do au_q FIX 2 $((1000-i*10)) "g$i" ""; done; au_q MERGETIP 2 900 g6 ""; au_q FIX 4 890 g7 ""; au_q MERGETIP 5 880 g8 ""; au_q FIX 3 870 g9 ""
 au_d 950 "FIX 2 help-round-trip-fix-1 delivered to lane 2, saw echoed; FIX 3 skipped as superseded"
@@ -337,6 +349,35 @@ check "13.2054 plain 'ctl postman audit' (no window flag) stays the mechanism-g 
 reset; bridge_reset; pm postman once --shadow >/dev/null 2>&1; printf '06:50 FIX 2 %s\n' "$T/BRIEF-b.md" >> "$Q"; pm postman once --shadow >/dev/null 2>&1; : > "$R/DISPATCH-log.md"; au_d 0 "FIX 2 BRIEF-b delivered to lane 2, saw echoed"
 check "13.2055 end to end: a real --shadow pass over a QUEUE-dispatch FIX 2 and the dispatcher's DISPATCH-log line for it audit as matched=1 missed=0 (exit 0); CONTROL in the same check: the same log line for FIX 3 (no queue line) is MISSED (exit 1)" \
   '{ o="$(au --parity)"; [ $? = 0 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=1 missed=0" && au_d 0 "FIX 3 other-brief delivered to lane 3" && { o="$(au --parity)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "^MISSED    FIX 3"'
+n14_round() { # BRIEF → a QUEUE-dispatch FIX 4 naming BRIEF through a real --shadow pass, then the dispatcher's log line delivering it; prints the parity audit
+  bridge_reset; pm postman once --shadow >/dev/null 2>&1; printf '06:50 FIX 4 %s\n' "$1" >> "$Q"; pm postman once --shadow >/dev/null 2>&1; : > "$R/DISPATCH-log.md"; au_d 0 "FIX 4 the-brief delivered to lane 4, saw echoed"; au --parity; }
+check "13.2058 end to end, a REFUSED line (mutant N14): a QUEUE-dispatch FIX 4 whose brief does not exist goes through a real --shadow pass, the dispatcher logs delivering it → MISSED naming the bridge's own reason (brief file … not found), exit 1; CONTROL in the same check: the same line with a brief that exists → matched=1 missed=0, exit 0" \
+  '{ o="$(n14_round "$T/BRIEF-b.md")"; [ $? = 0 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=1 missed=0" && { o="$(n14_round "$T/missing-brief.md")"; [ $? = 1 ]; } && printf "%s" "$o" | grep "^MISSED" | grep -q "FIX 4: .*bridge refused it: brief file .*missing-brief.md. not found"'
+# Real DISPATCH-log.md lines, VERBATIM after their HH:MM (roles/DISPATCH-log.md:541, 607, 632, 635, 145, 465, 628, 206, 681, 484, 486 on 2026-10-04)
+cat > "$T/dl-real.txt" <<'DLEOF'
+dispatcher: delivered T9 FIX 1 pointer to lane3 (queued behind its turn)
+dispatcher: delivered G-3 FIX 1 pointer to lane5
+dispatcher: T4 FIX 1 delivered to lane 5 (saw: t4 fix). Watch bcuuco5hr expires now; re-arming.
+dispatcher: T10 FIX 2 delivered to lane 1 (saw: t10 fix 2).
+FIX 4 (pg-t6 mergetip ruling) delivered, acked. NEXT 1 U-T9 still waits behind lane 1's undeliverable MERGETIP (ctl ghost-text bug); lane 3 box still holds my unsent pointer; both in CTL notes for the orchestrator
+MERGETIP lane1 task/mcp-e-1-converter delivered (FIX 1 already DONE c9fb56f1; merge ae0c059a remaining); REVIEW c9fb56f1 → B queued. MERGETIP lane5 task/mcp-e-2-comment-events delivered (queued behind its battery; tip de7ea7b7 is WIP, not queued for review).
+dispatcher: T10 FIX1 DONE f750ad28 verified (REVIEW by lane 1); T5 FIX 1 delivered to lane 2 (saw: t5 fix).
+#891 P-T8 landed 031c800c: delivered 06:32 NEXT 4 (U-T4->U-T5), MERGETIP 5, MERGETIP 1, NEXT 2 (G0 fix1 -> P-T5 tip -> U-T7); lane 3 still waits for P-T7 (P-T11 blocked), U-T9 re-merge held until U-T6 lands
+ACK T8 FIX 1 delivered by orchestrator (lane 4)
+lane4 F-5 FIX 1 delivered once (queued behind T3 turn); awaiting DONE → re-check REVIEW to B.
+lane1 T4 MERGETIP (T2 tip 7ba3a37d) delivered once, folded into FIX 1; awaiting the one DONE → ONE REVIEW to B.
+DLEOF
+au_dl() { au_d "$1" "$(sed -n "${2}p" "$T/dl-real.txt")"; }     # au_dl SECS-AGO LINE-NO (of dl-real.txt)
+f1_round() { # SHADOW-LANES → five real "<task> FIX <round> … to lane N" / "laneN <task> FIX <round>" lines, shadow FIX records for the given five lanes; prints the parity audit
+  au_reset; local k=0 w; for w in $1; do k=$((k+1)); au_q FIX "$w" $((700-k*10)) "r$k" ""; done; for k in 1 2 3 4; do au_dl $((600-k*10)) $k; done; au_dl 550 10; au --parity; }
+check "13.2059 DISPATCH-log grammar, a fix ROUND is not the LANE (F1 i): the real lines 'delivered T9 FIX 1 pointer to lane3', 'delivered G-3 FIX 1 pointer to lane5', 'T4 FIX 1 delivered to lane 5 (…)', 'T10 FIX 2 delivered to lane 1 (…)' and, the lane BEFORE the verb, 'lane4 F-5 FIX 1 delivered once (…)' pair with shadow FIX records for lanes 3, 5, 5, 1, 4 → matched=5 missed=0 extra=0, exit 0; CONTROL in the same check: the same lines against shadow FIX records for the ROUND numbers (1, 1, 1, 2, 1) leave four of them MISSED (only the lane-1 line pairs a round-1 record) → matched=1 missed=4 extra=4, exit 1" \
+  '{ o="$(f1_round "3 5 5 1 4")"; [ $? = 0 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=5 missed=0 duplicate=0 extra=0" && { o="$(f1_round "1 1 1 2 1")"; [ $? = 1 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=1 missed=4 duplicate=0 extra=4"'
+au_reset; au_q FIX 4 700 a1 ""; au_q MERGETIP 1 690 a2 ""; au_q MERGETIP 5 680 a3 ""; au_q FIX 2 670 a4 ""; au_q MERGETIP 1 660 a5 ""; au_dl 600 5; au_dl 590 6; au_dl 580 7; au_dl 570 11
+check "13.2070 DISPATCH-log grammar, sentences (F1 ii): the real 04:40 line 'FIX 4 (…) delivered, acked. NEXT 1 U-T9 still waits behind lane 1's …' yields only (FIX, 4) — a sentence end splits clauses, so the waiting NEXT 1 is no delivery (no MISSED NEXT 1); CONTROL in the same check: a real second sentence / clause that says delivered still pairs — 'MERGETIP lane1 … delivered (FIX 1 already DONE …); REVIEW … queued. MERGETIP lane5 … delivered (…)' gives MERGETIP 1 and 5 (the FIX 1 already DONE is not a delivery) and '… (REVIEW by lane 1); T5 FIX 1 delivered to lane 2' gives FIX 2; 'lane1 T4 MERGETIP (…) delivered once, folded into FIX 1' gives only MERGETIP 1: matched=5 missed=0 extra=0" \
+  '{ o="$(au --parity)"; [ $? = 0 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=5 missed=0 duplicate=0 extra=0" && ! printf "%s" "$o" | grep -q "^MISSED"'
+au_reset; for vw in NEXT:4 MERGETIP:5 MERGETIP:1 NEXT:2 FIX:4; do au_q "${vw%%:*}" "${vw##*:}" 700 "b$vw" ""; done; au_dl 600 8; au_dl 590 9
+check "13.2071 DISPATCH-log grammar, several deliveries in one line and the orchestrator's (F1 iii): the real 06:33 line 'delivered 06:32 NEXT 4 (…), MERGETIP 5, MERGETIP 1, NEXT 2 (…); lane 3 still waits …' gives exactly its four pairs (matched=4); the real 'ACK T8 FIX 1 delivered by orchestrator (lane 4)' is NOT a dispatcher delivery — it is listed BY-ORCH and pairs nothing, so the shadow FIX 4 record stays EXTRA, exit 0; CONTROL in the same check: the same ACK text without 'by orchestrator' pairs (FIX, 4): matched=5 extra=0 by_orchestrator=0" \
+  '{ o="$(au --parity)"; [ $? = 0 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=4 missed=0 duplicate=0 extra=1 unparsed=0 by_orchestrator=1" && printf "%s" "$o" | grep -q "^BY-ORCH   .*ACK T8 FIX 1 delivered by orchestrator (lane 4)" && printf "%s" "$o" | grep -q "^EXTRA     .*FIX 4" && : > "$R/DISPATCH-log.md" && au_dl 600 8 && au_d 590 "ACK T8 FIX 1 delivered (lane 4)" && { o="$(au --parity)"; [ $? = 0 ]; } && printf "%s" "$o" | tail -1 | grep -q "matched=5 missed=0 duplicate=0 extra=0 unparsed=0 by_orchestrator=0"'
 
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────
 # A refusal is "nothing typed AND the message still open"; the control is an idle pane that IS pasted into.
