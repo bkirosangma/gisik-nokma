@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { DrawIndex } from '../../src/timeline-graph/draw-index.js';
-import type { Draw, DrawBar } from '../../src/timeline-graph/draw-types.js';
+import type { Draw, DrawBar, DrawDiamond } from '../../src/timeline-graph/draw-types.js';
 import { TimelinePainter } from '../../src/timeline-graph/painter.js';
 
 const bar = (i: number, x0: number): DrawBar => ({
@@ -21,6 +21,7 @@ describe('29.303 TimelinePainter', () => {
     const { container, rerender } = render(<TimelinePainter {...props} view={{ x0: 0, x1: 600, y0: 0, y1: 400 }} />);
     const ids = () => [...container.querySelectorAll('[data-draw-id]')].map((e) => e.getAttribute('data-draw-id'));
     const first = ids();
+    expect(container.querySelector('.gn-tlg-canvas')?.getAttribute('data-mounted')).toBe(String(first.length)); // the stress pages read this count
     expect(first.length).toBeGreaterThan(0);
     expect(first.length).toBeLessThan(10);
     const el0 = container.querySelector('[data-draw-id="b0"]');
@@ -46,16 +47,30 @@ describe('29.303 TimelinePainter', () => {
     expect(names).toContain('Bar 0, done'); // control: the scan sees the painter's names
     expect(names.some((n) => /^(earlier|later|previous|next)$/i.test(n))).toBe(false);
   });
-  it('29.303 a bar whose ticket changed repaints in place (the primitives are memoised): new title and style, same DOM node; control: an unchanged bar keeps its node and text', () => {
-    const before: Draw[] = [{ ...bar(0, 0), long: true, title: 'Old title' }, { ...bar(1, 120), long: true, title: 'Kept title' }];
+  it('29.303 a vertical-only move swaps the mounted rows exactly; control: the top row is mounted first', () => {
+    const rows: Draw[] = [bar(0, 0), bar(1, 120), { ...bar(2, 0), b: { x0: 0, x1: 96, y0: 2_000, y1: 2_028 } }, { ...bar(3, 120), b: { x0: 120, x1: 216, y0: 2_000, y1: 2_028 } }];
+    const { container, rerender } = render(<TimelinePainter draws={rows} index={new DrawIndex(rows)} overscan={0} width={400} height={2_100} view={{ x0: 0, x1: 400, y0: 0, y1: 400 }} />);
+    const ids = () => [...container.querySelectorAll('[data-draw-id]')].map((e) => e.getAttribute('data-draw-id'));
+    expect(ids()).toEqual(['b0', 'b1']);
+    rerender(<TimelinePainter draws={rows} index={new DrawIndex(rows)} overscan={0} width={400} height={2_100} view={{ x0: 0, x1: 400, y0: 1_900, y1: 2_100 }} />);
+    expect(ids()).toEqual(['b2', 'b3']);
+  });
+  it('29.303 a bar or a diamond whose ticket changed repaints in place (the primitives are memoised): new text and style, same DOM node; control: an unchanged bar keeps its node and text', () => {
+    const before: Draw[] = [
+      { ...bar(0, 0), long: true, title: 'Old title' }, { ...bar(1, 120), long: true, title: 'Kept title' },
+      { kind: 'diamond', id: 'd2', ticketId: 't2', z: 1, b: { x0: 300, x1: 328, y0: 0, y1: 28 }, style: 'planned', key: 'GN-2', title: 'D', mark: null, revised: false, pin: null, draft: false, ariaLabel: 'GN-2 D' },
+    ];
     const view = { x0: 0, x1: 400, y0: 0, y1: 40 };
     const { container, rerender } = render(<TimelinePainter draws={before} index={new DrawIndex(before)} overscan={0} width={400} height={40} view={view} />);
     const el = (id: string) => container.querySelector(`[data-draw-id="${id}"]`) as HTMLElement;
-    const [b0, b1] = [el('b0'), el('b1')];
-    const after: Draw[] = [{ ...(before[0] as DrawBar), title: 'New title', style: 'active', mark: 'active' }, before[1] as DrawBar]; // a new object for the changed ticket only, as a scene rebuild makes
+    const [b0, b1, d2] = [el('b0'), el('b1'), el('d2')];
+    expect([d2.dataset['style'], d2.textContent]).toEqual(['planned', '']);
+    // a new object for each changed ticket only, as a scene rebuild makes
+    const after: Draw[] = [{ ...(before[0] as DrawBar), title: 'New title', style: 'active', mark: 'active' }, before[1] as DrawBar, { ...(before[2] as DrawDiamond), style: 'done', mark: 'done', revised: true }];
     rerender(<TimelinePainter draws={after} index={new DrawIndex(after)} overscan={0} width={400} height={40} view={view} />);
     expect([el('b0'), el('b0').querySelector('.gn-tlg-title')?.textContent, el('b0').dataset['style'], el('b0').querySelector('.gn-tlg-mark')?.textContent]).toEqual([b0, 'New title', 'active', '▶']);
     expect([el('b1'), el('b1').querySelector('.gn-tlg-title')?.textContent]).toEqual([b1, 'Kept title']);
+    expect([el('d2'), el('d2').dataset['style'], el('d2').textContent]).toEqual([d2, 'done', '✓revised']);
   });
   it('29.303 a TICKET id selects that ticket\'s bars and diamond (Home selects tickets); control: the other ticket stays unpressed', () => {
     const two: Draw[] = [bar(0, 0), bar(1, 120), { kind: 'diamond', id: 'd1', ticketId: 't1', z: 1, b: { x0: 240, x1: 268, y0: 0, y1: 28 }, style: 'done', key: 'GN-1', title: 'D', mark: null, revised: false, pin: null, draft: false, ariaLabel: 'GN-1 D' }];
