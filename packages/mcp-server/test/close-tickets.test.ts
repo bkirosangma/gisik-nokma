@@ -155,6 +155,9 @@ describe('close_tickets (package)', () => {
     // Two tickets are joined by "and" alone (the boundary of the list's wording).
     const two = recordingSession({ routes: routes() });
     expect(((await closeWith(two.session, ['T2', 'T1'])) as { wouldChange: string }).wouldChange).toBe(`Closes 2 tickets: CCSO-9 "Rate limits" and CCSO-4 "Fix login". ${DECIDES}`);
+    // A ticket with no key yet is named by its id.
+    const keyless = recordingSession({ routes: { [`GET /v1/workspaces/${WS}/tickets/T4`]: { key: null, title: 'No key yet', ticketState: { fields: {}, workflowId: 'wf' }, rollup: null } } });
+    expect(((await closeWith(keyless.session, ['T4'])) as { wouldChange: string }).wouldChange).toBe(`Closes 1 ticket: T4 "No key yet". ${DECIDES}`);
     // Only "not found" is named "one you cannot see": any other failed read (a 500) reaches the caller as it came, and nothing is sent.
     const broken = recordingSession({ routes: { ...routes(), [`GET /v1/workspaces/${WS}/tickets/T2`]: () => { throw new HttpError(500, { error: 'boom' }); } } });
     await expect(closeWith(broken.session, ['T1', 'T2'])).rejects.toThrow(new HttpError(500, { error: 'boom' })); // untouched: status and body as they came
