@@ -127,6 +127,10 @@ describe('29.303 TimelinePainter', () => {
     expect([...container.querySelectorAll('svg.gn-tlg-edges > g')].map((g) => g.getAttribute('data-draw-id'))).toEqual(['e1', 'e2']);
     expect([el('e1').querySelector('path')?.getAttribute('d'), el('e1').querySelector('text')?.textContent, el('e2').querySelector('text'), el('e2').dataset['loop'], el('e2').dataset['kind']]).toEqual(['M96 14 H150 V54 H200', 'Needs rework', null, 'true', 'blocks']);
     expect([el('e1').querySelector('text')?.getAttribute('x'), el('e1').querySelector('text')?.getAttribute('y'), el('e1').dataset['dim'], el('e2').dataset['dim']]).toEqual(['150', '10', 'true', 'false']);
+    // the boundary: exactly ONE edge in view (e1 ends at x 200, e2 starts at x 248) still draws its svg
+    rerender(<TimelinePainter draws={scene} index={new DrawIndex(scene)} overscan={0} width={2_000} height={200} view={{ x0: 0, x1: 220, y0: 0, y1: 200 }} />);
+    expect(container.querySelectorAll('svg.gn-tlg-edges')).toHaveLength(1);
+    expect([...container.querySelectorAll('svg.gn-tlg-edges > g')].map((g) => g.getAttribute('data-draw-id'))).toEqual(['e1']);
     rerender(<TimelinePainter draws={scene} index={new DrawIndex(scene)} overscan={0} width={2_000} height={200} view={{ x0: 560, x1: 900, y0: 0, y1: 40 }} />);
     expect(el('d3')).not.toBeNull(); // control: the view still mounts something
     expect(container.querySelector('svg')).toBeNull();
