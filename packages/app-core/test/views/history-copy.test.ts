@@ -277,6 +277,10 @@ describe('29.161 history copy — the flow built-ins read by name', () => {
     expect(set('reworkEstimate', 2)).toBe('Set Rework estimate to 2 days');
     expect(set('waitForAll', true)).toBe('Turned on Wait for all incoming');
     expect(set('waitForAll', null)).toBe('Turned off Wait for all incoming');
+    // Only `true` reads "Turned on" and only a number reads "Set … to N days": any other stored value falls through to the
+    // generic sentence (raw id), so a stray `false` or a string estimate is never narrated as something it is not.
+    expect(set('waitForAll', false)).toBe('Set waitForAll to false');
+    expect(set('estimate', '3')).toBe('Set estimate to 3');
     expect(set('priority', 'P1')).toBe('Set priority to P1'); // control
     expect(set('region', 'North')).toBe('Set region to North');
   });

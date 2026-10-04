@@ -318,7 +318,7 @@ what the prototype draws there.
 - **16.27** ✅ Priority renders the claim as the **SELECTED segment**, with its claim line. **AMENDED 2026-09-22** — it read *"it is a CONVENTION, so the claimed case arrives by the ticket carrying the field"*, and the retitle is the amendment: priority is a built-in, so the claimed case is the ORDINARY one, and the value renders through the control rather than as loose text. All three segments' `aria-selected` states are asserted, not only `P1`'s, so a control that marked every segment selected — or none — cannot pass.
 - **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text. **AMENDED 2026-09-22:** `startDate` joins the exclusion, asserted as `queryByTestId('field-startDate')` being null, and `field-priority` is asserted to appear exactly ONCE via `getAllByTestId` — an absence assertion would pass for a sheet that drew no priority row at all.
 - **16.29** ✅ Priority, Due and Start are **EDITORS**; **Type is the one row read-only**. **AMENDED TWICE:** by E5-6 (2026-09-21) this stopped pinning a uniform read-only absence and started pinning a split, and spec 2026-09-22 took the other half of the prototype's own shape — priority's segmented control and the Start row. Each editor is asserted POSITIVELY (its own control is present) so the case cannot pass by a control silently disappearing, and Type's read-only-ness is asserted as an absence the way `16.22` does for F's chip.
-- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is. ⚠ **This case is now the RELATIVE order of four rows inside a larger grid**, and it still holds: the full order — Description above the grid, then `State · Assignee · Priority · Due · Start · Type · Visibility`, then Subtasks and Comments — is `16.113`'s, one case owning the whole sequence rather than this one growing a clause per row added elsewhere. Neither case subsumes the other: this one reddens if two of ITS four swap, `16.113` reddens if a row moves around them.
+- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is. ⚠ **This case is now the RELATIVE order of four rows inside a larger grid**, and it still holds: the full order — Description above the grid, then `State · Assignee · Priority · Due · Start · Estimate · Type · Visibility` (Estimate joined between Start and Type since wtg2 T4), then Subtasks and Comments — is `16.113`'s, one case owning the whole sequence rather than this one growing a clause per row added elsewhere. Neither case subsumes the other: this one reddens if two of ITS four swap, `16.113` reddens if a row moves around them.
 - **16.100** ✅ Clicking a segment other than the selected one submits exactly ONE `ticket.field_set` carrying `{ fieldId: 'priority', value }`. The payload is asserted with `toEqual`, never `toMatchObject`, so a row that re-spelled the fieldId or wrapped the level in an object is a different claim about the ledger. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **16.101** ✅ CONTROL — clicking the segment ALREADY selected submits nothing. The ledger is append-only, so a commit that changed nothing would record a claim nobody made; and there is nothing to clear to, which is why priority has no clearing gesture at all while its twin Due does. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **16.102** ✅ A REFUSED priority prints the server's own sentence beside the row and leaves the PREVIOUS segment selected — a control that adopted the refused level would be showing a value nobody recorded. — `packages/app-core/test/views/ticket-sheet.test.tsx`
@@ -1507,7 +1507,7 @@ from the plan's array would have asserted an order that SKIPS a row the sheet re
 have passed, because every pair it named is still in that relative order.
 
 **The tint is by CLASS, not by `:nth-child`.** `ticket-sheet.tsx` computes it (`fieldRowClass`), with
-`FIXED_FIELD_ROWS = 7` so the generic custom-field loop CONTINUES the alternation instead of restarting it
+`FIXED_FIELD_ROWS = 7` (8 since wtg2 T4, whose Estimate row joined the fixed rows) so the generic custom-field loop CONTINUES the alternation instead of restarting it
 at zero — which would put two tinted rows side by side at the seam. A `:nth-child` rule would count the
 wrapper `<div>`s rather than the rows and would agree with the class only by luck. ⚠ **`FIXED_FIELD_ROWS` IS A COUNT, and the sentence that stood here claimed `16.116` was its witness. THAT CLAIM WAS MEASURED FALSE AND IS CORRECTED RATHER THAN DELETED:** `16.116` renders the DEFAULT fixture, whose `state.fields` is `{title, dueDate}` and whose two entries are BOTH excluded — so the loop draws no rows, the constant is never read, and mutating it to `6` left **160 of 160 cases passing**. The witness is `16.129` (`16.129` below), added when that was measured, and whose first run then caught a REAL defect in this very index — see the section after the Task 6 entry.
 
@@ -1523,7 +1523,7 @@ rather than rewritten.
 ### The case
 
 - **16.113** ✅ The Details sections stand in the prototype order — Description, State, Assignee, Priority,
-  Due, **Start**, Type, Visibility, Subtasks, Comments — asserted PAIRWISE by `compareDocumentPosition`
+  Due, **Start**, **Estimate** (since wtg2 T4, between Start and Type), Type, Visibility, Subtasks, Comments — asserted PAIRWISE by `compareDocumentPosition`
   rather than by index into markup, which a whitespace or wrapper change would move. Includes
   `field-start`, which the plan's draft array omitted; see the note above.
   `packages/app-core/test/views/ticket-sheet.test.tsx`.
@@ -1658,7 +1658,7 @@ lane's `16.110`–`16.129` block, which is now fully spent.
 
 **Why it exists: a count with no fixture that exercises it is a number, not a guarantee.** `Task 4` put the grid's
 alternating tint in a computed class (`fieldRowClass`) with a constant, `FIXED_FIELD_ROWS`, whose whole purpose is to
-carry the alternation PAST the seven fixed rows and into the generic custom-field loop. `16.116` was the only case
+carry the alternation PAST the seven fixed rows (eight since wtg2 T4's Estimate row) and into the generic custom-field loop. `16.116` was the only case
 reading the tint, and it renders the default fixture whose `state.fields` is `{title, dueDate}` — **both excluded by
 the loop's own list** — so the loop draws nothing and the constant is never read.
 
@@ -1692,15 +1692,18 @@ second defect rather than of a missing case.
 
 - **16.129** ✅ The tint alternation continues across the seam. The fixture carries a CUSTOM field, so `rowIndex`
   really runs, and **the CONTROL comes first**: `field-counterparty` is asserted present and the grid is asserted to
-  hold 8 rows — without a rendered loop row there is no seam to read, and every remaining assertion would be about the
+  hold 9 rows (8 until wtg2 T4 added the fixed Estimate row) — without a rendered loop row there is no seam to read, and every remaining assertion would be about the
   fixed rows only, which is exactly how the constant went unconstrained. Then both directions: the grid alternates
-  end to end, AND the seam is named on the two elements by id — the last fixed row (`field-visibility`, index 6)
-  untinted, the first loop row (`field-counterparty`, index 7) tinted — so a mis-set constant reports the seam rather
+  end to end, AND the seam is named on the two elements by id — the last fixed row (`field-visibility`, index 7 since wtg2 T4)
+  tinted, the first loop row (`field-counterparty`, index 8) untinted (before wtg2 T4: index 6 untinted, index 7 tinted) — so a mis-set constant reports the seam rather
   than an opaque index. `packages/app-core/test/views/ticket-sheet.test.tsx`.
 
 **Mutations, run AFTER the fix (161 collected in each run).** `FIXED_FIELD_ROWS = 6` → kills `16.129` alone.
 `FIXED_FIELD_ROWS = 8` → kills `16.129` alone. **The constant is now pinned from both sides**, and each mutation
 reports the failure at `row 7` — the seam — rather than at a count.
+**Since wtg2 T4** the fixed rows are eight (Estimate at index 5) and the SHIPPED value is `FIXED_FIELD_ROWS = 8`, so the
+pair pinned from both sides is now `7` and `9` (the T4 lane's S7 / S7b, both RED on `16.129`), and each reports the
+failure at `row 8`. `80` keeps the parity and was judged EQUIVALENT (S7x10).
 
 **⚠ NO RED WAS AVAILABLE FOR THIS CASE AND THAT IS STATED RATHER THAN GLOSSED.** The shipped behaviour was already
 correct once the index bug was fixed, so the case was written green and its value is established by MUTATION, not by

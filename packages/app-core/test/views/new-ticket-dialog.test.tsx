@@ -1824,6 +1824,12 @@ describe('13.1435–13.1441 the Starting status select', () => {
     render(<NewTicketDialog {...baseProps({ onCreate })} />);
     const input = screen.getByLabelText('Estimate (days)');
     expect(input).toHaveValue(null);
+    // The same pinned bounds as the sheet's input: jsdom enforces none of them, the browser's spinner and `:invalid` do.
+    expect(input).toHaveAttribute('type', 'number');
+    expect(input).toHaveAttribute('min', '1');
+    expect(input).toHaveAttribute('max', '365');
+    expect(input).toHaveAttribute('step', '1');
+    expect(input).toHaveAttribute('inputmode', 'numeric');
     expect(input.closest('label')?.firstChild?.textContent?.trim()).toBe('Estimate (days)'); // the visible label, not only aria-label
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));

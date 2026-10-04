@@ -3195,7 +3195,7 @@ describe('sheet prototype parity — the details body order and chrome', () => {
    * exists because **every other case in the file is green over the defect it
    * catches.**
    *
-   * ⚠ **THE HOLE, MEASURED.** The fixed rows take literal indices 0–6, and the
+   * ⚠ **THE HOLE, MEASURED.** The fixed rows take literal indices 0–6 (0–7 since wtg2 T4's Estimate row), and the
    * generic custom-field loop takes `FIXED_FIELD_ROWS + rowIndex` — a constant
    * whose whole purpose is to CONTINUE the alternation past the fixed rows
    * instead of restarting it at zero, which would put two tinted rows side by
@@ -3670,6 +3670,13 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(screen.getByTestId('field-start').compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(row.compareDocumentPosition(screen.getByTestId('field-type')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const input = within(row).getByLabelText('Estimate (days)');
+    // The plan's pinned bounds: jsdom enforces none of them, but they drive the browser's spinner and native `:invalid`,
+    // so a drifted bound would offer values `estimateValueSchema` then refuses.
+    expect(input).toHaveAttribute('type', 'number');
+    expect(input).toHaveAttribute('min', '1');
+    expect(input).toHaveAttribute('max', '365');
+    expect(input).toHaveAttribute('step', '1');
+    expect(input).toHaveAttribute('inputmode', 'numeric');
     // A blank on a ticket with no estimate is no change, so nothing is filed (a null claim would be a clearing nobody made).
     fireEvent.change(input, { target: { value: '5' } });
     fireEvent.change(input, { target: { value: '' } });
