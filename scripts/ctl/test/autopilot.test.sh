@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2147 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
+# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2149 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
 # Nothing here reads or writes the live pipeline: a SCRATCH lanes root (CTL_LANES_DIR), a scratch origin + repo (CTL_AUTOPILOT_REPO),
 # a seats fixture (CTL_AUTOPILOT_SEATS_CMD), a stub `ctl` that logs its argv (CTL_AUTOPILOT_CTL), a stub make-reviewer-boot.py, a fixed
 # clock, and a PATH-front `tmux` shim that logs every call. A guard case has its CONTROL in the same check: the same world with the one
@@ -84,6 +84,9 @@ freelane() { local w="$1"; shift; seat "$w" state=idle shells=0 box=empty unpush
 freerev() { seat "$1" state=idle shells=0 box=empty "${@:2}"; }
 ap() { out=$(PATH="$T/shim:$PATH" python3 "$AP" once --shadow --no-fetch 2>&1); rc=$?; }
 aplive() { out=$(PATH="$T/shim:$PATH" python3 "$AP" once --no-fetch 2>&1); rc=$?; }
+# apat EPOCH — one shadow pass at another clock: CTL_AUTOPILOT_NOW is set on that python3 call only (every other check stays at 10:00);
+# only its HH:MM reaches the ages (time.localtime under TZ=UTC), so the epoch's date is cosmetic
+apat() { out=$(CTL_AUTOPILOT_NOW="$1" PATH="$T/shim:$PATH" python3 "$AP" once --shadow --no-fetch 2>&1); rc=$?; }
 # /usr/bin/grep, never the PATH `grep` (ugrep on this machine: its -E did not match a literal "(on origin/…)" group, 2026-10-04)
 would() { printf '%s\n' "$out" | /usr/bin/grep -E "WOULD $1" >/dev/null; }
 said() { printf '%s\n' "$out" | /usr/bin/grep -F -- "$1" >/dev/null; }
@@ -293,6 +296,16 @@ check "13.2140 a REVIEW TOOK that mentions a FIX delta (\`TOOK 09:50 task/rev1 �
 world; freelane 3; rq "09:50 REVIEW task/wg1 $WG1 base=origin/release/workflow-graph brief=PTR-w.md lane=1 (WG)" "09:55 DONE 09:50 FIX task/wg1 ${WG1:0:8} → BRIEF-wg1-fix-1.md (reviewer B)"; ap; a=$out; fv; ap
 check "13.2143 FIX-WAIT holds only the verdict's OWN pool: a fresh FIX verdict on a WG item (lane=1) does not hold KG lane 3 (it takes KV4); CONTROL in the same check: the same 5-min-old verdict on a KG item (lane=4) holds it" \
   'printf "%s" "$a" | grep -q "WOULD start: lane 3 takes KG KV4" && ! printf "%s" "$a" | grep -q "WAIT lane 3" && said "WAIT lane 3: FIX verdict 09:55 task/rev1 (5 min old)" && ! said "WOULD"'
+# 13.2149: item_age_min's "midnight passed since the queue's last line" leg (now's clock > 6 h below the last line's). Its 6 h mirrors the
+# parser's day-rollover rule (13.2129: a time more than 6 h BELOW the previous line's is the next day); the item legs sit 5.5 h and 7 h
+# below the last line, not at the exact boundary. The clock moves through CTL_AUTOPILOT_NOW alone (apat); no line is written after the last.
+MID=$((NOW + 14 * 3600))   # 2026-10-05 00:00, the midnight after NOW (10:00)
+world; freelane 3; rq "23:40 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "23:50 DONE 23:40 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"
+apat $((MID + 5 * 60)); a=$out; apat $((MID + 4 * 60)); b=$out
+world; freerev 7; rq "12:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (the queue's last line)"
+apat $((NOW - 210 * 60)); c=$out; apat $((MID + 5 * 3600)); d=$out
+check "13.2149 the ages see MIDNIGHT with no line written since (FIX 2, F6): the queue's last line is yesterday's \`23:50 DONE 23:40 FIX task/rev1 … → BRIEF-…\` (a KG item) and the clock reads 00:05 -> the verdict is 15 min old, past the grace: no WAIT, lane 3 takes KV4; CONTROL in the same check: at 00:04 -> WAIT lane 3 (14 min old); and with a 12:00 REVIEW item as the last line, at 06:30 (5.5 h below it: the same day by the 6 h rule) reviewer A takes it, at 05:00 (7 h below: the next day, 17 h old) -> SKIP older than 12 h (17 h), no WOULD" \
+  'printf "%s" "$a" | grep -q "WOULD start: lane 3 takes KG KV4" && ! printf "%s" "$a" | grep -q "WAIT lane 3" && printf "%s" "$b" | grep -qF "WAIT lane 3: FIX verdict 23:50 task/rev1 (14 min old)" && ! printf "%s" "$b" | grep -q WOULD && printf "%s" "$c" | grep -q "WOULD review: A gisik:7 takes 12:00 task/rev1" && printf "%s" "$d" | grep -qF "SKIP reviewer A x task/rev1 ${REV1:0:8}: older than 12 h (17 h)" && ! printf "%s" "$d" | grep -q WOULD'
 
 # ================================================================ budget, one-per-pass, no block
 world; freelane 3; seat 10 weekly=96; ap; a=$out; world; freelane 3; order 'KV4 H++ docs/plan.md 2 task/kv4 path:packages/kg'; seat 10 weekly=86; ap; b=$out
@@ -362,6 +375,12 @@ lrev() { world; order; seat 3 state=idle shells="$1" box=empty unpushed=0 dirty=
 lrev 1; c=$out; lrev 0
 check "13.2145 a LANE's shells are ignored only when its task is over (planner R1): lane 3 idle, clean, its DONE's REVIEW line queued, with 1 shell -> starts KV4; a lane with 1 shell mid-task (last line a step CHECKPOINT) -> SKIP 1 shells running; a lane back from a review (\`CHECKPOINT reviewer idle after …\`) with 1 shell -> SKIP 1 shells running; CONTROL in the same check: that lane-reviewer with 0 shells takes the next item" \
   'printf "%s" "$a" | grep -q "WOULD start: lane 3 takes KG KV4" && printf "%s" "$b" | grep -q "SKIP lane 3: 1 shells running" && printf "%s" "$c" | grep -q "SKIP lane 3: 1 shells running" && ! printf "%s%s" "$b" "$c" | grep -q WOULD && would "review: lane 3 gisik:3 takes 09:10 task/rev1"'
+# fixround SHELLS [queued] — a FIX round: lane 3 pushed its FIX head cd34ef56aa; the queue holds the first round's ab12cd34… REVIEW line (freelane)
+fixround() { world; freelane 3 shells="$1" "last=DONE:DONE task/old3 cd34ef56aa RUNG: M"
+  [ -z "${2:-}" ] || rq "09:30 REVIEW task/old3 cd34ef56aa$(printf '%030d' 0) base=origin/release/knowledge-graph brief=BRIEF-old3-fix-1.md lane=3 (FIX 1 delta)"; ap; }
+fixround 0; a=$out; fixround 1; b=$out; fixround 0 queued; c=$out; fixround 1 queued
+check "13.2148 a lane's DONE is matched to its REVIEW line by SHA, not by branch (FIX 2, F5): a FIX round, lane 3 idle, clean, pushed, its last line \`DONE task/old3 cd34ef56aa\` (the FIX head) while the queue holds only the first round's \`REVIEW task/old3 ab12cd34…\` -> SKIP lane 3: DONE task/old3 cd34ef56 has no REVIEW line yet; the same lane with 1 shell -> SKIP 1 shells running (R1's exception needs THAT sha queued); no WOULD in either; CONTROL in the same check: the REVIEW line of cd34ef56aa… appended -> the lane takes KV4, with 0 shells and with 1" \
+  'printf "%s" "$a" | grep -q "SKIP lane 3: DONE task/old3 cd34ef56 has no REVIEW line yet" && printf "%s" "$b" | grep -q "SKIP lane 3: 1 shells running" && ! printf "%s%s" "$a" "$b" | grep -q WOULD && printf "%s" "$c" | grep -q "WOULD start: lane 3 takes KG KV4" && would "start: lane 3 takes KG KV4"'
 rung_row() { world; freelane 3; order "KV4 $1 docs/plan.md 2 task/kv4 path:packages/kg"; seat 10 weekly="$2"; }
 rung_row H+ 10; ap; a=$out; rung_row L 10; ap; b=$out; rung_row H++ 86; ap; c=$out; rung_row H++ 50; aplive
 check "13.2146 the order row's rung is the LAUNCH rung, as given (planner R2: the order file owns rung policy): an H+ row launches at opus/xhigh (not max), an L row at sonnet/medium; an H++ row is refused at weekly 86% (the budget guard); CONTROL in the same check: at weekly 50% the H++ row launches LIVE: make-lane-ptr gets --weekly 50 and writes \`RUNG: H++ (Opus/max)\`, ctl restart gets --model opus --effort max" \
