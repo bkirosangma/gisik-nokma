@@ -2448,7 +2448,8 @@ export function TicketSheet({
    *   saying rather than assuming.
    * - **Due and Start** are DOMAIN CONCEPTS and BUILT-IN fields —
    *   `ticket-events.ts` names them among the built-ins, and since spec
-   *   2026-09-22 that list is *title/description/dueDate/startDate/priority*.
+   *   2026-09-22 that list is *title/description/dueDate/startDate/priority*
+   *   (since wtg2 T4 also *estimate/reworkEstimate/waitForAll*).
    *   Both are read through `dateClaimOf`, the ONE place that resolves a date
    *   claim (`claims/ticket-dates.ts`, whose own docblock: *"There is NO other
    *   source of dates — absence is absence"*) rather than by reinterpreting

@@ -516,7 +516,8 @@ settings are kept for about a month in case they come back.
    - **Starting status** — which state of the workflow the ticket is born in, defaulting to the workflow's
      own first state. Disabled, with a note explaining where the ticket will actually start, while "Starts
      in the backlog?" is switched on — a backlog ticket has no starting state.
-   - **Start date** and **Due date** — optional, empty by default. Leave either blank to claim no date.
+   - **Start date**, **Due date** and **Estimate (days)** — optional, empty by default. Leave any blank to claim
+     nothing; an estimate is a whole number of days from 1 to 365.
    - **Priority** — P1, P2 or P3; starts at P2. Every ticket has one, and you can change it later (§5).
    - **Description** — the same editor a ticket's own description box uses (§5, below).
    - **Parent** — which bigger ticket this sits under. It defaults to **None (project root)**. Leave it
@@ -535,7 +536,7 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 Open a ticket by clicking it on any of the ticket tabs — the Backlog, Board, List, Calendar or Timeline. You
 get a panel with three tabs: **Details**, **History** and **Attachments**.
 
-On the Details tab you can do **five things**:
+On the Details tab you can do **six things**:
 
 1. **Move it to another state** — the **Move…** button. (§7)
 2. **Change who can see it** — the pill on the **Visibility** row, which opens a menu. (§10)
@@ -544,6 +545,8 @@ On the Details tab you can do **five things**:
 4. **Set its priority** — the **Priority** control, P1 / P2 / P3. Every ticket has one; new tickets start at
    P2. A ticket cannot be left without one, so there is nothing to clear. (§5)
 5. **Set or clear its start date** — the **Start** row's date box, like Due. (§5)
+6. **Set or clear its estimate** — the **Estimate** row's number box, like Start: a whole number of days
+   from 1 to 365, or blank for no estimate. (§5)
 
 **On a phone** the panel opens on the things you change most — State, Assignee and Priority — and the
 description is folded behind **Add a description** (**Edit description** once it has one) so the fields
