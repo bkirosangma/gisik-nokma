@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EventEnvelope } from '../src/envelope.js';
 import type { TicketState } from '../src/entity-state.js';
 import { makeEnvelope } from '../src/testing.js';
+import { ticketCreatedPayload } from '../src/events/ticket-events.js';
 import {
   applyTicketEvent,
   foldTicketToWorkflowVersion,
@@ -773,6 +774,30 @@ describe('3.965 ticket.created writes the priority claim — every ticket has on
       clientTime: '2026-08-21T08:00:00.000Z',
       serverTime: '2026-08-21T08:00:00.900Z',
     });
+  });
+});
+
+describe('29.154-29.156 estimate, rework estimate, wait-for-all', () => {
+  const base = { typeId: 'task', projectId: '01J9GPRJ000000000000000000', parentId: null, title: 'T' };
+  it('29.154 ticket.created takes an optional whole-day estimate', () => {
+    expect(ticketCreatedPayload.parse({ ...base, estimate: 7 }).estimate).toBe(7);
+    for (const bad of [0, 366, 2.5, '3', null]) expect(ticketCreatedPayload.safeParse({ ...base, estimate: bad }).success, String(bad)).toBe(false);
+    expect('estimate' in ticketCreatedPayload.parse(base)).toBe(false); // control: absent stays absent
+  });
+  it('29.155 the creation fold writes the estimate claim, or no key', () => {
+    const state = fold([createdWith({ estimate: 4 })]);
+    expect(state.fields.estimate).toEqual({ value: 4, actorId: createdWith({}).actorId, clientTime: createdWith({}).clientTime, serverTime: createdWith({}).serverTime });
+    expect(Object.keys(createdState().fields).sort()).toEqual(['priority', 'title']); // control
+  });
+  it('29.156 field_set folds the three claims: set, replace, clear', () => {
+    const set = (fieldId: string, value: unknown) => makeEnvelope({ type: 'ticket.field_set', entity: { kind: 'ticket', id: TICKET }, payload: { fieldId, value }, actorId: 'user-anselma' });
+    let state = fold([createdWith({}), set('estimate', 3), set('reworkEstimate', 2), set('waitForAll', true), set('estimate', 5)]);
+    expect(state.fields.estimate?.value).toBe(5);
+    expect(state.fields.reworkEstimate?.value).toBe(2);
+    expect(state.fields.waitForAll).toMatchObject({ value: true, actorId: 'user-anselma' });
+    state = applyTicketEvent(state, set('waitForAll', null), deps);
+    expect(state.fields.waitForAll?.value).toBeNull(); // a clearing CLAIM, not a deleted key
+    expect(state.fields.priority?.value).toBe('P2'); // control
   });
 });
 

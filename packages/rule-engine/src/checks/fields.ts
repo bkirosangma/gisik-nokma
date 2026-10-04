@@ -1,5 +1,13 @@
 import type { CustomFieldDef, EventEnvelope } from '@gisik-nokma/domain';
-import { PRIORITIES, dueDateValueSchema, isRealIstDay, prioritySchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
+import {
+  PRIORITIES,
+  dueDateValueSchema,
+  estimateValueSchema,
+  isRealIstDay,
+  prioritySchema,
+  ticketFieldSetPayload,
+  waitForAllValueSchema,
+} from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
@@ -69,12 +77,13 @@ function customFieldVerdict(field: CustomFieldDef, value: unknown): Accept | Ref
  * other, keeping the clearer's id and both clocks — except `title`: a ticket
  * always has one.
  *
- * Order: kind → payload → unknown ticket → the five built-ins → unknown type →
+ * Order: kind → payload → unknown ticket → the eight built-ins → unknown type →
  * unknown field → clearing → kind fit. The built-ins are answered BEFORE the
  * type is resolved because they do not belong to the type: `title`,
- * `description`, `dueDate`, `startDate` and `priority` ride this event on
- * every ticket whatever its type declares, and `ticketTypeDefSchema` refuses a
- * custom field that shadows one of their ids (`ticket-types.ts:43-48`). Refusing a title
+ * `description`, `dueDate`, `startDate`, `priority`, `estimate`,
+ * `reworkEstimate` and `waitForAll` ride this event on every ticket whatever
+ * its type declares, and `ticketTypeDefSchema` refuses a
+ * custom field that shadows one of their ids (`ticket-types.ts:113-118`). Refusing a title
  * change with "this ticket's type is not defined" would be a sentence about the
  * wrong noun — the defect class rulings P11, P12 and P13 closed three times in
  * this plan.
@@ -152,6 +161,22 @@ export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext
     return prioritySchema.safeParse(value).success
       ? ACCEPT
       : refuse('field.type-mismatch', fieldKindRefusal('Priority', `one of ${PRIORITIES.join(', ').replace(/, (P\d)$/, ' or $1')}`));
+  }
+
+  // Estimate and rework estimate (ES-1, ES-5): the same whole-day schema, answered before the type resolves.
+  if (p.fieldId === 'estimate' || p.fieldId === 'reworkEstimate') {
+    if (value === null) return ACCEPT;
+    return estimateValueSchema.safeParse(value).success
+      ? ACCEPT
+      : refuse('field.type-mismatch', fieldKindRefusal(p.fieldId === 'estimate' ? 'Estimate' : 'Rework estimate', 'a whole number of days from 1 to 365'));
+  }
+
+  // Wait for all incoming (ES-2): on, or cleared. `false` is not a claim anyone should make.
+  if (p.fieldId === 'waitForAll') {
+    if (value === null) return ACCEPT;
+    return waitForAllValueSchema.safeParse(value).success
+      ? ACCEPT
+      : refuse('field.type-mismatch', fieldKindRefusal('Wait for all incoming', 'true to turn it on, or null to clear it'));
   }
 
   // Now, and only now, is the ticket's own TYPE the subject: everything below

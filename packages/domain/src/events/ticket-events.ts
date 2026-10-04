@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
-import { dueDateValueSchema, prioritySchema } from '../ticket-types.js';
+import { dueDateValueSchema, estimateValueSchema, prioritySchema } from '../ticket-types.js';
 
 /**
  * The payload shapes of the ticket vocabulary (spec §3). Schemas only — the
@@ -150,6 +150,11 @@ export const ticketCreatedPayload = z
     startDate: dueDateValueSchema.optional(),
     dueDate: dueDateValueSchema.optional(),
     /**
+     * The birth ESTIMATE in whole days (ES-1). OPTIONAL, AND ABSENT MEANS NO CLAIM, the `startDate` rule above:
+     * the reducer writes no key for an absent member, because a null claim would be a clearing nobody made.
+     */
+    estimate: estimateValueSchema.optional(),
+    /**
      * Drafts (spec `2026-10-03-drafts-design.md` §2.2): this ticket is born PRIVATE, with no key.
      * OPTIONAL, AND ABSENT MEANS PUBLISHED AT BIRTH — what every stored `ticket.created` meant, so the
      * additive-field rule `start`, `priority` and the rest follow holds. `z.literal(true)`, never a
@@ -182,7 +187,8 @@ export const ticketCollaboratorPayload = z.object({ userId: z.string().min(1) })
 /**
  * Shape-only at the door: {fieldId, value}. Semantics (does the field exist,
  * does the value fit its kind) are the engine's job — see checkTicketFieldSet.
- * value: null is the clearing claim; built-ins title/description/dueDate/startDate/priority ride
+ * value: null is the clearing claim; built-ins title/description/dueDate/startDate/priority and the
+ * three flow built-ins estimate/reworkEstimate (whole days, 1 to 365) and waitForAll (`true`) ride
  * this same event, and a due date value is always { date, note? } — a claim.
  *
  * `value` is REQUIRED, and `z.unknown()` alone does not make it so: probed

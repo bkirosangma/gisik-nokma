@@ -1819,6 +1819,53 @@ describe('13.1435–13.1441 the Starting status select', () => {
     expect(within(listbox).queryByRole('option', { name: 'Locked' })).toBeNull();
   });
 
+  it('29.165 the Estimate input is empty by default, omitted when empty, and an invalid number disables Create', () => {
+    const onCreate = vi.fn();
+    render(<NewTicketDialog {...baseProps({ onCreate })} />);
+    const input = screen.getByLabelText('Estimate (days)');
+    expect(input).toHaveValue(null);
+    // The same pinned bounds as the sheet's input: jsdom enforces none of them, the browser's spinner and `:invalid` do.
+    expect(input).toHaveAttribute('type', 'number');
+    expect(input).toHaveAttribute('min', '1');
+    expect(input).toHaveAttribute('max', '365');
+    expect(input).toHaveAttribute('step', '1');
+    expect(input).toHaveAttribute('inputmode', 'numeric');
+    expect(input.closest('label')?.firstChild?.textContent?.trim()).toBe('Estimate (days)'); // the visible label, not only aria-label
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
+    expect(onCreate).toHaveBeenCalledTimes(1); // the next leg reads calls[0]; without this, no call at all would pass it
+    expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('estimate');
+  });
+  it('29.165 an estimate of 2.5 disables Create with its reason; 5 is carried as the number 5', () => {
+    const onCreate = vi.fn();
+    render(<NewTicketDialog {...baseProps({ onCreate })} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.change(screen.getByLabelText('Estimate (days)'), { target: { value: '2.5' } });
+    expect(screen.getByRole('alert').textContent).toBe('Estimate must be a whole number of days from 1 to 365.');
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeDisabled();
+    expect(screen.getByText('Fix the estimate to create the ticket')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Estimate (days)'), { target: { value: '5' } });
+    expect(screen.queryByText('Fix the estimate to create the ticket')).toBeNull(); // control: a valid estimate leaves no hint
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
+    expect(onCreate.mock.calls[0]?.[0]).toMatchObject({ estimate: 5 });
+  });
+  it('29.165 the estimate is emptied on every open, like the dates', () => {
+    const { rerender } = render(<NewTicketDialog {...baseProps()} />);
+    fireEvent.change(screen.getByLabelText('Estimate (days)'), { target: { value: '5' } });
+    expect(screen.getByLabelText('Estimate (days)')).toHaveValue(5); // control: the value took
+    rerender(<NewTicketDialog {...baseProps({ open: false })} />);
+    rerender(<NewTicketDialog {...baseProps()} />);
+    expect(screen.getByLabelText('Estimate (days)')).toHaveValue(null);
+  });
+  it('29.165 a taken-back create reopens with its estimate (restoreDraft)', () => {
+    const restoreDraft = { ticketId: '01J9GTKA000000000000000000', title: 'Order the tent', typeId: 'task', parentId: null, assigneeId: null, start: 'backlog' as const, priority: 'P2' as const };
+    const { unmount } = render(<NewTicketDialog {...baseProps({ restoreDraft: { ...restoreDraft, estimate: 7 } })} />);
+    expect(screen.getByLabelText('Estimate (days)')).toHaveValue(7);
+    unmount();
+    render(<NewTicketDialog {...baseProps({ restoreDraft })} />);
+    expect(screen.getByLabelText('Estimate (days)')).toHaveValue(null); // control: a draft without one restores none
+  });
+
   it('13.1436 is disabled with a helper sentence while "Starts in the backlog?" is ON', async () => {
     const user = userEvent.setup();
     // No record in storage: the switch's own default is ON (backlog), so

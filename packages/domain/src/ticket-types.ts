@@ -5,7 +5,7 @@ import { IST_DAY_REGEX, isRealIstDay } from './ist-day.js';
 export const CUSTOM_FIELD_KINDS = ['text', 'number', 'date', 'select', 'person'] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
 
-export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate', 'priority'] as const;
+export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate', 'priority', 'estimate', 'waitForAll', 'reworkEstimate'] as const;
 export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
 
 /**
@@ -192,7 +192,7 @@ export const dueDateValueSchema = z.object({
 export type DueDateValue = z.infer<typeof dueDateValueSchema>;
 
 /**
- * Priority is a BUILT-IN with three properties the other four built-ins do not
+ * Priority is a BUILT-IN with three properties the other built-ins do not
  * share (owner ruling 2026-09-22, spec `docs/superpowers/specs/2026-09-22-priority-builtin-design.md`):
  * it is ALWAYS present (no never-claimed state, no clearing), it STARTS AT P2
  * (the reducer writes the claim on `ticket.created`, attributed to the creator),
@@ -205,3 +205,18 @@ export const prioritySchema = z.enum(PRIORITIES);
 export type Priority = z.infer<typeof prioritySchema>;
 /** Where every ticket starts (owner: "everything starts at p2 the middle"). Applied by the REDUCER, never at parse. */
 export const DEFAULT_PRIORITY: Priority = 'P2';
+
+/** Estimate and rework estimate: whole calendar days, 1 to 365 (spec ES-1, decision 2). `null` clears; that is the engine's branch. */
+export const estimateValueSchema = z.number().int().min(1).max(365);
+/** Wait for all incoming: `true`, cleared with `null` at the engine; absent means off. `false` is not a value, so "on" and "never said" are the only readings. */
+export const waitForAllValueSchema = z.literal(true);
+
+type ClaimBag = Readonly<Record<string, { readonly value: unknown } | undefined>>;
+/** Total: a stored claim that fails the schema reads as no estimate. T10/T11 read estimates through these, never `fields.x.value` directly. */
+export function claimedEstimate(fields: ClaimBag, id: 'estimate' | 'reworkEstimate'): number | null {
+  const parsed = estimateValueSchema.safeParse(fields[id]?.value);
+  return parsed.success ? parsed.data : null;
+}
+export function claimedWaitForAll(fields: ClaimBag): boolean {
+  return waitForAllValueSchema.safeParse(fields['waitForAll']?.value).success;
+}
