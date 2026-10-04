@@ -48,6 +48,11 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md`; sp
 - ✅ **29.015 — no Date, Math.random, performance, requestAnimationFrame, setTimeout or document in src (outside dom/); control: the scan finds a planted read.** (`packages/viewport/test/seam.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T3 -->
 <!-- wtg-part1-viewport-timeline-view T4 -->
+- ❌ **29.050 — rows equal the greatest overlap on 200 seeds, and no two items in a row share a day; control: an UNSORTED first fit exceeds the optimum on at least one seed.** (`packages/viewport/test/pack.test.ts`)
+- ❌ **29.051 — with 1 to 3 segments per item on 200 seeds, the segment packing never needs more rows than the hull packing, and every segment of an item sits in its one row without sharing a day; control: the hull packer alone can need more rows | a tie keeps the segment packing (`strategy: 'segments'`).** (`packages/viewport/test/pack.test.ts`)
+- ❌ **29.052 — adjacent days share a row (the next can stand side by side); a shared day does not; control: the same pair one day apart split | the same rule through the row search: a two-segment item whose gap is exactly the other bar's days shares its row, one shared day splits them | equal starts order by natural key (GN-9 before GN-10), keyed before unkeyed, then by id; the input order does not matter | adding an item that starts after everything changes no existing row; control: adding one that starts first can | an item with no segment throws a RangeError, not silently dropped.** (`packages/viewport/test/pack.test.ts`)
+- ❌ **29.053 — a one-day bar whose key needs 70 px at 16 px/day reserves 5 days, so a bar on day 3 goes to a second row; control: no label measure and they share a row | the packing scale is injected: at 8 px/day the same label is 9 days, so the footprint is wider (the bucket rule is applied by the caller via packScale).** (`packages/viewport/test/pack.test.ts`)
+- ❌ **29.054 — ten thousand items.** (`packages/viewport/test/pack.test.ts`)
 <!-- wtg-part1-viewport-timeline-view T5 -->
 <!-- wtg-part1-viewport-timeline-view T6 -->
 <!-- wtg-part1-viewport-timeline-view T7 -->
