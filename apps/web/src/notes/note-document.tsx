@@ -77,6 +77,39 @@ export function markNoteAsNew(noteId: string): void {
 }
 
 /**
+ * "Linked from" on a note (Knowledge Graph spec B §3.1). Its own component, not a
+ * query in `NoteDocumentBody`: the body learns the note's workspace only once the
+ * note has loaded, and its early returns come before this mount, so a hook there
+ * would have no workspace to ask with on the first render.
+ */
+function NoteLinkedFrom({
+  dataSource,
+  workspaceId,
+  noteId,
+  nameOf,
+  onNavigate,
+}: {
+  dataSource: DataSource;
+  workspaceId: string;
+  noteId: string;
+  nameOf: (userId: string) => string;
+  onNavigate: (href: string) => void;
+}) {
+  const linkedFrom = useLiveQuery(dataSource, workspaceId, `${noteId}:linked-from`, () =>
+    dataSource.query.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }),
+  );
+  return (
+    <LinkedFromSection
+      page={linkedFrom}
+      loadMore={(cursor) => dataSource.query.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }, cursor)}
+      hrefOf={(row) => linkedFromHref(row, ticketRefHrefIn(workspaceId))}
+      nameOf={nameOf}
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+/**
  * The note itself (notes series Plan 5, spec §9.2, §9.6).
  *
  * ## Finding the workspace, and why this iterates
@@ -115,39 +148,6 @@ export function markNoteAsNew(noteId: string): void {
  * draws the same frozen sentence My Work draws, for the same reason: a 404
  * that could mean "gone" or "not yours" must not guess which.
  */
-
-/**
- * "Linked from" on a note (Knowledge Graph spec B §3.1). Its own component, not a
- * query in `NoteDocumentBody`: the body learns the note's workspace only once the
- * note has loaded, and its early returns come before this mount, so a hook there
- * would have no workspace to ask with on the first render.
- */
-function NoteLinkedFrom({
-  dataSource,
-  workspaceId,
-  noteId,
-  nameOf,
-  onNavigate,
-}: {
-  dataSource: DataSource;
-  workspaceId: string;
-  noteId: string;
-  nameOf: (userId: string) => string;
-  onNavigate: (href: string) => void;
-}) {
-  const linkedFrom = useLiveQuery(dataSource, workspaceId, `${noteId}:linked-from`, () =>
-    dataSource.query.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }),
-  );
-  return (
-    <LinkedFromSection
-      page={linkedFrom}
-      loadMore={(cursor) => dataSource.query.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }, cursor)}
-      hrefOf={(row) => linkedFromHref(row, ticketRefHrefIn(workspaceId))}
-      nameOf={nameOf}
-      onNavigate={onNavigate}
-    />
-  );
-}
 function NoteDocumentBody({
   noteId,
   workspaces,
