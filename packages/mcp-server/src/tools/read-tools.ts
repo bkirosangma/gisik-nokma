@@ -187,7 +187,7 @@ export function readTools(session: Session): ToolDefinition[] {
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`,
           'ticket',
         )) as { ticketState?: { fields?: Record<string, { value: unknown }>; links?: unknown } } & Record<string, unknown>;
-        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded outbound `ticketState.links`.
+        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded `ticketState.links` (this stream's ids only).
         const linked = (await readOrNotFound(
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/links`,
@@ -200,8 +200,9 @@ export function readTools(session: Session): ToolDefinition[] {
         );
         // The description is a document: answer it as Markdown (with what Markdown cannot show), never as the raw tree.
         const { description, ...fields } = detail.ticketState?.fields ?? {};
-        // One representation of links: `ticketState.links` (outbound ids only) is dropped in favour of `links`.
-        const { links: _outbound, ...state } = detail.ticketState ?? {};
+        // One representation of links: `ticketState.links` (the ids held on this ticket's stream: its outbound links, plus a
+        // draft's inbound `from` entries) is dropped in favour of `links`.
+        const { links: _held, ...state } = detail.ticketState ?? {};
         return {
           ...detail,
           ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),

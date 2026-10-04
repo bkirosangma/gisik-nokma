@@ -38,6 +38,7 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       break;
     case 'ticket.reparented':
       add('ticket', payload['newParentId']);
+      add('ticket', payload['childId']); // the draft-side pending child (drafts T6, owner ruling O1)
       break;
     case 'note.created':
       add('project', payload['homeProjectId']);
@@ -51,8 +52,10 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       break;
     case 'ticket.link_added':
     case 'ticket.link_removed':
-      // Spec A: the TARGET is the second ticket a link names; a purged one refuses the claim.
+      // Spec A: the TARGET is the second ticket a link names; a purged one refuses the claim. Drafts R42: a
+      // from-form link also names its SOURCE.
       add('ticket', payload['targetId']);
+      add('ticket', payload['from']);
       break;
     case 'ticket.published':
       // Drafts T1: the publish names its project (the key query needs it); a purged project refuses it.

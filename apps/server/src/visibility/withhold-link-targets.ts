@@ -1,14 +1,21 @@
-import { isTicketLinkEvent, withheldLinkPayload, type TicketLinkKind, type TicketState } from '@gisik-nokma/domain';
+import { isTicketLinkEvent, linkPayloadDirection, withheldLinkPayload, type TicketLinkKind, type TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { LINK_TARGET_NOT_VISIBLE_REASON, PERMISSION_VISIBILITY_RULE } from '../permissions/check-permission.js';
-import { canSee } from './can-see.js';
+import { canOpen } from './can-open.js';
 
 /**
  * Spec A §2.4 on the doors that serve STORED claims (typed-links T4b): a link's
  * other end is withheld from a viewer who cannot see it. ONE predicate,
- * `canSee`, which answers a never-minted, a purged and a hidden id the same
- * (`can-see.ts`, "Unknown and invisible are the same answer"), so the withheld
- * copy cannot tell them apart. `parentId` is NOT withheld, and the difference
+ * `canOpen`: `canSee`, or the viewer's own openable draft (drafts T6, R41: the
+ * author is shown a link to their own draft in full; `canSee` alone is false
+ * for every draft, the author's too). It answers a never-minted, a purged, a
+ * hidden id and another person's draft the same (`can-see.ts`, "Unknown and
+ * invisible are the same answer"), so the withheld copy cannot tell them apart.
+ * A draft-side entry or event (drafts R42) names its OTHER end in `from`; its
+ * `targetId` is the draft whose stream holds it. Withheld, such an event keeps its
+ * `from` key and loses the id, `{kind, targetId: null, from: null}`, so History, the
+ * replica and MCP still read it in (`linkPayloadDirection`; drafts T6 FIX 1, planner ruling 2026-10-04 21:08); a plain
+ * link keeps `{kind, targetId: null}`. `parentId` is NOT withheld, and the difference
  * is the read door's: the detail read serves a restricted parent's id
  * (`parent: {kind:'restricted', id}`), and it withholds a link's.
  * See `visible-events-for.ts`, "What the filter does NOT hide".
@@ -36,13 +43,13 @@ import { canSee } from './can-see.js';
  */
 export type TargetSight = (targetId: string) => Promise<boolean>;
 
-/** `canSee`, memoised for one request or one drain: a page or a range names the same target many times. */
+/** `canOpen`, memoised for one request or one drain: a page or a range names the same target many times. */
 export function targetSight(db: Queryable, viewerId: string): TargetSight {
   const memo = new Map<string, Promise<boolean>>();
   return (targetId) => {
     let answer = memo.get(targetId);
     if (answer === undefined) {
-      answer = canSee(db, viewerId, targetId);
+      answer = canOpen(db, viewerId, targetId);
       memo.set(targetId, answer);
     }
     return answer;
@@ -51,9 +58,10 @@ export function targetSight(db: Queryable, viewerId: string): TargetSight {
 
 async function withheldOrSame(type: string, payload: unknown, sees: TargetSight): Promise<unknown> {
   if (!isTicketLinkEvent(type) || payload === null || typeof payload !== 'object') return payload;
-  const p = payload as { kind: TicketLinkKind; targetId?: unknown };
-  if (typeof p.targetId !== 'string' || (await sees(p.targetId))) return payload;
-  return withheldLinkPayload(p.kind);
+  const p = payload as { kind: TicketLinkKind; targetId?: unknown; from?: unknown };
+  const other = p.from ?? p.targetId;
+  if (typeof other !== 'string' || (await sees(other))) return payload;
+  return withheldLinkPayload(p.kind, linkPayloadDirection(payload));
 }
 
 /**
@@ -88,11 +96,11 @@ export async function withholdEvent<E extends { type: string; payload: unknown }
   return payload === e.payload ? e : { ...e, payload };
 }
 
-/** A folded state's links, visible targets only; the key absent when none remain (T1's absent-not-empty rule). */
+/** A folded state's links, visible other ends only; the key absent when none remain (T1's absent-not-empty rule). */
 export async function withholdLinks(state: TicketState, sees: TargetSight): Promise<TicketState> {
   if (state.links === undefined) return state;
   const kept: NonNullable<TicketState['links']> = [];
-  for (const l of state.links) if (await sees(l.targetId)) kept.push(l);
+  for (const l of state.links) if (await sees(l.from ?? l.targetId)) kept.push(l);
   if (kept.length === state.links.length) return state;
   const { links: _all, ...rest } = state;
   return kept.length > 0 ? { ...rest, links: kept } : rest;

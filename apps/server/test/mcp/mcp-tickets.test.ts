@@ -160,3 +160,53 @@ describe('MCP tickets through the hosted door', () => {
     expect(ownerDup.linkTarget).toEqual({ key: hKey });
   });
 });
+
+describe("28.196 get_ticket_history on a published draft names its from-form link's source (D6 FIX 1)", () => {
+  it("D's line names S's key and reads in; a member who cannot see S gets {kind, from: \"a ticket you can't see\"}, linkTarget null and linkDirection in, and never S's id or key; CONTROL: S's line names D and reads out", async () => {
+    const w = await buildDoorWorld(db, '2896');
+    const [S, D] = [newUlid(), newUlid()];
+    const ev = (id: string, type: string, payload: unknown) => ({
+      id: newUlid(), workspaceId: w.workspaceId, entity: { kind: 'ticket', id }, type, version: 1, payload,
+      actorId: w.owner.userId, origin: 'web', clientTime: new Date().toISOString(),
+    });
+    const post = async (events: unknown[]) => {
+      const res = await w.app.inject({ method: 'POST', url: '/v1/events', headers: { authorization: `Bearer ${w.owner.sessionToken}` }, payload: { events } });
+      for (const r of res.json<{ results: Array<{ status: string; reason?: string }> }>().results) expect(r.status, r.reason).toBe('committed');
+    };
+    await post([
+      ev(S, 'ticket.created', { typeId: 'task', projectId: w.projectId, parentId: null, title: 'Ice maker', start: 'backlog' }),
+      ev(D, 'ticket.created', { typeId: 'task', projectId: w.projectId, parentId: null, title: 'Chiller', start: 'backlog', draft: true }),
+      ev(D, 'ticket.link_added', { kind: 'blocks', targetId: D, from: S }), // S blocks D, filed from D's side
+      ev(D, 'ticket.published', { projectId: w.projectId }),
+    ]);
+    const keyOf = async (id: string) =>
+      (await w.app.inject({ method: 'GET', url: `/v1/workspaces/${w.workspaceId}/tickets/${id}`, headers: { authorization: `Bearer ${w.owner.sessionToken}` } })).json<{ key: string }>().key;
+    const [sKey, dKey] = [await keyOf(S), await keyOf(D)];
+    expect(sKey).toMatch(/-\d+$/); // precondition: two real keys that differ
+    expect(dKey).toMatch(/-\d+$/);
+    expect(sKey).not.toBe(dKey);
+    type Line = { type: string; payload: Record<string, unknown>; linkTarget?: unknown; linkDirection?: unknown };
+    const linkOf = async (caller: 'owner' | 'member', ticketId: string) => {
+      const r = await callTool(w.app, w[caller].token, 'get_ticket_history', { ticketId });
+      expect(r.isError, r.text).toBe(false);
+      const lines = (r.json as { events: Line[] }).events.filter((e) => e.type === 'ticket.link_added');
+      expect(lines, `${caller} ${ticketId}`).toHaveLength(1);
+      return { line: lines[0]!, text: r.text };
+    };
+
+    const { line: ownerD } = await linkOf('owner', D);
+    expect(ownerD.linkTarget).toEqual({ key: sKey }); // S, not D itself
+    expect(ownerD.linkDirection).toBe('in');
+    expect(ownerD.payload).toEqual({ kind: 'blocks', targetId: D, from: S });
+    const { line: ownerS } = await linkOf('owner', S); // CONTROL: S's re-file
+    expect([ownerS.linkTarget, ownerS.linkDirection]).toEqual([{ key: dKey }, 'out']);
+
+    await post([ev(S, 'visibility.set', { ticketId: S, mode: 'explicit', userIds: [w.owner.userId] })]);
+    const { line: memberD, text } = await linkOf('member', D);
+    expect(memberD.payload).toEqual({ kind: 'blocks', from: "a ticket you can't see" });
+    expect(memberD).toHaveProperty('linkTarget', null);
+    expect(memberD.linkDirection).toBe('in');
+    expect(text).not.toContain(S);
+    expect(text).not.toContain(sKey);
+  });
+});

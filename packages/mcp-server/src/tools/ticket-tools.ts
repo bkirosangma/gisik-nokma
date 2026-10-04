@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PRIORITIES, rankBetween, TICKET_LINK_KINDS } from '@gisik-nokma/domain';
+import { linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS } from '@gisik-nokma/domain';
 import { spliceDoc, type BodyEdit } from '@gisik-nokma/editor/markdown-doc';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
@@ -42,10 +42,15 @@ const updateShape = {
   workflow: z.object({ toWorkflowId: id, toStateId: id }).optional(),
 };
 
+/** The other end of a link the server withheld from this caller, as a line's payload names it. */
+const HIDDEN_END = "a ticket you can't see";
+
 /** A payload without any document in it (owner question Q4): the ledger's facts, never a body. One rule for a line and for a contested claim's original. */
 export function redactedPayload(type: string, eventId: string, payload: Record<string, unknown>): Record<string, unknown> {
   if (type === 'ticket.link_added' || type === 'ticket.link_removed') {
-    return payload['targetId'] === null ? { kind: payload['kind'], target: "a ticket you can't see" } : payload;
+    if (payload['targetId'] !== null) return payload;
+    // Withheld (typed-links T4b). A draft-side `from` entry hides its SOURCE: its target is this ticket (drafts T6 FIX 1).
+    return linkPayloadDirection(payload) === 'in' ? { kind: payload['kind'], from: HIDDEN_END } : { kind: payload['kind'], target: HIDDEN_END };
   }
   if (type === 'comment.added') return { commentId: eventId };
   if (type === 'comment.edited' || type === 'comment.deleted') return { commentId: payload['commentId'] };
@@ -67,11 +72,19 @@ export function redactedPayload(type: string, eventId: string, payload: Record<s
   return payload;
 }
 
-/** One `get_ticket_history` line. A link event keeps the server's `linkTarget` label (`{ key }`, or `null` for a target this caller cannot see; typed-links T4). */
-function historyLine(e: { id: string; type: string; payload: Record<string, unknown>; actorId: string; origin: string; serverTime: string; linkTarget?: { key: string | null } | null }) {
+/**
+ * One `get_ticket_history` line. A link event keeps the server's two labels: `linkTarget` (`{ key }` of the other end, or
+ * `null` for one this caller cannot see; typed-links T4) and `linkDirection` (`'in'` for a draft-side link that points into
+ * this ticket, else `'out'`; drafts T6 FIX 1).
+ */
+function historyLine(e: {
+  id: string; type: string; payload: Record<string, unknown>; actorId: string; origin: string; serverTime: string;
+  linkTarget?: { key: string | null } | null; linkDirection?: 'out' | 'in';
+}) {
   return {
     eventId: e.id, type: e.type, actorId: e.actorId, origin: e.origin, serverTime: e.serverTime, payload: redactedPayload(e.type, e.id, e.payload),
     ...(e.linkTarget === undefined ? {} : { linkTarget: e.linkTarget }),
+    ...(e.linkDirection === undefined ? {} : { linkDirection: e.linkDirection }),
   };
 }
 

@@ -64,6 +64,8 @@ export const REFUSALS = {
   'draft.parent-unpublished': 'The parent is still a draft. Publish the parent first.',
   'draft.not-a-draft': 'This ticket is not a draft.',
   'draft.project-mismatch': "The project does not match this draft's project.",
+  /** Drafts spec R43: no event on a public stream may name a draft. The copy is the owner-approved sentence (no full stop, like `draft.no-outsiders`). */
+  'draft.link-form': "Link to a draft from the draft's side",
   /**
    * A parent that resolves and is soft-deleted (E6-4). Not `unknown-parent`:
    * that sentence is false — the ticket exists, and the actor may well have
