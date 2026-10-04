@@ -306,6 +306,14 @@ def seat_free(s):
     return None
 
 
+def reviewer_free(s):
+    """seat_free + a clean worktree: `ctl restart` refuses a dirty one, and a TOOK written for a seat that never restarts sticks."""
+    why = seat_free(s)
+    if why: return why
+    if s.get("dirty"): return f"dirty {s['dirty']} (ctl restart would refuse it)"
+    return None
+
+
 def done_of(seat):
     """(branch, sha) of a lane's last DONE line: `DONE task/<b> <sha>` or `CHECKPOINT task/<b> <sha> DONE`."""
     last = seat.get("last") or {}
@@ -495,7 +503,7 @@ def decide(w, log):
         if not os.path.exists(f): continue
         boot = read(f).strip().split("\n")[0].strip()
         if not os.path.isfile(boot): acts.append({"do": "drop-pull", "who": x, "pullfile": f, "why": f"boot {boot} missing"}); continue
-        why = seat_free(w.seats.get(r["window"])) or cooldown(w, r["window"])
+        why = reviewer_free(w.seats.get(r["window"])) or cooldown(w, r["window"])
         if why: log(f"WAIT reviewer {x} PULL {os.path.basename(boot)}: {why}"); busy_windows.add(r["window"]); continue
         acts.append({"do": "pull", "who": x, "window": r["window"], "wt": r["wt"], "boot": boot, "pullfile": f}); busy_windows.add(r["window"])
     # (b) free lanes: FIX, then tip-ready, then stack
@@ -532,7 +540,7 @@ def decide(w, log):
     # (a) free reviewers
     for x, r in revs.items():
         if r["window"] in busy_windows: continue
-        why = seat_free(w.seats.get(r["window"])) or cooldown(w, r["window"])
+        why = reviewer_free(w.seats.get(r["window"])) or cooldown(w, r["window"])
         if not why and any(t["holder"] == f"reviewer {x}" for t in w.held):
             why = "holds an open TOOK (" + ", ".join(f"{t['ref']} {t['branch']}" for t in w.held if t["holder"] == f"reviewer {x}") + ")"
         if why: log(f"SKIP reviewer {x}: {why}"); continue
@@ -595,14 +603,15 @@ class Door:
     def restart(self, window, wt, brief, model, effort, override=None):
         argv = [self.ctl, "restart", str(window), wt, brief] + (["--override", override] if override else []) + ["--model", model, "--effort", effort]
         rc, last = self.sh(*argv)
-        self.log(f"  restart gisik:{window}: rc={rc} {last[:160]}")
-        return rc
+        ok = rc == 0 or "no backend line" in last   # restart.sh's known false negative (O7 "Landing and restarts")
+        self.log(f"  restart gisik:{window}: rc={rc} {last[:160]}" + ("" if ok else " — FLAG restart failed: the controller clears it"))
+        return ok
 
     def do_drop_pull(self, a):
         os.remove(a["pullfile"])
 
     def do_pull(self, a):
-        self.restart(a["window"], a["wt"], a["boot"], "opus", "high")
+        if not self.restart(a["window"], a["wt"], a["boot"], "opus", "high"): return   # the PULL file stays: retried after the cooldown-free next pass
         os.remove(a["pullfile"]); self.ledger(a["window"], "PULL", "-", os.path.basename(a["boot"]))
 
     def do_review(self, a):

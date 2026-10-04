@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2134 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
+# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2136 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
 # Nothing here reads or writes the live pipeline: a SCRATCH lanes root (CTL_LANES_DIR), a scratch origin + repo (CTL_AUTOPILOT_REPO),
 # a seats fixture (CTL_AUTOPILOT_SEATS_CMD), a stub `ctl` that logs its argv (CTL_AUTOPILOT_CTL), a stub make-reviewer-boot.py, a fixed
 # clock, and a PATH-front `tmux` shim that logs every call. A guard case has its CONTROL in the same check: the same world with the one
@@ -298,6 +298,16 @@ PY
 }
 check "13.2131 the TOOK is written under the reviewers' mkdir lock with a RE-CHECK inside it: when another seat TOOK the item between the decision and the door, the autopilot appends nothing and restarts nobody (NOT TAKEN … taken by another seat); CONTROL in the same check: without the race it appends its TOOK and calls ctl restart; the lock dir is gone afterwards either way" \
   'o=$(race race) && printf "%s" "$o" | grep -q "NOT TAKEN task/rev1: taken by another seat" && [ ! -e "$T/ctl.log" ] && [ "$(grep -c " TOOK 09:10 task/rev1" "$R/QUEUE-review.md")" = 1 ] && [ ! -e "$R/.queue.lock.d" ] && o=$(race none) && grep -q "(reviewer A, autopilot, FULL)" "$R/QUEUE-review.md" && grep -q "^restart 7 " "$T/ctl.log" && [ ! -e "$R/.queue.lock.d" ]'
+
+world; item1 1; freerev 7 dirty=1; echo "$R/BOOT-x.md" > "$R/PULL-B.boot"; echo boot > "$R/BOOT-x.md"; freerev 9 dirty=2; ap; a=$out
+world; item1 1; freerev 7; echo "$R/BOOT-x.md" > "$R/PULL-B.boot"; echo boot > "$R/BOOT-x.md"; freerev 9; ap
+check "13.2135 a reviewer whose worktree is DIRTY is not restarted (ctl restart would refuse it after the TOOK was written): A dirty 1 gets no review, B dirty 2 keeps its PULL file waiting; CONTROL in the same check: both clean -> A takes task/rev1 and B is pulled" \
+  'printf "%s" "$a" | grep -q "SKIP reviewer A: dirty 1" && printf "%s" "$a" | grep -q "WAIT reviewer B PULL BOOT-x.md: dirty 2" && ! printf "%s" "$a" | grep -q WOULD && would "review: A gisik:7 takes 09:10 task/rev1" && would "pull: restart reviewer B"'
+failpull() { world; freerev 9; echo "$R/BOOT-x.md" > "$R/PULL-B.boot"; echo boot > "$R/BOOT-x.md"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/ctl.log"\necho "FAIL restart worktree x is dirty"; exit 1\n' "$T" > "$T/ctl"; aplive
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/ctl.log"\necho "OK $1 stub"\n' "$T" > "$T/ctl"; }
+check "13.2136 a FAILED restart (not the known 'no backend line' false negative) keeps the PULL file, writes no ledger row and logs a FLAG; CONTROL in the same check: the same pull with a restart that succeeds removes the file" \
+  'failpull && printf "%s" "$out" | grep -q "FLAG restart failed" && [ -f "$R/PULL-B.boot" ] && ! /usr/bin/grep -q "PULL" "$R/AUTOPILOT-ledger.tsv" 2>/dev/null && aplive && [ ! -e "$R/PULL-B.boot" ] && /usr/bin/grep -q "PULL" "$R/AUTOPILOT-ledger.tsv"'
 
 # ================================================================ 13.2134 the slot-hold warning
 sw() { world; rm -rf "$T/sem"; mkdir -p "$T/sem/slot-1"; printf '4001|Sun Oct 4 05:40:06 2026 |mut-driver|%s\n' $((NOW - $1)) > "$T/sem/slot-1/holder"; printf '%s\n' "${@:2}" > "$T/ps.txt"
