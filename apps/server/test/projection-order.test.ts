@@ -101,6 +101,11 @@ describe('projection registration order (coordination §8)', () => {
       // table proj_rollups reads there is complete only because proj_tickets
       // was replayed before it.
       'proj_rollups',
+      // Typed links T2 (27.020). Beside the proj_tickets/proj_rollups pair (`proj_tickets.links` is the source's folded
+      // copy of these links) but BELOW proj_rollups, so the adjacency above stays intact. No adjacency is load-bearing
+      // for it: `apply` reads only its own rows and `purged_entities`, and no projection reads proj_ticket_links in a
+      // transaction.
+      'proj_ticket_links',
       'proj_memberships',
       // Plan 4 Task 14. §8 amended to slot it directly after proj_memberships,
       // so this INSERTS above proj_visibility rather than appending.
@@ -188,6 +193,7 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_groups', ['proj_groups']],
       ['proj_tickets', ['proj_tickets']],
       ['proj_rollups', ['proj_rollups']],
+      ['proj_ticket_links', ['proj_ticket_links']],
       ['proj_memberships', ['proj_memberships']],
       // ONE table, and `invite_tokens` — created by the same migration — is
       // deliberately not it. See the second assertion in this file.

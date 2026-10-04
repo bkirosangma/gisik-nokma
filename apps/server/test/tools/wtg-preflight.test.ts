@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { BUILTIN_FIELD_IDS, newUlid } from '@gisik-nokma/domain';
 import {
   NEW_BUILTIN_FIELD_IDS,
   formatWtgPreflight,
@@ -59,6 +59,7 @@ async function workflowRaw(workspaceId: string, workflowId: string, version: num
 describe('29.147 shadow detector', () => {
   it('29.147 reports ledger, projection and claim shadows; superseded counts in the ledger only; near misses are clean', async () => {
     const dirty = newUlid(); const superseded = newUlid(); const clean = newUlid();
+    expect(NEW_BUILTIN_FIELD_IDS.every((id) => (BUILTIN_FIELD_IDS as readonly string[]).includes(id))).toBe(true); // 29.153: T1's list is a subset of the domain's
     const bad = def('invoice', { fields: [num('estimate'), num('amount')] });
     const eventId = await defineRaw(dirty, bad);
     await projectRaw(dirty, bad);

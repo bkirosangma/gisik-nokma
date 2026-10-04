@@ -34,7 +34,8 @@ export const SWEEP: Record<string, SweepEntry> = {
   search: { args: { workspaceId: 'w', query: 'q' } },
   search_tickets: { args: { workspaceId: 'w', query: 'q' } },
   list_tickets: { args: { projectId: 'p' } },
-  get_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
+  // Typed links T4: get_ticket also reads the links route, which answers `{ links }`.
+  get_ticket: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async (path) => (path.endsWith('/links') ? { links: [] } : TICKET_DETAIL) } },
   list_members: { args: { workspaceId: 'w' } },
   // read end
   create_ticket: { args: { workspaceId: 'w', projectId: 'p', typeId: 'ty', title: 'A ticket' } },
@@ -70,6 +71,10 @@ export const SWEEP: Record<string, SweepEntry> = {
   link_note: { args: { noteId: 'n', ticketId: 't', action: 'attach' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   delete_note: { args: { noteId: 'n', confirm_name: 'N' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   restore_note: { args: { noteId: 'n' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  restore_note_version: {
+    args: { noteId: 'n', versionId: 'v' },
+    session: { get: async (path) => (path.endsWith('/history') ? { versions: [{ eventId: 'v', authorId: 'u', recordedAt: '2026-10-02T10:00:00.000Z', seq: 1 }] } : path.endsWith('/history/v') ? { body: { type: 'doc', content: [{ type: 'paragraph' }] } } : { note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null } }) },
+  },
   get_note_history: { args: { noteId: 'n' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   // note end
   // attachment begin (T8)
@@ -88,6 +93,10 @@ export const SWEEP: Record<string, SweepEntry> = {
   restore_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
   get_ticket_history: { args: { ticketId: 't' }, session: { get: async () => ({ ticketId: 't', events: [] }) } },
   rank_ticket: { args: { workspaceId: 'w', ticketId: 't', after: 'n' }, session: { get: async () => TICKET_DETAIL } },
+  link_tickets: {
+    args: { workspaceId: 'w', ticketId: 't', targetId: 'n', kind: 'blocks', action: 'remove' },
+    session: { get: async () => ({ links: [{ kind: 'blocks', direction: 'out', ticket: { id: 'n' } }] }) },
+  },
   // ticket end
   // discovery begin (T10)
   list_ticket_types: { args: { workspaceId: 'w' }, session: { get: async () => ({ ticketTypes: [] }) } },

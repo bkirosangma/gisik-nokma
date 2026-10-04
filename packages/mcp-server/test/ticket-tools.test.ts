@@ -98,7 +98,10 @@ describe('14.451 update_ticket', () => {
     await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { title: 'x' } })).rejects.toThrow(
       '"title" is a built-in field: use the title argument',
     );
-    expect(f.batches, 'refusals send nothing').toHaveLength(1);
+    for (const id of ['estimate', 'reworkEstimate', 'waitForAll']) {
+      await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { [id]: 3 } })).rejects.toThrow(`"${id}" is a built-in field and cannot be set through fields`);
+    }
+    expect(f.batches, '29.163 refusals send nothing').toHaveLength(1);
     await tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, title: 'Only' }); // control
     expect(f.batches[1]).toHaveLength(1);
     expect(f.batches[1]![0]).toMatchObject({ type: 'ticket.field_set', payload: { fieldId: 'title', value: 'Only' } });
@@ -232,5 +235,64 @@ describe('14.455 rank_ticket', () => {
     );
     await expect(tool('rank_ticket', f.session).handler({ workspaceId: WS, ticketId: T })).rejects.toThrow('rank_ticket needs before, after, or both');
     expect(f.batches).toHaveLength(2);
+  });
+});
+
+describe('27.055–27.057 link_tickets', () => {
+  const LINKS = `/v1/workspaces/${WS}/tickets/${T}/links`;
+  const linkRoutes = {
+    [LINKS]: {
+      links: [
+        { kind: 'blocks', direction: 'in', ticket: { id: B } },
+        { kind: 'relates', direction: 'in', ticket: { id: C } },
+        { kind: 'duplicates', direction: 'out', ticket: { id: X } },
+      ],
+    },
+  };
+
+  it("27.055 action 'add' files ONE ticket.link_added on ticketId's stream, origin mcp, the session's actor; control: kind 'parent' is refused before anything is sent", async () => {
+    const f = fake();
+    await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'blocks', action: 'add' });
+    expect(f.batches).toHaveLength(1);
+    expect(f.batches[0]).toHaveLength(1);
+    const event = f.batches[0]![0]!;
+    expect(event).toMatchObject({ type: 'ticket.link_added', entity: { kind: 'ticket', id: T }, origin: 'mcp', actorId: ME });
+    expect(payloadOf(event)).toEqual({ kind: 'blocks', targetId: B });
+    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'parent', action: 'add' })).rejects.toThrow();
+    expect(f.batches).toHaveLength(1);
+  });
+
+  it("27.056 action 'remove' files link_removed on the STORED source, from either end; a links-read 404 is the uniform sentence and sends nothing; control: an outgoing link stays on this stream, a missing one is an error naming it", async () => {
+    const removal = async (kind: string, targetId: string) => {
+      const f = fake(linkRoutes);
+      await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId, kind, action: 'remove' });
+      expect(f.batches).toHaveLength(1);
+      expect(f.batches[0]).toHaveLength(1);
+      const event = f.batches[0]![0]!;
+      expect(event['type']).toBe('ticket.link_removed');
+      return { entity: (event['entity'] as { id: string }).id, payload: payloadOf(event) };
+    };
+    expect(await removal('blocks', B)).toEqual({ entity: B, payload: { kind: 'blocks', targetId: T } }); // incoming: stored on B
+    expect(await removal('relates', C)).toEqual({ entity: C, payload: { kind: 'relates', targetId: T } }); // a relates stored the other way
+    expect(await removal('duplicates', X)).toEqual({ entity: T, payload: { kind: 'duplicates', targetId: X } }); // control: outgoing
+    const f = fake(linkRoutes);
+    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'relates', action: 'remove' })).rejects.toThrow(
+      `no "relates" link between ${T} and ${B} that you can see`,
+    );
+    expect(f.batches).toHaveLength(0);
+    // A links read that 404s (the ticket is gone or hidden from you) answers the uniform sentence, never the raw HTTP error.
+    // Every detail answers (ROUTES) and `/links` is not routed, so the 404 is the links read's; the first leg is this removal answered.
+    const gone = fake(ROUTES);
+    await expect(tool('link_tickets', gone.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'blocks', action: 'remove' })).rejects.toThrow(
+      /^ticket not found or not visible to you$/,
+    );
+    expect(gone.batches).toHaveLength(0);
+  });
+
+  it('27.057 a refusal passes through in the house shape', async () => {
+    const f = fake(ROUTES, { results: [{ status: 'refused', eventId: 'e', rule: 'link.reverse', reason: '"Chiller" already blocks "Ice maker".' }] });
+    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'blocks', action: 'add' })).rejects.toThrow(
+      'refused by link.reverse: "Chiller" already blocks "Ice maker".',
+    );
   });
 });

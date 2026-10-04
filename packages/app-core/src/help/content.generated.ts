@@ -678,6 +678,24 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
+                  "text": "Gisik Nokma"
+                },
+                {
+                  "kind": "text",
+                  "text": " — the logo at the far left. It takes you to "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Home"
+                },
+                {
+                  "kind": "text",
+                  "text": ": your workspace's numbers and its Knowledge Graph."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
                   "text": "Workspaces"
                 },
                 {
@@ -3116,7 +3134,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " and "
+                      "text": ", "
                     },
                     {
                       "kind": "bold",
@@ -3124,7 +3142,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — optional, empty by default. Leave either blank to claim no date. - "
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Estimate (days)"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — optional, empty by default. Leave any blank to claim nothing; an estimate is a whole number of days from 1 to 365. - "
                     },
                     {
                       "kind": "bold",
@@ -3257,7 +3283,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "five things"
+                    "text": "six things"
                   },
                   {
                     "kind": "text",
@@ -3357,6 +3383,24 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " row's date box, like Due. (§5)"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set or clear its estimate"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Estimate"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row's number box, like Start: a whole number of days from 1 to 365, or blank for no estimate. (§5)"
                     }
                   ]
                 ]
@@ -11153,7 +11197,31 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — change any field, close and reopen, reorder the backlog, see a ticket's history, delete one or bring it back."
+                      "text": " — change any field, close and reopen, reorder the backlog, link two tickets ("
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "blocks"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "relates to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "duplicates"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") or remove a link from either end, see a ticket's history, delete one or bring it back."
                     }
                   ],
                   [

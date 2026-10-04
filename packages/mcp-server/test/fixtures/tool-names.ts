@@ -20,7 +20,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   note: [
     // note begin (T7)
-    'list_notes', 'get_note', 'create_note', 'update_note', 'link_note', 'delete_note', 'restore_note', 'get_note_history',
+    'list_notes', 'get_note', 'create_note', 'update_note', 'link_note', 'delete_note', 'restore_note', 'restore_note_version', 'get_note_history',
     // note end
   ],
   attachment: [
@@ -30,7 +30,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   ticket: [
     // ticket begin (T9)
-    'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket',
+    'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket', 'link_tickets',
     // ticket end
   ],
   discovery: [

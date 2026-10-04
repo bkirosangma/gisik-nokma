@@ -81,15 +81,9 @@ export function LegalNav() {
       aria-label="Legal"
     >
       <div className="gn-nav__inner">
-        {/* `NavBrand` (widened 2026-09-24, `apps/web/src/nav-brand.tsx`) —
-            neither piece is a link, which is also what keeps this bar from
-            adding a destination the product has not decided on: `/`
-            redirects to `/workspaces`, which bounces a signed-out reader
-            straight back to `/sign-in`, so a wordmark link here would be a
-            third route to the page they are already on. Was this bar's own
-            hand-rolled `<span>` pair (a `--gn-accent` tile, its own one-path
-            svg) until the class-collision fix unified it with `AppNav`'s —
-            see `NavBrand`'s own docblock. */}
+        {/* `NavBrand` (`apps/web/src/nav-brand.tsx`): the same brand LINK as `AppNav`'s, to `/` (Home, Knowledge
+            Graph spec E, 27.624). For a signed-out reader `/` renders Home's frame and sends them to `/sign-in?next=/`
+            (27.626), so the brand is a route to the page they need, not a third route to the page they are on. */}
         <NavBrand />
         <span className="gn-nav__spacer" />
         {user === null ? (

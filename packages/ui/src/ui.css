@@ -3617,6 +3617,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    be the first step toward the shared component `submitStartDate`'s docblock
    declines to extract on two instances. */
 .gn-ticket-sheet__start-input { align-self: start; }
+/* The Estimate row's number box (wtg2 T4): the Start input's `align-self`, and a width for three digits. */
+.gn-ticket-sheet__estimate-input { align-self: start; width: 6rem; }
 /* The Priority row's segmented control (spec 2026-09-22): `align-self: start`
    for the reason the due input's rule directly above gives — `.gn-ticket-sheet__
    field dd` is a flex COLUMN whose default `stretch` would otherwise run the

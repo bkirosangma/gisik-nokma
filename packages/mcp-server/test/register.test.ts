@@ -84,7 +84,7 @@ describe('the tools, registered', () => {
     }
   });
 
-  it('14.555 the final registry is the 63 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
+  it('14.555 the final registry is the 65 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
     // The plan's header order, spelled out HERE and not read from the fixture: editing the fixture alone cannot make this green.
     const FINAL = [
       'search', 'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
@@ -92,15 +92,15 @@ describe('the tools, registered', () => {
       'list_workspaces', 'get_workspace', 'create_workspace', 'rename_workspace', 'archive_workspace', 'restore_workspace', 'delete_workspace', 'undelete_workspace',
       'list_projects', 'get_project', 'create_project', 'update_project', 'archive_project', 'restore_project', 'delete_project', 'undelete_project',
       'list_comments', 'edit_comment', 'delete_comment',
-      'list_notes', 'get_note', 'create_note', 'update_note', 'link_note', 'delete_note', 'restore_note', 'get_note_history',
+      'list_notes', 'get_note', 'create_note', 'update_note', 'link_note', 'delete_note', 'restore_note', 'restore_note_version', 'get_note_history',
       'list_attachments', 'get_attachment', 'add_attachment',
-      'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket',
+      'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket', 'link_tickets',
       'list_ticket_types', 'list_workflows', 'my_work', 'get_attention', 'list_notifications', 'mark_notifications_read', 'list_my_invitations', 'respond_to_invitation',
       'manage_members', 'change_prefix', 'manage_groups',
       'define_workflow', 'define_ticket_type', 'migrate_ticket_type', 'set_visibility', 'update_workspace_settings',
       'list_deleted',
     ];
-    expect(FINAL).toHaveLength(63);
+    expect(FINAL).toHaveLength(65); // 63 until typed links T4 added `link_tickets` (27.060), 64 until MCP sweep 2 T4 added `restore_note_version` (14.555)
     const tools = allTools(fakeSession());
     expect(tools.map((t) => t.name)).toEqual(FINAL);
     expect(TOOL_NAMES).toEqual(FINAL);

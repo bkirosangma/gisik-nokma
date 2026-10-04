@@ -103,6 +103,18 @@ function renderValue(value: unknown): string | null {
   return null;
 }
 
+const days = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`;
+/** The three flow built-ins (wtg2 T4) read by name; anything unrecognised falls through to the generic sentence. */
+function flowFieldSentence(fieldId: string, value: unknown): string | null {
+  if (fieldId === 'estimate' || fieldId === 'reworkEstimate') {
+    const name = fieldId === 'estimate' ? 'Estimate' : 'Rework estimate';
+    if (value === null) return `Cleared ${name}`;
+    return typeof value === 'number' ? `Set ${name} to ${days(value)}` : null;
+  }
+  if (fieldId === 'waitForAll') return value === null ? 'Turned off Wait for all incoming' : value === true ? 'Turned on Wait for all incoming' : null;
+  return null;
+}
+
 /**
  * The sentence for one ledger event. Unrecognised types return `event.type`
  * unchanged — see this file's docblock on why that is the honest fallback.
@@ -141,6 +153,8 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
     case 'ticket.field_set': {
       const fieldId = str(payload, 'fieldId');
       if (fieldId === null) return event.type;
+      const flow = flowFieldSentence(fieldId, payload['value']);
+      if (flow !== null) return flow;
       const value = renderValue(payload['value']);
       // `null` is the CLEARING claim — see `renderValue`'s docblock.
       if (value === null) return payload['value'] === null ? `Cleared ${fieldId}` : event.type;

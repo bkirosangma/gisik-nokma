@@ -1,5 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
-import { collectImageAttachmentIds, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { collectImageAttachmentIds, EMPTY_NOTE_DOC, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import { spliceDoc, type BodyEdit } from '@gisik-nokma/editor/markdown-doc';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
@@ -15,6 +16,8 @@ export type NoteDetailWire = {
   attachedTickets: unknown[]; deleted: boolean; createdAt: string; updatedAt: string; body: unknown;
 };
 const NOT_FOUND = 'note not found or not visible to you';
+const VERSION_NOT_FOUND = 'note version not found or not visible to you';
+const DELETED_NOTE = 'This note is in Deleted items. Bring it back with restore_note first, then restore a version.';
 const enc = encodeURIComponent;
 const id = z.string().min(1);
 const SCOPES = ['private', 'workspace', 'project', 'inherit', 'explicit'] as const;
@@ -27,6 +30,29 @@ export async function readNote(session: Session, noteId: string): Promise<NoteDe
     return ((await session.get(`/v1/notes/${enc(noteId)}`)) as { note: NoteDetailWire }).note;
   } catch (error) {
     if (error instanceof HttpError && error.status === 404) throw new Error(NOT_FOUND);
+    throw error;
+  }
+}
+
+/**
+ * The stored body of one LISTED version of a note, copied and never converted (MCP sweep 2 §4.1). The version must be in
+ * the note's own history list (RV-2: an id of a rename event is not one); the body route answers 404 for a version born
+ * without a body (`read/notes.ts:369`), and the document the reducer folds in for that version is the empty one
+ * (`note-state.ts:139`), so that is what is restored (RV-3).
+ */
+async function versionBody(session: Session, noteId: string, versionId: string): Promise<unknown> {
+  let listed: Array<{ eventId: string }>;
+  try {
+    listed = ((await session.get(`/v1/notes/${enc(noteId)}/history`)) as { versions: Array<{ eventId: string }> }).versions;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) throw new Error(NOT_FOUND);
+    throw error;
+  }
+  if (!listed.some((version) => version.eventId === versionId)) throw new Error(VERSION_NOT_FOUND);
+  try {
+    return ((await session.get(`/v1/notes/${enc(noteId)}/history/${enc(versionId)}`)) as { body: unknown }).body;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) return EMPTY_NOTE_DOC;
     throw error;
   }
 }
@@ -192,6 +218,25 @@ export function noteTools(session: Session): ToolDefinition[] {
       },
     },
     {
+      name: 'restore_note_version',
+      description:
+        'Put an earlier saved version of a note back as its current body (versionId from get_note_history). The stored document is copied exactly, so ' +
+        'nothing that Markdown cannot carry is lost; the version it replaces stays in the history, so a restore is undone by restoring that version. ' +
+        'Only the note\'s author, an admin who can read it, or the owner can. A deleted note must be brought back with restore_note first. ' +
+        'Mentions that the restored text adds notify those people.',
+      inputSchema: { noteId: id, versionId: id },
+      handler: async (args) => {
+        const a = z.object({ noteId: id, versionId: id }).parse(args);
+        const note = await readNote(session, a.noteId);
+        if (note.deleted) throw new Error(DELETED_NOTE);
+        const body = await versionBody(session, a.noteId, a.versionId);
+        // Both sides are jsonb, so their key order agrees; `isDeepStrictEqual` does not rely on it.
+        if (isDeepStrictEqual(body, note.body)) return { noteId: a.noteId, restoredFrom: a.versionId, restored: false, reason: 'already the current body' };
+        const committed = await submitOne(session, envelopeFor(session, note.workspaceId, { kind: 'note', id: a.noteId }, 'note.body_set', { body }));
+        return { noteId: a.noteId, restoredFrom: a.versionId, restored: true, ...(committed as object) };
+      },
+    },
+    {
       name: 'get_note_history',
       description: 'A note\'s saved versions (who, when). With versionId, that version\'s body as Markdown.',
       inputSchema: historyShape,
@@ -202,7 +247,7 @@ export function noteTools(session: Session): ToolDefinition[] {
           const { body } = (await session.get(`/v1/notes/${enc(a.noteId)}/history/${enc(a.versionId)}`)) as { body: unknown };
           return { versionId: a.versionId, ...bodyAsMarkdown(body) };
         } catch (error) {
-          if (error instanceof HttpError && error.status === 404) throw new Error(a.versionId === undefined ? NOT_FOUND : 'note version not found or not visible to you');
+          if (error instanceof HttpError && error.status === 404) throw new Error(a.versionId === undefined ? NOT_FOUND : VERSION_NOT_FOUND);
           throw error;
         }
       },

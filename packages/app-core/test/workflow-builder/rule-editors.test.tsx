@@ -130,7 +130,8 @@ describe('RequireFieldEditor', () => {
     // description, dueDate, startDate) — the plan's own text lists only three,
     // but a prior fix round (dd1cdeb) added startDate to mirror domain's
     // BUILTIN_FIELD_IDS, and this test targets fieldChoicesFor's real output.
-    expect(optionLabels).toEqual(['Title', 'Description', 'Due date', 'Start date', 'Counterparty (Errand)']);
+    // 29.162 (wtg2 T4): Estimate and Rework estimate join the built-ins; Wait for all incoming never does.
+    expect(optionLabels).toEqual(['Title', 'Description', 'Due date', 'Start date', 'Estimate', 'Rework estimate', 'Counterparty (Errand)']);
     await user.click(within(listbox).getByRole('option', { name: 'Counterparty (Errand)' }));
     expect(store.getState().def.transitions[0]?.rules[0]).toEqual({
       kind: 'require-field',

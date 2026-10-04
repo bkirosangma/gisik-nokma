@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { newUlid } from '@gisik-nokma/domain';
 import { NOT_A_MEMBER_REASON, PERMISSION_ROLE_RULE, ticketDeleteAuthorityReason } from '../../src/permissions/check-permission.js';
 import { buildOAuthApp, hostedToken } from '../helpers/oauth.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -107,6 +108,55 @@ describe('MCP tickets through the hosted door', () => {
       { tool: 'get_ticket_history', args: (x) => ({ ticketId: x.ticketId }), stranger: TICKET_GONE, allowed: { caller: 'member' } },
       { tool: 'rank_ticket', args: t({ after: w.secondTicketId }), stranger: TICKET_GONE }, // the rank arithmetic is 14.455's
       { tool: 'get_ticket', args: t(), stranger: TICKET_GONE, allowed: { caller: 'member' } },
+      // 27.060 (typed-links T4): the server's gate decides; a member who sees both ends links them.
+      {
+        tool: 'link_tickets',
+        args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, targetId: x.secondTicketId, kind: 'relates', action: 'add' }),
+        stranger: `refused by ${PERMISSION_ROLE_RULE}: ${NOT_A_MEMBER_REASON}`,
+        allowed: { caller: 'member', eventType: 'ticket.link_added' },
+      },
     ]);
+    // 27.060: the link landed on ticketId's stream (the SOURCE), naming secondTicketId.
+    const linked = await w.db.pool.query<{ entity_id: string; payload: unknown }>(
+      `SELECT entity_id, payload FROM events WHERE workspace_id = $1 AND type = 'ticket.link_added'`,
+      [w.workspaceId],
+    );
+    expect(linked.rows).toEqual([{ entity_id: w.ticketId, payload: { kind: 'relates', targetId: w.secondTicketId } }]);
+  });
+
+  it("27.059 get_ticket_history withholds a hidden link target from a member: a ticket you can't see, never its id; control: the owner's line carries the id and the key", async () => {
+    const w = await buildDoorWorld(db, '2759');
+    const H = newUlid();
+    const ev = (id: string, type: string, payload: unknown) => ({
+      id: newUlid(), workspaceId: w.workspaceId, entity: { kind: 'ticket', id }, type, version: 1, payload,
+      actorId: w.owner.userId, origin: 'web', clientTime: new Date().toISOString(),
+    });
+    const res = await w.app.inject({ method: 'POST', url: '/v1/events', headers: { authorization: `Bearer ${w.owner.sessionToken}` }, payload: { events: [
+      ev(H, 'ticket.created', { typeId: 'task', projectId: w.projectId, parentId: null, title: 'Salary review', start: 'backlog' }),
+      ev(H, 'visibility.set', { ticketId: H, mode: 'explicit', userIds: [w.owner.userId] }),
+      ev(w.ticketId, 'ticket.link_added', { kind: 'duplicates', targetId: H }),
+    ] } });
+    for (const r of res.json<{ results: Array<{ status: string; reason?: string }> }>().results) expect(r.status, r.reason).toBe('committed');
+    const hKey = (await w.app.inject({ method: 'GET', url: `/v1/workspaces/${w.workspaceId}/tickets/${H}`, headers: { authorization: `Bearer ${w.owner.sessionToken}` } })).json<{ key: string }>().key;
+    expect(hKey).toMatch(/-\d+$/); // precondition: H has a key to leak
+    type Line = { type: string; payload: Record<string, unknown>; linkTarget?: unknown };
+    const historyAs = async (caller: 'owner' | 'member') => {
+      const r = await callTool(w.app, w[caller].token, 'get_ticket_history', { ticketId: w.ticketId });
+      expect(r.isError, r.text).toBe(false);
+      return r.json as { events: Line[] };
+    };
+    const dupOf = (out: { events: Line[] }) => out.events.find((e) => e.type === 'ticket.link_added')!;
+
+    const member = await historyAs('member');
+    const memberDup = dupOf(member);
+    expect(memberDup.payload).toEqual({ kind: 'duplicates', target: "a ticket you can't see" });
+    // N6 (AMEND p11): a withheld target is labelled null, not dropped.
+    expect(memberDup).toHaveProperty('linkTarget', null);
+    expect(JSON.stringify(member)).not.toContain(H);
+    expect(JSON.stringify(member)).not.toContain(hKey);
+
+    const ownerDup = dupOf(await historyAs('owner'));
+    expect(ownerDup.payload).toEqual({ kind: 'duplicates', targetId: H });
+    expect(ownerDup.linkTarget).toEqual({ key: hKey });
   });
 });

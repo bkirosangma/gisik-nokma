@@ -25,6 +25,7 @@ const count = (source: string, pattern: RegExp): number => [...stripComments(sou
 
 /** Routes whose level-1 heading is in another file: route → the file that renders it. */
 const DELEGATES: Record<string, string> = {
+  'apps/web/app/page.tsx': 'apps/web/src/home/home-screen.tsx',
   'apps/web/app/help/page.tsx': 'packages/app-core/src/help/help-browser.tsx',
   'apps/web/app/mcp/tokens/page.tsx': 'apps/web/src/mcp-tokens-screen.tsx',
   'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx': 'apps/web/src/project-title.tsx',
@@ -54,8 +55,8 @@ const ALLOWED_DOUBLES: Record<string, { count: number; why: string }> = {
     why: 'the same delegate file: the route mounts the New pane, never both',
   },
 };
-/** Routes that never paint: they redirect. */
-const REDIRECTS = ['apps/web/app/page.tsx'];
+/** Routes that never paint: they redirect. Empty since `/` became Home (spec E, 27.625); kept so a new redirect has a home. */
+const REDIRECTS: string[] = [];
 
 /** A heading element at level 1, written literally or chosen by a `heading = 'h1'` default. */
 const H1 = /<h1\b|heading\s*=\s*'h1'|<h1>/g;
