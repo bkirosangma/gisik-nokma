@@ -271,26 +271,47 @@ export class CameraAdapter implements ViewportDriver {
   private onKeyDown(e: KeyboardEvent): void {
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
     if ((e.target as Element | null)?.closest('input, textarea, select, [contenteditable="true"]') != null) return;
-    const base = this.glide?.target ?? {};
-    const x = base.x ?? this.cam.x;
-    const y = base.y ?? this.cam.y;
-    const zoom = base.zoom ?? this.cam.zoom;
-    const step = (KEY_PAN_PX * (e.shiftKey ? 4 : 1)) / this.cam.zoom;
+    // Keys compose (planner ruling 2026-10-04): a key applies to the camera the pending glide lands on, so a pan keeps a
+    // pending zoom and a zoom keeps a pending pan.
+    const land = this.landing();
+    const step = (KEY_PAN_PX * (e.shiftKey ? 4 : 1)) / land.zoom;
     const pan = (dx: number, dy: number): void => {
       e.preventDefault();
-      this.camera({ x: x + dx, y: y + dy });
+      this.camera({ x: land.x + dx, y: land.y + dy, zoom: land.zoom });
+    };
+    const zoomTo = (to: number): void => {
+      e.preventDefault();
+      // About the centre of the view the glide lands on; clamped first, so x and y are for the zoom it reaches.
+      const zoom = this.clampZoom(to);
+      const centre = { x: this.el.clientWidth / 2, y: this.el.clientHeight / 2 };
+      const g = this.glide;
+      const anchor = g?.anchor ?? centre;
+      // Nothing pending moves the centre (no x or y, and any zoom is about the centre): a zoom-only glide lands on the same
+      // camera and holds the centre on every frame (VP-4), where a glide to x, y and zoom at once would drift it.
+      if (g?.target.x === undefined && g?.target.y === undefined && anchor.x === centre.x && anchor.y === centre.y) this.camera({ zoom });
+      else this.camera({ zoom, x: land.x + centre.x / land.zoom - centre.x / zoom, y: land.y + centre.y / land.zoom - centre.y / zoom });
     };
     if (e.key === 'ArrowLeft') pan(-step, 0);
     else if (e.key === 'ArrowRight') pan(step, 0);
     else if (e.key === 'ArrowUp') pan(0, -step);
     else if (e.key === 'ArrowDown') pan(0, step);
-    else if (e.key === '+' || e.key === '=') {
-      e.preventDefault();
-      this.camera({ zoom: zoom * KEY_ZOOM });
-    } else if (e.key === '-' || e.key === '_') {
-      e.preventDefault();
-      this.camera({ zoom: zoom / KEY_ZOOM });
+    else if (e.key === '+' || e.key === '=') zoomTo(land.zoom * KEY_ZOOM);
+    else if (e.key === '-' || e.key === '_') zoomTo(land.zoom / KEY_ZOOM);
+  }
+
+  /** The camera the pending glide lands on (the camera itself when none is pending). */
+  private landing(): Camera {
+    const g = this.glide;
+    if (g === null) return { ...this.cam };
+    let { x, y, zoom } = this.cam;
+    if (g.target.zoom !== undefined) {
+      // a zoom holds the world point under its anchor, as zoomAbout does on every frame
+      const world = this.toWorld(g.anchor);
+      zoom = g.target.zoom;
+      x = world.x - g.anchor.x / zoom;
+      y = world.y - g.anchor.y / zoom;
     }
+    return { x: g.target.x ?? x, y: g.target.y ?? y, zoom };
   }
 
   private listen(type: string, handler: (e: Event) => void, options?: AddEventListenerOptions): void {
