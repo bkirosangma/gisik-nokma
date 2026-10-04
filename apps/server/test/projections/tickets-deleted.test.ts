@@ -197,6 +197,10 @@ describe('proj_tickets carries deleted_at / deleted_by, and restore clears them'
       reopened_at: null,
       deleted_at: new Date('2026-09-20T06:00:00.000Z'),
       deleted_by: null,
+      // Drafts T3: the row type carries the draft columns; this row is not a draft.
+      draft_author_id: null,
+      draft_at: null,
+      draft_discarded: null,
     };
     expect(rowToTicketState(shaped).deleted).toBeNull();
     // The positive control through the same call: set the second column and the

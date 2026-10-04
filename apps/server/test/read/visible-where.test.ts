@@ -507,7 +507,9 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
 
     const params = new SqlParams();
     const eff = await resolveEffectiveRole(pool, world.owner, world.workspaceId);
-    expect(visibleTicketsWhere(eff, world.owner, params)).toBe('TRUE');
+    // Drafts T3 (spec R19): the owner's constant is the draft clause, not `TRUE` — still no tenancy clause
+    // and still no parameter, which is what this case is about.
+    expect(visibleTicketsWhere(eff, world.owner, params)).toBe('(v.draft_author_id IS NULL)');
     expect(params.toArray()).toEqual([]);
   });
 

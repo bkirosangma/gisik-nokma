@@ -178,7 +178,7 @@ export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseR
                SELECT e.server_time
                  FROM events e
                 WHERE e.entity_kind = 'ticket' AND e.entity_id = t.ticket_id
-                  AND e.type IN ('ticket.created', 'ticket.transitioned')
+                  AND e.type IN ('ticket.created', 'ticket.transitioned', 'ticket.published')
                 ORDER BY e.seq DESC
                 LIMIT 1
              ) entered ON true
