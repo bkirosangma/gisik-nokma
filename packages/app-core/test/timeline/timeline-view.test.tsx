@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
+import { KEY_GAP_PX } from '@gisik-nokma/viewport';
 import {
   TIMELINE_EMPTY_COPY,
   TIMELINE_SIDE_LIST_COPY,
@@ -709,6 +710,38 @@ describe('29.102 only the bars near the view are mounted', () => {
     document.body.innerHTML = '';
     renderTimeline(all, { today: '2026-06-01' });
     expect(bars()).toBe(300);
+  });
+});
+
+/**
+ * 29.055 (the view's half; the packing half is `packages/viewport/test/pack.test.ts`): the packer reserves an outside key
+ * from the bar's END, `KEY_GAP_PX` after it, so the view must decide "outside" with the SAME predicate and draw the key at
+ * the SAME gap. A second copy of the comparison here would let the two drift apart while every test of each stays green.
+ */
+describe('29.055 the view decides an outside key with the packer\'s one predicate and draws it at the packer\'s gap', () => {
+  it('29.055 the "outside" comparison is written once, in pack.ts, and the view calls keyOutside; control: the scan counts a planted copy', () => {
+    const roots = [join(REPO_ROOT, 'packages/viewport/src'), join(REPO_ROOT, 'packages/app-core/src')];
+    const comparisons = (text: string) => (text.match(/\bbarPx\s*<=?(?!=)|>=?\s*barPx\b/g) ?? []).length;
+    let total = 0;
+    for (const root of roots) {
+      for (const file of readdirSync(root, { recursive: true }) as string[]) {
+        if (/\.tsx?$/.test(file)) total += comparisons(readFileSync(join(root, file), 'utf8'));
+      }
+    }
+    expect(total).toBe(1);
+    expect(comparisons(readFileSync(join(REPO_ROOT, 'packages/viewport/src/pack.ts'), 'utf8'))).toBe(1);
+    expect(readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-view.tsx'), 'utf8')).toMatch(/\bkeyOutside\(barPx, measure\(row\.key\)\)/);
+    expect(comparisons('const outside = row.key !== null && barPx < measure(row.key);')).toBe(1);
+    expect(comparisons('const outside = measure(row.key) > barPx;')).toBe(1);
+  });
+
+  it('29.055 ui.css draws the outside key KEY_GAP_PX (4 px) after the bar\'s end; the literal is pinned too, so a gap scaled on both sides still reddens', () => {
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const body = /^\.gn-timeline__key--outside \{([^}]*)\}/m.exec(css)?.[1] ?? '';
+    const left = /(?:^|;)\s*left:\s*([^;]+);/.exec(body)?.[1]?.trim();
+    expect(left).toBe(`calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + ${KEY_GAP_PX}px)`);
+    expect(KEY_GAP_PX).toBe(4);
+    expect(left).toBe('calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + 4px)');
   });
 });
 

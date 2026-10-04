@@ -53,10 +53,25 @@ export function naturalKeyCompare(a: string, b: string): number {
   return comparePartLists(keyPartsOf(a), keyPartsOf(b));
 }
 
-/** PK-4: a bar shorter than its label shows the key just outside its end, so the label is part of the footprint. */
+/** The gap in px between a bar's end and a key drawn outside it. `ui.css` `.gn-timeline__key--outside` draws at this gap (pinned, 29.055). */
+export const KEY_GAP_PX = 4;
+
+/**
+ * PK-4: the key goes outside a bar narrower than it (a bar exactly as wide holds it). The ONE definition: the packer and the
+ * Timeline view both ask this, so the key the view draws outside is the key the packer reserved room for (29.055).
+ */
+export function keyOutside(barPx: number, keyPx: number): boolean {
+  return barPx < keyPx;
+}
+
+/**
+ * PK-4: a bar shorter than its label shows the key just outside its END, so the label is part of the footprint: the bar,
+ * then `KEY_GAP_PX` and the label, counted from the bar's last day (ERRATA E10: the first formula counted the label from
+ * the START, so a short bar's outside key ran over the next bar in its row). A bar that holds its key is its own footprint.
+ */
 export function footprintOf(seg: Seg, labelPx: number, ppd: number): Seg {
-  const labelDays = Math.ceil(labelPx / ppd);
-  return { start: seg.start, end: Math.max(seg.end, seg.start + labelDays - 1) };
+  if (!keyOutside((seg.end - seg.start + 1) * ppd, labelPx)) return { start: seg.start, end: seg.end };
+  return { start: seg.start, end: seg.end + Math.ceil((KEY_GAP_PX + labelPx) / ppd) };
 }
 
 /** Sorted by start, overlapping segments merged (one item's own footprints may overlap each other). */

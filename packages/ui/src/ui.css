@@ -6103,7 +6103,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   .gn-timeline__bar .gn-timeline__title-text { display: block; }
 }
 /* A bar shorter than its key shows the key just outside its end, never hidden (PK-4). It fades out while a zoom is moving
-   and returns after the re-pack. */
+   and returns after the re-pack. The `+ 4px` is `KEY_GAP_PX` (packages/viewport/src/pack.ts): the packer reserves the key's
+   room from the bar's end at that gap, so the two move together (29.055 pins both). */
 .gn-timeline__key--outside {
   position: absolute;
   z-index: 1;

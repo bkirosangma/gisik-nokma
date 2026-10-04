@@ -5,6 +5,7 @@ import {
   crossFade,
   isMonday,
   isWeekend,
+  keyOutside,
   mondayOnOrBefore,
   mountRange,
   panLimits,
@@ -252,7 +253,7 @@ const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
     .filter((part): part is string => part !== null && part !== undefined && part !== '')
     .join('; ');
   const barPx = (row.endDay - row.startDay + 1) * ppd;
-  const outside = row.key !== null && barPx < measure(row.key);
+  const outside = row.key !== null && keyOutside(barPx, measure(row.key));
   const vars = {
     ['--d0' as string]: row.startDay - firstDay,
     ['--dn' as string]: row.endDay - row.startDay + 1,
