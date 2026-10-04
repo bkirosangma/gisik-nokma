@@ -12,6 +12,7 @@ describe('29.134 a Decision is never a default type', () => {
     expect(defaultRootTypeFor(ladder)?.id).toBe('task');
     expect(defaultRootTypeFor(ladder.filter((t) => t.id !== 'task'))?.id).toBe('story'); // control: Decision is skipped even when Task is absent
     expect(subtaskTypeFor(ladder.filter((t) => t.id !== 'task'), 2)?.id).toBe('sub-task');
+    expect(defaultRootTypeFor([L('task', 3), L('decision', 3)])?.id).toBe('task'); // one other legal type is enough to skip it
     expect(defaultRootTypeFor([L('chore', 3), L('errand', 3)])?.id).toBe('chore'); // control: the id tie-break still applies to others
     expect(defaultRootTypeFor([L('decision', 3)])?.id).toBe('decision'); // control: legal and alone, so the last resort
     expect(subtaskTypeFor([L('story', 2), L('decision', 3)], 2)?.id).toBe('decision'); // control: the last resort for a child

@@ -426,6 +426,7 @@ describe('29.137 ticket.decided in History', () => {
     expect(said({ outcome: null })).toBe('Cleared the decision');
     expect(said({ outcome: null, from: null })).toBe('Cleared the decision');
     expect(said({ outcome: 'Yes', from: null })).toBe('Decided: Yes'); // a fill-in after a clear reads as a choice
+    expect(said({ outcome: 'Yes', from: '' })).toBe('Decided: Yes'); // a blank from reads as none
     expect(said({})).toBe('ticket.decided'); // control: no payload, the wire name
     expect(said({ outcome: '' })).toBe('ticket.decided');
     expect(said({ outcome: 3 })).toBe('ticket.decided');

@@ -100,6 +100,8 @@ describe('29.135 ticket.decided payload and registration', () => {
     expect(ok({ outcome: null })).toBe(true);
     expect(ok({ outcome: 'No', from: 'Yes' })).toBe(true);
     expect(ok({ outcome: 'No', from: null })).toBe(true);
+    expect(ok({ outcome: 'No', from: '   ' })).toBe(false); // from is a label too: blank and 61 characters are refused
+    expect(ok({ outcome: 'No', from: 'x'.repeat(61) })).toBe(false);
     expect(ok({ outcome: 'Yes', closeStarted: [OTHER] })).toBe(true);
     expect(ok({})).toBe(false); // absent is not a clear
     expect(ok({ outcome: '   ' })).toBe(false);
