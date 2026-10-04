@@ -122,6 +122,10 @@ describe('Links section', () => {
     let stored: TicketLinkView[] = [];
     const ingest = deferredIngest((events) => {
       const p = events[0]!.payload as { kind: TicketLinkView['kind']; targetId: string };
+      if (events[0]!.type === 'ticket.link_removed') {
+        stored = [];
+        return;
+      }
       stored = p.targetId === TICKET ? [{ ...row(p.kind, 'in', 'GN-133', OTHER) }] : [row(p.kind, 'out', 'GN-133', OTHER)];
     });
     const source = createFakeDataSource({ getTicketLinks: async () => stored }, ingest.script);
@@ -134,16 +138,21 @@ describe('Links section', () => {
     const region = await screen.findByRole('region', { name: 'Is blocked by' });
     expect(region.querySelector('[aria-busy="true"]')).not.toBeNull(); // inside its group, not merely somewhere
     expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(1);
+    expect(within(region).queryByRole('button', { name: /^Remove/ })).toBeNull(); // a busy row cannot be removed
     expect(triples(source.ingested)).toEqual([['ticket.link_added', OTHER, { kind: 'blocks', targetId: TICKET }]]);
     await ingest.releaseAll();
     await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeNull());
     expect(within(screen.getByRole('region', { name: 'Is blocked by' })).getByText('Title GN-133')).toBeInTheDocument();
     expect(screen.getByText('Linked: is blocked by GN-133')).toBeInTheDocument();
+    // the busy row was handed over for good: removing the saved row leaves no ghost of the pending one
+    await user.click(screen.getByRole('button', { name: 'Remove: is blocked by GN-133' }));
+    await ingest.releaseAll();
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Is blocked by' })).toBeNull());
 
     await openPicker(user); // control: "Blocks" files on this ticket's stream
     await chooseKind(user, 'Blocks');
     await findTicket(user);
-    expect(triples(source.ingested).slice(1)).toEqual([['ticket.link_added', TICKET, { kind: 'blocks', targetId: OTHER }]]);
+    expect(triples(source.ingested).slice(2)).toEqual([['ticket.link_added', TICKET, { kind: 'blocks', targetId: OTHER }]]);
     await ingest.releaseAll();
   });
 
