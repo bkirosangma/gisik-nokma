@@ -3,6 +3,7 @@ import { membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
+import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { appendTestEvent } from '../helpers/ledger.js';
 import { applyAll, seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 
@@ -201,4 +202,74 @@ it('28.080 an author keeps their own draft off the purge list while they can sti
   expect(asGuest.ids).toContain(`scope-revoked:${asGuest.ws}`);
   expect(asGuest.ids.join('|')).not.toContain(asGuest.theirs);
   expect(asGuest.ids.filter((id) => id.startsWith('purge:'))).toEqual([]);
+});
+
+/** Ledger row plus EVERY projection: `record` applies only the visibility-side ones, and a publish also moves `proj_tickets`. */
+async function recordFull(env: LedgerEvent): Promise<LedgerEvent> {
+  await appendTestEvent(db.pool, env);
+  const client = await db.pool.connect();
+  try {
+    for (const projection of buildProjectionRegistry().all()) await projection.apply(env, client);
+  } finally {
+    client.release();
+  }
+  return env;
+}
+
+it('28.095 publish reaches the readers: an online reader is sent a reach-granted notice naming the ticket (not its draft child), an away reader gets the events in order, and before the publish neither is sent anything', async () => {
+  const ws = newUlid();
+  const project = newUlid();
+  const [author, online, away] = [newUlid(), newUlid(), newUlid()];
+  await seedProject(db.pool, ws, project);
+  for (const user of [author, online, away]) await seedMember(db.pool, ws, user, 'member');
+  // A publish re-pins the ticket to its type's CURRENT binding, so the real ticket projection must find the type
+  // and its workflow; `proj_workflows` belongs to one workspace per workflow id, so this world publishes its own.
+  const workflowId = `wf-reach-${ws.slice(-8).toLowerCase()}`;
+  await recordFull(
+    testEnvelope({
+      workspaceId: ws, entity: { kind: 'workflow', id: workflowId }, type: 'workflow.defined', actorId: author,
+      payload: {
+        id: workflowId, version: 1, name: 'Reach flow', initialStateId: 'todo',
+        states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }],
+        transitions: [{ from: 'todo', to: 'done', rules: [] }],
+      },
+    }),
+  );
+  await recordFull(
+    testEnvelope({
+      workspaceId: ws, entity: { kind: 'ticket-type', id: newUlid() }, type: 'ticket-type.defined', actorId: author,
+      payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId, fields: [] },
+    }),
+  );
+  const parent = newUlid();
+  const child = newUlid();
+  const twin = newUlid();
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: parent, workflowId, draftBy: author });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: child, parentId: parent, workflowId, draftBy: author });
+  await seedTicket(db.pool, { workspaceId: ws, projectId: project, ticketId: twin, workflowId, createdBy: author });
+  const edit = await record(ticketEvent(ws, 'ticket.field_set', parent, { fieldId: 'title', value: 'drafted' }, author));
+  const twinEdit = await record(ticketEvent(ws, 'ticket.field_set', twin, { fieldId: 'title', value: 'twin edited' }, author));
+
+  // BEFORE the publish: the stream is live for both readers (the twin's edit) and says nothing of the draft
+  for (const [name, viewer] of [['online', online], ['away', away]] as const) {
+    const items = await collect(viewer, ws, 0);
+    expect(idsOf(items), name).toContain(twinEdit.id);
+    expect(idsOf(items), name).not.toContain(edit.id);
+    expect(entityIds(items), name).not.toContain(parent);
+    expect(idsOf(items).join('|'), name).not.toContain(parent);
+  }
+
+  const published = await recordFull(ticketEvent(ws, 'ticket.published', parent, { projectId: project }, author));
+
+  // the online reader's cursor ran past the drafting: a notice, then the event
+  const onlineIds = idsOf(await collect(online, ws, twinEdit.workspaceSeq));
+  expect(onlineIds).toContain(`reach-granted:${parent}`);
+  expect(onlineIds.indexOf(`reach-granted:${parent}`)).toBeLessThan(onlineIds.indexOf(published.id));
+  expect(onlineIds.join('|')).not.toContain(child); // the child is still a draft: not named
+
+  // the away reader's cursor is at the start: the ordinary stream carries everything, in order
+  const awayIds = idsOf(await collect(away, ws, 0));
+  expect(awayIds).toEqual(expect.arrayContaining([edit.id, published.id]));
+  expect(awayIds.indexOf(edit.id)).toBeLessThan(awayIds.indexOf(published.id));
+  expect(awayIds.join('|')).not.toContain(child);
 });

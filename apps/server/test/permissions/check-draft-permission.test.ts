@@ -6,6 +6,7 @@ import {
   PERMISSION_VISIBILITY_RULE,
   TICKET_NOT_VISIBLE_REASON,
 } from '../../src/permissions/check-permission.js';
+import { DRAFT_NOT_ALLOWED_RULE as ENGINE_DRAFT_NOT_ALLOWED_RULE } from '@gisik-nokma/rule-engine';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
 import { seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
@@ -107,5 +108,15 @@ describe('28.071 G1: the author\'s permission gate on a draft', () => {
 
     // CONTROL, same `it`: the SAME author's `ticket.closed`, refused above on the draft, is admitted on a published ticket
     expect(await as('ticket.closed', w.publishedId, w.author)).toBeNull();
+  });
+});
+
+describe('28.090 parity with the engine draft gate', () => {
+  it('the engine and this gate refuse a draft with the same rule id, and the sentence is the one the engine tests pin', () => {
+    expect(ENGINE_DRAFT_NOT_ALLOWED_RULE).toBe(DRAFT_NOT_ALLOWED_RULE);
+    expect(DRAFT_NOT_ALLOWED_RULE).toBe('draft.not-allowed');
+    // the same literal `packages/rule-engine/test/draft-gate.test.ts` asserts, so neither side can drift alone
+    expect(draftNotAllowedReason('ticket.transitioned')).toBe('A draft cannot be moved. Publish it first, or discard it.');
+    expect(draftNotAllowedReason('ticket.deleted')).toBe('A draft cannot be deleted. Discard it instead.');
   });
 });
