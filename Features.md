@@ -3827,7 +3827,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part1-viewport-timeline-view T3 bullet -->
 <!-- wtg-part1-viewport-timeline-view T4 bullet -->
 <!-- wtg-part1-viewport-timeline-view T5 bullet -->
-<!-- wtg-part1-viewport-timeline-view T6 bullet -->
+- ⚙️ **`ScrollAdapter`: smooth movement on a native scroller** (Workflow and Timeline graphs Part 1 T6; cases 29.030–29.036, 29.039; `packages/viewport/src/dom/{clock,scroll-adapter}.ts`) — the time views keep the platform's own scrolling (wheel, swipe, touch, scrollbar) and add what it lacks: Ctrl + wheel and pinch zoom about the pointer (the day under it holds within 0.5 px, also where the platform rounds scroll positions), glides on the spring (a Today jump lands inside 450 ms, instantly under reduced motion, never chasing a target past either end of the scroller), keys (arrows 7 days, Shift 28, PageUp/Down 90% of a viewport, Home / T centre today, + / - zoom 1.25x), mouse-drag pan with momentum (a press catches a fling; the click that ends a drag is swallowed), a rubber band at the ends through `--tl-overshoot`, px per day in the one `--tl-ppd` custom property, and a frame stream with smoothed velocity in days per second. The zoom is capped below the browser's scroll size (`MAX_SCROLL_PX`); axis `y` serves portrait. Reads time only through an injected `Clock` (`src/dom/clock.ts` is the only file naming the browser clock).
 <!-- wtg-part1-viewport-timeline-view T7 bullet -->
 <!-- wtg-part1-viewport-timeline-view T8 bullet -->
 <!-- wtg-part1-viewport-timeline-view T9 bullet -->
