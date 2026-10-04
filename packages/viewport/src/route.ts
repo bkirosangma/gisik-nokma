@@ -4,8 +4,9 @@
  * An arrow leaves the source bar's END anchor, runs on axis-aligned segments only, and enters the target bar's START
  * anchor with the arrowhead on the anchor: from the left in landscape, from above in portrait. It takes a vertical
  * run in the gutter just before the target (`target.start - 14 px`), or just after the source end, or, when the target
- * starts before the source ends, a horizontal channel between the two rows. Of those candidates (in that order) the
- * first that crosses no third bar wins; if none is clean, the one with the fewest crossings.
+ * starts before the source ends, a horizontal channel between the two rows (on one row, in the middle of the 12 px gap
+ * below it: never on a bar's edge). Of those candidates (in that order) the first that crosses no third bar wins; if none
+ * is clean, the one with the fewest crossings.
  *
  * Portrait is the same router on transposed boxes: time runs down, so "left" becomes "above".
  * Loops (TG-12) are curves, not corners: `routeLoop` below.
@@ -23,6 +24,8 @@ export type Route = {
 };
 
 export const GUTTER_PX = 14;
+/** The gap between two rows of bars (spec TG-13: a 28 px bar in a 40 px pitch, 12 px of gap). */
+const ROW_GAP_PX = 12;
 
 const transposeBox = (b: Box): Box => ({ x: b.y, y: b.x, w: b.h, h: b.w });
 const transposePt = (p: Pt): Pt => ({ x: p.y, y: p.x });
@@ -70,7 +73,7 @@ function routeLandscape(from: Box, to: Box, obstacles: readonly Box[]): Route {
   const vx = t.x - GUTTER_PX;
   const ux = s.x + GUTTER_PX;
   const below = t.y >= s.y;
-  const cy = below ? (from.y + from.h + Math.max(to.y, from.y + from.h)) / 2 : (to.y + to.h + Math.max(from.y, to.y + to.h)) / 2;
+  const cy = below ? (from.y + from.h + Math.max(to.y, from.y + from.h + ROW_GAP_PX)) / 2 : (to.y + to.h + Math.max(from.y, to.y + to.h)) / 2;
   const candidates: Pt[][] = [];
   if (s.y === t.y && s.x < t.x) candidates.push([s, t]);
   if (vx > s.x) candidates.push([s, { x: vx, y: s.y }, { x: vx, y: t.y }, t]);
