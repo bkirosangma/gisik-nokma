@@ -25,7 +25,7 @@ const miss = 'No user with that email. Someone you can already see in this works
 const GUEST_SENTENCE = 'They will join this workspace as a guest and see only this ticket.';
 const WORKSPACE_GONE = 'workspace not found or not visible to you';
 
-/** One row per tool that takes `assignee_email`. T8 appends `create_ticket`. */
+/** One row per tool that takes `assignee_email`. */
 type Row = {
   tool: 'assign_ticket' | 'create_ticket';
   claim: 'ticket.assigned' | 'ticket.created';
@@ -44,6 +44,12 @@ export const ROWS: Row[] = [
     tool: 'assign_ticket', claim: 'ticket.assigned', readsTicket: true, reads: [`/v1/workspaces/${WS}/tickets/${T}`],
     args: (extra = {}) => ({ workspaceId: WS, ticketId: T, assignee_email: ASHA.email, ...extra }),
     headline: (p) => `Assigns CCSO-4 "Fix login" to ${p.name} (${p.email}).`,
+    assigneeIn: (claim) => (claim['payload'] as { assigneeId: unknown }).assigneeId,
+  },
+  {
+    tool: 'create_ticket', claim: 'ticket.created', readsTicket: false, reads: ['/v1/me/workspaces'],
+    args: (extra = {}) => ({ workspaceId: WS, projectId: P, typeId: 'task', title: 'Fix login', assignee_email: ASHA.email, ...extra }),
+    headline: (p) => `Creates "Fix login" in Counter (Corner Shop) and assigns it to ${p.name} (${p.email}).`,
     assigneeIn: (claim) => (claim['payload'] as { assigneeId: unknown }).assigneeId,
   },
 ];
@@ -282,5 +288,78 @@ describe('assignee_email: the confirmation (package)', () => {
       expect(outside).toContain('ADDED AS A GUEST');
       expect(outside).toContain(GUEST_SENTENCE);
     }
+  });
+});
+
+describe('create_ticket by email (package)', () => {
+  const CREATE = (): Row => ROWS.find((r) => r.tool === 'create_ticket')!;
+  const createWith = (s: Stub, extra: Record<string, unknown> = {}) => call(CREATE(), s, extra);
+  const entityOf = (event: Record<string, unknown>) => (event['entity'] as { id: string }).id;
+
+  it('14.653 assigneeId with assignee_email, and confirm_assignee without an email, are refused before any request; assigneeId alone and neither behave as before; the stateId/start check still runs first', async () => {
+    for (const [label, extra, sentence] of [
+      ['both', { assigneeId: 'U2' }, 'create_ticket takes at most one of assigneeId and assignee_email'],
+      ['confirm without an email', { assignee_email: undefined, confirm_assignee: ASHA.userId }, 'confirm_assignee only goes with assignee_email'],
+      // `assigneeId` too, so the new "at most one" check WOULD fire: only the order of the two checks decides the sentence.
+      ['the older check first', { stateId: 'doing', start: 'backlog', assigneeId: 'U2' }, 'a backlog ticket has no starting status'],
+    ] as const) {
+      const s = stub();
+      await expect(createWith(s, { ...extra }), label).rejects.toThrow(sentence);
+      expect(s.requests, `${label}: nothing sent`).toEqual([]);
+    }
+    // assigneeId alone, "me" included, and neither: ONE event, no lookup, no read.
+    const alone = stub();
+    const make = writeTools(alone.session).find((t) => t.name === 'create_ticket')!;
+    await make.handler({ workspaceId: WS, projectId: P, typeId: 'task', title: 'A', assigneeId: 'me' });
+    await make.handler({ workspaceId: WS, projectId: P, typeId: 'task', title: 'B' });
+    const batches = eventBatches(alone.requests);
+    expect(batches.map((b) => (b[0]!['payload'] as { assigneeId?: string }).assigneeId)).toEqual([ME, undefined]);
+    expect(alone.requests.filter((r) => r.method === 'GET' || r.path === LOOKUP), 'the old path reads and looks up nothing').toEqual([]);
+  });
+
+  it('14.654 call 1 creates nothing: one lookup, the directory read for the names, no event, no assign-outsider, and the markdown is not even converted', async () => {
+    for (const email of [ASHA.email, RAVI.email]) {
+      const s = stub();
+      // A ticket key in the body: converting it is a `GET /v1/search` (`markdown-io.ts:32-36,48`), so a conversion on call 1 is
+      // VISIBLE in the request list. Plain Markdown with no mention, key or note link makes no request at all.
+      const out = (await createWith(s, { assignee_email: email, markdown: '## Steps\n\n1. ring the vendor about [[CCSO-12]]' })) as Preview;
+      expect(out.preview).toBe(true);
+      expect(at(s.requests, LOOKUP)).toHaveLength(1);
+      expect(writes(s.requests)).toEqual([]);
+      expect(s.requests.map((r) => r.path), 'the lookup, then the directory read for the names; nothing else').toEqual([LOOKUP, '/v1/me/workspaces']);
+    }
+    // CONTROL, same `it`: call 2 with the userId creates.
+    const s = stub();
+    await createWith(s, { confirm_assignee: ASHA.userId });
+    expect(eventBatches(s.requests)).toHaveLength(1);
+  });
+
+  it('14.655 call 2 creates the ticket with assigneeId = the resolved userId (in the workspace: one ticket.created through /v1/events; an outsider: assign-outsider whose event IS that ticket.created), and the reply carries the new ticketId', async () => {
+    const inside = stub();
+    const a = (await createWith(inside, { confirm_assignee: ASHA.userId })) as { ticketId: string };
+    const claim = eventBatches(inside.requests)[0]![0]!;
+    expect(claim).toMatchObject({ type: 'ticket.created', origin: 'mcp', actorId: ME });
+    expect((claim['payload'] as { assigneeId: string }).assigneeId).toBe(ASHA.userId);
+    expect(a.ticketId).toBe(entityOf(claim));
+    expect(a.ticketId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    const outside = stub();
+    const b = (await createWith(outside, { assignee_email: RAVI.email, confirm_assignee: RAVI.userId })) as { ticketId: string };
+    const posted = at(outside.requests, OUTSIDER)[0]!.body as { userId: string; event: Record<string, unknown> };
+    expect(posted.userId).toBe(RAVI.userId);
+    expect(posted.event).toMatchObject({ type: 'ticket.created', origin: 'mcp', actorId: ME });
+    expect((posted.event['payload'] as { assigneeId: string }).assigneeId).toBe(RAVI.userId);
+    expect(b.ticketId).toBe(entityOf(posted.event));
+    expect(eventBatches(outside.requests)).toEqual([]);
+    expect(b.ticketId).not.toBe(a.ticketId); // CONTROL: each creation mints its own id
+  });
+
+  it('14.656 a confirmation that resolves to a miss or to a different person mints no ticket id into any request', async () => {
+    const moved = stub({ lookup: (_e, n) => (n === 1 ? ASHA : RAVI) });
+    await createWith(moved);
+    await createWith(moved, { confirm_assignee: ASHA.userId });
+    expect(writes(moved.requests)).toEqual([]);
+    const gone = stub({ lookup: () => null });
+    await expect(createWith(gone, { confirm_assignee: ASHA.userId })).rejects.toThrow(miss);
+    expect(writes(gone.requests)).toEqual([]);
   });
 });

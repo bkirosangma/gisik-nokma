@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { newUlid } from '@gisik-nokma/domain';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { canSee } from '../../src/visibility/can-see.js';
 import { callTool } from './helpers/door-matrix.js';
@@ -40,6 +41,13 @@ export const HROWS: HRow[] = [
       await mustCommit(w.app, w.owner, [event(w.workspaceId, w.owner, { kind: 'ticket', id: w.ticketId }, 'ticket.deleted', {})]);
       return {};
     },
+  },
+  {
+    tool: 'create_ticket', claim: 'ticket.created',
+    args: (w, email, extra = {}) => ({ workspaceId: w.workspaceId, projectId: w.projectId, typeId: 'task', title: `Born assigned ${email}`, assignee_email: email, ...extra }),
+    ticketOf: (_w, reply) => reply['ticketId'] as string,
+    // call 2 names a type that does not exist: the engine refuses the creation (the confirmation is the userId only, so the other arguments may differ).
+    sabotage: async () => ({ typeId: 'no-such-type' }),
   },
 ];
 
@@ -222,5 +230,69 @@ describe('assignee_email through the hosted door', () => {
       expect((await membershipLedger(w, guest.userId)).map((m) => m.type)).toEqual(['membership.granted']); // the setup's own grant, no second one, no demotion
       expect(await roleOf(w, guest.userId)).toBe('guest');
     }
+  });
+});
+
+describe('create_ticket by email through the hosted door', () => {
+  const CREATE = (): HRow => HROWS.find((r) => r.tool === 'create_ticket')!;
+  const ticketCount = async (w: EmailWorld) => Number((await w.db.pool.query(`SELECT count(*) AS n FROM proj_tickets WHERE project_id = $1`, [w.projectId])).rows[0].n);
+  const eventTotal = async (w: EmailWorld) => Number((await w.db.pool.query(`SELECT count(*) AS n FROM events WHERE workspace_id = $1`, [w.workspaceId])).rows[0].n);
+
+  it('14.654 call 1 for an outsider creates no ticket and appends no event; the project\'s tickets and the ledger are unchanged', async () => {
+    const w = await buildEmailWorld(db, '26540');
+    const out = await w.outsider('out-654@example.test');
+    const before = { tickets: await ticketCount(w), events: await eventTotal(w) };
+    const preview = await ask(w, w.member, CREATE(), out.email!);
+    expect((preview.json as unknown as Preview)).toMatchObject({ preview: true, joinsAsGuest: true });
+    expect({ tickets: await ticketCount(w), events: await eventTotal(w) }).toEqual(before);
+    // CONTROL, same `it`: call 2 creates exactly one ticket.
+    await ask(w, w.member, CREATE(), out.email!, { confirm_assignee: out.userId });
+    expect(await ticketCount(w)).toBe(before.tickets + 1);
+  });
+
+  it('14.655 the created ticket is assigned to the resolved person from birth, in both arms, and the guest sees it', async () => {
+    const w = await buildEmailWorld(db, '26550');
+    const inside = await w.outsider('inside-655@example.test');
+    await mustCommit(w.app, w.owner, [event(w.workspaceId, w.owner, { kind: 'membership', id: `${w.workspaceId}:${inside.userId}` }, 'membership.granted', { userId: inside.userId, role: 'member' })]);
+    const a = await ask(w, w.owner, CREATE(), inside.email!, { confirm_assignee: inside.userId });
+    expect(a.isError, a.text).toBe(false);
+    const aId = (a.json as { ticketId: string }).ticketId;
+    expect(await assigneeOf(w, aId)).toBe(inside.userId);
+    const out = await w.outsider('out-655@example.test');
+    const b = await ask(w, w.member, CREATE(), out.email!, { confirm_assignee: out.userId });
+    expect(b.isError, b.text).toBe(false);
+    const bId = (b.json as { ticketId: string }).ticketId;
+    expect(await assigneeOf(w, bId)).toBe(out.userId);
+    expect(await roleOf(w, out.userId)).toBe('guest');
+    expect(await canSee(db.pool, out.userId, bId)).toBe(true);
+    expect(await canSee(db.pool, out.userId, aId)).toBe(false); // CONTROL: only the ticket they were born onto
+  });
+
+  it('14.656 a refusal after confirmation (an unknown ticket type; a project the caller is not in) is the server\'s words, creates nothing, and leaves no guest membership; the ledger shows the grant taken back', async () => {
+    const w = await buildEmailWorld(db, '26560');
+    const out = await w.outsider('out-656@example.test');
+    const before = await ticketCount(w);
+    const badType = await ask(w, w.member, CREATE(), out.email!, { confirm_assignee: out.userId, typeId: 'no-such-type' });
+    expect(badType.isError).toBe(true);
+    expect(badType.text).toMatch(/^refused by [\w.-]+: .+/);
+    expect(badType.text).not.toContain('answered 422');
+    // A second project the member is NOT on.
+    const other = newUlid();
+    await mustCommit(w.app, w.owner, [
+      event(w.workspaceId, w.owner, { kind: 'project', id: other }, 'project.created', { name: 'Closed room' }),
+      event(w.workspaceId, w.owner, { kind: 'project', id: other }, 'project.member_added', { userId: w.owner.userId, projectAdmin: true }),
+    ]);
+    const notOn = await ask(w, w.member, CREATE(), out.email!, { confirm_assignee: out.userId, projectId: other });
+    expect(notOn.isError, 'if the server lets a workspace member create in a project they are not on, say so in the HANDOFF and drop this arm: the unknown-type arm above already owns the claim').toBe(true);
+    expect(await ticketCount(w)).toBe(before);
+    expect(await roleOf(w, out.userId)).toBeNull();
+    const ledger = (await membershipLedger(w, out.userId)).map((m) => m.type);
+    expect(ledger.length).toBeGreaterThanOrEqual(2); // the unknown-type arm reaches the engine AFTER the grant
+    expect(ledger.filter((t) => t === 'membership.granted')).toHaveLength(ledger.filter((t) => t === 'membership.revoked').length); // every grant was taken back
+    expect(ledger.at(-1)).toBe('membership.revoked');
+    // CONTROL, same `it`: the same confirmation with the ordinary arguments creates.
+    const ok = await ask(w, w.member, CREATE(), out.email!, { confirm_assignee: out.userId });
+    expect(ok.isError, ok.text).toBe(false);
+    expect(await ticketCount(w)).toBe(before + 1);
   });
 });
