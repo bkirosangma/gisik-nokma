@@ -56,7 +56,8 @@ export class CameraAdapter implements ViewportDriver {
     this.el = options.element;
     this.layer = options.layer;
     this.clock = options.clock ?? browserClock;
-    this.cam = options.start ?? { x: 0, y: 0, zoom: 1 };
+    // A copy: the camera is written in place, and the caller's `start` must not move with it.
+    this.cam = options.start === undefined ? { x: 0, y: 0, zoom: 1 } : { ...options.start };
     this.lastX = this.cam.x;
     this.el.style.touchAction = 'none';
     this.el.style.overscrollBehavior = 'contain';
