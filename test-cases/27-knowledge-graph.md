@@ -8,6 +8,7 @@
 | 27.001–27.094 | A, typed links | `2026-10-03-typed-links.md`: T1 27.001–27.019 · T2 27.020–27.034 · T3 27.035–27.049 · T4 27.050–27.064 · T5 27.065–27.079 · T4b 27.080–27.094 (added 2026-10-04) |
 | 27.100–27.179 | B, reference index and backlinks | `2026-10-03-reference-index.md` |
 | 27.200–27.349 | C, Knowledge Graph view | `2026-10-03-knowledge-graph-view.md` |
+| 27.360–27.399 | C follow-ups, harness port | `ctl-pw-ports` (planner P35, 2026-10-05): 27.360–27.362 |
 | 27.400–27.549 | D, MCP graph query and semantic layer | `2026-10-03-mcp-graph-semantic-layer.md` |
 | 27.600–27.659 | E, Home | `2026-10-03-home.md` |
 
@@ -214,6 +215,12 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 <!-- KG-C T7 -->
 <!-- KG-C T8 -->
 <!-- KG-C T9 -->
+
+### 27.3.1 The harness port (`task/ctl-pw-ports`, planner P35 2026-10-05)
+
+- ✅ **27.360 — `KG_PW_PORT` moves the harness:** with it set, the RESOLVED `playwright.config.ts` (read in a fresh node, so a config that ignored the variable cannot pass) has the webServer url, the base url and the vite `--port … --strictPort` on that port (`packages/knowledge-graph-browser/tests/port.spec.ts`)
+- ✅ **27.361 — CONTROL:** with `KG_PW_PORT` unset the same read gives 3191 in all three
+- ✅ **27.362 — the vite config follows too:** `vite.config.ts` resolved through vite's own loader gives `server.port` = `KG_PW_PORT` with `strictPort`; CONTROL in the same test: unset → 3191
 
 ## 27.4 MCP graph query and semantic layer (spec D, 27.400–27.549)
 

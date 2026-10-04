@@ -831,6 +831,15 @@ Block `13.2230`–`13.2239` for `task/ctl-sem-gate-slot` (planner 2026-10-04, pr
 - 13.2234 🧪 Under the cap the probes still bind during a gate: low free memory waits (reason `pressure`) and a sustained swap-in waits (reason `swap`), never reason `gate`.
 - 13.2235 🧪 `ctl run-tests --dry-run` names the cap: `at least N slot(s) are held (CTL_SEM_GATE_SLOTS)` with 1 by default, the set value for 0 and 3, and 1 for a value that is not a number.
 
+## Playwright ports: the gate on 3291 / 3292, every other browser run on a free port (`task/ctl-pw-ports`, planner P35 2026-10-05: gates #1 and #2 went RED on "localhost:3191 already used")
+
+- 13.2280 🧪 `ctl gate` exports `KG_PW_PORT=3291` and `FG_PW_PORT=3292`: its `--dry-run` line names both, the REAL gate run's environment (what `gate.sh`, and so turbo, starts with) carries them, and a port the caller exported (3191 / 3192) does not leak in
+- 13.2281 🧪 Two CONCURRENT `ctl run-tests` of a Playwright command (two slots) get four DIFFERENT ports (a KG port is not the other run's FG port either), all inside the range, never 3191 / 3291 / 3192 / 3292; a `--dry-run` names ports inside the range and a command with no Playwright in it names none; each trigger alone (the word `playwright`, `turbo`, a `*-graph-browser` package in the command or as the directory) is enough. (A dry-run holds no slot, so two dry-runs cannot reserve against each other: the concurrency leg uses real runs.)
+- 13.2282 🧪 A HELD port is skipped: with the range's first port listened on (IPv6 and IPv4, one run each) the run gets KG >= base+1 and another FG, and its `--dry-run` names base+1
+- 13.2283 🧪 A `KG_PW_PORT` the caller exported is kept; a command naming neither Playwright, a `*-graph-browser` package nor turbo runs with its environment untouched (CONTROL for 13.2281)
+- 13.2284 🧪 The summary prints `ports: KG_PW_PORT=… FG_PW_PORT=…` right after the queue wait, and the log header records them
+- 13.2285 🧪 With fewer than two free ports in the range (`CTL_PW_PORT_COUNT=1`) the run FAILS (`FAIL run-tests <label> no free Playwright ports — nothing was run`, rc 1) and the command is not run; its `--dry-run` fails too
+
 ## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
 
 Why: inter-seat messages were `tmux send-keys` pastes and regex-filtered `tail -n0 -F` monitors, which lose lines at every 30-minute expiry, are eaten by copy mode, pick option 1 of a permission prompt, and leave a FIX written to QUEUE-gate but never delivered (mechanisms a–g of `PLAN-efficiency-robustness-2026-10-03.md`); a Claude seat (the dispatcher, $89/week) did the relaying. Design: `docs/superpowers/specs/2026-10-03-ctl-postman-design.md` (planner ack 2026-10-03 06:37 with amendments A–C: shadow mode ≥ 20 deliveries AND one gate cycle with zero misses; `postman audit` and the planner-target page → ⚑ notes line are part of the MVP; `pane_state` refuses a menu, copy-mode and non-empty box text, each with its control in the same check).

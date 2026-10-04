@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850 and 13.2230-13.2235, test-cases/13-deploy-and-ops.md);
+# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235 and 13.2280-13.2285, test-cases/13-deploy-and-ops.md);
 # run by `ctl selftest`. Every case id starts its check's name. No real load is needed: `memory_pressure`, `sysctl` and `vm_stat` are PATH
 # stubs that read files, the clock is a file (CTL_SEM_CLOCK_FILE: a sleep advances it and runs CTL_SEM_SLEEP_HOOK, so a wait of minutes costs
 # no real time), and a slot is "held" by planting its directory with a live pid. Two cases (13.1767, 13.1774) use the REAL clock and real
@@ -244,7 +244,7 @@ check "13.1850 the command runs in the CALLER's directory (a subdirectory, no --
 
 # gate priority marker: written by verbs/gate.sh around the REAL gate run only
 bare=$(mktemp -d); /usr/bin/git init -q --bare "$bare"
-gr=$(mktemp -d); ( cd "$gr" && /usr/bin/git init -q . && /usr/bin/git symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes/gate-lock && printf '%s\n' '#!/bin/bash' 'ls "$CTL_SEM_DIR" | grep "^gate-" > "$CTL_SEM_DIR/../during"' 'printf "Tasks:    41 successful, 41 total\nCached:    0 cached, 41 total\n" > "$1"' 'echo "GATE_MODE=${GATE_MODE:-unset}"' 'echo EXIT=${GATE_FIXTURE_EXIT:-0}' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo helper > docs/lanes/gate-lock/locked-test.sh && /usr/bin/git add -A && /usr/bin/git commit -q -m base && /usr/bin/git remote add origin "$bare" && /usr/bin/git push -q -u origin main && /usr/bin/git checkout -q -b feat && /usr/bin/git commit -q --allow-empty -m feat )
+gr=$(mktemp -d); ( cd "$gr" && /usr/bin/git init -q . && /usr/bin/git symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes/gate-lock && printf '%s\n' '#!/bin/bash' 'ls "$CTL_SEM_DIR" | grep "^gate-" > "$CTL_SEM_DIR/../during"' 'echo "${KG_PW_PORT:-unset} ${FG_PW_PORT:-unset}" > "$CTL_SEM_DIR/../ports"' 'printf "Tasks:    41 successful, 41 total\nCached:    0 cached, 41 total\n" > "$1"' 'echo "GATE_MODE=${GATE_MODE:-unset}"' 'echo EXIT=${GATE_FIXTURE_EXIT:-0}' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo helper > docs/lanes/gate-lock/locked-test.sh && /usr/bin/git add -A && /usr/bin/git commit -q -m base && /usr/bin/git remote add origin "$bare" && /usr/bin/git push -q -u origin main && /usr/bin/git checkout -q -b feat && /usr/bin/git commit -q --allow-empty -m feat )
 gate_run() { ( cd "$gr" && CTL_DRY_RUN=0 "$HERE/ctl" gate "$(/usr/bin/git rev-parse HEAD)" --repo "$gr" "$@" 2>&1 ); }
 reset; rm -f "$fx/during"; dry=$(gate_run --dry-run)
 check "13.1772 ctl gate --dry-run writes no priority marker (and did dry-run)" 'printf "%s" "$dry" | tail -1 | grep -q "^OK gate dry-run" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^gate-")" ] && [ ! -e "$fx/during" ]'
@@ -261,6 +261,64 @@ reset; rm -f "$fx"/p*.t
 pr() { rt_real --label "$1" -- sh -c 'date +%s > "$1.start"; sleep 4; date +%s > "$1.end"' x "$fx/$1" ; }
 pr p1 > "$fx/p1.out" & q1=$!; pr p2 > "$fx/p2.out" & q2=$!; sleep 1; pr p3 > "$fx/p3.out" & q3=$!; wait $q1 $q2 $q3
 check "13.1774 two runs overlap, a third (CTL_TEST_SLOTS=2 default) waits ≥ 2 s for one to finish and logs that wait" 's1=$(cat "$fx/p1.start"); s2=$(cat "$fx/p2.start"); s3=$(cat "$fx/p3.start"); e1=$(cat "$fx/p1.end"); e2=$(cat "$fx/p2.end"); [ "$s2" -lt "$e1" ] && [ "$s3" -ge "$e1" -o "$s3" -ge "$e2" ] && w=$(sed -n "s/^queue wait: \([0-9]*\)s.*/\1/p" "$fx/p3.out") && [ "$w" -ge 2 ] && grep -q "waited for: slots" "$fx/p3.out"'
+
+
+# --- Playwright ports (13.2280-13.2285): the gate runs the browser packages on 3291 / 3292, every other Playwright run on a FREE port of its own ---
+check "13.2280 ctl gate --dry-run names the Playwright ports it exports: KG_PW_PORT=3291 FG_PW_PORT=3292" 'reset; gate_run --dry-run | grep -q "^DRY: GATE_MODE=fresh KG_PW_PORT=3291 FG_PW_PORT=3292 "'
+reset; rm -f "$fx/ports"; gate_run >/dev/null
+check "13.2280 the REAL gate run puts KG_PW_PORT=3291 and FG_PW_PORT=3292 in the environment gate.sh (and so turbo) starts with" '[ "$(cat "$fx/ports" 2>/dev/null)" = "3291 3292" ]'
+reset; rm -f "$fx/ports"; ( export KG_PW_PORT=3191 FG_PW_PORT=3192; gate_run >/dev/null )
+check "13.2280 …and a port the CALLER exported does not leak into the gate: it still gets 3291 / 3292" '[ "$(cat "$fx/ports" 2>/dev/null)" = "3291 3292" ]'
+
+# a block of 30 ports nobody listens on, so the cases below do not depend on what else this machine runs
+pwbase=$(python3 -c '
+import socket
+for b in range(3600, 3990, 30):
+    ok = True
+    for p in range(b, b + 30):
+        s = socket.socket()
+        try: s.bind(("127.0.0.1", p))
+        except OSError: ok = False
+        finally: s.close()
+    if ok: print(b); break')
+export CTL_PW_PORT_BASE="$pwbase"; unset KG_PW_PORT FG_PW_PORT
+pw_cmd=(sh -c 'echo "${KG_PW_PORT:-unset} ${FG_PW_PORT:-unset}" > "$1"; sleep 3 # playwright' x)   # the word "playwright" in the command is what makes the verb pick ports
+reset; rm -f "$fx"/pw*.out
+rt_real --label pw1 -- "${pw_cmd[@]}" "$fx/pw1.out" >/dev/null & q1=$!; rt_real --label pw2 -- "${pw_cmd[@]}" "$fx/pw2.out" >/dev/null & q2=$!; wait $q1 $q2
+read -r k1 f1 < "$fx/pw1.out"; read -r k2 f2 < "$fx/pw2.out"
+check "13.2281 two CONCURRENT Playwright runs (two slots) get FOUR different ports (KG and FG of each: a KG port may not be the other run's FG port either), all inside the range, none of them 3191 / 3291 / 3192 / 3292" '[ "$(printf "%s\n" $k1 $f1 $k2 $f2 | sort -u | wc -l | tr -d " ")" = 4 ] && for p in $k1 $f1 $k2 $f2; do [ "$p" -ge "$pwbase" ] && [ "$p" -lt $((pwbase+100)) ] || exit 1; done'
+dry1=$(rt --dry-run -- sh -c ': # playwright'); dry2=$(rt --dry-run -- pnpm exec playwright test)
+check "13.2281 a --dry-run names the ports its run would get (inside the range, not 3191 / 3291) and a command with no Playwright in it names none" 'for d in "$dry1" "$dry2"; do kp=$(printf "%s" "$d" | sed -n "s/.* with KG_PW_PORT=\([0-9]*\) FG_PW_PORT=.*/\1/p"); [ -n "$kp" ] && [ "$kp" -ge "$pwbase" ] && [ "$kp" -lt $((pwbase+100)) ] || exit 1; done; ! rt --dry-run -- vitest run | grep -q KG_PW_PORT'
+
+mkdir -p "$repo/packages/flow-graph-browser"
+dry3=$(rt --dry-run -- pnpm turbo run test); dry4=$(rt --dry-run -- pnpm --filter @gisik-nokma/knowledge-graph-browser test); dry5=$( cd "$repo/packages/flow-graph-browser" && PATH="$FB:$PATH" "$HERE/ctl" run-tests --dry-run -- pnpm test 2>&1 )
+check "13.2281 …each trigger alone: a turbo command names ports" 'printf "%s" "$dry3" | grep -q " with KG_PW_PORT=[0-9]* FG_PW_PORT="'
+check "13.2281 …a command naming a *-graph-browser package names ports" 'printf "%s" "$dry4" | grep -q " with KG_PW_PORT=[0-9]* FG_PW_PORT="'
+check "13.2281 …a plain \`pnpm test\` run FROM a *-graph-browser directory names ports" 'printf "%s" "$dry5" | grep -q " with KG_PW_PORT=[0-9]* FG_PW_PORT="'
+
+pw_hold() {   # pw_hold <family> <port> <file>: a background listener on that port, reported ready by <file>; its pid goes to $fx/pids (cleaned up on exit)
+  python3 -c '
+import socket, sys, time
+fam = socket.AF_INET6 if sys.argv[1] == "6" else socket.AF_INET
+s = socket.socket(fam); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("::1" if sys.argv[1] == "6" else "127.0.0.1", int(sys.argv[2]))); s.listen()
+open(sys.argv[3], "w").write("up"); time.sleep(60)' "$1" "$2" "$3" >/dev/null 2>&1 &   # stdout closed: a $(...) caller must not wait for the holder
+  echo $! >> "$fx/pids"; hp=$!; n=0; while [ ! -f "$3" ] && [ "$n" -lt 50 ]; do sleep 0.1; n=$((n+1)); done; echo "$hp"
+}
+for fam in 6 4; do
+  reset; rm -f "$fx/pw1.out" "$fx/held"; hp=$(pw_hold $fam "$pwbase" "$fx/held")
+  rt_real --label pwh -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null; read -r kh fh < "$fx/pw1.out"; dryh=$(rt --dry-run -- sh -c ': # playwright'); kill "$hp" 2>/dev/null; wait "$hp" 2>/dev/null
+  check "13.2282 a HELD port is skipped (IPv$fam listener on the range's first port): the run gets KG >= base+1 and FG another free one, and its --dry-run names a different port too" '[ -f "$fx/held" ] && [ "$kh" -ge $((pwbase+1)) ] && [ "$fh" -ge $((pwbase+1)) ] && [ "$kh" != "$fh" ] && printf "%s" "$dryh" | grep -q " with KG_PW_PORT=$((pwbase+1)) "'
+done
+reset; rm -f "$fx/ran"; nofree=$(CTL_PW_PORT_COUNT=1 rt --label pwx -- sh -c ': > "$1" # playwright' x "$fx/ran"); nofreerc=$?; nofreed=$(CTL_PW_PORT_COUNT=1 rt --dry-run -- sh -c ': # playwright')
+check "13.2285 with fewer than two free ports the run FAILS (rc 1) and the command is not run; its --dry-run fails too" '[ $nofreerc -eq 1 ] && [ ! -e "$fx/ran" ] && printf "%s" "$nofree" | tail -1 | grep -q "^FAIL run-tests pwx no free Playwright ports" && printf "%s" "$nofreed" | tail -1 | grep -q "^FAIL run-tests no free Playwright ports"'
+reset; rm -f "$fx/pw1.out"; KG_PW_PORT=4999 rt_real --label pwk -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null; read -r kp fp < "$fx/pw1.out"
+check "13.2283 a KG_PW_PORT the caller exported is kept (FG still picked inside the range)" '[ "$kp" = 4999 ] && [ "$fp" -ge "$pwbase" ] && [ "$fp" -lt $((pwbase+100)) ]'
+reset; rm -f "$fx/pw1.out"; rt_real --label pwn -- sh -c 'echo "${KG_PW_PORT:-unset} ${FG_PW_PORT:-unset}" > "$1"' x "$fx/pw1.out" >/dev/null
+check "13.2283 a command that names neither Playwright, a *-graph-browser package nor turbo runs with its environment untouched" '[ "$(cat "$fx/pw1.out")" = "unset unset" ]'
+reset; pwlog=$(rt_real --label pws -- sh -c 'true # playwright' | tr "\n" "~")
+check "13.2284 the summary names the ports it picked (one line, after the queue wait) and the log header records them" 'printf "%s" "$pwlog" | grep -q "queue wait[^~]*~ports: KG_PW_PORT=[0-9]* FG_PW_PORT=[0-9]*~" && grep -q "^# ports: KG_PW_PORT=" "$(ls -t "$CTL_LOG_DIR"/run-tests-*.log | head -1)"'
+unset CTL_PW_PORT_BASE
 
 rm -rf "$bare" "$gr"
 [ "$fails" -eq 0 ] && echo "run-tests.test.sh: ok" || { echo "run-tests.test.sh: $fails FAILED"; exit 1; }
