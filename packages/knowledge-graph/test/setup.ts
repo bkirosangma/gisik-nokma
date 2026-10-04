@@ -11,3 +11,6 @@ import '@testing-library/jest-dom/vitest';
  * 'button' and name 'Plain'").
  */
 afterEach(cleanup);
+
+/** jsdom has no `matchMedia`; `watchTheme` listens on one (`src/theme/read-palette.ts`). */
+window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;

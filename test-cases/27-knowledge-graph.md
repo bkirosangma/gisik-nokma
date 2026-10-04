@@ -210,6 +210,7 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 - ✅ **27.258 — `edgePeople` clears 3:1** on `surface` and `surfaceRaised` in every style and theme; control: the mockup's own greys (`#a8a49a`, `#57544c`) measure under 3:1 (`packages/ui/test/tokens.test.ts`)
 - ✅ **27.259 — the pairless roles:** `fogDot` (never interactive) and `graphCardLine` (a hairline; a card is told by its fill and text) measure under 3:1 and no `CONTRAST_PAIRS` row names them; control: the fog dot still reads at 1.5:1 or more (`packages/ui/test/tokens.test.ts`)
 <!-- KG-C T5 -->
+- ✅ **27.263 — the palette reader:** every palette role is read from its own `--gn-*` variable and `dark` from the painted card fill's luminance (below 0.5; `#bbbbbb` is dark, `#bcbcbc` light; an inline `color-scheme` decides nothing); a `data-theme` or `data-style` flip on `<html>` notifies until stopped; control: an unset variable reads as empty, not a fallback colour (`packages/knowledge-graph/test/theme.test.ts`)
 <!-- KG-C T6 -->
 <!-- KG-C T7 -->
 <!-- KG-C T8 -->
