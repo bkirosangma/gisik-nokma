@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LinkedFromPage, LinkedFromRow, ServerStreamFrame } from '@gisik-nokma/domain';
@@ -87,6 +87,18 @@ describe('27.146 a click opens the source; a comment opens its parent at the com
     // A COMMENT row with no ticket href: without the `base === null` guard this would be 'null#comment-C4'
     // (a plain ticket row returns `base` either way, so it cannot tell the guard from its absence).
     expect(linkedFromHref(row(4, { sourceKind: 'comment', sourceId: 'C4' }), () => null)).toBeNull();
+  });
+
+  it('27.146 with onNavigate the click is cancelled for the router; without it the anchor navigates natively (control)', () => {
+    const onNavigate = vi.fn();
+    const page = { total: 1, nextCursor: null, items: [row(1)] };
+    const { unmount } = render(<LinkedFromSection {...props(live(page), { onNavigate })} />);
+    // `fireEvent` answers false when a handler called preventDefault.
+    expect(fireEvent.click(screen.getByRole('link'))).toBe(false);
+    expect(onNavigate.mock.calls).toEqual([['/t/S1']]);
+    unmount();
+    render(<LinkedFromSection {...props(live(page))} />);
+    expect(fireEvent.click(screen.getByRole('link'))).toBe(true);
   });
 });
 
@@ -286,9 +298,14 @@ describe('27.151 a Linked from row on the sheet navigates through the sheet’s 
   });
 
   it('27.151 the sheet\'s Show all asks the same read for this ticket with the cursor', async () => {
-    const getLinkedFrom = vi.fn(async (_ws: string, _target: unknown, cursor?: string) =>
-      cursor === '9' ? { total: 2, items: [row(4)], nextCursor: null } : { total: 2, items: [commentRow], nextCursor: '9' },
-    );
+    // Only the FIRST call answers the first page: a later call without the cursor ends the walk at once, so a
+    // loadMore that dropped the cursor fails the last-call assertion below instead of paging forever.
+    let calls = 0;
+    const getLinkedFrom = vi.fn(async (_ws: string, _target: unknown, cursor?: string) => {
+      calls += 1;
+      if (calls === 1) return { total: 2, items: [commentRow], nextCursor: '9' };
+      return cursor === '9' ? { total: 2, items: [row(4)], nextCursor: null } : { total: 2, items: [], nextCursor: null };
+    });
     render(sheet(createFakeDataSource({ getTicket: async () => MINIMAL_READ, getLinkedFrom })));
     const section = await screen.findByTestId('linked-from');
     await userEvent.click(within(section).getByRole('button', { name: 'Show all 2' }));

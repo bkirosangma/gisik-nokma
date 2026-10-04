@@ -353,9 +353,13 @@ describe('27.152-27.153 the note document draws Linked from between its body and
     cleanup();
 
     // "Show all" on the note asks the same read for this note, with the cursor.
-    const paged = vi.fn(async (_ws: string, _target: unknown, cursor?: string) =>
-      cursor === '9' ? { total: 2, items: [LINKED[1]!], nextCursor: null } : { total: 2, items: [LINKED[0]!], nextCursor: '9' },
-    );
+    // Only the FIRST call answers the first page (see 27.151): a call without the cursor then ends the walk at once.
+    let calls = 0;
+    const paged = vi.fn(async (_ws: string, _target: unknown, cursor?: string) => {
+      calls += 1;
+      if (calls === 1) return { total: 2, items: [LINKED[0]!], nextCursor: '9' };
+      return cursor === '9' ? { total: 2, items: [LINKED[1]!], nextCursor: null } : { total: 2, items: [], nextCursor: null };
+    });
     renderDocument({ getLinkedFrom: paged, getNoteComments: async () => [] });
     const more = await screen.findByTestId('linked-from');
     await userEvent.setup().click(within(more).getByRole('button', { name: 'Show all 2' }));
