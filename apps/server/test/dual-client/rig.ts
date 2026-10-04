@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import {
   newSubmittedEvent,
   type IngestResult,
@@ -14,6 +14,7 @@ import {
   type Replica,
   type SyncEngine,
   type SyncItem,
+  type SyncStorage,
   type SyncTransport,
 } from '@gisik-nokma/sync-client';
 // The node adapter lives on the testing subpath so app builds never resolve
@@ -35,20 +36,19 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { getTicketStateFromDb } from '../../src/projections/tickets.js';
 import { createSyncService, type SyncEventResult, type SyncService } from '../../src/sync/sync-service.js';
 import {
-  BOOTSTRAP_BACKFILL_TYPES,
   type BootstrapResponse,
   type BootstrapTicket,
 } from '../../src/sync/sync-routes.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
 import { reconcileHeldIds, reconcileHeldNoteIds } from '../../src/sync/reconcile-route.js';
-import { ticketBootstrapFor } from '../../src/sync/sync-routes.js';
+import { bootstrapTicket, ticketBootstrapFor } from '../../src/sync/sync-routes.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
 import { canSee } from '../../src/visibility/can-see.js';
+import { targetSight } from '../../src/visibility/withhold-link-targets.js';
 import { canReadNoteById } from '../../src/visibility/can-read-note.js';
 import { listVisibleTickets } from '../../src/visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
-import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
 import { listNotes } from '../../src/read/notes.js';
 import { purgedRefsAmong } from '../../src/purge/purged-lookup.js';
 import { readDeletedItems } from '../../src/read/deleted-items.js';
@@ -74,10 +74,12 @@ import { seedMember, seedProject } from '../helpers/seed.js';
  * Sync-down is `visibleEventsFor` piped into `replica.applyServerItem`, the
  * same primitive the WebSocket hub wraps (`stream/hub.ts`), advanced by the
  * same per-envelope `workspaceSeq` cursor rule the hub uses. Bootstrap is the
- * route's own assembly (`sync-routes.ts`) re-run here without HTTP, including
- * its `BOOTSTRAP_BACKFILL_TYPES` — imported, never restated, because a
- * hand-copied backfill list is a bootstrap the server never sends and a rig
- * that proves the replica against a fiction.
+ * route's own assembly (`sync-routes.ts`) re-run here without HTTP, and each
+ * ticket's payload is the product's own `bootstrapTicket` — imported, never
+ * restated (typed-links T4b deleted the restatement), because a hand-copied
+ * assembly is a bootstrap the server never sends and a rig that proves the
+ * replica against a fiction: the copy dropped the snapshot's provenance, and
+ * would have served a hidden link target the route withholds.
  *
  * Not real: the network. No socket opens and no HTTP request is made; the
  * harness stands in for the transport and nothing else, which is what makes
@@ -154,6 +156,8 @@ export type HarnessClient = {
   userId: string;
   replica: Replica;
   outbox: Outbox;
+  /** This device's store, so a scenario can scan EVERY row it holds (27.089: no row holds a withheld target). Read only. */
+  storage: SyncStorage;
   /**
    * Exposed so a scenario can read `lastApplyFailure()` / `status()` — never to
    * `start()` it, and never to `settled()` it.
@@ -247,30 +251,6 @@ export type Harness = {
 };
 
 /**
- * One ticket's bootstrap payload, exactly as `sync-routes.ts`'s private
- * `bootstrapTicket` builds it. Restated rather than imported only because the
- * route does not export it; the filter's two halves — the tail past the
- * snapshot, plus every backfill type regardless of position — and the backfill
- * list itself are the route's own.
- */
-async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<BootstrapTicket> {
-  const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
-  const all = await readEntityEvents(client, 'ticket', ticketId);
-  const snapSeq = snapshot?.seq ?? 0;
-  const backfill: readonly string[] = BOOTSTRAP_BACKFILL_TYPES;
-  return {
-    ticketId,
-    snapshot:
-      snapshot === null
-        ? null
-        : // The same cast the route and the snapshot writer make, for the same
-          // reason: no `ticketStateSchema` exists to parse the jsonb against.
-          { seq: snapshot.seq, state: snapshot.state as unknown as TicketState },
-    events: all.filter((e) => e.seq > snapSeq || backfill.includes(e.type)),
-  };
-}
-
-/**
  * `GET /v1/sync/bootstrap` without the HTTP: the route's assembly, in the
  * route's order, inside the route's `REPEATABLE READ` cut. The cursor is read
  * FIRST so a subscription at `streamSeq` can only re-deliver, never skip —
@@ -302,8 +282,11 @@ async function bootstrapFor(pool: Pool, userId: string, workspaceId: string): Pr
     );
     const definitions = defRows.map(rowToEnvelope);
     const tickets: BootstrapTicket[] = [];
+    // The product's own `bootstrapTicket` (typed-links T4b), with this client's
+    // sight: a link whose target it cannot see arrives withheld, as on the route.
+    const sees = targetSight(client, userId);
     for (const row of await listVisibleTickets(client, userId, workspaceId)) {
-      tickets.push(await bootstrapTicket(client, row['ticket_id'] as string));
+      tickets.push(await bootstrapTicket(client, row['ticket_id'] as string, sees));
     }
     // THE NOTES, and their absence here was MEASURED rather than assumed
     // (Plan 2 Task 8): without this section a harness client bootstraps ABOVE
@@ -708,7 +691,7 @@ export async function createHarness(): Promise<Harness> {
       }
     }
 
-    return { userId, replica, outbox, engine, ds, pulls, notePulls, goOnline, syncDown, submit };
+    return { userId, replica, outbox, storage, engine, ds, pulls, notePulls, goOnline, syncDown, submit };
   }
 
   const harness: Harness = {
@@ -752,22 +735,18 @@ export async function createHarness(): Promise<Harness> {
 
     projTicket: (ticketId) => getTicketStateFromDb(pool, workspaceId, ticketId),
     /**
-     * ## A PRODUCT DEFECT SURFACES THROUGH THIS, and it is not the rig's
+     * ## The snapshot gap this note once recorded was the RIG's, and is closed
      *
-     * After a snapshot pass, a client created FRESH cannot read the snapshotted
-     * ticket through `ds.query.getTicket`: it throws `ReplicaGapError` for
-     * `stateProvenance`, because `replica-data-source.ts` requires a
-     * `ticket.created` or `ticket.transitioned` in the local `events` table and
-     * a snapshot-bounded bootstrap ships neither below the line.
-     * `replica.getTicket` answers fine — only the DataSource door refuses.
-     *
-     * **The snapshot-bounded bootstrap and the DataSource's provenance rule
-     * contradict each other.** Recorded, not fixed: it is a product question,
-     * not a harness one, and fixing it here would hide it. Owner: unassigned.
-     * A scenario that snapshots before creating a client will meet it as what
-     * looks like a rig failure.
+     * Until typed-links T4b this rig restated `bootstrapTicket`, and the copy
+     * dropped the snapshot's `provenance`. So a client created FRESH after a
+     * snapshot pass threw `ReplicaGapError` for `stateProvenance` from
+     * `ds.query.getTicket`: a snapshot-bounded bootstrap ships no
+     * `ticket.created` / `ticket.transitioned` below the line, and the copy
+     * carried no snapshot provenance either. The product's `bootstrapTicket`
+     * passes `provenance` through (closure 4), and the rig now imports it.
+     * Re-measured 2026-10-04 with a throwaway probe: the old restated rig
+     * reproduces the throw, the product's function reads the ticket.
      */
-
     async snapshotPass() {
       await runSnapshotPass(pool, { minEvents: 1 });
     },
