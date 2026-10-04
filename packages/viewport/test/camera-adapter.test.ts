@@ -293,7 +293,7 @@ describe('29.037 the camera', () => {
     el.dispatchEvent(pointer('pointerup', { x: 500, y: 300 }));
   });
 
-  it('29.038 glides: the camera animates to a target inside 450 ms, never jumps on frame 1, and lands at once under reduced motion; the frame stream ends with moving: false | Frame.velocity is world x per second, smoothed 0.8 / 0.2, and 0 at rest; the last frame carries the landing | maxMs never stretches a glide past 450 ms (900 asked) and a shorter one is honoured (100); the last frame moves under 1 px | each axis lands though another settles first | a zoom past maxZoom lands at maxZoom and rests | reduced motion: a released flick leaves no momentum', () => {
+  it('29.038 glides: the camera animates to a target inside 450 ms, never jumps on frame 1, and lands at once under reduced motion; the frame stream ends with moving: false | Frame.velocity is world x per second, smoothed 0.8 / 0.2, and 0 at rest; the last frame carries the landing | maxMs never stretches a glide past 450 ms (900 asked) and a shorter one is honoured (100); the last frame moves under 1 px (x and y) and is the resting one; the first frame covers 1 - e^(-16 / tau) of the way | each axis lands though another settles first | a zoom past maxZoom lands at maxZoom and rests | reduced motion: a released flick leaves no momentum', () => {
     const { cam, fc, frames } = mount();
     cam.camera({ x: 5000, y: 3000, zoom: 2 });
     fc.advance(16);
@@ -301,25 +301,45 @@ describe('29.037 the camera', () => {
     expect(cam.getCamera().x).toBeLessThan(5000);
     // the first frame reports a fifth of its speed: 0.8 * 0 + 0.2 * (x - 0) / 0.016 s
     expect(frames[0]?.velocity).toBeCloseTo((cam.getCamera().x / 0.016) * 0.2, 6);
-    fc.advance(480);
+    // the second keeps 0.8 of the first: 0.8 * v0 + 0.2 * (x2 - x1) / 0.016 s
+    const x1 = cam.getCamera().x;
+    fc.advance(16);
+    expect(frames[1]?.velocity).toBeCloseTo(0.8 * (frames[0]?.velocity ?? 0) + ((cam.getCamera().x - x1) / 0.016) * 0.2, 6);
+    fc.advance(464);
     expect(cam.getCamera().x).toBeCloseTo(5000, 0);
     expect(cam.getCamera().zoom).toBeCloseTo(2, 2);
     expect(frames[frames.length - 1]?.moving).toBe(false);
     expect(frames[frames.length - 1]).toMatchObject({ offset: 5000, scale: 2, velocity: 0 });
     // maxMs 900 is held to 450: a 5,000 px glide lands inside 496 ms; its first frame covers a fifth to two fifths of the way
     cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    const glideFrom = frames.length;
     cam.camera({ x: 5000 }, { maxMs: 900 });
     fc.advance(16);
+    // tau = 0.95 * 450 ms / ln(5,000 / 0.5 px) = 46.4 ms, so the first 16 ms frame covers 29.2% of the way: 1,457.9
+    expect(cam.getCamera().x).toBeCloseTo(5000 * (1 - Math.exp(-16 / ((0.95 * 450) / Math.log(5000 / 0.5)))), 6);
     expect(cam.getCamera().x).toBeGreaterThan(1000);
     expect(cam.getCamera().x).toBeLessThan(2000);
     fc.advance(480);
     expect(cam.getCamera().x).toBe(5000);
+    // the landing frame is the resting one: no idle frame follows it
+    expect(frames.slice(glideFrom).filter((f) => f.offset === 5000)).toEqual([expect.objectContaining({ moving: false })]);
     // it arrives without a jump: the last frame moved under 1 px
     expect(Math.abs((frames[frames.length - 1]?.offset ?? 0) - (frames[frames.length - 2]?.offset ?? 0))).toBeLessThan(1);
     // maxMs 100 is honoured: back to 0 inside 112 ms
     cam.camera({ x: 0 }, { maxMs: 100 });
     fc.advance(112);
     expect(cam.getCamera().x).toBe(0);
+    // a pure y glide arrives without a jump too: the last frame moved y under 1 px (y read by a second subscriber, then unsubscribed)
+    const ys: number[] = [];
+    const off = cam.onFrame(() => ys.push(cam.getCamera().y));
+    cam.camera({ y: 5000 });
+    fc.advance(700);
+    off();
+    expect(ys[ys.length - 1]).toBe(5000);
+    expect(Math.abs((ys[ys.length - 1] ?? 0) - (ys[ys.length - 2] ?? 0))).toBeLessThan(1);
+    cam.camera({ y: 0 }, { instant: true });
+    fc.advance(16);
+    expect(ys[ys.length - 1]).toBe(5000);
     // a 1% zoom settles in about 200 ms, the 5,000 px pan later: the pan still lands (and the same for y)
     cam.camera({ x: 5000, zoom: 1.01 });
     fc.advance(700);
@@ -348,7 +368,7 @@ describe('29.037 the camera', () => {
     expect(r.cam.getCamera().x).toBe(120);
   });
 
-  it('29.038 keys pan 80 px / zoom 1.25x, Shift pans four times as far; destroy detaches | every handled key is cancelled; each arrow pans its way, = and _ zoom; the zoom holds the centre and arrives without a jump; quick presses add up | ignored and not cancelled: an unhandled key, Alt, Ctrl, Meta, an already cancelled key, and typing in an input, textarea, select or contenteditable (control: a plain child pans) | destroy stops the loop mid-glide and drops the frame callbacks', () => {
+  it('29.038 keys pan 80 px / zoom 1.25x, Shift pans four times as far; destroy detaches | every handled key is cancelled; each arrow pans its way, = and _ zoom; the first zoom frame follows its tau, the zoom holds the centre and arrives without a jump; quick presses add up | ignored and not cancelled: an unhandled key, Alt, Ctrl, Meta, an already cancelled key, and typing in an input, textarea, select or contenteditable (control: a plain child pans) | destroy stops the loop mid-glide and drops the frame callbacks', () => {
     const { el, cam, fc, frames } = mount();
     const press = (key: string, shiftKey = false) => el.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }));
     // dispatchEvent answers false when the handler cancelled the event
@@ -359,8 +379,11 @@ describe('29.037 the camera', () => {
     fc.advance(700);
     expect(cam.getCamera().x).toBeCloseTo(80 + 320, 0);
     const centre = cam.toWorld({ x: 400, y: 300 });
+    const zoomFrom = frames.length;
     expect(press('+')).toBe(false);
     fc.advance(700);
+    // the zoom's tau is 0.95 * 450 ms / ln(1000 * ln 1.25) = 79.1 ms: its first 16 ms frame takes 1.25^(1 - e^(-16 / 79.1))
+    expect(frames[zoomFrom]?.scale).toBeCloseTo(Math.pow(1.25, 1 - Math.exp(-16 / ((0.95 * 450) / Math.log(1000 * Math.log(1.25))))), 9);
     expect(cam.scale()).toBeCloseTo(1.25, 2);
     // the zoom holds the world point at the centre, and its last frame changed the zoom by under 0.2%
     expect(Math.abs(cam.toWorld({ x: 400, y: 300 }).x - centre.x) * cam.scale()).toBeLessThan(0.5);
