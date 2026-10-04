@@ -20,7 +20,7 @@ pnpm --filter @gisik-nokma/flow-graph-browser exec vite --host            # then
 #   http://<lan-ip>:3192/stress.html?scene=view&n=2000&auto=1
 ```
 
-A page run posts its record to `/__results`, which appends a line to `results/stress.jsonl` (gitignored) after `parseResult` accepts it. `harness/bars.ts` holds the section 13 bars as data; `judge(record)` lists the reasons a record misses its bar.
+A page run posts its record to `/__results`, which appends a line to `test-results/stress.jsonl` (ignored by the root `.gitignore` on every branch; Playwright keeps its own output in `test-results/pw/`, so a test run does not clear the records) after `parseResult` accepts it. `harness/bars.ts` holds the section 13 bars as data; `judge(record)` lists the reasons a record misses its bar.
 
 ## Scenes
 

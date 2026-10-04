@@ -136,7 +136,7 @@
 - **Consumes:** nothing from earlier tasks. From the codebase: `TimelineView` and `TicketDatesInput` exported by `@gisik-nokma/app-core`, `themeStylesheet` from `@gisik-nokma/ui/tokens`, `@gisik-nokma/ui/ui.css`.
 - **Produces:**
   - `@gisik-nokma/viewport`: `DAYS_PER_WEEK`, `weekdayOf(day): 0..6` (0 = Monday), `isMonday`, `isWeekend`, `mondayOnOrBefore`, `mondaysIn(first, last)`, `axisLevels(ppd): {weekLabels, dayNumbers, weekendTint}`, `crossFade(ppd, threshold, half = 2)`. Day numbers are epoch days: day 0 is Thursday 1970-01-01, day 4 is Monday 1970-01-05.
-  - `@gisik-nokma/flow-graph-browser` (private): `frameStats(gapsMs): FrameStats`, `samplePan(step, durationMs): Promise<number[]>`, `parseResult(body)`, `StressRecord`, `SceneName = 'time' | 'flow' | 'view'`, `BARS`, `barFor(record)`, `judge(record): string[]`, `timeScene`, `flowScene`; the page `stress.html?scene=time|flow|view&n=<count>[&auto=1]`; `window.__stress`; `POST /__results` appending to `results/stress.jsonl`.
+  - `@gisik-nokma/flow-graph-browser` (private): `frameStats(gapsMs): FrameStats`, `samplePan(step, durationMs): Promise<number[]>`, `parseResult(body)`, `StressRecord`, `SceneName = 'time' | 'flow' | 'view'`, `BARS`, `barFor(record)`, `judge(record): string[]`, `timeScene`, `flowScene`; the page `stress.html?scene=time|flow|view&n=<count>[&auto=1]`; `window.__stress`; `POST /__results` appending to `test-results/stress.jsonl`.
   - The catalogue: `test-cases/29-workflow-timeline-graphs.md` with Part 1's per-task anchors and one Part anchor for each of Parts 2 to 5, and Features section 26 likewise (see the Global Constraints for the spellings).
   - The registration set and the gate pinned to the MEASURED count (46 when written).
 
@@ -1641,7 +1641,7 @@ Parts 2 to 5 each own ONE anchor below, seeded here so the sub-sections always s
   ```bash
   pnpm turbo run build --filter=@gisik-nokma/flow-graph-browser^...
   FG_HEADED=1 /Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh fgb-headed -- pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/stress.spec.ts --grep "29.003" > /tmp/fgb-headed.log 2>&1; tail -n 12 /tmp/fgb-headed.log
-  tail -n 3 packages/flow-graph-browser/results/stress.jsonl
+  tail -n 3 packages/flow-graph-browser/test-results/stress.jsonl
   ```
 
   Read the `view` record's `pan.fps`, `pan.worstMs`, `pan.p95Ms` and `clickToSettleMs`, and count what the page mounted (open `stress.html?scene=view&n=2000&auto=1` in the headed window and run `document.querySelectorAll('.gn-timeline__bar').length` in its console; the shipped view mounts only its eight-week window, so this is far below 2,000 and the record must say so). Append a `## Records` section to the end of the package README (T13 adds the second record under it):
@@ -1664,7 +1664,7 @@ Parts 2 to 5 each own ONE anchor below, seeded here so the sub-sections always s
   cd packages/flow-graph-browser && pnpm exec vite --host   # run_in_background; note the pid
   ```
 
-  URL for the owner: `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` (the page runs three pans by itself and posts its record). Wait for the record: `tail -n 2 packages/flow-graph-browser/results/stress.jsonl` shows a line with `"touch":true`. Stop the server by its exact pid (no `pkill`). Add the phone row to the README table and write `phone: N fps, worst N ms, p95 N ms, click-to-settle N ms (device: <the UA string's model>)` on the same 29.016 line. If the owner is not available, the line stays ❌ and the lane reports `NEEDS: owner phone` as a standing blocker for T13 only (T2 to T12 are not held up by it); in that case also write the desktop half now.
+  URL for the owner: `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` (the page runs three pans by itself and posts its record). Wait for the record: `tail -n 2 packages/flow-graph-browser/test-results/stress.jsonl` shows a line with `"touch":true`. Stop the server by its exact pid (no `pkill`). Add the phone row to the README table and write `phone: N fps, worst N ms, p95 N ms, click-to-settle N ms (device: <the UA string's model>)` on the same 29.016 line. If the owner is not available, the line stays ❌ and the lane reports `NEEDS: owner phone` as a standing blocker for T13 only (T2 to T12 are not held up by it); in that case also write the desktop half now.
 
   Flip 29.016 to 🧪 only when both halves carry their numbers (T13's catalogue test, 29.119, requires at least two `N fps` figures on this line).
 
@@ -2635,16 +2635,31 @@ describe('29.021 what to fetch', () => {
   });
 
   it('29.021 at most two in flight; the visible chunks first; low-priority behind-the-travel fetches are cancelled when a visible one needs the slot', () => {
+    // still: wanted = days 79-141 = chunks 2, 3, 4; visible = chunks 3 (days 88-115) and 4 (days 116-143); chunk 2 is outside the view
     const p = planFetches({ view, velocity: 0, loaded: new Set(), inFlight: none, bounds, reversed: false });
-    expect(p.start).toHaveLength(2);
-    expect(p.start.every((s) => s.priority === 'high')).toBe(true);
-    const visible = new Set(chunksCovering(view));
-    expect(visible.has(p.start[0]!.chunk)).toBe(true);
+    expect(p.start).toEqual([{ chunk: 3, priority: 'high' }, { chunk: 4, priority: 'high' }]);
+    // one already in flight: one slot left, and the in-flight chunk is not started twice
+    const oneBusy = planFetches({ view, velocity: 0, loaded: new Set(), inFlight: new Map<number, 'high' | 'low'>([[3, 'high']]), bounds, reversed: false });
+    expect(oneBusy.start).toEqual([{ chunk: 4, priority: 'high' }]);
+    // two high fetches in flight (even unwanted ones): nothing starts and a HIGH fetch is never cancelled
     const busy = planFetches({ view, velocity: 0, loaded: new Set(), inFlight: new Map([[50, 'high'], [51, 'high']]), bounds, reversed: false });
     expect(busy.start).toEqual([]);
-    const lows = new Map<number, 'high' | 'low'>([[chunkOf(60), 'low'], [chunkOf(61), 'low']]);
-    const moving = planFetches({ view, velocity: 12, loaded: new Set(), inFlight: lows, bounds, reversed: false });
-    expect(moving.cancel.length).toBeGreaterThan(0);
+    expect(busy.cancel).toEqual([]);
+    // a low fetch no longer wanted is cancelled even when nothing waits: travelling later from days 100-120 wants
+    // days 89-141 = chunks 3, 4 (both loaded), so chunk 2 (days 60-87) has fallen out of the wanted range
+    const stray = planFetches({ view, velocity: 12, loaded: new Set([3, 4]), inFlight: new Map<number, 'high' | 'low'>([[2, 'low']]), bounds, reversed: false });
+    expect(stray).toEqual({ start: [], cancel: [2] });
+    // the slot rule: travelling later over days 116-136 wants chunks 3, 4, 5; chunk 3 (behind, low) and chunk 5 (high) are in
+    // flight and STILL wanted, chunk 4 (visible) waits: the low fetch is cancelled to free its slot and chunk 4 starts
+    const full = planFetches({
+      view: { start: chunkStart(4), end: chunkStart(4) + 20 },
+      velocity: 12,
+      loaded: new Set(),
+      inFlight: new Map<number, 'high' | 'low'>([[3, 'low'], [5, 'high']]),
+      bounds,
+      reversed: false,
+    });
+    expect(full).toEqual({ start: [{ chunk: 4, priority: 'high' }], cancel: [3] });
   });
 
   it('29.021 travelling later, the chunk BEHIND the view is low priority and starts after the visible one; control: standing still, the same chunk is high', () => {
@@ -2663,6 +2678,9 @@ describe('29.021 what to fetch', () => {
     const loaded = new Set(chunksCovering(wantedRange(view, 0).range));
     expect(planFetches({ view, velocity: 0, loaded, inFlight: none, bounds, reversed: false }).start).toEqual([]);
     expect(planFetches({ view, velocity: 0, loaded: new Set(), inFlight: none, bounds: { first: 99, last: -99 }, reversed: false }).start).toEqual([]);
+    // each bound on its own: the wanted chunks are 2, 3, 4; only the one inside [first, last] may start
+    expect(planFetches({ view, velocity: 0, loaded: new Set(), inFlight: none, bounds: { first: 4, last: 100 }, reversed: false }).start).toEqual([{ chunk: 4, priority: 'high' }]);
+    expect(planFetches({ view, velocity: 0, loaded: new Set(), inFlight: none, bounds: { first: -100, last: 2 }, reversed: false }).start).toEqual([{ chunk: 2, priority: 'high' }]);
   });
 });
 
@@ -2672,23 +2690,27 @@ describe('29.022 widening, eviction, neighbours', () => {
     expect(planWiden({ loaded, bounds, lastSide: 1, entryCount: 5 })).toEqual({ chunk: 9, side: -1 });
     expect(planWiden({ loaded, bounds, lastSide: -1, entryCount: 5 })).toEqual({ chunk: 12, side: 1 });
     expect(planWiden({ loaded, bounds: { first: 10, last: 11 }, lastSide: 0, entryCount: 5 })).toBeNull();
+    // one side at the index extent: the other side is taken instead of stopping
+    expect(planWiden({ loaded, bounds: { first: 10, last: 100 }, lastSide: 1, entryCount: 5 })).toEqual({ chunk: 12, side: 1 });
     expect(planWiden({ loaded: new Set(Array.from({ length: MAX_CHUNKS }, (_, i) => i)), bounds, lastSide: 0, entryCount: 5 })).toBeNull();
     expect(planWiden({ loaded, bounds, lastSide: 0, entryCount: 10_000 })).toBeNull();
-    expect(planWiden({ loaded: new Set(), bounds, lastSide: 0, entryCount: 0 })).toBeNull();
+    // the control needs UNBOUNDED bounds: with finite bounds an empty set's ±Infinity edges fail the bounds check anyway,
+    // so the leg would stay green with the `size === 0` guard deleted
+    expect(planWiden({ loaded: new Set(), bounds: { first: -Infinity, last: Infinity }, lastSide: 0, entryCount: 0 })).toBeNull();
   });
 
   it('29.022 past the cap the farthest chunk goes first and nothing within a viewport of the view is ever evicted', () => {
     const view = { start: 0, end: 27 };
     const loaded = new Set(Array.from({ length: 45 }, (_, i) => i - 22));
+    // 45 chunks (-22..22), 5 over the cap. Distance of chunk c's centre from day 13.5 is |4 + 28c|: 22 → 620, -22 → 612,
+    // 21 → 592, -21 → 584, 20 → 564. Farthest first, exactly five.
     const out = chunksToEvict(loaded, view, () => 1);
-    expect(out).toHaveLength(5);
-    const protectedSet = new Set(chunksCovering({ start: -28, end: 55 }));
-    for (const c of out) expect(protectedSet.has(c)).toBe(false);
-    const dist = (c: number) => Math.abs((chunkStart(c) + chunkEnd(c)) / 2 - 13.5);
-    expect(dist(out[0]!)).toBeGreaterThanOrEqual(dist(out[out.length - 1]!));
+    expect(out).toEqual([22, -22, 21, -21, 20]);
     expect(chunksToEvict(new Set([0, 1, 2]), view, () => 1)).toEqual([]);
+    // the protection leg: 24,000 entries, and evicting both far chunks still leaves 12,000 (> 10,000), so only the
+    // protected set (chunks -2..1, days -28..55) stops the loop from taking chunk 1 next
     const heavy = chunksToEvict(new Set([0, 1, 40, -40]), view, () => 6000);
-    expect(heavy).toEqual([40, -40].sort((a, b) => Math.abs(b) - Math.abs(a)) );
+    expect(heavy).toEqual([40, -40]);
   });
 
   it('29.023 the next coarser preset, the same centre at another scale, the neighbouring packing scales, the mount range', () => {
@@ -2739,15 +2761,35 @@ describe('29.024 the cache', () => {
 
   it('29.025 scopes: the same scope in another order is one cache; the fifth scope drops the least recently used; a get refreshes', () => {
     expect(scopeKey(['b', 'a'], ['p'], true)).toBe(scopeKey(['a', 'b'], ['p'], true));
+    expect(scopeKey(['a'], ['q', 'p'], true)).toBe(scopeKey(['a'], ['p', 'q'], true));
     expect(scopeKey(['a'], [], true)).not.toBe(scopeKey(['a'], [], false));
-    const s = new ScopeCaches<I, D>(4);
+    const s = new ScopeCaches<I, D>(); // the DEFAULT max (4) is the contract; passing 4 would leave a wrong default green
     for (const k of ['1', '2', '3', '4']) s.get(k);
     s.get('1');
     s.get('5');
     expect(s.keys()).toEqual(['3', '4', '1', '5']);
+    // one cache per scope: a second get of a held scope returns the SAME cache (with what it loaded), not a fresh one
+    const five = s.get('5');
+    five.putChunk(0, [{ id: 'x', title: 'X' }]);
+    expect(s.get('5')).toBe(five);
+    expect(s.get('5').has(0)).toBe(true);
   });
 });
 ```
+
+**Kills:** (mutants of this task's Step 3 and Step 4 code; each must turn its `it()` red)
+- 29.020 chunks: (a) `CHUNK_ORIGIN_DAY = 4` → `0` (day 0 is a Thursday, `isMonday` fails) (b) `chunkEnd` drops the `- 1` (29 days) (c) `chunkOf` uses `Math.trunc` for `Math.floor` (`chunkOf(chunkEnd(-1))` = 0, not -1).
+- 29.021 wanted range: (a) `behind = Math.ceil(V / 2)` → `V` (start 79, not 89) (b) `LOOK_AHEAD_S = 1.5` → `1` (velocity 40: end 160, not 180) (c) `MOVING_DAYS_PER_S = 1` → `0` (0.5 days/s reports side 1).
+- 29.021 at most two in flight: (a) delete planFetches' second `for` loop (`full` becomes `{start: [], cancel: []}`) (b) drop `!input.inFlight.has(c)` from the candidates filter (`oneBusy` starts chunk 3 again) (c) drop the `!wantedSet.has(chunk)` arm of the first cancel loop (`stray` cancels nothing).
+- 29.021 behind is low, still is high: (a) swap the priority comparator in `candidates.sort` (`'high' ? 1 : -1`: chunk 3 low starts first) (b) `behind` ignores the travel side (`!visible.has(chunk) && chunkEnd(chunk) < input.view.start`: the still control marks chunk 3 low) (c) swap the two arms of the `side === 1 ? … : …` test in `behind` (chunk 3 becomes high while moving).
+- 29.021 reversal and exclusions: (a) delete the `input.reversed ||` arm (cancel `[]`) (b) drop `!input.loaded.has(c)` (the all-loaded plan starts chunks 3, 4) (c) drop `c <= input.bounds.last` (the `last: 2` plan starts chunks 3, 4).
+- 29.022 widening: (a) invert `input.lastSide === 1 ? -1 : 1` (b) delete the `input.entryCount >= MAX_DETAIL_ENTRIES` check (c) delete the `input.loaded.size === 0` check (the unbounded control returns `{chunk: -Infinity, side: 1}`).
+- 29.022 eviction: (a) drop `.filter((c) => !protectedChunks.has(c))` (`heavy` becomes `[40, -40, 1]`) (b) sort by ascending distance (`out` becomes `[2, -3, 3, -4, 4]`) (c) `&&` → `||` in the stop condition (`out` is `[]`).
+- 29.023 zoom helpers: (a) `p < ppd - 0.05` → `p <= ppd` (56 → 56) (b) swap `Math.floor` / `Math.ceil` in `rangeAtPpd` (`{76, 147}`) (c) drop `s >= 4` in `neighbourScales` (4 → `[8, 2]`).
+- 29.023 pan limits: (a) `Math.min` → `Math.max` for `start` (990..1010 gives 960) (b) `Math.max` → `Math.min` for `end` (500..2000 gives 1056) (c) default `minHalfDays = 56` → `28` (null gives 972..1028).
+- 29.024 stale: (a) `markStale` returns `true` for an unloaded chunk (b) `putChunk` keeps the old mark (`stale: this.chunks.get(chunk)?.stale ?? false`) (c) `getChunk` hides a stale chunk (`held?.stale ? undefined : held`).
+- 29.024 patchEntry: (a) skip the `this.index` block (returns 2, index start stays 1) (b) `break` after the first chunk copy patched (returns 2) (c) `entryCount` also counts the index (5).
+- 29.025 scopes: (a) remove `this.scopes.delete(scopeKey)` before the re-`set` in `get` (keys `['2', '3', '4', '5']`) (b) default `max = 4` → `5` (`'2'` survives) (c) `[...projectIds].sort()` → `[...projectIds]` (the `['q', 'p']` key differs).
 
   Run: `slot-run.sh vp -- pnpm --filter @gisik-nokma/viewport exec vitest run test/range.test.ts --maxWorkers=2 > /tmp/vp.log 2>&1; tail -n 20 /tmp/vp.log`. Expected: FAIL (modules missing).
 
@@ -3076,18 +3118,11 @@ export function scopeKey(workspaceIds: readonly string[], projectIds: readonly s
 
 - [ ] **Step 5: Export them**
 
-`packages/viewport/src/index.ts` (new):
+`packages/viewport/src/index.ts` (exists on the ref with T1/T2's seven lines): add only T3's own two export lines (planner ruling 2026-10-04):
 
 ```ts
-export * from './spring.js';
-export * from './momentum.js';
-export * from './rubber-band.js';
-export * from './anchored-zoom.js';
-export * from './wheel.js';
-export * from './calendar-days.js';
 export * from './range-plan.js';
 export * from './range-cache.js';
-export * from './driver.js';
 ```
 
   (On a merge with T4 and T5 take the union of the `export *` lines.) Run the package suite: `slot-run.sh vp -- pnpm --filter @gisik-nokma/viewport test > /tmp/vp.log 2>&1; tail -n 20 /tmp/vp.log`, then typecheck and build. Expected: 25 tests green after T3 on its own.
@@ -3101,6 +3136,8 @@ export * from './driver.js';
   - `nextCoarserPpd`: `p < ppd - 0.05` to `p <= ppd` (56 returns 56) ; `neighbourScales`: drop the `>= 4` bound; `panLimits`: `Math.min` to `Math.max` → 29.023.
   - `RangeCache.markStale` returning `true` for an unloaded chunk; `putChunk` not clearing `stale`; `patchEntry` skipping the index → 29.024. `ScopeCaches`: no `delete` before re-`set` in `get` (a get no longer refreshes); `max` to `5` → 29.025.
   - Record the survivors in the HANDOFF. (`rangeAtPpd`'s `Math.floor`/`Math.ceil` swap is killed by the exact `{75, 148}` expectation.)
+
+**Prose to sweep:** none found (searched the ref outside `docs/superpowers/` for `range-plan`, `range-cache`, `RangeCache`, `planFetches`, `chunksToEvict`, `ScopeCaches`, `range planner`; the one hit, `packages/viewport/src/driver.ts:2` — "the range planner, the cache and the packer never know which one is under them", stays true: both files are pure and import no adapter).
 
 - [ ] **Step 7: Flip, bullet, gate**
   - Flip ❌ to ✅ on 29.020–29.025; `pnpm check:citations`.
@@ -3129,7 +3166,7 @@ export * from './driver.js';
 - **Used by:** T8 (`layoutLanes` packs each epic lane), Part 3 and Part 4 (every lane of the Timeline graph and Home).
 
 **Design notes:**
-- Items are sorted by (first segment start, natural key, id) and each goes into the FIRST row where none of its segments shares a day with one already there. For ONE interval per item this greedy first fit is optimal: the row count equals the greatest number of footprints overlapping on a day (PK-2), and `maxOverlap` is the independent check of that claim. With several segments per item it is a heuristic, so the same items are also packed by their hulls and the smaller packing wins; a tie keeps the segment packing, which leaves the gaps usable.
+- Items are sorted by (first segment start, natural key, id) and each goes into the FIRST row where none of its segments shares a day with one already there. For ONE interval per item this greedy first fit is optimal: the row count equals the greatest number of footprints overlapping on a day (PK-2), and `maxOverlap` is the independent check of that claim. With several segments per item the segment packing is used: it leaves the gaps usable, and taking items in the same first-start order it never needs more rows than packing their hulls. The hull packing is still computed and compared, kept as PK-2's guard; segment packing is never worse (planner ruling 2026-10-04).
 - Two bars on adjacent days (one ends on the 14th, the next starts on the 15th) share a row; a shared day does not.
 - **The label is part of the footprint** (PK-4): a bar shorter than its label reserves the label's width along the time axis, so the key shown just outside its end never sits on top of the next bar. The label width is INJECTED (`labelPx`), cached by the caller; the pack module never measures text. The caller passes `ppd = packScale(ppd)` (T2) so rows re-pack only when the zoom crosses a power-of-two edge, not every frame of a pinch.
 - Deterministic: the result is a function of the items and `ppd` only (input order does not matter); an item with no segment throws a `RangeError` rather than vanishing.
@@ -3209,15 +3246,24 @@ describe('29.051 multi-segment items', () => {
     let hullWorse = 0;
     for (let seed = 1; seed <= 200; seed += 1) {
       const r = rng(seed + 1000);
+      // 1 to 3 segments per item, the count drawn from the seeded generator (spec PK-2; planner ruling 2026-10-04).
+      // Checked by hand-simulation of Step 3's code: the hull packing is worse on 187 of the 200 seeds and never better.
       const items: PackItem[] = Array.from({ length: 24 }, (_, i) => {
-        const a = Math.floor(r() * 40);
-        const b = a + 2 + Math.floor(r() * 5);
-        const c = b + 2 + Math.floor(r() * 12);
-        return { id: `m${i}`, key: `GN-${i}`, segments: [{ start: a, end: b }, { start: c, end: c + Math.floor(r() * 4) }] };
+        const n = 1 + Math.floor(r() * 3);
+        const segments: Seg[] = [];
+        let at = Math.floor(r() * 40);
+        for (let k = 0; k < n; k += 1) {
+          const end = at + 2 + Math.floor(r() * 5);
+          segments.push({ start: at, end });
+          at = end + 2 + Math.floor(r() * 12);
+        }
+        return { id: `m${i}`, key: `GN-${i}`, segments };
       });
       const out = packLane(items, { ppd: 16 });
       const hull = packLaneBy(items, { ppd: 16 }, 'hull');
-      expect(out.rows, `seed ${seed}`).toBeLessThanOrEqual(hull.rows);
+      // The SEGMENT packing itself, not `out`: `packLane` returns the smaller of the two, so `out.rows <= hull.rows` held by construction.
+      const segs = packLaneBy(items, { ppd: 16 }, 'segments');
+      expect(segs.rows, `seed ${seed}`).toBeLessThanOrEqual(hull.rows);
       if (hull.rows > out.rows) hullWorse += 1;
       const placed = new Map<number, Seg[]>();
       for (const it of items) {
@@ -3229,6 +3275,10 @@ describe('29.051 multi-segment items', () => {
       }
     }
     expect(hullWorse).toBeGreaterThan(0);
+    // A tie keeps the segment packing (PK-2): both packings need 2 rows here.
+    const twin = (id: string): PackItem => ({ id, key: `GN-${id}`, segments: [{ start: 0, end: 1 }, { start: 5, end: 6 }] });
+    const tie = packLane([twin('1'), twin('2')], { ppd: 16 });
+    expect([tie.rows, tie.strategy]).toEqual([2, 'segments']);
   });
 });
 
@@ -3239,16 +3289,23 @@ describe('29.052 adjacency, ties and stability', () => {
     const touching: PackItem = { id: 'c', key: 'GN-3', segments: [{ start: 14, end: 18 }] };
     expect(packLane([a, next], { ppd: 16 }).rows).toBe(1);
     expect(packLane([a, touching], { ppd: 16 }).rows).toBe(2);
+    // The same rule through the row search (a row that already reaches past the bar's start): a two-segment item whose gap
+    // is exactly days 10-14 takes `a` beside both of its segments; with day 10 shared it does not.
+    const gapped: PackItem = { id: 'g', key: 'GN-4', segments: [{ start: 0, end: 9 }, { start: 15, end: 18 }] };
+    const gappedShared: PackItem = { id: 'h', key: 'GN-5', segments: [{ start: 0, end: 10 }, { start: 15, end: 18 }] };
+    expect(packLane([a, gapped], { ppd: 16 }).rows).toBe(1);
+    expect(packLane([a, gappedShared], { ppd: 16 }).rows).toBe(2);
   });
 
   it('29.052 equal starts order by natural key (GN-9 before GN-10), keyed before unkeyed, then by id; the input order does not matter', () => {
     expect(naturalKeyCompare('GN-9', 'GN-10')).toBeLessThan(0);
     expect(naturalKeyCompare('GN-10', 'GN-9')).toBeGreaterThan(0);
     const mk = (id: string, key: string | null): PackItem => ({ id, key, segments: [{ start: 5, end: 9 }] });
-    const items = [mk('z', null), mk('y', 'GN-10'), mk('x', 'GN-9'), mk('w', null)];
+    // `w` before `z` here, so a sort that drops the id tie-break keeps `forward` right and only `back` ([z, x, y, w]) goes wrong.
+    const items = [mk('w', null), mk('y', 'GN-10'), mk('x', 'GN-9'), mk('z', null)];
     const forward = packLane(items, { ppd: 16 });
     const back = packLane([...items].reverse(), { ppd: 16 });
-    expect([...forward.rowOf]).toEqual([...forward.rowOf]);
+    expect([...back.rowOf].sort()).toEqual([...forward.rowOf].sort());
     for (const it of items) expect(back.rowOf.get(it.id)).toBe(forward.rowOf.get(it.id));
     expect([forward.rowOf.get('x'), forward.rowOf.get('y'), forward.rowOf.get('w'), forward.rowOf.get('z')]).toEqual([0, 1, 2, 3]);
   });
@@ -3312,6 +3369,17 @@ describe('29.054 ten thousand items', () => {
   });
 });
 ```
+
+**Kills:** (each mutant is an edit of Step 3's `pack.ts`, checked by hand-running the fixtures)
+- 29.050 rows equal the greatest overlap: (a) `orderByStart` sorts the bucket days with a bare `.sort()` (lexicographic: day 10 before day 2) → the rows-equal leg alone; (b) `rowOf.set(p.item.id, r)` to `rowOf.set(p.item.id, rows.length - 1)` → the no-shared-day leg alone (row count unchanged); (c) fast path `rowEnd[r] < firstStart` to `<=` → both.
+- 29.051 multi-segment items: (a) `rowHolds` ends `return false` instead of `return true` (every multi-segment item opens a row) → the segments-vs-hull leg and the control; (b) `byHull.rows < bySegments.rows` to `<=` (a tie goes to the hull) → the tie leg; (c) the `rowOf.set(..., rows.length - 1)` mutant above → the no-shared-day leg.
+- 29.052 adjacency: (a) `rowHolds`: `hit.start <= s.end` to `hit.start <= s.end + 1` → the gapped leg (the fast path hides it from the single-interval pair); (b) `firstEndingAtOrAfter`: `.end < day` to `.end <= day` → the touching and gapped-shared legs; (c) fast path `<` to `<=` → the touching leg.
+- 29.052 natural key order: (a) `keyPartsOf` keeps digit runs as text (`GN-10` before `GN-9`) → the `naturalKeyCompare` legs and the row pin; (b) swap the keyed-before-unkeyed returns in `compareItems` → the row pin; (c) `compareItems` returns `0` instead of comparing ids → the input-order legs alone (`forward` stays [0, 1, 2, 3]).
+- 29.052 adding an item after everything: none from a single edit of `pack.ts` (`later` collides with nothing, so wherever any order puts it no other item moves); it guards a redesign (best fit, a key-first order). The control is killed by `orderByStart` returning the input order (`first` is then packed last and moves nothing).
+- 29.052 an item with no segment: (a) delete the `RangeError` throw in `footprints` (the item then fails with a `TypeError` on `segs[0]`); (b) throw `Error` instead of `RangeError`.
+- 29.053 70 px at 16 px/day: (a) `footprintOf`: `Math.ceil` to `Math.floor` → the first `footprintOf` leg; (b) `footprintOf` returns `seg.start + labelDays - 1` without the `Math.max` → the 0-9 leg; (c) `footprints` passes `0` instead of `label(item, 0)` for a one-segment item → the two-rows leg alone.
+- 29.053 at 8 px/day: (a) `Math.ceil` to `Math.floor` (8.75 → 8 days, end 7); (b) drop the `- 1` (end 9).
+- 29.054 ten thousand items (VP_PERF only): (a) `orderByStart` returns the input order → the rows-equal leg; the 20 ms leg is a timing and has no reliable single mutant.
 
   Two details to keep. The generator is seeded so a failing seed can be replayed (`seed N` is in every assertion message). `29.054` is skipped unless `VP_PERF` is set: it is a timing, and a timing on a shared gate machine is noise (the memory rule: a speed case is run LOCAL, warm, and quoted as such).
 
@@ -3492,9 +3560,10 @@ export function packLaneBy(items: readonly PackItem[], opts: PackOptions, strate
 
 /**
  * PK-2: the packing a lane uses. Greedy by start with first fit is optimal for ONE interval per item, so the row
- * count equals the largest number of footprints overlapping on any day. With several segments per item it is a
- * heuristic, so the same items are also packed by their hulls and the packing with fewer rows wins (a tie goes to
- * the segment-set packing, which leaves the gaps usable).
+ * count equals the largest number of footprints overlapping on any day. With several segments per item the
+ * segment-set packing is returned (it leaves the gaps usable); taking items in the same first-start order, it never
+ * needs more rows than packing their hulls. The hull comparison below is kept as PK-2's guard; segment packing is
+ * never worse (planner ruling 2026-10-04).
  */
 export function packLane(items: readonly PackItem[], opts: PackOptions): PackResult {
   const bySegments = packLaneBy(items, opts, 'segments');
@@ -3525,19 +3594,10 @@ export function maxOverlap(items: readonly PackItem[], opts: PackOptions): numbe
 
 - [ ] **Step 4: Export it and run**
 
-`packages/viewport/src/index.ts` (new):
+`packages/viewport/src/index.ts` (exists on the ref with T1/T2's seven lines): add only `export * from './pack.js';` (planner ruling 2026-10-04). On a merge with T3 or T5, take the union of the `export *` lines.
 
 ```ts
-export * from './spring.js';
-export * from './momentum.js';
-export * from './rubber-band.js';
-export * from './anchored-zoom.js';
-export * from './wheel.js';
-export * from './calendar-days.js';
-export * from './range-plan.js';
-export * from './range-cache.js';
 export * from './pack.js';
-export * from './driver.js';
 ```
 
   Run the package suite (33 tests pass and 1 is skipped), typecheck and build. Then the timing, three times, warm: `VP_PERF=1 slot-run.sh vp-perf -- pnpm --filter @gisik-nokma/viewport exec vitest run test/pack.test.ts -t 29.054 --maxWorkers=1 > /tmp/vp-perf.log 2>&1; grep "29.054 pack" /tmp/vp-perf.log`. Expected: a median under 20 ms (the spec's pack bar for 10,000 items); record the three medians and the machine in the HANDOFF. If it is over, do not loosen the bar: profile (`node --cpu-prof`) and fix the packer.
@@ -3548,15 +3608,17 @@ export * from './driver.js';
   - `firstEndingAtOrAfter`: `.end < day` to `<=` → 29.050 / 29.051.
   - `footprintOf`: `Math.ceil` to `Math.floor`; drop the `- 1` → 29.053.
   - `keyPartsOf`: stop converting digit runs to numbers (`GN-10` sorts before `GN-9`); swap the keyed-before-unkeyed branches → 29.052.
-  - `packLane`: `byHull.rows < bySegments.rows` to `<=` (a tie goes to the hull): SURVIVES — the row count is unchanged and the cases pin counts, not which packing won a tie. Record as a survivor with that reason (the segment packing's gaps stay usable only by convention). `normalise`: `s.start <= last.end` to `<` is an EQUIVALENT mutant (touching segments occupy the same days merged or not); record it.
+  - `packLane`: `byHull.rows < bySegments.rows` to `<=` (a tie goes to the hull) → 29.051 (its tie leg pins `strategy: 'segments'` on two identical two-segment items). Deleting the hull comparison altogether (always `bySegments`) is EQUIVALENT: with both packings taking items in the same first-start order, every row an item cannot enter holds an earlier-starting item whose hull covers the new item's first day, so the segment packing never needs more rows than the hull packing; record it as equivalent. The hull comparison is kept as PK-2's guard; segment packing is never worse (planner ruling 2026-10-04). `normalise`: `s.start <= last.end` to `<` is an EQUIVALENT mutant (touching segments occupy the same days merged or not); record it.
   - the `footprints(...).length > 1` guard in `packLane` removed (hull always packed): equivalent for the rows, slower; record.
+
+**Prose to sweep:** none found (searched on the ref: `pack`, `packLane`, `footprintOf`, `row packing`, `pack.ts` in `packages/viewport/`, `packages/flow-graph-browser/README.md`, `Features.md`, `test-cases/29-workflow-timeline-graphs.md`; the only hits are `packages/viewport/src/anchored-zoom.ts:40` and `src/driver.ts:2`, which stay true, and the anchors `Features.md:3829` / `test-cases/29-workflow-timeline-graphs.md:50` this task fills).
 
 - [ ] **Step 6: Flip, bullet, gate**
   - Flip ❌ to ✅ on 29.050–29.053. **29.054 goes to 🧪, not ✅**: its test is skipped on the gate (`VP_PERF` unset), so a ✅ would claim a check that does not run. Append the recorded `median N ms (LOCAL, warm, VP_PERF=1, <machine>)` to its line. `pnpm check:citations`.
   - Features section 26: replace `<!-- wtg-part1-viewport-timeline-view T4 bullet -->` with:
 
 ```markdown
-- ⚙️ **Row packing** (Workflow and Timeline graphs Part 1 T4; cases 29.050–29.054; `packages/viewport/src/pack.ts`) — `packLane` puts each item in the first row where none of its segments shares a day (sorted by first start, natural key, id; adjacent days share a row), so the row count equals the greatest overlap on any day for single-interval items; multi-segment items are also packed by their hulls and the smaller packing wins. A bar shorter than its label reserves the label's width (`footprintOf`, with the measure injected), so packing is deterministic and clock-free. 10,000 items pack inside the budget (29.054, `VP_PERF=1`).
+- ⚙️ **Row packing** (Workflow and Timeline graphs Part 1 T4; cases 29.050–29.054; `packages/viewport/src/pack.ts`) — `packLane` puts each item in the first row where none of its segments shares a day (sorted by first start, natural key, id; adjacent days share a row), so the row count equals the greatest overlap on any day for single-interval items; multi-segment items keep the segment packing, which is never worse than packing their hulls (the hull comparison stays as PK-2's guard; planner ruling 2026-10-04). A bar shorter than its label reserves the label's width (`footprintOf`, with the measure injected), so packing is deterministic and clock-free. 10,000 items pack inside the budget (29.054, `VP_PERF=1`).
 ```
 
   - Package suite WHOLE, typecheck, build, gate, land (as T2).
@@ -3608,6 +3670,8 @@ describe('29.065 edge routing on packed rows', () => {
     const r = routeEdge(bar(0, 0, 4), bar(8, 0, 3), []);
     expect(r.points).toEqual([{ x: 64, y: 14 }, { x: 128, y: 14 }]);
     expect(r.crossings).toBe(0);
+    // a gap narrower than the 14 px gutter has no gutter candidate: only the straight-line candidate gives two points here
+    expect(routeEdge(bar(0, 0, 4), { x: 72, y: 0, w: 48, h: 28 }, []).points).toEqual([{ x: 64, y: 14 }, { x: 72, y: 14 }]);
   });
 
   it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor', () => {
@@ -3624,14 +3688,30 @@ describe('29.065 edge routing on packed rows', () => {
   it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ', () => {
     const from = bar(0, 0, 4);
     const to = bar(20, 2, 3);
-    const blocker = bar(12, 1, 6); // stands in the gutter before the target at x = 306
+    const blocker = bar(18, 1, 2); // x 288-320 on row 1: stands in the gutter before the target at x = 306
     const clean = routeEdge(from, to, []);
     const around = routeEdge(from, to, [{ x: to.x - 40, y: 40, w: 30, h: 28 }]);
     const forced = routeEdge(from, to, [blocker]);
+    // CONTROL: no bar, the first candidate (the gutter 14 px before the target, x = 306)
+    expect(clean.points).toEqual([{ x: 64, y: 14 }, { x: 306, y: 14 }, { x: 306, y: 94 }, { x: 320, y: 94 }]);
     expect(clean.points).not.toEqual(around.points);
+    // a bar in the gutter before the target: the gutter AFTER the source (x = 64 + 14 = 78), clean
+    expect(around.points).toEqual([{ x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 94 }, { x: 320, y: 94 }]);
     expect(around.crossings).toBe(0);
-    expect(forced.points.length).toBeGreaterThan(0);
+    expect(forced.points).toEqual(around.points);
+    expect(forced.crossings).toBe(0);
     expect(axisAligned(around.points)).toBe(true);
+    // a bar that only TOUCHES the first candidate's runs (an edge on x = 306 from either side, an edge on y = 14 from
+    // above and from below) is not in the way: the first candidate is kept
+    const touching: Box[] = [
+      { x: 306, y: 40, w: 10, h: 28 },
+      { x: 296, y: 40, w: 10, h: 28 },
+      { x: 100, y: 14, w: 20, h: 20 },
+      { x: 100, y: -6, w: 20, h: 20 },
+    ];
+    const grazed = routeEdge(from, to, touching);
+    expect(grazed.points).toEqual(clean.points);
+    expect(grazed.crossings).toBe(0);
   });
 
   it('29.065 the target starts before the source ends: a channel between the rows, five corners at most', () => {
@@ -3642,6 +3722,9 @@ describe('29.065 edge routing on packed rows', () => {
     expect(r.points.length).toBeLessThanOrEqual(6);
     expect(r.points[0]).toEqual({ x: from.x + from.w, y: 14 });
     expect(r.points[r.points.length - 1]).toEqual({ x: to.x, y: to.y + 14 });
+    // the channel runs half-way between the source's bottom (28) and the target's top (40), out past the source end (256 + 14)
+    // and back to the gutter before the target (192 - 14)
+    expect(r.points).toEqual([{ x: 256, y: 14 }, { x: 270, y: 14 }, { x: 270, y: 34 }, { x: 178, y: 34 }, { x: 178, y: 54 }, { x: 192, y: 54 }]);
   });
 
   it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above', () => {
@@ -3652,6 +3735,8 @@ describe('29.065 edge routing on packed rows', () => {
     const port = routeEdge(t(from), t(to), [], 'portrait');
     expect(port.points).toEqual(land.points.map((p) => ({ x: p.y, y: p.x })));
     expect(port.label).toEqual({ x: land.label.y, y: land.label.x });
+    // the last step runs DOWN onto the target's start anchor (its top edge's middle): the arrowhead enters from above
+    expect(port.points.slice(-2)).toEqual([{ x: 94, y: 114 }, { x: 94, y: 128 }]);
   });
 
   it('29.065 the label sits on the longest segment along the time axis', () => {
@@ -3659,6 +3744,8 @@ describe('29.065 edge routing on packed rows', () => {
     expect(r.label.y).toBe(14);
     expect(r.label.x).toBeGreaterThan(64);
     expect(r.label.x).toBeLessThan(30 * 16);
+    // the path is 64 -> 466 on row 0 (402 px), down, then 466 -> 480 (14 px): the middle of the long run
+    expect(r.label).toEqual({ x: 265, y: 14 });
   });
 });
 
@@ -3703,6 +3790,8 @@ describe('29.066 a loop is a curved return arrow, with no pill and no corners', 
     const slim: Box = { x: 50, y: 0, w: 8, h: 28 };
     expect(routeLoop(diamond, slim).points[3]).toEqual({ x: 54, y: 0 });
     expect(routeLoop(diamond, target).d).toBe(routeLoop({ ...diamond }, { ...target }).d);
+    // a function of the boxes alone: fresh copies give the exact string, not merely an equal one
+    expect(routeLoop({ ...diamond }, { ...target }).d).toBe('M 414 80 C 414 -28, 38 -28, 38 0');
   });
 });
 
@@ -3710,21 +3799,45 @@ describe('29.067 a loop lifts over a bar that is in its way', () => {
   it('29.067 the smallest lift that crosses no third bar wins; with nothing in the way the first lift is used; with all three blocked the one with the fewest crossings is reported', () => {
     const diamond: Box = { x: 400, y: 80, w: 28, h: 28 };
     const target: Box = { x: 32, y: 0, w: 96, h: 28 };
+    expect(LOOP_LIFTS_PX).toEqual([28, 64, 100]);
     const clear = routeLoop(diamond, target, []);
-    expect(clear.points[1].y).toBe(-LOOP_LIFTS_PX[0]);
-    // a bar sitting in the arc at the first lift
+    expect(clear.points[1].y).toBe(-28); // the first lift, as a literal (not read back from the constant)
+    expect(clear.crossings).toBe(0);
+    // a bar the arc crosses at lift 28 (y about -11 at x = 226) but clears at lift 64 (y about -38 there): the SECOND lift wins
+    const low: Box = { x: 200, y: -30, w: 40, h: 25 };
+    const second = routeLoop(diamond, target, [low]);
+    expect(second.crossings).toBe(0);
+    expect(second.points[1].y).toBe(-64);
+    // a bar sitting in the arc at the first two lifts (y -40 to -10): only the third lift (y about -65 there) clears it
     const inTheWay: Box = { x: 200, y: -40, w: 40, h: 30 };
     const lifted = routeLoop(diamond, target, [inTheWay]);
     expect(lifted.crossings).toBe(0);
     expect(lifted.points[1].y).toBeLessThan(clear.points[1].y);
-    // blocked at every lift: a wall across the arc
+    expect(lifted.points[1].y).toBe(-100);
+    // blocked at every lift: a wall across the arc; the three tie at one crossing and the first (smallest) is reported
     const wall = [{ x: 200, y: -120, w: 40, h: 118 }];
     const stuck = routeLoop(diamond, target, wall);
     expect(stuck.crossings).toBe(1);
-    expect(stuck.points[1].y).toBe(-LOOP_LIFTS_PX[0]);
+    expect(stuck.points[1].y).toBe(-28);
+    // the wall plus the low bar: lift 28 crosses two, lifts 64 and 100 cross one: the fewest, smallest first, is lift 64
+    const fewest = routeLoop(diamond, target, [...wall, low]);
+    expect(fewest.crossings).toBe(1);
+    expect(fewest.points[1].y).toBe(-64);
   });
 });
 ```
+
+**Kills:**
+- 29.065 same row, straight line: (a) delete the `if (s.y === t.y && s.x < t.x) candidates.push([s, t]);` arm (the 8 px gap then takes the six-point channel) (b) `s` at `from.x` instead of `from.x + from.w` (c) `t.y` as `to.y` instead of `to.y + to.h / 2`.
+- 29.065 another row, the gutter before the target: (a) `GUTTER_PX = 14` to `12` (b) swap the `vx` and `ux` candidate pushes (the gutter after the source first) (c) `const vx = t.x - GUTTER_PX` to `t.x + GUTTER_PX`.
+- 29.065 a third bar in the way: (a) `crossings()` returning `0` (the obstacle ignored: `around`/`forced` keep the first candidate) (b) swap the `vx` and `ux` candidate pushes (`clean` takes x = 78) (c) `a.x > box.x` to `a.x >= box.x` (or any one of the four position comparisons `a.x > box.x`, `a.x < box.x + box.w`, `a.y > box.y`, `a.y < box.y + box.h` loosened to `>=` / `<=`: `grazed` leaves the first candidate).
+- 29.065 the channel: (a) `cy` as `from.y + from.h` (the channel on the source's bottom edge, y = 28) (b) `ux = s.x + GUTTER_PX` to `s.x` in the channel (c) drop the channel push (the target starting before the source end then has no candidate: `candidates[0]` is undefined).
+- 29.065 portrait: (a) skip `transposePt` on the way back (`points: r.points`) (b) `label: r.label` untransposed (c) the portrait branch calls `routeLandscape(from, to, obstacles)` on the untransposed boxes.
+- 29.065 the label: (a) `a.y === b.y` to `a.x === b.x` (the label on the longest vertical run) (b) `label = { x: a.x, y: a.y }` instead of the middle (c) drop the `Math.abs(b.x - a.x) > longest` test (the label on the LAST horizontal run, y = 94).
+- 29.066 landscape: (a) `LOOP_ENTRY_INSET_PX = 6` to `10` (b) `Math.min(s.y, e.y)` to `e.y` in `c1`/`c2` (the lower-row control lands its controls at y = 132) (c) `label` left at `s` (no highest-point scan: `label.y` = 80).
+- 29.066 portrait: (a) the portrait start anchor `from.x` to `from.x + from.w / 2` (b) portrait `c1.x` as `Math.max(s.x, e.x) - lift` (72, not left of both ends) (c) ignore `orientation` in `routeLoop` (the landscape string comes back).
+- 29.066 deterministic, slim bar: (a) `Math.min(LOOP_ENTRY_INSET_PX, to.w / 2)` to `LOOP_ENTRY_INSET_PX` (lands at 56) (b) `to.w / 2` to `to.w` (c) `round2` dropped from the `d` template in favour of `toFixed(1)` (the literal string changes).
+- 29.067 lifts: (a) `LOOP_LIFTS_PX = [28, 64, 100]` to `[28, 28, 28]` (b) `[28, 64, 100]` to `[28, 100, 64]` or `[28, 100]` (the low bar's answer is no longer -64) (c) `n < best.crossings` to `n <= best.crossings` (the wall reports lift 100, the fewest case lift 100) (d) count crossings as one boolean (`n = obstacles.some(...) ? 1 : 0`: the fewest case reports lift 28).
 
   Run: `slot-run.sh vp -- pnpm --filter @gisik-nokma/viewport exec vitest run test/route.test.ts --maxWorkers=2 > /tmp/vp.log 2>&1; tail -n 20 /tmp/vp.log`. Expected: FAIL (module missing).
 
@@ -3913,23 +4026,13 @@ export function routeLoop(from: Box, to: Box, obstacles: readonly Box[] = [], or
 
 - [ ] **Step 4: Export it and run**
 
-`packages/viewport/src/index.ts` (new):
+`packages/viewport/src/index.ts` (exists on the ref with T1/T2's seven lines): add only this task's own export line (planner ruling 2026-10-04, as for T3 and T4); on a merge, take the union of the `export *` lines:
 
 ```ts
-export * from './spring.js';
-export * from './momentum.js';
-export * from './rubber-band.js';
-export * from './anchored-zoom.js';
-export * from './wheel.js';
-export * from './calendar-days.js';
-export * from './range-plan.js';
-export * from './range-cache.js';
-export * from './pack.js';
 export * from './route.js';
-export * from './driver.js';
 ```
 
-  Run the package suite (43 tests pass and 1 is skipped after T5 on its own), typecheck and build.
+  Run the package suite (with T3 and T4 on the base, 42 tests pass and 1 is skipped: counted at `457f3caa`, the base holds 13 viewport tests, T3 adds 12, T4 adds 9 with 29.054 skipped, T5 adds 9; on the bare base T5 gives 22; re-count on the tip), typecheck and build.
 
 - [ ] **Step 5: Mutation pass (own)**
   - `GUTTER_PX = 14` to `12` → 29.065 (the 14 px gutter). Reorder the candidates (the gutter before the source first) → 29.065 (third bar in the way / control).
@@ -3939,6 +4042,8 @@ export * from './driver.js';
   - `LOOP_LIFTS_PX = [28, 64, 100]` to `[28, 28, 28]` → 29.067; `LOOP_ENTRY_INSET_PX = 6` to `10` → 29.066; the portrait start anchor `from.x` to `from.x + from.w / 2` → 29.066 portrait.
   - `routeLoop`'s `if (n === 0) break;` removed: EQUIVALENT (a later lift can never beat 0 crossings, and `n < best.crossings` is strict); record it.
   - `label` as the first sampled point instead of the highest → 29.066.
+
+**Prose to sweep:** none found (searched on `origin/release/workflow-graph`: `routeEdge`, `routeLoop`, `route.ts`, `LOOP_LIFTS`, `GUTTER_PX`, `edge routing`, `loop routing` in `Features.md`, `test-cases/`, `packages/viewport/`, `packages/flow-graph-browser/`, `docs/*.md`; the only hits are the T5 anchors `Features.md:3830` and `test-cases/29-workflow-timeline-graphs.md:51`, which this task's own Step 1 and Step 6 replace, and `packages/viewport/src/index.ts:1-7` carries no comment).
 
 - [ ] **Step 6: Flip, bullet, gate**
   - Flip ❌ to ✅ on 29.065–29.067; `pnpm check:citations`.
@@ -4939,9 +5044,15 @@ describe('29.037 the camera', () => {
       expect(Math.abs(now.y - world.y) * cam.scale()).toBeLessThan(0.5);
     }
     const z = cam.scale();
-    expect(z).not.toBe(1);
-    el.dispatchEvent(wheel({ dx: 30, dy: 12 }));
-    expect(cam.getCamera().x).toBeCloseTo(cam.toWorld({ x: 0, y: 0 }).x, 9);
+    // wheel up zooms IN: the notched -120 (exp(0.264)) and the Ctrl pair (exp(0.096) * exp(-0.096)) leave exp(0.264)
+    expect(z).toBeCloseTo(Math.exp(0.264), 6);
+    const before = cam.getCamera();
+    const pan = wheel({ dx: 30, dy: 12 });
+    el.dispatchEvent(pan);
+    expect(pan.defaultPrevented).toBe(true);
+    expect(cam.getCamera().x).toBeCloseTo(before.x + 30 / z, 9);
+    expect(cam.getCamera().y).toBeCloseTo(before.y + 12 / z, 9);
+    expect(cam.scale()).toBe(z);
     for (let i = 0; i < 200; i += 1) el.dispatchEvent(wheel({ dy: -120 }));
     expect(cam.scale()).toBe(4);
     for (let i = 0; i < 400; i += 1) el.dispatchEvent(wheel({ dy: 120 }));
@@ -4972,8 +5083,14 @@ describe('29.037 the camera', () => {
     expect(cam.scale()).toBeCloseTo(2, 5);
     const after = cam.toWorld({ x: 400, y: 300 });
     expect(Math.abs(after.x - mid.x) * cam.scale()).toBeLessThan(0.5);
-    el.dispatchEvent(pointer('pointerup', { x: 200, y: 300, id: 2, kind: 'touch' }));
-    el.dispatchEvent(pointer('pointerup', { x: 600, y: 300, id: 3, kind: 'touch' }));
+    expect(Math.abs(after.y - mid.y) * cam.scale()).toBeLessThan(0.5);
+    // both fingers slide 100 px right: the midpoint leaves the viewport centre (400, 300) and the world point follows it
+    el.dispatchEvent(pointer('pointermove', { x: 300, y: 300, id: 2, kind: 'touch' }));
+    el.dispatchEvent(pointer('pointermove', { x: 700, y: 300, id: 3, kind: 'touch' }));
+    const slid = cam.toWorld({ x: 500, y: 300 });
+    expect(Math.abs(slid.x - mid.x) * cam.scale()).toBeLessThan(0.5);
+    el.dispatchEvent(pointer('pointerup', { x: 300, y: 300, id: 2, kind: 'touch' }));
+    el.dispatchEvent(pointer('pointerup', { x: 700, y: 300, id: 3, kind: 'touch' }));
     fc.advance(1000);
     // flick
     cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
@@ -4984,15 +5101,23 @@ describe('29.037 the camera', () => {
     }
     el.dispatchEvent(pointer('pointerup', { x: 380, y: 300 }));
     const released = cam.getCamera().x;
+    expect(released).toBe(120);
+    // release velocity 1.5 px/ms = 1,500 px/s: 200 ms of decay travel 360 * (1 - e^(-200/240)) = 203.5 px
     fc.advance(200);
-    expect(cam.getCamera().x).toBeGreaterThan(released + 20);
+    expect(cam.getCamera().x).toBeGreaterThan(released + 150);
     fc.advance(4000);
     const rest = cam.getCamera().x;
+    // the whole flick travels v * tau = 1,500 px/s * 0.24 s = 360 px, less the < 2 px/s left when it stops
+    expect(rest - released).toBeGreaterThan(355);
+    expect(rest - released).toBeLessThan(361);
     fc.advance(400);
     expect(cam.getCamera().x).toBe(rest);
-    // rested
+    // stopped means the frame loop went idle, not only that x held
+    expect(fc.pending()).toBe(0);
+    // rested: the move is 16 ms after the press, so the samples span time; 300 ms of rest empties the 80 ms window
     cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 300 }));
+    fc.advance(16);
     el.dispatchEvent(pointer('pointermove', { x: 450, y: 300 }));
     fc.advance(300);
     el.dispatchEvent(pointer('pointerup', { x: 450, y: 300 }));
@@ -5028,6 +5153,11 @@ describe('29.037 the camera', () => {
     press('+');
     fc.advance(700);
     expect(cam.scale()).toBeCloseTo(1.25, 2);
+    // 80 SCREEN px: at zoom 1.25 a key pan is 64 world units
+    const x1 = cam.getCamera().x;
+    press('ArrowRight');
+    fc.advance(700);
+    expect((cam.getCamera().x - x1) * cam.scale()).toBeCloseTo(80, 0);
     cam.destroy();
     const e = wheel({ dy: -120 });
     el.dispatchEvent(e);
@@ -5035,6 +5165,14 @@ describe('29.037 the camera', () => {
   });
 });
 ```
+
+**Kills:**
+- 29.037 one transform: (a) `paint()`: `${-x * zoom}px` → `${-x}px` (b) delete `this.el.style.touchAction = 'none';` (c) `toWorld`: `px.x / this.cam.zoom` → `px.x * this.cam.zoom`.
+- 29.037 wheel: (a) `onWheel`: `this.zoomAbout(this.cam.zoom * intent.factor, this.local(e))` → anchor `{ x: this.el.clientWidth / 2, y: this.el.clientHeight / 2 }` (b) `this.cam.zoom * intent.factor` → `this.cam.zoom / intent.factor` (wheel up zooms out: z = exp(-0.264)) (c) move `e.preventDefault()` into the zoom branch (the pixel pan is no longer cancelled).
+- 29.037 pixel pan: (a) `this.cam.x += intent.dx / this.cam.zoom` → `this.cam.x += intent.dx` (b) `+=` → `-=` on the pan x.
+- 29.038 drag / pinch / flick: (a) the pinch branch's `y: this.pinch.world.y - mid.y / zoom` → `y: this.cam.y` (b) `const mid = this.pinchMid()` → `{ x: this.el.clientWidth / 2, y: this.el.clientHeight / 2 }` (pinch about the view centre: the slide leg) (c) `onPointerEnd`: `const t = this.clock.now()` → `const t = this.samples[this.samples.length - 1]?.t ?? this.clock.now()` (the rested release gets a velocity).
+- 29.038 glides: (a) `camera()`: `options.instant === true || (this.options.reducedMotion ?? prefersReducedMotion)()` → `options.instant === true` (reduced motion glides) (b) `Math.min(options.maxMs ?? MAX_GLIDE_MS, MAX_GLIDE_MS)` → `options.maxMs ?? 4500` (tau stays 85 ms: about 15 px short at 496 ms) (c) `tick`: `busy = !done` → `busy = true` (the last frame says moving: true).
+- 29.038 keys: (a) `e.shiftKey ? 4 : 1` → `e.shiftKey ? 2 : 1` (b) `step = (KEY_PAN_PX * (e.shiftKey ? 4 : 1)) / this.cam.zoom` → drop `/ this.cam.zoom` (100 screen px at zoom 1.25) (c) delete the `for (const remove of this.removers.splice(0)) remove();` line in `destroy`.
 
   Run: `slot-run.sh vp -- pnpm --filter @gisik-nokma/viewport exec vitest run test/camera-adapter.test.ts --maxWorkers=2 > /tmp/vp.log 2>&1; tail -n 20 /tmp/vp.log`. Expected: FAIL (module missing).
 
@@ -5341,22 +5479,9 @@ export class CameraAdapter implements ViewportDriver {
 }
 ```
 
-`packages/viewport/src/index.ts` (new):
+`packages/viewport/src/index.ts` (exists on the ref with T1/T2's seven lines): add only this task's own export line (planner ruling 2026-10-04, as for T3 and T4); on a merge, take the union of the `export *` lines:
 
 ```ts
-export * from './spring.js';
-export * from './momentum.js';
-export * from './rubber-band.js';
-export * from './anchored-zoom.js';
-export * from './wheel.js';
-export * from './calendar-days.js';
-export * from './range-plan.js';
-export * from './range-cache.js';
-export * from './pack.js';
-export * from './route.js';
-export * from './driver.js';
-export * from './dom/clock.js';
-export * from './dom/scroll-adapter.js';
 export * from './dom/camera-adapter.js';
 ```
 
@@ -5376,12 +5501,14 @@ const cam = (page: Page): Promise<Cam> => page.evaluate(() => (window as unknown
 const nodeLeft = (page: Page): Promise<number> => page.evaluate(() => document.querySelector('.node')!.getBoundingClientRect().left);
 const settled = async (page: Page): Promise<void> => {
   let last = await cam(page);
-  for (let i = 0; i < 40; i += 1) {
+  for (let i = 0; i < 80; i += 1) {
     await page.waitForTimeout(50);
     const now = await cam(page);
     if (now.x === last.x && now.y === last.y && now.zoom === last.zoom) return;
     last = now;
   }
+  // a camera that never comes to rest is a failure, not a quiet return (a fast flick stops within about 2.3 s)
+  throw new Error('the camera never came to rest within 4 s');
 };
 
 test('29.045 a mouse drag pans the world with the pointer, then momentum carries on and stops', async ({ page }) => {
@@ -5396,8 +5523,8 @@ test('29.045 a mouse drag pans the world with the pointer, then momentum carries
   await page.mouse.up();
   await settled(page);
   const after = await cam(page);
-  // the release velocity carried the camera a little further than the pointer went, and it came to rest
-  expect(after.x).toBeGreaterThanOrEqual(during.x);
+  // the release velocity carried the camera further than the pointer went (strictly: with no momentum after === during), and it came to rest
+  expect(after.x).toBeGreaterThan(during.x);
   expect(after.y).toBeCloseTo(0, 0);
   const rest = await cam(page);
   await page.waitForTimeout(200);
@@ -5425,12 +5552,20 @@ test('29.046 Ctrl + wheel zooms about the pointer: the world point under it stay
   expect((await cam(page)).zoom).toBeGreaterThan(1.3);
   expect((await cam(page)).zoom).toBeLessThan(3);
   expect(worst).toBeLessThanOrEqual(0.5);
+  // the SCREEN agrees with the camera at this zoom: node 0 (world 0, 0) is drawn at (0 - x) * zoom from the view's left
+  const c = await cam(page);
+  expect(Math.abs((await nodeLeft(page)) - (box.x - c.x * c.zoom))).toBeLessThan(0.5);
 });
 
 test('29.047 a pixel wheel scroll pans; the arrow keys pan by 80 px; plus and minus zoom; the page does not scroll', async ({ page }) => {
   await page.goto('/camera.html');
   const view = page.locator('#view');
   const box = (await view.boundingBox())!;
+  // make the page itself scrollable both ways, so "the page does not scroll" can fail (the 800 x 500 view alone never overflows)
+  await page.evaluate(() => {
+    document.body.style.width = '3000px';
+    document.body.style.height = '3000px';
+  });
   await page.mouse.move(box.x + 200, box.y + 200);
   await page.mouse.wheel(60, 0);
   await page.waitForTimeout(100);
@@ -5447,7 +5582,11 @@ test('29.047 a pixel wheel scroll pans; the arrow keys pan by 80 px; plus and mi
   await page.keyboard.press('-');
   await settled(page);
   expect((await cam(page)).zoom).toBeCloseTo(z0, 2);
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  // the wheel and the arrow are horizontal: scrollX is the axis they would have moved
+  expect(await page.evaluate(() => [window.scrollX, window.scrollY])).toEqual([0, 0]);
+  // CONTROL: the page CAN scroll, so the line above is not true merely of an unscrollable page
+  await page.evaluate(() => window.scrollTo(10, 10));
+  expect(await page.evaluate(() => [window.scrollX, window.scrollY])).toEqual([10, 10]);
 });
 
 test('29.048 reduced motion: a key press jumps with no glide and a drag release leaves no momentum', async ({ page }) => {
@@ -5479,14 +5618,26 @@ test('29.049 two touch points pinch and pan as one gesture; the world point unde
   const world0 = { x: 400, y: 250 };
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at(300, 250, 1), at(500, 250, 2)] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [at(200, 250, 1), at(600, 250, 2)] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   const c = await cam(page);
   expect(c.zoom).toBeGreaterThan(1.9);
   // the midpoint stayed at 400, so the world point first under it (400, 250) is still under it
   expect(c.x + 400 / c.zoom).toBeCloseTo(world0.x, 0);
+  expect(c.y + 250 / c.zoom).toBeCloseTo(world0.y, 0);
+  // the pan half of the gesture: both fingers slide 50 px right, the midpoint (now 450, off the view's centre) still holds world0
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [at(250, 250, 1), at(650, 250, 2)] });
+  const d = await cam(page);
+  expect(d.x + 450 / d.zoom).toBeCloseTo(world0.x, 0);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await ctx.close();
 });
 ```
+
+**Kills:**
+- 29.045: (a) delete `if (vx !== 0 || vy !== 0) this.momentum = { vx, vy };` (after === during, and the strict `>` turns red) (b) `onPointerMove`: `this.cam.x -= (now.x - before.x) / this.cam.zoom` → `+=` (during.x is -200).
+- 29.046: (a) `onWheel`'s zoom anchor `this.local(e)` → `{ x: this.el.clientWidth / 2, y: this.el.clientHeight / 2 }` (drift of tens of px at (420, 180)) (b) `paint()`: `${-x * zoom}px` → `${-x}px` (node 0 drawn at box.x - x, not box.x - x * 2.05) (c) delete the `if (intent.kind === 'zoom')` arm so every wheel pans (zoom stays 1: `> 1.3` turns red).
+- 29.047: (a) `KEY_PAN_PX = 80` → `60` (b) `KEY_ZOOM = 1.25` → `1.5` (c) delete `e.preventDefault()` at the top of `onWheel` (the 3,000 px page scrolls 60 px: scrollX).
+- 29.048: (a) `onPointerEnd`: drop `&& !(this.options.reducedMotion ?? prefersReducedMotion)()` (momentum under reduced motion) (b) `camera()`: `const reduce = options.instant === true` (the key glides: about 14–25 px read, not 80) (c) `paint()`: `translate(${-x * zoom}px` → `translate(${x * zoom}px` (the control: node 0 at box.x + 200).
+- 29.049: (a) `const mid = this.pinchMid()` → `{ x: this.el.clientWidth / 2, y: this.el.clientHeight / 2 }` (the slide leg: world 425 under 450) (b) `y: this.pinch.world.y - mid.y / zoom` → `y: this.cam.y` (c) `this.pinchDistance()) / this.pinch.distance` → `this.pinch.distance) / this.pinchDistance()` (zoom 0.5).
 
 `packages/flow-graph-browser/harness/camera.html` (new):
 
@@ -5529,7 +5680,7 @@ const camera = new CameraAdapter({
   Build the package, then run: `pnpm turbo run build --filter=@gisik-nokma/viewport && slot-run.sh fgb -- pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/camera.spec.ts > /tmp/fgb.log 2>&1; tail -n 30 /tmp/fgb.log`. Expected: 5 tests green. The harness imports the BUILT `@gisik-nokma/viewport`, so a viewport edit needs a rebuild before the browser sees it (a stale `dist` is the usual cause of a red spec that is green in jsdom). The touch test (29.049) opens its own touch-enabled browser context.
 
 - [ ] **Step 5: Mutation pass (own)**
-  - `paint()`: `-x * zoom` to `-x` (the transform ignores the zoom) → 29.037 and 29.045.
+  - `paint()`: `-x * zoom` to `-x` (the transform ignores the zoom) → 29.037 and 29.046.
   - `zoomAbout`: anchor taken from the viewport centre → 29.037 and 29.046.
   - the `touch-action = 'none'` line removed → 29.037 control.
   - the pixel-pan division by `zoom` removed → 29.037 control (the same delta at zoom 2).
@@ -5537,6 +5688,8 @@ const camera = new CameraAdapter({
   - the pinch's world point re-read at every move instead of fixed at the start → 29.038, 29.049.
   - momentum started for a rested release (drop the `releaseVelocity` zero) → 29.038 control; reduced motion ignored for the release → 29.048.
   - Record the survivors.
+
+**Prose to sweep:** none found (searched on the ref: `CameraAdapter`, `camera.html`, `camera.spec`, `dom/camera-adapter`, `camera-adapter`, the `packages/viewport/src/index.ts` export list). Read and still true after T7: `packages/flow-graph-browser/README.md:33` (the `camera.html` row, "added by Part 1 T7"), `packages/viewport/src/wheel.ts:6` ("The CameraAdapter … uses it"), `packages/flow-graph-browser/harness/scenes.ts:61` (the flow scene moves "the way `CameraAdapter` moves it"), `packages/viewport/src/driver.ts:4` ("the Workflow graph's camera uses graph px and a unitless zoom").
 
 - [ ] **Step 6: Flip, bullet, gate**
   - Flip ❌ to ✅ on 29.037, 29.038, 29.045–29.049; `pnpm check:citations`.
@@ -5607,6 +5760,9 @@ describe('29.080 a claimed day is a day number', () => {
 });
 ```
 
+**Kills:**
+- 29.080 a claimed day is a day number: (a) `dayNumberOf` returns `Math.round(dateMs(isoDay) / DAY_MS) - 1` (day 0 / day 4 legs) (b) `isoDayOf` returns `isoDate((dayNumber + 1) * DAY_MS)` (round-trip leg) (c) `dayNumberOf` wraps `dateMs` in `try { … } catch { return Number.NaN; }` (the 30 February control). (`Math.round` → `Math.floor` is equivalent: the division is exact.)
+
 `packages/app-core/test/timeline/timeline-layout.test.ts` (new):
 
 ```ts
@@ -5637,18 +5793,25 @@ describe('29.081 lanes pack on their own and stack', () => {
     const b: LayoutLane = { laneId: 'b', items: [item('b1', 0, 4), item('b2', 10, 14)] }; // 1 row
     const land = layoutLanes([a, b], { ppd: 24, measure: fixed(0) });
     expect(land.lanes.map((l) => l.rows)).toEqual([3, 1]);
-    expect(land.lanes[0]).toMatchObject({ offset: 0, extent: LANE_HEADING + 3 * ROW_PITCH });
-    expect(land.lanes[1]).toMatchObject({ offset: LANE_HEADING + 3 * ROW_PITCH, extent: LANE_HEADING + ROW_PITCH });
-    expect(land.extent).toBe(LANE_HEADING * 2 + 4 * ROW_PITCH);
+    // The rows each bar was given, not only the count: a1, a2, a3 all overlap on days 5-6.
+    expect(land.lanes[0]?.bars.map((bar) => [bar.id, bar.row])).toEqual([['a1', 0], ['a2', 1], ['a3', 2]]);
+    // The spec's pixels as literals (34 heading, 40 pitch, 112 column): a test that re-reads the exported constants stays
+    // green when a constant changes.
+    expect([LANE_HEADING, ROW_PITCH, COLUMN_WIDTH]).toEqual([34, 40, 112]);
+    expect(land.lanes[0]).toMatchObject({ offset: 0, extent: 34 + 3 * 40 });
+    expect(land.lanes[1]).toMatchObject({ offset: 34 + 3 * 40, extent: 34 + 40 });
+    expect(land.extent).toBe(34 * 2 + 4 * 40);
     const port = layoutLanes([a, b], { ppd: 24, measure: fixed(0), orientation: 'portrait' });
-    expect(port.lanes.map((l) => [l.offset, l.extent])).toEqual([[0, 3 * COLUMN_WIDTH], [3 * COLUMN_WIDTH, COLUMN_WIDTH]]);
+    expect(port.lanes.map((l) => [l.offset, l.extent])).toEqual([[0, 3 * 112], [3 * 112, 112]]);
     const twin = layoutLanes([a, { laneId: 'c', items: a.items.map((i) => ({ ...i, id: `c-${i.id}` })) }], { ppd: 24, measure: fixed(0) });
-    expect(twin.lanes[1]?.rows).toBe(twin.lanes[0]?.rows);
+    expect(twin.lanes.map((l) => l.rows)).toEqual([3, 3]);
   });
 
   it('29.081 an empty lane list is a zero-height layout, and a lane never has fewer than one row', () => {
     expect(layoutLanes([], { ppd: 24, measure: fixed(0) })).toMatchObject({ lanes: [], extent: 0 });
-    expect(layoutLanes([{ laneId: 'x', items: [] }], { ppd: 24, measure: fixed(0) }).lanes[0]?.extent).toBe(LANE_HEADING + ROW_PITCH);
+    // Both the row count and the extent of an empty lane (planner ruling 2026-10-04): one row, and the room for one row.
+    expect(layoutLanes([{ laneId: 'x', items: [] }], { ppd: 24, measure: fixed(0) }).lanes[0]).toMatchObject({ rows: 1, extent: 34 + 40 });
+    expect(layoutLanes([{ laneId: 'x', items: [] }], { ppd: 24, measure: fixed(0), orientation: 'portrait' }).lanes[0]).toMatchObject({ rows: 1, extent: 112 });
   });
 });
 
@@ -5691,6 +5854,11 @@ describe('29.084 the paper pin', () => {
     const make = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1', pinned), item('b', 4, 6, 'GN-2')] });
     expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
     expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(2);
+    // Exactly 14 px, by behaviour: 50 + 14 = 64 px is 4 days at 16 px/day (one row), 51 + 14 = 65 px is 5 (two rows).
+    // 13 px would put 51 in one row; 15 px would put 50 in two.
+    expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(50) }).lanes[0]?.rows).toBe(1);
+    expect(layoutLanes([make(true)], { ppd: 16, measure: fixed(51) }).lanes[0]?.rows).toBe(2);
+    expect(layoutLanes([make(false)], { ppd: 16, measure: fixed(51) }).lanes[0]?.rows).toBe(1);
   });
 });
 
@@ -5698,6 +5866,9 @@ describe('29.085 stability', () => {
   it('29.085 adding a bar that starts after everything changes no existing row; control: a bar that starts first can', () => {
     const items = Array.from({ length: 20 }, (_, i) => item(`i${i}`, i * 2, i * 2 + 5, `GN-${i}`));
     const before = layoutLanes([{ laneId: 'l', items }], { ppd: 24, measure: fixed(40) }).lanes[0]?.bars;
+    // Non-empty, and the bars really sit in different rows (each spans 6 days and one starts every 2: rows 0, 1, 2 in turn),
+    // so "no row changed" below is a claim about three rows, not about one row every bar shares.
+    expect(before?.map((bar) => bar.row).join('')).toBe('01201201201201201201');
     const later = layoutLanes([{ laneId: 'l', items: [...items, item('later', 900, 904, 'GN-900')] }], { ppd: 24, measure: fixed(40) }).lanes[0]?.bars;
     for (const bar of before ?? []) expect(later?.find((b) => b.id === bar.id)?.row).toBe(bar.row);
     const first = layoutLanes([{ laneId: 'l', items: [item('first', -5, 100, 'GN-0'), ...items] }], { ppd: 24, measure: fixed(40) }).lanes[0]?.bars;
@@ -5714,9 +5885,23 @@ describe('29.086 what is mounted', () => {
     expect(barsInRange(lane, { start: 15, end: 19 })).toEqual([]);
     expect(barsInRange(lane, { start: 25, end: 30 }).map((b) => b.id)).toEqual(['d']);
     expect(barsInRange(lane, { start: 26, end: 30 })).toEqual([]);
+    // The slice is in start-day order, then id: ids that sort the other way, and a tie on day 5.
+    const mixed = layoutLanes([{ laneId: 'm', items: [item('z', 0, 2), item('y', 5, 6), item('x', 5, 8)] }], { ppd: 24, measure: fixed(0) }).lanes[0]!;
+    expect(barsInRange(mixed, { start: 0, end: 10 }).map((b) => b.id)).toEqual(['z', 'x', 'y']);
   });
 });
 ```
+
+**Kills:**
+- 29.081 lanes pack on their own and stack: (a) hoist the pack items out of the `for (const lane of lanes)` loop so every lane packs the items of all lanes so far (lane b gets 3 rows) (b) `LANE_HEADING = 34` to `30`, `ROW_PITCH = 40` to `36` or `COLUMN_WIDTH = 112` to `100` (c) `const portrait = options.orientation !== 'portrait'`.
+- 29.081 an empty lane list is a zero-height layout, and a lane never has fewer than one row: (a) drop the `max(1, …)` (`const rows = result.rows`; the empty lane reads `rows: 0` and `extent: 34`, and in portrait `extent: 0`; planner ruling 2026-10-04) (b) push `rows: result.rows` while the extent keeps `rows` (only the `rows: 1` leg goes red) (c) start `cursor` at `LANE_HEADING`.
+- 29.082 on 50 seeds the rows equal the greatest overlap: (a) `labelPx: () => 0` ignoring `options.measure` (23 of the 50 seeds differ) (b) pack at `ppd: options.ppd` instead of `scale` while still returning `scale` (19 seeds differ) (c) delete the `.sort(…)` on `bars` (the reversed input keeps its own order, so the shuffled leg differs).
+- 29.083 a one-day bar whose key needs 70 px: (a) `labelPx` returns `PIN_PX` instead of the measured width (b) `ppd: scale` to `ppd: 64`.
+- 29.083 rows are the same for every ppd inside one bucket: (a) pack at `ppd: options.ppd` (24 px/day gives "0,0") (b) `const scale = options.ppd` (the scale leg) (c) `row: result.rowOf.get(item.id) ?? 0` to `row: 0` (31.99 and 32 both "0,0").
+- 29.084 a pinned bar adds 14 px: (a) remove the `+ (source?.pinned === true ? PIN_PX : 0)` term (b) `PIN_PX = 14` to `13` (the 51 leg) or `15` (the 50 leg) (c) add `PIN_PX` to every item, pinned or not (the unpinned 60 and 51 legs go to two rows).
+- 29.085 adding a bar that starts after everything changes no existing row: (a) `row: result.rowOf.get(item.id) ?? 0` to `row: 0` (the precondition and the control) (b) look rows up by position, `row: result.rowOf.get(lane.items[0]!.id) ?? 0` (every bar row 0). Otherwise it guards T4's first fit by start through the layout.
+- 29.086 barsInRange returns the bars that touch the range: (a) `bar.endDay >= range.start` to `>` (the day-4 leg) (b) `bar.startDay <= range.end` to `<` (`c` drops from 5-10) (c) sort `bars` by id only, or by start day only (the `['z', 'x', 'y']` leg).
+
 
   Build the package app-core reads, then run: `pnpm turbo run build --filter=@gisik-nokma/viewport && slot-run.sh ac -- pnpm --filter @gisik-nokma/app-core exec vitest run test/timeline/timeline-days.test.ts test/timeline/timeline-layout.test.ts --maxWorkers=2 > /tmp/ac.log 2>&1; tail -n 20 /tmp/ac.log`. Expected: FAIL (modules missing).
 
@@ -5776,6 +5961,7 @@ export type PlacedLane = {
   offset: number;
   /** Landscape: the lane's height in px (heading + rows). Portrait: its width (rows x 112). */
   extent: number;
+  /** The rows the lane occupies; at least 1, an empty lane included (planner ruling 2026-10-04). */
   rows: number;
   /** Sorted by start day, then id: stable for the virtualised slice. */
   bars: PlacedBar[];
@@ -5822,8 +6008,10 @@ export function layoutLanes(
     const bars = lane.items
       .map((item): PlacedBar => ({ id: item.id, row: result.rowOf.get(item.id) ?? 0, startDay: item.startDay, endDay: item.endDay }))
       .sort((a, b) => a.startDay - b.startDay || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    const extent = portrait ? Math.max(1, result.rows) * COLUMN_WIDTH : LANE_HEADING + Math.max(1, result.rows) * ROW_PITCH;
-    placed.push({ laneId: lane.laneId, offset: cursor, extent, rows: result.rows, bars });
+    // A lane never has fewer than one row, an empty lane included: `rows` and `extent` agree (planner ruling 2026-10-04).
+    const rows = Math.max(1, result.rows);
+    const extent = portrait ? rows * COLUMN_WIDTH : LANE_HEADING + rows * ROW_PITCH;
+    placed.push({ laneId: lane.laneId, offset: cursor, extent, rows, bars });
     cursor += extent;
   }
   return { lanes: placed, scale, extent: cursor };
@@ -5852,12 +6040,14 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
  // would re-export this module's internals — `PATHS`, `sinceDay`, `CAP` — as
 ```
 
-  (`layoutLanes` and the constants stay internal to the package until Part 4 needs them: the view imports them by path.) Run the two files (expected 8 tests green) and `pnpm --filter @gisik-nokma/app-core typecheck`.
+  (`layoutLanes` and the constants stay internal to the package until Part 4 needs them: the view imports them by path.) Run the two files (expected 9 tests green: 1 in `timeline-days.test.ts`, 8 in `timeline-layout.test.ts`) and `pnpm --filter @gisik-nokma/app-core typecheck`.
 
 - [ ] **Step 5: Mutation pass (own)**
   - `dayNumberOf`: `Math.round` to `Math.floor` (a float below `.5` noise would flip) is expected to SURVIVE for exact `DAY_MS` division; record it as equivalent. Drop the `RangeError` (return `NaN`) → 29.080's control.
-  - `layoutLanes`: use `options.ppd` instead of `scale` for packing → 29.083 (bucket case); `LANE_HEADING = 34` to `30`; `ROW_PITCH = 40` to `36`; `COLUMN_WIDTH = 112` to `100` → 29.081; `PIN_PX = 14` to `10` → 29.084; drop `Math.max(1, ...)` → 29.081 empty-lane case; remove the `pinned` addition → 29.084; sort `bars` by id only → 29.085/29.086 if they read order.
+  - `layoutLanes`: use `options.ppd` instead of `scale` for packing → 29.083 (bucket case); `LANE_HEADING = 34` to `30`; `ROW_PITCH = 40` to `36`; `COLUMN_WIDTH = 112` to `100` → 29.081; `PIN_PX = 14` to `10` → 29.084; drop `Math.max(1, ...)` (one `rows` now feeds both `rows` and `extent`; planner ruling 2026-10-04) → 29.081 empty-lane case; remove the `pinned` addition → 29.084; sort `bars` by id only → 29.085/29.086 if they read order.
   - `barsInRange`: `>=` to `>` or `<=` to `<` → 29.086 (inclusive at both ends).
+
+**Prose to sweep:** none found (searched on the ref: `day number`, `dayNumberOf`, `timeline-days`, `layoutLanes` in `packages/app-core/src`, `packages/viewport/src`, `Features.md`, `test-cases/29-workflow-timeline-graphs.md`; the comment block above the new export at `packages/app-core/src/index.ts:293-298` describes `TimelineView` only and stays true; the clock scan's prose in `packages/app-core/test/calendar/clock-free.test.ts:208-217` names roots, not files). T8 adds files and one export line; nothing it changes is described elsewhere yet.
 
 - [ ] **Step 6: Flip, bullet, gate**
   - Flip ❌ to ✅ on 29.080–29.086; `pnpm check:citations`.
@@ -5927,6 +6117,8 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 
   **The radio variant (29.087; planner ruling P5).** `grep -n "radiogroup" -r packages/ui/src packages/app-core/src apps/web/src` must print nothing on the base (else consume it and say so). Test first in `packages/ui/test/segmented-control-radio.test.tsx`: render `SegmentedControl` with `variant="radio"` and three options, assert `radiogroup` / `radio` / `aria-checked`, ArrowRight moves focus and selects; in the SAME `it()`, the control: the default variant renders `tablist` / `tab` / `aria-selected`. Then add `variant?: 'tabs' | 'radio'` (default `'tabs'`, so every existing render site is byte-identical) to `packages/ui/src/components/segmented-control.tsx` (it renders `role="tablist"` at `:130` and `role="tab"` at `:147` on the KG tip; re-read it): when `'radio'` the root is `role="radiogroup"`, each button `role="radio"` with `aria-checked={on}` instead of `aria-selected`, the roving tabindex and arrow keys unchanged, the same classes. Run the `packages/ui` and `apps/web` suites whole (a role change can move an accessible-name ratchet). Flip 29.087 in the commit that lands the test and the variant.
 
+  **Kills** (the `variant` edit to `segmented-control.tsx`): 29.087: (a) render `role="tablist"` for `'radio'` (b) set `aria-selected` instead of `aria-checked` on a radio (c) ArrowRight moves focus without calling `onChange` (the "moving AND selecting" leg); the same-`it()` control reds on (d) `role="radiogroup"` for the default variant too.
+
   The test diffs are unified diffs against the files at `origin/release/workflow-graph`; apply each with `patch -p1` from the repo root (save the fenced text, `patch -p1 --no-backup-if-mismatch < file`) or by hand. Controls live in the same `it()` as the case.
 
 `packages/app-core/test/timeline/timeline-model.test.ts`:
@@ -5982,7 +6174,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  });
  
-@@ -322,134 +315,30 @@
+@@ -322,134 +315,34 @@
        ]),
      );
      // The bar is untouched, and the bad day is printed verbatim beside it.
@@ -6124,18 +6316,22 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +  it('29.093 the row carries the claimed days as day numbers (1970-01-05 is day 4): a one-day period is startDay === endDay; a real leap day is placed', () => {
 +    const one = onlyRow(model([dated('2026-08-24', '2026-08-24', 'Same day')]));
 +    expect([one.startDay, one.endDay]).toEqual([dayNumberOf('2026-08-24'), dayNumberOf('2026-08-24')]);
++    // The number itself, not only agreement with the helper: day 0 is 1970-01-01, so 1970-01-05 is day 4 and 2026-08-24 is 20689.
++    expect(one.startDay).toBe(20689);
 +    const leap = onlyRow(model([dated('2028-02-29', '2028-03-07', 'Leap')]));
 +    expect([leap.startDay, leap.endDay]).toEqual([dayNumberOf('2028-02-29'), dayNumberOf('2028-03-07')]);
 +    expect(leap.endDay - leap.startDay).toBe(7);
-+    // control: a day that is not a day is refused by the guard, not turned into a bar
-+    expect(allRows(model([dated('2026-02-30', '2026-03-05', 'Bad day')]))).toHaveLength(0);
++    // control: a day that is not a day is refused by the guard, not turned into a bar: it is side-listed as unplaceable
++    const bad = model([dated('2026-02-30', '2026-03-05', 'Bad day')]);
++    expect(allRows(bad)).toHaveLength(0);
++    expect(bad.sideList.map((entry) => entry.reason)).toEqual(['unplaceable-day']);
 +  });
 +
 +  it('29.093 both claims and their two authors still make one row with the exact provenance sentence', () => {
      const m = model([
        ticket({
          fields: {
-@@ -460,26 +349,56 @@
+@@ -460,26 +353,56 @@
        }),
      ]);
      const row = onlyRow(m);
@@ -6206,7 +6402,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  });
  
-@@ -711,11 +630,11 @@
+@@ -711,11 +634,11 @@
      expect(row.customClaims[0]!.claim.fieldId).toBe('filed-on');
      // 24 Aug and 28 Aug are both in the 24-30 week: one column, untouched by
      // the 26 Aug claim.
@@ -6220,7 +6416,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
      const stretch = ticket(
        {
          fields: {
-@@ -728,23 +647,7 @@
+@@ -728,23 +651,7 @@
        [],
        [{ id: 'filed-on', name: 'Filed on' }],
      );
@@ -6245,7 +6441,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  
    it('a custom date claim does NOT rescue a ticket from the side list — but the note stops lying', () => {
-@@ -856,7 +759,7 @@
+@@ -856,7 +763,7 @@
   * still distinguish. The distinct-count assertion records the collapse rather
   * than hiding it.
   */
@@ -6254,7 +6450,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    function assigned(assigneeId: string, title: string, start?: string, due?: string): TicketDatesInput {
      const fields: Record<string, unknown> = { title: claimField(title) };
      if (start !== undefined) fields.startDate = claimField({ date: start });
-@@ -879,7 +782,6 @@
+@@ -879,7 +786,6 @@
      expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
      // The property the deleted sentence used to carry, now carried by this one.
      expect(m.emptyCopy).toContain('your filter');
@@ -6262,7 +6458,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  
    it('an unmatched LANE reaches the same sentence — the door outlives the copy', () => {
-@@ -888,43 +790,21 @@
+@@ -888,43 +794,21 @@
      expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
    });
  
@@ -6314,7 +6510,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  
    it('a timeline with anything on it has no empty sentence at all', () => {
-@@ -933,43 +813,6 @@
+@@ -933,43 +817,6 @@
      expect(
        model([ticket({ fields: { title: claimField('Undated') } })]).emptyCopy,
      ).toBeNull();
@@ -6358,7 +6554,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  
    /**
-@@ -1041,12 +884,10 @@
+@@ -1041,12 +888,10 @@
      expect(m.groups).toHaveLength(1);
      expect(m.groups[0]!.epicId).toBe('epic_full');
      expect(m.groups[0]!.rows.map((row) => row.ticketId)).toEqual(['epic_full']);
@@ -6375,7 +6571,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  
    it('a TRULY undated epic is a lane and nothing else — neither a row nor missing work', () => {
-@@ -1161,18 +1002,3 @@
+@@ -1161,18 +1006,3 @@
      expect(bare.groups).toEqual([]);
    });
  });
@@ -6396,12 +6592,30 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 -});
 ```
 
+**Kills** (mutants of this task's `timeline-model.ts`, Step 3):
+- 11.52 "start EQUAL to due is a period of one day": (a) `start.date <= due.date` to `<` (the one-day period is side-listed, `onlyRow` throws) (b) `endDay: dayNumberOf(due.date) + 1`.
+- 11.54 "the bar is untouched" (bad custom day) and "a real leap day is placed": (a) feed the custom claims' days into `unplaceable` (the dated ticket is side-listed) (b) `endDay: dayNumberOf(start.date)` (the leap bar is 0 days long).
+- 29.093 the row carries the claimed days: (a) `startDay: dayNumberOf(start.date) + 1` (b) `endDay: dayNumberOf(start.date)` (the leap leg) (c) delete the `unplaceable` guard (`dayNumberOf('2026-02-30')` throws, and the reason leg names `unplaceable-day`).
+- 29.093 both claims and their two authors: (a) `barProvenance(due, start, opts.userName)` (b) `endDay: dayNumberOf(start.date)`.
+- 29.094 a year before and a year after: (a) `firstDay` with `Math.max` (b) `lastDay` from `row.startDay` (c) the extent loop reads only `group.rows[0]` (Long ago, Now, Far ahead are one lane, sorted by start).
+- 29.094 a custom date claim neither extends a row nor adds one: (a) `lastDay` takes `Math.max` over the row's custom claim days too (b) `customClaims` dropped from the row (`toHaveLength(1)`).
+- 11.58 "a custom claim far away neither extends a bar nor makes a row" and the edited 11.58 pair leg: (a) `endDay` stretched to the latest custom claim day.
+- 29.096 todayDay: (a) drop `isCalendarDay(opts.today) &&` (`dayNumberOf('2026-02-30')` throws) (b) `todayDay` null when `opts.today` lies outside `[firstDay, lastDay]` (a window guard by another name: `2031-01-01` with no rows).
+- 11.61 / 29.095 "the empties are ONE distinct model; a model with a row is another": (a) compute `firstDay` / `lastDay` over every dated INPUT instead of the drawn rows (the filter and lane models get an extent and differ from `model([])`).
+- 13.1036 (the epic's own bar, edited leg): (a) `endDay: dayNumberOf(start.date)`.
+
 `packages/app-core/test/timeline/timeline-view.test.tsx`:
 
 ```diff
 --- a/packages/app-core/test/timeline/timeline-view.test.tsx
 +++ b/packages/app-core/test/timeline/timeline-view.test.tsx
-@@ -6,7 +6,6 @@
+@@ -1,12 +1,11 @@
+ import { readFileSync } from 'node:fs';
+ import { dirname, join, resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { fireEvent, render, screen, within } from '@testing-library/react';
++import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+ import { describe, expect, it, vi } from 'vitest';
  import type { TicketState } from '@gisik-nokma/domain';
  import {
    TIMELINE_EMPTY_COPY,
@@ -6461,14 +6675,14 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
          { date: '2026-08-24', actorId: 'user_kiro' },
          { date: '2026-08-28', actorId: 'user_kiro' },
          userName,
-@@ -218,40 +215,29 @@
+@@ -218,40 +215,57 @@
    });
  });
  
 -describe('11.74 the window moves four weeks at a time, and Today follows the prop rather than the mount', () => {
 -  it('Later shifts forward, Earlier comes back, and the columns that leave really leave', () => {
 +describe('29.099 there are no pages: no Earlier / Later, a Today button, a zoom switch and a two-row axis', () => {
-+  it('29.099 the toolbar is Today and a Day | Week | Month switch with Week marked; Earlier and Later are gone (control: Today is there)', () => {
++  it('29.099 the toolbar is Today and a Day | Week | Month switch with Week marked; Earlier and Later are gone (control: Today is there)', async () => {
      renderTimeline([]);
 -    expect(screen.getByText(WEEK_17_AUG)).toBeInTheDocument();
 -    // 14 Sep is ALREADY on screen before the shift — the plan's own assertion
@@ -6508,6 +6722,23 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    expect(within(zoom).getAllByRole('radio').map((t) => t.textContent)).toEqual(['Day', 'Week', 'Month']);
 +    expect(within(zoom).getByRole('radio', { name: 'Week' })).toHaveAttribute('aria-checked', 'true');
 +    expect(within(zoom).getByRole('radio', { name: 'Day' })).toHaveAttribute('aria-checked', 'false');
++    // The mark follows the zoom, not a constant: choosing Day marks Day once the zoom lands. Reduced motion makes the zoom
++    // instant (the adapter reads `prefers-reduced-motion` through matchMedia, which jsdom lacks), so it lands on the next frame.
++    vi.stubGlobal('matchMedia', (query: string) => ({
++      matches: query.includes('reduce'),
++      media: query,
++      addEventListener() {},
++      removeEventListener() {},
++      addListener() {},
++      removeListener() {},
++    }));
++    try {
++      fireEvent.click(within(zoom).getByRole('radio', { name: 'Day' }));
++      await waitFor(() => expect(within(zoom).getByRole('radio', { name: 'Day' })).toHaveAttribute('aria-checked', 'true'));
++      expect(within(zoom).getByRole('radio', { name: 'Week' })).toHaveAttribute('aria-checked', 'false');
++    } finally {
++      vi.unstubAllGlobals();
++    }
 +  });
 +
 +  it('29.099 the axis has a period row with a W label on each Monday and a day-number row; a weekend day carries the mark', () => {
@@ -6521,10 +6752,21 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    // control: no weekday carries it
 +    const monday = [...(axis?.querySelectorAll('.gn-timeline__axis-day') ?? [])].filter((n) => !n.hasAttribute('data-weekend'));
 +    expect(monday.length).toBeGreaterThan(weekendDays.length);
++    // The RIGHT days, not only the right share: read each day cell by its offset from the W 24 Aug label (labels and day cells
++    // share `--d0`, the day's offset from the surface's first day). Mon 24 and Fri 28 are clear, Sat 29 and Sun 30 are marked.
++    const mon = Number((within(axis as HTMLElement).getByText('W 24 Aug') as HTMLElement).style.getPropertyValue('--d0'));
++    const dayAt = (d0: number) =>
++      [...(axis?.querySelectorAll<HTMLElement>('.gn-timeline__axis-day') ?? [])].find((n) => n.style.getPropertyValue('--d0') === String(d0));
++    expect(dayAt(mon)?.textContent).toBe('24');
++    expect(dayAt(mon)?.getAttribute('data-weekend')).toBeNull();
++    expect(dayAt(mon + 4)?.getAttribute('data-weekend')).toBeNull();
++    expect(dayAt(mon + 5)?.getAttribute('data-weekend')).toBe('true');
++    expect(dayAt(mon + 6)?.getAttribute('data-weekend')).toBe('true');
++    expect(dayAt(mon + 7)?.textContent).toBe('31');
    });
  });
  
-@@ -305,7 +291,7 @@
+@@ -305,7 +319,7 @@
      expect(screen.getByRole('note')).toHaveTextContent('your filter');
    });
  
@@ -6533,7 +6775,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
      renderTimeline([
        ticket({
          fields: {
-@@ -315,7 +301,8 @@
+@@ -315,7 +329,8 @@
          },
        }),
      ]);
@@ -6543,7 +6785,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  
    it('and NO sentence at all when there is something to show — the over-firing half', () => {
-@@ -532,96 +519,182 @@
+@@ -532,96 +547,204 @@
    });
  });
  
@@ -6579,6 +6821,9 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    expect(barOf('Mon to Wed')).toHaveAttribute('data-day-to', String(dayNumberOf('2026-08-26')));
 +    // --d0 is relative to the surface's first day, so the offset BETWEEN two bars is their distance in days
 +    expect(Number(prop('One day', '--d0')) - Number(prop('Mon to Wed', '--d0'))).toBe(dayNumberOf('2026-09-30') - dayNumberOf('2026-08-24'));
++    // ...and the offset itself is the axis's: a bar starting Monday 24 Aug has the --d0 of the W 24 Aug label above it (a
++    // difference alone cannot see an offset counted from the wrong origin, since both bars would carry it).
++    expect(prop('Mon to Wed', '--d0')).toBe((screen.getByText('W 24 Aug') as HTMLElement).style.getPropertyValue('--d0'));
 +  });
 +
 +  it('29.097 there is no window: work a year before and a year after is drawn, with the surface long enough to hold it', () => {
@@ -6642,11 +6887,13 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    const described = document.getElementById(narrow.getAttribute('aria-describedby') as string);
 +    expect(described).toHaveTextContent('GN-13');
 +    expect(narrow.getAttribute('aria-label')).toBe('Narrow');
++    // exactly one key per bar: inside the wide one, outside the narrow one, never both at once
++    expect(container.querySelectorAll('.gn-timeline__key')).toHaveLength(2);
++    expect((wide.closest('.gn-timeline__row') as HTMLElement).querySelector('.gn-timeline__key--outside')).toBeNull();
 +    // control: a bar with no key (a draft or a replica row) has none to show, inside or outside
 +    document.body.innerHTML = '';
 +    const bare = renderTimeline([ticket({ fields: { title: claimField('Bare'), startDate: claimField({ date: '2026-09-08' }), dueDate: claimField({ date: '2026-09-08' }) } })]);
 +    expect(bare.container.querySelector('.gn-timeline__key')).toBeNull();
-+    expect(container).toBeDefined();
 +  });
 +
 +  it('29.100 a finished ticket carries a check, one in progress a play mark, one not started none; the description says it in words', () => {
@@ -6657,7 +6904,8 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    expect(mark('Done one')).toBe('✓');
 +    expect(mark('Active one')).toBe('▶');
 +    expect(mark('Fresh one')).toBeNull();
-+    expect(screen.getByRole('button', { name: 'Done one' })).toHaveAttribute('title', expect.stringContaining('Done;'));
++    expect(screen.getByRole('button', { name: 'Done one' })).toHaveAttribute('title', expect.stringMatching(/^Done; /));
++    expect(screen.getByRole('button', { name: 'Active one' })).toHaveAttribute('title', expect.stringMatching(/^In progress; /));
 +    expect(screen.getByRole('button', { name: 'Fresh one' }).getAttribute('title')).not.toMatch(/Done|In progress/);
 +  });
 +});
@@ -6669,6 +6917,10 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    expect(lines()).toHaveLength(1);
 +    expect(lines()[0]).toHaveAttribute('aria-hidden', 'true');
 +    expect(lines()[0]).toHaveAttribute('data-day', String(dayNumberOf('2026-08-23')));
++    // ...and it is DRAWN on that day: Sunday 23 Aug is one day left of the W 24 Aug label (both offsets count from the
++    // surface's first day), so a line placed from the wrong origin fails here even though its data-day is right.
++    const mondayD0 = Number((screen.getByText('W 24 Aug') as HTMLElement).style.getPropertyValue('--d0'));
++    expect(Number((lines()[0] as HTMLElement).style.getPropertyValue('--d0'))).toBe(mondayD0 - 1);
 +    rerender(<TimelineView tickets={[]} today="2026-10-07" userName={userName} onOpenTicket={vi.fn()} />);
 +    expect(lines()[0]).toHaveAttribute('data-day', String(dayNumberOf('2026-10-07')));
 +    rerender(<TimelineView tickets={[]} today="2026-02-30" userName={userName} onOpenTicket={vi.fn()} />);
@@ -6693,6 +6945,17 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +      const measured = bars();
 +      expect(measured).toBeGreaterThan(0);
 +      expect(measured).toBeLessThan(300);
++      // WHICH bars, not only how many. Bar i is on 2026-01-05 + 3i, so Bar 49 is on today (2026-06-01). The viewport is 40 days
++      // (960 px at 24 px/day) centred on today, so the visible days are today -20 .. +20 and one viewport either side reaches
++      // about today -61 .. +61 (Bars 29 to 69). Bars 21 and 77 are 84 days away, past any band of the view; Bars 0 and 299 are
++      // the ends of the data.
++      const mounted = (i: number) => screen.queryByRole('button', { name: `Bar ${i}` }) !== null;
++      expect([mounted(29), mounted(49), mounted(69)]).toEqual([true, true, true]);
++      expect([mounted(0), mounted(21), mounted(77), mounted(299)]).toEqual([false, false, false, false]);
++      // After the mount and its first refresh the band IS spec PR-5's [visible - V, visible + V], exactly (planner ruling
++      // 2026-10-04): visible = today -20 .. +20 (offset today - 19.5, 40 days), V = 41, band = today -61 .. +61. Bars 28 and 70
++      // (today -63 and +63) are just outside it; the 54-day guess the view starts from (today -81 .. +80) would mount both.
++      expect([mounted(28), mounted(70)]).toEqual([false, false]);
 +    } finally {
 +      stub.mockRestore();
 +    }
@@ -6797,6 +7060,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 +    renderTimeline([withClaim, plain]);
 +    const rowOfFiled = screen.getByRole('button', { name: 'Filed' }).closest('.gn-timeline__row') as HTMLElement;
 +    expect(rowOfFiled.querySelector('[data-custom-claims]')).not.toBeNull();
++    expect(rowOfFiled.querySelector('[data-custom-claims]')).toHaveTextContent(customLabel('Filed on', '2026-08-26'));
 +    expect(rowOfFiled.querySelector('.gn-timeline__bar [data-custom-claims]')).toBeNull();
 +    expect((screen.getByRole('button', { name: 'Plain' }).closest('.gn-timeline__row') as HTMLElement).querySelector('[data-custom-claims]')).toBeNull();
 +  });
@@ -6815,7 +7079,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
    });
  });
  
-@@ -647,7 +720,7 @@
+@@ -647,7 +770,7 @@
      const { container } = renderTimeline([filed()]);
      const claim = screen.getByText(customLabel('Filed on', '2026-08-26', 'user_anselma'));
      expect(claim).toHaveAttribute('data-field-id', 'filed-on');
@@ -6824,7 +7088,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
      // The list is beside the ticket, never a cell in the week grid: it is not
      // inside the bar, and the bar is the only thing this row puts on a column.
      expect(claim.closest('.gn-timeline__bar')).toBeNull();
-@@ -658,7 +731,7 @@
+@@ -658,7 +781,7 @@
      renderTimeline([filed()]);
      expect(screen.getByRole('button', { name: 'Dated' })).toHaveAttribute(
        'title',
@@ -6833,7 +7097,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
          barProvenance(
            { date: '2026-08-24', actorId: 'user_kiro' },
            { date: '2026-08-28', actorId: 'user_kiro' },
-@@ -724,7 +797,7 @@
+@@ -724,7 +847,7 @@
      expect(container.querySelector('[data-custom-claims]')).toBeNull();
      expect(screen.getByRole('button', { name: 'Dated' })).toHaveAttribute(
        'title',
@@ -6842,7 +7106,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
          { date: '2026-08-24', actorId: 'user_kiro' },
          { date: '2026-08-28', actorId: 'user_kiro' },
          userName,
-@@ -858,124 +931,6 @@
+@@ -858,124 +981,6 @@
    });
  });
  
@@ -6967,7 +7231,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
  /**
   * E4-28 (batch B15, case `11.223`) — the timeline's own half of the same
   * finding calendar-view.test.tsx's `11.222` covers: a bar's rendered text is
-@@ -1014,99 +969,6 @@
+@@ -1014,99 +1019,6 @@
    });
  });
  
@@ -7069,6 +7333,25 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
  
 ```
 
+**Kills** (mutants of this task's `timeline-view.tsx`, Step 5, unless named otherwise):
+- 11.73 / 11.80 / the third `title` leg (the edited `IN_PROGRESS + ...` expectations): (a) drop `mark?.word` from `detail` (b) put the word after the provenance in `detail`.
+- 11.80 "the claim under its own field name" (the edited `.closest('.gn-timeline__row')` leg): (a) render `CustomClaimList` once per lane instead of inside `TimelineBar`'s row.
+- 29.099 the toolbar: (a) add an `Earlier` button to the toolbar (b) `value={'week'}` instead of `preset ?? 'free'` (the Day click leg) (c) `variant="tabs"` on the zoom switch (no `radiogroup`) (d) `if (frame.moving)` instead of `if (!frame.moving)` around `setPpd` (the zoom never settles into the state, Week stays marked).
+- 29.099 the axis: (a) `data-weekend={isWeekend(d.day - firstDay)}` (the share of tinted days is unchanged; the Sat 29 and Sun 30 legs red) (b) drop the `gn-timeline__axis-row--days` row (c) `week: isWeekend(day) ? ...` instead of `isMonday(day)` (no `W 24 Aug`).
+- 29.095 dated work a year away is drawn: (a) `const range = band` always (drop the `unmeasured` branch: the 2027 bar is outside the band around today) (b) `hasContent = sideList.length > 0` in the model (the empty sentence shows over a drawn bar).
+- 29.097 `--dn` and the day numbers: (a) `'--dn': row.endDay - row.startDay` (b) `'--d0': row.startDay` without `- firstDay` (the new W 24 Aug leg; the difference leg alone survives it) (c) `data-day-to={row.startDay}`.
+- 29.097 no window: (a) `const range = band` always (b) the surface width from weeks: `` `calc(var(--tl-ppd) * ${Math.ceil(extentDays / 7)} * 1px)` ``.
+- 29.097 no stylesheet number in the markup: (a) `DEFAULT_PPD = ZOOM_PRESETS.day` (`--tl-ppd` is 56) (b) a bar `style={{ left: ... }}` in px.
+- 29.098 packing: (a) `layoutRow={0}` for every bar (b) `--lane-extent` written as `${lane.rows * 40}px` (the 34 px heading dropped).
+- 29.100 the key: (a) `outside = row.key !== null && barPx >= measure(row.key)` (b) drop `row.key` from `detail` (c) drop `!outside &&` from the inside key (the key-count leg reads 3).
+- 29.100 the state mark: (a) swap the glyphs in `stateMark` (b) drop `mark?.word` from `detail` (c) `stateMark` returns the play mark for `'open'` too.
+- 29.101 the today line: (a) drop `model.todayDay !== null &&` (an invalid day draws a line with no `data-day`) (b) `'--d0': model.todayDay` without `- firstDay` (the new W 24 Aug leg) (c) drop `props.today` from the model's `useMemo` deps (a new prop does not move the line).
+- 29.102 the mounted band: (a) `const range = { start: firstDay, end: firstDay + extentDays - 1 }` always (Bar 0 mounted) (b) the first-frame `setBand(mountRange(adapter.visibleRange()))` written as `setBand(adapter.visibleRange())` (the band is the visible days only, so Bars 29 and 69 are unmounted) (c) `anchorDay = model.firstDay ?? model.todayDay ?? 0` (Bar 49 unmounted) (d) delete the first-frame `setBand` line (the 54-day guess stays, so Bars 28 and 70 are mounted; planner ruling 2026-10-04).
+- 29.102 the source scan: (a) delete `memo(` around `TimelineBar`.
+- 29.102 the render count: lands in T12 (T12's `it`, counted through its `timelinePinLabel` mock). Until then T9's own guard is the source scan, so `onOpen={(id) => props.onOpenTicket(id)}` (memo defeated, the scan stays green) is a KNOWN T9 SURVIVOR, killed in T12; record it in the HANDOFF.
+- 29.103 the claim list: (a) render `CustomClaimList` inside the `<button>` (b) drop `row.customClaims.length > 0 &&` (an empty list on Plain) (c) the claim `<li>` prints `entry.claim.date` instead of `entry.label`.
+- 29.105 the pages are gone: (a) `const SHIFT_DAYS = 28;` left in `timeline-view.tsx` (b) a `--timeline-week-columns` declaration left in `ui.css` (Step 6).
+
 `packages/app-core/test/views/phone-project-views-hooks.test.tsx`:
 
 ```diff
@@ -7162,6 +7445,8 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
  });
 ```
 
+**Kills** (`timeline-view.tsx`, Step 5): 29.107 the class structure: (a) render the canvas directly under `.gn-timeline` (drop the `.gn-timeline__stage` wrapper) (b) keep `className="gn-timeline__header"` on the toolbar (c) render `TimelineBar`'s `<button>` without its `.gn-timeline__row` wrapper.
+
 `packages/app-core/test/calendar/clock-free.test.ts`:
 
 ```diff
@@ -7247,6 +7532,10 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
  
 ```
 
+**Kills** (`timeline-model.ts`, Step 3):
+- 11.60 "the whole model is byte-identical in every zone": (a) `startDay: Math.floor(new Date(`${start.date}T00:00`).getTime() / 86_400_000)` (a local-time parse: the four zones disagree) (b) `todayDay` dropped from the returned model (the `"todayDay":20688` leg).
+- 11.60 "a claimed day is the same day number in every zone": (a) the same local-time parse for `startDay` (Pacific/Kiritimati and Asia/Kolkata, east of UTC, land on 20687; Niue and UTC on 20688).
+
   The UI stylesheet and token tests (a NEW file, plus three edited ones: the roster is 53 now, the weeks-band and clipped-edge rows are gone, the second inverted-zebra family retired with the grid):
 
 `packages/ui/test/timeline-continuous.test.ts` (new):
@@ -7315,6 +7604,9 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
     // The phone is a portrait ORIENTATION chosen by the view (PK-7), not a media-query arm of the same grid.
     const phoneArms = parseRules(ui).filter((r) => r.atRule !== null && r.atRule.includes('max-width') && r.selectors.some((s) => s.includes('.gn-timeline')));
     expect(phoneArms.map((r) => r.selectors.join(', '))).toEqual([]);
+    // CONTROL: the same filter does find a view's phone arm where one exists (the calendar keeps its own), so the empty list
+    // above is the stylesheet's answer and not a filter that can match nothing.
+    expect(parseRules(ui).some((r) => r.atRule !== null && r.atRule.includes('max-width') && r.selectors.some((s) => s.includes('.gn-calendar')))).toBe(true);
     // CONTROL: the scan can see a timeline rule at all.
     expect(names('.gn-timeline__bar')).toBeGreaterThan(0);
   });
@@ -7328,6 +7620,12 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
   });
 });
 ```
+
+**Kills** (`tokens.ts` and `ui.css`, Step 6):
+- 29.104 the weekend role: (a) map `timelineWeekend` to an 8-digit (translucent) primitive in one style (b) delete the `{ fg: 'textMuted', bg: 'timelineWeekend', minimum: 4.5 }` row (c) map `timelineWeekend` to `labelWarmDark` in a dark arm (the 4.5 ratio leg).
+- 29.106 the canvas: (a) bar `height: 28px` to `30px` (b) bar `top` to `calc(34px + var(--row) * 40px + 8px)` (c) drop `overscroll-behavior: contain` (d) the weekend tile `* 7px` to `* 6px` in `background-size`.
+- 29.106 nothing of the paged grid: (a) keep a `.gn-timeline__weeks` rule (b) keep the old `@media (max-width: 40rem) { .gn-timeline { ... } }` arm (c) keep `.gn-timeline__row:nth-of-type(odd)`.
+- 29.106 Today pill and reduced motion: (a) `.gn-timeline__nav` `min-height: 2.25rem` (b) delete the `@media (prefers-reduced-motion: reduce)` block.
 
 `packages/ui/test/tokens.test.ts`:
 
@@ -7396,6 +7694,8 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
        const body = declarationsFor(UI_CSS_TEXT, selector);
 ```
 
+**Kills:** the roster count (`toBe(53)`): (a) delete the new `CONTRAST_PAIRS` row in `tokens.ts` (52) (b) add it twice (the duplicate check). The zebra control: none, guards existing behaviour (the list family's ODD parity; the retired Timeline sibling leaves the control list because its rule is deleted in Step 6).
+
 `packages/ui/test/neo-hk4-field-rim.test.ts`:
 
 ```diff
@@ -7414,6 +7714,8 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
      expect(CONTRAST_PAIRS.some((p) => p.fg === 'border' && p.bg === 'surfaceWell' && p.minimum === 3)).toBe(true);
      expect(CONTRAST_PAIRS.some((p) => p.fg === 'textAccent' && p.bg === 'surfaceTrack' && p.minimum === 4.5)).toBe(true);
 ```
+
+**Kills:** 24.121 the roster is 53: (a) delete the `textMuted` / `timelineWeekend` row (52) (b) re-add a `fieldRim` row (existing guard).
 
 `packages/ui/test/styling-b8-timeline.test.ts`:
 
@@ -7446,6 +7748,8 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
        sheet: 'ui',
        selectors: ['.gn-timeline__side-entry--start-after-due', '.gn-timeline__side-entry--unplaceable-day'],
 ```
+
+**Kills:** 20.271 (narrowed): (a) delete the `.gn-timeline__bar[data-pending]` rule in Step 6's `ui.css` (the new control) (b) restore `min-height: 2.25rem` on `.gn-timeline__nav` (existing). 20.272: none, guards existing behaviour (no flat boundary in the timeline rules).
 
   Build and run (expected RED: the model has no `startDay`, the view has no canvas): `pnpm turbo run build --filter=@gisik-nokma/viewport --filter=@gisik-nokma/ui && slot-run.sh ac -- pnpm --filter @gisik-nokma/app-core exec vitest run test/timeline test/calendar/clock-free.test.ts test/views/phone-project-views-hooks.test.tsx --maxWorkers=2 > /tmp/ac.log 2>&1; tail -n 40 /tmp/ac.log`.
 
@@ -8369,6 +8673,7 @@ export function TimelineView(props: TimelineViewProps) {
       setMoving((current) => (current === frame.moving ? current : frame.moving));
     };
     const off = adapter.onFrame(refresh);
+    if (width > 0) setBand(mountRange(adapter.visibleRange())); // PR-5 from the first measured frame; the 54-day guess is only transitional (planner ruling 2026-10-04)
     refresh({ now: 0, offset: adapter.offset(), scale: adapter.scale(), velocity: 0, moving: false });
     return () => {
       off();
@@ -9097,7 +9402,7 @@ export function TimelineView(props: TimelineViewProps) {
  /**
   * The web app on phones, Plan Task 8 — the project page's other views (§21.8): the project header and
 - * view tabs (21.110), List / Backlog (21.111), Calendar (21.112) and Timeline (21.113). 21.114 (the four
-+ * view tabs (21.110), List / Backlog (21.111), Calendar (21.112). The Timeline's case, 21.113, was retired with the paged grid by Workflow and Timeline graphs Part 1 (29.106 pins the continuous canvas's stylesheet, 29.109 its structure). 21.114 (the four
++ * view tabs (21.110), List / Backlog (21.111), Calendar (21.112). The Timeline's case, 21.113, was retired with the paged grid by Workflow and Timeline graphs Part 1 (29.106 pins the continuous canvas's stylesheet, 29.107 its structure). 21.114 (the four
   * views at 360 / 412 / 440, no page overflow, scrollers scroll) is a browser case and stays 🧪.
   *
   * Every phone rule sits inside the existing 40rem arm (FD1) and AFTER the base rule it overrides — equal
@@ -9191,6 +9496,8 @@ export function TimelineView(props: TimelineViewProps) {
    it('23.145 `.gn-timeline__open` is left-aligned; the other side-list rows are unchanged', () => {
      const open = ruleExactly(ui, '.gn-timeline__open');
 ```
+
+  **Kills:** none for the two web files: they only delete the retired 21.113 and 23.142 cases and re-word docblocks; the surviving cases (21.110–21.112, 21.115, 23.141, 23.145) guard existing behaviour unchanged by this task.
 
   Then the catalogue. Each line below is retired in place (the id stays, the marker becomes 🚫, the reason names the Part 1 id that replaced it; ids are never reused and never renumbered). The `Features.md` / case diffs are against the files at `origin/release/workflow-graph`: apply by id, not by line number.
 
@@ -9419,7 +9726,7 @@ export function TimelineView(props: TimelineViewProps) {
 - [ ] **Step 11: Mutation pass (own)**
   - `dayNumberOf` off by one in the row (`startDay: dayNumberOf(...) + 1`) → 29.093; `--dn` computed without `+ 1` → 29.097; `endDay < startDay` rows (a start-after-due ticket drawn) → the 11.73 side-list tests.
   - `isCalendarDay` guard on `todayDay` removed → 29.101 (an invalid day must draw none).
-  - delete `memo(` around `TimelineBar` → 29.102 (both the source scan and the render-count case go RED; a render-count case alone let the removal survive in the first draft, which is why the source scan sits beside it).
+  - delete `memo(` around `TimelineBar` → 29.102 (the source scan goes RED in T9; the render-count case lands in T12 and goes RED there too; a render-count case alone let the removal survive in the first draft, which is why the source scan sits beside it).
   - mount every bar even with a measured width → 29.102; `mountRange` replaced by the visible range → 29.102.
   - toolbar: add an `Earlier` button → 29.099 and 29.105; `presetOf` ignored (always mark Week) → 29.099.
   - `outside = barPx < measure(key)` flipped → 29.100; the `stateMark` arms swapped → 29.100.
@@ -9427,8 +9734,32 @@ export function TimelineView(props: TimelineViewProps) {
   - `timelineWeekend` mapped to a translucent colour → 29.104.
   - Record survivors with reasons.
 
+**Prose to sweep:** what this task makes FALSE that the steps above do not already edit (line numbers at `origin/release/workflow-graph`; re-read before editing). Already edited above, so NOT listed: `docs/manual.md:1067-1069`, `docs/faq.md:774-775` (and the regenerated `content.generated.ts`), `Features.md:2765-2767`, `:3598`, `:3624`, `:3672`, the case lines 11.55, 11.56, 11.74, 11.75, 11.79, 11.82, 13.474, 13.477, 20.271, 21.113, 23.142, the `ui.css` comments starting at `:2791`, `:2964`, `:2980` and `:4747`, the docblocks of the two web tests, `styling-b8-timeline.test.ts`, `tokens.test.ts`, `phone-project-views-hooks.test.tsx`, `clock-free.test.ts` and the `SHIFT_DAYS` comment in `src/index.ts`.
+- `test-cases/11-calendar-notifications.md:51` — 11.61 says the distinct count is **2** and "the `narrowedAway` guard survives and still keeps the window sentence away, so the window miss is still its own" (after T9 the count is 1, the guard and the window sentence are gone, and the test is retitled for 29.095).
+- `packages/app-core/test/timeline/timeline-model.test.ts:837-858` — the 11.61 docblock: "work that is fully dated but wholly outside the window", "The window miss is the case the component cannot reconstruct", "THE BLOCK IS NOW ABOUT TWO SENTENCES, NOT THREE ... The guard it steered by is kept" (the diff keeps `:856-858` as context).
+- `packages/app-core/test/timeline/timeline-model.test.ts:712-713` — "24 Aug and 28 Aug are both in the 24-30 week: one column, untouched by the 26 Aug claim" (kept as diff context; there are no columns).
+- `packages/app-core/test/timeline/timeline-view.test.tsx:26` — "11.73–11.82 — `TimelineView`, the week columns over Task 10's landed model" (11.74, 11.79 and 11.82 are retired; there are no week columns); `:42` "a clipped marker on a bar that fits" and `:48-49` "the title column's own text ... (11.79)" (no clipped marker, no title column).
+- `packages/app-core/test/timeline/timeline-view.test.tsx:104-106` — `TODAY`'s docblock: "`mondayOnOrBefore` puts the window's first column on 2026-08-17, so week 0 is 17 Aug and the eighth (default) column starts 5 Oct" (kept as context by the `@@ -106` hunk).
+- `packages/app-core/test/timeline/timeline-view.test.tsx:646` — the 11.80 test title "in the title column and not inside the bar", and `:651-652` "never a cell in the week grid ... the bar is the only thing this row puts on a column" (the diff changes `:650` to `.gn-timeline__row` and keeps both).
+- `packages/app-core/src/claims/claim-labels.ts:199-211` — `TIMELINE_EMPTY_COPY`'s docblock: "The FIRST empty timeline", "work that is fully dated and merely elsewhere in time", "Reached when nothing is on screen, nothing visible is scheduled outside the window, and nothing a narrowing removed would have shown here" (one empty arm now; Step 4 edits only `:236-260`).
+- `packages/app-core/src/calendar/calendar-view.tsx:451-452` — "the same shape `.gn-list__section-title` and `.gn-timeline__weeks` already declare for the identical reason" (the weeks band is deleted).
+- `packages/ui/src/ui.css:2645-2648` — "`fill4` → `--gn-fill-quaternary`, already the established mapping ... (`.gn-list__table-row:nth-child(odd)` below, the timeline's own week columns)" (the timeline's zebra is deleted).
+- `packages/ui/test/in-transit.test.ts:37-38` — the anchoring rationale "`.gn-timeline__bar[data-pending]` never matches inside `.gn-timeline__bar[data-clipped-start][data-clipped-end]`" names a rule Step 6 deletes.
+- `packages/ui/test/components.test.tsx:1953-1954` — 13.1147's docblock "the timeline's Earlier / Today / Later buttons" (only Today remains; the case still holds for `.gn-timeline__nav`).
+- `Features.md:2772` — "IST day boundaries everywhere a day is decided — calendar cell assignment, timeline day columns, ..." (no columns: day numbers on one axis).
+- `test-cases/21-mobile-web.md:99` — 21.114 (🧪) "the Timeline scrolls inside its track with the toolbar in view" and "Not measured: ... the Timeline toolbar's `sticky left` position" (the sticky toolbar arm is deleted; amend, keep the dated evidence).
+- `test-cases/13-board-prototype-port.md:857` and `:944` — "the same pair Task 11's `.gn-timeline__weeks` uses" / "the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1939-1942`)" (present tense about a deleted rule, in other cases' evidence notes); `:1926-1927` "`.gn-timeline__nav` — the three Earlier / Today / Later buttons".
+- `Features.md` §26, T3's bullet as T3 writes it (plan line 3110 on the ref copy): "Pure and unused by a screen until a later Part: Part 1 builds no route". After T9 the Timeline view calls `mountRange` and `panLimits`. Reword it to: "the Timeline view uses `mountRange` and `panLimits`; the fetch planners and the cache wait for a later Part (Part 1 builds no route)" (planner ruling 2026-10-04).
+- `apps/web/e2e-stack/tap-target-baseline.json:8` (`"stack-phone-390|/p/:projectId#timeline": 37`) and `apps/web/e2e-stack/type-scale-baseline.json:8` (`"stack-phone-390|/p/:projectId#timeline": 0`) are measured numbers for the week grid's DOM. T9 replaces that DOM, so it re-measures both in Step 12 (planner ruling 2026-10-04).
+- Not swept (dated records, not living prose): `docs/design/prototype-delta-2026-09-18.md:615,620`, `docs/hig-reconciliation-audit.md:559`, `docs/lanes/*-history.md`.
+
 - [ ] **Step 12: Flip and gate**
-  - Flip ❌ to ✅ on 29.093–29.107; `pnpm check:citations` (the retired ids are not checked: only ✅ ids are).
+  - Flip ❌ to ✅ on 29.093–29.107, **except 29.102, which goes to 🟡** (planner ruling 2026-10-04). In T9, 29.102 has only the source scan; the render counter its case line promises lands in T12, which flips it to ✅. Then run `pnpm check:citations` (the retired ids are not checked: only ✅ ids are).
+  - **Re-measure the e2e-stack phone Timeline baselines this task changes** (planner ruling 2026-10-04: the task that changes the DOM owns them):
+    - The files are `apps/web/e2e-stack/tap-target-baseline.json` (key `stack-phone-390|/p/:projectId#timeline`, 37 on the ref) and `apps/web/e2e-stack/type-scale-baseline.json` (the same key, 0 on the ref).
+    - Also check `apps/web/e2e-stack/accessible-names-baseline.json` (`stack-phone-390|/p/:projectId`, `:9`) for a change.
+    - The dev stack is the primary checkout's (rule #23). Ask the controller for `ctl rebuild` with this branch merged into the release branch's build, then run `apps/web/e2e-stack/viewport.spec.ts` once with `UPDATE_TAP_BASELINE=1 UPDATE_TYPE_SCALE_BASELINE=1` (and `UPDATE_ACCESSIBLE_BASELINE=1` only if that key moved).
+    - Commit only the Timeline keys that changed, in this PR, and name each old → new number in the HANDOFF. A number that RISES is a regression: report it rather than recording it.
   - Whole suites named LOCAL: ui, app-core, web (`ui.css` changed). `pnpm check:help`, `pnpm check:citations`, `pnpm check:env`, `pnpm check:tasks`.
   - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`. HANDOFF: the mutation table, the survivors, and the line "T11 turns the phone portrait; until then a phone shows the landscape chart (21.113 is retired, 29.109 lands in T11)".
 
@@ -9499,13 +9830,19 @@ test('29.040 the panel fills the height under its filters, a bar is 28 px on a 4
   await expect(page.locator('.gn-timeline__canvas')).toBeVisible();
   const s = await state(page);
   expect(s.panelH).toBeGreaterThan(500);
+  // TV-11 fills to the WINDOW, not to the host div (80vh = 576 px here): the panel ends 16 px above the window's bottom edge
+  const bottomGap = await page.evaluate(() => window.innerHeight - (document.querySelector('.gn-timeline') as HTMLElement).getBoundingClientRect().bottom);
+  expect(bottomGap).toBeGreaterThanOrEqual(15);
+  expect(bottomGap).toBeLessThanOrEqual(17);
   const tops = await page.evaluate(() => {
-    const bars = [...document.querySelectorAll<HTMLElement>('.gn-timeline__bar')].slice(0, 40);
+    // ONE lane, every bar in it (the band covers all 60 days): the packed rows are contiguous, so the distinct tops are the pitch
+    const bars = [...document.querySelectorAll<HTMLElement>('.gn-timeline__lane')[0]!.querySelectorAll<HTMLElement>('.gn-timeline__bar')];
     return { heights: [...new Set(bars.map((b) => b.getBoundingClientRect().height))], tops: [...new Set(bars.map((b) => Math.round(b.getBoundingClientRect().top)))].sort((a, b) => a - b) };
   });
   expect(tops.heights).toEqual([28]);
+  expect(tops.tops.length).toBeGreaterThanOrEqual(3); // at least two pitches to compare, or `every` below passes on nothing
   const pitches = tops.tops.slice(1).map((t, i) => t - (tops.tops[i] as number));
-  expect(pitches.every((p) => p === 40)).toBe(true);
+  expect(pitches).toEqual(pitches.map(() => 40));
   // 200 bars over 60 days stack into more rows than the panel holds: scroll the lanes and the axis keeps its place
   await page.evaluate(() => { (document.querySelector('.gn-timeline__canvas') as HTMLElement).scrollTop = 300; });
   await page.waitForTimeout(100);
@@ -9533,14 +9870,29 @@ test('29.041 Ctrl + wheel zooms about the pointer: the day under it moves less t
   await page.goto('/timeline.html?n=40&theme=light');
   const canvas = page.locator('.gn-timeline__canvas');
   await expect(canvas).toBeVisible();
+  // The page must be ABLE to scroll, or `pageY === 0` below is true whatever the view does (the panel alone fits the window).
+  // Every wheel event is recorded at the window, after the canvas's listener: `defaultPrevented` is the cancel itself.
+  await page.evaluate(() => {
+    document.body.style.minHeight = '200vh';
+    const w = window as unknown as { __wheel: boolean[] };
+    w.__wheel = [];
+    window.addEventListener('wheel', (e) => w.__wheel.push(e.defaultPrevented), { passive: true });
+    // A whole-pixel start, so the reference day below is exact (the open position may be a half pixel the platform rounded)
+    (document.querySelector('.gn-timeline__canvas') as HTMLElement).scrollLeft = 2400;
+  });
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeGreaterThan(100);
   const box = (await canvas.boundingBox()) as { x: number; y: number };
   const dayAtPointer = (st: { ppd: number; scrollLeft: number }) => (st.scrollLeft + 600) / st.ppd;
   const before = await state(page);
+  expect(before.scrollLeft).toBe(2400);
   await page.mouse.move(box.x + 600, box.y + 200);
   let worst = 0;
-  for (let i = 0; i < 12; i += 1) {
+  // 24 small steps (x e^0.048 each: 24 -> 76 px/day), every one BELOW the 96 cap: an event at the cap writes nothing, so a
+  // sweep that reaches it (the old -60 steps did after two events) gives the naive read-back nothing to drift on
+  for (let i = 0; i < 24; i += 1) {
     await page.keyboard.down('Control');
-    await page.mouse.wheel(0, -60);
+    await page.mouse.wheel(0, -4);
     await page.keyboard.up('Control');
     await page.waitForTimeout(40);
     const st = await state(page);
@@ -9549,8 +9901,12 @@ test('29.041 Ctrl + wheel zooms about the pointer: the day under it moves less t
   await page.waitForTimeout(600);
   const after = await state(page);
   expect(after.ppd).toBeGreaterThan(before.ppd);
+  expect(after.ppd).toBeLessThan(96);
   expect(worst).toBeLessThanOrEqual(0.5 + 1e-6);
   expect(after.pageY).toBe(0);
+  const cancelled = await page.evaluate(() => (window as unknown as { __wheel: boolean[] }).__wheel);
+  expect(cancelled.length).toBeGreaterThan(0);
+  expect(cancelled.every((prevented) => prevented)).toBe(true);
 });
 
 test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the arrow keys glide 7 days, Today and Home put today in the middle, and reduced motion lands at once', async ({ page, browser }) => {
@@ -9558,9 +9914,13 @@ test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the
   const canvas = page.locator('.gn-timeline__canvas');
   await expect(canvas).toBeVisible();
   expect(Math.abs(await todayCentre(page))).toBeLessThan(2);
-  // mouse drag: 200 px left of the pointer is 200 px of scroll, and a drag begun on a bar would not pan (unit-tested)
+  // mouse drag: 200 px left of the pointer is 200 px of scroll, and a drag begun on a bar would not pan (unit-tested), so the
+  // drag must START on empty canvas or a correct view reds here for the wrong reason
+  const onBar = (p: Page, x: number, y: number) =>
+    p.evaluate(([px, py]) => document.elementFromPoint(px, py)?.closest('.gn-timeline__bar') != null, [x, y] as const);
   const box = (await canvas.boundingBox()) as { x: number; y: number };
   const before = await state(page);
+  expect(await onBar(page, box.x + 700, box.y + 250)).toBe(false);
   await page.mouse.move(box.x + 700, box.y + 250);
   await page.mouse.down();
   await page.mouse.move(box.x + 500, box.y + 250, { steps: 8 });
@@ -9579,19 +9939,36 @@ test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the
   await page.keyboard.press('Home');
   await page.waitForTimeout(700);
   expect(Math.abs(await todayCentre(page))).toBeLessThan(2);
-  // touch: no drag handler runs, the browser's own pan scrolls the canvas and the page stays put
+  // touch: no drag handler runs and the browser's own pan scrolls the canvas. `gn-dragging` is added on pointerdown and removed on
+  // pointerup/cancel, so a class check AFTER the swipe is green either way: an observer records every class it ever held.
   const ctx = await browser.newContext({ viewport: { width: 900, height: 700 }, hasTouch: true });
   const touch = await ctx.newPage();
   await touch.goto('/timeline.html?n=40&span=200&theme=light');
   await expect(touch.locator('.gn-timeline__canvas')).toBeVisible();
+  expect(await onBar(touch, 450, 300)).toBe(false); // a touch begun on a bar is ignored by the adapter anyway: start off one
+  await touch.evaluate(() => {
+    const c = document.querySelector('.gn-timeline__canvas') as HTMLElement;
+    const w = window as unknown as { __dragged: boolean };
+    w.__dragged = false;
+    new MutationObserver((records) => {
+      for (const r of records) if ((r.oldValue ?? '').includes('gn-dragging') || c.classList.contains('gn-dragging')) w.__dragged = true;
+    }).observe(c, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+  });
+  const dragged = () => touch.evaluate(() => (window as unknown as { __dragged: boolean }).__dragged);
   const t0 = await state(touch);
   const cdp = await ctx.newCDPSession(touch);
   await cdp.send('Input.synthesizeScrollGesture', { x: 450, y: 300, xDistance: -400, yDistance: 0, gestureSourceType: 'touch', speed: 1200 });
   await touch.waitForTimeout(500);
   const t1 = await state(touch);
   expect(t1.scrollLeft - t0.scrollLeft).toBeGreaterThan(300);
-  expect(t1.pageY).toBe(0);
-  expect(await touch.locator('.gn-timeline__canvas.gn-dragging').count()).toBe(0);
+  expect(await dragged()).toBe(false);
+  // control: the same observer on the same page sees a MOUSE drag (begun on the sticky axis, which holds no bar whatever scrolled)
+  const tbox = (await touch.locator('.gn-timeline__canvas').boundingBox()) as { x: number; y: number };
+  await touch.mouse.move(tbox.x + 450, tbox.y + 20);
+  await touch.mouse.down();
+  await touch.mouse.move(tbox.x + 400, tbox.y + 20, { steps: 4 });
+  await touch.mouse.up();
+  expect(await dragged()).toBe(true);
   await ctx.close();
   // reduced motion: the same key press has already landed on the next frame
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -9645,21 +10022,43 @@ test('29.043 a fast pan of 10 viewports at one per second leaves no frame with a
   expect(result.frames).toBeGreaterThan(100);
   expect(result.moved).toBeGreaterThan(9 * 1280);
   expect(result.empty).toBe(0);
+  // PR-5, the mechanism: the band is mounted BEFORE it scrolls in. The data covers every day several times over, so a bar that
+  // intersects the visible days never leaves the view empty for one frame; `empty === 0` alone stays green with the band cut to
+  // the visible days. At rest the band reaches at least a quarter viewport past each edge (the refresh rule), so bars that START
+  // an eighth of a viewport beyond the right edge, and END one before the left, are mounted.
+  await page.waitForTimeout(500);
+  const beyond = await page.evaluate(() => {
+    const r = (document.querySelector('.gn-timeline__canvas') as HTMLElement).getBoundingClientRect();
+    const bars = [...document.querySelectorAll('.gn-timeline__bar')].map((b) => b.getBoundingClientRect());
+    return { ahead: bars.filter((q) => q.left > r.right + r.width / 8).length, behind: bars.filter((q) => q.right < r.left - r.width / 8).length };
+  });
+  expect(beyond.ahead).toBeGreaterThan(0);
+  expect(beyond.behind).toBeGreaterThan(0);
 });
 
 test('29.044 a custom date claim is a callout that opens on hover and on focus and is hidden otherwise', async ({ page }) => {
   await page.goto('/timeline.html?n=40&span=60&theme=light');
   const row = page.locator('.gn-timeline__row:has(.gn-timeline__claims)').first();
   const claims = row.locator('.gn-timeline__claims');
+  // `toBeHidden` also passes when NOTHING matches: the callout must exist (and stay mounted) for "hidden" to mean anything
+  await expect(claims).toHaveCount(1);
   await expect(claims).toBeHidden();
   await row.locator('.gn-timeline__bar').hover();
   await expect(claims).toBeVisible();
   await page.mouse.move(5, 5);
+  await expect(claims).toHaveCount(1);
   await expect(claims).toBeHidden();
   await row.locator('.gn-timeline__bar').focus();
   await expect(claims).toBeVisible();
 });
 ```
+
+**Kills:** (this task's own code is the harness page; the mutants are edits to the code it proves in a browser: T6's `scroll-adapter.ts`, T9's `timeline-view.tsx` and `ui.css` blocks, as Step 5 lists)
+- 29.040 the panel fills the height, 28 px on 40 px, sticky axis, weekend tint: (a) delete the `useFillHeight(panelRef)` call in `TimelineView` (the panel no longer ends 16 px above the window: `bottomGap` reds) (b) `.gn-timeline__bar` `height: 28px` → `30px` (heights `[30]`), or `top: calc(34px + var(--row) * 40px + 6px)` → `* 42px` (pitches 42) (c) `.gn-timeline__axis` `position: sticky` → `relative` (gap −300) (d) delete `canvas.dataset['weekend'] = …` in the frame handler (`weekend` undefined, not `'on'`).
+- 29.041 Ctrl + wheel zooms about the pointer, the page does not scroll: (a) `pos()` returns `dom` always (the naive read-back; drift past 0.5 px over 24 below-cap events on a rounding platform) (b) the wheel listener's `{ passive: false }` → `{ passive: true }` (`preventDefault` ignored: the window records `defaultPrevented === false`) (c) `onWheel` returns before `applyScale` (ppd stays 24: `after.ppd > before.ppd` reds).
+- 29.042 drag, touch, keys, Today, Home, reduced motion: (a) drop `e.pointerType === 'touch' ||` in `onPointerDown` (the observer records `gn-dragging` during the swipe) (b) `go(e.shiftKey ? 28 : 7)` → `go(e.shiftKey ? 28 : 8)` (ArrowRight lands 24 px off) (c) `const reduce = options.instant === true || this.reduced()` → `options.instant === true` (50 ms after the press the glide is ~90 px short) (d) `goToday` aims at `anchorDay - adapter.viewportDays() / 2` without `+ 0.5` (today 12 px off centre); delete the `'Home'` arm (Home leaves today 168 px off).
+- 29.043 a fast pan leaves no empty band: (a) `mountRange` returns `{ start: view.start, end: view.end }` (no bar starts an eighth of a viewport past either edge: `ahead`/`behind` 0) (b) delete the quarter-edge `setBand(mountRange(range))` in the frame handler (the band stays around today; frames go empty within about 3 s: `empty > 0`).
+- 29.044 the custom date claim callout: (a) delete the `.gn-timeline__row:hover > .gn-timeline__claims` selector (not visible after hover) (b) delete the `:focus-within` selector (not visible after focus) (c) the base `.gn-timeline__row > .gn-timeline__claims` rule's `display: none` → `display: block` (the first `toBeHidden` reds).
 
   Read the specs before the page. They fix the contract: 24 px per day is the Week preset the view opens on (`PPD`); the touch case opens a SECOND browser context with `hasTouch` and drives the platform's pan through a CDP `Input.synthesizeScrollGesture`, because a mouse-event simulation would exercise the wrong code path; the reduced-motion case navigates again under `emulateMedia({ reducedMotion: 'reduce' })`. 29.043 pans 10 viewports in 10 seconds from the first day that has data (the margin before it is empty by design, TV-3) and requires every sampled frame to have at least one bar in view.
 
@@ -9740,13 +10139,22 @@ createRoot(document.getElementById('root') as HTMLElement).render(
   Expected: 5 tests green, named `LOCAL, headless`. The harness reads the BUILT packages, so after any source edit rebuild first (a stale `dist` is the usual cause of a red spec that is green in jsdom). If a case is red for a real reason, FIX THE PRODUCT with a failing unit case first in the file that owns the unit (the view test, the adapter test, the stylesheet test), then re-run both. Do not loosen a spec to its tolerance: 0.5 px is the spec's number.
 
 - [ ] **Step 5: Mutation pass (own)**
-  - `ScrollAdapter.pos()` returns the DOM value every time (the naive read-back) → 29.041 must go RED on this platform: Chromium at device pixel ratio 1 rounds `scrollLeft`. If it stays green the case is not exercising the trap; strengthen it (more events, a higher start position) before moving on.
+  - `ScrollAdapter.pos()` returns the DOM value every time (the naive read-back) → 29.041 must go RED on this platform: Chromium at device pixel ratio 1 rounds `scrollLeft`. **Run this mutant first, and keep the result** (planner ruling 2026-10-04).
+    - If it goes RED at DPR 1, 29.041 stays on the `desktop` project as written.
+    - If it SURVIVES at DPR 1, the platform did not round, so the leg cannot see the trap there. Add a second Playwright project to `packages/flow-graph-browser/playwright.config.ts`: `{ name: 'desktop-dpr15', use: { ...devices['Desktop Chrome'], deviceScaleFactor: 1.5, headless: process.env['FG_HEADED'] !== '1' } }`. At DPR 1.5, `scrollLeft` snaps to device pixels, so the read-back is no longer exact.
+    - When you use that project, run 29.041 on it (`test.skip(testInfo.project.name !== 'desktop-dpr15', …)` inside 29.041, and the reverse skip only if another case breaks there), then re-run the mutant and confirm it is RED there.
+    - Record in the HANDOFF and on the 29.041 case line which project the leg runs on (`desktop` at DPR 1, or `desktop-dpr15`) and the mutant's result on each.
   - the `wheel` listener registered `passive: true` (so `preventDefault` is ignored) → 29.041 (`pageY` is 0 only because the event was cancelled).
-  - `overscroll-behavior: contain` removed from `.gn-timeline__canvas` → 29.042 touch case or 29.041.
+  - `overscroll-behavior: contain` removed from `.gn-timeline__canvas` → 29.106 (T9's stylesheet parse). No T10 case can see it: the swipe in 29.042 starts mid-canvas and never reaches an end, and an uncancelled Ctrl + wheel zooms the browser rather than scrolling the page; record it as a known survivor here.
   - `.gn-timeline__axis` `position: sticky` to `relative` → 29.040.
   - bar `height: 28px` to `30px`, or the 40 px pitch to 42 → 29.040.
   - the weekend `data-weekend` flip removed → 29.040.
   - the `mountRange` margin made 0 (only the visible days mounted) → 29.043 (an empty frame appears during the fast pan). Record the survivors.
+
+**Prose to sweep:**
+- `packages/flow-graph-browser/playwright.config.ts:3` — "Real-browser stress cases for the time and flow surfaces": after this task `tests/` also holds the behaviour specs (`timeline.spec.ts`), which make no frame-rate claim and pass headless (this task's own NEEDS line); say so beside the stress sentence.
+- `packages/flow-graph-browser/README.md:32` — the `timeline.html?n=&span=&theme=` row: the page this task builds also reads `h` and `style` (the Interfaces line); add them.
+- Only if Step 5 adds the `desktop-dpr15` project: `packages/flow-graph-browser/playwright.config.ts` holds one `desktop` project on the ref, so its header comment and the README's run section are where a second project gets named, and the "Expected: 5 tests green" count becomes the per-project count the run prints (planner ruling 2026-10-04).
 
 - [ ] **Step 6: Flip, bullet, gate**
   - Flip ❌ to ✅ on 29.040–29.044; `pnpm check:citations`.
@@ -9798,7 +10206,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 ```diff
 --- a/packages/app-core/test/timeline/timeline-view.test.tsx
 +++ b/packages/app-core/test/timeline/timeline-view.test.tsx
-@@ -998,3 +998,30 @@
+@@ -1048,3 +1048,50 @@
      expect(TIMELINE_SIDE_LIST_COPY).toBe('Add a start and a due date to place a ticket on the timeline.');
    });
  });
@@ -9808,18 +10216,33 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 +    ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } });
 +
 +  it('29.108 with bars only far from today the pill reads "Nothing in view" and offers both jumps, the one with no bar beyond it disabled; control: a bar around today shows no pill', () => {
++    // jsdom has no layout: the canvas is 0 px wide, so the view rests on [today, today] (TODAY = 2026-08-23) and the verdict is about that day.
 +    renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
-+    expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
++    const pill = screen.getByRole('status');
++    expect(pill).toHaveTextContent('Nothing in view');
++    // The pill hangs off the stage, never inside the scroller (29.109's "never inside the scroller", seen in the DOM).
++    expect(pill.closest('.gn-timeline__canvas')).toBeNull();
++    expect(pill.parentElement).toHaveClass('gn-timeline__stage');
 +    expect(screen.getByRole('button', { name: 'Jump to the next bar' })).toBeEnabled();
 +    expect(screen.getByRole('button', { name: 'Jump to the previous bar' })).toBeDisabled();
 +    document.body.innerHTML = '';
 +    renderTimeline([bar('Around today', '2026-08-21', '2026-08-26')]);
++    expect(screen.getByRole('button', { name: 'Around today' })).toBeInTheDocument();
 +    expect(screen.queryByRole('status')).toBeNull();
 +  });
 +
 +  it('29.108 no timeline control is named Earlier, Later, Previous or Next, with the pill up or down', () => {
 +    const names = /^(Earlier|Later|Previous|Next)$/i;
 +    renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
++    // Pill UP: its two jumps exist, so a jump renamed "Next" or "Previous" would be found.
++    expect(screen.getByRole('status')).toBeInTheDocument();
++    expect(screen.getAllByRole('button', { name: /^Jump to the (previous|next) bar$/ })).toHaveLength(2);
++    expect(screen.queryAllByRole('button', { name: names })).toHaveLength(0);
++    document.body.innerHTML = '';
++    // Pill DOWN: the toolbar alone (Today and the zoom switch) names none of them either.
++    renderTimeline([bar('Around today', '2026-08-21', '2026-08-26')]);
++    expect(screen.queryByRole('status')).toBeNull();
++    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
 +    expect(screen.queryAllByRole('button', { name: names })).toHaveLength(0);
 +  });
 +
@@ -9827,9 +10250,19 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 +    renderTimeline([]);
 +    expect(screen.queryByRole('status')).toBeNull();
 +    expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_EMPTY_COPY);
++    document.body.innerHTML = '';
++    // CONTROL, same it: the same mount with one bar far from today DOES raise the pill, so the null above is the empty-chart rule
++    // and not a verdict that never runs in jsdom.
++    renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
++    expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
 +  });
 +});
 ```
+
+**Kills:**
+- 29.108 the pill and its jumps: (a) `const none = frame.moving ? false : rows.length > 0` (drop the `!rows.some(...)` visibility test: the "Around today" control raises a pill) (b) the previous jump's `disabled={!hasPrevious}` → `disabled={!hasNext}` (hasNext/hasPrevious swapped: next disabled, previous enabled) (c) move the `{nothingInView && (...)}` block inside the `.gn-timeline__canvas` div (`pill.closest('.gn-timeline__canvas')` is no longer null).
+- 29.108 no Earlier / Later / Previous / Next: (a) the label `Jump to the next bar` → `Next` (the pill-up names leg finds it) (b) `setNothingInView(... none)` → `setNothingInView(false)` (the pill never rises: the pill-up precondition goes red).
+- 29.108 an empty chart has no pill: (a) drop `rows.length > 0 &&` (a resting empty chart raises the pill) (b) `setNothingInView(... none)` → `setNothingInView(false)` (the same-it control goes red).
 
 `packages/app-core/test/views/phone-project-views-hooks.test.tsx`:
 
@@ -9861,6 +10294,9 @@ createRoot(document.getElementById('root') as HTMLElement).render(
  });
 ```
 
+**Kills:**
+- 29.110 the panel names its orientation: (a) `PORTRAIT_BELOW_PX = 640` → `600` (639 reads landscape) (b) drop `width > 0 &&` in `useOrientation` (an unmeasured panel reads portrait) (c) `width < PORTRAIT_BELOW_PX` → `width <= PORTRAIT_BELOW_PX` (640 reads portrait).
+
 `packages/ui/test/timeline-continuous.test.ts`:
 
 ```diff
@@ -9875,7 +10311,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
  const STYLES = ['hig', 'minimal', 'neo'] as const;
  const THEMES = ['light', 'dark'] as const;
  
-@@ -73,3 +73,43 @@
+@@ -73,3 +73,48 @@
      expect(valueOf(calm, 'transition')).toBe('none');
    });
  });
@@ -9902,7 +10338,9 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 +    expect(valueOf(ruleExactly(ui, portrait('.gn-timeline__key--outside')), 'display')).toBe('none');
 +    // CONTROL, same it: the landscape bar is still placed by --d0 from the left, and portrait is NOT a media query.
 +    expect(valueOf(ruleExactly(ui, '.gn-timeline__bar'), 'left')).toBe('calc(var(--d0) * var(--tl-ppd) * 1px)');
-+    expect(ui).toContain(portrait(''));
++    const portraitRules = parseRules(ui).filter((r) => r.selectors.some((s) => s.includes("[data-orientation='portrait']")));
++    expect(portraitRules.length).toBeGreaterThanOrEqual(10);
++    expect(portraitRules.filter((r) => r.atRule !== null).map((r) => `${r.atRule} ${r.selectors.join(', ')}`)).toEqual([]);
 +  });
 +
 +  it('29.109 the pill is a rounded status chip over the bottom of the stage, never inside the scroller; the disabled jump is dimmed and not clickable', () => {
@@ -9913,13 +10351,20 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 +    expect(valueOf(pill, 'z-index')).toBe('4');
 +    expect(valueOf(pill, 'background')).toBe('var(--gn-surface-raised)');
 +    expect(valueOf(ruleExactly(ui, '.gn-timeline__stage'), 'position')).toBe('relative');
-+    expect(valueOf(ruleExactly(ui, '.gn-timeline__nothing .gn-timeline__nav:disabled'), 'cursor')).toBe('default');
-+    // CONTROL: the stage, not the canvas, is the pill's positioning parent (the canvas scrolls and would carry the pill away).
++    const disabled = ruleExactly(ui, '.gn-timeline__nothing .gn-timeline__nav:disabled');
++    expect(valueOf(disabled, 'cursor')).toBe('default');
++    expect(valueOf(disabled, 'opacity')).toBe('0.45');
++    // GUARD (T9's canvas, not a control of this task's rules): the canvas is itself a positioning parent that scrolls, so a pill inside
++    // it would be carried away; the pill's place OUTSIDE it is pinned in the DOM by 29.108 (`pill.closest('.gn-timeline__canvas')`).
 +    expect(valueOf(ruleExactly(ui, '.gn-timeline__canvas'), 'position')).toBe('relative');
 +    expect(ruleExactly(ui, '.gn-timeline__stage')).not.toContain('overflow');
 +  });
 +});
 ```
+
+**Kills:**
+- 29.109 portrait geometry: (a) portrait `--tl-gutter: 80px` → `72px` (b) portrait `.gn-timeline__bar` `width: 100px` → `96px` (c) wrap the portrait `.gn-timeline__key--outside` rule in `@media (max-width: 40rem)` (`ruleExactly` at top level throws and the media scan lists it). The landscape-bar leg guards T9's base rule against a lane that edits it instead of the portrait arm (a second top-level `.gn-timeline__bar` rule makes `ruleExactly` throw).
+- 29.109 the pill: (a) `.gn-timeline__nothing` `position: absolute` → `static` (b) drop `opacity: 0.45` from the disabled jump (c) `border-radius: 999px` → `0.5rem`. The canvas `position` leg guards T9 (`Kills: none` for that leg); the pill's DOM place is pinned by 29.108.
 
 `packages/flow-graph-browser/tests/timeline-phone.spec.ts` (new):
 
@@ -9944,18 +10389,36 @@ test('29.111 on a 390 px phone the view is portrait: time runs down, bars are 10
   });
   expect(geometry.widths).toEqual([100]);
   expect(geometry.later.top).toBeGreaterThan(geometry.first.top);
+  // time runs down at the scale: the two bars' tops are their day gap x 24 px (the Week preset), whatever rows they packed into
+  expect(Math.abs(geometry.later.top - geometry.first.top - (geometry.later.day - geometry.first.day) * 24)).toBeLessThanOrEqual(1);
   expect(geometry.canvasScrolls).toBe(true);
   expect(geometry.pageWide).toBeLessThanOrEqual(0);
-  // the gutter is sticky: scroll the lanes down and a day label is still at the canvas's left edge
-  await page.evaluate(() => { (document.querySelector('.gn-timeline__canvas') as HTMLElement).scrollTop = 400; });
-  await page.waitForTimeout(150);
-  const gutter = await page.evaluate(() => {
+  const labelLeft = () => page.evaluate(() => {
     const c = (document.querySelector('.gn-timeline__canvas') as HTMLElement).getBoundingClientRect();
     const label = [...document.querySelectorAll<HTMLElement>('.gn-timeline__axis-day')].map((d) => d.getBoundingClientRect()).find((r) => r.bottom > c.top && r.top < c.bottom);
     return label === undefined ? null : label.left - c.left;
   });
+  // scroll the lanes down and a day label is still on screen at the canvas's left edge
+  await page.evaluate(() => { (document.querySelector('.gn-timeline__canvas') as HTMLElement).scrollTop = 400; });
+  await page.waitForTimeout(150);
+  const gutter = await labelLeft();
   expect(gutter).not.toBeNull();
   expect(Math.abs(gutter as number)).toBeLessThan(1);
+  // the gutter is STICKY: on a chart whose lanes are wider than the phone (40 tickets packed into 10 days), scroll the lanes 200 px
+  // SIDEWAYS and the day labels stay at the left edge (a vertical scroll alone cannot tell sticky from absolute)
+  await page.goto('/timeline.html?n=40&span=10&theme=light');
+  await expect(page.locator('.gn-timeline__canvas')).toBeVisible();
+  const room = await page.evaluate(() => {
+    const c = document.querySelector('.gn-timeline__canvas') as HTMLElement;
+    c.scrollLeft = 200;
+    return { room: c.scrollWidth - c.clientWidth, left: c.scrollLeft };
+  });
+  expect(room.room).toBeGreaterThanOrEqual(200);
+  expect(room.left).toBe(200);
+  await page.waitForTimeout(150);
+  const stuck = await labelLeft();
+  expect(stuck).not.toBeNull();
+  expect(Math.abs(stuck as number)).toBeLessThan(1);
   await ctx.close();
 });
 
@@ -9966,6 +10429,18 @@ test('29.112 Nothing in view appears once the view comes to rest over a gap, its
   const pill = page.getByRole('status');
   await expect(pill).toContainText('Nothing in view');
   await expect(page.getByRole('button', { name: 'Jump to the next bar' })).toBeDisabled();
+  // The fixture's bars are days 0, 6-13 and 13-15; all three are mounted at open. The NEAREST bar before the view is the one that
+  // ends LAST (13-15), so that is where "previous" must land, not merely on some bar.
+  const ends = await page.locator('.gn-timeline__bar').evaluateAll((bars) => bars.map((b) => Number((b as HTMLElement).dataset['dayTo'])));
+  expect(ends).toHaveLength(3);
+  const lastEnd = Math.max(...ends);
+  /** The `data-day-to` of the bar whose centre sits within 1.5 days (36 px at 24 px/day) of the canvas's centre, or null. */
+  const centredOn = () => page.evaluate(() => {
+    const r = (document.querySelector('.gn-timeline__canvas') as HTMLElement).getBoundingClientRect();
+    const mid = (r.left + r.right) / 2;
+    const hit = [...document.querySelectorAll<HTMLElement>('.gn-timeline__bar')].find((b) => { const q = b.getBoundingClientRect(); return Math.abs((q.left + q.right) / 2 - mid) < 36; });
+    return hit === undefined ? null : Number(hit.dataset['dayTo']);
+  });
   // a verdict about where the view has come to REST: while a glide is moving over the same gap there is no pill, and it is back after.
   // PageDown aims past the last scrollable day, so this also pins that a glide clamped by the scroller still comes to rest.
   await page.locator('.gn-timeline__canvas').focus();
@@ -9984,8 +10459,25 @@ test('29.112 Nothing in view appears once the view comes to rest over a gap, its
   await expect.poll(barsShown, { timeout: 3000 }).toBeGreaterThan(0);
   await page.waitForTimeout(300);
   await expect(pill).toHaveCount(0);
+  // ...and it came to rest CENTRED on the nearest bar before the view (the last-ending one), not on the farthest. Read it only
+  // after the glide's 450 ms cap, so a glide to the farthest bar cannot be sampled while passing over the nearest one.
+  await page.waitForTimeout(500);
+  await expect.poll(centredOn, { timeout: 3000 }).toBe(lastEnd);
   // no paging control survives: nothing is named Earlier, Later, Previous or Next
   await expect(page.getByRole('button', { name: /^(Earlier|Later|Previous|Next)$/i })).toHaveCount(0);
+  // "next" likewise lands on the NEAREST bar after the view: bars at days 0, 90-97 and 180-182, today (day 60) over the gap between
+  await page.goto('/timeline.html?n=3&span=270&theme=light');
+  await expect(pill).toContainText('Nothing in view');
+  const nearestAfter = await page.evaluate(() => {
+    const today = Number((document.querySelector('.gn-timeline__today') as HTMLElement).dataset['day']);
+    const after = [...document.querySelectorAll<HTMLElement>('.gn-timeline__bar')].filter((b) => Number(b.dataset['dayFrom']) > today);
+    return after.length === 0 ? null : Math.min(...after.map((b) => Number(b.dataset['dayTo'])));
+  });
+  expect(nearestAfter).not.toBeNull();
+  await page.getByRole('button', { name: 'Jump to the next bar' }).click();
+  await page.waitForTimeout(500);
+  await expect.poll(centredOn, { timeout: 3000 }).toBe(nearestAfter);
+  await expect(pill).toHaveCount(0);
   // CONTROL: with bars around today there is no pill at all
   await page.goto('/timeline.html?n=40&span=120&theme=light');
   await expect(page.locator('.gn-timeline__bar').first()).toBeVisible();
@@ -9996,20 +10488,30 @@ test('29.112 Nothing in view appears once the view comes to rest over a gap, its
 test('29.111 a rotation re-builds the adapter on the other axis: resized from a phone to a desktop width the view is landscape and scrolls sideways, and back it scrolls down', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 1000, height: 780 } });
   const page = await ctx.newPage();
-  await page.goto('/timeline.html?n=40&span=90&theme=light');
+  // 40 tickets packed into 10 days: the portrait lanes are wider than the phone, so the landscape scrollLeft has room to survive a rotation
+  await page.goto('/timeline.html?n=40&span=10&theme=light');
   const canvas = page.locator('.gn-timeline__canvas');
   await expect(canvas).toBeVisible();
   const axes = () => page.evaluate(() => {
     const c = document.querySelector('.gn-timeline__canvas') as HTMLElement;
-    return { orientation: document.querySelector('.gn-timeline')!.getAttribute('data-orientation'), x: c.scrollWidth > c.clientWidth, y: c.scrollHeight > c.clientHeight };
+    return { orientation: document.querySelector('.gn-timeline')!.getAttribute('data-orientation'), x: c.scrollWidth > c.clientWidth, y: c.scrollHeight > c.clientHeight, left: c.scrollLeft, top: c.scrollTop };
   });
-  expect(await axes()).toMatchObject({ orientation: 'landscape', x: true });
+  const wide = await axes();
+  expect(wide).toMatchObject({ orientation: 'landscape', x: true });
+  // landscape opens centred on today (day 60), far from the surface's first day: the scroller is well to the right
+  expect(wide.left).toBeGreaterThan(200);
   await page.setViewportSize({ width: 390, height: 780 });
   await expect.poll(async () => (await axes()).orientation).toBe('portrait');
+  const tall = await axes();
+  // a NEW scroller (`key={orientation}`): the landscape scrollLeft is gone although the portrait lanes could scroll sideways ...
+  expect(tall.x).toBe(true);
+  expect(tall.left).toBe(0);
+  // ... and the portrait adapter centred it on today DOWN the page before any key was pressed
+  expect(tall.top).toBeGreaterThan(0);
   // the key press must move the PORTRAIT scroller's own axis: an adapter left on the old axis would write scrollLeft and nothing would move down
   await canvas.focus();
   await page.keyboard.press('PageDown');
-  await expect.poll(() => canvas.evaluate((c) => (c as HTMLElement).scrollTop), { timeout: 3000 }).toBeGreaterThan(0);
+  await expect.poll(() => canvas.evaluate((c) => (c as HTMLElement).scrollTop), { timeout: 3000 }).toBeGreaterThan(tall.top);
   await page.setViewportSize({ width: 1000, height: 780 });
   await expect.poll(async () => (await axes()).orientation).toBe('landscape');
   const left = await canvas.evaluate((c) => (c as HTMLElement).scrollLeft);
@@ -10019,6 +10521,11 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
   await ctx.close();
 });
 ```
+
+**Kills:**
+- 29.111 portrait on a 390 px phone: (a) `PORTRAIT_BELOW_PX = 640` → `320` (390 px stays landscape) (b) drop the portrait `.gn-timeline__bar` `top` declaration (the landscape row-pitch `top` applies: two bars' tops are no longer their day gap x 24 px) (c) portrait `.gn-timeline__axis` `position: sticky` → `absolute` (the labels leave the left edge after the 200 px sideways scroll). The `pageWide` leg guards T9's contained scroller.
+- 29.112 Nothing in view at rest, the jumps: (a) `frame.moving ? false : ...` → the bare expression (the pill stays up through the PageDown glide; `toHaveCount(0)` times out) (b) the previous jump's sort `b.endDay - a.endDay` → `a.endDay - b.endDay` (it lands on day 0, `centredOn` ≠ `lastEnd`) (c) the next jump's sort `a.startDay - b.startDay` → `b.startDay - a.startDay` (it lands on days 180–182, `centredOn` ≠ `nearestAfter`).
+- 29.111 a rotation rebuilds the adapter: (a) remove `key={orientation}` from the canvas (the same element keeps its ~1,900 px landscape `scrollLeft`: `tall.left` ≠ 0) (b) the adapter effect's deps `[portrait]` → `[]` (the new portrait canvas has no adapter: `tall.top` is 0) (c) `axis: portrait ? 'y' : 'x'` → `axis: 'x'` (the portrait centring writes `scrollLeft`, `scrollTop` stays 0).
 
   The phone spec opens its own 390 x 780 touch context for 29.111 and runs a third test that rotates one page (1000 to 390 to 1000 px wide) and presses PageDown in each orientation, so an adapter left on the old axis shows. Its second test is the one that earns its keep: with 3 bars in the first 20 days and today at day 60 the view opens over a gap; PageDown glides to the end of the scroller and the pill must be ABSENT while it moves and PRESENT once it rests; a jump then glides to a bar and the pill goes. Run (expected RED: no `data-orientation`, no pill): `slot-run.sh ac -- pnpm --filter @gisik-nokma/app-core exec vitest run test/timeline test/views/phone-project-views-hooks.test.tsx --maxWorkers=2 > /tmp/ac.log 2>&1; tail -n 30 /tmp/ac.log`.
 
@@ -10133,7 +10640,7 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
        const held = bandRef.current;
        const days = range.end - range.start + 1;
        if (range.start < held.start + days / 4 || range.end > held.end - days / 4) setBand(mountRange(range));
-@@ -390,7 +424,7 @@
+@@ -391,7 +425,7 @@
        adapter.destroy();
        adapterRef.current = null;
      };
@@ -10142,7 +10649,7 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
  
    // The first day of the surface moved (data arrived to the left): keep the same day at the viewport edge.
    useLayoutEffect(() => {
-@@ -405,16 +439,36 @@
+@@ -406,16 +440,36 @@
      if (adapter !== null) adapter.animateTo({ offset: anchorDay + 0.5 - adapter.viewportDays() / 2 });
    };
  
@@ -10184,7 +10691,7 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
        <header className="gn-timeline__toolbar">
          <button type="button" className="gn-timeline__nav" onClick={goToday}>
            Today
-@@ -442,7 +496,7 @@
+@@ -444,7 +498,7 @@
        )}
  
        <div className="gn-timeline__stage">
@@ -10193,7 +10700,7 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
          <div className="gn-timeline__surface" style={surfaceStyle}>
            <div className="gn-timeline__axis" aria-hidden="true">
              <div className="gn-timeline__axis-row gn-timeline__axis-row--period">
-@@ -508,6 +562,17 @@
+@@ -510,6 +564,17 @@
            })}
          </div>
        </div>
@@ -10363,7 +10870,7 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
 
 - [ ] **Step 6: Look at it (frontend-design)**
 
-  Take a 390 x 780 screenshot of `http://localhost:3192/timeline.html?n=40&span=90&theme=light` and one of `?n=3&span=20` (the pill), in light and dark and in the `neo` and `hig` styles (`&style=hig`), with `pnpm exec playwright screenshot --viewport-size=390,780 ...` against `vite` started from `packages/flow-graph-browser` (exact pid, no `pkill`). Read the PNGs. Measure, do not eyeball: the day gutter's left edge, a bar's width (100), a lane's column width (112), the pill's bottom offset and that it does not overlap the toolbar. Fix `ui.css` and re-run step 5.
+  Take a 390 x 780 screenshot of `http://localhost:3192/timeline.html?n=40&span=90&theme=light` and one of `?n=3&span=20` (the pill), in light and dark and in the `neo` and `hig` styles (`&style=hig`), with `pnpm exec playwright screenshot --viewport-size=390,780 <url> /tmp/wtg1-t11/<name>.png` (outside the worktree; never a tracked or un-ignored path in the checkout: an untracked file there blocks every gate) against `vite` started from `packages/flow-graph-browser` (exact pid, no `pkill`). Read the PNGs. Measure, do not eyeball: the day gutter's left edge, a bar's width (100), a lane's column width (112), the pill's bottom offset and that it does not overlap the toolbar. Fix `ui.css` and re-run step 5.
 
 - [ ] **Step 7: Docs and Features**
 
@@ -10413,13 +10920,23 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
   - `PORTRAIT_BELOW_PX = 640` to `600` or `700`; `width > 0 &&` removed (an unmeasured panel becomes portrait) → 29.110.
   - `frame.moving ? false : ...` to the bare expression (the pill shows while moving) → 29.112 (`toHaveCount(0)` right after PageDown).
   - `rows.length > 0 &&` removed (a pill over an empty chart) → 29.108's control.
-  - the `jump` target sort direction swapped; `hasNext`/`hasPrevious` swapped → 29.108.
+  - the `jump` target sort direction swapped (either arm) → 29.112 (the `centredOn` legs; 29.108 never clicks a jump); `hasNext`/`hasPrevious` swapped → 29.108.
   - `key={orientation}` removed (the adapter keeps the old axis after a rotation) → the third spec test (resize 1000 to 390 to 1000: PageDown must move `scrollTop` in portrait and `scrollLeft` back in landscape). The unit cases cannot see this mutant; if the spec test also survives it, record it and strengthen the spec before landing.
   - portrait CSS: `.gn-timeline__bar` width `100px` to `96px`, the gutter `80px` to `72px` → 29.109 and 29.111; the pill's `position` made `static` → 29.109.
   - Record survivors.
 
+**Prose to sweep:**
+- `packages/app-core/src/timeline/timeline-view.tsx` docblock as T9 writes it (plan lines 8021–8023) — "React re-renders on three slow events only: the data changes, the zoom SETTLES ..., or the view nears the edge of the mounted band": T11 adds two more (the Nothing-in-view verdict flipping at rest, and an orientation change). Add them.
+- `docs/faq.md:774` (ref), as T9 rewrites it (plan line 9358) — "the Timeline is the same idea stretched sideways as one continuous chart": on a phone it now runs down the page. Add the phone clause the manual gets in Step 7.
+- `Features.md` §26 T9 bullet as T9 writes it (plan line 9415) — "bars 28 px high on a 40 px pitch ..., custom date claims as callouts beside the bar": landscape only after T11 (portrait bars are 100 px columns on a 112 px pitch, the claims sit under the bar). Qualify it as the landscape chart and point at the T11 bullet.
+- `apps/web/e2e-stack/tap-target-baseline.json:8` and `apps/web/e2e-stack/type-scale-baseline.json:8` (the `stack-phone-390|/p/:projectId#timeline` key): T9 re-measured them for the landscape chart, but on a 390 px phone T11 turns the chart portrait and adds the pill and its jumps. Re-measure them in Step 9 (planner ruling 2026-10-04).
+
 - [ ] **Step 9: Flip, gate**
   - Flip ❌ to ✅ on 29.108–29.112; `pnpm check:citations`, `pnpm check:help`.
+  - **Re-measure the e2e-stack phone Timeline baselines for this task's DOM** (planner ruling 2026-10-04): the task that changes the DOM owns its baselines.
+    - Re-measure the same files T9 did: `apps/web/e2e-stack/tap-target-baseline.json` and `apps/web/e2e-stack/type-scale-baseline.json` (key `stack-phone-390|/p/:projectId#timeline`), and check `apps/web/e2e-stack/accessible-names-baseline.json`'s `stack-phone-390|/p/:projectId`.
+    - Ask the controller for `ctl rebuild` with this branch, then run `apps/web/e2e-stack/viewport.spec.ts` once with `UPDATE_TAP_BASELINE=1 UPDATE_TYPE_SCALE_BASELINE=1` (and `UPDATE_ACCESSIBLE_BASELINE=1` only if that key moved).
+    - Commit only the Timeline keys that changed, and name old → new in the HANDOFF. A number that rises is reported, not recorded.
   - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
 
 
@@ -10468,7 +10985,7 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
 `apps/server/test/read/pin-counts.test.ts` (new):
 
 ```ts
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { NO_PIN, pinCountsFor, pinOf } from '../../src/read/pin-counts.js';
@@ -10538,8 +11055,12 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     const guest = await pinsFor('guestUnlisted');
     // A guest reads neither the workspace nor the project note; the ticket's attachments still count.
     expect(guest.get(world.TP)).toEqual({ notes: 0, attachments: 2 });
-    // CONTROL, same it: the counts DIFFER by viewer, so the note count is not a constant and the viewer reaches the predicate.
-    expect(new Set([owner.get(world.TP)?.notes, memberIn.get(world.TP)?.notes, guest.get(world.TP)?.notes]).size).toBe(3);
+    // CONTROL, same it: TP really holds FIVE note links (the deleted note's included), so the owner's 4 is the deleted rule at
+    // work and not a link the fixture failed to write.
+    const links = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM proj_note_attachments WHERE ticket_id = $1', [world.TP]);
+    expect(links.rows[0]?.n).toBe(5);
+    // Only the asked-for tickets are keys: the note-owned file (ticket_id NULL) adds no key of its own.
+    expect([...owner.keys()].sort()).toEqual([world.TP, world.TE].sort());
   });
 
   it('29.113 an inherited note reaches a guest through its ticket; a note-owned attachment is never a ticket\'s; an empty id list reads nothing', async () => {
@@ -10549,8 +11070,15 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     // The workspace note's own attachment (ticket_id NULL) did not become an attachment of TP: TP has exactly the two files.
     expect((await pinsFor('owner')).get(world.TP)?.attachments).toBe(2);
     const eff = await resolveEffectiveRole(db.pool, world.ids.owner, world.WS);
+    // "Reads nothing" is a statement about the database: no query is sent for an empty page (an `ANY('{}')` query would also
+    // answer an empty map, so the map's size alone cannot tell).
+    const queries = vi.spyOn(db.pool, 'query');
     expect((await pinCountsFor(db.pool, eff, world.ids.owner, [])).size).toBe(0);
-    expect(pinOf(new Map(), 'no-such-ticket')).toEqual(NO_PIN);
+    expect(queries).not.toHaveBeenCalled();
+    queries.mockRestore();
+    // The literal, not `NO_PIN`: comparing with the module's own constant would pass whatever that constant held.
+    expect(pinOf(new Map(), 'no-such-ticket')).toEqual({ notes: 0, attachments: 0 });
+    expect(NO_PIN).toEqual({ notes: 0, attachments: 0 });
   });
 
   it('29.113 the list page carries the pin on every row, and the row of a ticket with nothing is {notes: 0, attachments: 0}, never absent', async () => {
@@ -10562,15 +11090,29 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     expect(byId.get(world.TP)?.pin).toEqual({ notes: 4, attachments: 2 });
     expect(byId.get(world.TE)?.pin).toEqual({ notes: 1, attachments: 1 });
     // A third ticket with no note and no file: the route answers zeros.
+    const bareId = newUlid();
     await applyCommitted(db.pool, [
-      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.created', payload: { typeId: 'task', projectId: world.P, parentId: null, title: 'Bare' } }),
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'ticket', id: bareId }, type: 'ticket.created', payload: { typeId: 'task', projectId: world.P, parentId: null, title: 'Bare' } }),
     ]);
     const again = await readList(db.pool, eff, world.ids.owner, world.WS, world.P, { spec: {}, limit: 50, groupBy: 'flat' });
     const bare = again.groups.flatMap((g) => g.cards).find((c) => c.title === 'Bare') as { pin?: unknown } | undefined;
+    expect(bare).toBeDefined();
     expect(bare?.pin).toEqual({ notes: 0, attachments: 0 });
+    // Then a note alone (no file): the notes-only path of the merge, which neither TP nor TE exercises (both hold files).
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.author, entity: { kind: 'note', id: world.NOTES.nProject }, type: 'note.attached', payload: { ticketId: bareId } }),
+    ]);
+    const third = await readList(db.pool, eff, world.ids.owner, world.WS, world.P, { spec: {}, limit: 50, groupBy: 'flat' });
+    const noteOnly = third.groups.flatMap((g) => g.cards).find((c) => c.ticketId === bareId) as { pin?: unknown } | undefined;
+    expect(noteOnly?.pin).toEqual({ notes: 1, attachments: 0 });
   });
 });
 ```
+
+**Kills:**
+- 29.113 per viewer: (a) drop `AND ${visibleNotesWhere(eff, viewerId, params)}` from the notes query (memberIn and the guest read 4); (b) drop `AND n.deleted = FALSE` (the owner reads 5); (c) widen the files query to `WHERE ticket_id = ANY($1::text[]) OR ticket_id IS NULL` (the note-owned file lands under a `null` key: the keys leg).
+- 29.113 inherited / note-owned / empty: (a) delete `if (ticketIds.length === 0) return pins;` (two queries are sent: the spy leg); (b) the second merge loop writes `{ notes: 0, attachments: row.n }` (TE reads `{0, 1}` for guestListed); (c) the files query also counts the files of notes linked to the ticket (`… OR note_id IN (SELECT note_id FROM proj_note_attachments WHERE ticket_id = ANY($1::text[]))`, grouped by the link's ticket: TP reads 3 attachments).
+- 29.113 the list page: (a) `routes/list.ts` spreads `pin` only when a count is above zero (Bare has no pin); (b) `pinOf` returns `pins.get(ticketId)` without `?? NO_PIN`; (c) the merge is driven by the files rows only (`for (const row of files.rows) pins.set(row.ticket_id, { notes: notes.rows.find((r) => r.ticket_id === row.ticket_id)?.n ?? 0, attachments: row.n })`, the first loop deleted: the note-only Bare reads zeros).
 
   **The file carries one row the notes fixture lacks: a deleted note.** `beforeAll` creates a workspace-scope note, attaches it to TP and deletes it (`note.created`, `note.attached`, `note.deleted`, the last shaped like the fixture's own deleted note, `apps/server/test/helpers/notes-fixture.ts:301-302`). The owner could read it, so only the `n.deleted = FALSE` clause keeps it out of the count, and the owner's `4` is the control (a mutant that drops the clause reads 5). Those three events were written from the fixture's lines and the file's own `attach` helper and were not run against a database when this plan was drafted: run the file before trusting it, and if the reducer refuses the ordering, split the attach and the delete into two `applyCommitted` calls. A note in a trashed project (`NOTE_PROJECT_LIVE_WHERE`) has no fixture here; its mutant is recorded as a survivor rather than building a trash world in this task.
 
@@ -10592,6 +11134,8 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
  }
  
 ```
+
+**Kills:** (the real-door list `it`, 29.113's wire half) (a) `routes/list.ts` spreads `pin` only when a count is above zero; (b) `routes/list.ts` returns `assembled` instead of `listCards` to `groupCards` (no `pin` on the wire); (c) `pinOf` without `?? NO_PIN` (the key is dropped by `JSON.stringify`, so the card has no `pin`).
 
   The wire reader, then the shell adapter:
 
@@ -10662,6 +11206,10 @@ describe('29.114 the list row carries the paper pin whole, or not at all', () =>
 });
 ```
 
+**Kills:**
+- 29.114 a pin on the wire reaches the row: (a) `mapPin` returns `{ pin: { notes: 0, attachments: 0 } }` when `raw === undefined` (the unknown arm); (b) the `...mapPin(record['pin'], …)` spread is removed from `mapListRow`; (c) `mapPin` swaps the two reads (`notes: asNumber(record['attachments'], …)`).
+- 29.114 refused naming its path: (a) `attachments: asNumber(record['attachments'] ?? 0, …)` (a half pin maps); (b) `notes: Number(record['notes'])` in place of `asNumber` (the string `'2'` maps); (c) `mapPin` passes `path` instead of `` `${path}.notes` `` to the notes read (the path regex fails).
+
 `apps/web/test/ticket-dates-input-pin.test.ts` (new):
 
 ```ts
@@ -10696,6 +11244,8 @@ describe('29.114 the shell adapter carries the paper pin from the list row to th
   });
 });
 ```
+
+**Kills:** 29.114 the shell adapter: (a) the return spreads `pin: row.pin` unconditionally (the key is present, as `undefined`); (b) the pin spread is dropped from the return (the counts never reach the input); (c) the adapter defaults the absent pin to zeros (`pin: row.pin ?? { notes: 0, attachments: 0 }`).
 
   The model, the view and the stylesheet:
 
@@ -10740,6 +11290,8 @@ describe('29.114 the shell adapter carries the paper pin from the list row to th
      const epic = ticket({ id: 'epic1', typeId: 'epic', fields: { title: claimField('Registrations') } });
 ```
 
+**Kills:** 29.115: (a) the model's `pin: input.pin ?? null` (zeros kept: the known-none leg); (b) the model tests `input.pin.notes > 0` only (the `{0, 3}` row loses its pin); (c) `timelinePinLabel` pluralises at one (`pin.notes === 1 ? 'notes' : …`), keeps a zero count, or joins with `' and '` (each breaks one of the four label legs).
+
 `packages/app-core/test/timeline/timeline-view.test.tsx`:
 
 ```diff
@@ -10766,7 +11318,7 @@ describe('29.114 the shell adapter carries the paper pin from the list row to th
  
  /**
   * 11.73–11.82 — `TimelineView`, the week columns over Task 10's landed model.
-@@ -619,6 +633,59 @@
+@@ -653,6 +667,59 @@
    });
  });
  
@@ -10826,7 +11378,7 @@ describe('29.114 the shell adapter carries the paper pin from the list row to th
  describe('29.101 the today line is one line, on the prop\'s day', () => {
    it('29.101 one line, aria-hidden, at today\'s day number; a different prop moves it; an invalid day draws none', () => {
      const { container, rerender } = renderTimeline([]);
-@@ -666,6 +733,25 @@
+@@ -715,6 +782,25 @@
      const memoised = (text: string) => /import \{[^}]*\bmemo\b[^}]*\} from 'react'/.test(text) && /const TimelineBar = memo\(function TimelineBar\(/.test(text);
      expect(memoised(source)).toBe(true);
      expect(memoised("const TimelineBar = function TimelineBar(props) { return null; };")).toBe(false);
@@ -10854,7 +11406,12 @@ describe('29.114 the shell adapter carries the paper pin from the list row to th
  
 ```
 
-  The view test adds a second `it` to **29.102** (a T9 case, already ✅; it stays ✅). The render counter hangs on `timelinePinLabel`, which a bar calls once per render, so it needs the pin to exist; the source scan T9 added beside it is the other half, and the two together are what stops a removal of the bar's `memo`.
+**Kills:**
+- 29.116 a pinned wide bar: (a) `pinWords` dropped from `detail` (the description leg); (b) the model keeps zero counts (`pin: input.pin ?? null`: Plain draws a second pin, the count leg); (c) `data-pinned` never set, or the pin words appended to the bar's `aria-label` (the name leg).
+- 29.116 a one-day bar: (a) drop `+ (row.pin === null ? 0 : PIN_PX)` from `outside` (Tight pinned keeps its key inside); (b) render `{pin}` inside the button unconditionally (drop `!outside &&`: Short carries a pin inside); (c) drop `{pin}` from the outside span (Short's outside key has no pin).
+- 29.102 the render count: none of this task's code; guards existing behaviour (T9's `memo` on `TimelineBar`, with T12's `timelinePinLabel` call as the counter). Its mutant: `const TimelineBar = function TimelineBar(` without `memo(` (the second render leg goes red).
+
+  The view test adds a second `it` to **29.102**. It is a T9 case that T9 left 🟡 with only its source scan; this `it` completes it, and Step 11 flips it to ✅ (planner ruling 2026-10-04). The render counter hangs on `timelinePinLabel`, which a bar calls once per render, so it needs the pin to exist; the source scan T9 added beside it is the other half, and the two together are what stops a removal of the bar's `memo`.
 
 `packages/ui/test/timeline-continuous.test.ts`:
 
@@ -10896,6 +11453,8 @@ describe('29.114 the shell adapter carries the paper pin from the list row to th
 +  });
 +});
 ```
+
+**Kills:** 29.117: (a) `.gn-timeline__bar[data-pinned] { padding-right: 16px; }`; (b) `.gn-timeline__pin { right: 4px; }` or `top: 0` / `transform` dropped; (c) the outside rule's `position: static` dropped or `margin-left: 2px` (or `.gn-timeline__pin { color: var(--gn-accent-text); }`).
 
   Run (expected RED everywhere: no module, no field, no class). The server file needs the TEST database; the others need only their package:
 
@@ -11373,7 +11932,7 @@ export function PaperPinIcon({ size = 12 }: { size?: number }) {
   +  } as unknown as TicketDatesInput;
   ```
 
-  It is a measurement aid: no spec asserts on it and no case id names it. Take 1x and 2x screenshots of `timeline.html?n=40&span=90&pins=1` at Week and Day zoom, light and dark, in `neo` and `hig` (`&style=hig`), and read them. Measure rather than eyeball: the pin's right inset inside a bar (6 px), its size (12 px), that the title text does not run under it (the bar's `padding-right` is 22 px), and that outside a one-day bar it follows the key with a 4 px gap. At 390 px (T11) the pin keeps the same inside-the-end rule along the column. Fix `ui.css` and re-run step 7.
+  It is a measurement aid: no spec asserts on it and no case id names it. Take 1x and 2x screenshots of `timeline.html?n=40&span=90&pins=1` at Week and Day zoom, light and dark, in `neo` and `hig` (`&style=hig`), and read them; save them under `packages/flow-graph-browser/test-results/` (ignored by the root `.gitignore:24` `test-results/` rule) or the lane's scratch directory, never elsewhere in the worktree, so no untracked file reaches a gate checkout. Measure rather than eyeball: the pin's right inset inside a bar (6 px), its size (12 px), that the title text does not run under it (the bar's `padding-right` is 22 px), and that outside a one-day bar it follows the key with a 4 px gap. At 390 px (T11) the pin keeps the same inside-the-end rule along the column. Fix `ui.css` and re-run step 7.
 
 - [ ] **Step 9: Docs and Features**
 
@@ -11411,8 +11970,14 @@ export function PaperPinIcon({ size = 12 }: { size?: number }) {
   - Model: `pin: input.pin` (zeros kept) → 29.115. View: `PIN_PX` not added to the footprint test → 29.116 (`Tight pinned`);  `aria-hidden` removed from the svg → 29.116. `.gn-timeline__bar[data-pinned]` padding or `right: 6px` changed → 29.117. Remove the bar's `memo` → 29.102's render count AND its source scan; remove only the scan's regex match target → the render count still kills it.
   - Record survivors.
 
+**Prose to sweep:**
+- `packages/domain/src/read-models.ts:330` — "A `TicketCard` plus the five facts the LIST route — and only the list route — also serves": the list route now serves a sixth, `pin` (and the "Field by field" list at `:356` names five).
+- `apps/server/test/integration/real-door-round-trip.test.ts:389` — "The LIST route's card: `expectedCard` plus the five facts ruling P25 clause 1 added to it": `expectedListCard` now adds `pin` too (this task's own edit to that function).
+- `packages/app-core/src/claims/ticket-dates.ts:28-30` — the `TicketDatesInput` docblock lists what the views take as head state, the pending field ids and the custom date fields; `pin` (like `key` before it) is not among them.
+- `packages/ui/src/ui.css`, the comment T9 lands above `.gn-timeline__key--outside` (plan line 9005, not on the ref yet) — "A bar shorter than its key shows the key just outside its end": a PINNED bar shorter than its key plus 14 px now shows key and pin outside.
+
 - [ ] **Step 11: Flip, gate**
-  - Flip ❌ to ✅ on 29.113–29.117; `pnpm check:citations`, `pnpm check:help`, `pnpm check:env`, `pnpm check:tasks`.
+  - Flip ❌ to ✅ on 29.113–29.117, and flip **29.102 from 🟡 to ✅**: its render counter is this task's second 29.102 `it` (planner ruling 2026-10-04). Then run `pnpm check:citations`, `pnpm check:help`, `pnpm check:env`, `pnpm check:tasks`.
   - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
 
 
@@ -11518,7 +12083,25 @@ export function emptyAnchors(md: string, kind: 'cases' | 'bullet'): string[] {
   return left;
 }
 
-const FPS = /\d+(\.\d+)? fps/g;
+const range = (a: number, b: number): string[] => Array.from({ length: b - a + 1 }, (_, i) => `29.${String(a + i).padStart(3, '0')}`);
+/** Part 1's allocation (file 29's "Ids by task" line): T1-T13 own these 85 ids; the gaps stay free for follow-ups. */
+const PART1_IDS: readonly string[] = [...range(1, 16), ...range(20, 25), ...range(30, 54), ...range(65, 67), ...range(80, 87), ...range(93, 119)];
+
+/** The allocated ids with no id line at all (a deleted line is neither pending nor closed, so `notClosed` cannot see it). */
+function missingIds(lines: readonly IdLine[]): string[] {
+  const have = new Set(lines.map((l) => l.id));
+  return PART1_IDS.filter((id) => !have.has(id));
+}
+
+/** The Part 1 tasks with no Features bullet: each bullet names `(Workflow and Timeline graphs Part 1 T<n>; cases ...`. */
+function missingBullets(section: string): string[] {
+  return Array.from({ length: 13 }, (_, i) => `T${i + 1}`).filter((t) => !section.includes(`Workflow and Timeline graphs Part 1 ${t};`));
+}
+
+/** The measured halves of a record (`desktop: 61 fps`, `phone: 34.5 fps`). The bar text ("at least 60 fps") is neither. */
+function recordHalves(line: string): { desktop: boolean; phone: boolean } {
+  return { desktop: /desktop: \d+(\.\d+)? fps/.test(line), phone: /phone: \d+(\.\d+)? fps/.test(line) };
+}
 
 describe('29.119 the Part 1 catalogue is closed', () => {
   const cases = read('test-cases/29-workflow-timeline-graphs.md');
@@ -11527,9 +12110,13 @@ describe('29.119 the Part 1 catalogue is closed', () => {
   it('29.119 no id line in 29.001-29.119 is pending or partial; control: a planted pending line and a planted partial one are both found', () => {
     const lines = part1Lines(cases);
     expect(lines.length).toBeGreaterThanOrEqual(80);
+    expect(missingIds(lines)).toEqual([]);
     expect(notClosed(lines)).toEqual([]);
     const planted = cases + '\n- ❌ **29.050 — a planted pending line.**\n- 🟡 **29.051 — a planted partial one.**\n';
     expect(notClosed(part1Lines(planted))).toEqual(['29.050', '29.051']);
+    // control for the allocation leg: the same file with its 29.050 line deleted is missing exactly 29.050
+    const dropped = cases.split('\n').filter((l) => !l.includes('**29.050 — ')).join('\n');
+    expect(missingIds(part1Lines(dropped))).toEqual(['29.050']);
   });
 
   it('29.119 the nine pins the paged grid retired are 🚫 and name the Part 1 id that replaced them; control: an un-retired copy of each is found', () => {
@@ -11542,30 +12129,53 @@ describe('29.119 the Part 1 catalogue is closed', () => {
         .map((l) => (l.includes(`**${id}`) && l.includes('🚫') ? l.replace('🚫', '✅') : l))
         .join('\n');
       expect(unretired(reopened, id), `${id} reopened`).toBe(true);
+      // control: still 🚫 but naming no replacement is reported too (kills `unretired` without the `replaced by` clause)
+      const orphaned = md
+        .split('\n')
+        .map((l) => (l.includes(`**${id}`) && l.includes('🚫') ? l.replace(/replaced by 29\.\d{3}/g, 'replaced later') : l))
+        .join('\n');
+      expect(unretired(orphaned, id), `${id} with no replacement`).toBe(true);
     }
   });
 
   it('29.119 every Part 1 task wrote its case lines and its Features bullet (no anchor is left empty); control: a seed with the anchors alone is found empty', () => {
+    // the case anchors stay by design: all 13 must be there, or a renamed anchor would make emptyAnchors vacuous
+    expect(cases.match(new RegExp(`^<!-- ${PLAN} T\\d+ -->$`, 'gm'))?.length ?? 0).toBe(13);
     expect(emptyAnchors(cases, 'cases')).toEqual([]);
-    const featuresSection = features.slice(features.indexOf('## 26. Workflow and Timeline graphs'));
+    const at = features.indexOf('## 26. Workflow and Timeline graphs');
+    expect(at).toBeGreaterThanOrEqual(0); // indexOf -1 would slice the last character and pass both legs below
+    const featuresSection = features.slice(at);
     expect(emptyAnchors(featuresSection, 'bullet')).toEqual([]);
+    expect(missingBullets(featuresSection)).toEqual([]);
     expect(emptyAnchors(`<!-- ${PLAN} T1 -->\n<!-- ${PLAN} T2 -->\n- ✅ **29.001 — x.**\n`, 'cases')).toEqual(['T1']);
     expect(emptyAnchors(`<!-- ${PLAN} T3 bullet -->\n`, 'bullet')).toEqual(['T3']);
+    // control: an anchor deleted without its bullet leaves no anchor to find, but the bullet is missing
+    expect(missingBullets(featuresSection.replace('Workflow and Timeline graphs Part 1 T5;', 'Part 1, task five;'))).toEqual(['T5']);
   });
 
   it('29.119 the two manual records carry numbers: 29.016 (before) and 29.118 (after) each name a desktop and a phone fps; control: a record with no numbers has none', () => {
     for (const id of ['29.016', '29.118']) {
       const line = cases.split('\n').find((l) => l.includes(`**${id} — `));
       expect(line, id).toBeDefined();
-      expect((line as string).match(FPS)?.length ?? 0, `${id} fps figures`).toBeGreaterThanOrEqual(2);
-      expect((line as string).includes('🧪'), `${id} is manual`).toBe(true);
+      expect(recordHalves(line as string), `${id} desktop and phone fps`).toEqual({ desktop: true, phone: true });
+      expect((line as string).startsWith('- 🧪 '), `${id} is manual`).toBe(true);
     }
-    expect('- 🧪 **29.016 — measured on the owner\'s phone.**'.match(FPS)).toBeNull();
+    expect(recordHalves('- 🧪 **29.016 — measured on the owner\'s phone.**')).toEqual({ desktop: false, phone: false });
+    // control: 29.118 as Step 1 writes it quotes the bars ("at least 60 fps", "at least 30 fps") and is no record
+    expect(recordHalves('- ❌ **29.118 — meets the section 13 bars (desktop at least 60 fps with a worst frame of 20 ms or less; phone at least 30 fps with 50 ms or less).**')).toEqual({ desktop: false, phone: false });
+    // control: half a record is half
+    expect(recordHalves('- 🧪 **29.118 — x; desktop: 61 fps, worst 18 ms.**')).toEqual({ desktop: true, phone: false });
   });
 });
 ```
 
-  Run: `slot-run.sh srv -- pnpm --filter @gisik-nokma/server exec vitest run test/tooling/wtg-part1-catalogue.test.ts --maxWorkers=2 > /tmp/srv.log 2>&1; tail -n 30 /tmp/srv.log`. Expected at this point, after Step 1 and before the measurement: `it` 2 (the nine retired pins) green; `it` 1 RED naming exactly `29.118` and `29.119` (this task's own lines are still ❌); `it` 3 RED naming exactly `T13` (this task's Features bullet anchor is still in place); `it` 4 RED (29.118 has no fps figures). Those three reds are the task's progress bar and each goes away in a named step below. If any red names anything else (another task's id or anchor), an earlier task left a pending line or an anchor in place: fix that task's catalogue line in this PR and say so in the HANDOFF.
+**Kills:**
+- 29.119 no id line pending or partial: (a) `notClosed` admitting ❌ (`['✅', '🧪', '🚫', '❌']`): the planted-pending control returns `['29.051']`; (b) `part1Lines` bound `n <= 119` to `n <= 49`: `missingIds` reports every id from 29.050 up; (c) `missingIds` returning `[]`: the deleted-29.050 control fails.
+- 29.119 the nine retired pins: (a) `unretired` without the `replaced by` clause (`return !line.includes('🚫')`): the no-replacement control returns false; (b) `unretired` without the `line.includes('🚫')` arm: the reopened (✅) control still names `replaced by 29.` and returns false; (c) the line regex losing its `\*\*${escaped}\*\* ` arm: the five file-11 lines (`- **11.55** 🚫 ...`) are not found and `unretired` is true on the real files.
+- 29.119 every task wrote its lines and bullet: (a) `emptyAnchors` for `bullet` returning filled: the planted `T3 bullet` control returns `[]`; (b) `emptyAnchors` for `cases` dropping the next-line test (`filled = true`): the seed control returns `[]` for T1; (c) `missingBullets` returning `[]`: the T5 control fails (a task that deleted its anchor without writing a bullet would pass `emptyAnchors`).
+- 29.119 the manual records carry numbers: (a) `recordHalves` without the `desktop:` anchor (`/\d+(\.\d+)? fps/` for desktop): the Step 1 bar-text control returns `desktop: true`; (b) the `phone` test dropped (`phone: true`): the half-record control returns `phone: true`.
+
+  Run: `slot-run.sh srv -- pnpm --filter @gisik-nokma/server exec vitest run test/tooling/wtg-part1-catalogue.test.ts --maxWorkers=2 > /tmp/srv.log 2>&1; tail -n 30 /tmp/srv.log`. Expected at this point, after Step 1 and before the measurement: `it` 2 (the nine retired pins) green; `it` 1 RED naming exactly `29.118` and `29.119` (this task's own lines are still ❌); `it` 3 RED naming exactly `T13` (this task's Features bullet anchor is still in place); `it` 4 RED (29.118 carries no `desktop: N fps` / `phone: N fps` record and is not 🧪; the bar text "at least 60 fps" in its Step 1 wording is not a record). Those three reds are the task's progress bar and each goes away in a named step below. If any red names anything else (another task's id or anchor), an earlier task left a pending line or an anchor in place: fix that task's catalogue line in this PR and say so in the HANDOFF.
 
 - [ ] **Step 3: Re-measure on a headed desktop (case 29.118, desktop half)**
 
@@ -11574,7 +12184,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
   ```bash
   pnpm turbo run build --filter=@gisik-nokma/flow-graph-browser^...
   FG_HEADED=1 /Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh fgb-headed -- pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/stress.spec.ts --grep "29.003" > /tmp/fgb-headed.log 2>&1; tail -n 12 /tmp/fgb-headed.log
-  tail -n 3 packages/flow-graph-browser/results/stress.jsonl
+  tail -n 3 packages/flow-graph-browser/test-results/stress.jsonl
   ```
 
   Run it three times; the log prints `fg-stress view (...)` with the pan's `fps`, `worstMs`, `p95Ms` and `clickToSettleMs`. Count what the page mounted (open `stress.html?scene=view&n=2000&auto=1` in the headed window and run `document.querySelectorAll('.gn-timeline__bar').length` in the console): it is far below 2,000, and the figure goes in the record. Take the MEDIAN run by fps and write its row (`judge` is applied to that record in `harness/bars.ts`; if it lists a reason, the bar is missed).
@@ -11583,7 +12193,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
 
 - [ ] **Step 4: Re-measure on the owner's real phone (case 29.118, phone half)**
 
-  Exactly T1 step 15: start `pnpm exec vite --host` from `packages/flow-graph-browser` in the background (note the pid), ask the controller to relay `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` to the owner, wait for a `"touch":true` line in `results/stress.jsonl`, stop the server by its exact pid (no `pkill`). Ask for the page THREE times when the owner is willing; the page runs three pans per load.
+  Exactly T1 step 15: start `pnpm exec vite --host` from `packages/flow-graph-browser` in the background (note the pid), ask the controller to relay `http://<this machine's LAN ip>:3192/stress.html?scene=view&n=2000&auto=1` to the owner, wait for a `"touch":true` line in `test-results/stress.jsonl`, stop the server by its exact pid (no `pkill`). Ask for the page THREE times when the owner is willing; the page runs three pans per load.
 
 - [ ] **Step 5: Write the records**
 
@@ -11601,7 +12211,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
   Replace the anchor `<!-- wtg-part1-viewport-timeline-view T13 bullet -->` in section 26 with:
 
 ```markdown
-- ✅ **Part 1 is closed: re-measured and guarded** (Workflow and Timeline graphs Part 1 T13; cases 29.118, 29.119; `apps/server/test/tooling/wtg-part1-catalogue.test.ts`) — the existing view at 2,000 dated tickets is panned again on a headed desktop and a real phone and written against the section 13 bars and the 29.016 baseline (case 29.118); a tooling test keeps the Part 1 block honest: no pending line left in 29.001–29.119, the retired pins stay retired with their replacements, and the paged grid's names stay out of the source.
+- ✅ **Part 1 is closed: re-measured and guarded** (Workflow and Timeline graphs Part 1 T13; cases 29.118, 29.119; `apps/server/test/tooling/wtg-part1-catalogue.test.ts`) — the existing view at 2,000 dated tickets is panned again on a headed desktop and a real phone and written against the section 13 bars and the 29.016 baseline (case 29.118); a tooling test keeps the Part 1 block honest: no pending line left in 29.001–29.119, the retired pins stay retired with their replacements, every Part 1 task's lines and bullet exist, and both manual records carry a desktop and a phone figure (the paged grid's names are kept out of the source by 29.105, not by this test).
 ```
 
   Leave the closing `<!-- wtg-part1-viewport-timeline-view end -->` marker where it is: it is the permanent insertion point the later Parts' sections sit below.
@@ -11627,9 +12237,11 @@ describe('29.119 the Part 1 catalogue is closed', () => {
 
   A Features anchor still present means a task never wrote its bullet: that is a defect of that task, fixed in this PR and named in the HANDOFF.
 
+**Prose to sweep:** `docs/superpowers/plans/2026-10-03-wtg-part1-viewport-timeline-view.md:38` (Global Constraints, "Catalogue") gives T9 `29.093–29.107` and lists `29.087–29.092` as unused. T9 writes 29.087, and file 29 (`test-cases/29-workflow-timeline-graphs.md:29` on the ref, "T9 087 + 093–107") and this task's `PART1_IDS` (85 ids) follow it. Correct the line to T9 `29.087`, `29.093–29.107`, with unused `29.088–29.092` (planner ruling 2026-10-04: file 29 is right; T1's landed text is left alone). Otherwise none found (searched on the ref: `29.118`, `29.119`, `after the lift`, `wtg-part1-catalogue`, `Records`, `T13` in `packages/flow-graph-browser/README.md`, `test-cases/`, `Features.md`, `docs/` outside the plans; the only hits are the block table `test-cases/29-workflow-timeline-graphs.md:10`/`:27`, the ledger row `docs/lanes/task-ledger.tsv:658` and `packages/flow-graph-browser/harness/stress.tsx:12`, which stay true). Note: `packages/flow-graph-browser/README.md:23` still names `results/stress.jsonl` on the ref; it is moved by `task/wtg1-stress-output-ignored`, not by this task; if that branch has not landed when T13 runs, the records are read from `results/stress.jsonl` instead of `test-results/` in Steps 3 and 4.
+
 - [ ] **Step 8: Mutation, gate**
 
-  Mutation pass (own), on the catalogue test: a different threshold than 80 on the count (set 90, expect RED), `notClosed` admitting ❌ (expect the planted-pending control to fail), `unretired` without the `replaced by` clause (expect the reopened control or the real lines to fail), `emptyAnchors` for `bullet` returning filled (expect the planted anchor control to fail), the fps count `>= 2` to `>= 1` (expected SURVIVOR: the real lines each carry two or more figures and no control plants a one-figure record; record it as a known gap of the guard). Record survivors.
+  Mutation pass (own), on the catalogue test: a different threshold than 80 on the count (set 90, expect RED), `notClosed` admitting ❌ (expect the planted-pending control to fail), `unretired` without the `replaced by` clause (expect the no-replacement control to fail), `emptyAnchors` for `bullet` returning filled (expect the planted anchor control to fail), `missingIds` / `missingBullets` returning `[]` (expect the deleted-29.050 / the T5 control to fail), `recordHalves` counting any `N fps` as a desktop figure (expect the Step 1 bar-text control to fail) and dropping its `phone` test (expect the half-record control to fail). Record survivors.
 
   - `pnpm check:citations` (29.119 is ✅ with its covering test; 29.118 is 🧪).
   - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.

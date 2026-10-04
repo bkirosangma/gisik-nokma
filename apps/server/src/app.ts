@@ -205,6 +205,14 @@ export type AppDeps = {
    * staleness is decided by the tables.
    */
   onNoteBodyCommitted?: (noteId: string) => void;
+  /**
+   * Erases a discarded draft (drafts spec R15): called with the ticket id after a `ticket.discarded` COMMITS. It
+   * is a callback, not an import, for the reason `onNoteBodyCommitted` is: `AppDeps.pool` is a `Queryable` and the
+   * erasure needs a `Pool`, and the projection registry is not an app dependency. `src/index.ts` supplies the real
+   * one. Optional because nearly every suite never discards; when absent no listener is registered, and the
+   * purge sweep (`purge/sweep.ts`) erases the draft on its next run instead.
+   */
+  onDraftDiscarded?: (ticketId: string) => Promise<void>;
 };
 
 /**
@@ -1168,6 +1176,24 @@ export function buildApp(
     });
     app.addHook('onClose', () => {
       unsubscribeEmbedNudge();
+    });
+  }
+  // The draft erasure (drafts spec R15): after a `ticket.discarded` commits, erase the draft. FIRE-AND-FORGET like the
+  // listeners above: the commit's answer must not wait on a multi-statement transaction, and a failure here is
+  // retried by the purge sweep (the flag stays set until the erasure succeeds), so it is logged, never thrown into
+  // the ingest path as an unhandled rejection. Registered ONLY when supplied, for the reason the nudge gives.
+  if (deps.onDraftDiscarded !== undefined) {
+    const onDraftDiscarded = deps.onDraftDiscarded;
+    const unsubscribeDraftErasure = deps.ingest.onEventCommitted((event) => {
+      if (event.type !== 'ticket.discarded') return;
+      Promise.resolve()
+        .then(() => onDraftDiscarded(event.entity.id))
+        .catch((error: unknown) => {
+          app.log.error({ err: error, ticketId: event.entity.id }, 'draft erasure failed; the purge sweep retries it');
+        });
+    });
+    app.addHook('onClose', () => {
+      unsubscribeDraftErasure();
     });
   }
   // The attachment doors (Plan 7 Tasks 9 and 10) — upload and download. This

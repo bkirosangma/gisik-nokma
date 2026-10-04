@@ -54,6 +54,15 @@ export const REFUSALS = {
    */
   'hierarchy.unknown-parent': 'The chosen parent ticket does not exist in this workspace.',
   /**
+   * Drafts (spec 1, R11). `parent-unpublished` is a PUBLISH whose parent is still the author's own draft. A
+   * published ticket naming a draft as parent on its own stream is `hierarchy.unknown-parent` (spec R4, owner
+   * ruling O1: a draft id is not a ticket there), and so is another person's draft (R3), so no id is an oracle.
+   * `draft.not-allowed` is not in this map because its sentence depends on the type (`draftNotAllowedReason`).
+   */
+  'draft.parent-unpublished': 'The parent is still a draft. Publish the parent first.',
+  'draft.not-a-draft': 'This ticket is not a draft.',
+  'draft.project-mismatch': "The project does not match this draft's project.",
+  /**
    * A parent that resolves and is soft-deleted (E6-4). Not `unknown-parent`:
    * that sentence is false — the ticket exists, and the actor may well have
    * held its id from before the delete — and not silently accepted, which put

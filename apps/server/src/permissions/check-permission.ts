@@ -59,7 +59,8 @@ export const PERMISSION_VISIBILITY_RULE = 'permission.visibility';
 /**
  * The rule id for an author's event on their OWN draft that the draft allowlist does not admit (drafts spec
  * §3.3, R7). Its own id, not `permission.role`: the sentence names the way out ("Publish it first, or
- * discard it."). `packages/rule-engine`'s `REFUSALS['draft.not-allowed']` (T5) must be this same string.
+ * discard it."). `packages/rule-engine`'s `DRAFT_NOT_ALLOWED_RULE` (`checks/drafts.ts`) spells the same id and both
+ * take the sentence from `draftNotAllowedReason`; the parity case 28.090 fails if they drift.
  */
 export const DRAFT_NOT_ALLOWED_RULE = 'draft.not-allowed';
 
@@ -1663,7 +1664,7 @@ export async function checkVisibilityPermission(
   }
   // The allowlist (R6, R7) is judged BEFORE every authority check below on purpose: a member's
   // `ticket.deleted` on their own draft must read "A draft cannot be deleted. Discard it instead." and not
-  // the project-admin sentence the delete block gives. The engine twin (`checkTicketDraft`, T5) judges the
+  // the project-admin sentence the delete block gives. The engine twin (`checkTicketDraftGate`) judges the
   // same list for the client precheck and the replica.
   if (access === 'own-draft' && !draftAllows(env.type)) {
     return refuseWith(DRAFT_NOT_ALLOWED_RULE, draftNotAllowedReason(env.type));

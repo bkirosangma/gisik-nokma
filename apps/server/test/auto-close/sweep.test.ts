@@ -833,3 +833,75 @@ describe('13.1167 a parent promoted into terminal by a republish is not swept wh
     expect(await closedEvents(parent)).toEqual([{ actor_id: SYSTEM_ACTOR_AUTO_CLOSE, origin: 'server' }]);
   });
 });
+
+describe('28.096 a draft child is not open work for the sweep (drafts spec)', () => {
+  it('closes a terminal parent whose only child is a draft, and still holds back one with a published open child beside a draft', async () => {
+    const ws = newUlid();
+    await seedWorkflowAndType(ws);
+    await seedAutoClose(ws, DAYS);
+    const childType = `${TYPE_ID}-child`;
+    // Two parents that reach `done` long ago, each after its children were filed (the only order the hierarchy check allows).
+    const onlyDraft = await seedTicket({ workspaceId: ws, enteredAt: '2026-08-01T06:00:00.000Z', state: 'doing' });
+    const withOpen = await seedTicket({ workspaceId: ws, enteredAt: '2026-08-01T06:00:00.000Z', state: 'doing' });
+    const draftUnderOnlyDraft = newUlid();
+    const draftUnderOpen = newUlid();
+    const openChild = newUlid();
+    const child = (id: string, parentId: string, draft: boolean) =>
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'ticket', id },
+        type: 'ticket.created',
+        payload: {
+          typeId: childType,
+          projectId: PROJECT,
+          parentId,
+          title: draft ? 'A draft child' : 'An open child',
+          start: draft ? 'backlog' : 'focus',
+          ...(draft ? { draft: true } : {}),
+        },
+        serverTime: '2026-08-01T06:01:00.000Z',
+      });
+    const finish = (id: string) =>
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'ticket', id },
+        type: 'ticket.transitioned',
+        payload: { to: 'done' },
+        serverTime: '2026-08-02T00:00:00.000Z',
+      });
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'ticket-type', id: childType },
+        type: 'ticket-type.defined',
+        payload: { id: childType, name: 'Sweep sub-task', icon: 'check', rank: 2, workflowId: WF, fields: [] },
+      }),
+      child(draftUnderOnlyDraft, onlyDraft, true),
+      child(draftUnderOpen, withOpen, true),
+      child(openChild, withOpen, false),
+      finish(onlyDraft),
+      finish(withOpen),
+    ]);
+    // The world, read off the projection rather than assumed of the seed: both parents terminal, the drafts flagged.
+    const { rows } = await db.pool.query<{ ticket_id: string; state_category: string; is_draft: boolean }>(
+      'SELECT ticket_id, state_category, draft_author_id IS NOT NULL AS is_draft FROM proj_tickets WHERE workspace_id = $1',
+      [ws],
+    );
+    const byId = new Map(rows.map((r) => [r.ticket_id, r]));
+    expect(byId.get(onlyDraft)).toMatchObject({ state_category: 'terminal', is_draft: false });
+    expect(byId.get(withOpen)).toMatchObject({ state_category: 'terminal', is_draft: false });
+    expect(byId.get(draftUnderOnlyDraft)?.is_draft).toBe(true);
+    expect(byId.get(draftUnderOpen)?.is_draft).toBe(true);
+    expect(byId.get(openChild)).toMatchObject({ state_category: 'open', is_draft: false });
+
+    const report = await sweep();
+    expect(report).toEqual({ workspacesOn: 1, candidates: 1, closed: 1, refused: 0 });
+    expect(await closedAt(onlyDraft)).not.toBeNull(); // the draft child did not hold it
+    expect(await closedEvents(onlyDraft)).toEqual([{ actor_id: SYSTEM_ACTOR_AUTO_CLOSE, origin: 'server' }]);
+    expect(await closedAt(withOpen)).toBeNull(); // CONTROL: a published open child still does
+    expect(await closedEvents(withOpen)).toHaveLength(0);
+  });
+});

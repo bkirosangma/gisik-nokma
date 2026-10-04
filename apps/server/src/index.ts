@@ -13,6 +13,7 @@ import { signInMaxFor } from './http/rate-limit.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { startReferencesBackfill } from './projections/backfill-references.js';
 import { buildProjectionRegistry } from './projections/index.js';
+import { discardDraft } from './purge/discard-draft.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
 import { startSnapshotWriter } from './sync/snapshot-writer.js';
 import { startEmbedWorker } from './search/embed-worker.js';
@@ -133,6 +134,15 @@ async function main(): Promise<void> {
   // assignment, and nothing can call it in that window because nothing is
   // listening yet.
   let nudgeEmbedWorker: ((noteId: string) => void) | null = null;
+  // Where attachment bytes land, decided by `OBJECT_STORE` and nothing
+  // else: local disk in dev, S3-compatible where one is configured.
+  // `createObjectStoreFromEnv` is the ONE seam that reads those names, so
+  // no other file needs an `if (env.OBJECT_STORE === …)`. No new variable is
+  // introduced here — every name it reads is already documented in
+  // `.env.example` and already checked by `scripts/check-env-example.mjs`.
+  // Hoisted out of `buildApp`'s deps so the draft erasure below deletes from
+  // the same store the attachment routes write to.
+  const store = createObjectStoreFromEnv(process.env);
   const app = buildApp(
     {
       db: pool,
@@ -155,14 +165,12 @@ async function main(): Promise<void> {
       onNoteBodyCommitted: (noteId) => {
         nudgeEmbedWorker?.(noteId);
       },
-      // Where attachment bytes land, decided by `OBJECT_STORE` and nothing
-      // else: local disk in dev, S3-compatible where one is configured.
-      // `createObjectStoreFromEnv` is the ONE seam that reads those names, so
-      // no other file needs an `if (env.OBJECT_STORE === …)`; this is its only
-      // non-test call site. No new variable is introduced here — every name it
-      // reads is already documented in `.env.example` and already checked by
-      // `scripts/check-env-example.mjs`.
-      store: createObjectStoreFromEnv(process.env),
+      // The draft erasure (drafts spec R15): the real thing, over this process's pool, registry and object store. The
+      // purge sweep (`backup-daemon-main.ts`, job `purge`) retries whatever this misses.
+      onDraftDiscarded: async (ticketId) => {
+        await discardDraft(pool, ticketId, { projections, store, now: new Date() });
+      },
+      store,
     },
     {
       logLevel: config.logLevel,

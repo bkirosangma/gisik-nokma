@@ -208,10 +208,14 @@ export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseR
           -- the engine's getChildrenStates does not consult it either
           -- (engine-context.ts): the two must answer alike, and E6-4
           -- (soft-deleted children) is the change that moves them together.
+          -- A DRAFT child is not open work (drafts spec): it is private to
+          -- its author and the engine's close.ts and transition.ts do not
+          -- count it, so this sub-select must not either.
           AND NOT EXISTS (
                 SELECT 1 FROM proj_tickets c
                  WHERE c.parent_id = t.ticket_id
                    AND c.state_category <> 'terminal'
+                   AND c.draft_author_id IS NULL
               )
           AND entered.server_time < $2
         ORDER BY t.ticket_id`,
