@@ -127,6 +127,13 @@ export type TicketState = {
    */
   links?: TicketLink[];
   /**
+   * On a DRAFT only: the published tickets it holds as pending children (drafts T6, owner ruling O1), in the order
+   * held, filed by `ticket.reparented { childId }` on the draft's stream. Neither ticket's `parentId` moves until
+   * the draft is published, when each is re-filed on the child's own stream and the key goes. ABSENT when empty,
+   * on the reducer and on `rowToTicketState` alike (the rule `links` follows).
+   */
+  pendingChildren?: string[];
+  /**
    * Present ONLY while the ticket is a DRAFT (drafts spec §2.3): private to `authorId`, with no key.
    * ABSENT on every other ticket, on the reducer and on `rowToTicketState` alike (the rule `links` follows:
    * the dual-client rig's `toEqual` needs both producers to agree on shape). `ticket.published` removes it;

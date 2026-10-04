@@ -38,6 +38,7 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       break;
     case 'ticket.reparented':
       add('ticket', payload['newParentId']);
+      add('ticket', payload['childId']); // the draft-side pending child (drafts T6, owner ruling O1)
       break;
     case 'note.created':
       add('project', payload['homeProjectId']);

@@ -14,6 +14,7 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketLinkAddedPayload,
+  ticketReparentedPayload,
   visibilitySetPayload,
   draftAllows,
   draftNotAllowedReason,
@@ -1698,6 +1699,19 @@ export async function checkVisibilityPermission(
           return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
         }
       }
+    }
+  }
+
+  /**
+   * The draft-side `childId` form (drafts T6, owner ruling O1): the author holds a published child C on their
+   * draft. The door above granted the draft; the child must be one this person could reparent, the same question
+   * the door asks of a plain reparent's own entity, and with the link block's sentence for the other end it names.
+   * `canOpen`, as above: the author's own draft child reaches the engine, which says it moves on its own stream.
+   */
+  if (env.type === 'ticket.reparented') {
+    const moved = ticketReparentedPayload.safeParse(env.payload);
+    if (moved.success && moved.data.childId !== undefined && !(await canOpen(ctx.db, ctx.sessionUserId, moved.data.childId))) {
+      return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
     }
   }
 

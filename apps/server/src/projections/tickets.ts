@@ -129,6 +129,8 @@ type TicketRow = {
    * reducer folds them, `[]` for a ticket with none. `proj_ticket_links` is the queryable copy of the same links.
    */
   links: TicketLink[];
+  /** `TicketState.pendingChildren`' column (drafts T6, owner ruling O1): `[]` on every ticket that holds none. */
+  pending_children: string[];
 };
 
 /**
@@ -245,6 +247,7 @@ export function rowToTicketState(row: TicketRow): TicketState {
     // `rank` and `deleted` above, the reducer never writes an empty `links` (its last removal drops the key), so the
     // column's `[]` reads back as no key at all.
     ...(row.links.length > 0 ? { links: row.links } : {}),
+    ...(row.pending_children.length > 0 ? { pendingChildren: row.pending_children } : {}),
   };
 }
 
@@ -318,8 +321,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
         closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by,
-        draft_author_id, draft_at, draft_discarded, links)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        draft_author_id, draft_at, draft_discarded, links, pending_children)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -341,7 +344,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        draft_author_id = EXCLUDED.draft_author_id,
        draft_at = EXCLUDED.draft_at,
        draft_discarded = EXCLUDED.draft_discarded,
-       links = EXCLUDED.links`,
+       links = EXCLUDED.links,
+       pending_children = EXCLUDED.pending_children`,
     [
       next.id,
       next.workspaceId,
@@ -399,6 +403,7 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // with none (never `[]`), and the column is NOT NULL; the ON CONFLICT list above is what makes the last
       // removal's absent key clear an existing row rather than leave it holding a stale link.
       JSON.stringify(next.links ?? []),
+      JSON.stringify(next.pendingChildren ?? []),
     ],
   );
 }

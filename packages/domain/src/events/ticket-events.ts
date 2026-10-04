@@ -221,7 +221,14 @@ export const ticketFieldSetPayload = z.object({
     .refine((value) => value !== undefined, 'is required: a field claim with no value would record a clearing nobody made'),
 });
 
-export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullable() });
+/**
+ * `childId` (drafts spec R4, owner ruling O1, drafts T6): filed ONLY on a draft D's stream. `{ newParentId: D,
+ * childId: C }` holds the published C as D's pending child; `{ newParentId: null, childId: C }` withdraws it. C's
+ * stream is never written until D is published, when the server re-files `{ newParentId: D }` on C's own stream.
+ */
+export const ticketReparentedPayload = z
+  .object({ newParentId: ulidString.nullable(), childId: ulidString.optional() })
+  .refine((p) => p.childId === undefined || p.childId !== p.newParentId, { message: 'a ticket cannot be its own pending child' });
 
 /**
  * Typed ticket links (Knowledge Graph spec A §2.2). Both events go on the

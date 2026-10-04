@@ -19,6 +19,11 @@ describe('28.116 payloadIds names the source of a from-form link', () => {
       expect(payloadIds(type, { kind: 'blocks', targetId: D }), type).toEqual([['ticket', D]]); // CONTROL
     }
   });
+
+  it('names a pending child beside the new parent (28.128); a plain reparent names the parent alone', () => {
+    expect(payloadIds('ticket.reparented', { newParentId: D, childId: S })).toEqual([['ticket', D], ['ticket', S]]);
+    expect(payloadIds('ticket.reparented', { newParentId: D })).toEqual([['ticket', D]]); // CONTROL
+  });
 });
 
 /** Erase a ticket exactly as `purge-comment-edits.test.ts:38-39` does: trash it, mark it, purge it at its due time. */
@@ -126,5 +131,32 @@ describe('28.125 the listeners hear the publish and then each re-filed event, af
     } finally {
       await db.drop();
     }
+  });
+});
+
+describe('28.128 an erased pending child', () => {
+  it('is skipped at publish, not refused; a new childId naming it is purge.erased', async () => {
+    // p11 N16 (28.128): C is D1's pending child, then C is erased; D1's publish succeeds and files nothing on C
+    const db = await createTestDatabase();
+    try {
+      const { app, ingest } = buildTestApp(db);
+      await app.ready();
+      const x = await linkedDrafts(db);
+      const c = newUlid();
+      await applyCommitted(db.pool, [
+        ev(x.base, 'ticket', c, 'ticket.created', { typeId: TYPE_ID, projectId: x.P, parentId: null, title: 'Pending child' }, x.author),
+        ev(x.base, 'ticket', x.d1, 'ticket.reparented', { newParentId: x.d1, childId: c }, x.author),
+      ]);
+      await eraseTicket(db, x.base, c);
+      expect((await ingest.ingestBatch([x.publish(x.d1)]))[0]?.status).toBe('committed');
+      expect((await db.pool.query(`SELECT 1 FROM events WHERE entity_id = $1 AND type = 'ticket.reparented'`, [c])).rows).toHaveLength(0);
+      // the plan's kill (e): `payloadIds` names `childId`, so a new hold naming the erased C is refused at the purge check
+      const [again] = await ingest.ingestBatch([x.submit('ticket.reparented', x.d2, { newParentId: x.d2, childId: c })]);
+      expect(again).toMatchObject({ status: 'refused', rule: PURGE_RULE });
+      await app.close();
+    } finally {
+      await db.drop();
+    }
+    // CONTROL: 28.128's publish leg (routes/draft-relations.test.ts), the same shape with C live, files exactly one follower on C
   });
 });

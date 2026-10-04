@@ -140,13 +140,16 @@ const LIVE_GATE_EXEMPT: ReadonlySet<string> = new Set([
  * server does, and an offline device that still holds the ticket gets its
  * refusal (and its contest) instead of a silently accepted edit.
  */
+/** `checkTicketLive`'s sentence, also the pending-child form's for a deleted child (drafts T6, `hierarchy.ts`). */
+export const DELETED_TICKET_REASON = 'This ticket is deleted; restore it first.';
+
 export async function checkTicketLive(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
   if (env.entity.kind !== 'ticket') return ACCEPT;
   if (LIVE_GATE_EXEMPT.has(env.type)) return ACCEPT;
   const ticket = await getTicketState(ctx, env.entity.id);
   if (ticket === null) return ACCEPT;
   if ((ticket.deleted ?? null) !== null) {
-    return refuse(REFUSAL_RULES.deletedTicket, 'This ticket is deleted; restore it first.');
+    return refuse(REFUSAL_RULES.deletedTicket, DELETED_TICKET_REASON);
   }
   return ACCEPT;
 }

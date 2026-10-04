@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type Ulid } from '@gisik-nokma/domain';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 describe('28.115 projection and rebuild', () => {
   it('keys a from-form row by its source, deletes exactly that row, survives the publish under the re-file and rebuilds clean; CONTROL: a plain row is keyed by the entity', async () => {
-    const [s, s2, d] = [newUlid(), newUlid(), newUlid()].sort(); // s < d: the removal leg below needs S's stream replayed first
+    const [s, s2, d] = [newUlid(), newUlid(), newUlid()].sort() as [Ulid, Ulid, Ulid]; // s < d: the removal leg below needs S's stream replayed first
     await w.published(s);
     await w.published(s2);
     await w.draft(d);

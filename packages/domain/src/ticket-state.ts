@@ -384,6 +384,14 @@ export function applyTicketEvent(
     }
     case 'ticket.reparented': {
       const p = ticketReparentedPayload.parse(env.payload);
+      if (p.childId !== undefined) {
+        // Drafts T6 (owner ruling O1): held on the DRAFT as pending; neither ticket's `parentId` moves.
+        const held = state.pendingChildren ?? [];
+        const next =
+          p.newParentId === null ? held.filter((id) => id !== p.childId) : held.includes(p.childId) ? held : [...held, p.childId];
+        const { pendingChildren: _held, ...rest } = state;
+        return { ...rest, ...(next.length > 0 ? { pendingChildren: next } : {}) };
+      }
       return { ...state, parentId: p.newParentId };
     }
     case 'ticket.workflow_rebound': {
@@ -517,9 +525,10 @@ export function applyTicketEvent(
       if (!category) {
         throw new Error(`applyTicketEvent: workflow "${workflow.id}" has no state "${state.stateId}"`);
       }
-      // The draft-side entries (`from`) are re-filed on their sources by the server in the same transaction
-      // (spec R44) and live there from now on; the draft's own outgoing links stay.
-      const { draft: _published, links: held, ...rest } = state;
+      // The draft-side entries (`from`) and the pending children are re-filed on their own streams by the server
+      // in the same transaction (spec R44, owner ruling O1) and live there from now on; the draft's own outgoing
+      // links stay.
+      const { draft: _published, links: held, pendingChildren: _refiled, ...rest } = state;
       const kept = (held ?? []).filter((l) => l.from === undefined);
       return {
         ...rest,
