@@ -45,7 +45,7 @@ async function workflowRaw(workspaceId: string, workflowId: string, version: num
   const states = [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }];
   await db.pool.query(
     `INSERT INTO proj_workflows (workspace_id, workflow_id, version, name, definition, defined_by, defined_at, published_workspace_seq)
-     VALUES ($1, $2, $3, 'wf', $4, $5, now(), $3)`,
+     VALUES ($1, $2, $3::integer, 'wf', $4, $5, now(), $3::integer)`,
     [workspaceId, workflowId, version, JSON.stringify({ id: workflowId, version, name: 'wf', initialStateId, states, transitions: [] }), ACTOR],
   );
 }
