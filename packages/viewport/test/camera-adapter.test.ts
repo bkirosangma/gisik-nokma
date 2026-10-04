@@ -117,7 +117,7 @@ describe('29.037 the camera', () => {
     expect(cam.getCamera().x).toBe(20);
   });
 
-  it('29.038 drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | frames say moving while pressed | a right-button press and a hover do not pan (control: a pen barrel press does) | the pointer is captured and released | at zoom 2 a drag and a flick move half as far, on both axes | a vertical flick | a cancelled flick leaves no momentum | the release velocity is the newest 12 samples | a stray pointerup leaves a pinch alone; the pinch clamps; two fingers on one point move nothing | a press, a wheel and camera() each stop a flick; a press stops a glide', () => {
+  it('29.038 drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | frames say moving while pressed | a right-button press and a hover do not pan (control: a pen barrel press does) | a middle button does not pan | the pointer is captured and released | at zoom 2 a drag and a flick move half as far, on both axes | a vertical flick | a cancelled flick leaves no momentum | the release velocity is the newest 12 samples | a stray pointerup leaves a pinch alone; the pinch clamps; two fingers on one point move nothing | a press, a wheel and camera() each stop a flick; a press stops a glide', () => {
     const { el, cam, fc, frames } = mount();
     el.dispatchEvent(pointer('pointerdown', { x: 400, y: 300, id: 1, kind: 'touch' }));
     el.dispatchEvent(pointer('pointermove', { x: 350, y: 280, id: 1, kind: 'touch' }));
@@ -191,6 +191,11 @@ describe('29.037 the camera', () => {
     el.dispatchEvent(pointer('pointermove', { x: 450, y: 300, button: 2 }));
     el.dispatchEvent(pointer('pointerup', { x: 450, y: 300, button: 2 }));
     el.dispatchEvent(pointer('pointermove', { x: 400, y: 300 }));
+    expect(cam.getCamera()).toMatchObject({ x: 0, y: 0 });
+    // a middle-button (1) mouse press does not pan either: only the primary button (0) drags
+    el.dispatchEvent(pointer('pointerdown', { x: 500, y: 300, button: 1 }));
+    el.dispatchEvent(pointer('pointermove', { x: 450, y: 300, button: 1 }));
+    el.dispatchEvent(pointer('pointerup', { x: 450, y: 300, button: 1 }));
     expect(cam.getCamera()).toMatchObject({ x: 0, y: 0 });
     // control: a pen pressed with its barrel button (2) is not a mouse, so it pans
     el.dispatchEvent(pointer('pointerdown', { x: 500, y: 300, button: 2, kind: 'pen' }));
