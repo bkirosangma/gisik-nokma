@@ -19,6 +19,8 @@ import { DocumentTitle } from '../src/document-title.js';
  * the title should also be changed dynamically to reflect the content or topic
  * of the current view."*
  *
+ * `/` became Home (spec E, 27.625) and is swept like every route: there is no longer an excluded list.
+ *
  * ## Why this file is mostly a SOURCE SWEEP, and what that can and cannot prove
  *
  * The defect is not one route's title; it is that **a route can have NO title and
@@ -67,17 +69,6 @@ function pageRoutes(dir: string = APP_DIR): string[] {
   return found.sort();
 }
 
-/**
- * Routes that render NO view and therefore name none.
- *
- * `app/page.tsx` is `redirect('/workspaces')` and nothing else — the browser
- * leaves before a title could describe anything, and giving it one would be a
- * claim about a screen that never draws. Excluded rather than exempted: the arm
- * below asserts the route still IS a bare redirect, so this set cannot quietly
- * become the place an unwanted page is hidden.
- */
-const NO_VIEW_ROUTES = ['page.tsx'];
-
 /** How a route declares its title, or `null` when it declares none. */
 function declaredTitle(source: string): 'metadata' | 'generateMetadata' | 'DocumentTitle' | null {
   if (/export\s+(?:async\s+)?function\s+generateMetadata\b/.test(source)) return 'generateMetadata';
@@ -114,7 +105,6 @@ describe('P12 the product names each view', () => {
     //   - `<DocumentTitle>`, which is correct ONLY where the topic resolves from
     //     a READ — the workspace and project names land long after the repair.
     const undeclared = routes
-      .filter((route) => !NO_VIEW_ROUTES.includes(route))
       .filter((route) => {
         const dir = dirname(route);
         const own = readFileSync(join(APP_DIR, route), 'utf8');
@@ -156,18 +146,6 @@ describe('P12 the product names each view', () => {
       const sibling = join(APP_DIR, dirname(route), 'layout.tsx');
       expect(existsSync(sibling), `${route} has no server layout for its generic title`).toBe(true);
       expect(declaredTitle(readFileSync(sibling, 'utf8'))).toBe('metadata');
-    }
-  });
-
-  it('the excluded routes are still bare redirects, so the exclusion cannot hide a page', () => {
-    for (const route of NO_VIEW_ROUTES) {
-      const source = readFileSync(join(APP_DIR, route), 'utf8');
-      // The control that keeps this a NAMED absence: the route must still be a
-      // redirect and still render nothing. A page that grew a view would fail
-      // here rather than slipping past the sweep above.
-      expect(source, `${route} no longer redirects`).toMatch(/redirect\(/);
-      expect(source, `${route} renders something`).not.toMatch(/<[a-z]/);
-      expect(declaredTitle(source)).toBeNull();
     }
   });
 

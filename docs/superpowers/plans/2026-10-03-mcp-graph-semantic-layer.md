@@ -939,6 +939,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   `apps/server/test/read/item-visibility.test.ts`. Copy the world setup from `test/search/embed-worker.test.ts:42-50` (`createTestDatabase` + `seedNotesFixture`):
   - **27.411.** For `memberOut`, `hiddenItems` over `[ticket TP, note nProject, note nWorkspace]` answers `[TP, nProject]`, and for `memberIn` it answers `[]`.
+    - (Planner ruling 2026-10-04, Q1: Rule A. `memberOut` does NOT lose TP or nProject. Every member and admin is on every founded project (`effective-role.ts:5-19`), so `memberOut` READS TP and nProject. The landed test (`apps/server/test/read/item-visibility.test.ts:16-19`, `:65-95`) uses `guestListed` as the reader who loses TP, nProject, nWorkspace and a workspace-mode ticket TW (keeping TE and nExplicit), and `memberOut` / `memberIn` / the owner as the controls that lose nothing. The landed test is the record; the legs here describe the pre-Rule-A plan.)
     - Same `it`: after a `ticket.deleted` on TP (`applyCommitted(db.pool, [makeCommitted({ workspaceId: WS, entity: { kind: 'ticket', id: TP }, type: 'ticket.deleted', payload: {}, actorId: ids.owner })])`), `memberOut`'s answer is `[nProject]`. The trashed ticket is ignored, not counted.
     - Same `it`, FIRST (before the trash), the fail-closed control. Save TP's visibility row (`CREATE TEMP TABLE kept_vis AS SELECT * FROM proj_visibility WHERE ticket_id = $1`), delete it, and assert `hiddenItems` as `memberIn` over `[TP]` answers `[TP]`: no visibility row means hidden, never seen. The control: `memberIn` over `[TP]` answered `[]` just before the delete. Put the row back (`INSERT INTO proj_visibility SELECT * FROM kept_vis`) before going on.
     - Control: the owner's answer over `[TP, nProject, nWorkspace]` is `[]` before and after the trash.
@@ -1134,41 +1135,62 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   `apps/server/test/search/item-embed.test.ts`:
   - Setup: copy `embed-worker.test.ts:42-50` and its `fakeVector`, which starts at `:52`.
   - Seed: `seedNotesFixture` gives TP and TE. Add a comment on TP through `applyCommitted` (`comment.added` on `{ kind: 'ticket', id: TP }`; take the payload shape from `ticket-events.ts`'s `commentAddedPayload`) and a description through `ticket.field_set` (`fieldId: 'description'`, value a doc built with `docFromText` or the shape `ticket-state.ts:190-209` reads; re-read both before writing).
-  - Every case injects `embedTexts: async (texts) => texts.map(fakeVector)`, as 18.136–18.140 do.
+  - Every case injects `embedTexts: async (texts) => texts.map(fakeVector)`, as 18.136–18.140 do, and records each call's texts (`embedCalls`, as `embed-worker.test.ts`'s `fakeEmbedder` does).
+  - **Every worker is built with `log: (msg) => logged.push(msg)`, and every `it` ends with `expect(logged).toEqual([])`.** `runOnce` IS `runGuarded` (`embed-worker.ts:245`), which catches any throw and returns 0 (`:207-221`). Without this line every "returns 0" leg below is also green when `itemsPass` throws.
+  - The seeded description has TWO chunks: `docOf`-style content `[heading 'Licence', paragraph 'Renewal needs the stamped form', heading 'Fees', paragraph 'Pay the fee at the counter']`. `chunkDoc` flushes on every heading (`doc-chunks.ts`, the `node.type === HEADING` arm) and otherwise packs up to 150 words into ONE chunk, so a one-paragraph description could never show a tail row.
+  - The comment body is a single paragraph whose text appears in neither TP's title nor its description (Step 5's 27.428 control needs that too).
 
   The cases:
   - **27.420** `runOnce` writes TP's chunks:
-    - chunk 0 = the title with `heading_path ''`, then the description's chunks;
-    - one row per comment chunk with `item_kind 'comment'` and `ticket_id = TP`.
+    - TP's `item_kind 'ticket'` rows, ordered by `chunk_index`, are EXACTLY `[{0, '', 'Renew the trade licence'}, {1, 'Licence', 'Licence\nRenewal needs the stamped form'}, {2, 'Fees', 'Fees\nPay the fee at the counter'}]` as `(chunk_index, heading_path, chunk_text)`;
+    - the comment has exactly one row: `item_kind 'comment'`, `item_id` = the `comment.added` event's id (that IS `comment_id`, `1790000000000_proj-ticket-comments.sql:82`), `ticket_id = TP`, `chunk_text` = the comment's text;
+    - every row's `source_hash` equals the hash recomputed in the test with the plan's SQL expression over the current `proj_tickets` / `proj_ticket_comments` row (one `SELECT md5(…)` per item).
 
-    Control in the same `it`: a second `runOnce` returns 0 and writes nothing.
+    Control in the same `it`: a second `runOnce` returns 0, every row's `(chunk_text, source_hash)` is unchanged, and `embedCalls` gained nothing.
+
+    Kills: (a) drop the title piece (`[{ headingPath: '', text: item.title }, ...bodyChunks]` → `bodyChunks`) (b) write `item.item_id` into `ticket_id` for comments (c) `c.h <> ${TICKET_TEXT_HASH}` → `TRUE` (always stale; the control reds).
   - **27.421** Changes:
-    - A `ticket.field_set` on the description moves the hash, and the next pass rewrites TP's ticket chunks (the new text is in `chunk_text`). The REPLACE is whole-set: a shorter body leaves no tail rows.
-    - Control: a `ticket.field_set` on `priority` returns 0 from the next pass.
+    - A `ticket.field_set` on the description (from the two-chunk body to ONE paragraph `'Renewal is due'`) moves the hash. The next pass returns ≥ 1, and TP's ticket rows are now EXACTLY `[{0, '', title}, {1, '', 'Renewal is due'}]`: two rows, `max(chunk_index) = 1`, no row at index 2. The REPLACE is whole-set.
+    - Control: a `ticket.field_set` on `priority` returns 0 from the next pass, and TP's rows are byte-equal before and after.
+
+    Kills: (a) `c.h <> ${TICKET_TEXT_HASH}` → `FALSE` (b) replace the per-item `DELETE FROM search_item_chunks WHERE item_kind = $1 AND item_id = $2` with `INSERT … ON CONFLICT (item_kind, item_id, chunk_index) DO UPDATE` (the index-2 row survives) (c) add `t.fields::text` to `TICKET_TEXT_HASH` (the priority control reds).
   - **27.422** Removal and recovery:
-    - A `comment.edited` re-embeds that comment.
-    - A `comment.deleted` removes its rows.
+    - A `comment.edited` re-embeds that comment: its single row's `chunk_text` is the NEW text and `source_hash` moved.
+    - A `comment.deleted` removes its rows (count 0 for that `item_id`) while TP's ticket rows remain (the same count as before the delete, > 0).
     - A `ticket.deleted` on TP removes every row with `ticket_id = TP`.
-    - A `ticket.restored` brings them back on the next pass.
+    - A `ticket.restored` brings them back on the next pass (count ≥ 1, chunk 0 is the title).
 
-    Control: TE's rows are untouched throughout.
-  - **27.423** A model change re-embeds every item: `startEmbedWorker(pool, { model: 'other@x', … })` rewrites all of them. Control: the same model rewrites none.
+    Control: TE's rows are byte-equal throughout, AND `embedCalls` after the first pass never contains TE's title (a pass that deleted and re-wrote TE's rows would leave them byte-equal, so the equality alone cannot see it).
+
+    Kills: (a) `COMMENT_TEXT_HASH` → `md5('')` (the edit is never re-picked) (b) drop the `OR (c.item_kind = 'comment' AND NOT EXISTS …)` disjunct of the cleanup DELETE (c) drop the cleanup's first disjunct (`NOT EXISTS … proj_tickets … deleted_at IS NULL`) (d) drop `c.item_id IS NULL OR` from the ticket arm of the staleness query (the restore is never re-picked).
+  - **27.423** A model change re-embeds every item: `startEmbedWorker(pool, { model: 'other@x', … })` returns ≥ the number of items, and afterwards EVERY `search_item_chunks` row has `model = 'other@x'`. 27.422 deleted TP's comment, so add a new `comment.added` on TP and run one pass with the old model first. Assert that at least one `item_kind 'ticket'` row and one `item_kind 'comment'` row exist, then the model per kind. Control: the same model (`'other@x'` again) returns 0.
+
+    Kills: (a) drop `OR c.model <> $1` from the ticket arm (b) drop it from the comment arm (c) write the literal `'test-model@1'` instead of `model` in the INSERT.
   - **27.424** The race:
-    - An `embedTexts` stub soft-deletes TP (applies `ticket.deleted`) DURING the call. The pass writes no row for TP. That is the `FOR SHARE` recheck.
-    - Same `it`: a stub that instead edits TP's description during the call writes chunks with the OLD hash, and the next pass rewrites them.
+    - Fresh ticket TR, created in this `it` (so it has no rows: assert `count = 0` first). An `embedTexts` stub that, when `texts` contains TR's title, applies `ticket.deleted` on TR before answering. After the pass: the stub DID fire (a flag), `proj_tickets.deleted_at` for TR is set, and `search_item_chunks` has no row with `ticket_id = TR`. That is the `FOR SHARE` recheck.
+    - Same `it`: fresh ticket TQ with an embedded description (one clean pass first). Capture `h0` = TQ's `source_hash`. Edit the description (`ticket.field_set`), then a stub that, when `texts` contains TQ's title, applies a SECOND description edit before answering. After that pass, TQ's rows carry the FIRST edit's text and `source_hash` = the md5 of the first edit's text, computed in the test (exactly, not "≠ the new one"). The next pass returns ≥ 1, and the rows carry the second edit's text.
 
-    Control: the plain stub writes TP.
+    Control: the plain stub writes TR's twin TR2 (created alike in the same pass, no deletion): its chunk 0 is its title.
+
+    Kills: (a) drop the `if (still.rowCount === 0) { ROLLBACK; continue; }` block (b) re-read the hash inside the transaction (`SELECT ${TICKET_TEXT_HASH} … FOR SHARE`) and write it instead of `item.source_hash` (c) drop the `t.deleted_at IS NULL` from the ticket recheck's WHERE.
   - **27.425** `nudgesItemEmbedding`:
     - true for `ticket.created`, `ticket.field_set`, `ticket.deleted`, `ticket.restored`, and `comment.added` / `comment.edited` / `comment.deleted` on a TICKET entity;
     - false for `comment.added` on a NOTE entity, for `note.created`, and for `ticket.transitioned`.
 
     Same `it`, the control: `nudgesEmbedding` still answers exactly as 18.140 pins.
+
+    Same `it`, the wiring (`app.ts:1164`, the OR): `buildApp` with an `onNoteBodyCommitted` spy (copy 18.140's app setup in `embed-worker.test.ts`); a committed `ticket.field_set` on TP calls the spy once with TP's id, and a committed `ticket.transitioned` does not call it.
+
+    Kills: (a) drop `event.entity.kind === 'ticket' &&` (the note-comment leg reds) (b) replace the set test with `event.type.startsWith('ticket.') || event.type.startsWith('comment.')` (`ticket.transitioned` reds) (c) leave `app.ts:1164` as `if (nudgesEmbedding(event))` (the wiring leg reds).
   - **27.426** Purge:
-    - After a ticket purge of TP (drive it the way `test/purge/` drives one; copy the nearest ticket-purge test's setup and cite it), `search_item_chunks` has no row with `ticket_id = TP`.
-    - A surviving ticket that referenced TP has its rows deleted (`rederiveSurvivors`), so the next pass rebuilds them from text whose TP chip now resolves as purged.
+    - Seed a survivor first: ticket TS2 whose description holds a `ticketRef` chip `{ ticketId: TP, key, title: TP's title }` (`collectSurvivors` finds it by `payload::text LIKE '%<TP>%'`, `survivors.ts:25-30`; `docToPlainText` renders the chip as `KEY title`, `doc-text.ts:123-132`). One pass; assert TS2 has ≥ 1 row and its description chunk contains TP's title.
+    - After a ticket purge of TP (drive it the way `test/purge/` drives one; copy the nearest ticket-purge test's setup and cite it), and BEFORE any pass, `search_item_chunks` has no row with `ticket_id = TP` (the next pass's cleanup DELETE would remove them anyway, so this leg is only about `erasure.ts` if it is read before that pass).
+    - Also before any pass, TS2 has 0 rows (`rederiveSurvivors`). The next pass rebuilds them: the description chunk contains `PURGED_ITEM_LABEL` and no longer contains TP's title.
     - `test/purge/table-rules.test.ts` is green with the new table.
 
-    Control: TE's rows survive TP's purge.
+    Control: TE's rows survive TP's purge, byte-equal.
+
+    Kills: (a) drop the `erasure.ts` statement (TP's rows survive the purge) (b) drop the `survivors.ts` DELETE (TS2's rows are still there before the pass) (c) `table-rules.ts`'s `search_item_chunks` row removed (`table-rules.test.ts` reds).
 
   Run: `pnpm --filter @gisik-nokma/server exec vitest run test/search/item-embed.test.ts --maxWorkers=2 > /tmp/kgd-t2-embed.log 2>&1; tail -30 /tmp/kgd-t2-embed.log`. Expected: FAIL.
 
@@ -1301,12 +1323,12 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     return event.entity.kind === 'ticket' && ITEM_NUDGE_TICKET_TYPES.has(event.type);
   }
   ```
-  - `apps/server/src/app.ts:1161`: `if (nudgesEmbedding(event) || nudgesItemEmbedding(event)) onNoteBodyCommitted(event.entity.id);`.
-  - Add one docblock sentence at `:1150`: the callback is now "a text that is embedded changed", and the name is kept to avoid churn in `index.ts:329-334`.
+  - `apps/server/src/app.ts:1164`: `if (nudgesEmbedding(event) || nudgesItemEmbedding(event)) onNoteBodyCommitted(event.entity.id);`. (Cite corrected from `:1161`, which on the ref is the `if (deps.onNoteBodyCommitted !== undefined)` guard; the call is `:1164`.)
+  - Add one docblock sentence at `:1150`: the callback is now "a text that is embedded changed", and the name is kept to avoid churn in `index.ts:330-335` (cite corrected from `:329-334`; `:329` is the worker's `: null;`).
   - Import `nudgesItemEmbedding` from `./search/nudge.js`, beside `nudgesEmbedding`'s import.
 
   Purge:
-  - `purge/table-rules.ts`, after `search_note_chunks` (`:163-167`):
+  - `purge/table-rules.ts`, after `search_note_chunks` (`:172-176`; cite corrected from `:163-167`, which on the ref is `projection_backfills` and `proj_note_lexemes`):
     ```ts
     search_item_chunks: {
       rule: 'rederive',
@@ -1315,7 +1337,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     },
     ```
   - `purge/erasure.ts`, after `:90`: `['DELETE FROM search_item_chunks WHERE ticket_id = ANY($1::text[])', [T]],`.
-  - `purge/survivors.ts`, inside the ticket loop after `:79`'s `for` closes: `await db.query('DELETE FROM search_item_chunks WHERE ticket_id = $1', [ticketId]);`. This mirrors `:94` for notes.
+  - `purge/survivors.ts`, inside `rederiveSurvivors`' ticket loop (`:97-102`), after the inner `for` closes (`:101`): `await db.query('DELETE FROM search_item_chunks WHERE ticket_id = $1', [ticketId]);`. This mirrors `:115` for notes. (Cites corrected: the plan said "the ticket loop, `:76-80`", "after `:79`" and "mirrors `:94`". On the ref, `:76-80` is `lockSurvivors`, whose `:79` is the NOTE lock loop, and the note-chunk DELETE is `:115`.)
 
   Run the Step 3 command. Expected: PASS. Then run `test/search/embed-worker.test.ts` and `test/purge/` (18.136–18.140 and the purge guard): PASS.
 
@@ -1326,6 +1348,21 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   | drop the `FOR SHARE` recheck | 27.424 reds |
   | `c.h <> …` → `FALSE` | 27.421 reds |
   | drop the survivors line | 27.426's survivor line reds |
+
+  **Prose to sweep:** (all of Task 2; each line names the step whose commit makes it false, and that commit fixes it)
+  - [Step 4] `apps/server/src/search/embed-worker.ts:109-113` — "The pass. Returns how many notes it processed — embedded notes plus notes whose chunks were dropped". It now counts tickets, comments and removed item rows too.
+  - [Step 4] `apps/server/src/app.ts:188-190` — `onNoteBodyCommitted` is "Called once per committed note event whose TEXT changed — `note.created` and `note.body_set`, filtered by `nudgesEmbedding`". It is now also called for the ticket and comment types of `nudgesItemEmbedding`.
+  - [Step 4] `apps/server/src/search/nudge.ts:3-4` and `:25-28` — the module is "Which committed events wake the embedding worker", and "`note.created` and `note.body_set` are the plan's two". A second predicate now wakes it too.
+  - [Step 5] `apps/server/src/routes/search.ts:188-192` — "Tickets have no chunks in v1, so `mode=meaning` is a NOTE mode and the ticket half answers `[]`". Step 5 replaces it.
+  - [Step 5] `packages/app-core/src/online/online-data-source.ts:523-526` — "leaving it out would ask the server to search tickets too, and `mode=meaning` would then return `hits: []` anyway". The `kinds: 'note'` choice still stands, but the reason given is false after Step 5.
+  - [Step 6] `packages/mcp-server/src/tools/read-tools.ts:68-69` — "`mode: "meaning"` … answers notes only". Step 6 replaces it.
+  - [Step 5, fixed in Step 7's Features edit] `Features.md:1189-1190` — "**`mode=meaning` returns `hits: []`**: tickets have no chunks in v1". Step 7's grep for `answers notes only` does not find this line; grep `hits: \[\]` as well.
+  - [Step 5] `test-cases/18-notes.md:170` (18.150) and `apps/server/test/routes/search-notes.test.ts:132` ("tickets have no chunks in v1"). Step 5 amends both.
+  - [Step 6] `apps/server/src/config.ts:171` — "Search keeps answering lexically; only `mode=meaning` goes stale" — and `apps/server/src/index.ts:316-319` — "a box short on memory serves the whole product except `mode=meaning` search". With the worker disabled, `similar` (new here) goes stale too.
+  - [Step 6] `Features.md:3454` — "`search` (tickets and/or notes, by words or, for notes, by meaning …)" and "Sixty-three tools in both doors". Both false after Step 6 (tickets by meaning; one more tool).
+  - [Step 6] `Features.md:3407` — "nine registered tools (sixteen since MCP CRUD Task 6, sixty-three since MCP-everything)": one more tool.
+  - [Step 6] `test-cases/14-mcp-server.md:938` and `packages/mcp-server/test/register.test.ts:87` — 14.555 "the final registry is the 63 tools". Step 6 already says to update both; listed so the count in the Features bullet above moves with them.
+  - Searched with no other hit: `docs/manual.md` (`meaning`, `notes only`; `:1939` and `:2018` speak of English only and stay true; §16's "What your assistant can do", `:2043-2069`, lists no search mode) and `packages/app-core/src/help/content.generated.ts` (the same two sentences).
 
   Commit.
 
@@ -1338,22 +1375,29 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   `apps/server/test/routes/search-meaning-tickets.test.ts`:
   - Setup: `seedNotesFixture` and `buildTestApp`.
-  - Run the REAL worker pass once with the real model (`startEmbedWorker(db.pool, { intervalMs: 3_600_000 }).runOnce()`, then `stop()`).
+  - The fixture's tickets have a title and nothing else (`notes-fixture.ts`'s `ticket(TP, 'Renew the trade licence')`). Before the pass, give TP a description (`ticket.field_set`, one paragraph, e.g. `'The municipal office wants the stamped renewal form before the end of March'`) and a comment (`comment.added`, e.g. `'Call the accountant about the late fee waiver'`), through `applyCommitted`. The three texts share no word, so lexical precedence (`title` → `description` → `comment`, `read-models.ts:446-450`) cannot pick a different column from the one meaning picks.
+  - Run the REAL worker pass once with the real model (`startEmbedWorker(db.pool, { intervalMs: 3_600_000, log: (msg) => logged.push(msg) }).runOnce()`, then `stop()`), and assert `logged` is `[]` and that `search_item_chunks` holds TP's three rows (title, description, comment) before any case runs. A swallowed failure (`runGuarded`, `embed-worker.ts:207-221`) would otherwise leave every "absent" leg below green.
   - Query with `signInWithPhone` and the route, as `search-notes.test.ts` does. Re-read its helper `search(user, qs)` and copy it.
 
   The cases:
   - **27.427** `GET /v1/search?workspaceId=…&q=<TP's description text>&mode=meaning`:
     - as `memberIn` it returns TP in `hits` with `matchedIn: 'description'`;
-    - as `memberOut` it does not return TP;
-    - as `guestListed` it returns TE for TE's text and never TP.
+    - Rule A, accepted by planner ruling 2026-10-04 (report Q1). The plan's leg was "as `memberOut` it does not return TP". On the ref every member is on every founded project (`effective-role.ts:5-19`, `RULE_A_ROLES`), so `memberOut` READS TP (project mode), and the leg is red on correct code. Rebound as T1 did (`test/read/item-visibility.test.ts:16-19`): `memberOut` is now the Rule A control, and it DOES get TP; the reader who cannot see TP is a guest;
+    - as `guestListed` (on no project; explicit lists only, `visible-where.ts:114-115`), the description query answers `hits` that contain TE (the guest's one visible ticket, so the list is not empty for an unrelated reason) and no TP; and TE's text (`'Share the July invoices'`) returns TE and never TP.
 
     Control: the owner gets TP.
+
+    Kills: (a) drop `visibleTicketsWhere(eff, viewerId, params)` from `where` in `meaningTicketHits` (`guestListed` sees TP) (b) `row.chunk_index === 0 ? 'title' : 'description'` → `'title'` always. (Dropping the meaning branch is NOT killed here: the exact description text is also a lexical hit with `matchedIn 'description'`. 27.429 kills it.)
   - **27.428** `matchedIn`:
     - a query equal to TP's title → `'title'`;
     - a query equal to TP's comment text → `'comment'`.
 
     Control: lexical mode for the comment text also says `'comment'`, so both modes agree on the column vocabulary.
-  - **27.429** A ticket that matches LEXICALLY but has no chunks (created after the pass) is absent from meaning `hits` and present in lexical `hits`. These are two paths, not one path twice.
+
+    Kills: (a) `row.chunk_index === 0` → `row.chunk_index === 1` (b) drop the `row.item_kind === 'comment' ? 'comment' :` arm (the comment's chunk 0 then answers `'title'`).
+  - **27.429** A ticket that matches LEXICALLY but has no chunks (created after the pass) is absent from meaning `hits` and present in lexical `hits`. These are two paths, not one path twice. Same `it`: after a `comment.deleted` on TP's comment (no pass in between, so its chunk row is still there), the comment-text query in meaning mode no longer answers `matchedIn: 'comment'` for TP.
+
+    Kills: (a) drop the inserted `if (wantTickets && mode === 'meaning')` block (the new ticket appears in meaning `hits` through the lexical path) (b) drop the `(c.item_kind = 'ticket' OR EXISTS (… k.deleted_at IS NULL))` conjunct (the deleted comment's stale chunk still answers).
 
   `apps/server/src/read/item-search.ts`:
   ```ts
@@ -1450,7 +1494,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   Expected: PASS.
 
-  Mutation: drop `visibleTicketsWhere` from `where` → 27.427's `memberOut` line reds.
+  Mutation: drop `visibleTicketsWhere` from `where` → 27.427's `guestListed` line reds. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan said "`memberOut` line"; `memberOut` reads TP on the ref.)
 
   Commit.
 
@@ -1604,25 +1648,32 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     ```
   - `tool-sweep.ts`: `similar: { args: { workspaceId: 'w', item: { kind: 'ticket', id: 't' } }, session: { get: async () => ({ workspaceId: 'w', item: { kind: 'ticket', id: 't' }, hits: [] }) } },`.
   - `register.test.ts:89-103`: append `'similar',` on its own line after `'list_deleted',` and set the length to the new count.
-    - The count is 64 on today's tip. Plan A's `link_tickets` makes it 65 if A lands first.
+    - The count is 64 after this step: 63 on `origin/release/knowledge-graph` before it (2026-10-04: `register.test.ts:103` `toHaveLength(63)`, and 14.555's title says "63 tools"), plus `similar`. Plan A's `link_tickets` makes it 65 if A lands first. (The original line said "64 on today's tip"; the ref has 63, so 64 is the count AFTER `similar`.)
     - Re-derive it from the release tip at PR time. Never copy a number from this plan.
     - Update 14.555's title in that test and in `test-cases/` (grep `14.555`) to the new count.
   - `read-tools.ts:65-71`. Replace `'what they say rather than the words they use and answers notes only. '` with `'what they say rather than the words they use, for tickets (their title, description and comments) and notes alike. '`.
 
   Tests:
   - `apps/server/test/routes/similar.test.ts`, with the real worker pass and the real model as in Step 5:
+    - Seed before the pass (as Step 5 does for TP): TP's description and comment, and a note `nNear` (workspace scope) whose body paraphrases TP's description.
     - **27.430** `GET …/similar?item=ticket:TP&k=5`:
-      - as `memberIn` it answers hits that never include TP itself, with scores in [−1, 1] and descending;
-      - as `memberOut` → 404 (TP is not theirs);
+      - as `memberIn` it answers `hits.length >= 2` (asserted FIRST: "descending" over 0 or 1 hit cannot fail), hits that never include TP itself, with scores in [−1, 1], and `scores` equal to `[...scores].sort((a, b) => b - a)` with `scores[0] > scores.at(-1)` (strictly, so a constant score cannot pass);
+      - as `guestUnlisted` → 404 (TP is not theirs), with a body byte-equal to `READ_NOT_FOUND_BODY`. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's subject was `memberOut`, who reads TP on the ref; a guest on no project does not.) Same `it`: `memberOut` → 200 (the Rule A control, so the 404 is about the reader);
       - `k=21` → 400;
       - `item=widget:x` → 400.
 
-      Control: as the owner, a note whose text was written to be near TP's ranks first.
+      Control: as the owner, `nNear` ranks first (`hits[0]` is `{ kind: 'note', id: nNear }`). `nNear` is the NEWEST note, so every fixture note the owner sees sorts before it by id: only a distance order puts it first.
 
-      Same `it`: `guestListed`'s hits for `item=ticket:TE` never include TP or `nProject`.
+      Same `it`: `guestListed`'s hits for `item=ticket:TE` are non-empty and include `nExplicit` (asserted first: guestListed is in its explicit list, `notes-fixture.ts:208-212`), and never include TP or `nProject`.
+
+      Kills: (a) drop `WHERE NOT (kind = ${kindParam} AND id = ${idParam})` (TP itself ranks first at score 1) (b) `ORDER BY v <=> ${src}::vector, kind, id` → `ORDER BY kind, id` (the descending leg reds, and the older-id fixture notes sort before `nNear`) (c) drop `${ticketVisible}` (guestListed sees TP) (d) drop `${noteVisible}` (guestListed sees nProject) (e) drop the route's `if (!visible) return reply.code(404)…` (guestUnlisted gets 200).
   - `packages/mcp-server/test/graph-tools.test.ts`. Copy `member-admin-tools.test.ts`'s fake Session (re-read its top; `get`, `post`, `postEvents`, `...NO_TRANSFER`):
-    - **27.431** `similar` GETs `/v1/workspaces/w/similar?item=ticket%3At&k=3` and returns the body. A 404 from the session becomes `item not found or not visible to you`. Control: without `k`, the path has no `&k=`.
-    - **27.432** `allTools` includes `similar` after `list_deleted`, and the `search` description no longer contains `answers notes only`. Control: it still contains `"CCSO-12"`.
+    - **27.431** `similar` GETs `/v1/workspaces/w/similar?item=ticket%3At&k=3` (asserted on the recorded path, exactly) and returns the body the session answered (`toEqual` that object). A 404 from the session becomes `item not found or not visible to you`. Control: without `k`, the path is exactly `/v1/workspaces/w/similar?item=ticket%3At`.
+
+      Kills: (a) build `item=` without `enc` (the path holds `ticket:t`) (b) `'item'` → `'ticket'` in `readOrNotFound`'s noun (c) `a.k === undefined ? '' : …` → always append `&k=${String(a.k)}` (the control's path ends `&k=undefined`).
+    - **27.432** `allTools` includes `similar` directly after `list_deleted` (by index, not `toContain`), and the `search` description no longer contains `answers notes only` AND does contain `for tickets (their title, description and comments) and notes alike` (a deleted sentence would otherwise pass the negative leg). Control: it still contains `"CCSO-12"`.
+
+      Kills: (a) leave `read-tools.ts:69` unchanged (b) delete the sentence instead of replacing it (the positive leg reds) (c) register `graphTools` before `trashTools` in `register.ts`.
 
   Run:
   - `pnpm --filter @gisik-nokma/mcp-server build > /tmp/kgd-t2-mcpb.log 2>&1; tail -5 /tmp/kgd-t2-mcpb.log`
@@ -1677,17 +1728,17 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 - Modify:
   - `packages/domain/src/envelope.ts:35`: `'concept',` after `'group',`, with a comment.
   - `packages/domain/test/envelope.test.ts:309-320`: "lists exactly the ten kinds", with `'concept'` last.
-  - `packages/domain/src/vocabulary.ts`: a concept block after the group block (`:463-491`), and an import line beside `:6`.
+  - `packages/domain/src/vocabulary.ts`: a concept block after the group block (`:484-512`; cite corrected from `:463-491`, the block moved when plan A's `ticket.link_*` types landed), and an import line beside `:6`.
   - `packages/domain/src/index.ts`: `export * from './events/concept-events.js';` beside `:32`.
-  - `packages/domain/src/registry.ts:36-60`: `types(): string[]`, ONLY if the release tip has no listing method yet. Plan A's census (spec A §5.2 case 7) needs the same one; if plan A landed it first, use theirs.
-  - `apps/server/src/projections/index.ts`: import, and `registry.register(projConcepts)` after `:198`.
-  - `apps/server/test/projection-order.test.ts:75-77` (and its `[name, tables]` mirror, `:149`): `'proj_concepts'` last.
+  - `packages/domain/src/registry.ts:36-60`: `types(): string[]`, ONLY if the release tip has no listing method yet. Plan A's census (spec A §5.2 case 7) needs the same one; if plan A landed it first, use theirs. **On `origin/release/knowledge-graph` (2026-10-04) it has: `registrations(): readonly EventTypeRegistration[]` (`registry.ts:40-41`, factory `:62-64`). So add nothing; the tests below use `domainRegistry.registrations().map((r) => r.type)`.**
+  - `apps/server/src/projections/index.ts`: import, and `registry.register(projConcepts)` after `:204` (cite corrected from `:198`: the last registration on the ref is `registry.register(referencesProjection)` at `:204`).
+  - `apps/server/test/projection-order.test.ts:75-77` (the names list runs to `:163`, last entry `'proj_references'` at `:162`) and its `[name, tables]` mirror (`:230`, cite corrected from `:149`): `'proj_concepts'` last.
   - `apps/server/src/permissions/check-permission.ts:1947-1950`: call `checkConceptPermission` directly after `checkNotePermission`.
   - `apps/server/src/visibility/visible-events-for.ts:276-283`: `case 'concept':`.
   - `apps/server/src/purge/check-purged.ts:34-69`: concept arms.
   - `apps/server/src/purge/table-rules.ts`: three rows.
   - `apps/server/src/purge/erasure.ts:77-94`: one statement.
-  - `packages/app-core/src/views/history-copy.ts:125-239`: concept arms, and `HistoryCopyContext` (`:40-64`) gains `conceptName?` and `itemLabel?`.
+  - `packages/app-core/src/views/history-copy.ts:126-250` (the switch; cite corrected from `:125-239`): concept arms, and `HistoryCopyContext` (`:48-65`, corrected from `:40-64`) gains `conceptName?` and `itemLabel?`.
 
 **Interfaces:**
 - **Produces:**
@@ -1703,6 +1754,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     - `checkConceptPermission(env, ctx: VisibilityContext): Promise<Refusal | null>`;
     - `CONCEPT_RULES`, the rule-name object;
     - `liveConceptItems(db, workspaceId, conceptId): Promise<ItemRef[]>`, which Task 4 reuses.
+  - In app-core (planner ruling 2026-10-04, Q2): `HistoryCopyContext` gains `conceptName?: (conceptId: string) => string` and `itemLabel?: (kind: 'ticket' | 'note', id: string) => string | undefined`; Task 9's `HistoryList` resolver is the caller. A redacted item (`itemId: ''`) reads "a ticket" / "a note", never the raw type.
 - **Consumes:**
   - `hiddenItems`, `ItemRef` (Task 1);
   - `displayName` (`packages/domain/src/display-name.ts:49`);
@@ -1722,14 +1774,17 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   ```ts
   import { describe, expect, it } from 'vitest';
   import {
-    CONCEPT_EVENT_TYPES, ENTITY_KINDS, conceptCreatedPayload, conceptItemTaggedPayload, conceptLinkedPayload,
+    CONCEPT_EVENT_TYPES, CONCEPT_PAYLOADS, ENTITY_KINDS, conceptCreatedPayload, conceptItemTaggedPayload, conceptLinkedPayload,
     conceptMergedPayload, conceptDeletedPayload, conceptDescribedPayload, domainRegistry,
   } from '../src/index.js';
 
   describe('27.440–27.442 the concept vocabulary', () => {
     it('27.440 concept is an entity kind, last; control: notebook still is not', () => {
       expect(ENTITY_KINDS.at(-1)).toBe('concept');
-      expect([...ENTITY_KINDS]).not.toContain('notebook');
+      // Ten, and `group` still directly before it: 'concept' REPLACING 'group' (or added twice) passes `.at(-1)` alone.
+      expect(ENTITY_KINDS).toHaveLength(10);
+      expect(ENTITY_KINDS.at(-2)).toBe('group');
+      expect([...ENTITY_KINDS]).not.toContain('notebook'); // sanity only: no code in this task can add it (18.001 owns it)
     });
 
     it('27.441 each payload takes its shape and refuses an extra member, an unknown kind or relation; control: the valid shape parses', () => {
@@ -1745,18 +1800,31 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
       expect(conceptDeletedPayload.safeParse({}).success).toBe(true);
       expect(conceptDeletedPayload.safeParse({ why: 'x' }).success).toBe(false);
       expect(conceptDescribedPayload.safeParse({ summary: 'x'.repeat(2001) }).success).toBe(false);
+      expect(conceptDescribedPayload.safeParse({ summary: 'x'.repeat(2000) }).success).toBe(true); // the bar itself: `max(1999)` reds here
       expect(conceptDescribedPayload.safeParse({ summary: '' }).success).toBe(true); // control: '' clears
+      expect(conceptCreatedPayload.safeParse({ name: '   ' }).success).toBe(false); // displayName, not z.string().min(1)
     });
 
-    it('27.442 the nine are registered at version 1 against concept, and nothing else is a concept.* type; control: concept.bogus is not', () => {
+    it('27.442 the nine are registered at version 1 against concept, and nothing else is a concept.* type; control: each carries its own schema', () => {
       expect(CONCEPT_EVENT_TYPES).toHaveLength(9);
-      for (const type of CONCEPT_EVENT_TYPES) expect(domainRegistry.get(type, 1)?.entityKind, type).toBe('concept');
-      expect(domainRegistry.types().filter((type) => type.startsWith('concept.')).sort()).toEqual([...CONCEPT_EVENT_TYPES].sort());
-      expect(domainRegistry.hasType('concept.bogus')).toBe(false);
+      for (const type of CONCEPT_EVENT_TYPES) {
+        expect(domainRegistry.get(type, 1)?.entityKind, type).toBe('concept');
+        // The control. `hasType('concept.bogus')` could not fail: nothing in this task registers a bogus type.
+        // A loop that registered every type with ONE schema can: identity per type (planner ruling 2026-10-04, Q7: accepted).
+        expect(domainRegistry.get(type, 1)?.payloadSchema, type).toBe(CONCEPT_PAYLOADS[type]);
+      }
+      // `registrations()` is the ref's listing (registry.ts:40-41); `types()` if plan A's tip renamed it.
+      const conceptTypes = domainRegistry.registrations().map((r) => r.type).filter((type) => type.startsWith('concept.'));
+      expect(conceptTypes.sort()).toEqual([...CONCEPT_EVENT_TYPES].sort());
     });
   });
   ```
   If the listing method on the tip is named differently (plan A), use that name.
+
+  Kills:
+  - 27.440: (a) leave `envelope.ts` without `'concept'` (b) put `'concept'` in place of `'group'` (length 9 reds) (c) insert it before `'group'` (`.at(-1)` reds).
+  - 27.441: (a) drop `.strict()` from `conceptCreatedPayload` (b) `CONCEPT_SUMMARY_MAX = 2000` → `2001` (c) `z.enum(CONCEPT_ITEM_KINDS)` → `z.string()`.
+  - 27.442: (a) register with `version: 2` (b) register every type with `payloadSchema: conceptCreatedPayload` (c) a tenth `'concept.restored'` added to the loop's list but not to `CONCEPT_EVENT_TYPES`.
 
   `packages/domain/src/events/concept-events.ts`:
   ```ts
@@ -1821,7 +1889,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   };
   ```
 
-  `packages/domain/src/vocabulary.ts`. After the group block (`:491`):
+  `packages/domain/src/vocabulary.ts`. After the group block (`:512`; corrected from `:491`):
   ```ts
   /**
    * The concept vocabulary (Knowledge Graph spec D §3.1). Nine types against a `concept` entity. Who may write is
@@ -1834,7 +1902,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - Import `CONCEPT_EVENT_TYPES` and `CONCEPT_PAYLOADS` from `./events/concept-events.js`.
   - `envelope.ts:35`: append `'concept',` with the comment `// Knowledge Graph spec D §3.1: nine concept.* types in vocabulary.ts. Visibility is D4's, at read time.`
   - `envelope.test.ts:309-320`: retitle the case "lists exactly the ten kinds" and add `'concept'`.
-  - `registry.ts`: if needed, add `types(): string[]` to `EventTypeRegistry` and `types: () => [...types].sort()` to the factory.
+  - `registry.ts`: if needed, add `types(): string[]` to `EventTypeRegistry` and `types: () => [...types].sort()` to the factory. (Not needed on the ref: `registrations()` exists.)
 
   Run `pnpm --filter @gisik-nokma/domain build` and then its suite (`--maxWorkers=2`, log to `/tmp/kgd-t3-domain.log`). Expected: PASS.
 
@@ -2004,8 +2072,8 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   };
   ```
   - Re-read `LedgerEvent` for `origin` and `serverTime` (`proj-groups.ts` uses `event.serverTime` and `event.actorId`; `origin` is on every envelope, `envelope.ts:39-…`).
-  - `projections/index.ts`: append `registry.register(projConcepts);` after `:198`, with a comment in that file's style: the downward and upward dependency reads. It reads `purged_entities` only, which is never reset.
-  - `projection-order.test.ts:75-77`: append `'proj_concepts'`, extend the title, and mirror it at `:149`.
+  - `projections/index.ts`: append `registry.register(projConcepts);` after `:204` (corrected from `:198`), with a comment in that file's style: the downward and upward dependency reads. It reads `purged_entities` only, which is never reset.
+  - `projection-order.test.ts:75-77`: append `'proj_concepts'` after `'proj_references'` (`:162`), extend the title, and mirror it after `:230` (corrected from `:149`).
 
   Purge:
   - `table-rules.ts`:
@@ -2023,25 +2091,38 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   `apps/server/test/concepts/projection.test.ts`:
   - Setup: `createTestDatabase` + `seedNotesFixture`.
   - Concept events are applied with `applyCommitted` / `makeCommitted` (`test/helpers/apply.ts`), `entity: { kind: 'concept', id: C }`.
+  - Concept ids that a case ORDERS are minted as a sorted pair, `const [lo, hi] = [newUlid(), newUlid()].sort()`, and the case asserts `lo < hi` first. Two `newUlid()` calls in the same millisecond are not guaranteed to be ascending, and a "C2 < C1" case whose ids came out the other way round tests the no-swap path twice.
   - The cases:
-    - **27.443** created → renamed → described('') → deleted, with the row at each step. Control: a second `concept.created` with the same id changes nothing (`DO NOTHING`).
-    - **27.444** Tag TP and nProject, untag nProject, and only TP's row remains, with `tagged_by` and `origin` from the event (an `origin: 'mcp'` event stores `'mcp'`). Control: a `ticket.deleted` on TP keeps its row.
-    - **27.445**
-      - `concept.linked {otherId: C2, relation: 'related'}` on C1 where `C2 < C1` stores `(a = C2, b = C1)`.
-      - `broader` stores `(C1, C2)` as written.
-      - `unlinked` from either side of a `related` link removes it.
+    - **27.443** `created {name: 'Scroll', summary: 'first'}` → `renamed 'Scroll jumps'` → `described ''` → `deleted`, with the row at each step: after rename, `name = 'Scroll jumps'` AND `summary = 'first'` (still); after `described ''`, `summary = ''` (from `'first'`: a summary that started `''` cannot show a no-op `described` arm); after delete, the row still EXISTS with `deleted = TRUE`. Control: a second `concept.created` with the same id and `name: 'Other'` changes nothing: `name` is still `'Scroll jumps'` and `created_by` is the first event's actor.
 
-      Control: `broader` from C2 does not remove C1's `broader` link.
-    - **27.446** Merge C1 into C2, where both tag TP and C1 also tags TE:
+      Kills: (a) the `described` arm `UPDATE … SET summary = $2` → `SET name = $2` (b) the `deleted` arm `UPDATE … SET deleted = TRUE` → `DELETE FROM proj_concepts WHERE concept_id = $1` (c) `ON CONFLICT (concept_id) DO NOTHING` → `DO UPDATE SET name = EXCLUDED.name`.
+    - **27.444** Tag TP (as `memberIn`, `origin: 'mcp'`) and nProject (as `author`, `origin: 'web'`), untag nProject, and only TP's row remains, with `tagged_by = memberIn` and `origin = 'mcp'` (an `origin: 'mcp'` event stores `'mcp'`; the two tags differ in both fields so neither can be a constant). Control: a `ticket.deleted` on TP keeps its row.
+
+      Kills: (a) the untag `DELETE` loses `AND item_kind = $2 AND item_id = $3` (TP's row goes too) (b) store `'web'` instead of `event.origin` (c) add a `case 'ticket.deleted':` arm to `projConcepts.apply` that deletes the item's rows (the control reds).
+    - **27.445** With `[C2, C1] = sorted pair` (so `C2 < C1`, asserted):
+      - `concept.linked {otherId: C2, relation: 'related'}` on C1 stores `(a = C2, b = C1)`.
+      - `broader` from C1 to C2 stores `(C1, C2)` as written, although `C2 < C1`.
+      - `unlinked` from either side of a `related` link removes it: link from C2 and unlink from C1, then link from C1 and unlink from C2. The FIRST order is the one that needs `linkKey` in the `unlinked` arm (from C1 the raw key `(C1, C2)` is not the stored `(C2, C1)`).
+
+      Control: `concept.unlinked {otherId: C1, relation: 'broader'}` on C2 does not remove C1's `broader (C1, C2)` row.
+
+      Kills: (a) `linkKey` → `return [self, other]` (the `related` insert breaks the table's CHECK and throws) (b) `linkKey` swaps for `broader` too (drop `relation === 'related' &&`) (c) the `unlinked` arm uses `[concept, p.otherId]` instead of `linkKey(…)` (d) the `unlinked` DELETE matches both orders (`(a = $1 AND b = $2) OR (a = $2 AND b = $1)`; the control reds).
+    - **27.446** Merge C1 into C2, where both tag TP and C1 also tags TE, and C1 has a `related` link to a third concept C3 (applied before the merge, so "no links" has something to remove):
       - C2 has TP once and TE;
-      - C1 is `deleted` with `merged_into = C2` and has no items or links.
+      - C1 is `deleted` with `merged_into = C2` and has no items and no `proj_concept_links` row naming it (C3's link is gone; C3 itself is untouched).
+
+      Kills: (a) drop the merge INSERT's `ON CONFLICT DO NOTHING` (the shared TP throws on the primary key) (b) drop `DELETE FROM proj_concept_links WHERE a = $1 OR b = $1` from the merged arm (c) drop the merged arm's `DELETE FROM proj_concept_items WHERE concept_id = $1`.
     - **27.452**
       - Tag TP into C. A `ticket.deleted` keeps the row; `ticket.restored` keeps it.
       - Purge TP (copy the nearest ticket-purge test's driver from `test/purge/`, and cite it). The row is gone.
-      - `verifyProjections({ pool, projections: buildProjectionRegistry() })` reports no difference: the rebuild skipped the purged item.
+      - `verifyProjections({ pool, projections: buildProjectionRegistry() })` reports no difference: the rebuild skipped the purged item. Assert first that the concept stream still holds the `concept.item_tagged` naming TP after the purge (`SELECT … FROM events WHERE entity_kind = 'concept'`): the guard is only exercised if replay meets that event.
 
-      Control: a row tagging nProject survives the purge.
-    - **27.455** `reset` empties all three tables.
+      Control: a row tagging nProject INTO THE SAME concept C survives the purge (a statement that erased whole concepts, or every row of a concept that names a purged item, would take it too).
+
+      Kills: (a) drop the `purged_entities` guard in the `item_tagged` arm (verify reds) (b) drop the `erasure.ts` statement (the row survives the purge) (c) the erasure statement → `DELETE FROM proj_concept_items WHERE concept_id IN (SELECT concept_id FROM proj_concept_items WHERE item_id = ANY($1::text[]))` (the control reds).
+    - **27.455** All three tables hold ≥ 1 row (asserted first), then `reset` empties all three.
+
+      Kills: drop any one of the three `DELETE`s in `reset` (one mutant per table; each reds its own count).
 
   Run the file (`--maxWorkers=2`, logged). Expected: PASS after Step 4's door exists, if the purge driver goes through ingest. Otherwise PASS now.
 
@@ -2199,25 +2280,41 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     - concept CP tagging TP (project P);
     - concept CW tagging nWorkspace;
     - concept CE tagging TE (explicit [guestListed]).
+  - Mint CP and CW as a sorted pair (`[CP, CW] = [newUlid(), newUlid()].sort()`, asserted `CP < CW`). 27.450's "other side" leg needs the second link attempt to come from the HIGHER id (see its Kills).
   - The cases:
-    - **27.447** For EVERY type in `CONCEPT_EVENT_TYPES` (iterate the constant, with a valid payload per type from a table in the test), `guestListed` is refused with `permission.concept`. Same `it`, the control: `memberIn` is admitted for `concept.created`.
-    - **27.448** `memberOut` tags TP into CW → `concept.item-unknown`. Control: `memberIn` tags TP into CW → admitted.
+    - **27.447** For EVERY type in `CONCEPT_EVENT_TYPES` (iterate the constant, with a valid payload per type from a table in the test, every one addressed to CE, which `guestListed` CAN see: TE is explicit `[guestListed]`, `notes-fixture.ts:202`), `guestListed` is refused with `permission.concept`. Assert `table` has exactly the keys of `CONCEPT_EVENT_TYPES` first. Same `it`, the control: `memberIn` is admitted for `concept.created`.
+
+      Kills: (a) drop the `ctx.eff.workspaceRole === 'guest'` line (on CE the guest then passes `seesConcept` and is ADMITTED for `renamed`; on a concept the guest cannot see, `concept.unknown` would still red, but less sharply) (b) move the guest line below `if (type === 'concept.created') return null;` (c) return the guest refusal under `CONCEPT_RULES.unknown`.
+    - **27.448** `memberOut` (who sees CW: nWorkspace is workspace-scoped) tags TE into CW → `concept.item-unknown`. Control: the owner (who reads every ticket, `visible-where.ts:138`) tags TE into CW → admitted. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's item was TP, and its control `memberIn`; on the ref `memberOut` reads TP, so the refusal leg was red on correct code. TE is explicit `[guestListed]`, hidden from every member.)
+
+      Kills: (a) drop the `seesItem` check in the `item_tagged` arm (b) `seesItem` returns `rows.length > 0` without asking `hiddenItems` (c) `seesItem`'s ticket arm loses `AND ${LIVE_TICKET_WHERE}` — not killed here (TP is live); 27.457's census does not cover it either, so it is recorded as a survivor for the lane to pin with a trashed-ticket tag if it chooses.
     - **27.449** Hidden, absent and deleted concepts:
-      - `memberOut` renames CP (TP hidden from them) → `concept.unknown`, with the SAME reason as renaming a never-created id and as renaming a deleted concept.
-      - `memberIn` (sees TP) renames CP → admitted.
+      - `memberOut` renames CE (TE hidden from them) → `concept.unknown`, with the SAME reason as renaming a never-created id and as renaming a deleted concept. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's concept was CP; `memberOut` reads TP on the ref.)
+      - `memberIn` (sees TP) renames CP → admitted; the owner (sees TE) renames CE → admitted, so CE itself is renamable and the refusal is about the reader.
       - The admin renames CE → `concept.unknown`. The admin is not in TE's explicit list, the `false` cell `notes-fixture.ts:28-35` keeps.
+
+      Kills: (a) `seesConcept` ignores `hiddenItems` (returns `true` once the row exists) (b) drop `AND deleted = FALSE` from `seesConcept`'s query (the deleted-concept leg is admitted) (c) give the deleted case its own reason string.
     - **27.450** The state rules, each with its control in the same `it`:
       - tagging TP into CP again → `concept.already-tagged`, while TP into CW is admitted;
       - untagging nProject from CP → `concept.not-tagged`, while untagging TP is admitted;
       - linking CP to CP → `concept.self`, while CP to CW is admitted;
-      - with `related` CP↔CW applied, linking from CW (the other side) → `concept.link-exists`, while `broader` CW→CP is admitted;
+      - with `related` CP↔CW applied (from CP), linking from CW, the HIGHER id (the other side) → `concept.link-exists`, while `broader` CW→CP is admitted;
       - unlinking `broader` CP→CW when only `related` exists → `concept.link-unknown`.
-    - **27.451** `author` (not CP's creator; CP was created by the owner) untags TP from CP and deletes CW → both admitted (D2: removable by a member). Control: `memberOut` deleting CP → `concept.unknown`.
-    - **27.453** After TP is purged (or with a hand-inserted `purged_entities` row for TP, if the driver is heavy; say which), `checkPurged` refuses `concept.item_tagged {ticket, TP}`. Control: `{note, nProject}` is admitted.
+
+      Kills: (a) drop `if (tagged) return refuse(CONCEPT_RULES.alreadyTagged, …)` (b) `return tagged ? null : refuse(…notTagged…)` → `return null` (c) the door's `[a, b]` without the `related` swap (`[self, p.otherId]`): from CW the raw key `(CW, CP)` is not the stored `(CP, CW)`, so it is admitted — the reason the attempt must come from the higher id (d) the `exists` query drops `AND relation = $3` (the `link-unknown` leg finds the `related` row).
+    - **27.451** `author` (not CP's creator; CP was created by the owner) untags TP from CP and deletes CW → both admitted (D2: removable by a member). Assert first that `proj_concepts.created_by` for CP is the owner. Control: `memberOut` deleting CE → `concept.unknown` (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan said CP, which `memberOut` sees on the ref).
+
+      Kills: (a) add a creator check to the `deleted` / `item_untagged` path (`SELECT created_by …` ≠ `ctx.sessionUserId` → refuse) (b) make `concept.deleted` admin-only (`ctx.eff.workspaceRole` not owner/admin → refuse).
+    - **27.453** After TP is purged (or with a hand-inserted `purged_entities` row for TP, if the driver is heavy; say which), `checkPurged` refuses `concept.item_tagged {ticket, TP}` with `PURGE_RULE`. Control: `{note, nProject}` is admitted.
+
+      Kills: (a) drop the `concept.item_tagged` / `item_untagged` arms from `payloadIds` (b) `add(payload['itemKind'], …)` → `add('note', …)` (the ticket leg is admitted).
   - `apps/server/test/concepts/census.test.ts`, **27.454**:
+    - First, the RAW stream (`SELECT … FROM events WHERE workspace_id = WS AND entity_kind = 'concept'`) holds the seeded concept events (≥ 3: CP, CW, CE created and tagged). A "yields none" over a stream that has none cannot fail.
     - For each of `memberIn`, `owner` and `guestListed`, `visibleEventsFor` over the workspace stream after the seeding above yields NO event with `entity.kind === 'concept'`.
     - Re-read `visible-events-for.ts:442`'s signature and copy the nearest caller in `test/visibility/`, citing it.
     - Control: a `ticket.*` event on TP in the same stream is yielded to `memberIn`.
+
+    Kills: (a) `case 'concept': return 'withheld'` → `return 'workspace'` (b) → `return 'roster'`.
 
   Run the two files and `test/permissions/` WHOLE (the door changed), `--maxWorkers=2`, logged. Expected: PASS.
 
@@ -2234,14 +2331,15 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 - [ ] **Step 5: History sentences and the census (27.456–27.457)**
 
   `packages/app-core/src/views/history-copy.ts`.
-  - `HistoryCopyContext` (`:40-64`) gains:
+  - `HistoryCopyContext` (`:48-65`; corrected from `:40-64`) gains:
     ```ts
     /** Knowledge Graph spec D: a concept's name for `concept.linked`/`merged` sentences; the id when unknown. */
     conceptName?: (conceptId: string) => string;
-    /** A tagged item's label (a ticket key + title, a note title); "a ticket" / "a note" when unknown or hidden. */
-    itemLabel?: (kind: 'ticket' | 'note', id: string) => string;
+    /** A tagged item's label (a ticket key + title, a note title); `undefined` when unknown or hidden, so the sentence reads "a ticket" / "a note". */
+    itemLabel?: (kind: 'ticket' | 'note', id: string) => string | undefined;
     ```
-  - Before `default:` (`:237`):
+    (planner ruling 2026-10-04, Q2: the return type is `string | undefined`, so Task 9's resolver can answer `undefined` for an unknown or redacted id and the `??` below falls through to "a ticket" / "a note".)
+  - Before `default:` (`:248`; corrected from `:237`):
     ```ts
     case 'concept.created': {
       const name = str(payload, 'name');
@@ -2258,8 +2356,9 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     case 'concept.item_untagged': {
       const kind = str(payload, 'itemKind');
       const id = str(payload, 'itemId');
-      if ((kind !== 'ticket' && kind !== 'note') || id === null) return event.type;
-      const label = ctx.itemLabel?.(kind, id) ?? (kind === 'ticket' ? 'a ticket' : 'a note');
+      if (kind !== 'ticket' && kind !== 'note') return event.type;
+      // A redacted item (`itemId: ''`, Task 4's history redaction; `str` reads '' as null) reads "a ticket" / "a note".
+      const label = (id === null ? undefined : ctx.itemLabel?.(kind, id)) ?? (kind === 'ticket' ? 'a ticket' : 'a note');
       return event.type === 'concept.item_tagged' ? `Added ${label}` : `Removed ${label} from the concept`;
     }
     case 'concept.linked':
@@ -2278,22 +2377,43 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     case 'concept.deleted':
       return 'Deleted the concept';
     ```
+    (planner ruling 2026-10-04, Q2: Task 4's decision wins. The arm no longer returns `event.type` on `id === null`; it falls through to "a ticket" / "a note". The plan's line was `if ((kind !== 'ticket' && kind !== 'note') || id === null) return event.type;`.)
 
-  `packages/app-core/test/concept-history-copy.test.ts`. **27.456**: for EVERY type in `CONCEPT_EVENT_TYPES`, with a valid payload from a per-type table, `describeEvent` returns a sentence that is not `event.type`.
-  - `item_tagged` with `itemLabel` → `Added GN-12 Scroll jumps`.
-  - Without `itemLabel` → `Added a ticket`.
+  `packages/app-core/test/concept-history-copy.test.ts`. **27.456**: for EVERY type in `CONCEPT_EVENT_TYPES`, with a valid payload from a per-type table, `describeEvent` returns the EXACT sentence in that table (assert the table's keys equal `CONCEPT_EVENT_TYPES` first). "Not `event.type`" alone passes for a sentence with the wrong verb or the two link relations swapped. The table, with `ctx = { conceptName: () => 'Phones' }` unless a row says otherwise:
+  - `created {name: 'Scroll'}` → `Created the concept Scroll`; `created {name: 'Scroll', fromSuggestion: <ULID>}` → `Created the concept Scroll from a suggestion`;
+  - `renamed {name: 'Scroll jumps'}` → `Renamed the concept to Scroll jumps`;
+  - `described {summary: 'x'}` → `Changed the summary`; `described {summary: ''}` → `Cleared the summary` (`str` reads `''` as absent, `history-copy.ts:68-71`);
+  - `item_tagged {ticket, T}` with `itemLabel: () => 'GN-12 Scroll jumps'` → `Added GN-12 Scroll jumps`; without `itemLabel` → `Added a ticket`; `{note, N}` without → `Added a note`;
+  - `item_untagged {ticket, T}` without `itemLabel` → `Removed a ticket from the concept`;
+  - (planner ruling 2026-10-04, Q2) redacted: `item_tagged {ticket, itemId: ''}` WITH `itemLabel: () => 'GN-12 Scroll jumps'` → `Added a ticket`, and `item_untagged {note, itemId: ''}` → `Removed a note from the concept`. Same `it`, the kind guard's control: `item_tagged {itemKind: 'person', itemId: T}` → `concept.item_tagged` (the raw type);
+  - `linked {C, broader}` → `Set Phones as a broader concept`; `linked {C, related}` → `Linked the related concept Phones`; `linked {C, related}` with NO `conceptName` → `Linked the related concept <C>`;
+  - `unlinked {C, related}` → `Removed the link to Phones`;
+  - `merged {intoId: C}` → `Merged into Phones`;
+  - `deleted {}` → `Deleted the concept`.
 
   Control: a payload with no `name` on `concept.created` falls back to the raw type. Import `describeEvent` by relative path (`../src/views/history-copy.js`), as the existing history-copy tests do; grep for one and cite it.
 
-  `apps/server/test/concepts/census.test.ts`, **27.457**. The registry census, iterating `domainRegistry.types()` filtered to `concept.`:
+  Kills: (a) swap the `broader` / `related` sentences in the `linked` arm (b) drop the `fromSuggestion` branch of `created` (c) the `described` arm always answers `Changed the summary` (d) (planner ruling 2026-10-04, Q2) restore `|| id === null) return event.type` → the redacted legs read `concept.item_tagged` / `concept.item_untagged` (e) call `ctx.itemLabel?.(kind, id ?? '')` on a redacted id → the redacted `item_tagged` leg reads `Added GN-12 Scroll jumps`.
+
+  `apps/server/test/concepts/census.test.ts`, **27.457**. The registry census, iterating `domainRegistry.registrations()` (the ref's listing; `types()` if plan A renamed it) filtered to `concept.`, with the list asserted to have length 9 first:
   1. Each is in `CONCEPT_EVENT_TYPES`.
   2. Each is refused to a guest by the door (`permission.concept`), so the door has an arm.
-  3. For the five that name another entity, `checkPurged` refuses when that entity is in `purged_entities`.
-  4. The projection's `apply` is total over them: applying each, in a valid order, throws nothing.
+  3. For the five that name another entity, `checkPurged` refuses when that entity is in `purged_entities`: `item_tagged` and `item_untagged` once with a purged TICKET and once with a purged NOTE (the kind comes from the payload), and `linked`, `unlinked`, `merged` with a purged CONCEPT id.
+  4. The projection's `apply` is total over them AND each arm does something: apply, in order, `created C1`, `created C2`, `renamed C1`, `described C1 'x'`, `item_tagged C1 TP`, `item_untagged C1 TP`, `linked C1→C2 related`, `unlinked C1→C2 related`, `merged C1 into C2`, `deleted C2`, and after EACH one the three tables' contents (`SELECT … ORDER BY` every column, serialised) differ from before it. "Throws nothing" alone is green with any arm deleted: the `default:` returns.
 
-  Control in the same `it`: a made-up `concept.bogus` is absent from the registry. The history half is 27.456 (app-core), and the audience half is the compile-time switch (TS2366) plus 27.454.
+  Control in the same `it`: a guest's NON-concept event (`comment.added` on TP) is not refused by `checkConceptPermission` (it returns `null`), so leg 2 is the concept arm answering and not a blanket refusal. (The plan's control, "`concept.bogus` is absent from the registry", could not fail: nothing in this task registers it. The replacement is accepted: planner ruling 2026-10-04, Q7.) The history half is 27.456 (app-core), and the audience half is the compile-time switch (TS2366) plus 27.454.
+
+  Kills: (a) delete the `concept.described` arm from `projConcepts.apply` (leg 4) (b) drop the `concept.merged` arm from `payloadIds` (leg 3) (c) drop `if (env.entity.kind !== 'concept') return null;` from `checkConceptPermission` (the control reds: the guest's comment is refused `permission.concept`).
 
   Run: build domain → app-core → server; then app-core's suite, the server's `test/concepts/`, `test/purge/`, `test/permissions/`, `test/projection-order.test.ts`, `test/visibility/` (all `--maxWorkers=2`, logged).
+
+  **Prose to sweep:** (all of Task 3; fix each in the commit of the step named)
+  - [Step 2] `packages/domain/test/envelope.test.ts:309` — "lists exactly the nine kinds". Step 2 retitles it to ten.
+  - [Step 4] `apps/server/src/permissions/check-permission.ts:1899-1910` — "Four passes, one context, and the ORDER is load-bearing at every seam", then a numbered list of four. Already stale on the ref (the note, group, prefix, lifecycle and comment-authority passes are not in it); the concept pass is one more pass the list omits. Rewrite it, or at least add the concept pass after the note pass.
+  - [Step 4] `apps/server/src/permissions/check-permission.ts:1951` — "SECOND, and after the role gate on purpose" (of `checkMembershipOwnerAuthority`). It is already third on the ref (after the note pass), and the concept pass makes it fourth.
+  - [Step 4] `apps/server/src/purge/check-purged.ts:18-23` — "Field names are the schemas' own (`events/ticket-events.ts` …; `events/note-events.ts` …)". The concept arms read `events/concept-events.ts` fields; add it to the list.
+  - [Step 3] `apps/server/test/projection-order.test.ts:75` — the title lists the pinned order and ends at `search`; Step 3 extends it.
+  - Searched with no other hit: `Features.md` and `test-cases/` for `nine kinds`, `ENTITY_KINDS`, `entity kinds` (`Features.md:538` and `test-cases/06-auth-visibility.md:128` describe the TS2366 switch, which stays true: `concept` gets an arm); `visible-events-for.ts:228-242` (stays true).
 
   Commit.
 
@@ -2310,7 +2430,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
 **Decisions this task makes:**
 - **An empty concept** is visible to workspace members and above, never to guests. §3.2 says "workspace members only", read as non-guests (G11).
-- **History redaction.** A concept's history redacts `itemId` to `''` in any `item_tagged` or `item_untagged` event naming an item the reader cannot see NOW. An untagged item may since have narrowed. The sentence then reads "a ticket". This is spec A §2.6's redaction rule for MCP, applied at the route, so the app and MCP share it.
+- **History redaction.** A concept's history redacts `itemId` to `''` in any `item_tagged` or `item_untagged` event naming an item the reader cannot see NOW. An untagged item may since have narrowed. The sentence then reads "a ticket" (Task 3's `item_tagged`/`item_untagged` arm falls through on the redacted id: planner ruling 2026-10-04, Q2). This is spec A §2.6's redaction rule for MCP, applied at the route, so the app and MCP share it.
 - **Links.** A link to a concept the reader cannot see is dropped from `get`, not redacted. The link names a concept, and a concept's name is content.
 - **Confirmations.**
   - `manage_concept` needs `confirm_name` (the concept's exact name) for `delete` and `merge` only. Those destroy a grouping; `create`, `rename` and `describe` do not.
@@ -2374,41 +2494,62 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   `apps/server/test/concepts/reads.test.ts`:
   - Setup: `seedNotesFixture` and `buildTestApp(db)`; each user signs in with `signInWithPhone` (copy `search-notes.test.ts`'s helper).
   - Seed with `applyCommitted`:
-    - CP tagging TP;
+    - CP tagging TP (CP's `concept.created` with `origin: 'mcp'`, so 27.467's origin leg is not `makeCommitted`'s default `'web'`, `test/helpers/apply.ts:97`);
     - CW tagging nWorkspace;
     - CE tagging TE;
     - C0 tagging nothing;
-    - `related` CP↔CW.
+    - CM tagging nWorkspace AND TE (a MIXED concept: `memberIn` sees only nWorkspace, `guestListed` only TE; without it every concept has one item and `every` cannot be told from `some`);
+    - `related` CP↔CW, and `related` CP↔CE (27.467's link filter needs a linked concept that a reader of CP cannot see).
+  - **Who sees what on the ref** (Rule A, accepted by planner ruling 2026-10-04 (report Q1)): every member and admin is on every founded project (`effective-role.ts:5-19`), so `memberOut` READS TP and nProject. The owner reads everything (`visible-where.ts:138`, `:305`). Guests read explicit lists only (`:114-115`, `:319-322`): they lose TP, nProject and nWorkspace. Every non-owner except `guestListed` loses TE, nExplicit and nInherit. The plan's legs that used `memberOut` as "the reader who cannot see TP" are rebound below, as T1's lane did (`test/read/item-visibility.test.ts:16-19`).
   - The cases:
-    - **27.465** `GET /v1/workspaces/WS/concepts`. For EVERY user in `NOTES_USERS`, the returned ids equal the concepts whose live items `hiddenItems` answers `[]` for that user, with C0 for non-guests only. This is an agreement test, the 18.021 pattern. Control in the same `it`: the answer differs between at least two users, so it is not constant.
-    - **27.466** C0 is listed for `memberOut`, and absent for `guestListed` and `guestUnlisted`. Control: tag nWorkspace into C0 and it follows nWorkspace's audience instead.
+    - **27.465** `GET /v1/workspaces/WS/concepts`. For EVERY user in `NOTES_USERS`, the returned ids equal the concepts whose live items `hiddenItems` answers `[]` for that user, with C0 for non-guests only. This is an agreement test, the 18.021 pattern. Control in the same `it`: the answer differs between at least two users, so it is not constant; and CM is absent for both `memberIn` and `guestListed` (each sees one of its two items).
+
+      Kills: (a) `liveItems.every((item) => !hidden.has(key(item)))` → `.some(…)` (CM is listed for both) (b) the empty-concept arm → `true` (C0 listed for guests) (c) the list handler skips `visibleConceptIds` and returns every live concept.
+    - **27.466** C0 is listed for `memberOut`, and absent for `guestListed` and `guestUnlisted`. Control: tag TE into C0 and it follows TE's audience instead: now listed for `guestListed` and absent for `memberOut`. (The plan's control tagged nWorkspace, whose audience is exactly the empty rule's on this fixture — every non-guest — so it could not tell the two apart.)
+
+      Kills: (a) the empty-concept arm → `true` (C0 listed for guests) (b) → `false` (C0 absent for `memberOut`) (c) `liveItems.length === 0` → `liveItems.length <= 1` (a one-item concept takes the empty rule: the control's `guestListed` leg reds).
     - **27.467** `GET /v1/concepts/CP`:
-      - `memberIn` gets 200 with `items = [TP]` (`label` is TP's key + title), `createdBy`, and `origin: 'web'`;
-      - its `links` show CW only when the reader sees CW;
-      - `memberOut` gets 404 with `READ_NOT_FOUND_BODY`, byte-equal to the 404 for a random ULID.
+      - `memberIn` gets 200 with `items = [TP]` (`label` is TP's key + title, exactly), `createdBy` = the owner, and `origin: 'mcp'`;
+      - its `links` show CW only when the reader sees CW: `memberIn`'s `links` are EXACTLY `[{ otherId: CW, relation: 'related', direction: 'related', otherName: <CW's name> }]` (CE is linked too and `memberIn` cannot see TE), while the owner's `links` hold both CW and CE;
+      - `guestUnlisted` gets 404 with `READ_NOT_FOUND_BODY`, byte-equal to the 404 for a random ULID. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's subject was `memberOut`, who reads TP on the ref. Same `it`: `memberOut` → 200.)
+
+      Kills: (a) `readConceptView` skips step 2 (`visibleConceptIds(…, [id])`) (b) drop the link filter (CE reaches `memberIn`) (c) a ticket's `label` = its title alone.
     - **27.468** (Review Focus 1)
-      - Apply `visibility.set` making TP explicit `[owner]`. Copy the payload from `test/helpers/seed.ts`'s `setVisibilityEnv` (`:` grep it).
+      - First, `memberIn` gets 200 on CP and the list includes CP (the precondition: a 404 after proves nothing if it was 404 before).
+      - Apply `visibility.set` making TP explicit `[owner]`. Copy the payload from `test/helpers/seed.ts`'s `setVisibilityEnv` (`:531`).
       - `memberIn` now gets 404 on CP, and the list omits it, with NO other write in between (nothing cached).
       - Same `it`, the door: `memberIn` renaming CP is refused with `concept.unknown`.
       - Control: the owner still gets 200.
+
+      Kills: (a) memoise `visibleConceptIds` per `(userId, conceptId)` in a module-level `Map` (b) the door's `seesConcept` answers from a cache filled at tag time. (No Rule A change: an explicit `[owner]` audience hides TP from every member.)
     - **27.469** (Review Focus 2)
       - A ticket TX, explicit `[owner]`, assigned to `memberOut` (`ticket.assigned`; take the payload from `ticket-events.ts`). TX is tagged into CX.
-      - `memberOut` sees CX (the assignee arm, `assigneeReachWhere`, `visibility/assignee-arm.ts:63`).
+      - `memberOut` sees CX (the assignee arm, `assigneeReachWhere`, `visibility/assignee-arm.ts:63`): 200, asserted before the reassignment.
       - After reassignment to the owner, `memberOut` gets 404.
       - Control: `memberIn`, never assigned, gets 404 throughout.
+
+      Kills: (a) `visibleConceptIds` decides a ticket item from `proj_visibility` alone (`resolved_mode` / `resolved_user_ids`) instead of `hiddenItems` (the assignee arm is lost: the 200 leg reds) (b) `readConceptView` caches the step-2 answer per concept (the post-reassignment 404 reds).
     - **27.470**
-      - `?item=ticket:TP` lists CP only, for `memberIn`.
-      - The same query from `memberOut` → 404, because the reader cannot see the item.
+      - `?item=ticket:TP` lists exactly `[CP]`, for `memberIn`.
+      - The same query from `guestListed` → 404, because the reader cannot see the item. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's subject was `memberOut`, who reads TP on the ref; same `it`: `memberOut` → 200 with `[CP]`.)
       - `?item=widget:x` → 400.
+
+      Kills: (a) drop the `proj_concept_items` filter by the item (every visible concept is listed) (b) skip the item's `hiddenItems` check (the guest gets 200 with `[]`) (c) the item regex accepts any kind (`^(\w+):(.+)$`).
     - **27.471** `GET /v1/concepts/CW/history`:
       - Tag TE into CW as the owner, then untag it. TE is explicit [guestListed], so `memberIn` cannot see it.
-      - `memberIn`'s history shows both events with `payload.itemId === ''`.
-      - Control: the owner's shows TE's id.
-    - **27.472** `GET /v1/workspaces/WS/concepts/audience?conceptId=CW&add=ticket:TP`:
-      - answers `members` = the roster size, `before` = the members who see CW now, and `after` = those who would see CW + TP (TP drops `memberOut` and the guests);
+      - `memberIn` gets 200 (CW is `{nWorkspace}` again), and its history holds EXACTLY two events naming an item of kind `ticket` (the tag and the untag), both with `payload.itemId === ''`; the `concept.created` and the nWorkspace tag are unredacted.
+      - Control: the owner's shows TE's id on both.
+
+      Kills: (a) drop the redaction (b) redact by the concept's CURRENT items (`liveConceptItems`) instead of the items the events name (TE is no longer tagged, so nothing is redacted) (c) blank `itemKind` instead of `itemId`.
+    - **27.472** `GET /v1/workspaces/WS/concepts/audience?conceptId=CW&add=ticket:TE`:
+      - answers EXACTLY `{ conceptId: CW, members: 7, before: 5, after: 1 }`. `members` is `NOTES_USERS.length` (seven workspace-scope grants); `before` is everyone who reads nWorkspace (owner, admin, memberIn, memberOut, author; guests do not, `visible-where.ts:319`); `after` is the owner alone (TE is explicit `[guestListed]`, and `guestListed` does not read nWorkspace).
       - `after < before`.
 
-      Control: `add=note:nWorkspace` (already tagged) gives `after === before`.
+      Control: `add=note:nWorkspace` (already tagged) gives `after === before === 5`.
+
+      (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan added TP, "TP drops `memberOut` and the guests". On the ref `memberOut` reads TP and the guests never read CW, so TP gives `after === before` and the case could not show narrowing. TE does.)
+
+      Kills: (a) the roster query loses `AND scope_kind = 'workspace'` (`members` counts project rows too: 10) (b) `liveAfter = liveOf(db, workspaceId, add)` without `...current` (`after` = owner + `guestListed` = 2) (c) `sees` counts a member when ANY item is visible (`.length < items.length`) instead of none hidden.
 
   `apps/server/src/read/concepts.ts`:
   ```ts
@@ -2557,7 +2698,10 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - Then 100 × `GET /v1/concepts/C490` as the member, through `app.inject`, and record p95.
   - The bar: **≤ 150 ms**.
   - Control in the same `it`: `GET /v1/concepts/C500` answers 404 for the member (the 10 hidden), so the measured route did the D4 work.
+  - Same `it`: EVERY one of the 100 measured responses is 200 with `items.length === 490`. A route that answered 404 fast would otherwise meet the bar.
   - Print the p95 for the DONE.
+
+  Kills: (a) `visibleConceptIds` skips `hiddenItems` (C500 answers 200: the control reds) (b) `readConceptView` answers `null` above some item count (the 200 leg reds). The bar itself is a measurement, not a mutant target.
 
   If the bar misses: STOP (Global Constraints) and report the number.
 
@@ -2567,32 +2711,44 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   `packages/mcp-server/test/concept-tools.test.ts`. The fake Session is copied from `member-admin-tools.test.ts`'s top: `get` answers by path from a map, and `postEvents` records the batch and answers `accepted`. The cases:
   - **27.474**
-    - `list_concepts {workspaceId}` GETs `/v1/workspaces/w/concepts` and pages it.
-    - `get_concept {conceptId}` GETs `/v1/concepts/c`.
+    - `list_concepts {workspaceId}` GETs exactly `/v1/workspaces/w/concepts` and pages it: with three concepts in the fake body and `limit: 2`, the answer holds the first two and a non-null `nextCursor`, and that cursor returns the third with `nextCursor: null`.
+    - `get_concept {conceptId}` GETs exactly `/v1/concepts/c` and returns the fake body (`toEqual`).
     - A 404 from either → `concept not found or not visible to you`.
 
     Control: `list_concepts` with `item` puts `?item=ticket%3At` on the path.
+
+    Kills: (a) return `body.concepts` without `page(…)` (b) `readOrNotFound(…, 'concept')` → `'item'` (c) build `?item=` without `enc` (the path holds `ticket:t`).
   - **27.475** `manage_concept`:
-    - `create {name}` posts ONE `concept.created` with `entity.kind 'concept'`, a fresh ULID and `origin 'mcp'`.
-    - `rename` and `describe` post directly.
-    - `delete` without `confirm_name` answers the preview `{ preview: true, wouldChange: 'Deletes the concept "Scroll".', counts: { items: 3 }, nothingChanged: true, confirm: 'confirm_name must be "Scroll"' }` and posts NOTHING.
-    - With the right name it posts `concept.deleted`.
-    - `merge {intoId}` previews similarly, naming both concepts.
-  - **27.476** (Review Focus 5) `tag_items {conceptId, action: 'add', items: [ticket t2]}`, with the audience GET answering `{ members: 9, before: 6, after: 3 }`:
+    - `create {name}` posts ONE `concept.created` with `entity.kind 'concept'`, a fresh ULID (`/^[0-9A-HJKMNP-TV-Z]{26}$/`, and two creates give two different ids) and `origin 'mcp'`, payload exactly `{ name }`.
+    - `rename` and `describe` post directly, on `entity.id === 'c'`, with payloads exactly `{ name }` and `{ summary }`; `describe {summary: ''}` posts `{ summary: '' }` (an empty summary clears, so it must not be read as "missing").
+    - `delete` without `confirm_name` answers the preview `{ preview: true, wouldChange: 'Deletes the concept "Scroll".', counts: { items: 3 }, nothingChanged: true, confirm: 'confirm_name must be "Scroll"' }` and posts NOTHING (the fake's `postEvents` call log is empty). The fake concept has exactly 3 items.
+    - With `confirm_name: 'scroll'` (wrong case) it answers the same preview; with `'Scroll'` it posts `concept.deleted` on `c`.
+    - `merge {intoId: 'd'}` (the fake answers `d` as `"Phones"`) without `confirm_name` answers `wouldChange: 'Merges "Scroll" into "Phones"; its items move and "Scroll" is deleted.'` and posts nothing; with the name it posts `concept.merged {intoId: 'd'}` on `c`.
+
+    Kills: (a) skip `confirmOrPreview` for delete (b) `if (a.summary === undefined)` → `if (!a.summary)` (`describe ''` throws) (c) post `concept.merged` on `into.id` with `{ intoId: concept.id }` (the direction swaps).
+  - **27.476** (Review Focus 5) `tag_items {conceptId, action: 'add', items: [ticket t2, note n3]}`, with the audience GET answering `{ members: 9, before: 6, after: 3 }`:
     - no `confirm_name` → the preview `wouldChange: 'Fewer people will see this concept: 3 of 9 members'`, `counts: { members: 9, before: 6, after: 3 }`, nothing posted;
     - a WRONG `confirm_name` → the same preview;
-    - the right one → ONE `postEvents` call carrying every `concept.item_tagged`.
+    - the right one → ONE `postEvents` call carrying both `concept.item_tagged` events, in order (`{ticket, t2}`, `{note, n3}`). TWO items, because with one item a loop of `submitOne` calls also makes exactly one call.
 
-    Same `it`, the control: the GET path carries `conceptId=c&add=ticket%3At2`.
+    Same `it`, the control: the GET path is exactly `…/concepts/audience?conceptId=c&add=ticket%3At2&add=note%3An3`.
+
+    Kills: (a) replace `submitBatch(session, a.items.map(…))` with a `for` loop of `submitOne` (two `postEvents` calls) (b) the sentence uses `audience.before` for `after` (`6 of 9`) (c) join the `add=` parameters with `,` instead of `&`.
   - **27.477**
     - `add` with `{ before: 6, after: 6 }` posts at once, with no preview.
-    - `remove` never GETs the audience and posts `concept.item_untagged` for each item.
+    - `remove` never GETs the audience (the fake's GET log holds only `/v1/concepts/c`) and posts `concept.item_untagged` for each item.
     - A refusal in the batch comes back as `event 0 refused by concept.already-tagged: …` (`submitBatch`'s sentence, `submit.ts:49`).
-  - **27.478** `link_concepts {conceptId, otherId, relation: 'related', action: 'add'}` posts `concept.linked` on `conceptId`, and `remove` posts `concept.unlinked`. A refusal passes through as `refused by concept.self: A concept cannot be linked to itself.`
+
+    Kills: (a) `audience.after < audience.before` → `<=` (the plan's own mutation row) (b) drop the `if (a.action === 'add')` guard around the audience GET (c) `type` → always `'concept.item_tagged'`. The refusal leg guards existing behaviour (`submitBatch`, `submit.ts:46-56`): no mutant of this task's code reaches it unless the tool catches the error, which it does not.
+  - **27.478** `link_concepts {conceptId, otherId, relation: 'related', action: 'add'}` posts `concept.linked` on `conceptId` with payload exactly `{ otherId, relation: 'related' }`, and `remove` with `relation: 'broader'` posts `concept.unlinked` with `{ otherId, relation: 'broader' }`. A refusal passes through as `refused by concept.self: A concept cannot be linked to itself.`
+
+    Kills: (a) post on `{ kind: 'concept', id: a.otherId }` with `otherId: a.conceptId` (b) the `add`/`remove` ternary inverted (c) a hard-coded `relation: 'related'`.
   - **27.479**
     - `allTools` ends `…, 'list_deleted', 'similar', 'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts'` (plus whatever the release tip added; re-derive).
     - `TOOL_NAMES` agrees.
-    - Every new tool has a description that names its confirm rule where it has one.
+    - Every new tool has a description that names its confirm rule where it has one: `manage_concept`'s contains `confirm_name` and `merge and delete`; `tag_items`'s contains `confirm_name` and `Fewer people will see this concept`; `link_concepts`'s does NOT contain `confirm_name` (it has no confirm rule).
+
+    Kills: (a) register `conceptTools` before `graphTools` in `register.ts` (b) drop the `confirm_name` sentence from `tag_items`' description (c) add `link_concepts` to `tool-names.ts` but not to `register.ts`.
 
   `packages/mcp-server/src/tools/concept-tools.ts`:
   ```ts
@@ -2737,10 +2893,13 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   `apps/server/test/mcp/concept-tools-e2e.test.ts`, **27.480**. The real server, the real tool, and an in-process Session.
   - Copy how `apps/server/test/mcp/` drives a tool against `buildTestApp`; grep for the nearest e2e that calls a write tool and cite it.
-  - `memberIn` calls `tag_items` adding TP to CW: the first call answers the preview with numbers equal to the route's `GET …/audience`, and the database is unchanged.
+  - Rule A, accepted by planner ruling 2026-10-04 (report Q1). The plan added TP to CW. On the ref everyone who reads CW (owner, admin, memberIn, memberOut, author) also reads TP, so `after === before` and NO preview is ever answered: the case's first leg is red on correct code. `memberIn` cannot add TE either (the door refuses an item it cannot see). Rebound: a test-local ticket TL, explicit `[owner, memberIn]`; adding TL to CW narrows 5 → 2.
+  - `memberIn` calls `tag_items` adding TL to CW: the first call answers the preview with numbers equal to the route's `GET …/audience` AND equal to `{ members: 7, before: 5, after: 2 }` (`wouldChange: 'Fewer people will see this concept: 2 of 7 members'`), and the database is unchanged (`proj_concept_items` for CW has the same rows before and after).
   - The second call with `confirm_name` writes. `proj_concept_items` has the row with `origin = 'mcp'` and `tagged_by = memberIn`.
 
-  Control: `memberOut` calling `get_concept CP` → `concept not found or not visible to you`.
+  Control: `memberOut` calling `get_concept CE` → `concept not found or not visible to you` (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan said CP, which `memberOut` reads on the ref).
+
+  Kills: (a) `if (audience.after < audience.before)` → `if (false)` (the first call writes) (b) `confirmOrPreview(concept.name, …)` → `confirmOrPreview(concept.id, …)` (the confirmed call previews again; no row) (c) `envelopeFor(…)` replaced by a `newSubmittedEvent` with `origin: 'web'` in `ev` (the row's `origin` reds).
 
   Run:
   - build domain → mcp-server → server;
@@ -2750,6 +2909,12 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   All `--maxWorkers=2`, logged.
 
   Mutation: `tag_items` compares `after <= before` → 27.477's no-preview line reds.
+
+  **Prose to sweep:** (all of Task 4)
+  - [Step 4] `packages/mcp-server/test/register.test.ts:87` (14.555's title, "the 63 tools") and `:103` (`toHaveLength`), and `test-cases/14-mcp-server.md:938` (14.555, "the final registry is the 63 tools"): five more tools.
+  - [Step 4] `Features.md:3454` — "Sixty-three tools in both doors" (Task 2 moves it by one; this task by five more).
+  - [Step 4] `Features.md:3407` — "sixty-three since MCP-everything": the same count, five more.
+  - Searched with no other hit: `docs/manual.md` §16 (`:2043-2069`, "What your assistant can do": a list of what it CAN do, which an omission does not falsify; Task 9 writes the concepts section); `apps/server/src/routes/ticket-history.ts:145-176` (exporting `toHistoryEvent` falsifies no comment); `Features.md` and `test-cases/` for `concept` (none outside §24 D / §27.D on the ref).
 
   Commit.
 
@@ -2774,7 +2939,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - nightly at 02:00 IST (once per IST date per workspace);
   - after 200 item changes in a workspace, 10 minutes after the latest change (each change re-arms the 10 minutes).
 
-  "Item change" = an event `nudgesEmbedding` or `nudgesItemEmbedding` accepts. The counter is in memory: a restart loses at most 199 counts, and the nightly run covers that. The job runs only where the embed worker runs (`config.embedWorkerEnabled`, `index.ts:321`), because its input is the worker's output.
+  "Item change" = an event `nudgesEmbedding` or `nudgesItemEmbedding` accepts. The counter is in memory: a restart loses at most 199 counts, and the nightly run covers that. The job runs only where the embed worker runs (`config.embedWorkerEnabled`, `index.ts:322`; cite corrected from `:321`, a comment line), because its input is the worker's output.
 - **Who may see and resolve suggestions:** members and above (a guest gets 404, as `routes/groups.ts` answers a guest). Resolving needs the §3.3 rule: see every item.
 
 **Files:**
@@ -2798,8 +2963,8 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - `check-permission.ts`: route the rejection type to it, beside the T3 call.
   - `purge/table-rules.ts` and `erasure.ts`: three tables.
   - `history-copy.ts`: one arm.
-  - `index.ts` beside `:321-337`: start the scheduler.
-  - `app.ts:1158-1166`: `deps.onSemanticChange?.(event.workspaceId)` on the same subscription.
+  - `index.ts` beside `:322-338` (cite corrected from `:321-337`): start the scheduler.
+  - `app.ts:1161-1169` (the subscription block; cite corrected from `:1158-1166`, which starts mid-comment): `deps.onSemanticChange?.(event.workspaceId)` on the same subscription.
   - `concept-tools.ts`: two tools.
   - `tool-names.ts` / `tool-sweep.ts` / `register.test.ts`.
 
@@ -2849,7 +3014,9 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     - 13 hashes;
     - an extra `itemIds` member.
 
-    Control: exactly 3 and exactly 12 hashes parse.
+    Control: exactly 3 and exactly 12 hashes parse. Every hash in the case is `itemHash(…)`-shaped (32 lowercase hex, `semantic/signature.ts`'s `itemHash`), so the valid shape is the one the job writes.
+
+    Kills: (a) `.min(3)` → `.min(2)` (b) `.max(12)` → `.max(13)` (c) drop `.strict()` (d) `{64}` → `{63,64}`. One mutant per refused input; the 3 / 12 controls kill `.min(4)` / `.max(11)`.
 
   `apps/server/migrations/<P3>_suggestions.sql`:
   ```sql
@@ -2930,7 +3097,9 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   ```
   Register it after `projConcepts`, and extend the `projection-order.test.ts` pins.
 
-  **27.485** (`job.test.ts`, its first case): `test/purge/table-rules.test.ts` is green with the three tables, and a rejection applied through `applyCommitted` lands in `proj_concept_rejections`. Control: `verifyProjections` agrees.
+  **27.485** (`job.test.ts`, its first case): `test/purge/table-rules.test.ts` is green with the three tables, and a rejection applied through `applyCommitted` lands in `proj_concept_rejections` with `rejected_by` = the event's actor, `item_hashes` = the payload's, and `origin` = the event's. Control: `verifyProjections` agrees (`proj_concept_rejections` is in its registry, so a replay that wrote another `rejected_at` would differ).
+
+  Kills: (a) drop `registry.register(projConceptRejections)` (no row) (b) `rejected_at = event.serverTime` → `new Date()` (verify reds) (c) drop the `sem_job_state` row from `table-rules.ts` (`table-rules.test.ts` reds).
 
   Commit.
 
@@ -2942,18 +3111,30 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - Item vectors are written STRAIGHT into `search_item_chunks` with `fakeVector`-style unit vectors (copy `embed-worker.test.ts:52-…`). These cases test the job's database plumbing; Task 1 tests what vectors mean.
   - Use the `twoClusters()` geometry of Task 1's 27.400 at 512 dims, so the clusters are certain.
 
+  - Every "workspace-audience" ticket gets `setVisibilityEnv(WS, id, 'workspace')` after `seedTicket`. `seedTicket` alone writes no `visibility.set`, so the ticket resolves to its project's audience and its key is `p:<P>` (`semantic/partition.ts`, `ticketAudienceKey`), not `'w'`: 27.487's `'w'` leg would be red on correct code (T1's `item-visibility.test.ts` sets `'workspace'` the same way for `TW`).
+  - Every case asserts its expected row count EXACTLY (`toHaveLength`), never "no row for X" alone: a job that wrote nothing at all passes every "no row" leg.
+
   The cases:
   - **27.487** (§7 case 5, at the database level)
     - Four workspace-audience tickets and four tickets explicit `[owner]` (`setVisibilityEnv`) get IDENTICAL vectors and text.
-    - `runSuggestionJob` writes two rows: their `partition_key`s are `'w'` and `'e:<owner>'`, and no row mixes ids from both.
+    - `runSuggestionJob` writes exactly two rows: their `partition_key`s, sorted, are `['e:<owner>', 'w']`, each row's `item_id` is exactly its four tickets, and no row mixes ids from both.
     - Control in the same `it`: make all eight workspace-audience and re-run → one row of eight.
+
+    Kills: (a) `partition: ticketKey.get(row.id) ?? 'w'` → `partition: 'w'` (the plan's mutation: one row of eight) (b) the INSERT writes `'w'` for `partition_key` (the key leg reds while the grouping is right).
   - **27.488** Run twice:
-    - the same `id` and `signature` both times;
-    - after one ticket's vector moves out of the cluster and the job re-runs, the old signature's row is gone and a new one exists.
+    - exactly one row both times, with the same `id` and `signature`;
+    - after one ticket's vector moves out of the cluster (three remain, `SUGGESTION_MIN_SIZE`) and the job re-runs, exactly one row: the old signature's row is gone and the new one's `item_id` is the three.
+
+    Kills: (a) `ON CONFLICT … DO UPDATE SET …` gains `id = EXCLUDED.id` (the id moves) (b) drop the `DELETE FROM sem_suggestions WHERE … NOT (signature = ANY …)` (two rows after the move) (c) replace the upsert with DELETE-all + INSERT (a fresh `newUlid()` every run).
   - **27.489** Rejections:
-    - After a rejection of row R (`workspace.concept_suggestion_rejected` with R's signature and hashes, through `applyCommitted`), the re-run writes no row for that set.
-    - Control in the same `it`: replace 3 of R's 4 items with 3 new items, so the overlap is 1/7. The re-run writes it again.
-  - **27.490** A concept tagging 2 of a community's 4 items (`proj_concept_items` via `applyCommitted` of `concept.created` + tags) suppresses the suggestion. Control: 1 of 4 does not.
+    - Two clusters R and Q (four items each, far apart). After a rejection of row R (`workspace.concept_suggestion_rejected` with R's signature and hashes, through `applyCommitted`), the re-run writes exactly one row, Q (so the job still produces; the R leg is not "the job wrote nothing").
+    - Same `it`: a rejection of Q's signature and hashes filed in a SECOND workspace does not suppress Q here.
+    - Control in the same `it`: replace 3 of R's 4 items with 3 new items, so the overlap is 1/7. The re-run writes it again (two rows).
+
+    Kills: (a) pass no `rejected` to `suggestAll` (R is written) (b) the rejections query loses `WHERE workspace_id = $1` (Q is suppressed). The control guards Task 1's `changedByMoreThanHalf` at the database level; no mutant of this task's code reaches it.
+  - **27.490** A concept tagging 2 of a community's 4 items (`proj_concept_items` via `applyCommitted` of `concept.created` + tags) suppresses the suggestion (0 rows). Control: 1 of 4 does not (1 row). Same `it`: a DELETED concept tagging 2 of 4 does not suppress it (1 row).
+
+    Kills: (a) `conceptsOf: (key) => conceptsByItem.get(key) ?? []` → `() => []` (b) the tags query drops `AND c.deleted = FALSE` (the deleted-concept leg reds) (c) the tags query drops `WHERE i.workspace_id = $1` — not killed here (one workspace); recorded.
 
   `apps/server/src/semantic/suggestion-job.ts`:
   ```ts
@@ -3147,21 +3328,26 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - `proj_workspaces (workspace_id, archived, deleted_at, …)` (`migrations/1790500000000_lifecycle.sql:6-13`). The nightly run skips deleted and archived workspaces: nobody curates them.
 
   Wiring:
-  - `index.ts`, after `:328`: `const suggestionScheduler = embedWorker === null ? null : startSuggestionScheduler(pool, { log: (msg) => { app.log.warn(msg); } });`. Add its `stop()` beside `embedWorker?.stop()` (`:335-337`).
+  - `index.ts`, after `:335` (the end of the `nudgeEmbedWorker = …` assignment; cite corrected from `:328`, which is inside `startEmbedWorker(…)`'s argument list): `const suggestionScheduler = embedWorker === null ? null : startSuggestionScheduler(pool, { log: (msg) => { app.log.warn(msg); } });`. Add its `stop()` beside `embedWorker?.stop()` (`:336-338`, corrected from `:335-337`).
   - Pass `onSemanticChange: (workspaceId) => suggestionScheduler?.change(workspaceId)` into `buildApp`'s deps, the way `nudgeEmbedWorker` reaches `onNoteBodyCommitted`. Re-read that hand-off and copy it.
-  - `app.ts:1158-1166`: in the same subscription, `if ((nudgesEmbedding(event) || nudgesItemEmbedding(event)) && deps.onSemanticChange !== undefined) deps.onSemanticChange(event.workspaceId);`. Register the subscription when EITHER callback is supplied.
+  - `app.ts:1161-1169` (corrected from `:1158-1166`): in the same subscription, `if ((nudgesEmbedding(event) || nudgesItemEmbedding(event)) && deps.onSemanticChange !== undefined) deps.onSemanticChange(event.workspaceId);`. Register the subscription when EITHER callback is supplied.
 
   `apps/server/test/semantic/scheduler.test.ts`, **27.491**:
   - Fake timers. A `runJob` spy, and `now` pinned.
   - 199 `change('W')` calls → no run after 11 minutes.
   - The 200th → no run at 9 minutes, one run at 10.
   - Another change at 5 minutes re-arms (no run at 10, one at 15).
+  - After that run, 199 more `change('W')` calls → no run after 11 more minutes (the counter was reset).
   - `tick()`:
     - at 01:59 IST → no run;
-    - at 02:10 IST → one run per workspace;
-    - again at 02:40 the same date → none (the `sem_job_state` row).
+    - at 02:10 IST → one run per workspace: the `runJob` spy's workspace ids, sorted, equal the two live workspaces exactly;
+    - again at 02:40 the same date → none (the `sem_job_state` row);
+    - at 02:10 IST the NEXT date → one run per workspace again;
+    - a third workspace, ARCHIVED, and a fourth, DELETED, are never in the spy's ids.
 
-  Control: `change('V')` 200 times does not run `'W'`. The `tick` half needs a database; put it in its own `it` with `createTestDatabase` and two seeded workspaces.
+  Control: `change('V')` 200 times does not run `'W'`. The `tick` half needs a database; put it in its own `it` with `createTestDatabase` and two seeded workspaces (plus the archived and the deleted one).
+
+  Kills: (a) `if (count < CHANGES_BEFORE_RUN) return;` → `<=` (the 200th does not arm) (b) drop `clearTimeout(existing)` (the re-arm leg runs at 10) (c) drop `counts.set(workspaceId, 0)` in the timer (the 199-more leg runs) (d) `IST_OFFSET_MS` → `5 * 60 * 60 * 1000` (02:10 IST reads as hour 1: no run) (e) `last_nightly_ist_date < $1::date` dropped from the OR (the next-date leg does not run) (f) drop `AND NOT w.archived`. The control kills a single shared counter (`counts` keyed by nothing).
 
   Commit.
 
@@ -3234,30 +3420,45 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - Setup: `seedNotesFixture`, then rows inserted straight into `sem_suggestions`:
     - S1 = {TP, nProject, nWorkspace};
     - S2 = {nWorkspace, nExplicit, TE}.
+  - **Who sees S1 and S2 on the ref** (Rule A, accepted by planner ruling 2026-10-04 (report Q1)): S1 = {TP, nProject, nWorkspace} is read by every non-guest (every member is on every founded project, `effective-role.ts:5-19`), so `memberOut` SEES S1. S2 = {nWorkspace, nExplicit, TE} is read by the owner alone (TE and nExplicit are explicit `[guestListed]`, nExplicit's author arm admits `author`, and `guestListed` does not read nWorkspace). The plan's legs that used `memberOut` as the reader who cannot see S1 are rebound to S2 below, as T1's lane did (`test/read/item-visibility.test.ts:16-19`).
   - The cases:
-    - **27.492** As `memberIn`, the list includes S1. As `memberOut` it does not (TP hidden). As `guestListed` → 404.
-      - Control: the owner's list includes S1.
+    - **27.492** As `memberIn`, the list includes S1 and NOT S2. As `memberOut` it includes S1 too (the Rule A control; the plan's leg "as `memberOut` it does not (TP hidden)" was red on correct code). As `guestListed` → 404.
+      - Control: the owner's list includes S1 AND S2 (so S2's absence for `memberIn` is about the reader, not the row).
       - Same `it`: the list for EVERY non-guest user equals the agreement with `hiddenItems`.
+
+      Kills: (a) drop the `.filter((row) => row.item_id.every(…))` (S2 reaches `memberIn`) (b) `.every` → `.some` (S2 reaches `memberIn`: it reads nWorkspace) (c) drop `|| eff.workspaceRole === 'guest'` from the 404 line.
     - **27.493**
       - `memberIn` rejecting S1 (through `checkPermission`, `makeEnvelope` on `{ kind: 'workspace', id: WS }`) is admitted.
-      - `memberOut` rejecting S1 → `suggestion.unknown`, with the SAME reason as a made-up signature.
+      - `memberIn` rejecting S2 → `suggestion.unknown`, with the SAME reason as a made-up signature; the owner rejecting S2 is admitted. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's refused subject was `memberOut` on S1, which `memberOut` sees on the ref.)
       - `guestListed` → `permission.concept`.
-    - **27.494** (Review Focus 2) TX is explicit `[owner]` and assigned to `memberOut`; S3 = {TX, nWorkspace, nProject…}, a set `memberOut` sees.
+
+      Kills: (a) `seesSuggestion` skips `hiddenItems` (returns `true` once the row exists: S2 is admitted) (b) drop the guest line from `checkSuggestionRejection` (the guest gets `suggestion.unknown` instead) (c) not wiring `checkSuggestionRejection` into `check-permission.ts` (every leg is admitted).
+    - **27.494** (Review Focus 2) TX is explicit `[owner]` and assigned to `memberOut`; S3 = {TX, nWorkspace, nProject…}, a set `memberOut` sees (Rule A gives `memberOut` nProject; TX comes through the assignee arm).
       - `memberOut`'s list includes S3, although S3's `partition_key` names only the owner.
       - After TX is reassigned, it does not.
+      - Control: `memberIn` (never assigned) never sees S3.
+
+      Kills: (a) the route keeps a row only when the reader is in its `partition_key` (the first leg reds) (b) the route memoises `hiddenItems` per suggestion id (the reassignment leg reds).
     - **27.495**
       - `concept.created {fromSuggestion: <random ULID>}` → `suggestion.unknown`.
       - `{fromSuggestion: S1.id}` as `memberIn` → admitted.
-      - As `memberOut` → `suggestion.unknown`.
+      - `{fromSuggestion: S2.id}` as `memberIn` → `suggestion.unknown`; as the owner → admitted. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's refused subject was `memberOut` on S1.)
+
+      Kills: (a) drop the `fromSuggestion` check from the `concept.created` arm (b) `seesSuggestion` skips `hiddenItems` (c) `{ id: p.fromSuggestion }` → `{ signature: p.fromSuggestion }` (S1.id is then unknown: the admitted leg reds).
     - **27.496**
+      - Before the rejection, apply a `concept.created` and a tag (any concept) so the raw stream holds `concept.*` events: assert `SELECT count(*) FROM events WHERE entity_kind = 'concept'` ≥ 2 first. Without it the control below has nothing to withhold.
       - The rejection applied through ingest (`buildTestApp` + the events route) lands in `proj_concept_rejections`.
       - `visibleEventsFor` yields it to `memberIn` with a payload of exactly `{ signature, itemHashes }`, and no key holds an item id.
       - Control: no `concept.*` event is yielded (27.454 still holds).
+
+      Kills: (a) drop `registry.register(projConceptRejections)` (b) register the type with `entityKind: 'concept'` (ingest refuses the workspace-entity envelope as a misfiled kind; the landing leg reds). The payload and stream legs guard existing behaviour: the strict schema (27.486) and `audienceClassOf`'s `'workspace'` arm.
     - **27.497**
       - `describeEvent` renders `'Rejected a suggested concept'`.
-      - The census: for every registered type starting `workspace.concept_`, the door has an arm (a guest is refused with `permission.concept`).
+      - The census: the registered types starting `workspace.concept_` are exactly `['workspace.concept_suggestion_rejected']` (asserted first, so the loop is not over an empty list), and for each the door has an arm (a guest is refused with `permission.concept`).
 
       Control: `workspace.renamed` by a guest is still refused by its own rule (`permission.role`).
+
+      Kills: (a) drop the `history-copy.ts` arm (b) drop the guest line from `checkSuggestionRejection` (c) a second `workspace.concept_*` type registered without a door arm (the census list reds).
 
   Run the files, `test/permissions/` and `test/concepts/` (`--maxWorkers=2`, logged). Expected: PASS.
 
@@ -3308,19 +3509,35 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - Update `tool-names.ts` (`concept` block), `tool-sweep.ts` and `register.test.ts` FINAL.
 
   Tests:
-  - **27.498** (`suggestion-tools.test.ts`, fake Session):
-    - `review_suggestions` GETs and pages.
-    - `resolve_suggestion accept {name}` posts ONE batch: `concept.created {name, fromSuggestion}` followed by one `concept.item_tagged` per item, all on the same concept id, all `origin: 'mcp'`.
-    - `reject` posts `workspace.concept_suggestion_rejected` on `{ kind: 'workspace', id: w }` with the hashes.
+  - **27.498** (`suggestion-tools.test.ts`, fake Session; the fake suggestion has THREE items):
+    - `review_suggestions` GETs exactly `/v1/workspaces/w/suggestions` and pages (three suggestions, `limit: 2` → two and a non-null `nextCursor`).
+    - `resolve_suggestion accept {name}` posts ONE batch (one `postEvents` call): `concept.created {name, fromSuggestion}` followed by one `concept.item_tagged` per item (three, in the suggestion's order, payloads `{ itemKind, itemId }` exactly), all on the same concept id, all `origin: 'mcp'`.
+    - `reject` posts `workspace.concept_suggestion_rejected` on `{ kind: 'workspace', id: w }` with payload exactly `{ signature, itemHashes }` from the fake suggestion.
     - An unknown `suggestionId` → `suggestion not found or not visible to you`.
     - Control: `accept` without `name` → `accept needs name`, and nothing is posted.
-    - A batch is not atomic (`apps/server/src/ingest/ingest-service.ts:56-64`). A refused tag at index 2 throws `event 2 refused by …` (`submitBatch`, `submit.ts:49`) while the concept and the first tag stay committed: visible, attributed and removable, so D2 holds. The tool description says so (the literal above).
+    - A batch is not atomic (`apps/server/src/ingest/ingest-service.ts:56-64`). A refused tag at index 2 throws `event 2 refused by …` (`submitBatch`, `submit.ts:49`) while the concept and the first tag stay committed: visible, attributed and removable, so D2 holds. The tool description says so (the literal above): assert it contains `the concept is still made`.
+
+    Kills: (a) `ev(a.workspaceId, conceptId, …)` → `ev(a.workspaceId, newUlid(), …)` for the tags (three different ids) (b) the reject payload drops `itemHashes` (c) `submitBatch([...])` → `submitOne` for the create, then `submitBatch` for the tags (two `postEvents` calls).
   - **27.499** (`suggestion-e2e.test.ts`, the real server, as 27.480):
-    - `memberIn` accepts S1. The concept exists with S1's items, `from_suggestion = S1.id`, and every item row has `origin 'mcp'`. That proves the batch's second event sees the first's projection at the door.
-    - A re-run of `runSuggestionJob` no longer writes S1's signature (≥ 50% tagged).
-  - **27.500** FINAL and `TOOL_NAMES` include the two names after `link_concepts`. Control: the length equals the literal's count.
+    - The suggestion must come from the JOB, or the re-run leg cannot fail: a row inserted straight into `sem_suggestions` (as Step 5's S1 is) has no item vectors behind it, so `runSuggestionJob` writes no such signature with or without the concept. So: write IDENTICAL vectors straight into `search_item_chunks` / `search_note_chunks` (as 27.487 does) for three items of ONE partition that `memberIn` reads — TP, a second project ticket TP2 and nProject, all `p:<P>` (`ticketAudienceKey` / `noteAudienceKey`) — run the job, and assert it wrote exactly that one row, with `signature === signatureOf(['note:<nProject>', 'ticket:<TP>', 'ticket:<TP2>'])`. (S1 itself, {TP, nProject, nWorkspace}, spans `p:<P>` and `'w'`: the job can never produce it.)
+    - `memberIn` accepts that suggestion. The concept exists with its three items, `from_suggestion` = its id, and every item row has `origin 'mcp'`. That proves the batch's second event sees the first's projection at the door.
+    - A re-run of `runSuggestionJob` no longer writes that signature (≥ 50% tagged): zero rows for the workspace.
+
+    Kills: (a) the job's tags query returns nothing (`conceptsOf: () => []`; the re-run writes the row again) (b) `resolve_suggestion` tags the items onto `s.id` instead of the new `conceptId` (the door answers `concept.unknown`; no item rows) (c) `resolve_suggestion` omits `fromSuggestion` (the column is NULL).
+  - **27.500** FINAL and `TOOL_NAMES` include the two names after `link_concepts`. Control: in `allTools(…)`, `review_suggestions` sits at `indexOf('link_concepts') + 1` and `resolve_suggestion` at `+ 2` (the plan's control, "the length equals the literal's count", compared the literal with itself).
+
+    Kills: (a) append the two tools to `concept-tools.ts`'s array BEFORE `link_concepts` (b) add them to `register.test.ts`'s FINAL and `tool-names.ts` but not to `concept-tools.ts`.
 
   Run the mcp-server suite, the server `test/mcp/` and `test/semantic/` (logged). Expected: PASS.
+
+  **Prose to sweep:** (all of Task 5; fix each in the commit of the step named)
+  - [Step 4] `apps/server/src/app.ts:1157-1160` — "Registered ONLY when the caller supplied the callback". After Step 4 it is registered when EITHER callback is supplied; say so.
+  - [Step 4] `apps/server/src/app.ts:188-190` — `onNoteBodyCommitted` is the listener's one callback (Task 2 already widens its list); `onSemanticChange` joins it on the same subscription. Its new docblock and this one must agree on which events reach which.
+  - [Step 4] `apps/server/src/config.ts:171` — "Search keeps answering lexically; only `mode=meaning` goes stale" — and `apps/server/src/index.ts:316-319` — "serves the whole product except `mode=meaning` search". With `EMBED_WORKER_ENABLED=false` the suggestion job never starts (`suggestionScheduler` is `null`), so suggestions stop too.
+  - [Step 2] `apps/server/test/projection-order.test.ts:75` — the pinned-order title; `proj_concept_rejections` follows `proj_concepts`.
+  - [Step 5] `apps/server/src/permissions/check-permission.ts:1899-1910` — the pass list (Task 3's sweep); `checkSuggestionRejection` is one more pass.
+  - [Step 6] `packages/mcp-server/test/register.test.ts:87`, `:103`; `test-cases/14-mcp-server.md:938`; `Features.md:3454` ("Sixty-three tools in both doors") and `Features.md:3407` ("sixty-three since MCP-everything") — the tool count, two more.
+  - Searched with no other hit: `docs/manual.md` (`suggest`), `Features.md` and `test-cases/` (`suggestion`, outside §24 D / §27.D).
 
   Commit.
 
@@ -3397,27 +3614,40 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
      */
     export { edgeSentence, formatGraphDate, howText, provenanceLine, relation } from '@gisik-nokma/domain';
     ```
-  - **27.505:** plan C's `packages/knowledge-graph/test/engine/sentences.test.ts` (27.232–27.235) is UNCHANGED and green, and `edgeSentence` imported from `@gisik-nokma/domain` is the same function object as the engine's. Control: domain's own build has no `react` or `sigma` import (`grep -c` = 0 over `packages/domain/dist`).
+  - **27.505:** plan C's `packages/knowledge-graph/test/engine/sentences.test.ts` (27.232–27.235) is UNCHANGED and green (`git diff --exit-code origin/release/knowledge-graph -- packages/knowledge-graph/test/engine/sentences.test.ts` prints nothing), and `edgeSentence` imported from `@gisik-nokma/domain` is the same function object as the engine's (`expect(engineEdgeSentence).toBe(domainEdgeSentence)`, `toBe`, not `toEqual`: two copies of the code are two objects). Control: domain's own build has no `react` or `sigma` import: `grep -rlE "from '(react|sigma|graphology)" packages/domain/dist` prints NOTHING. (`grep -c` over a directory is not a count: without `-r` it errors "Is a directory" and prints no `0`, so "= 0" could never be read off it.)
+
+    Kills: (a) recreate `engine/sentences.ts` as a COPY of the moved code instead of the re-export (the `toBe` identity reds); (b) leave an `import … from 'react'` (or the plan C file's `sigma` type import, if it has one) in the moved `graph-sentences.ts` (the dist grep reds). Plan C Task 2's `sentences.ts` is NOT on `origin/release/knowledge-graph` yet (`git cat-file -e` fails), so re-read it as landed before naming its imports.
 
   Run: build domain → knowledge-graph; run knowledge-graph's suite. Expected: PASS.
+
+  **Prose to sweep (Step 2's commit):** none found on the ref (searched: `engine/sentences`, `sentences.ts`, `edgeSentence` in `packages/`, `apps/`, `Features.md`, `docs/`). Plan C Task 2 creates the file and its Features bullet; Step 6's "Amend plan C's Features bullet on sentences" is the sweep once it lands.
 
   Commit.
 
 - [ ] **Step 3: The concept arm (27.506–27.507), tests first**
 
   `apps/server/test/graph/concept-arm.test.ts`:
-  - Setup: `seedNotesFixture` + `buildTestApp`; concepts CP {TP} and CW {nWorkspace}, plus suggestion row S1 {TP, nProject, nWorkspace}.
+  - Setup: `seedNotesFixture` + `buildTestApp`; concepts CP {TP}, CW {nWorkspace}, **CWE {TE, nWorkspace}** and **CE {TE}**, plus suggestion rows S1 {TP, nProject, nWorkspace}, **S2 {TE, nProject, nWorkspace}** and **SG {TE, nExplicit}** (TE and nExplicit are explicit [guestListed]: `notes-fixture.ts` seeds TE's `visibility.set` and nExplicit's `scope: { mode: 'explicit', userIds: [guestListed] }`).
+    - Tag TP into CP with an `origin: 'mcp'` event (`makeCommitted`'s origin), so the edge's `origin` cannot come from a default `'web'`.
+    - Who sees what on the ref (`visible-where.ts:105-123` the ticket audience switch, `:136-140` `visibleTicketsWhere`, `:303-325` `visibleNotesWhere`; Rule A, `effective-role.ts:5-19,166-187`): the owner sees everything; every member and admin is on every founded project, so `memberIn` AND `memberOut` see TP, nProject and nWorkspace; no non-owner except `guestListed` sees TE or nExplicit; a guest sees explicit lists only (not TP, nProject or nWorkspace). So the non-guest "reader who cannot see" an item must be denied by TE, never by TP or nProject (T1 recorded the same drift: `apps/server/test/read/item-visibility.test.ts:16-19`).
+    - Why CWE, S2 and SG: `memberOut` centred on `note:nWorkspace` never REACHES CP (CP tags only TP), so the plan's "nothing names CP" held with the `visibleConceptIds` filter deleted. CWE is reached through nWorkspace and holds TE, which `memberOut` cannot see, so only D4 can drop it. S2 is the same for the suggestion arm. S1 cannot do that job, because under Rule A `memberOut` sees all three of its items. SG's items are all visible to `guestListed`, so only the guest arm (`eff.workspaceRole === 'guest'`) drops it.
   - Request through the route: `GET /v1/graph/neighbours?center=ticket:TP&hops=1&ws=WS&groups=concepts`.
   - The cases:
     - **27.506**
-      - As `memberIn`, the ring holds `concept:CP` with `kind 'concept'`, `label` = CP's name and `suggested: false`, and a `tag` edge from `concept:CP` to `ticket:TP` whose `addedBy` is the tagger's display name and whose `origin` is the event's.
-      - As `memberOut` (centred on `note:nWorkspace`), `concept:CW` is present and nothing names CP.
+      - As `memberIn`, the ring holds `concept:CP` with `kind 'concept'`, `label` = CP's name and `suggested: false`, and a `tag` edge from `concept:CP` to `ticket:TP` whose `addedBy` is the tagger's display name and whose `origin` is `'mcp'` (the event's).
+      - As `memberOut` (centred on `note:nWorkspace`): `concept:CW` is present (precondition: the ring is non-empty, so the next leg is not read off an empty answer); `concept:CWE` is ABSENT from `items`, and no edge has `from` or `to` equal to `concept:CWE`. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's subject was "nothing names CP", read as CP being hidden from `memberOut` through TP. On the ref `memberOut` reads TP, and CP is never reached from nWorkspace anyway. The hidden concept is now CWE, hidden through TE.)
+      - Rule A control, same `it`: `memberOut` centred on `ticket:TP` DOES get `concept:CP`.
 
       Control: with `groups=blocks`, there is no concept item at all.
+
+      Kills: (a) drop the `visibleConceptIds` filter in the new `resolve` arm (select every `conceptIds` row) → `concept:CWE` appears for `memberOut`; (b) delete the `if (groups.has('concepts'))` guard in `expand` → the `groups=blocks` control shows a concept; (c) pass `{ addedById: row.tagged_by, addedAt: row.tagged_at }` without `origin` in the `add('tag', …)` call → the edge's `origin` is `null`, not `'mcp'`.
     - **27.507**
-      - As `memberIn`, the ring centred on `ticket:TP` also holds `concept:<S1.id>` with `suggested: true` and a `tag` edge with `suggested: true`.
-      - As `memberOut` (centred on `note:nWorkspace`), S1 is absent, because TP is hidden from them.
-      - As `guestListed`, no suggestion ever appears.
+      - As `memberIn`, the ring centred on `ticket:TP` also holds `concept:<S1.id>` with `suggested: true` and a `tag` edge with `suggested: true` (and `concept:CP`'s edge still `suggested: false`, so one hard-coded value cannot satisfy both).
+      - As `memberOut` (centred on `note:nWorkspace`), S2 is absent, because TE is hidden from them. (Rule A, accepted by planner ruling 2026-10-04 (report Q1): the plan's subject was "S1 is absent, because TP is hidden from them". On the ref `memberOut` reads TP, nProject and nWorkspace, so S1 is PRESENT for them. The hidden suggestion is now S2, hidden through TE.)
+      - Rule A control, same `it`: `memberOut`'s ring centred on `note:nWorkspace` DOES hold `concept:<S1.id>`. That is also the precondition that the suggestion arm runs for this reader at all.
+      - As `guestListed` centred on `ticket:TE` (`groups=concepts`): `concept:CE` is present (precondition: the guest's ring is not empty for some other reason), and `concept:<SG.id>` is ABSENT although `hiddenItems` answers `[]` for SG's items for this guest (assert that too, in the same `it`).
+
+      Kills: (a) delete `if ((await hiddenItems(…)).length > 0) continue;` in the suggestion arm → S2 appears for `memberOut`; (b) change `eff === null || eff.workspaceRole === 'guest'` to `eff === null` → SG appears for `guestListed`; (c) leave plan C's literal `suggested: false` in `readGraphRing`'s edge mapping (`graph-neighbours.ts:311` on the ref) instead of carrying `RawEdge.suggested` → S1's tag edge reads `false`.
 
   `apps/server/src/read/graph-neighbours.ts`. At the end of `resolve`, replacing plan C's `return out; // concepts: …` line:
   ```ts
@@ -3487,32 +3717,45 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   Mutation: drop the `visibleConceptIds` filter → 27.506's `memberOut` line reds.
 
+  **Prose to sweep (Step 3's commit):**
+  - `packages/domain/src/graph.ts:73` — `/** A concept suggestion (spec D); always false until D. */`: false once suggestion rows resolve with `suggested: true`.
+  - `apps/server/src/read/graph-neighbours.ts:153` — `return out; // concepts: spec D adds a resolver; until then none resolve`: the step replaces this line; make sure the comment goes with it.
+  - `apps/server/src/read/graph-neighbours.ts:311` — the view edge's literal `suggested: false`: the step must carry `RawEdge.suggested` here (27.507 (c)); `:50`'s `RawEdge` type gains the field.
+
   Commit.
 
 - [ ] **Step 4: `graph/path` and `graph/trace` (27.508–27.510), tests first**
 
   `apps/server/test/graph/path-trace.test.ts`:
   - Seed plan A's `proj_ticket_links` and plan B's `proj_references` through their EVENTS (`ticket.link_added`, a description with a ticket chip). Copy plan C's `test/graph/` seeding helper as landed and cite it. Never insert rows by hand: the projection is under test too.
-  - Chain: T1 blocks T2 blocks T3 blocks T4, with T3 explicit `[owner]`. Also T1 relates T5, and T5 relates T4.
+  - Chain: T1 blocks T2 blocks T3 blocks T4, with T3 explicit `[owner]`. Also T1 relates T5, T5 relates T6, and T6 relates T4.
+    - (The plan first said "T1 relates T5, and T5 relates T4". That makes T1–T5–T4 a path of length 2, and `shortestPaths` stops at the first hop that reaches `to` (`!dist.has(to)` in its loop), so the owner could never get "two paths of length 3". T6 makes the relates path length 3, as the case intends. Planner ruling 2026-10-04, Q3: confirmed. `graph_path` answers only the shortest paths, all of the same minimal length; the fixture stays.)
+    - Mint the ids so the sort below is observable (planner ruling 2026-10-04, Q4): take four fresh ULIDs `[a, b, c, d] = [newUlid(), newUlid(), newUlid(), newUlid()].sort()` and set T2 = a, T5 = b, T6 = c, T3 = d (assert `T2 < T5` and `T6 < T3`). The sorted answer then puts `[T1, T2, T3, T4]` first, while the walk back from T4 over sorted parents (T6 before T3) FINDS `[T1, T5, T6, T4]` first, so the unsorted order is the reverse.
   - The cases:
     - **27.508** `GET /v1/graph/path?from=ticket:T1&to=ticket:T4&maxHops=6`:
-      - as the owner: two paths of length 3, via T2–T3 and via T5, with T5's first or by `compareRingEntries`. Pin the order the code produces and say why in the test;
-      - as `memberIn`: only the T5 path (T3 is hidden);
+      - as the owner: exactly two paths, each with `refs.length === 4` (3 hops), IN THIS ORDER: `paths.map((p) => p.refs)` `toEqual` `[[T1, T2, T3, T4], [T1, T5, T6, T4]]` (as `ticket:` refs). (Planner ruling 2026-10-04, Q4: `shortestPaths` sorts its answer lexicographically by the node-id sequence, so the test pins the exact order; this replaces the set comparison.)
+      - as `memberIn`: exactly one path, `[T1, T5, T6, T4]` (T3 is hidden);
       - `maxHops=7` → 400;
-      - `to` unreachable within `maxHops=1` → `paths: []`.
+      - `to` unreachable within `maxHops=1` → `paths: []` (and with `maxHops=3` the same pair answers two paths, in the same `it`, so the `[]` is the hop limit and not an empty graph).
 
-      Control: each path's `sentences[0]` is `edgeSentence` of its first edge.
+      Control: each path's `sentences.length === edges.length`, `sentences[0]` is `edgeSentence(paths[i].edges[0], labelOf)` with `labelOf` built from the response's `items`, AND `sentences[0]` contains T1's label (so a route that passed `() => ''` as the label resolver reds).
+
+      Kills: (a) delete `if (!known.has(edge.from) || !known.has(edge.to)) continue;` in `shortestPaths` → `memberIn` gets the T2–T3 path; (b) replace `Math.min(maxHops, PATH_MAX_HOPS)` with `PATH_MAX_HOPS` → the `maxHops=1` leg finds a path; (c) `if (paths.length >= PATH_MAX_PATHS) return;` → `>= 1` → the owner gets one path; (d) (planner ruling 2026-10-04, Q4) delete `paths.sort((x, y) => bySequence(x.refs, y.refs))` → the owner's pair comes back as `[[T1, T5, T6, T4], [T1, T2, T3, T4]]`. Recorded survivor: deleting the `parents` sort is equivalent here (two shortest paths, under the cap of 3); it decides only WHICH three are kept when more than three tie.
     - **27.509** `GET /v1/graph/trace?from=ticket:T1&kind=blocks&direction=out&maxDepth=10`:
-      - the owner gets T2 (depth 1), T3 (2), T4 (3);
+      - the owner gets exactly `[{T2, depth 1, via T1}, {T3, 2, via T2}, {T4, 3, via T3}]` (`ref`, `depth` and `via` each asserted);
       - `memberIn` gets T2 only. The chain STOPS at the hidden T3 and does not reach T4 through it.
-      - A cycle (T4 blocks T1) ends the owner's chain without repeating T1.
+      - A cycle, seeded on its OWN pair so the T1–T4 path above stays three hops: T7 blocks T8, T8 blocks T7. The owner's trace from T7 is exactly `[{T8, depth 1}]`: no entry for T7.
       - `maxDepth=11` → 400.
-    - **27.510**
-      - `kind=parent&direction=out` from a sub-subtask returns its parent, then its grandparent;
-      - `direction=in` from the grandparent returns both in depth order;
-      - `kind=ref&direction=out` follows a description's ticket chip.
 
-      Control: `kind=ref` skips `person` targets.
+      Kills: (a) in `traceChain`, keep a hidden node in `next` (walk past it) → `memberIn` reaches T4 (the plan's mutation); (b) `const seen = new Set([from])` → `new Set<string>()` → the cycle leg returns T7 at depth 2; (c) swap `near`/`far` for `direction === 'out'` in `step`'s `blocks` arm → the owner's chain from T1 is empty.
+    - **27.510**
+      - `kind=parent&direction=out` from a sub-subtask returns exactly `[parent (depth 1), grandparent (depth 2)]`;
+      - `direction=in` from the grandparent returns both in depth order;
+      - `kind=ref&direction=out` follows a description's ticket chip: the description of TA holds a ticket chip to TB AND a mention of `memberIn`, and the chain is exactly `[ticket:TB]`.
+
+      Control: `kind=ref` skips `person` targets: `person:<memberIn>` is NOT in the chain, although `memberIn` is a member whose name the graph resolves (the same mention reaches `person:` in a `groups=people` ring, asserted in the same `it`, so the skip is the filter and not an unresolvable person).
+
+      Kills: (a) swap the two `parent` SQL strings (`out` ↔ `in`) → the sub-subtask's `out` trace is empty; (b) drop `AND target_kind IN ('ticket', 'note')` from the `ref`/`out` select → `person:<memberIn>` joins the chain.
 
   `apps/server/src/read/graph-trace.ts`:
   ```ts
@@ -3593,7 +3836,9 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   /**
    * Spec D §5.1 `graph_path`: up to 3 shortest paths. A BFS layer by layer over plan C's `expand` (every edge kind
    * in `groups`), keeping only refs `resolve` returns, so no path passes through anything the viewer cannot see.
-   * Every shortest predecessor of a node is kept; paths are enumerated back from `to`, first found first.
+   * Every shortest predecessor of a node is kept; paths are enumerated back from `to` over predecessors sorted by
+   * ref, and the answer is sorted lexicographically by its node-id sequence, so the same graph always answers the
+   * same paths in the same order (planner ruling 2026-10-04, Q4).
    */
   export async function shortestPaths(
     db: Queryable,
@@ -3628,6 +3873,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
       }
       frontier = next;
     }
+    for (const list of parents.values()) list.sort((x, y) => (x.ref < y.ref ? -1 : x.ref > y.ref ? 1 : 0));
     const paths: Array<{ refs: string[]; edges: Raw[] }> = [];
     const walk = (ref: string, refs: string[], edges: Raw[]): void => {
       if (paths.length >= PATH_MAX_PATHS) return;
@@ -3638,7 +3884,14 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
       for (const p of parents.get(ref) ?? []) walk(p.ref, [ref, ...refs], [p.edge, ...edges]);
     };
     if (dist.has(to)) walk(to, [], []);
+    paths.sort((x, y) => bySequence(x.refs, y.refs));
     return { paths, known };
+  }
+
+  /** Lexicographic order over node-id sequences (planner ruling 2026-10-04, Q4). */
+  function bySequence(a: readonly string[], b: readonly string[]): number {
+    for (let i = 0; i < Math.min(a.length, b.length); i += 1) if (a[i] !== b[i]) return a[i]! < b[i]! ? -1 : 1;
+    return a.length - b.length;
   }
   ```
   - The route turns `RawEdge` into `GraphEdgeView` exactly as plan C's `readGraphRing` does. Re-read that mapping and import its helper, or export it beside `expandGraph`.
@@ -3657,6 +3910,10 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   Run the file. Expected: PASS.
 
   Mutation: in `traceChain`, keep a hidden node in `next` (walk past it) → 27.509's `memberIn` line reds.
+
+  **Prose to sweep (Step 4's commit):**
+  - `apps/server/src/read/graph-neighbours.ts:29` and `:169` name the walker `expand` (header docblock; its own one-line doc). True if the export is an alias (`export { expand as expandGraph }`); if the function itself is RENAMED, both lines and the `readGraphRing` docblock's "`expand` reads the link tables raw" go false. Say which in the commit.
+  - Otherwise none found (searched: `graph/path`, `graph/trace`, `graph_path`, `graph_trace`, `shortest` in `apps/server/src`, `docs/`, `Features.md`, `test-cases/27-knowledge-graph.md`).
 
   Commit.
 
@@ -3684,20 +3941,37 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   Tests (extend `graph-tools.test.ts`, fake Session):
   - **27.511** `graph_neighbours {center: ticket t, hops: 2}`:
-    - GETs `hops=1`, then `hops=2`. When the first answers `cursor: '2000'`, it GETs that page before `hops=2`.
-    - Items are merged without duplicates, and `sentences[i] === edgeSentence(edges[i], …)`.
+    - The recorded GETs are exactly, in order: `hops=1` (no cursor), `hops=1&cursor=2000`, `hops=2`, when the first answers `cursor: '2000'` and the others `cursor: null`. Without `scope`, each carries `ws=` with EVERY workspace id the fake directory answers (two: `w`, `w2`), not just the first.
+    - Items are merged without duplicates: the fake puts `note:n` on BOTH the hop-1 second page and the hop-2 page, and the result holds `note:n` exactly once (`filter(ref === 'note:n').length === 1`), while the total item count equals the number of distinct refs the fake served (so a merge that drops everything after the first page also reds).
+    - Edges merge by id the same way (one edge id served twice → once).
+    - `sentences[i] === edgeSentence(edges[i], labelOf)` with `labelOf` built from the merged items, AND `sentences[0]` contains both of `edges[0]`'s end labels (a `() => ''` resolver reds).
     - `hops: 5` is refused by the schema.
 
-    Control: with `scope.workspaces: ['w9']` it never reads the directory.
-  - **27.512** `graph_path` and `graph_trace` build the paths above and pass the body through. A 404 → `item not found or not visible to you`.
+    Control: with `scope.workspaces: ['w9']` it never reads the directory, and every GET carries `ws=w9`.
+
+    Kills: (a) stop after the first page (ignore `cursor`) → the `cursor=2000` GET is missing and `note:n`'s hop-1 copy is lost; (b) merge items by pushing, not by ref → `note:n` twice; (c) default `ws` to `readDirectory(session)[0].workspaceId` only → `w2` missing from the query.
+  - **27.512** `graph_path` and `graph_trace` GET exactly `/v1/graph/path?from=ticket%3At&to=note%3An&maxHops=3` and `/v1/graph/trace?from=ticket%3At&kind=blocks&direction=in&maxDepth=4` (each ref `encodeURIComponent`-ed, as `similar` does in 27.431), and return the fake's body `toEqual` it with a marker field the fake added (`{ marker: 'p' }` / `{ marker: 't' }`), so a tool that rebuilds the body reds. Without `maxHops` / `maxDepth` the path has no `&maxHops=` / `&maxDepth=`. A 404 → `item not found or not visible to you`.
+
+    Kills: (a) `graph_trace` drops `direction` from its query string → the exact path differs; (b) `graph_path` always appends `&maxHops=${String(a.maxHops)}` → `maxHops=undefined` in the bare call; (c) a GET outside `readOrNotFound` → the 404 throws the transport error, not the sentence.
   - **27.513** (spec D §7 case 9, the MCP half; D6 changes no MCP output):
     - For EVERY tool in `allTools(fakeSession())`, no `inputSchema` key matches `/semantic|layer|switch/i`.
-    - Server half, in `apps/server/test/graph/concept-arm.test.ts`: `GET /v1/graph/neighbours?…&semantic=off` answers a body byte-equal to the same request without it. The server has no switch to hear.
+    - Server half, in `apps/server/test/graph/concept-arm.test.ts`: `GET /v1/graph/neighbours?…&semantic=off` answers a body byte-equal to the same request without it, and that body holds at least one `kind: 'concept'` item (precondition, so two empty rings cannot be "equal"). The server has no switch to hear.
 
     Control: the key scan finds `groups` on `graph_neighbours`, so the scan reads real schemas.
+
+    Kills: (a) add `semantic: z.boolean().optional()` (or `layer`) to `neighboursShape` → the MCP scan reds; (b) a server mutant that drops concept items when `request.query.semantic === 'off'` → the byte-equal leg reds. Plan C's route (`apps/server/src/routes/graph.ts`) is not on the ref yet; (b) is a mutant of the route this task extends, not of code in this task.
   - **27.514** FINAL lists `'graph_neighbours', 'graph_path', 'graph_trace', 'similar'` where the `graph` block sits; `TOOL_NAMES` agrees.
 
+    Kills: (a) register `similar` before the three new tools in `graphTools` → `allTools` order differs from FINAL; (b) leave `'graph_trace'` out of `tool-names.ts`'s `graph` block → `TOOL_NAMES` differs.
+
   Run: build domain → knowledge-graph → mcp-server → server; then the mcp-server suite, the server `test/graph/` and `test/mcp/`, and the knowledge-graph suite (logged). Expected: PASS.
+
+  **Prose to sweep (Step 5's commit):** each count below is re-derived from the tip at PR time (Tasks 2, 4, 5 and plan A move it too):
+  - `packages/mcp-server/test/register.test.ts:87` — 14.555's title "the final registry is the 63 tools of the plan";
+  - `test-cases/14-mcp-server.md:938` — 14.555's line "the final registry is the 63 tools in the plan's order";
+  - `Features.md:3407` — "nine registered tools (sixteen since MCP CRUD Task 6, sixty-three since MCP-everything)";
+  - `Features.md:3454` — "Sixty-three tools in both doors" (the MCP-everything bullet);
+  - `docs/manual.md:2043-2069` (§16 "What your assistant can do") lists every capability family; it names no graph or concept reading. Not false, but Task 9's manual section is where the three tools are named; do not add them here twice.
 
   Commit.
 
@@ -3817,6 +4091,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     });
 
     it('27.516 under the sweep, a read-only tool never writes and a write tool posts only the events it declares', async () => {
+      const postedBy = new Map<string, string[]>();
       for (const tool of allTools(fakeSession())) {
         const entry = SWEEP[tool.name];
         if (entry === undefined) throw new Error(`${tool.name} has no SWEEP entry`);
@@ -3826,16 +4101,23 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
         const session: Session = {
           ...base,
           postEvents: async (events) => {
-            posted.push(...events.map((event) => event.type));
+            posted.push(...(events as Array<{ type: string }>).map((event) => event.type));
             return base.postEvents(events);
           },
           post: async (path, body) => {
             routePosts += 1;
             return base.post(path, body);
           },
+          // add_attachment writes through postMultipart (attachment-tools.ts:39), not post: without this arm,
+          // misfiling it as read-only would pass both read-only legs.
+          postMultipart: async (path, fields, file) => {
+            routePosts += 1;
+            return base.postMultipart(path, fields, file);
+          },
         };
         const handler = allTools(session).find((t) => t.name === tool.name)!.handler;
         await handler(entry.args); // 14.88 runs every sweep entry to completion the same way (register.test.ts:270-278)
+        postedBy.set(tool.name, posted);
         if (MCP_READ_ONLY_TOOLS.includes(tool.name)) {
           expect(posted, `${tool.name} is read-only`).toEqual([]);
           expect(routePosts, `${tool.name} is read-only`).toBe(0);
@@ -3843,13 +4125,27 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
           for (const type of posted) expect(MCP_WRITE_AUDIT[tool.name]!.events, `${tool.name} posted ${type}`).toContain(type);
         }
       }
+      // Control: the recorder sees posts, and the D tools' sweep entries DO post, so the "declares" loop above is not
+      // a loop over [] for them. A sweep entry that answers a preview (no confirm_name, or a narrowing audience)
+      // posts nothing; give these four entries a non-preview call (manage_concept create, tag_items add with
+      // before === after, link_concepts add, resolve_suggestion accept) if Tasks 4–5 wrote them otherwise.
+      for (const name of ['create_ticket', 'manage_concept', 'tag_items', 'link_concepts', 'resolve_suggestion']) {
+        expect(postedBy.get(name)?.length ?? 0, `${name}'s sweep entry posted nothing`).toBeGreaterThan(0);
+      }
     });
   });
   ```
   - The overlay is the sweep's own: `{ ...fakeSession(), ...entry.session }` (`register.test.ts:273`). Re-read `Session`'s `post` and `postEvents` signatures (`src/session.ts`) and match the wrapper's parameter lists to them.
-  - Control for 27.516, in the same `it`: assert that at least one tool in the loop DID post. With today's sweep that is `create_ticket`'s entry; check it. This proves the recorder sees posts.
+  - Control for 27.516, in the same `it` (in the block above): `create_ticket` and the four D write tools each DID post under the sweep. "At least one tool posted" was satisfied by `create_ticket` alone and left the declared-events loop running over `[]` for every D tool. Re-read `SWEEP`'s `create_ticket` entry (`tool-sweep.ts`) and confirm it posts.
+  - `Session.postMultipart` is `(path, fields, file)` (`session.ts:17`); `post` is `(path, body)` (`:12`), `postEvents` is `(events: unknown[])` (`:13`), hence the cast in the recorder.
+
+  Kills (27.515): (a) leave `similar` out of `MCP_READ_ONLY_TOOLS` → its `classified` is 0; (b) list `manage_groups` in BOTH `MCP_WRITE_AUDIT` and `MCP_READ_ONLY_TOOLS` → its `classified` is 2; (c) keep a manifest row for a tool `allTools` no longer registers → the sorted-equality leg reds.
+
+  Kills (27.516): (a) move `add_attachment` from `MCP_WRITE_AUDIT` to `MCP_READ_ONLY_TOOLS` → `routePosts` is 1 (through the `postMultipart` arm) for a read-only tool; (b) drop `'concept.item_tagged'` from `tag_items`' `events` → `tag_items posted concept.item_tagged` reds; (c) drop `'concept.linked'` from `link_concepts`' `events` → the same leg reds for it.
 
   Run: build mcp-server, then this file (logged). Expected: PASS once Step 2's manifest is complete. Every failure message names the tool to fix.
+
+  **Prose to sweep (Steps 2–3's commit):** none found (searched: `write-audit`, `read-only tool`, `MCP_READ_ONLY`, `D2` in `packages/mcp-server/README.md`, `packages/mcp-server/src`, `Features.md` §14 MCP bullets). `src/index.ts:1-8`'s export list only grows.
 
   Commit.
 
@@ -3859,21 +4155,26 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   ```ts
   /** Every type `describeEvent` has an arm for (KG-D T7: the D2 audit reads it; 27.517's app half proves each renders). */
   export const HISTORY_RENDERED_TYPES: readonly string[] = [
-    // describeEvent's arms on release/smoothness (history-copy.ts:125-236), in switch order:
+    // describeEvent's arms on origin/release/knowledge-graph (history-copy.ts:126-248), in switch order:
     'ticket.created', 'ticket.field_set', 'ticket.transitioned', 'visibility.set', 'ticket.assigned',
     'ticket.collaborator_added', 'ticket.collaborator_removed', 'ticket.workflow_rebound', 'ticket.reparented',
     'ticket.ranked', 'ticket.closed', 'ticket.reopened', 'ticket.deleted', 'ticket.restored',
-    'comment.added', 'comment.edited', 'comment.deleted', 'attachment.added', 'claim.contested', 'claim.contested_resolved',
+    'comment.added', 'comment.edited', 'comment.deleted', 'attachment.added',
+    // plan A's arms, LANDED on the ref (history-copy.ts:226-227):
+    'ticket.link_added', 'ticket.link_removed',
+    'claim.contested', 'claim.contested_resolved',
     // KG-D Tasks 3 and 5:
     ...CONCEPT_EVENT_TYPES, 'workspace.concept_suggestion_rejected',
-    // plan A's arms (ticket.link_added, ticket.link_removed), once landed: re-grep `case '` and add every arm not listed
   ];
   ```
   The list is DATA copied from the switch. Before committing, re-grep `case '` in the file, because the release tip may hold arms this plan did not see (plan A's). Every arm must be listed.
   - `packages/app-core/test/history-rendered.test.ts`: a `SAMPLES: Record<string, unknown>` payload per type.
-    - Its keys must EQUAL `HISTORY_RENDERED_TYPES`. That control means a type added to the switch without a sample, or to the list without an arm, reds.
-    - For each type, `describeEvent({ …base, type, payload: SAMPLES[type] })` is not the raw type.
+    - Its keys must EQUAL `HISTORY_RENDERED_TYPES`. That catches a type in the list with no sample.
+    - For each type, `describeEvent({ …base, type, payload: SAMPLES[type] })` is not the raw type. That catches a type in the list with NO ARM (it falls back to the raw type).
+    - The reverse direction, an arm added to the switch but not to the list, is caught by neither of the two legs above (the list is data; nothing derives it from the switch). So, same `it`: read `../src/views/history-copy.ts` as text (`readFileSync(new URL('../src/views/history-copy.ts', import.meta.url), 'utf8')`), collect every `/case '([a-z_.]+)':/g` label, and expect the sorted label set to EQUAL the sorted `HISTORY_RENDERED_TYPES` (the spread `CONCEPT_EVENT_TYPES` are themselves case labels after Task 3). Precondition: the scan found more than 20 labels, so a regex that matches nothing cannot pass.
     - Take each sample from the arm's own `str(payload, …)` reads.
+
+    Kills (27.517's app half): (a) delete the `case 'concept.merged':` arm from `describeEvent` → its sample renders the raw type; (b) delete `'ticket.link_added'` from `HISTORY_RENDERED_TYPES` → the source-scan equality reds (and the SAMPLES-keys equality, if its sample stays); (c) add a new `case 'x.y':` arm without listing it → the source-scan equality reds.
 
   `apps/server/test/mcp/d2-audit.test.ts`:
   ```ts
@@ -3882,12 +4183,16 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   import { describe, expect, it } from 'vitest';
   import { domainRegistry } from '@gisik-nokma/domain';
   import { HISTORY_RENDERED_TYPES } from '@gisik-nokma/app-core';
-  import { KNOWN_D2_GAPS, MCP_WRITE_AUDIT, type D2Leg } from '@gisik-nokma/mcp-server';
+  import { KNOWN_D2_GAPS, MCP_WRITE_AUDIT, type D2Leg, type WriteAudit } from '@gisik-nokma/mcp-server';
 
   const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
   function failuresOf(tool: string): D2Leg[] {
-    const audit = MCP_WRITE_AUDIT[tool]!;
+    return legsOf(MCP_WRITE_AUDIT[tool]!);
+  }
+
+  /** The missing legs of ONE audit row; split out so 27.518's control can hand it a row with one field changed. */
+  function legsOf(audit: WriteAudit): D2Leg[] {
     const missing: D2Leg[] = [];
     if (audit.events.some((type) => !HISTORY_RENDERED_TYPES.includes(type))) missing.push('history');
     const file = audit.surface === null ? null : `${ROOT}${audit.surface.file}`;
@@ -3898,6 +4203,8 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   describe('27.517–27.518 the D2 audit: rendered by history, on an app surface, with a remove path', () => {
     it('27.517 the computed failures EQUAL the frozen ratchet (it may only shrink); control: the concept tools pass history', () => {
+      // Control: ROOT is the repo root. A wrong ROOT fails EVERY surface leg, and the first run's paste would freeze that.
+      expect(existsSync(`${ROOT}packages/app-core/src/views/history-copy.ts`)).toBe(true);
       const actual = Object.fromEntries(Object.keys(MCP_WRITE_AUDIT).map((tool) => [tool, failuresOf(tool)]).filter(([, legs]) => (legs as D2Leg[]).length > 0));
       const frozen = Object.fromEntries(Object.entries(KNOWN_D2_GAPS).map(([tool, gap]) => [tool, [...gap.missing]]));
       expect(actual, 'A tool newly failing D2 must be fixed; a fixed one must be REMOVED from KNOWN_D2_GAPS').toEqual(frozen);
@@ -3905,17 +4212,32 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     });
 
     it('27.518 every declared event and remove type is registered; control: a made-up remove type fails the remove leg', () => {
+      let declared = 0;
       for (const [tool, audit] of Object.entries(MCP_WRITE_AUDIT)) {
-        for (const type of audit.events) expect(domainRegistry.hasType(type), `${tool}: ${type}`).toBe(true);
+        for (const type of audit.events) {
+          declared += 1;
+          expect(domainRegistry.hasType(type), `${tool}: ${type}`).toBe(true);
+        }
+        if (audit.remove !== null) expect(domainRegistry.hasType(audit.remove), `${tool} remove: ${audit.remove}`).toBe(true);
       }
-      expect(domainRegistry.hasType('concept.unmade')).toBe(false);
+      expect(declared).toBeGreaterThan(0);
+      // Control, on the SUBJECT: the same audit row with only `remove` changed gains the 'remove' leg, and without the change does not.
+      const row = MCP_WRITE_AUDIT['manage_concept']!;
+      expect(legsOf(row)).not.toContain('remove');
+      expect(legsOf({ ...row, remove: 'concept.unmade' })).toContain('remove');
     });
   });
   ```
-  - `@gisik-nokma/app-core` is already a server dependency (`apps/server/package.json:49`).
-  - `@gisik-nokma/mcp-server` is one too. Re-read the line and cite it in the test's docblock.
+  - `@gisik-nokma/app-core` is already a server dependency (`apps/server/package.json:53`; the plan said `:49`, which is wrong on the ref).
+  - `@gisik-nokma/mcp-server` is one too (`apps/server/package.json:36`). Cite both in the test's docblock. Export `WriteAudit` from `src/index.ts` with the other three.
   - Paste the first run's `actual` into `KNOWN_D2_GAPS`, with a `why` per tool. Expected after the paste: PASS.
-  - Mutation: delete one concept arm from `describeEvent` → 27.517 reds, and the `history` leg appears for that tool.
+  - Mutation: drop `'concept.merged'` from `HISTORY_RENDERED_TYPES` (`...CONCEPT_EVENT_TYPES.filter((t) => t !== 'concept.merged')`) → 27.517 reds, and the `history` leg appears for `manage_concept`. (The plan said "delete one concept arm from `describeEvent`". That leaves the LIST unchanged, and this file reads only the list, so 27.517 stays green; that mutant is killed by the app half's sample leg above.)
+
+  Kills (27.517): (a) drop `'concept.merged'` from `HISTORY_RENDERED_TYPES` (`...CONCEPT_EVENT_TYPES.filter((t) => t !== 'concept.merged')`) → `manage_concept` gains `history` and the ratchet equality reds; (b) change `KG`'s marker for `link_concepts` to a string the file lacks → `surface` appears for it (once Task 8 has removed that leg); (c) `ROOT = fileURLToPath(new URL('../../../', import.meta.url))` → the `existsSync` control reds.
+
+  Kills (27.518): (a) set `tag_items`' `remove` to `'concept.item_removed'` (unregistered) → the remove-registered leg reds; (b) `legsOf` checks `audit.remove === null` only (drops `!domainRegistry.hasType(audit.remove)`) → the control's `'concept.unmade'` row has no `remove` leg.
+
+  **Prose to sweep (Step 4's commit):** none found (searched: `describeEvent`, `HISTORY_RENDERED`, `history renders`, `D2` in `packages/app-core/src/views/history-copy.ts` docblocks `:5-40` and `:194-213`, `Features.md`, `docs/manual.md`). The census docblock at `history-copy.ts:202-205` describes `history-copy.test.ts`'s domain-list census and stays true beside the new list.
 
   Commit.
 
@@ -3937,10 +4259,20 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 
   `packages/app-core/test/attribution.test.tsx`, **27.519**:
   - `attributionLabel('Ama Rangsa', 'mcp') === 'Claude, for Ama Rangsa'`.
+  - `attributionLabel('Ama Rangsa', 'mobile') === 'Ama Rangsa'` and `attributionLabel('Ama Rangsa', 'server') === 'Ama Rangsa'`: `'web'` alone cannot tell `origin === 'mcp'` from `origin !== 'web'` (`ORIGINS` is `['web', 'mobile', 'desktop', 'server', 'mcp']`, `envelope.ts:54`).
   - `HistoryList` renders an `origin: 'mcp'` event's actor span as `Claude, for Ama Rangsa`, and a `'web'` one as `Ama Rangsa` (control).
-  - Grep app-core and web tests for assertions on `gn-history__actor` text with an `mcp` origin. Any that exist change in this commit; name them in DONE.
+  - Same `it`: an `origin: 'mcp'` event whose actor the roster does not name renders `Claude, for Unknown person` (the inner `actorLabel` floor still applies; `provenance.ts:58-63`).
+  - Grep app-core and web tests for assertions on `gn-history__actor` text with an `mcp` origin. Any that exist change in this commit; name them in DONE. (On the ref the only `gn-history__actor` assertions are `packages/app-core/test/views/history-list.test.tsx:102-103`, an unnamed actor, origin not `mcp`.)
+
+  Kills: (a) `origin === 'mcp'` → `origin !== 'web'` in `attributionLabel` → the `'mobile'` leg reads `Claude, for Ama Rangsa`; (b) leave `history-list.tsx:75` as `actorLabel(…)` (no `attributionLabel` wrap) → the `HistoryList` `mcp` leg reads `Ama Rangsa`; (c) wrap the other way, `actorLabel(event.actorId, attributionLabel(nameOf(…), event.origin))` → the unknown-actor leg reads `Claude, for` (or `Claude, for <id>`, as the test's `nameOf` answers) instead of `Claude, for Unknown person`.
 
   Run: build domain → app-core → mcp-server → server. Then the app-core suite, the web suite (it renders `HistoryList`), the mcp-server suite and the server `test/mcp/` (logged). Expected: PASS.
+
+  **Prose to sweep (Step 5's commit):**
+  - `docs/manual.md:2041` — "**Every change it makes is recorded under your name**, like any other change in the ticket's history.": an MCP change now reads "Claude, for <your name>", not like any other change. Amend, and regenerate the help content `check:help` compares (`scripts/help-content.mjs` → `packages/app-core/src/help/content.generated.ts`).
+  - `packages/app-core/src/views/history-copy.ts:105-107` — "Routing through `actorLabel` is the same floor the actor line one span to the right uses … so a sentence and the actor beside it cannot disagree about who somebody is": for an `mcp` event the actor line now reads "Claude, for X" while a sentence naming the same person reads "X". Still the same floor, but the "cannot disagree" sentence needs the MCP prefix named.
+  - `packages/app-core/src/views/history-list.tsx:28-31` — "the label goes through `actorLabel`": now through `attributionLabel(actorLabel(…), origin)`; name the wrapper.
+  - Plan C's `provenanceLine` literal `', via Claude'` (Task 6's moved `graph-sentences.ts`) is not on the ref; its docblock, if it names the literal, changes with it.
 
   Commit.
 
@@ -4047,49 +4379,72 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - `replica-data-source.ts`: four `ReplicaGapError` entries, the `getGroups` shape (`:663` absences, `:1214` the reject). Concepts are online-only (`audienceClassOf` → `'withheld'`, Task 3).
   - Stubs: `stub-services.ts:132` gets `unstubbed('…')` ×4, and `fake-data-source.ts:34` gets defaults that reject with a 404 `HttpError`. Never an empty concept.
   - **27.520** (extend the online data source's existing test file; grep `getGroups` in `packages/app-core/test/online/` and add beside it):
-    - each read GETs its path;
-    - a `null` transport answer throws `HttpError(404)`;
-    - the replica rejects each with `ReplicaGapError`.
+    - each read GETs its EXACT path: `/v1/concepts/c`, `/v1/concepts/c/history`, `/v1/workspaces/w/suggestions`, and `getConceptAudience('w', 'c', [ticket t, note n])` → `/v1/workspaces/w/concepts/audience?conceptId=c&add=ticket%3At&add=note%3An` (both adds, in order);
+    - each read returns the UNWRAPPED value: `getConceptHistory` → the body's `events` array (`toBe(body.events)`), `getSuggestions` → `body.suggestions`, `getConcept` / `getConceptAudience` → the body;
+    - a `null` transport answer throws `HttpError` with `status === 404`, for EACH of the four (a loop over the four methods, not one);
+    - the replica rejects each of the four with `ReplicaGapError`, and `REPLICA_GAPS` has the four keys (12.185 compares those keys against the methods that reject, `replica-data-source.ts:635-640`).
 
-    Control: `getConceptAudience(ws, null, [t])` has no `conceptId=`.
+    Control: `getConceptAudience(ws, null, [t])` has no `conceptId=` (path `…/concepts/audience?add=ticket%3At`).
+
+    Kills: (a) `getConceptHistory` returns `raw as ConceptHistoryResponse` (no `.events`) → the unwrap leg reds; (b) drop `if (raw === null) throw new HttpError(404, path);` from `getSuggestions` → its `null` leg resolves `undefined`; (c) join the adds with `,` instead of `&add=` → the exact audience path reds.
+
+  **Prose to sweep (Step 2's commit):**
+  - `apps/web/test/helpers/stub-services.ts:51` — "every read below is `unstubbed`": stays true only if the four new reads go in as `unstubbed('…')` (the plan says they do).
+  - `packages/app-core/test/helpers/fake-data-source.ts:12-24` (the header docblock) makes no claim about the defaults' values, so the four rejecting defaults falsify nothing there; the neighbours answer empty (`:34` `getGroups: async () => []`), so give the four a one-line comment saying why they reject.
+  - Otherwise none found (searched: `getGroups`, `REPLICA_GAPS`, `ReplicaGapError` docblocks in `replica-data-source.ts:633-661`, `data-source.ts:244-254`).
 
   Commit.
 
 - [ ] **Step 3: The concept inspector (27.521–27.527), tests first**
 
   `packages/app-core/test/concept-inspector.test.tsx` (jsdom; the fake data source; a recording `make` and `ingest`):
-  - **27.521** A confirmed concept (`item.suggested === false`) renders:
+  - **27.521** A confirmed concept (`item.suggested === false`) renders, from a fixture `ConceptView` with TWO items and TWO links (one `direction: 'broader'`, one `'related'`):
     - its name as the heading and its summary;
     - "Created by Ama Rangsa" (`origin: 'web'`), or "Created by Claude, for Ama Rangsa" (`origin: 'mcp'`, through `attributionLabel`);
-    - one row per item (label + "Remove from concept" button);
-    - a Links list (`gn-kg-concept-links`) with a Remove per link;
+    - one row per item (label + "Remove from concept" button): exactly two rows, each with its own label;
+    - a Links list (`gn-kg-concept-links`) with a Remove per link, reading exactly `Broader: <name>` and `Related: <name>`;
     - Rename and Delete.
 
     Control: a concept with no items says `No items yet`.
+
+    Kills: (a) `Created by {props.nameOf(c.createdBy)}` (drop `attributionLabel`) → the `mcp` leg reads `Created by Ama Rangsa`; (b) swap the `'Broader: '` / `'Narrower: '` arms of the direction ternary → the broader link reads `Narrower: …`; (c) render `items.slice(0, 1)` → the exactly-two-rows leg reads one row.
   - **27.522** "Remove from concept" on TP ingests ONE `concept.item_untagged {itemKind:'ticket', itemId:TP}` on `{kind:'concept', id}`.
-    - The row disappears at once (optimistic).
-    - A refused result puts it back and calls `onRefusal` with the server's rule and reason.
+    - The row disappears at once (optimistic): the fake `ingest` returns a DEFERRED promise, and the row is absent BEFORE the test resolves it. (With an instantly-resolving fake, "at once" and "after the commit" render the same, so the optimistic leg could not fail.)
+    - A refused result (resolve the deferred with `{status:'refused', rule:'concept.not-tagged', reason:'That item is not in this concept.'}`) puts the row back, calls `onRefusal` with exactly `{ rule: 'concept.not-tagged', reason: 'That item is not in this concept.' }`, and does NOT call `onChanged`.
 
-    Control: a committed result calls `onChanged` once.
+    Control: a committed result calls `onChanged` once, and the row stays gone.
+
+    Kills: (a) move `setRemoved(… add(key))` after `await send(…)` → the row is still there while the deferred is pending; (b) in `send`, `if (results.some((r) => r.status === 'committed'))` → `if (results.length > 0)` → `onChanged` is called on the refusal; (c) drop the `setRemoved((s) => { … n.delete(key) … })` rollback → the row does not come back.
   - **27.523**
-    - Rename opens an inline field and ingests `concept.renamed {name}`.
-    - Delete asks "Delete the concept <name>? Its items stay; only the grouping goes." and ingests `concept.deleted {}` on Confirm, and nothing on Cancel.
-    - A link's Remove ingests `concept.unlinked {otherId, relation}`.
-  - **27.524** A suggestion (`item.suggested === true`):
-    - renders "Suggested", its terms and items, and NO Rename / Delete / Remove;
-    - "Confirm" shows a name field prefilled with the suggestion's label (`terms.join(' · ')`, e.g. `drag · column · board`), disabled while empty;
-    - submitting ingests ONE batch: `concept.created {name, fromSuggestion: <id>}` then one `concept.item_tagged` per item, all on one fresh concept id (`newUlid`).
-    - A batch is not atomic (`apps/server/src/ingest/ingest-service.ts:56-64`: "Each event commits or fails independently"). Same `it`: with the fake `ingest` answering committed, committed, refused (`concept.item-unknown`), `onChanged` IS called once (the concept exists, with two items) and `onRefusal` gets `concept.item-unknown`. Control: all-committed calls `onChanged` once and `onRefusal` never.
-  - **27.525** "Reject" ingests `workspace.concept_suggestion_rejected {signature, itemHashes}` on `{kind:'workspace', id: ws}`. Control: the payload has no `itemIds` key.
-  - **27.526** The narrowing preview (§3.2):
-    - Before Confirm, the inspector asks `getConceptAudience(ws, null, items)`. When `after < before`, it shows `Fewer people will see this concept: <after> of <members> members` above the Confirm button.
+    - Rename opens an inline field (prefilled with the current name); after the user types `Scroll on phones`, Save ingests `concept.renamed {name: 'Scroll on phones'}` (the TYPED name, not `c.name`); Save is disabled while the field is blank.
+    - Delete asks "Delete the concept <name>? Its items stay; only the grouping goes." and ingests `concept.deleted {}` on Confirm, and nothing on Cancel (precondition for the Cancel leg: the `alertdialog` was on screen before Cancel was pressed, and is gone after).
+    - A link's Remove ingests `concept.unlinked {otherId, relation}` with the link's own `otherId` and `relation` (the fixture's two links differ in both, and the test presses the SECOND link's Remove).
 
-    Control: when `after === before`, no sentence is shown. The user's Confirm click is the confirmation; the sentence is shown before it, never after.
+    Kills: (a) the rename form sends `{ name: c.name }` → the typed-name leg reds; (b) the Cancel button calls `send(…concept.deleted…)` → the Cancel leg sees one ingest; (c) the link Remove sends `c.links[0]`'s ids → the second link's press posts the first link's `otherId`.
+  - **27.524** A suggestion (`item.suggested === true`):
+    - renders "Suggested", its terms and items, and NO Rename / Delete / Remove (by role and name: no button named `Rename`, `Delete`, `Remove`, `Remove from concept`);
+    - (planner ruling 2026-10-04, Q5) the terms are a secondary line under the label: with the fixture `terms: ['drag', 'column', 'board']`, `label: 'drag · column · board'`, the heading reads `drag · column · board` and its NEXT element sibling reads exactly `drag, column, board`;
+    - "Confirm" shows a name field prefilled with the suggestion's label (`terms.join(' · ')`, e.g. `drag · column · board`), disabled while empty;
+    - submitting ingests ONE batch: `concept.created {name, fromSuggestion: <id>}` then one `concept.item_tagged` per item, all on one fresh concept id (`newUlid`): the batch's length is `1 + items.length` with a 2-item fixture, every `entity.id` is equal, and that id is NOT the suggestion's id.
+    - A batch is not atomic (`apps/server/src/ingest/ingest-service.ts:56-64`: "Each event commits or fails independently"). Same `it`: with the fake `ingest` answering committed, committed, refused (`concept.item-unknown`), `onChanged` IS called once (the concept exists, with two items) and `onRefusal` gets `concept.item-unknown`. Control: all-committed calls `onChanged` once and `onRefusal` never.
+
+    Kills: (a) `conceptEv(s.id, …)` for every event (reuse the suggestion id) → the not-the-suggestion-id leg reds; (b) in `send`, `if (bad !== undefined) { …refuse…; return false; }` BEFORE the `onChanged` line → the partial batch never calls `onChanged`; (c) render `ConfirmedPanel` for every item (drop the `props.item.suggested ?` branch) → "Suggested" is missing and Rename appears; (d) (planner ruling 2026-10-04, Q5) drop the `gn-kg-concept__terms` line → the heading's next sibling is the item list; (e) render `s.label` in the terms line → it reads `drag · column · board`.
+  - **27.525** "Reject" ingests `workspace.concept_suggestion_rejected` on `{kind:'workspace', id: ws}` whose payload `toEqual`s EXACTLY `{ signature: <fixture signature>, itemHashes: <fixture hashes> }` (the fixture's signature and hashes are distinct strings, neither equal to the suggestion id). That exact equality is the control: no `itemIds` (or any other) key. (The plan's "the payload has no `itemIds` key" alone could not fail: nothing in the code ever adds one.)
+
+    Kills: (a) send `{ signature: s.id, itemHashes: s.itemHashes }` → the signature leg reds; (b) `entity: { kind: 'workspace', id: s.id }` → the entity leg reds; (c) add `itemIds: s.items.map((i) => i.id)` to the payload → the exact-equality leg reds.
+  - **27.526** The narrowing preview (§3.2):
+    - Before Confirm, the inspector asks `getConceptAudience(ws, null, items)` (assert the call's three arguments exactly: `conceptId` is `null` for a concept that does not exist yet). With `{ members: 9, before: 6, after: 3 }` it shows `Fewer people will see this concept: 3 of 9 members` above the Confirm button (DOM order: the sentence precedes the button).
+
+    Control: when `after === before` (`{ members: 9, before: 6, after: 6 }`), no sentence is shown. The user's Confirm click is the confirmation; the sentence is shown before it, never after.
+
+    Kills: (a) the sentence uses `before` (the plan's mutation) → `6 of 9`; (b) `a.after <= a.before` → the control shows a sentence; (c) ask `getConceptAudience(ws, s.id, s.items)` → the argument leg reds.
   - **27.527** Through `KnowledgeGraph` (plan C's own test harness for the view, with a stub `source`; re-read plan C's 27.31x harness and reuse it):
-    - selecting a concept item renders `renderConceptPanel`'s node inside the inspector;
+    - selecting a concept item renders `renderConceptPanel`'s node inside the inspector, and the prop received the selected item (its `ref` equals the concept's);
     - selecting a ticket does not.
 
     Control: with no `renderConceptPanel`, the inspector shows plan C's default for a concept, unchanged.
+
+    Kills: (a) drop the `kind === 'concept'` condition in the inspector (render the prop for any selection) → the ticket leg shows the node; (b) call `renderConceptPanel(centreItem, …)` instead of the selected item → the `ref` leg reds. Plan C's `inspector.tsx` is not on the ref; bind the mutants to the landed condition.
 
   `packages/app-core/src/views/use-concept.ts`: a small loader hook, `useConcept(dataSource, conceptId | null)` → `{ data, error, reload }`. Copy the shape of the loader `TicketNotesSection` receives as `notes` (`notes.data`, `notes.error`, `notes.reload()`, `ticket-notes-section.tsx:66,85-86`). Re-read its source hook and mirror it.
 
@@ -4208,6 +4563,9 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     return (
       <section className="gn-kg-concept-inspector gn-kg-concept-inspector--suggested" aria-label={`Suggested concept ${s.label}`}>
         <p className="gn-kg-concept__badge">Suggested</p>
+        {/* planner ruling 2026-10-04, Q5: the label, then the terms as a secondary line under it (27.524). */}
+        <h3 className="gn-kg-concept__name">{s.label}</h3>
+        <p className="gn-kg-concept__terms">{s.terms.join(', ')}</p>
         <ul className="gn-kg-concept__items">{s.items.map((i) => <li key={`${i.kind}:${i.id}`}>{i.label}</li>)}</ul>
         <form onSubmit={(e) => {
           e.preventDefault();
@@ -4246,6 +4604,10 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   | `send` treats a refusal as committed | 27.522 reds |
   | the narrowing sentence uses `before` | 27.526 reds |
 
+  **Prose to sweep (Step 3's commit):**
+  - `packages/ui/src/ui.css:9582-9584` — "Four per-task regions, seeded empty by T1": a fifth block, `/* KG: D concept */`, makes "Four" false. Amend the count (or say "one region per task, plan C's four plus spec D's").
+  - Plan C's `react/inspector.tsx` / `knowledge-graph.tsx` docblocks (NOT on the ref; re-read as landed): any sentence that says the inspector's concept body is plan C's own, or that `KnowledgeGraphProps` lists every host hook, goes false with `renderConceptPanel`.
+
   Commit.
 
 - [ ] **Step 4: D6 — the switch changes no data (27.528–27.529)**
@@ -4259,14 +4621,20 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     - `ingest` is never called;
     - no non-GET request is made;
     - `getPreferences` / `putPreferences` and every workspace-settings call are never called;
-    - the ONLY storage write is `localStorage['gn-kg-semantic']`.
+    - the recorded `setItem` calls are EXACTLY three, every one on key `SEMANTIC_KEY` (`'gn-kg-semantic'`), the last one writing the Off value plan C's `writeSemantic` writes. ("The ONLY storage write is the key" was also true of a switch that wrote nothing at all.)
 
-    Control in the same `it`: clicking "Remove from concept" in a concept panel DOES call `ingest`, so the spies are live.
+    Control in the same `it`: with the switch back On, clicking "Remove from concept" in a concept panel DOES call `ingest`, so the spies are live.
+
+    Kills: none of this task's code implements the switch; it guards plan C's view-only switch (spec C §6.4) and this task's host wiring. Concrete mutants it must turn red: (a) `ConceptInspector` (or the host's `renderConceptPanel`) ingesting anything on mount or unmount (a "seen" write); (b) the host persisting the switch through `putPreferences` as well as `localStorage`.
   - **27.529** The concept data is unchanged by the switch:
-    - `getConcept(CP)` answers byte-equal before and after an Off→On cycle;
-    - the ring source's requests differ only by the `concepts` group (plan C's `fetchGroups`).
+    - over the ONLINE data source with a recording `http` (not the fake data source, which would hand back the object the test gave it), `getConcept(CP)` issues the same GET path before and after an Off→On cycle, and the path carries no `semantic` parameter;
+    - the ring source's requests differ only by the `concepts` group (plan C's `fetchGroups`): Off's `groups=` lacks `concepts`, On's has it, and every other query parameter is identical.
 
     The MCP half is 27.513 (Task 6).
+
+    Kills: (a) `getConcept`'s path gains `?semantic=${readSemantic() ? 'on' : 'off'}` → the same-path leg reds; (b) the host drops `concepts` AND another group when Off → the "only by `concepts`" leg reds. ("`getConcept(CP)` answers byte-equal" against a fake data source could not fail: the fake answers the fixture whatever the switch does.)
+
+  **Prose to sweep (Step 4's commit):** none: the step adds a test file only (searched: `semantic`, `gn-kg-semantic` in `packages/app-core/src`, `Features.md`).
 
   Run, then commit.
 
@@ -4277,14 +4645,22 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     - Semantic Off removes both pills.
 
     Control: On draws them again.
-  - **27.531** The colour scan and `ui.css` block checks (plan C's `colour-scan` case and the CSS structure test, re-run) pass with the new block.
+
+    Kills: (a) drop the `props.item.suggested ?` branch in `ConceptInspector` (always `ConfirmedPanel`) → the suggested pill's panel has no "Suggested" / "Confirm"; (b) the host passes `renderConceptPanel` only for `suggested === false` items → clicking the suggested pill shows plan C's default body.
+  - **27.531** The colour scan and `ui.css` block checks (plan C's `colour-scan` case and the CSS structure test, re-run) pass with the new block. Precondition: the scan's input includes the `/* KG: D concept */` block (assert the block's first selector is among the scanned rules), so a block outside the scanned region cannot pass by not being read.
+
+    Kills: (a) a raw `#hex` or `rgb(…)` in the `/* KG: D concept */` block → the colour scan reds; (b) the block placed below `/* KG: end */` → the structure check reds (plan C's check; re-read what it asserts as landed).
   - **27.532** `KNOWN_D2_GAPS`:
     - remove the `surface` leg for `manage_concept`, `link_concepts` and `resolve_suggestion`. Their markers `gn-kg-concept-inspector` and `gn-kg-concept-links` now exist in `packages/app-core/src/views/concept-inspector.tsx`, the file T7's `KG` constant already names;
     - 27.517 is green with the smaller ratchet.
 
     Control: re-adding one removed leg to the ratchet reds 27.517.
 
+    Kills: (a) rename the links list's class `gn-kg-concept-links` → `gn-kg-concept__links` in `concept-inspector.tsx` → `link_concepts`' surface fails and 27.517 reds; (b) leave `resolve_suggestion`'s `surface` leg in `KNOWN_D2_GAPS` → 27.517 reds (fixed but still listed).
+
   Run: the browser package (`pnpm --filter @gisik-nokma/knowledge-graph-browser test`, per plan C), the server `test/mcp/d2-audit.test.ts`, and the ui suite (logged).
+
+  **Prose to sweep (Step 5's commit):** `packages/mcp-server/src/tools/write-audit.ts` — the `why` strings of the three removed `KNOWN_D2_GAPS` legs go with them, and the `KG` constant's comment ("Task 8 creates it") becomes past tense. Otherwise none found (searched: `KNOWN_D2_GAPS`, `surface` in `Features.md` §24 D's T7 bullet, `test-cases/27-knowledge-graph.md` 27.517).
 
   Commit.
 
@@ -4305,7 +4681,7 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 - Modify:
   - `packages/app-core/src/data-source.ts` (+ online, replica and stubs): `getItemConcepts(workspaceId, item)`;
   - `packages/app-core/src/views/ticket-sheet.tsx:4417-4435`: mount `ConceptsRow` directly ABOVE `TicketNotesSection`;
-  - `apps/web/src/notes/note-document.tsx:710` (beside `NoteByline`): mount it;
+  - `apps/web/src/notes/note-document.tsx:734` (beside `NoteByline`; the plan said `:710`, which is wrong on the ref): mount it;
   - the phone ticket sheet's Details (grep where `TicketNotesSection` mounts on phone, if separately) and the phone note panel (`apps/web/src/notes/notes-phone-panel.tsx`);
   - `concept-inspector.tsx`: a "History" disclosure;
   - `docs/manual.md`: a "Concepts and suggestions" section;
@@ -4325,19 +4701,30 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
 - [ ] **Step 2: The row (27.540–27.544), tests first**
 
   `packages/app-core/test/concepts-row.test.tsx` (jsdom, the fake data source):
-  - **27.540** With `getItemConcepts` answering [CP, CW], the row reads `Concepts` followed by two pills, each with a remove button labelled `Remove from concept <name>`.
+  - **27.540** With `getItemConcepts` answering [CP, CW], the row reads `Concepts` followed by two pills, each with a remove button labelled `Remove from concept <name>` (CP's and CW's names, each on its own pill). `getItemConcepts` was called with exactly `(ws, { kind: 'ticket', id: T })`.
     - D4 is the server's. The control: an answer of `[]` renders nothing at all (no empty heading), and a 404 renders nothing.
-  - **27.541** Removing CP's pill:
-    - ingests `concept.item_untagged {itemKind, itemId}` on `{kind:'concept', id: CP}`;
-    - hides the pill at once;
-    - shows a toast with Undo that re-ingests `concept.item_tagged`.
 
-    Control: a refusal restores the pill and calls `onRefusal`.
-  - **27.542** With `localStorage['gn-kg-semantic'] = 'off'` the row renders nothing, and `getItemConcepts` is NOT called. With `'on'` (or unset) it renders. With a throwing `localStorage` it renders (plan C's rule: default On).
-  - **27.543** `NoteDocument` (web) renders the row for its note, and the ticket sheet renders it above the Notes section.
-    - The ticket-sheet half is DOM order: `ticket-notes` follows the row.
+    Kills: (a) the remove button's `aria-label` drops the name (`'Remove from concept'`) → the per-pill label leg reds; (b) `if (shown.length === 0 && toast === null) return null;` deleted → the `[]` control renders an empty `Concepts` heading; (c) call `getItemConcepts(props.workspaceId, { kind: 'ticket', id: props.workspaceId })` (wrong item) → the argument leg reds.
+  - **27.541** Removing CP's pill:
+    - ingests `concept.item_untagged {itemKind, itemId}` on `{kind:'concept', id: CP}` (the row's item, and CP's id, not CW's);
+    - hides the pill at once: the fake `ingest` returns a DEFERRED promise, and CP's pill is absent BEFORE the test resolves it (an instant fake cannot tell "at once" from "after the commit");
+    - after the commit, shows a toast with Undo; Undo ingests `concept.item_tagged` with the SAME `{itemKind, itemId}` on CP, and on its commit CP's pill is back.
+
+    Control: a refusal (resolve the deferred with `refused`) restores the pill and calls `onRefusal` with the server's exact `{ rule, reason }`, and shows no toast.
+
+    Kills: (a) move `setHidden((s) => new Set(s).add(c.id))` after the `await` → the pill is still there while the deferred is pending; (b) `undo` ingests `ev(c.id, 'concept.item_untagged')` → the Undo leg sees the wrong type; (c) drop the `setHidden(… n.delete(c.id) …)` after a refusal → the pill does not come back.
+  - **27.542** With `localStorage['gn-kg-semantic'] = 'off'` the row renders nothing, and `getItemConcepts` is NOT called. With `'on'` (or unset) it renders. With a throwing `localStorage` it renders (plan C's rule: default On). Same `it`: a row rendered with `'on'` (pills loaded), then the key set to `'off'` and the component re-rendered (`rerender`), renders nothing. (Mounted with `'off'` from the start, `concepts` stays `null`, so the render guard's `!on` is never the deciding term; only an already-loaded row tests it.)
+
+    Kills: (a) drop `if (!on) return;` in the `useEffect` → `getItemConcepts` IS called with `'off'`; (b) drop `!on ||` from the render guard → the re-rendered row keeps its pills; (c) `catch { return false; }` in `semanticOn` → the throwing-storage leg renders nothing. Each leg has its own mutant: the plan's one "drop the `!on` early return" names two different lines.
+  - **27.543** `NoteDocument` (web) renders the row for its note (`getItemConcepts` called with `{ kind: 'note', id: <noteId> }`), and the ticket sheet renders it above the Notes section.
+    - The ticket-sheet half is DOM order: `ticket-notes` follows the row (`row.compareDocumentPosition(notesSection) & Node.DOCUMENT_POSITION_FOLLOWING`), and both are present (precondition).
     - Control: a ticket with no concepts shows no row.
+
+    Kills: (a) mount `<ConceptsRow` BELOW `<TicketNotesSection` in `ticket-sheet.tsx` → the order leg reds; (b) `note-document.tsx` passes `item={{ kind: 'ticket', id: note.noteId }}` → the note's argument leg reds.
   - **27.544** Phone: the same row in the phone ticket sheet and the phone note panel, at full width. Copy the nearest phone-sheet test's harness and cite it.
+    - jsdom has no layout, so "at full width" cannot be MEASURED here: assert the row is a direct child of the Details column the phone sheet already lays out full width (the same parent `TicketNotesSection` has), and do not add a browser case (planner ruling 2026-10-04, Q6: the structural leg is accepted).
+
+    Kills: (a) the phone ticket sheet does not mount `ConceptsRow` → the presence leg reds; (b) mount it inside a narrower wrapper than `TicketNotesSection`'s parent → the same-parent leg reds.
 
   `packages/app-core/src/views/concepts-row.tsx`:
   ```tsx
@@ -4418,25 +4805,39 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
   - Mounting:
     - `ticket-sheet.tsx`: directly above `:4424`'s `<TicketNotesSection`, `<ConceptsRow workspaceId={workspaceId} item={{ kind: 'ticket', id: ticketId }} dataSource={dataSource} make={make} onRefusal={(r) => setServerRefusal(r)} />`, using the same props `TicketNotesSection` receives.
     - `ticket-sheet.tsx`'s props above are the ones `<TicketNotesSection` receives at `:4424-4434` (read: `dataSource`, `workspaceId`, `ticketId`, `make`, `onRefusal={(r) => setServerRefusal(r)}`).
-    - `note-document.tsx` has no `make` in scope: its `write` builds one per call with `makeSubmittedFactory({ actorId: user.id, origin: 'web' })` (`:522-537`), and its only server-refusal line is the Restore banner's `restoreRefusal` (`:744-748`, class `gn-refusal gn-refusal--server`). So, directly after `<NoteByline … />` (`:710`), mount `{user === null ? null : <ConceptsRow workspaceId={note.workspaceId} item={{ kind: 'note', id: note.noteId }} dataSource={dataSource} make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })} onRefusal={(r) => setConceptRefusal(r.reason)} />}`, add `const [conceptRefusal, setConceptRefusal] = useState<string | null>(null);`, and render it under the row in the same `<p role="alert" className="gn-refusal gn-refusal--server">` shape.
+    - `note-document.tsx` has no `make` in scope: its `write` builds one per call with `makeSubmittedFactory({ actorId: user.id, origin: 'web' })` (`:542-557`, the factory call at `:544`; the plan said `:522-537`), and its only server-refusal line is the Restore banner's `restoreRefusal` (`:769-773`, class `gn-refusal gn-refusal--server`; the plan said `:744-748`). So, directly after `<NoteByline … />` (`:734`; the plan said `:710`), mount `{user === null ? null : <ConceptsRow workspaceId={note.workspaceId} item={{ kind: 'note', id: note.noteId }} dataSource={dataSource} make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })} onRefusal={(r) => setConceptRefusal(r.reason)} />}`, add `const [conceptRefusal, setConceptRefusal] = useState<string | null>(null);`, and render it under the row in the same `<p role="alert" className="gn-refusal gn-refusal--server">` shape.
   - `ui.css`: a `/* D: concepts row */` block in the ticket-sheet Details region, on the 2026-09-29 layout rules, with pills in plan C's concept tokens.
 
   Run: build → the app-core and web suites (logged). Expected: PASS.
 
   Mutation: drop the `!on` early return → 27.542 reds.
 
+  **Prose to sweep (Step 2's commit):**
+  - `packages/app-core/src/views/ticket-sheet.tsx:4417-4422` — "THE NOTES SECTION — Subtasks → Notes → Comments, the prototype's own order (spec §10.1)": with the row mounted directly above `<TicketNotesSection` (`:4424`), the Details order is Subtasks → Concepts → Notes → Comments. Amend the comment (and say the Concepts row is spec D §6's, not the prototype's).
+  - `docs/manual.md` §15 (Notes, `:1809`…) describes the note's byline (`:1955`: "an attached ticket appears as a badge in the note's own byline"); the row sits under the byline and is described by Step 4's new section, so nothing here goes false. Re-read `:1940-1960` when mounting, in case the byline paragraph lists what sits under it.
+  - Plan C's `react/semantic-pref.ts` docblock (NOT on the ref): if it says the key is read only by the Knowledge Graph, app-core's `ConceptsRow` makes that false.
+
   Commit.
 
 - [ ] **Step 3: Concept history (27.545)**
 
   In `ConfirmedPanel` (Task 8), add a `<details className="gn-kg-concept__history"><summary>History</summary>…</details>`. When opened, it loads `getConceptHistory(c.id)` and renders `<HistoryList events={events} nameOf={props.nameOf} />`. Extend `HistoryList` with optional `conceptName` and `itemLabel` resolvers passed into `HistoryCopyContext` (`history-list.tsx:61`).
-  - The `itemLabel` resolver answers from the loaded concept's items. Any id NOT among them, including `''` (redacted, Task 4), answers `undefined`, so the sentence reads "a ticket" / "a note".
+  - The `itemLabel` resolver (`(kind, id) => string | undefined`, Task 3's type per planner ruling 2026-10-04, Q2) answers from the loaded concept's items. Any id NOT among them answers `undefined`, so the sentence reads "a ticket" / "a note". A redacted `''` never reaches the resolver: Task 3's arm reads it as absent and falls through to "a ticket" / "a note" itself.
 
   `packages/app-core/test/concept-history.test.tsx`, **27.545**:
   - an MCP-made tag reads `Added GN-12 Scroll jumps` with the actor `Claude, for Ama Rangsa`;
-  - a redacted untag reads `Removed a ticket from the concept`.
+  - a redacted untag (`itemId: ''`) reads `Removed a ticket from the concept`;
+  - an untag naming an id that is NOT among the loaded concept's items (a real-looking ULID, not `''`) also reads `Removed a ticket from the concept`, while the same event naming a loaded item's id reads `Removed GN-12 Scroll jumps from the concept`.
+  - `getConceptHistory` is not called until the `<details>` is opened (precondition: zero calls before, one after).
 
   Control: a `web` event's actor is the bare name.
+
+  Kills: (a) the `itemLabel` resolver falls back to the id (`?? id`) → the unknown-id leg reads `Removed 01J… from the concept` (the `''` leg is Task 3's arm, killed by 27.456 (d)/(e); planner ruling 2026-10-04, Q2); (b) `HistoryList` does not pass `itemLabel` into `HistoryCopyContext` (`history-list.tsx:61`) → the loaded-item leg reads `Removed a ticket …`; (c) load the history on mount, not on open → the precondition leg sees one call before opening.
+
+  **Prose to sweep (Step 3's commit):**
+  - `packages/app-core/src/views/history-list.tsx:6-10` — "The history view IS the ledger, filtered (spec §3). Every entry shows the actor, the origin device, and BOTH CLOCKS": still true, but the docblock's examples are ticket-only; `HistoryList` now also renders a concept's history. Add one line, or nothing if the reviewer judges it still true.
+  - `history-list.tsx:61` — `const ctx: HistoryCopyContext = { nameOf, stateName, typeName };`: the code line itself changes; the props docblock above it (`:57`, "Optional resolvers for the sentences — see `HistoryCopyContext`") stays true.
+  - Task 3's `HistoryCopyContext.itemLabel` docblock and type (`=> string | undefined`) match this resolver (planner ruling 2026-10-04, Q2); nothing to sweep.
 
   Commit.
 
@@ -4449,8 +4850,17 @@ The lane re-measures all of this; the numbers are what to expect, not what to co
     - the semantic layer switch ("changes what you see, never the data");
     - the MCP tools by name, with "Claude, for <you>" in history.
   - Run `pnpm check:help`. If it requires a help entry per manual section (re-read `scripts/` for it), add the entry.
-  - **27.546** `check:help` is green, and the manual contains each of `Concepts`, `Suggested`, `Confirm`, `Reject`, `Semantic layer` (a grep test beside the existing manual checks; cite it).
+  - **27.546** `check:help` is green, and the manual's NEW section (the text from its `Concepts and suggestions` heading to the next heading of the same level) contains each of `Concepts`, `Suggested`, `Confirm`, `Reject`, `Semantic layer`, and the five MCP tool names `list_concepts`, `get_concept`, `manage_concept`, `tag_items`, `review_suggestions` (a grep test beside the existing manual checks; cite it). Scope the grep to that section: `docs/manual.md` on the ref already contains `Confirm` once (and `Concepts`, `Suggested`, `Reject`, `Semantic layer` zero times), so a whole-file grep for `Confirm` could not fail. Precondition: the section is found and non-empty, and does NOT contain `Connected assistants` (a §16 phrase), so the bound really stops at the next heading.
+
+    Kills: (a) write the section without the semantic-layer paragraph → `Semantic layer` is missing from the section; (b) name the MCP tools in §16's "What your assistant can do" list instead of the new section → the tool-name leg reds; (c) edit `docs/manual.md` without regenerating `packages/app-core/src/help/content.generated.ts` → `check:help` (`scripts/help-content.mjs --check`, `package.json:24`) reds.
   - **27.547** `KNOWN_D2_GAPS` holds NO concept tool (`tag_items`' surface leg is dropped now), and 27.517 is green. Control: `failuresOf('tag_items')` is `[]`.
+
+    Kills: (a) the remove button's `aria-label` loses the literal `Remove from concept` (e.g. `Untag ${c.name}`) → `tag_items`' surface fails and the control reds; (b) leave `tag_items` in `KNOWN_D2_GAPS` → 27.517 reds (fixed but listed).
+
+  **Prose to sweep (Step 4's commit):**
+  - `packages/mcp-server/src/tools/write-audit.ts` — `tag_items`' `KNOWN_D2_GAPS` `why` goes with the row, and the `ROW` constant's comment, if it says the file does not exist yet, goes past tense.
+  - `docs/manual.md:3-8` (the introduction: "Where the product cannot do something yet, this manual says so plainly") makes no section count claim; no section index exists to update (searched: `§16`, `sections`, a contents list). Number the new section §17 after §16 (`:2021`), or say why not.
+  - Otherwise none found (searched: `concept`, `semantic` in `docs/manual.md`, `packages/app-core/src/help/`).
 
   Commit.
 

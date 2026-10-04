@@ -13,6 +13,7 @@ import {
   ticketAssignedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
+  ticketLinkAddedPayload,
   visibilitySetPayload,
   draftAllows,
   draftNotAllowedReason,
@@ -208,6 +209,12 @@ export const VISIBILITY_CLAIM_MISMATCH_REASON = 'This claim does not name the ti
  * rebuild the existence oracle Task 8's 404s removed one layer up.
  */
 export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
+/**
+ * Typed links, rules 6 and 7 (spec A §2.3): the one sentence for a target
+ * this person cannot see AND for one that does not exist, so the gate is no
+ * existence oracle (`canSee` answers false for both, its own docblock).
+ */
+export const LINK_TARGET_NOT_VISIBLE_REASON = 'The other ticket does not exist in this workspace, or you cannot see it.';
 /**
  * E6-17 (2026-09-21). The person a `ticket.assigned` or
  * `ticket.collaborator_added` NAMES must hold a role in the ticket's workspace.
@@ -1668,6 +1675,23 @@ export async function checkVisibilityPermission(
   // same list for the client precheck and the replica.
   if (access === 'own-draft' && !draftAllows(env.type)) {
     return refuseWith(DRAFT_NOT_ALLOWED_RULE, draftNotAllowedReason(env.type));
+  }
+
+  /**
+   * Typed links (spec A, rules 6 and 7). Adding needs the right to edit the
+   * source: for a ticket-stream event that right IS `canSee` (the line above,
+   * the same gate `ticket.field_set` meets). Both events also need the target
+   * to be visible. Rule 7's "either end" collapses to "both": a person who sees
+   * only one end is never shown the link (§2.4), so there is nothing they
+   * could be removing. A payload that does not parse passes through to the
+   * engine's `malformed-payload`, the named-person block's convention below.
+   */
+  if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
+    const link = ticketLinkAddedPayload.safeParse(env.payload);
+    if (link.success && link.data.targetId !== env.entity.id
+        && !(await canSee(ctx.db, ctx.sessionUserId, link.data.targetId))) {
+      return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
+    }
   }
 
   /**
