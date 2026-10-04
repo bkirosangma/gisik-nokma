@@ -126,6 +126,10 @@ export type TicketState = {
    * reducer drops the key with the last link, so the two shapes agree.
    */
   links?: TicketLink[];
+  /** A Decision's CURRENT outcome (DC-4/PS-2). ABSENT when none: never decided, cleared, or released by a loop reset. */
+  outcome?: string;
+  /** A Decision's pass records, oldest first (PS-2). ABSENT until the first choice; the reducer, `rowToTicketState` and the replica all agree. */
+  passes?: PassRecord[];
   /**
    * On a DRAFT only: the published tickets it holds as pending children (drafts T6, owner ruling O1), in the order
    * held, filed by `ticket.reparented { childId }` on the draft's stream. Neither ticket's `parentId` moves until
@@ -150,6 +154,11 @@ export type TicketState = {
  * ABSENT when none, on a plain entry and a `from` entry alike.
  */
 export type TicketLink = { kind: TicketLinkKind; targetId: string; from?: string; label?: string };
+
+/** One change of mind inside a pass: what the sender replaced, with whom and when (`env.actorId`, `env.serverTime`). */
+export type PassRevision = { from: string | null; to: string | null; by: string; at: string };
+/** One pass of a Decision: the choice that opened it (`by`, `at`) and every revision since. `outcome` is the pass's CURRENT value (null after a clear). */
+export type PassRecord = { pass: number; outcome: string | null; by: string; at: string; revisions: PassRevision[] };
 
 /** A draft's head state: who drafted it, when, and whether they have discarded it. */
 export type TicketDraft = { authorId: string; at: string; discarded?: true };

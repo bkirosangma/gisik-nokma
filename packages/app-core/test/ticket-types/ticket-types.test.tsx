@@ -682,7 +682,10 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     const byName = new Map(gateway.submitted.map((event) => [(event.payload as TicketTypeDef).name, event.payload as TicketTypeDef]));
     expect(byName.get('Errand')?.rank).toBe(5);
     expect(byName.get('Invoice')?.rank).toBe(6);
-    expect(renderedOrder(container).slice(0, builtins.length)).toEqual(builtins.map((b) => b.name));
+    // The list sorts by rank, then id (wtg2 T5: the rank-3 Decision draws between Story and Task), not seed order.
+    expect(renderedOrder(container).slice(0, builtins.length)).toEqual(
+      [...builtins].sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : 1)).map((b) => b.name),
+    );
     expect(renderedOrder(container).slice(builtins.length)).toEqual(['Errand', 'Invoice']);
   });
 });

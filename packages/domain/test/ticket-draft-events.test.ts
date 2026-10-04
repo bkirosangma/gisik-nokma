@@ -170,6 +170,7 @@ const REFUSED: readonly string[] = [
   'ticket.ranked',
   'ticket.deleted',
   'ticket.restored',
+  'ticket.decided', // wtg2 T5 (29.135, spec D-7)
   'comment.added',
   'comment.edited',
   'comment.deleted',
@@ -205,6 +206,8 @@ describe('28.007 the author allowlist', () => {
     }
     expect(draftNotAllowedReason('ticket.deleted')).toBe('A draft cannot be deleted. Discard it instead.');
     expect(draftNotAllowedReason('ticket.closed')).toBe('A draft cannot be closed. Publish it first, or discard it.');
+    // 29.135 (spec D-7): the verb names the act, not the generic "changed that way"
+    expect(draftNotAllowedReason('ticket.decided')).toBe('A draft cannot be decided. Publish it first, or discard it.');
     expect(draftNotAllowedReason('comment.added')).toBe(
       'A draft cannot be commented on. Publish it first, or discard it.',
     );

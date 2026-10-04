@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import { BUILTIN_TICKET_TYPE_SEEDS, type SubmittedEvent, type TicketTypeDef, type WorkflowDef } from '@gisik-nokma/domain';
 import { EMPTY_BOARD_COPY, type BoardView, type TicketListView } from '@gisik-nokma/app-core';
 import { HttpError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
@@ -446,7 +446,9 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
     );
     const user = userEvent.setup();
     await user.click(await findEnabledCreate());
-    expect(await typeOptionLabels(user)).toEqual(['Epic', 'Story', 'Task', 'Sub-task']);
+    // Derived from the seeds, not retyped (wtg2 T5: the fallback ladder is five, Decision last in seed order).
+    expect(await typeOptionLabels(user)).toEqual(BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name));
+    expect(BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name)).toEqual(['Epic', 'Story', 'Task', 'Sub-task', 'Decision']);
     // The sentence that stops the ladder from passing itself off as the answer.
     expect(screen.getByText(BUILTIN_LADDER_NOTICE)).toBeInTheDocument();
   });

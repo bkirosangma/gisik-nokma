@@ -147,6 +147,7 @@ export const BUILTIN_TICKET_TYPE_SEEDS = [
   { id: 'story', name: 'Story', icon: 'book', rank: 2 },
   { id: 'task', name: 'Task', icon: 'check', rank: 3 },
   { id: SUB_TASK_TYPE_ID, name: 'Sub-task', icon: 'list', rank: 4 },
+  { id: DECISION_TYPE_ID, name: 'Decision', icon: 'diamond', rank: 3 },
 ] as const;
 
 /**

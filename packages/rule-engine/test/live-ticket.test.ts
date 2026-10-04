@@ -84,6 +84,8 @@ const GATED: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown]> 
   // refuses them like the rest; the draft gate (T5) is a different, earlier question.
   ['ticket.published', () => ({ projectId: PROJECT })],
   ['ticket.discarded', () => ({})],
+  // wtg2 T5 (29.135): a decision is an act on the ticket, so a deleted ticket refuses it like the rest.
+  ['ticket.decided', () => ({ outcome: 'Yes' })],
   ['attachment.added', () => ({ attachmentId: '01J9GATT000000000000000000', filename: 'a.txt', mime: 'text/plain', size: 1, sha256: 'ab' })],
   ['visibility.set', (id) => ({ ticketId: id, mode: 'explicit', userIds: [PEER] })],
 ];

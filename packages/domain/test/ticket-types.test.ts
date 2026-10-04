@@ -184,15 +184,16 @@ describe('ticketTypeDefSchema', () => {
 });
 
 /**
- * 5.2 — Asserts the shipped ladder's ranks (epic1/story2/task3/sub-task4), that DEEPEST_RANK equals the ladder's real computed maximum (not just the literal 4), and that builtinTicketTypeDefs materialises all four types bound to the given default workflow.
+ * 5.2 — Asserts the shipped ladder's ranks (epic1/story2/task3/sub-task4, and the Decision at 3 beside Task, wtg2 T5 case 29.134), that DEEPEST_RANK equals the ladder's real computed maximum (not just the literal 4), and that builtinTicketTypeDefs materialises all five types bound to the given default workflow.
  */
 describe('built-in seeds', () => {
-  it('ships the ladder epic(1) story(2) task(3) sub-task(4)', () => {
+  it('ships the ladder epic(1) story(2) task(3) sub-task(4) decision(3)', () => {
     expect(BUILTIN_TICKET_TYPE_SEEDS.map((t) => [t.id, t.rank])).toEqual([
       ['epic', 1],
       ['story', 2],
       ['task', 3],
       ['sub-task', 4],
+      ['decision', 3],
     ]);
     expect(SUB_TASK_TYPE_ID).toBe('sub-task');
     // DEEPEST_RANK is the rank the parent-required rule keys off (design
@@ -205,7 +206,7 @@ describe('built-in seeds', () => {
 
   it('materialises full defs bound to a workspace default workflow', () => {
     const defs = builtinTicketTypeDefs('wf-default');
-    expect(defs).toHaveLength(4);
+    expect(defs).toHaveLength(5);
     for (const def of defs) {
       expect(ticketTypeDefSchema.parse(def)).toEqual(def);
       expect(def.workflowId).toBe('wf-default');

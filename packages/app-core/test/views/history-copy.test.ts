@@ -44,13 +44,13 @@ const ENTITY_KIND_TICKET_UNIVERSE = [
 ] as const;
 
 /**
- * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20; the drafts pair, T1, made it 22). Pinned as a NUMBER so a
+ * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20; the drafts pair, T1, made it 22; `ticket.decided`, wtg2 T5, made it 23). Pinned as a NUMBER so a
  * change to the domain's lists fails loudly here rather than quietly shrinking
  * what this census covers: the failure message says to re-read the
  * registrations, which is the actual remedy. It is not a count of the
- * registrations (24), as the docblock above says.
+ * registrations (25), as the docblock above says.
  */
-const REGISTRATIONS_ON_2026_10_03 = 22;
+const REGISTRATIONS_ON_2026_10_03 = 23;
 
 /**
  * ONE VALID PAYLOAD PER TYPE, and the table is what makes this a census of
@@ -131,7 +131,7 @@ describe('3.183 history copy — the census', () => {
     expect(
       TICKET_EVENT_TYPES.length,
       'TICKET_EVENT_TYPES changed shape: re-read packages/domain/src/vocabulary.ts and re-derive the universe',
-    ).toBe(19);
+    ).toBe(20);
     expect(CONTEST_EVENT_TYPES.length).toBe(2);
     expect(new Set(ENTITY_KIND_TICKET_UNIVERSE).size).toBe(REGISTRATIONS_ON_2026_10_03);
   });

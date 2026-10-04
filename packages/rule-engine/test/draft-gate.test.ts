@@ -56,6 +56,8 @@ const REFUSED: Array<[...Row, reason: string]> = [
   ['visibility.set', (id) => ({ ticketId: id, mode: 'explicit', userIds: [OTHER] }), 'A draft cannot be shared. Publish it first, or discard it.'],
   ['ticket.deleted', () => ({}), 'A draft cannot be deleted. Discard it instead.'],
   ['ticket.restored', () => ({}), 'A draft cannot be restored. Publish it first, or discard it.'],
+  // wtg2 T5 (29.135, spec D-7): a draft cannot be decided
+  ['ticket.decided', () => ({ outcome: 'Yes' }), 'A draft cannot be decided. Publish it first, or discard it.'],
 ];
 
 describe('28.090 the engine draft gate', () => {

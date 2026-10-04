@@ -182,4 +182,14 @@ describe('evaluateEvent dispatches ticket-type.defined', () => {
         '"Sub-task" is the built-in sub-task type; its rank is 4 and cannot be changed. Define a custom type for differently-ranked work.',
     });
   });
+
+  it('29.134 the Decision seed is rank-locked at 3 through the dispatch; the same def at rank 3 is accepted', async () => {
+    expect(await evaluateEvent(typeDefined(def({ id: 'decision', name: 'Decision', rank: 4 })), ctx())).toEqual({
+      refused: true,
+      rule: 'type.builtin-rank',
+      reason:
+        '"Decision" is the built-in decision type; its rank is 3 and cannot be changed. Define a custom type for differently-ranked work.',
+    });
+    expect(await evaluateEvent(typeDefined(def({ id: 'decision', name: 'Decision', rank: 3 })), ctx())).toEqual({ refused: false }); // control
+  });
 });

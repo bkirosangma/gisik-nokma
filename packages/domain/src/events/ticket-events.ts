@@ -413,6 +413,22 @@ export const ticketClosedPayload = z.object({}).strict();
 /** `ticket.reopened` (spec §1.2) — the explicit reopen; same empty payload. */
 export const ticketReopenedPayload = z.object({}).strict();
 
+/** Most tickets one `ticket.decided` may ask the settle to close "Not taken" while they are started (PS-6). */
+export const DECISION_CLOSE_STARTED_MAX = 50;
+/**
+ * `ticket.decided` (DC-4): the outcome of a Decision. `outcome: null` clears it. `from` is the outcome the sender saw: the
+ * engine refuses a stale one (`decision.stale-from`, T6). `closeStarted` is a request to the settle (T15/T16), recorded
+ * here so the ledger shows what the person chose; it folds into nothing. `outcome` is REQUIRED: an absent member would be a
+ * clear nobody asked for.
+ */
+export const ticketDecidedPayload = z
+  .object({
+    outcome: linkLabelSchema.nullable(),
+    from: linkLabelSchema.nullable().optional(),
+    closeStarted: z.array(ulidString).max(DECISION_CLOSE_STARTED_MAX).optional(),
+  })
+  .strict();
+
 /**
  * `ticket.deleted` — the SOFT delete. The ticket stops appearing in views; its
  * ledger, and its row, stay. Producer of `TicketState.deleted`.
