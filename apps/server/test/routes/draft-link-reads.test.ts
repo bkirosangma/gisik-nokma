@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type Ulid } from '@gisik-nokma/domain';
+import { GRAPH_GROUPS, newUlid, type Ulid } from '@gisik-nokma/domain';
+import { readGraphRing } from '../../src/read/graph-neighbours.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -63,5 +64,144 @@ describe('28.115 projection and rebuild', () => {
     expect(await w.send('owner', 'ticket.link_removed', s, { kind: 'blocks', targetId: d })).toMatchObject({ status: 'committed' });
     expect((await w.linkRows(d)).map((r) => [r.source_id, r.target_id, r.kind])).toEqual([[d, s2, 'blocks']]);
     expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
+  });
+});
+
+type LinksBody = { links: Array<{ kind: string; direction: string; ticket: { id: string; key: string | null; title: string } }> };
+const shape = (b: LinksBody) => b.links.map((l) => [l.kind, l.direction, l.ticket.id]);
+
+describe('28.117 the links read on a draft', () => {
+  it('shows the author both directions, hides it from everyone else byte-identically, and keeps draft ends off a published sheet; CONTROL: after publish both sheets list it', async () => {
+    const [s, s2, d, d2] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    await w.published(s);
+    await w.published(s2);
+    await w.draft(d);
+    await w.draft(d2);
+    await w.fromLink(d, s, 'blocks');
+    await w.send('member', 'ticket.link_added', d, { kind: 'relates', targetId: s2 });
+    await w.send('member', 'ticket.link_added', d, { kind: 'relates', targetId: d2 });
+
+    const mine = (await w.links('member', d)).json() as LinksBody;
+    expect(shape(mine).sort()).toEqual([['blocks', 'in', s], ['relates', 'out', d2], ['relates', 'out', s2]].sort());
+    expect(mine.links.find((l) => l.ticket.id === d2)?.ticket.key).toBeNull(); // a draft has no key
+    expect(mine.links.find((l) => l.ticket.id === s)?.ticket.key).toMatch(/-\d+$/);
+    expect(Object.keys(mine)).toEqual(['links']);
+
+    const unknown = await w.links('owner', newUlid());
+    expect(unknown.statusCode).toBe(404);
+    for (const role of ['owner', 'admin', 'projectLead', 'guest'] as const) {
+      const res = await w.links(role, d);
+      expect(res.statusCode, role).toBe(404);
+      expect(res.json(), role).toEqual(unknown.json()); // byte-identical to an id that never existed
+    }
+
+    // the published sheets never list the draft end, for the owner or for the author
+    for (const role of ['owner', 'member'] as const) {
+      expect(((await w.links(role, s)).json() as LinksBody).links, role).toEqual([]);
+      expect(((await w.links(role, s2)).json() as LinksBody).links, role).toEqual([]);
+    }
+
+    // p11 N10 (28.117): a TRASHED source drops off the draft's own sheet; restored, it is back
+    const withoutS = [['relates', 'out', d2], ['relates', 'out', s2]].sort();
+    expect(await w.send('owner', 'ticket.deleted', s, {})).toMatchObject({ status: 'committed' });
+    expect(shape((await w.links('member', d)).json() as LinksBody).sort()).toEqual(withoutS);
+    expect(await w.send('owner', 'ticket.restored', s, {})).toMatchObject({ status: 'committed' });
+    // p11 N11 (28.117): a source HIDDEN from the author drops off the draft's own sheet; unhidden, it is back
+    await w.send('owner', 'visibility.set', s, { ticketId: s, mode: 'explicit', userIds: [read.userIds.owner] });
+    expect(shape((await w.links('member', d)).json() as LinksBody).sort()).toEqual(withoutS);
+    await w.send('owner', 'visibility.set', s, { ticketId: s, mode: 'inherit' });
+    expect(shape((await w.links('member', d)).json() as LinksBody).sort()).toEqual([['blocks', 'in', s], ...withoutS].sort()); // CONTROL
+
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    expect(shape((await w.links('owner', s)).json() as LinksBody)).toEqual([['blocks', 'out', d]]); // CONTROL
+    expect(shape((await w.links('owner', d)).json() as LinksBody).sort()).toEqual([['blocks', 'in', s], ['relates', 'out', s2]].sort());
+  });
+
+  // Planner ruling 17:19, legs (2) and (3): the rows exist (R42), so the owner's "no trace" rule is kept by every
+  // READER of them. The KG ring has no own-draft allowance, so the author's ring read of S shows no D either.
+  it('keeps every draft end off the graph ring and off T\'s sheet for everyone; CONTROL: a published twin edge on the same centre is returned', async () => {
+    const [s, s2, t, d] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    await w.published(s);
+    await w.published(s2);
+    await w.published(t);
+    await w.draft(d);
+    expect(await w.fromLink(d, s, 'blocks')).toMatchObject({ status: 'committed' }); // S blocks D, filed on D's stream
+    expect(await w.send('member', 'ticket.link_added', d, { kind: 'relates', targetId: t })).toMatchObject({ status: 'committed' }); // plain, on D's stream
+    expect(await w.send('owner', 'ticket.link_added', s2, { kind: 'relates', targetId: s })).toMatchObject({ status: 'committed' }); // the twins
+    expect(await w.send('owner', 'ticket.link_added', s2, { kind: 'blocks', targetId: t })).toMatchObject({ status: 'committed' });
+    expect(await w.linkRows(d)).toHaveLength(2); // the rows are there: only the readers can hide them
+
+    const ring = (viewer: string, centre: string) =>
+      readGraphRing(db.pool, viewer, {
+        center: { kind: 'ticket', id: centre }, hops: 1, workspaceIds: [w.WS()], projectIds: [], groups: new Set(GRAPH_GROUPS), offset: 0,
+      });
+    const { owner, admin, member } = read.userIds;
+    for (const [name, viewer, centre] of [['owner S', owner, s], ['owner T', owner, t], ['admin S', admin, s], ['admin T', admin, t], ['author S', member, s]] as const) {
+      const r = await ring(viewer, centre);
+      expect(r?.items.map((i) => i.id), name).toContain(s2); // CONTROL: the read returns a published edge
+      expect(r?.edges.filter((e) => ['blocks', 'relates'].includes(e.kind) && (e.from.endsWith(s2) || e.to.endsWith(s2))), name).toHaveLength(1);
+      expect(JSON.stringify(r), name).not.toContain(d);
+    }
+    for (const role of ['owner', 'admin', 'member'] as const) {
+      const sheet = (await w.links(role, t)).json() as LinksBody;
+      expect(shape(sheet), role).toEqual([['blocks', 'in', s2]]); // CONTROL in the same read
+      expect(JSON.stringify(sheet), role).not.toContain(d);
+    }
+  });
+});
+
+describe('28.118 the detail read', () => {
+  it('serves the author\'s draft its entries, filters by the other end, and shows a published sheet nothing; CONTROL: publish moves the link to S', async () => {
+    const [s, d] = [newUlid(), newUlid()];
+    await w.published(s);
+    await w.draft(d);
+    await w.fromLink(d, s);
+    expect((await w.stateOf('member', d)).ticketState.links).toEqual([{ kind: 'blocks', targetId: d, from: s }]);
+    for (const role of ['owner', 'member'] as const) {
+      expect((await w.stateOf(role, s)).ticketState.links, role).toBeUndefined();
+      expect('links' in (await w.stateOf(role, s)).ticketState, role).toBe(false);
+    }
+    expect((await w.detail('owner', d)).statusCode).toBe(404);
+
+    // the author loses sight of S: the from entry is dropped from THEIR read of the draft
+    await w.send('owner', 'visibility.set', s, { ticketId: s, mode: 'explicit', userIds: [read.userIds.owner] });
+    expect((await w.stateOf('member', d)).ticketState.links).toBeUndefined();
+    await w.send('owner', 'visibility.set', s, { ticketId: s, mode: 'inherit' });
+    expect((await w.stateOf('member', d)).ticketState.links).toEqual([{ kind: 'blocks', targetId: d, from: s }]); // CONTROL
+
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    expect((await w.stateOf('member', d)).ticketState.links).toBeUndefined();
+    expect((await w.stateOf('owner', s)).ticketState.links).toEqual([{ kind: 'blocks', targetId: d }]);
+  });
+});
+
+describe('28.105 events and History hide a link to a draft', () => {
+  it('carry nothing of D while the link is on D\'s stream, and carry the plain link after publish; CONTROL: the count did not move when the link was filed', async () => {
+    const [s, d] = [newUlid(), newUlid()];
+    await w.published(s);
+    await w.draft(d);
+    const eventsOf = async (role: 'owner' | 'member') => (await w.get(role, `/tickets/${s}/events`)).body;
+    const historyOf = async (role: 'owner' | 'member') =>
+      (await read.app.inject({ method: 'GET', url: `/v1/tickets/${s}/history`, headers: read.authOf(role) })).json() as { events: Array<{ type: string; payload: unknown }> };
+    const countBefore = (await historyOf('owner')).events.length;
+
+    await w.fromLink(d, s);
+    for (const role of ['owner', 'member'] as const) {
+      const events = await eventsOf(role);
+      expect(events, role).not.toContain(d);
+      expect(events, role).not.toContain('ticket.link_added');
+      const history = await historyOf(role);
+      expect(history.events.length, role).toBe(countBefore); // CONTROL
+      expect(JSON.stringify(history), role).not.toContain(d);
+    }
+
+    expect(await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+    const shown = await eventsOf('owner');
+    expect(shown).toContain('ticket.link_added');
+    expect(shown).toContain(d);
+    const key = (await w.stateOf('owner', d)).key;
+    expect(key).toMatch(/-\d+$/); // else `{ key: null }` would equal a linkTarget that lost its key
+    const line = (await historyOf('owner')).events.find((e) => e.type === 'ticket.link_added') as { linkTarget?: { key: string | null } } | undefined;
+    expect(line?.linkTarget).toEqual({ key });
   });
 });

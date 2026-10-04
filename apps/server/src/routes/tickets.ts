@@ -705,11 +705,12 @@ export function registerTicketRoutes(
         depth += 1;
       }
 
-      // Spec A §2.4: the folded links are the engine's whole truth; a reader gets
-      // only the targets they can see, and no key at all when none remain (the
-      // reducer's absent-not-empty shape), so nothing counts a hidden one.
+      // Spec A §2.4 and drafts R41: the folded links are the engine's whole truth; a reader gets only the entries
+      // whose OTHER end they can open, and no key at all when none remain (the reducer's absent-not-empty shape),
+      // so nothing counts a hidden one. For a draft-side entry (`from`) the other end is its source, not
+      // `targetId` (the draft itself).
       const seen = await Promise.all(
-        (state.links ?? []).map(async (l) => ((await canSee(deps.pool, request.currentUserId, l.targetId)) ? l : null)),
+        (state.links ?? []).map(async (l) => ((await canOpen(deps.pool, request.currentUserId, l.from ?? l.targetId)) ? l : null)),
       );
       const visibleLinks = seen.filter((l): l is NonNullable<typeof l> => l !== null);
       const { links: _all, ...stateWithoutLinks } = state;
