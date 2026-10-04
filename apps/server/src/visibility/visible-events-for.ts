@@ -8,7 +8,7 @@ import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
-import { canOpen, ticketAccess } from './can-open.js';
+import { canOpen, noteEventVisibleTo, ticketAccess } from './can-open.js';
 import { targetSight, withholdEvent } from './withhold-link-targets.js';
 import {
   grantNoticeFor,
@@ -550,13 +550,18 @@ export async function* visibleEventsFor(
             // The candidate set is every ticket this notice would name —
             // including the trigger ticket itself, which is why `dependents`
             // starts with it rather than using `tickets` alone. `notesAttachedTo`
-            // then keeps only `inherit`-scoped, non-deleted notes, and
-            // `noteGrantNoticeFor` decides which of those this reader may
-            // actually read.
+            // then keeps only `inherit`-scoped, non-deleted notes (a
+            // `ticket.published` adds the trigger ticket's notes of EVERY scope,
+            // drafts T9 R66), and `noteGrantNoticeFor` decides which of those
+            // this reader may actually read.
             //
-            // **That second question is redundant on THIS path and is kept
-            // anyway, which is worth stating rather than leaving to be
-            // re-derived.** Every id in `dependents` came either from the
+            // **That second question is redundant on THIS path for the
+            // `inherit` candidates and is kept anyway, which is worth stating
+            // rather than leaving to be re-derived.** (For the any-scope notes a
+            // publish adds it is load-bearing: a `workspace`, `project` or
+            // `explicit` note is not readable by definition of the ticket's
+            // audience; 28.194 names an explicit note to the owner and not to
+            // the admin.) Every id in `dependents` came either from the
             // trigger ticket — already admitted by the `if` above (`canOpen`:
             // `canSee`, or the reader's own draft, whose notes are asked
             // below like any other) — or
@@ -580,7 +585,12 @@ export async function* visibleEventsFor(
             // workspace: `audienceDependents` carries no workspace predicate
             // (its own docblock records this, owner unassigned).
             const dependents = [env.entity.id, ...tickets.map((t) => t.id)];
-            const noteIds = await notesAttachedTo(db, dependents);
+            // A publish also names the notes linked to the draft, whatever their scope (drafts R66): the withheld
+            // `note.attached` sits on the stream of a `workspace`, `project` or `explicit` note as well.
+            const inheritNotes = await notesAttachedTo(db, dependents);
+            const draftNotes =
+              env.type === 'ticket.published' ? await notesAttachedTo(db, [env.entity.id], { anyScope: true }) : [];
+            const noteIds = [...new Set([...inheritNotes, ...draftNotes])];
             const notes =
               noteIds.length === 0
                 ? []
@@ -735,6 +745,10 @@ export async function* visibleEventsFor(
         if (loaded === null) break;
         const armReach = await noteArmReach(db, userId, loaded.attachedVisibilities);
         if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities, armReach)) break;
+        // A `note.attached` / `note.detached` naming another person's draft goes to the author alone (drafts R66);
+        // one naming an erased draft goes to nobody (planner ruling 2026-10-04, follow-up). Withheld before the grant half
+        // below: attaching to a draft widens nobody's reach.
+        if (!(await noteEventVisibleTo(db, userId, env))) break;
         // The grant half, one entity kind over from the ticket branch above and
         // under the same ruling: a note event that can change this note's
         // resolved audience, reaching a reader who may read it NOW, hands back

@@ -1603,13 +1603,17 @@ export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityCon
   }
   if (env.type === 'note.attached' || env.type === 'note.detached') {
     // BOTH halves, and the readability half is already spent above: a reader of
-    // the note who cannot see the ticket is refused, and a person who can see
-    // the ticket but not the note never reaches this line. Attaching is how a
+    // the note who cannot OPEN the ticket (see it, or be the author of the
+    // draft, G11 below) is refused, and a person who can see the ticket but not
+    // the note never reaches this line. Attaching is how a
     // note's audience is widened, so it is not a reader's act alone.
     const { ticketId } = (env.type === 'note.attached' ? noteAttachedPayload : noteDetachedPayload).parse(
       env.payload,
     );
-    if (!(await canSee(ctx.db, ctx.sessionUserId, ticketId))) {
+    // G11 (drafts spec R66): `canOpen`, not `canSee`. The author of a draft attaches notes to it; everyone else is
+    // refused with the sentence an unknown ticket gets. `note.created {attachTicketId}` above keeps `canSee` on
+    // purpose: a creation event cannot be withheld from the note's other readers (28.191).
+    if (!(await canOpen(ctx.db, ctx.sessionUserId, ticketId))) {
       return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
     }
     return null;

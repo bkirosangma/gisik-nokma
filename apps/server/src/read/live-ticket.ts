@@ -1,5 +1,5 @@
 import type { Queryable } from '../db/queryable.js';
-import { LIVE_TICKET_WHERE } from './visible-where.js';
+import { LIVE_BASE_WHERE, LIVE_TICKET_WHERE } from './visible-where.js';
 
 /**
  * The route-level application of the soft-delete rule: **is this ticket still
@@ -46,7 +46,9 @@ import { LIVE_TICKET_WHERE } from './visible-where.js';
  *
  * This answers a question. What a `false` becomes — a 404 in the route's shared
  * body, an empty list, a filtered row — is the caller's decision, and it has to
- * be: the same predicate is a refusal at a file door and a filter in a view.
+ * be: the same predicate is a refusal at a door (the comments door) and a filter
+ * in a view. The three file doors ask `ticketIsOpenable` below instead (drafts
+ * T9, G10), after `canOpen`.
  */
 export async function ticketIsLive(
   db: Queryable,
@@ -56,6 +58,21 @@ export async function ticketIsLive(
   const { rowCount } = await db.query(
     `SELECT 1 FROM proj_tickets t
       WHERE t.workspace_id = $1 AND t.ticket_id = $2 AND ${LIVE_TICKET_WHERE}`,
+    [workspaceId, ticketId],
+  );
+  return rowCount === 1;
+}
+
+/**
+ * `ticketIsLive` for a DOOR (drafts spec G10): the deleted-ticket and deleted-project halves alone, so the author's own
+ * draft passes. It never decides WHO may open a draft; `canOpen` does, and every caller asks `canOpen` first. Asked
+ * alone it would admit a draft to anyone holding its id, which is why a view must keep using `ticketIsLive`. For a
+ * published ticket the two answers are the same query.
+ */
+export async function ticketIsOpenable(db: Queryable, workspaceId: string, ticketId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `SELECT 1 FROM proj_tickets t
+      WHERE t.workspace_id = $1 AND t.ticket_id = $2 AND ${LIVE_BASE_WHERE}`,
     [workspaceId, ticketId],
   );
   return rowCount === 1;

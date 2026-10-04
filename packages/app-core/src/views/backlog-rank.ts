@@ -1,4 +1,4 @@
-import { compareByRank, rankBetween } from '@gisik-nokma/domain';
+import { backfillUnranked, compareByRank, rankBetween } from '@gisik-nokma/domain';
 
 /**
  * Second wave Task 5 (backlog/closed second-wave plan, spec §8) — the Backlog
@@ -217,19 +217,11 @@ export function planRankMove<T extends RankRow>(
   beforeId: string | null,
 ): RankMovePlan {
   const others = sorted.filter((row) => row.ticketId !== movedId);
-  const newKeys = new Map<string, string>();
-  const backfill: RankBackfill[] = [];
-  // The unranked rows are a contiguous TAIL of `sorted` (that is what
-  // `compareByRank` does), and they are visited in drawn order, so the keys
-  // ascend and the visible order is untouched by the backfill itself.
-  let cursor = lastRankedKey(others);
-  for (const row of others) {
-    if (row.rank !== null) continue;
-    const key = rankBetween(cursor, null);
-    backfill.push({ ticketId: row.ticketId, rank: key });
-    newKeys.set(row.ticketId, key);
-    cursor = key;
-  }
+  // The unranked rows are a contiguous TAIL of `sorted` (that is what `compareByRank` does), visited in drawn order,
+  // so the keys ascend and the visible order is untouched by the backfill itself. The domain owns the rule
+  // (`backfillUnranked`), shared with the publish (`planTailRank`).
+  const backfill: RankBackfill[] = backfillUnranked(others);
+  const newKeys = new Map<string, string>(backfill.map((assignment) => [assignment.ticketId, assignment.rank]));
   // The neighbours are read against the backfilled list, so "place last" now
   // has a last key to sit after and the moved row lands where it was asked to.
   const effective =
