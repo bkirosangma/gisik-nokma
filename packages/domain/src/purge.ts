@@ -19,13 +19,18 @@ export const PURGED_ITEM_LABEL = 'Deleted item';
 
 /**
  * The payload a purged ticket's `ticket.created` is REDACTED to (spec §5.4). The
- * row is kept, not deleted, so `row_number() OVER (PARTITION BY
- * payload->>'projectId' ORDER BY workspace_seq)` (`apps/server/src/read/
- * ticket-numbers.ts`) still counts it and no later ticket is renumbered.
- * `purge_ledger` builds the same object in SQL; the trigger accepts nothing else.
+ * row is kept, not deleted, so `row_number()` over the numbering rows
+ * (`apps/server/src/read/ticket-numbers.ts`'s `NUMBERING_ROWS_SQL`) still counts
+ * it and no later ticket is renumbered. `purge_ledger` builds the same object in
+ * SQL; the trigger accepts nothing else.
  */
-export function redactedTicketCreatedPayload(projectId: string): { projectId: string; purged: true } {
-  return { projectId, purged: true };
+export function redactedTicketCreatedPayload(
+  projectId: string,
+  draft?: true,
+): { projectId: string; purged: true; draft?: true } {
+  // Drafts T2: a DRAFT's creation keeps its marker, so the key query (which does not count a draft's
+  // creation) still does not count it after a purge. `purge_ledger` builds the same object in SQL.
+  return draft === true ? { projectId, purged: true, draft: true } : { projectId, purged: true };
 }
 
 /**
@@ -37,6 +42,26 @@ export function redactedTicketCreatedPayload(projectId: string): { projectId: st
  */
 export function isRedactedTicketCreated(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
   if (env.type !== 'ticket.created') return false;
+  const payload = env.payload;
+  if (payload === null || typeof payload !== 'object') return false;
+  return (payload as { purged?: unknown }).purged === true;
+}
+
+/**
+ * A purged ticket's `ticket.published` is KEPT, redacted (drafts T2): it is a numbering row, and deleting it
+ * would shift every later key in the project down by one.
+ */
+export function redactedTicketPublishedPayload(projectId: string): { projectId: string; purged: true } {
+  return { projectId, purged: true };
+}
+
+/**
+ * True exactly for a redacted `ticket.published` (`=== true`, for `isRedactedTicketCreated`'s reason). Every
+ * replay reader that asks `isRedactedTicketCreated` first asks this too: the payload no longer satisfies the
+ * strict `ticketPublishedPayload`.
+ */
+export function isRedactedTicketPublished(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
+  if (env.type !== 'ticket.published') return false;
   const payload = env.payload;
   if (payload === null || typeof payload !== 'object') return false;
   return (payload as { purged?: unknown }).purged === true;

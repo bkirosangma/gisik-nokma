@@ -43,7 +43,7 @@ export function NoteEditorBand({ label, readOnly = true }: { label: string; read
 export function NoteDocumentSkeleton() {
   return (
     <div className="gn-note-document">
-      <Skeleton width="60%" height="var(--gn-title-page-size)" />
+      <Skeleton className="gn-skeleton--title" width="60%" />
       <div className="gn-notes__editor">
         <NoteEditorBand label="Loading the note" />
       </div>

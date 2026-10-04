@@ -10,9 +10,11 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketDeletedPayload,
+  ticketDiscardedPayload,
   ticketFieldSetPayload,
   ticketLinkAddedPayload,
   ticketLinkRemovedPayload,
+  ticketPublishedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
@@ -20,7 +22,7 @@ import {
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import { DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
-import { isRedactedTicketCreated } from './purge.js';
+import { isRedactedTicketCreated, isRedactedTicketPublished } from './purge.js';
 // `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
 // ticket vocabulary: Plan 2 shipped it there because the engine parses it, and
 // events/ticket-events.ts says so in its own header. Its destination field is
@@ -60,7 +62,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — SEVENTEEN of the TWENTY-TWO registered against
+ * The event types this reducer folds — NINETEEN of the TWENTY-FOUR registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -78,7 +80,8 @@ export type TicketStateDeps = {
  * whole job is to stop a reader mistaking the list for the entity set, and a
  * stale count is the first half of that mistake. The link pair (spec A) moved both
  * numbers again, to seventeen and twenty-two: they fold into `links`, so they belong here
- * too. (`comment.edited` and `comment.deleted` are the other two absent from this list;
+ * too. The draft pair (drafts spec §2.2) moved both numbers again, to nineteen and twenty-four:
+ * `ticket.published` and `ticket.discarded` fold into `TicketState.draft`. (`comment.edited` and `comment.deleted` are the other two absent from this list;
  * `sync-routes.ts` backfills them with the three above.)
  *
  * `ticket-type.defined` is deliberately absent for a different reason: it is
@@ -102,6 +105,8 @@ export const TICKET_EVENT_TYPES = [
   'ticket.restored',
   'ticket.link_added',
   'ticket.link_removed',
+  'ticket.published',
+  'ticket.discarded',
   'comment.added',
   'attachment.added',
 ] as const;
@@ -136,6 +141,13 @@ export function applyTicketEvent(
   if (isRedactedTicketCreated(env)) {
     throw new Error(
       `applyTicketEvent: ticket.created for ticket ${env.entity.id} is a purged (redacted) row — fold with foldTicketEvent, which produces no ticket from it`,
+    );
+  }
+  // Drafts T2 (spec §6.3, R29): a purged ticket's `ticket.published` is kept too, redacted, as a numbering
+  // row. Refused by NAME for the same reason as the creation above.
+  if (isRedactedTicketPublished(env)) {
+    throw new Error(
+      `applyTicketEvent: ticket.published for ticket ${env.entity.id} is a purged (redacted) row; fold with foldTicketEvent, which produces nothing from it`,
     );
   }
   if (env.type === 'ticket.created') {
@@ -263,6 +275,8 @@ export function applyTicketEvent(
       // concerned, and both read `null` — which is what the undo
       // (`ticket.restored`) folds BACK to, not a third value.
       deleted: null,
+      // Drafts (spec §2.3): the key is ABSENT for a published ticket, never `undefined`.
+      ...(p.draft === true ? { draft: { authorId: env.actorId, at: env.serverTime } } : {}),
     };
   }
 
@@ -474,6 +488,40 @@ export function applyTicketEvent(
       const { links: _dropped, ...without } = state;
       return without;
     }
+    case 'ticket.published': {
+      ticketPublishedPayload.parse(env.payload);
+      if (state.draft === undefined) {
+        throw new Error(
+          `applyTicketEvent: ticket.published for ticket ${state.id} that is not a draft; the engine must refuse it before it reaches a projection`,
+        );
+      }
+      // Re-pin to the type's binding in force NOW (spec §2.3): a draft may sit for weeks, and
+      // `migrate_ticket_type` cannot touch it. The ticket "is created" under the workflow in force at
+      // publish — the owner's rule that a ticket pins the workflow it was created under (2026-08-26).
+      const type = deps.getTicketType(state.typeId);
+      const workflow = type === undefined ? undefined : deps.getWorkflow(type.workflowId);
+      if (type === undefined || workflow === undefined) {
+        throw new Error(
+          `applyTicketEvent: ticket.published for ticket ${state.id}: its type "${state.typeId}" or that type's workflow is not defined; the engine must refuse it first`,
+        );
+      }
+      // Backlog is `open` in every workflow, but ask rather than assume.
+      const category = stateCategoryOf(workflow, state.stateId);
+      if (!category) {
+        throw new Error(`applyTicketEvent: workflow "${workflow.id}" has no state "${state.stateId}"`);
+      }
+      const { draft: _published, ...rest } = state;
+      return { ...rest, workflowId: type.workflowId, workflowVersion: workflow.version, stateCategory: category };
+    }
+    case 'ticket.discarded': {
+      ticketDiscardedPayload.parse(env.payload);
+      if (state.draft === undefined) {
+        throw new Error(
+          `applyTicketEvent: ticket.discarded for ticket ${state.id} that is not a draft; the engine must refuse it before it reaches a projection`,
+        );
+      }
+      return { ...state, draft: { ...state.draft, discarded: true } };
+    }
     case 'comment.added':
     case 'attachment.added':
       // Neither adds to head state: comments and attachments are ledger entries
@@ -493,8 +541,9 @@ export function applyTicketEvent(
 
 /**
  * `applyTicketEvent` for a caller whose state may be absent and whose stream
- * may hold a purged ticket's redacted creation (spec §5.4, D7): that row
- * produces no ticket, so the input state comes back unchanged. Every other event
+ * may hold a purged ticket's redacted creation (spec §5.4, D7) or, since drafts
+ * T2, its redacted `ticket.published` (a kept numbering row): neither row
+ * produces a ticket, so the input state comes back unchanged. Every other event
  * goes to `applyTicketEvent` untouched. A separate function rather than a wider
  * return type on `applyTicketEvent`, because three callers store its result as
  * a definite `TicketState` (`apps/server/src/projections/tickets.ts`,
@@ -506,7 +555,7 @@ export function foldTicketEvent(
   env: EventEnvelope,
   deps: TicketStateDeps,
 ): TicketState | undefined {
-  if (isRedactedTicketCreated(env)) return state;
+  if (isRedactedTicketCreated(env) || isRedactedTicketPublished(env)) return state;
   return applyTicketEvent(state, env, deps);
 }
 
