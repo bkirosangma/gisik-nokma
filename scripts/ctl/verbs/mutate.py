@@ -10,6 +10,7 @@ Seams (tests): CTL_MUTATE_RUN_TESTS (the run-tests command), CTL_MUTATE_SPLIT (3
 slot-run), CTL_MUTATE_PG_HOST / CTL_MUTATE_PG_PORT (the test Postgres, 127.0.0.1:54329), CTL_MUTATE_INJECT_FAIL (mutate-ast.mjs).
 Hidden sub-commands for the unit legs: `ranges <diff-file>`, `filter <path>...`, `reconcile <plan-json> <report-json>`.
 """
+import glob
 import json
 import os
 import re
@@ -307,6 +308,19 @@ def slot_run(label, cwd, cmd, max_secs):
     return p.returncode, max(0.0, wall - wait), (lm[-1].strip() if lm else '(no log line)'), out
 
 
+def recover_stryker_backup(pkgdir, tempdir):
+    """Stryker in place keeps the original of every file it rewrote under <tempdir>/backup-*/ and moves them back as it exits. A Stryker that
+    died first (stopped by the watchdog, crashed, killed) leaves them there: put them back BEFORE the temp dir is removed (mutate.sh's trap
+    does the same on a signal), or its edits stay in the tree. The caller then restores its own backup of the mutated file over this."""
+    for bk in glob.glob(os.path.join(pkgdir, tempdir, 'backup-*')):
+        for dp, _, names in os.walk(bk):
+            for name in names:
+                src = os.path.join(dp, name)
+                dst = os.path.join(pkgdir, os.path.relpath(src, bk))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.move(src, dst)
+
+
 def write(path, text):
     with open(path, 'w') as f:
         f.write(text)
@@ -352,7 +366,10 @@ def stryker_conf(repo, mutate, report, tempdir, vitest_config=None):
         'inPlace': True,
         'tempDirName': tempdir,
         'cleanTempDir': 'always',
-        'disableTypeChecks': True,
+        # Off: Stryker would otherwise write a `// @ts-nocheck` header into EVERY src/test/lib file of the package IN PLACE (measured: 534 apps/server
+        # files left edited when a run was stopped). vitest never type-checks (esbuild strips the types), so the header buys nothing; with it
+        # off, the only file Stryker rewrites in place is the mutated one, which the manifest backs up (13.2216 real-Stryker leg).
+        'disableTypeChecks': False,
     }
 
 
@@ -494,6 +511,7 @@ def run_file(repo, tmp, man, f, core, max_secs, st):
         try:
             rc, secs, log, _ = slot_run(f'mutate-{k}-{os.path.basename(f["rel"])}', pkgdir, ['node', core, 'run', conf], max_secs)
         finally:
+            recover_stryker_backup(pkgdir, tempdir)
             shutil.copy2(backup, src)
             shutil.rmtree(os.path.join(pkgdir, tempdir), ignore_errors=True)
             shutil.rmtree(os.path.join(pkgdir, f'{tempdir}-vitest'), ignore_errors=True)

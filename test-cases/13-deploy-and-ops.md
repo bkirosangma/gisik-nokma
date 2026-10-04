@@ -663,12 +663,12 @@ Block `13.2200`–`13.2229`, reserved by the planner after grepping every live t
 - 13.2208 🧪 The dry-run control with real Stryker (ruling (4)): a module whose INJECTED copy throws at import (its test registers 1 test, not 3) is exit 2.
 - 13.2209 🧪 Skips: a package without vitest and `apps/server` with the test Postgres unreachable are listed as SKIPPED; the test and generated files as excluded.
 - 13.2210 🧪 CONTROL for 13.2209: with something listening on the Postgres port, `apps/server` is planned.
-- 13.2211 🧪 A tool failure (run-tests exit 3) is exit 2, never a pass, and the tree is clean after it.
+- 13.2211 🧪 A tool failure (run-tests exit 3) is exit 2, never a pass, and the tree is clean after it. A Stryker that died with a file rewritten in place (its original in the temp dir's `backup-*/`) is exit 2 too, and that file is put back before the temp dir is removed (the verb's own backup of the mutated file wins over Stryker's copy, which is the injected one).
 - 13.2212 🧪 Every selecting flip reported twice: the dedupe keeps `custom injected 2 == counted 2`; both custom survivors on line 3; exit 1.
 - 13.2213 🧪 A custom alternative with no selecting flip in the report is exit 2 (`custom injected 2 != counted 1`), never a silent pass.
 - 13.2214 🧪 The control: fewer tests on the injected copy than `vitest list` finds on the unmutated tree is exit 2.
-- 13.2215 🧪 SIGINT mid-run, the injected file in place (precondition checked): exit 130, the file restored, no Stryker temp dir and no new `stryker-setup-<n>.js`, `git status` unchanged, the running run-tests got TERM.
-- 13.2216 🧪 SIGTERM mid-run: exit 143, the same restore.
+- 13.2215 🧪 SIGINT mid-run, the injected file in place (precondition checked): exit 130, the file restored, no Stryker temp dir and no new `stryker-setup-<n>.js`, `git status` unchanged, the running run-tests got TERM; a file Stryker rewrote in place is put back from its `backup-*/` first.
+- 13.2216 🧪 SIGTERM mid-run: exit 143, the same restore. With real Stryker, mid dry run, the only tracked file changed in place is the mutated one (`disableTypeChecks` off: Stryker otherwise writes `// @ts-nocheck` into every src/test file of the package, which a stopped run left in 534 apps/server files), and SIGTERM then leaves `git status` empty.
 - 13.2217 🧪 A slot-run over `CTL_MUTATE_MAX_SECS` is stopped (TERM to run-tests) and is exit 2, the tree clean.
 - 13.2218 🧪 CONTROL for 13.2217: a run under the cap completes; the defaults are pinned (600 s per slot-run, 300 mutants per run).
 - 13.2219 🧪 The split: a file above 300 mutants runs in chunks of at most 300, a file between 30 and 300 is one run; CONTROL — with the cap at 3000 the big file is one run.

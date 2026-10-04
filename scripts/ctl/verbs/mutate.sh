@@ -24,12 +24,22 @@ before="$(status_of)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/ctl-mutate.XXXXXX")" || { echo "FAIL mutate no temp dir"; exit 2; }
 child=""
 restore() {
-  local kind a b
+  local kind a b bk f
   if [ -f "$tmp/manifest" ]; then
+    # first Stryker's own in-place backups (a Stryker stopped before it put them back leaves the originals in <tempdir>/backup-*/), then the
+    # temp dirs go, then our backups of the mutated files, which win
+    while IFS=$'\t' read -r kind a b; do
+      [ "$kind" = rmdir ] || continue
+      case "$(basename "$a")" in .stryker-tmp-ctlmutate-*) ;; *) continue;; esac
+      for bk in "$a"/backup-*; do
+        [ -d "$bk" ] || continue
+        (cd "$bk" && find . -type f) | while IFS= read -r f; do mkdir -p "$(dirname "$a")/$(dirname "$f")"; mv -f "$bk/$f" "$(dirname "$a")/$f"; done
+      done
+      rm -rf "$a"
+    done < "$tmp/manifest"
     while IFS=$'\t' read -r kind a b; do
       case "$kind" in
         restore) [ -f "$b" ] && ! cmp -s "$b" "$a" && cp -p "$b" "$a";;
-        rmdir) case "$(basename "$a")" in .stryker-tmp-ctlmutate-*) rm -rf "$a";; esac;;
         rmsetup) for f in "$a"/stryker-setup-*.js; do [ -f "$f" ] && case ",$b," in *",$(basename "$f"),"*) ;; *) rm -f "$f";; esac; done;;
       esac
     done < "$tmp/manifest"

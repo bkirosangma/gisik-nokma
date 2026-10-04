@@ -34,7 +34,7 @@ mkrepo() {
   ln -s "$REPO/node_modules/@stryker-mutator" "$d/node_modules/@stryker-mutator"
   ln -s "$VITEST" "$d/node_modules/vitest"; ln -s "$TSC" "$d/node_modules/typescript"
 }
-# the recording run-tests shim, in DIR.fake (outside the repo: the verb checks the repo's git status): FAKE_MODE fail | sleep | flips-dup |
+# the recording run-tests shim (sleep mode: DIR.fake/ready once its setup and TERM trap are in place), in DIR.fake (outside the repo: the verb checks the repo's git status): FAKE_MODE fail | sleep | flips-dup |
 # flips-missing | control-short (fake_report.py)
 mkfake() {
   mkdir -p "$1.fake"
@@ -44,8 +44,13 @@ d="$(dirname "$0")"; echo "$*" >> "$d/calls"; echo $$ > "$d/fake.pid"
 shift 2; [ "$1" = -- ] && shift
 case "${FAKE_MODE:-ok}" in
   fail) echo "queue wait: 0s"; echo "log: $d/fake.log"; exit 3;;
-  sleep) : > stryker-setup-0.js   # as the vitest runner does (inPlace: in the package); the trap must remove it
-    trap 'echo TERM >> "$d/signals"; exit 143' TERM; sleep "${FAKE_SLEEP:-60}" & wait $!; echo "queue wait: 0s"; exit 0;;
+  sleep|backup-left) : > stryker-setup-0.js   # as the vitest runner does (inPlace: in the package); the trap must remove it
+    # as a Stryker stopped mid-run leaves things: test/calc.test.ts rewritten in place, its original in <tempDirName>/backup-x/
+    td="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tempDirName"])' "${@: -1}")"
+    mkdir -p "$td/backup-x/test" "$td/backup-x/src"; cp test/calc.test.ts "$td/backup-x/test/calc.test.ts"; printf '// @ts-nocheck\n' >> test/calc.test.ts
+    cp src/calc.ts "$td/backup-x/src/calc.ts"   # Stryker's "original" of the mutated file is the verb's INJECTED copy: the verb's own backup must win
+    [ "$FAKE_MODE" = backup-left ] && { echo "queue wait: 0s"; echo "log: $d/fake.log"; exit 1; }
+    trap 'echo TERM >> "$d/signals"; exit 143' TERM; : > "$d/ready"; sleep "${FAKE_SLEEP:-60}" & wait $!; echo "queue wait: 0s"; exit 0;;
 esac
 echo "queue wait: 0s"; echo "log: $d/fake.log"
 exec python3 "$d/fake_report.py" "$@"
@@ -130,6 +135,8 @@ pg_up_ok() { local port out; exec 3< <(python3 -c 'import socket,time; s=socket.
 check "13.2210 CONTROL for 13.2209: with something listening on the Postgres port, apps/server is planned, not skipped" 'pg_up_ok'
 fail_ok() { local out rc; out="$(FAKE_MODE=fail mut "$R1")"; rc=$?; [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run 1: Stryker failed (rc 3" && clean_tree "$R1" && committed "$R1"; }
 check "13.2211 a tool failure (run-tests exit 3) is exit 2, never a pass, and the tree is clean after it" 'fail_ok'
+left_ok() { local out rc; out="$(FAKE_MODE=backup-left mut "$R1")"; rc=$?; [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run 1: Stryker failed (rc 1" && clean_tree "$R1" && committed "$R1"; }
+check "13.2211 a Stryker that died with a file rewritten in place (its original in the temp dir's backup-*/) is exit 2 and the file is put back before the temp dir goes" 'left_ok'
 flips_ok() { local out rc; out="$(FAKE_MODE=flips-dup mut "$R1")"; rc=$?
   [ $rc -eq 1 ] && printf '%s\n' "$out" | grep -q "SURVIVOR packages/calc/src/calc.ts:3  custom:numeric  200 → 2000" && printf '%s\n' "$out" | grep -q "SURVIVOR packages/calc/src/calc.ts:3  custom:numeric  200 → 20$" \
   && grep -q "custom injected 2 == counted 2" "$CTL_LOG_DIR"/mutate-*.md && clean_tree "$R1" && committed "$R1"; }
@@ -139,13 +146,14 @@ check "13.2213 a custom alternative with no selecting flip in the report is exit
 short_ok() { local out rc; out="$(FAKE_MODE=control-short mut "$R1")"; rc=$?; [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "control: the injected copy registers 1 tests, the unmutated tree 3" && clean_tree "$R1"; }
 check "13.2214 the control: fewer tests registered on the injected copy than vitest list finds on the unmutated tree is exit 2" 'short_ok'
 # signals: the shim sleeps with the injected calc.ts in place; the verb gets the signal; the trap must put calc.ts back
-sig_ok() { local sig="$1" want="$2" vp n=0 rc; rm -f "$R1.fake/fake.pid" "$R1.fake/signals"
+sig_ok() { local sig="$1" want="$2" vp n=0 rc; rm -f "$R1.fake/fake.pid" "$R1.fake/signals" "$R1.fake/ready"
   set -m; ( cd "$R1" && FAKE_MODE=sleep CTL_MUTATE_RUN_TESTS="$R1.fake/fake-run-tests" CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" exec "$CTL" mutate --repo "$R1" --base HEAD~1 > "$R1.fake/sig.out" 2>&1 ) & vp=$!; set +m
-  while [ ! -f "$R1.fake/fake.pid" ] && [ $n -lt 100 ]; do sleep 0.2; n=$((n+1)); done
-  grep -q 'false ? 2000' "$R1/packages/calc/src/calc.ts" && [ -f "$R1/packages/calc/stryker-setup-0.js" ] || { echo "       (precondition: calc.ts is not injected, or no setup file, during the run)"; return 1; }
+  while [ ! -f "$R1.fake/ready" ] && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done
+  [ -f "$R1.fake/ready" ] || { echo "       (precondition: the shim never reached its sleep in 60 s; the verb said: $(tail -2 "$R1.fake/sig.out" | tr '\n' ' ' | cut -c1-200))"; kill "-$sig" "$vp"; wait "$vp"; return 1; }
+  grep -q 'false ? 2000' "$R1/packages/calc/src/calc.ts" && [ -f "$R1/packages/calc/stryker-setup-0.js" ] && grep -q '@ts-nocheck' "$R1/packages/calc/test/calc.test.ts" || { echo "       (precondition: calc.ts is not injected, or no setup file, or no Stryker in-place edit, during the run)"; return 1; }
   kill "-$sig" "$vp"; wait "$vp"; rc=$?
   [ $rc -eq "$want" ] && committed "$R1" && clean_tree "$R1" && grep -q TERM "$R1.fake/signals" && ! kill -0 "$(cat "$R1.fake/fake.pid")" 2>/dev/null; }
-check "13.2215 SIGINT mid-run (the injected calc.ts in place: precondition checked): exit 130, calc.ts restored, no Stryker temp dir and no new stryker-setup-<n>.js, git status unchanged, the running run-tests got TERM" 'sig_ok INT 130'
+check "13.2215 SIGINT mid-run (the injected calc.ts in place: precondition checked): exit 130, calc.ts restored, a file Stryker rewrote in place put back from its backup-*/, no Stryker temp dir and no new stryker-setup-<n>.js, git status unchanged, the running run-tests got TERM" 'sig_ok INT 130'
 check "13.2216 SIGTERM mid-run: exit 143, the same restore" 'sig_ok TERM 143'
 watchdog_ok() { local out rc; rm -f "$R1.fake/signals"; out="$(FAKE_MODE=sleep FAKE_SLEEP=5 CTL_MUTATE_MAX_SECS=1 mut "$R1")"; rc=$?
   [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "passed 1 s and was stopped" && grep -q TERM "$R1.fake/signals" && clean_tree "$R1" && committed "$R1"; }
@@ -193,6 +201,23 @@ R5="$T/r5"; mkrepo "$R5"; cp "$FX/throwing/calc.ts" "$R5/packages/calc/src/calc.
 throw_ok() { local out rc; out="$(cd "$R5" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" "$CTL" mutate --repo "$R5" --base HEAD~2 2>&1)"; rc=$?; printf '%s\n' "$out" > "$T/throw.out"
   [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "control: the injected copy registers 1 tests, the unmutated tree 3" && clean_tree "$R5"; }
 check "13.2208 the dry-run control (real Stryker): a module whose INJECTED copy throws at import (its test registers 1 test instead of 3) is exit 2" 'throw_ok'
+R6="$T/r6"; mkrepo "$R6"   # 13.2216 with real Stryker: a related test holds the dry run open while Stryker's own in-place edits are live
+cat > "$R6/packages/calc/test/slow.test.ts" <<EOF
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { over } from '../src/calc';
+it('slow', async () => { writeFileSync('$T/r6-started', String(over(1))); await new Promise((r) => setTimeout(r, 60000)); }, 120000);
+EOF
+$G -C "$R6" add -A; $G -C "$R6" commit -q -m slow
+realterm_ok() { local vp n=0 rc; rm -f "$T/r6-started"
+  set -m; ( cd "$R6" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" exec "$CTL" mutate --repo "$R6" --base HEAD~2 > "$T/r6.out" 2>&1 ) & vp=$!; set +m
+  while [ ! -f "$T/r6-started" ] && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done
+  [ -f "$T/r6-started" ] || { echo "       (precondition: the slow test never started)"; kill -TERM "$vp"; wait "$vp"; return 1; }
+  local mid; mid="$($G -C "$R6" status --porcelain --untracked-files=no)"
+  kill -TERM "$vp"; wait "$vp"; rc=$?
+  [ "$mid" = " M packages/calc/src/calc.ts" ] || { echo "       (mid-run, tracked files other than calc.ts are modified: $(printf '%s' "$mid" | tr '\n' ' ' | cut -c1-200))"; return 1; }
+  [ $rc -eq 143 ] && committed "$R6" && clean_tree "$R6" || { echo "       (rc $rc)"; tail -4 "$T/r6.out" | cut -c1-160 | sed 's/^/       /'; return 1; }; }
+check "13.2216 (real Stryker) mid dry run the ONLY tracked file Stryker has changed in place is the mutated calc.ts (no '// @ts-nocheck' written into the package: disableTypeChecks off); SIGTERM then is exit 143 with git status empty" 'realterm_ok'
 
 ctl_test_only_end mutate.test.sh
 [ "$fails" -eq 0 ] && echo "mutate.test.sh: ok" || { echo "mutate.test.sh: $fails FAILED"; exit 1; }
