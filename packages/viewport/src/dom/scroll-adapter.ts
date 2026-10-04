@@ -37,8 +37,8 @@ type Glide = { offset: number | null; scale: number | null; anchorPx: number; ta
 type Drag = { id: number; startClient: number; startPos: number; samples: PanSample[]; moved: boolean };
 
 /**
- * A native scroll container with a virtualised surface (spec VP-0). The platform keeps its touch momentum, wheel and
- * keyboard scrolling; this adds what it cannot do: glides (Today, keyboard, jump to a ticket), an anchored zoom, a mouse
+ * A native scroll container with a virtualised surface (spec VP-0). The platform keeps its touch momentum, wheel, swipe
+ * and scrollbar scrolling; this adds what it cannot do: glides (Today, keyboard, jump to a ticket), an anchored zoom, a mouse
  * drag with momentum and a rubber band, and a single stream of frames carrying the smoothed velocity.
  *
  * Px per day lives in ONE CSS custom property (`--tl-ppd`) that the stylesheet multiplies into every bar's left and
