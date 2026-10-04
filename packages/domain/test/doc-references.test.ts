@@ -5,6 +5,7 @@ import {
   extractMentionedUserIds,
   PURGED_ITEM_LABEL,
   SNIPPET_MAX_CHARS,
+  splitSnippet,
 } from '../src/index.js';
 
 const text = (value: string) => ({ type: 'text', text: value });
@@ -90,13 +91,6 @@ describe('27.103 literal brackets in the text never forge a second marker', () =
   });
 
   it('27.103 a bracket touching the marker never moves it: Task 2’s splitSnippet recovers exactly the reference’s own text', () => {
-    // Task 2 (Linked-from, linked-from.ts) owns the real splitSnippet; this is a local copy of its pinned rule
-    // (plan Task 2: the first "[[", then the first "]]" after it) so the invariant is pinned where the snippets are made.
-    const splitSnippet = (snippet: string) => {
-      const open = snippet.indexOf('[[');
-      const close = snippet.indexOf(']]', open + 2);
-      return open < 0 || close < 0 ? null : { before: snippet.slice(0, open), marked: snippet.slice(open + 2, close), after: snippet.slice(close + 2) };
-    };
     const shapes: Array<{ name: string; body: unknown; own: string }> = [
       { name: 'control: a plain chip', body: para(text('see '), chip('T1', 'GN-1', 'Crash'), text(' now')), own: 'GN-1 Crash' },
       { name: 'a ticket title ending ]', body: para(text('see '), chip('T1', 'GN-1', 'Crash on save [iOS]'), text(' now')), own: 'GN-1 Crash on save [iOS]' },

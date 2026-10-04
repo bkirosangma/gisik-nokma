@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
+import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString, type EventEnvelope } from '../envelope.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
-import { dueDateValueSchema, prioritySchema } from '../ticket-types.js';
+import { dueDateValueSchema, estimateValueSchema, prioritySchema } from '../ticket-types.js';
 
 /**
  * The payload shapes of the ticket vocabulary (spec §3). Schemas only — the
@@ -150,6 +150,11 @@ export const ticketCreatedPayload = z
     startDate: dueDateValueSchema.optional(),
     dueDate: dueDateValueSchema.optional(),
     /**
+     * The birth ESTIMATE in whole days (ES-1). OPTIONAL, AND ABSENT MEANS NO CLAIM, the `startDate` rule above:
+     * the reducer writes no key for an absent member, because a null claim would be a clearing nobody made.
+     */
+    estimate: estimateValueSchema.optional(),
+    /**
      * Drafts (spec `2026-10-03-drafts-design.md` §2.2): this ticket is born PRIVATE, with no key.
      * OPTIONAL, AND ABSENT MEANS PUBLISHED AT BIRTH — what every stored `ticket.created` meant, so the
      * additive-field rule `start`, `priority` and the rest follow holds. `z.literal(true)`, never a
@@ -182,7 +187,8 @@ export const ticketCollaboratorPayload = z.object({ userId: z.string().min(1) })
 /**
  * Shape-only at the door: {fieldId, value}. Semantics (does the field exist,
  * does the value fit its kind) are the engine's job — see checkTicketFieldSet.
- * value: null is the clearing claim; built-ins title/description/dueDate/startDate/priority ride
+ * value: null is the clearing claim; built-ins title/description/dueDate/startDate/priority and the
+ * three flow built-ins estimate/reworkEstimate (whole days, 1 to 365) and waitForAll (`true`) ride
  * this same event, and a due date value is always { date, note? } — a claim.
  *
  * `value` is REQUIRED, and `z.unknown()` alone does not make it so: probed
@@ -256,6 +262,26 @@ export const ticketLinkRemovedPayload = z.object(linkPayloadShape).strict().refi
 export const TICKET_LINK_EVENT_TYPES = ['ticket.link_added', 'ticket.link_removed'] as const;
 export function isTicketLinkEvent(type: string): boolean {
   return (TICKET_LINK_EVENT_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * The payload a link event is SERVED with when this viewer may not be told
+ * its target (typed-links T4b; spec A §2.4). Never stored: the ledger holds
+ * the real id, and the server builds this per viewer at every door
+ * (`apps/server/src/visibility/withhold-link-targets.ts`). One constructor and
+ * one key order, so a hidden, a purged and a never-minted target serialise
+ * byte for byte the same. The purge precedent is `redactedTicketCreatedPayload`
+ * (`purge.ts`).
+ */
+export function withheldLinkPayload(kind: TicketLinkKind): { kind: TicketLinkKind; targetId: null } {
+  return { kind, targetId: null };
+}
+
+/** True exactly for a served-withheld link event; `=== null`, as `isRedactedTicketCreated` uses `=== true`. */
+export function isWithheldLinkEvent(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
+  if (!isTicketLinkEvent(env.type)) return false;
+  const p = env.payload;
+  return p !== null && typeof p === 'object' && (p as { targetId?: unknown }).targetId === null;
 }
 const READINGS: Record<TicketLinkKind, { out: string; in: string }> = {
   blocks: { out: 'blocks', in: 'is blocked by' },

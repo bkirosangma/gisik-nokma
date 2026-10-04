@@ -17,7 +17,9 @@ export type TicketDetailWire = {
 };
 const id = z.string().min(1);
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a day in YYYY-MM-DD form');
-const BUILT_IN = new Set(['title', 'description', 'priority', 'startDate', 'dueDate']);
+const BUILT_IN = new Set(['title', 'description', 'priority', 'startDate', 'dueDate', 'estimate', 'reworkEstimate', 'waitForAll']);
+/** The wtg2 T4 built-ins have no update_ticket argument until Part 5, so "use the argument" would be false for them. Part 5 deletes this set. */
+const FLOW_BUILT_IN = new Set(['estimate', 'reworkEstimate', 'waitForAll']);
 const enc = encodeURIComponent;
 
 export async function readTicket(session: Session, workspaceId: string, ticketId: string): Promise<TicketDetailWire> {
@@ -87,7 +89,9 @@ export function ticketTools(session: Session): ToolDefinition[] {
         const ev = (type: string, payload: unknown) => envelopeFor(session, a.workspaceId, t, type, payload);
         const set = (fieldId: string, value: unknown) => ev('ticket.field_set', { fieldId, value });
         for (const key of Object.keys(a.fields ?? {})) {
-          if (BUILT_IN.has(key)) throw new Error(`"${key}" is a built-in field: use the ${key} argument`);
+          if (BUILT_IN.has(key)) {
+            throw new Error(FLOW_BUILT_IN.has(key) ? `"${key}" is a built-in field and cannot be set through fields` : `"${key}" is a built-in field: use the ${key} argument`);
+          }
         }
         const events = [];
         if (a.title !== undefined) events.push(set('title', a.title));

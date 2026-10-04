@@ -9,6 +9,7 @@ import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
 import { canOpen, ticketAccess } from './can-open.js';
+import { targetSight, withholdEvent } from './withhold-link-targets.js';
 import {
   grantNoticeFor,
   isGrantBackfillTrigger,
@@ -438,6 +439,13 @@ async function nowInvisibleTicketsInScope(
  * and id, nothing else. Redacting it here and not there would be two answers to
  * one question.
  *
+ * A link's other end is the exception, by the same rule (typed-links T4b, spec
+ * A §2.4): the read door withholds a link whose target this user cannot see,
+ * where it serves a restricted parent's id. So the ticket arm yields such a
+ * link event with `targetId: null`, and a contest of such a claim with the
+ * gate's cause, at the same `seq` and `workspaceSeq` (`withhold-link-targets.ts`,
+ * with the READER's sight). Each id follows its own read door.
+ *
  * ## Determinism
  *
  * No clock, locale or random source is read, and no caller can make one be
@@ -461,6 +469,9 @@ export async function* visibleEventsFor(
   );
 
   const eff = await resolveEffectiveRole(db, userId, workspaceId);
+  // Typed-links T4b: one memoised `canSee` per drain for link targets (the
+  // READER's sight, never the actor's), used only in the ticket arm below.
+  const sees = targetSight(db, userId);
 
   if (eff.workspaceRole === null) {
     // Not a member NOW. Either they never were — nothing is owed — or this very
@@ -583,7 +594,7 @@ export async function* visibleEventsFor(
               };
             }
           }
-          yield env;
+          yield await withholdEvent(env, sees);
         }
         // NO per-event purge here, and there used to be one — this is the site
         // the controller's ruling on case 6.101 emptied, so the absence is

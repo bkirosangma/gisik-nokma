@@ -7,10 +7,14 @@ import {
   PRIORITIES,
   SUB_TASK_TYPE_ID,
   builtinTicketTypeDefs,
+  claimedEstimate,
+  claimedWaitForAll,
   customFieldDefSchema,
   dueDateValueSchema,
+  estimateValueSchema,
   prioritySchema,
   ticketTypeDefSchema,
+  waitForAllValueSchema,
 } from '../src/ticket-types.js';
 import * as ticketTypesModule from '../src/ticket-types.js';
 import { IST_DAY_REGEX, istDayBounds } from '../src/ist-day.js';
@@ -158,6 +162,25 @@ describe('ticketTypeDefSchema', () => {
     expect(() => prioritySchema.parse('p1')).toThrow();
     expect(() => prioritySchema.parse(null)).toThrow();
   });
+
+  it('29.153 the three flow built-ins are reserved ids, validated by one origin', () => {
+    for (const id of ['estimate', 'waitForAll', 'reworkEstimate']) {
+      expect(() => ticketTypeDefSchema.parse({ ...base, fields: [{ id, name: 'X', type: 'number' }] }), id).toThrow(/shadows a built-in field/);
+    }
+    expect(() => ticketTypeDefSchema.parse({ ...base, fields: [{ id: 'estimates', name: 'X', type: 'number' }] })).not.toThrow(); // control
+    for (const ok of [1, 3, 365]) expect(estimateValueSchema.parse(ok)).toBe(ok);
+    for (const bad of [0, 366, 2.5, -1, '3', Number.NaN, null, true]) expect(estimateValueSchema.safeParse(bad).success, String(bad)).toBe(false);
+    expect(waitForAllValueSchema.safeParse(true).success).toBe(true);
+    for (const bad of [false, null, 'true', 1]) expect(waitForAllValueSchema.safeParse(bad).success, String(bad)).toBe(false);
+    expect(claimedEstimate({ estimate: { value: 3 } }, 'estimate')).toBe(3);
+    expect(claimedEstimate({ estimate: { value: 0 } }, 'estimate')).toBeNull();
+    expect(claimedEstimate({}, 'reworkEstimate')).toBeNull();
+    // Each id reads its OWN claim: with both present, the two readings differ.
+    expect(claimedEstimate({ estimate: { value: 3 }, reworkEstimate: { value: 2 } }, 'reworkEstimate')).toBe(2);
+    expect(claimedEstimate({ estimate: { value: 3 }, reworkEstimate: { value: 2 } }, 'estimate')).toBe(3);
+    expect(claimedWaitForAll({ waitForAll: { value: true } })).toBe(true);
+    expect(claimedWaitForAll({ waitForAll: { value: null } })).toBe(false);
+  });
 });
 
 /**
@@ -177,7 +200,7 @@ describe('built-in seeds', () => {
     // future seed goes deeper, this assertion is the thing that says so.
     expect(DEEPEST_RANK).toBe(Math.max(...BUILTIN_TICKET_TYPE_SEEDS.map((t) => t.rank)));
     expect(DEEPEST_RANK).toBe(4);
-    expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate', 'priority']);
+    expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate', 'priority', 'estimate', 'waitForAll', 'reworkEstimate']);
   });
 
   it('materialises full defs bound to a workspace default workflow', () => {

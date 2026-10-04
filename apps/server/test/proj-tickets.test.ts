@@ -337,6 +337,21 @@ describe('proj_tickets', () => {
     });
   });
 
+  it('29.160 the three claims and a birth estimate are stored verbatim with provenance', async () => {
+    const born: Draft = { ...created(WS, NEWBORN, 'task', PARENT, 'Estimated at birth'), payload: { typeId: 'task', projectId: PROJECT, parentId: PARENT, title: 'Estimated at birth', estimate: 4 } };
+    await applyAll(asLedger([...SEED, born,
+      ticketEvent(CHILD, 'ticket.field_set', { fieldId: 'estimate', value: 3 }),
+      ticketEvent(CHILD, 'ticket.field_set', { fieldId: 'reworkEstimate', value: 2 }),
+      ticketEvent(CHILD, 'ticket.field_set', { fieldId: 'waitForAll', value: true })]));
+    const child = await getTicketStateFromDb(db.pool, WS, CHILD);
+    expect(child?.fields['estimate']).toMatchObject({ value: 3, actorId: ACTOR });
+    expect(child?.fields['reworkEstimate']?.value).toBe(2);
+    expect(child?.fields['waitForAll']?.value).toBe(true);
+    expect((await getTicketStateFromDb(db.pool, WS, NEWBORN))?.fields['estimate']?.value).toBe(4);
+    const plain = await getTicketStateFromDb(db.pool, WS, GRANDCHILD); // control
+    expect(Object.keys(plain?.fields ?? {}).sort()).toEqual(['priority', 'title']);
+  });
+
   it('transition, assignment, collaborators and field claims update head state with provenance', async () => {
     await applyAll(
       asLedger([

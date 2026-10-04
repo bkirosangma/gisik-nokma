@@ -14,8 +14,8 @@ import type { LiveQueryResult } from './use-live-query.js';
  *
  * ## The values are written onto the REAL shapes
  *
- * `TicketRead` keeps the title at its top level, the state and the assignee on `ticket`, and the priority and
- * the two dates as CLAIMS in `ticket.fields` (`{value, actorId, clientTime, serverTime}`). A dates' claim value
+ * `TicketRead` keeps the title at its top level, the state and the assignee on `ticket`, and the priority, the
+ * estimate and the two dates as CLAIMS in `ticket.fields` (`{value, actorId, clientTime, serverTime}`). A dates' claim value
  * is `{date}` (or `null` for a cleared one), so the overlay carries the bare day and wraps it the way the wire
  * does; `dateClaimOf` and the sheet's priority reader then read the overlay with no second code path.
  *
@@ -35,6 +35,8 @@ export type TicketOverlay = {
   /** The day, `YYYY-MM-DD`, or `null` for a cleared date. */
   startDate?: string | null;
   dueDate?: string | null;
+  /** Whole days, or null for a cleared estimate (wtg2 T4). The claim value is the bare number, like a priority. */
+  estimate?: number | null;
 };
 export type OverlayField = keyof TicketOverlay;
 
@@ -44,13 +46,13 @@ export type OverlayField = keyof TicketOverlay;
  */
 export const OVERLAY_TTL_MS = 20_000;
 
-const CLAIM_FIELDS = ['priority', 'startDate', 'dueDate'] as const;
+const CLAIM_FIELDS = ['priority', 'startDate', 'dueDate', 'estimate'] as const;
 type ClaimField = (typeof CLAIM_FIELDS)[number];
 const isClaimField = (field: OverlayField): field is ClaimField => (CLAIM_FIELDS as readonly string[]).includes(field);
 
-/** What the wire stores for an overlay value of a claim field: a priority is the bare level, a date is `{date}` or `null`. */
+/** What the wire stores for an overlay value of a claim field: a priority is the bare level, an estimate the bare number, a date is `{date}` or `null`. */
 function claimValueOf(field: ClaimField, value: unknown): unknown {
-  if (field === 'priority') return value;
+  if (field === 'priority' || field === 'estimate') return value;
   return value === null ? null : { date: value };
 }
 
@@ -67,6 +69,8 @@ function readValueOf(read: TicketRead, field: OverlayField): unknown {
       return read.ticket.assigneeId;
     case 'priority':
       return read.ticket.fields['priority']?.value;
+    case 'estimate':
+      return read.ticket.fields['estimate']?.value ?? null;
     case 'startDate':
     case 'dueDate': {
       const value = read.ticket.fields[field]?.value;

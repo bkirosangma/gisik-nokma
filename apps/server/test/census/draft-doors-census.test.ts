@@ -40,12 +40,13 @@ const DOORS: Record<string, Partial<Calls>> = {
   'routes/drafts-publish.ts': { ticketAccess: 1 }, // the set publish (drafts T5b): the first id the caller cannot open refuses the set before ingest (28.098)
   'routes/people.ts': { isOpenableDraft: 1 }, // R8 (drafts T5): the outsider door refuses an assignment on the caller's own draft
   'routes/ticket-links.ts': { ticketAccess: 1 }, // the links route: a draft is the unknown-ticket body to everyone but its author (drafts T6, 28.117)
-  'routes/tickets.ts': { canOpen: 4 }, // G7: the detail read, the parent crumb, the epic walk; the ticketState link filter by the other end (drafts T6, 28.118)
+  'routes/tickets.ts': { canOpen: 3 }, // G7: the detail read, the parent crumb, the epic walk
   'sync/contests-route.ts': { canOpen: 1 }, // G6
   'sync/reconcile-route.ts': { canOpen: 1 }, // G5
   'sync/sync-routes.ts': { canOpen: 1, listMyDrafts: 1 }, // G3, G4
   'visibility/can-open.ts': { ticketAccess: 1, isOpenableDraft: 1, holdsDraftRights: 1 }, // canOpen is ticketAccess; ticketAccess is canSee then isOpenableDraft; R18
   'visibility/visible-events-for.ts': { canOpen: 1, ticketAccess: 1 }, // G2, and C4's own-draft test
+  'visibility/withhold-link-targets.ts': { canOpen: 1 }, // targetSight: every door's link-end predicate; the author's own draft end is served (drafts T6, 28.117-28.119)
 };
 
 function walk(dir: string, out: string[] = []): string[] {

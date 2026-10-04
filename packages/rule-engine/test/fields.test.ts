@@ -202,6 +202,29 @@ describe('checkTicketFieldSet', () => {
     });
   });
 
+  it('29.157 estimate and reworkEstimate: whole days 1..365 or null, on any ticket', async () => {
+    for (const [id, name] of [['estimate', 'Estimate'], ['reworkEstimate', 'Rework estimate']] as const) {
+      for (const ok of [1, 365, null]) expect(await checkTicketFieldSet(fieldSet(id, ok), ctx()), `${id} ${String(ok)}`).toEqual({ refused: false });
+      expect(await checkTicketFieldSet(fieldSet(id, 3), ctxWithoutTheTicketsType())).toEqual({ refused: false });
+      for (const bad of [0, 366, 2.5, '3', true]) {
+        expect(await checkTicketFieldSet(fieldSet(id, bad), ctx()), `${id} ${String(bad)}`).toEqual({
+          refused: true, rule: 'field.type-mismatch', reason: `"${name}" needs a whole number of days from 1 to 365.`,
+        });
+      }
+    }
+  });
+  it('29.158 waitForAll: true or null only', async () => {
+    expect(await checkTicketFieldSet(fieldSet('waitForAll', true), ctx())).toEqual({ refused: false });
+    expect(await checkTicketFieldSet(fieldSet('waitForAll', null), ctx())).toEqual({ refused: false });
+    // Answered before the type resolves, like the other built-ins: a ticket whose type is gone still takes it.
+    expect(await checkTicketFieldSet(fieldSet('waitForAll', true), ctxWithoutTheTicketsType())).toEqual({ refused: false });
+    for (const bad of [false, 'yes', 1]) {
+      expect(await checkTicketFieldSet(fieldSet('waitForAll', bad), ctx()), String(bad)).toEqual({
+        refused: true, rule: 'field.type-mismatch', reason: '"Wait for all incoming" needs true to turn it on, or null to clear it.',
+      });
+    }
+  });
+
   it('planted defect: a non-text title, a non-document description, a timestamp due date', async () => {
     expect(await checkTicketFieldSet(fieldSet('title', 42), ctx())).toEqual({
       refused: true,

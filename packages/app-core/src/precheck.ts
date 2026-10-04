@@ -584,10 +584,13 @@ function precheckTicketRanked(submitted: SubmittedEvent, cache: ClientStateCache
  * with, because every reason is the engine's own (`checks/links.ts`). The
  * guard is the cache: both tickets must be held, or "I have never heard of
  * it" would read as `link.unknown-target`. The online detail read's `links`
- * is filtered (typed-links T4); the event history, the stream and bootstrap
- * serve a hidden target withheld (`targetId: null`, typed-links T4b), which
- * the cache folds to nothing. So the cache holds only links whose both ends
- * this viewer sees, and the rules compare only the pair.
+ * is filtered (typed-links T4); the event history, the stream and both
+ * bootstraps serve a hidden target withheld (`targetId: null`,
+ * `apps/server/src/visibility/withhold-link-targets.ts`, typed-links T4b), which
+ * the cache folds to nothing (`isWithheldLinkEvent` in `foldTicketEvent`). So
+ * the cache never receives a link to a ticket this viewer could not see, and
+ * the rules compare only the pair. (A link held before a narrowing stays held:
+ * the device keeps an id it already had, see that module's residuals.)
  *
  * A removal needs only the SOURCE: `link.absent` is decided from the links
  * the source holds, and the engine never reads the target on that path. A

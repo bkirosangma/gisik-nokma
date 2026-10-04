@@ -360,6 +360,8 @@ export function CreateTicketFlow({
         // dialog omitted it.
         ...(draft.startDate === undefined ? {} : { startDate: { date: draft.startDate } }),
         ...(draft.dueDate === undefined ? {} : { dueDate: { date: draft.dueDate } }),
+        // The birth estimate (wtg2 T4): a bare whole number on the wire, omitted when the dialog omitted it.
+        ...(draft.estimate === undefined ? {} : { estimate: draft.estimate }),
       },
     });
 
