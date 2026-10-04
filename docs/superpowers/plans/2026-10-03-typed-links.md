@@ -84,8 +84,8 @@
 
 ## Review Focus
 
-1. **Removing a link from the "wrong" end.** An incoming link removed from the target's sheet, and a `relates` stored as B→A removed from A, must file `ticket.link_removed` on the STORED source's stream, with the stored kind and target. Otherwise `link.absent` refuses it, or a link silently survives. Pinned by 27.042 (T3), 27.056 (T4) and 27.069 (T5).
-2. **A link into a ticket the viewer cannot see** must be absent everywhere: the Links section, `ticketState.links` on the detail read, History (the target is withheld), `get_ticket`, and `get_ticket_history`. No count, no key, no title. Pinned by 27.050, 27.052, 27.053, 27.058 and 27.059 (T4).
+1. **Removing a link from the "wrong" end.** An incoming link removed from the target's sheet, and a `relates` stored as B→A removed from A, must file `ticket.link_removed` on the STORED source's stream, with the stored kind and target. Otherwise `link.absent` refuses it, or a link silently survives. Pinned by 27.042 (T3), 27.056 (T4) and 27.069 (T5); 27.054 (T4) is supporting evidence (planner ruling 2026-10-04).
+2. **A link into a ticket the viewer cannot see** must be absent everywhere: the Links section, `ticketState.links` on the detail read, History (the target is withheld), `get_ticket`, `get_ticket_history`, the event history `/tickets/:id/events` (T4b) and sync (T4b) (planner ruling 2026-10-04). No count, no key, no title. Pinned by 27.050, 27.052, 27.053, 27.058 and 27.059 (T4); the two (T4b) doors are typed-links T4b's.
 3. **A purged ticket at either end.** The live table and a rebuild agree (`verifyProjections` is clean). A replayed `link_added` toward an erased id writes no row. A new link to an erased id is refused. Pinned by 27.023, 27.024 and 27.025 (T2).
 4. **A refusal arriving after the optimistic row is drawn** (for example, the other user added the reverse a second earlier). The pending row disappears, nothing stays half-drawn, and the server's own sentence shows beside the Add control. Pinned by 27.067 (T5).
 5. **A double click on Remove or Undo** files exactly one event. Pinned by 27.068 (T5).
@@ -794,7 +794,7 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
 - Modify:
   - `packages/rule-engine/src/checks/refusals.ts` (`REFUSALS`, `:28` onward; a builder beside `rankRefusal`)
   - `packages/rule-engine/src/evaluate.ts:33-79` (import + two arms before `default`)
-  - `packages/rule-engine/src/fixtures/harness.ts:400-556` (`applyPriorEvent`): an arm only if this task adds a JSON fixture. It does not, so leave the harness and say so in the handoff.
+  - `packages/rule-engine/src/fixtures/harness.ts:393-557` (`applyPriorEvent`): an arm only if this task adds a JSON fixture. It does not, so leave the harness and say so in the handoff.
   - `apps/server/src/permissions/check-permission.ts:1639-1641` (after the `canSee(source)` refusal) and a new reason constant beside `TICKET_NOT_VISIBLE_REASON` (`:198`)
   - `packages/app-core/src/precheck.ts:183-190` (routing) and a new `precheckTicketLink` beside `precheckTicketRanked` (`:550-574`)
 
@@ -858,13 +858,15 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
     it('27.037 trashed target / source refused; control: restored accepted', async () => {
       expect(await evaluateEvent(link(A, 'blocks', B), world(del(B)))).toEqual({
         refused: true, rule: 'link.target-deleted', reason: 'The other ticket is deleted. Restore it, or pick another ticket.' });
-      expect((await evaluateEvent(link(A, 'blocks', B), world(del(A)))).refused).toBe(true);
+      expect(await evaluateEvent(link(A, 'blocks', B), world(del(A)))).toEqual({
+        refused: true, rule: 'deleted-ticket', reason: 'This ticket is deleted; restore it first.' }); // the live gate (`checks/deletion.ts:148-149`), not a link rule
       expect(await evaluateEvent(link(A, 'blocks', B), world(del(B), restore(B)))).toEqual(ok);
     });
     it('27.038 ordered duplicate refused; control: another kind accepted', async () => {
       expect(await evaluateEvent(link(A, 'blocks', B), world(link(A, 'blocks', B)))).toEqual({
         refused: true, rule: 'link.duplicate', reason: '"Ice maker" already blocks "Chiller".' });
-      expect(await evaluateEvent(link(A, 'duplicates', B), world(link(A, 'duplicates', B)))).toMatchObject({ rule: 'link.duplicate' });
+      expect(await evaluateEvent(link(A, 'duplicates', B), world(link(A, 'duplicates', B)))).toEqual({
+        refused: true, rule: 'link.duplicate', reason: '"Ice maker" already duplicates "Chiller".' });
       expect(await evaluateEvent(link(A, 'relates', B), world(link(A, 'blocks', B)))).toEqual(ok);
     });
     it('27.039 relates refused in either direction; control: a third ticket accepted', async () => {
@@ -887,10 +889,22 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
       expect(await evaluateEvent(link(A, 'relates', B, 'ticket.link_removed'), stored)).toEqual({
         refused: true, rule: 'link.absent', reason: 'This ticket holds no such link, so there is nothing to remove.' });
       expect(await evaluateEvent(link(B, 'relates', A, 'ticket.link_removed'), stored)).toEqual(ok);
+      // The KIND is part of the stored link: the storing stream removing another kind is absent too.
+      expect(await evaluateEvent(link(B, 'blocks', A, 'ticket.link_removed'), stored)).toMatchObject({ refused: true, rule: 'link.absent' });
     });
   });
   ```
-  Read `test-support.ts` for `createdIn`'s argument order and `PROJECT_B`'s workspace before running. If `created`'s ticket type id is not `'task'`, use the id `TASK` declares.
+  Kills (each against Step 2's `checks/links.ts` / `evaluate.ts`):
+  - 27.035: (a) drop `if (targetId === source.id) return refuse('link.self');` (A→A then passes every later check); (b) no `ticket.link_added` arm in `evaluate.ts` (the default accepts).
+  - 27.036: (a) drop `|| target.workspaceId !== env.workspaceId` (FOREIGN exists in the memory context, so it is accepted); (b) refuse the unknown id with a second sentence, e.g. `refuse('link.unknown-target', 'No such ticket.')` when `target === null` (the shared-refusal leg goes red).
+  - 27.037: (a) drop the `link.target-deleted` line (B is accepted while trashed); (b) `(target.deleted ?? null) !== null` → `target.deleted !== undefined` (a restored ticket's `deleted: null` is refused: the control goes red). The `del(A)` leg guards existing behaviour (`checkTicketLive`, `checks/deletion.ts:143-152`).
+  - 27.038: (a) drop the `holds(source, …)` duplicate line (the blocks and duplicates legs go red); (b) `holds` ignores `kind` (`l.targetId === targetId` only: the relates-on-a-blocks-pair control is refused); (c) `linkExistsRefusal` uses `linkReading(kind, 'in')` ("is duplicated by" in the second leg).
+  - 27.039: (a) drop the `holds(target, …)` branch; (b) its rule → always `'link.reverse'` (relates reads `link.duplicate`); (c) the reason built `(titleOf(source), titleOf(target))` in that branch ("Ice maker" first).
+  - 27.040: (a) refuse every `blocks` whose target holds ANY `blocks` (the three-cycle control is refused); (b) the reverse branch's rule → `'link.duplicate'` for every kind.
+  - 27.041: (a) `kind === 'relates' ? …` → `kind !== 'blocks' ? 'link.duplicate' : 'link.reverse'` (duplicates reads `link.duplicate`); (b) the reverse branch skipped for `duplicates` (accepted).
+  - 27.042: (a) the removal test `holds(source, …)` → `holds(source, …) || holds(target, …)` (A's removal is accepted); (b) drop the `ticket.link_removed` early return (the control on B reads `link.duplicate`); (c) `holds` ignores `kind` in the removal (the blocks-removal leg is accepted).
+
+  Read `test-support.ts` for `createdIn`'s argument order and `PROJECT_B`'s workspace before running (on `origin/release/knowledge-graph`: `createdIn(workspaceId, id, typeId, projectId)`, `test-support.ts:104-109`; `PROJECT_B` is only a project id, `:26`). If `created`'s ticket type id is not `'task'`, use the id `TASK` declares.
 
   Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run test/links.test.ts --maxWorkers=2 > /tmp/kg-a3.log 2>&1; tail -40 /tmp/kg-a3.log`.
   Expected: FAIL (the default arm accepts everything).
@@ -1042,10 +1056,24 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
     expect(await checkPermission(env(inEpic, hidden, 'ticket.link_removed'), { db: db.pool, sessionUserId: member })).toMatchObject(refusal);
     expect(await checkPermission(env(inEpic, newUlid()), { db: db.pool, sessionUserId: member })).toMatchObject(refusal);
     expect(await checkPermission(env(inEpic, shared), { db: db.pool, sessionUserId: member })).toBeNull();
+    expect(await checkPermission(env(inEpic, shared, 'ticket.link_removed'), { db: db.pool, sessionUserId: member })).toBeNull(); // the removal's own control
+  });
+
+  it('27.044 a hidden SOURCE is refused by the existing canSee(source) line, before the target is asked; control: the owner passes', async () => {
+    const env = (source: string, target: string) =>
+      makeEnvelope({ type: 'ticket.link_added', workspaceId: WS, actorId: member, entity: { kind: 'ticket', id: source }, payload: { kind: 'blocks', targetId: target } });
+    const sourceRefusal = { refused: true, rule: 'permission.visibility', reason: 'This ticket is not visible to you.' };
+    expect(await checkPermission(env(hidden, shared), { db: db.pool, sessionUserId: member })).toEqual(sourceRefusal);
+    // BOTH ends invisible to the member: the SOURCE's sentence wins, so the target was not asked first.
+    expect(await checkPermission(env(hidden, newUlid()), { db: db.pool, sessionUserId: member })).toEqual(sourceRefusal);
+    expect(await checkPermission(env(hidden, shared), { db: db.pool, sessionUserId: owner })).toBeNull();
   });
   ```
-  - Read `checkPermission`'s return type at `:1915-1998`. If it returns `Refusal | null` with a different field set, match it; the comment-authority test shows the form.
-  - **27.044:** `env(hidden, shared)` as member is refused with `TICKET_NOT_VISIBLE_REASON`'s literal `'This ticket is not visible to you.'`. Control: the same as owner → `null`.
+  - Read `checkPermission`'s return type at `:1915-1998` (on the ref: `Promise<Refusal | null>`, `:1915-1918`; `refuseWith` builds `{ refused, rule, reason }`, `:361-363`). If it differs on the branch, match it; the comment-authority test shows the form. Build each envelope as `check-comment-authority.test.ts:28-31` does (it also passes `origin: 'web'`).
+
+  Kills (each against this step's `check-permission.ts` block):
+  - 27.043: (a) remove the new `canSee(target)` block (all three refusal legs pass the gate); (b) the type test → `env.type === 'ticket.link_added'` only (the `link_removed` leg passes); (c) refuse only a target that EXISTS and is hidden, e.g. guard with `await ticketIsLive(...)` before `canSee` (the unknown-id leg passes: one sentence, no oracle); (d) invert to `await canSee(...)` (the two controls are refused).
+  - 27.044: (a) move the new block ABOVE the `canSee(source)` refusal at `:1639-1641` (the both-hidden leg reads the target's sentence). The first leg and the owner control guard existing behaviour (`canSee(source)`, `:1639-1641`).
 
   Run: server `test/permissions`, LOCAL.
   Expected: PASS. Flip ✅.
@@ -1064,16 +1092,17 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
         return precheckTicketLink(submitted, cache, deps);
       }
     ```
-  - Add beside `precheckTicketRanked`:
+  - Add beside `precheckTicketRanked` (its docblock's filtering sentence corrected, planner ruling 2026-10-04: the event history and sync still carry hidden targets until typed-links T4b):
     ```ts
     /**
      * Typed links (spec A): the SHARED engine, on the cache, and nothing typed
      * twice. Unlike `precheckTicketRanked`, there is no second literal to agree
      * with, because every reason is the engine's own (`checks/links.ts`). The
      * guard is the cache: both tickets must be held, or "I have never heard of
-     * it" would read as `link.unknown-target`. The client's copy of `links` is
-     * the server's, filtered to targets this viewer can see (typed-links T4);
-     * the rules compare only the pair, and both ends of the pair are visible.
+     * it" would read as `link.unknown-target`. The online detail read's `links`
+     * is filtered (typed-links T4); the event history and sync are filtered by
+     * typed-links T4b. The rules compare only the pair, and both ends of the
+     * pair are visible.
      */
     async function precheckTicketLink(submitted: SubmittedEvent, cache: ClientStateCache, deps: PrecheckDeps): Promise<PrecheckResult> {
       const parsed = ticketLinkAddedPayload.safeParse(submitted.payload);
@@ -1088,6 +1117,14 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
     ```
   - Read the existing `precheck.test.ts` for how a `ClientStateCache` is built in tests (`createClientStateCache` or similar, in `src/cache.ts`), and seed it with `ticketStateSeed({ id, fields: { title: { value: 'Ice maker', … } }, links })` from `test/helpers/seed.ts`.
   - Write `packages/app-core/test/precheck-links.test.ts` with one `it` per refusal plus the not-cached and passed controls in the same `it`s. Assert the literal reasons copied from 27.035–27.042, never imported constants.
+  - Call `precheckEvent(submitted, cache, { now })` with NO `deps.evaluate`: an injected evaluator would make every verdict the test's own value. The legs each `it` must hold (each fails on its own mutant below):
+    1. refused, exact `{ kind: 'refused', rule, reason }` for self, duplicate (blocks), relates stored B→A seen from A (`link.duplicate`), blocks-reverse (`link.reverse`), and a removal from the non-storing end (`link.absent`);
+    2. `{ kind: 'passed' }` for a fresh `blocks` between two cached tickets (control);
+    3. `not-evaluated` for a `link_added` whose SOURCE is not cached, and separately for one whose TARGET is not cached (the target is a real-shaped ULID the cache does not hold);
+    4. `{ kind: 'passed' }` for a `link_removed` of a link the source holds, with the TARGET not cached (a removal needs only the source: the target guard is `link_added`-only).
+  - Seed `links` on the cached `TicketState` (`ticketStateSeed({ ..., links: [{ kind: 'relates', targetId: A }] })`, `test/helpers/seed.ts:141`), and assert in the same `it` that the duplicate case's control (the same call with `links` absent) is `passed`, so the refusal is the seeded link's doing.
+
+  Kills (against this step's `precheck.ts` code): (a) route links to `notEvaluated()` instead of `precheckTicketLink` (legs 1, 2 and 4 go red); (b) drop the target-cache guard (leg 3's target case reads `link.unknown-target`); (c) drop `submitted.type === 'ticket.link_added' &&` from that guard (leg 4 reads `not-evaluated`); (d) drop the source-cache guard (leg 3's source case reads `unknown-ticket` from the engine); (e) map an engine refusal to `{ kind: 'refused', rule: verdict.rule, reason: '' }` (every exact reason in leg 1).
 
   Run: app-core `test/precheck-links.test.ts` and `test/precheck*.test.ts`, LOCAL.
   Expected: PASS. Flip 27.045 ✅.
@@ -1095,6 +1132,12 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   Commit.
 
 - [ ] **Step 5: Features, sweeps, DONE**
+
+  **Prose to sweep:** (fix in this task's commits)
+  - `packages/app-core/src/precheck.ts:335-338` — "No live path here can reach this. `precheckEvent` routes only `ticket.transitioned` to this context": after Step 4 `precheckTicketLink` routes both link types through `contextFromCache` too (still never reaching `getTicketTypeDef`, since `checks/links.ts` reads only `getEntityState`). Name both routes.
+  - `packages/rule-engine/src/checks/refusals.ts:12-14` — "The ids are namespaced by what the refusal is ABOUT — `ticket.` …, `hierarchy.` …, `field.` …": the list of namespaces gains `link.` (a link between two tickets).
+  - (searched, nothing else false: `link_added`, `link_removed`, `checkTicketLink`, `LINK_TARGET`, `passes through`, `has no case`, `every other event type` in `packages/rule-engine/src`, `packages/app-core/src/precheck.ts`, `apps/server/src/permissions/check-permission.ts`; `packages/domain/src/events/ticket-events.ts:211-214` already names `rule-engine/src/checks/links.ts` as the rules' home and becomes true.)
+
   - **Features:** replace `<!-- A T3 bullet -->` with `- ⚙️ **Typed links: the rules** (typed-links T3; `packages/rule-engine/src/checks/links.ts`, `apps/server/src/permissions/check-permission.ts`, `packages/app-core/src/precheck.ts`) — …`. Name all seven rules plus `link.absent`, and the one-sentence visibility refusal. Cases 27.035–27.045.
   - **Sweeps:** rule-engine, app-core, sync-client WHOLE (`local-context.ts` runs the same engine offline), server WHOLE.
   - **Mutations:**
@@ -1119,11 +1162,11 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   - `apps/server/test/routes/ticket-links.test.ts` (copy `test/routes/notes.test.ts:1-60`: `buildReadTestApp`, `world.authOf(role)`, `app.inject`)
 - Modify:
   - **Server:**
-    - `apps/server/src/app.ts` or wherever `registerNotesRoutes` is registered (grep): register the new route the same way.
+    - `apps/server/src/app.ts` (`registerNoteRoutes(...)` at `:937`, `registerTicketHistoryRoute(...)` at `:946`): register the new route the same way.
     - `apps/server/src/routes/tickets.ts:700-710`: `ticketState: state` → filtered.
     - `apps/server/src/routes/ticket-history.ts`: `TicketHistoryEvent` (`:29-39`) gains `linkTarget?`; the handler (`:266-311`) labels link events.
   - **MCP:**
-    - `packages/mcp-server/src/tools/ticket-tools.ts`: a `link_tickets` tool after `rank_ticket` (`:163-179`, its sibling); `historyLine` (`:62`) passes `linkTarget` through.
+    - `packages/mcp-server/src/tools/ticket-tools.ts`: a `link_tickets` tool after `rank_ticket` (`:166-182`, its sibling); `historyLine` (`:65-67`) passes `linkTarget` through.
     - `packages/mcp-server/src/tools/read-tools.ts:149-171` (`get_ticket`).
     - `packages/mcp-server/test/fixtures/tool-names.ts` (the `// ticket begin (T9)` block, after `'rank_ticket'`).
     - `packages/mcp-server/test/register.test.ts:87-110` (14.555: the literal list + `toHaveLength(63)` → 64). Check 14.80/14.81 and the hosted 14.262 list the same way (grep `rank_ticket` in `packages/mcp-server/test` and `apps/server/test/mcp`).
@@ -1156,26 +1199,86 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   - `- ❌ **27.054 — a link removed from the TARGET's side is a `link_removed` on the SOURCE's history, with the remover as actor;** control: the target's own history holds no link event.`
 
   In `apps/server/test/routes/ticket-links.test.ts`:
-  - **World:** `buildReadTestApp` (`S = world.world.taskInEpicId`, `SH = sharedTaskId`, `H = hiddenTaskId`; member sees S and SH, not H).
-  - **Seed:** `applyCommitted(db.pool, [link(S,'blocks',SH), link(H,'relates',S), link(S,'duplicates',H)])`, where `link` is `makeCommitted({ workspaceId: WS, actorId: owner, entity: { kind: 'ticket', id: source }, type: 'ticket.link_added', payload: { kind, targetId } })`.
+  - **World:** `buildReadTestApp` (`S = world.world.taskInEpicId`, `SH = sharedTaskId`, `H = hiddenTaskId`, `G = guestTaskId`; member sees S and SH, not H; the guest sees G, not H; `read-scenario.ts:176-189`).
+  - **Seed:** `applyCommitted(db.pool, [link(S,'blocks',SH), link(H,'relates',S), link(S,'duplicates',H), link(G,'blocks',H)])`, where `link` is `makeCommitted({ workspaceId: WS, actorId: owner, entity: { kind: 'ticket', id: source }, type: 'ticket.link_added', payload: { kind, targetId } })`. The fourth link gives 27.052 a ticket whose ONLY link is hidden from its viewer.
+  - **Order:** the `it`s run in file order 27.050 → 27.054; 27.054 runs LAST because it removes S→SH, and 27.051 restores SH before it ends.
+  - **Keys:** the world has no entered prefixes, so a key is `ticketKey('CC', 'RE', n)` (`test/read/ticket-cards.test.ts:687-703`), with `n` from `ticketNumbers(db.pool, WS, [id])` (`src/read/ticket-numbers.ts`).
 
   ```ts
+  type LinksBody = { links: Array<{ kind: string; direction: string; ticket: { id: string; projectId: string; key: string | null; title: string; stateCategory: string } }> };
+  type HistoryBody = { events: Array<{ type: string; actorId: string; payload: Record<string, unknown>; linkTarget?: { key: string | null } | null }> };
+  const linksOf = async (role: ReadRole, id = S) =>
+    ((await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${id}/links`, headers: world.authOf(role) })).json() as LinksBody);
+  const triples = (body: LinksBody) => body.links.map((l) => [l.kind, l.direction, l.ticket.id]);
+  const historyOf = async (role: ReadRole, id = S) =>
+    ((await app.inject({ method: 'GET', url: `/v1/tickets/${id}/history`, headers: world.authOf(role) })).json() as HistoryBody).events;
+  const keyOf = async (id: string) => ticketKey('CC', 'RE', (await ticketNumbers(db.pool, WS, [id])).get(id)!);
+
   it('27.050 both directions, hidden ends dropped with no trace; control: owner sees all', async () => {
-    const get = (role: ReadRole) => app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${S}/links`, headers: world.authOf(role) });
-    const member = (await get('member')).json() as { links: Array<{ kind: string; direction: string; ticket: { id: string } }> };
-    expect(member.links.map((l) => [l.kind, l.direction, l.ticket.id])).toEqual([['blocks', 'out', SH]]);
+    const member = await linksOf('member');
+    expect(triples(member)).toEqual([['blocks', 'out', SH]]);
     expect(JSON.stringify(member)).not.toContain(H);
     expect(Object.keys(member)).toEqual(['links']);
-    const owner = (await get('owner')).json() as typeof member;
-    expect(owner.links.map((l) => [l.kind, l.direction, l.ticket.id]).sort()).toEqual(
-      [['blocks', 'out', SH], ['duplicates', 'out', H], ['relates', 'in', H]].sort());
+    // The other end's shape: exact key, title, category (SH sits in `waiting`, category active: read-scenario.ts:162, :240-247).
+    expect(member.links[0]!.ticket).toEqual({ id: SH, projectId: world.world.projectId, key: await keyOf(SH), title: 'Renew the trade licence', stateCategory: 'active' });
+    const owner = await linksOf('owner');
+    expect(triples(owner).sort()).toEqual([['blocks', 'out', SH], ['duplicates', 'out', H], ['relates', 'in', H]].sort());
+  });
+
+  it('27.051 a trashed other end drops the row; restore brings it back; control: present before', async () => {
+    expect(triples(await linksOf('owner'))).toContainEqual(['blocks', 'out', SH]);
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: WS, actorId: owner, entity: { kind: 'ticket', id: SH }, type: 'ticket.deleted', payload: {} })]);
+    const during = triples(await linksOf('owner'));
+    expect(during).not.toContainEqual(['blocks', 'out', SH]);
+    expect(during).toContainEqual(['duplicates', 'out', H]); // only the trashed end's row goes
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: WS, actorId: owner, entity: { kind: 'ticket', id: SH }, type: 'ticket.restored', payload: {} })]);
+    expect(triples(await linksOf('owner'))).toContainEqual(['blocks', 'out', SH]);
+  });
+
+  it('27.052 ticketState.links holds only visible targets, no key when none remain; control: the owner holds both', async () => {
+    const stateOf = async (role: ReadRole, id: string) =>
+      (await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${id}`, headers: world.authOf(role) })).json().ticketState as Record<string, unknown>;
+    expect((await stateOf('member', S))['links']).toEqual([{ kind: 'blocks', targetId: SH }]);
+    expect((await stateOf('owner', S))['links']).toEqual([{ kind: 'blocks', targetId: SH }, { kind: 'duplicates', targetId: H }]);
+    const guestG = await stateOf('guest', G);
+    expect(guestG['id']).toBe(G); // precondition: the guest read the ticket
+    expect('links' in guestG).toBe(false); // its one link targets H: no key, not `[]`
+    expect((await stateOf('owner', G))['links']).toEqual([{ kind: 'blocks', targetId: H }]); // control: the link is stored
+  });
+
+  it('27.053 History labels link events, a hidden target withheld; control: a non-link event is untouched, and the owner gets the key', async () => {
+    const member = await historyOf('member');
+    const linkOf = (events: HistoryBody['events'], kind: string) => events.find((e) => e.type === 'ticket.link_added' && e.payload['kind'] === kind)!;
+    expect(linkOf(member, 'blocks').linkTarget).toEqual({ key: await keyOf(SH) });
+    expect(linkOf(member, 'blocks').payload).toEqual({ kind: 'blocks', targetId: SH });
+    expect(linkOf(member, 'duplicates').linkTarget).toBeNull();
+    expect(linkOf(member, 'duplicates').payload).toEqual({ kind: 'duplicates', targetId: null });
+    expect(JSON.stringify(member)).not.toContain(H); // H is a real ULID in the stored payload: the withholding is the route's
+    expect('linkTarget' in member.find((e) => e.type === 'ticket.created')!).toBe(false);
+    const ownerDup = linkOf(await historyOf('owner'), 'duplicates');
+    expect(ownerDup.linkTarget).toEqual({ key: await keyOf(H) });
+    expect(ownerDup.payload).toEqual({ kind: 'duplicates', targetId: H });
+  });
+
+  it('27.054 a removal from the TARGET's side is a link_removed on the SOURCE's history, by the remover; control: the target's history holds none', async () => {
+    expect(triples(await linksOf('member', SH))).toEqual([['blocks', 'in', S]]); // precondition: SH's sheet shows the incoming link
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: WS, actorId: member, entity: { kind: 'ticket', id: S }, type: 'ticket.link_removed', payload: { kind: 'blocks', targetId: SH } })]);
+    expect(triples(await linksOf('member', SH))).toEqual([]);
+    const removed = (await historyOf('member')).filter((e) => e.type === 'ticket.link_removed');
+    expect(removed.map((e) => [e.actorId, e.linkTarget])).toEqual([[member, { key: await keyOf(SH) }]]);
+    const shHistory = await historyOf('member', SH);
+    expect(shHistory.length).toBeGreaterThan(0); // precondition: the filter below runs over SH's real history
+    expect(shHistory.filter((e) => e.type.startsWith('ticket.link_'))).toEqual([]);
   });
   ```
-  - **The ticket shape:** add one assertion that the `blocks` row's `ticket` has `key` (a string matching `/-\d+$/`), `title` `'Renew the trade licence'` (`read-scenario.ts:177`) and a `stateCategory`.
-  - **27.052:** `GET /v1/workspaces/${WS}/tickets/${S}` as member: `ticketState.links` equals `[{ kind: 'blocks', targetId: SH }]`. As owner: two entries.
-  - **27.053:** `GET /v1/tickets/${S}/history` as member. The `duplicates` event has `linkTarget: null` and `payload: { kind: 'duplicates', targetId: null }`. The `blocks` event has `linkTarget: { key: <SH's key> }` and its payload whole. Control: the `ticket.created` event has no `linkTarget` key.
-  - **27.054:** apply `makeCommitted({ …, actorId: member, entity: { kind: 'ticket', id: S }, type: 'ticket.link_removed', payload: { kind: 'blocks', targetId: SH } })` (the member removing from SH's sheet files on S). S's history has it with `actorId` member; SH's history has no `ticket.link_*` event.
-  - Put 27.051 in the same file, with `ticket.deleted` / `ticket.restored` on SH.
+  (`owner`, `member` are `world.userIds.owner` / `.member`; import `ticketKey` from `@gisik-nokma/domain` and `ticketNumbers` from `../../src/read/ticket-numbers.js`.)
+
+  Kills (each against Step 2's code):
+  - 27.050: (a) drop `${visibleTicketsWhere(…)}` from `listTicketLinks` (member gains both H rows); (b) drop `OR l.target_id = ${me}` (owner loses `relates in H`); (c) invert the `direction` CASE; (d) `key: keys.get(r.ticket_id)` → `keys.get(ticketId)` / `null` (exact key leg); (e) the route returns `{ links, hidden: n }` (the keys leg).
+  - 27.051: (a) drop `${LIVE_TICKET_WHERE}` from the read (SH's row stays while trashed); (b) `LIVE_TICKET_WHERE` checked on the REQUESTED ticket instead of the other end (a second `proj_tickets` join on `${me}`), so SH's trash drops nothing.
+  - 27.052: (a) serve `ticketState: state` unfiltered (member holds H); (b) `servedState = { ...stateWithoutLinks, links: visibleLinks }` always (the guest's state holds `links: []`); (c) filter with `canSee(…, request.params.ticketId)` instead of `l.targetId` (member keeps H).
+  - 27.053: (a) keep `targetId` for a hidden target (`e.payload` untouched in the `else`); (b) drop the `canSee` test in the owners loop (member's duplicates row gets H's key); (c) label every event, not only `isTicketLinkEvent` (the created event gains `linkTarget`); (d) the key from `keysForAncestors` for the SOURCE ticket (blocks key ≠ SH's).
+  - 27.054: (a) the labeller tests `e.type === 'ticket.link_added'` instead of `isTicketLinkEvent` (the removal has no `linkTarget`); (b) drop `OR l.target_id = ${me}` (the precondition on SH reads `[]`). The SH-history leg guards existing behaviour (history is per stream).
 
   Run: server `test/routes/ticket-links.test.ts`, LOCAL.
   Expected: FAIL (404 route, no labels).
@@ -1357,15 +1460,18 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   **Fake and stub:** add `getTicketLinks: async () => []` to `createFakeDataSource`'s defaults, and `getTicketLinks: unstubbed('getTicketLinks')` to `apps/web/test/helpers/stub-services.ts:167`.
 
   **Tests:**
-  - **27.061:** add a describe to `packages/app-core/test/replica/replica-data-source.test.ts`, using that file's existing replica + bootstrap helpers (read its top). Seed tickets A, B, C, then A blocks B and C relates A. Assert A's links: `[['blocks','out',B], ['relates','in',C]]`. Then delete B: B drops.
-  - **27.061 control:** in `packages/app-core/test/online/online-data-source.test.ts`, stub the http wire with one link carrying `key: 'GN-142'` and assert it maps.
-  - **27.063:** `packages/app-core/test/online/mappers.test.ts`.
+  - **27.061:** add a describe to `packages/app-core/test/replica/replica-data-source.test.ts`, using that file's existing replica + bootstrap helpers (read its top). Seed tickets A, B, C, then A blocks B, C relates A, and A duplicates M where M is a real-shaped ULID the replica never received. Assert A's links EXACTLY (`toEqual`, out before in): `[{ kind: 'blocks', direction: 'out', ticket: { id: B, projectId, key: null, title: <B's title>, stateCategory: <B's> } }, { kind: 'relates', direction: 'in', ticket: { id: C, … key: null … } }]` — M is skipped, keys are `null`. Then delete B: exactly `[relates in C]`. Then delete C too (an INCOMING end): `[]`.
+  - **27.061 control:** in `packages/app-core/test/online/online-data-source.test.ts`, stub the http wire with one link carrying `key: 'GN-142'` and assert the whole mapped `TicketLinkView` (`toEqual`), so a mapper that drops or nulls `key` fails.
+  - **27.063:** `packages/app-core/test/online/mappers.test.ts`. Legs: `mapTicketState` of a wire with `links: [{ kind: 'blocks', targetId: X }]` holds exactly that; with `links: []` and with no `links`, the result has NO `links` key (`'links' in state` false: the domain's absent-not-empty rule); `mapHistory` maps `linkTarget: null` to `null`, `{ key: 'GN-1' }` to `{ key: 'GN-1' }`, and an absent one to no key; `mapTicketLinks` throws `MappingError` naming the path (assert the message contains `links.links[0].kind` for `kind: 'parent'`, and `….direction` for `direction: 'sideways'`, in the path format `mapNoteSummaries`' own errors use).
+  - **Censuses a new `DataSourceQuery` member trips** (not in the file list above): `apps/server/test/integration/soft-delete-client-surface.test.ts` (`DECIDED` gains `getTicketLinks`; `expect(MEMBERS).toHaveLength(…)` at `:848` +1 over the tree you merge into: 29 alone, 30 once reference-index (KG-B) T3's `getLinkedFrom` is in, extending the comment at `:843-847` to name both; planner ruling 2026-10-04 orders KG-B T3 first. ⚠ A clean tipmerge with both at 29 is WRONG; re-measure on the merged tree). The replica implements `getTicketLinks`, so it adds no `REPLICA_GAPS` entry and the absence-owner pattern at `replica-data-source.test.ts:565-567` is untouched; if a lane makes it a gap instead, that pattern must admit its owner.
   - **27.062:** add one scenario to `apps/server/test/dual-client/scenarios.test.ts` beside `:192-203`, in that file's scenario shape:
     - client A links T1 blocks T2;
     - client B links T2 blocks T1 → refused `link.reverse`;
     - client A removes;
     - the rig's existing state comparison runs after each step.
-  - **27.064:** in `apps/server/test/sync/snapshot-writer.test.ts`, the file folds via `TICKET_EVENT_TYPES` at `:194`. Add a `ticket.link_added` before the snapshot and assert that the snapshot's state has `links`. Assert `BOOTSTRAP_BACKFILL_TYPES` does not contain `'ticket.link_added'`. Control: the existing 12.115 case.
+  - **27.064:** in `apps/server/test/sync/snapshot-writer.test.ts`, the file folds via `TICKET_EVENT_TYPES` at `:194`. Add a `ticket.link_added` before the snapshot and assert that the snapshot's state has `links` equal to `[{ kind, targetId }]` exactly (not merely present). Assert `BOOTSTRAP_BACKFILL_TYPES` contains neither `'ticket.link_added'` nor `'ticket.link_removed'`. Control: the existing 12.115 case.
+
+  Kills (against this step's code): 27.061 (a) drop `live(o)` from the `out` arm (deleted B stays); (b) drop `!live(o)` from the `incoming` arm (deleted C stays); (c) drop the `incoming` arm (no `relates in C`); (d) `live(o)` → `o !== undefined` without the trash test in both arms; (e) `byId.get(l.targetId)` unchecked (M throws). 27.061 control: `mapTicketLinks` writes `key: null`. 27.063: (a) `mapTicketState` copies `links` whenever the wire has the field (`links: []` survives); (b) `mapHistory` turns `linkTarget: null` into `{ key: null }`; (c) `mapTicketLinks` accepts any string `kind`. 27.062, 27.064: none from this task's code; they guard T1/T2's fold and the snapshot writer (existing behaviour) through the new reads' inputs.
 
   Run (LOCAL):
   - build domain, rule-engine, app-core, sync-client;
@@ -1421,8 +1527,17 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   - 27.055–27.058 in `packages/mcp-server/test/ticket-tools.test.ts` and `read-tools.test.ts`. Use the file's `fake(routes, result)` session and `tool(name, session)` helpers (`ticket-tools.test.ts:41-66`).
     - **27.056:** the routes map answers `/v1/workspaces/${WS}/tickets/${T}/links` with `{ links: [{ kind: 'blocks', direction: 'in', ticket: { id: B } }, { kind: 'relates', direction: 'in', ticket: { id: C } }, { kind: 'duplicates', direction: 'out', ticket: { id: X } }] }`. Assert `f.batches` entity ids and payloads for each removal.
     - **27.057:** `fake(ROUTES, { results: [{ status: 'refused', eventId: 'e', rule: 'link.reverse', reason: '"Chiller" already blocks "Ice maker".' }] })` → `rejects.toThrow('refused by link.reverse: "Chiller" already blocks "Ice maker".')`.
+    - **27.055 legs:** `f.batches` is exactly ONE batch of ONE event, and that event `toMatchObject({ type: 'ticket.link_added', entity: { kind: 'ticket', id: T }, origin: 'mcp', actorId: ME, payload: { kind: 'blocks', targetId: B } })` with `payload` `toEqual` (no extra member). Control in the same `it`: `kind: 'parent'` rejects and `f.batches` is still length 1.
+    - **27.056 legs (one `it`, a fresh `fake` per removal or a running batch index):** remove `(blocks, B)` → entity `B`, payload `{ kind: 'blocks', targetId: T }`; remove `(relates, C)` → entity `C`, payload `{ kind: 'relates', targetId: T }`; remove `(duplicates, X)` → entity `T`, payload `{ kind: 'duplicates', targetId: X }`; remove `(relates, B)` (B holds only `blocks`) → rejects with `no "relates" link between ${T} and ${B} that you can see`, and the batch count is unchanged.
+    - **27.058 legs:** the fake's detail route answers a `ticketState` that HOLDS `links: [{ kind: 'blocks', targetId: B }]` (without it, "drops `ticketState.links`" cannot fail), and the links route answers rows carrying `projectId` and `stateCategory`. Assert `out.links` `toEqual` `[{ kind, direction, ticket: { id, key, title } }]` (the two extra fields dropped) and `'links' in out.ticketState` is false. Control: a ticket whose links route answers `{ links: [] }` gives `links: []`.
+
+    Kills (against this step's code): 27.055 (a) file on `{ kind: 'ticket', id: a.targetId }`; (b) payload `{ targetId: a.targetId }` without `kind`. 27.056 (a) always file on `a.ticketId` (both incoming legs); (b) keep `[a.ticketId, a.targetId]` as `[source, target]` but swap only the stream (incoming payload `targetId` reads B/C, not T); (c) drop `l.kind === a.kind` from the find (the `(relates, B)` leg removes the blocks link); (d) the `found === undefined` branch returns `{ result: null }` instead of throwing. 27.057: none, guards `submitOne`'s existing refusal sentence (`submit.ts:20`). 27.058 (a) spread `detail` unfiltered (`ticketState.links` survives); (b) map `ticket: l.ticket` whole (`projectId` appears); (c) skip the links read (`links` absent).
+  - **27.059 legs** (member's `get_ticket_history` on S, through the server): the `duplicates` line's payload is `{ kind: 'duplicates', target: "a ticket you can't see" }` and `JSON.stringify(result)` does not contain H; control in the same `it`: the OWNER's `duplicates` line carries `targetId: H` and `linkTarget: { key: <H's key> }`, so the withholding is the viewer's. Kills: `historyLine` drops `linkTarget` (the owner leg); the route's `else` keeps `targetId` (the member leg).
+  - **The 14.88 sweep** reads `SWEEP[name]` for every tool (`register.test.ts:271`): add a `link_tickets` entry to `packages/mcp-server/test/fixtures/tool-sweep.ts` beside `rank_ticket` (`:90`), with a `session.get` answering the links route. Not in the file list above.
   - 27.059 and 27.060's door row in `apps/server/test/mcp/mcp-tickets.test.ts`. Use `buildDoorWorld` / `runDoorMatrix` with DoorRow `{ tool: 'link_tickets', args: { workspaceId, ticketId: <member-visible>, targetId: <member-visible>, kind: 'relates', action: 'add' }, stranger: true, allowed: { caller: 'member', eventType: 'ticket.link_added' } }`. Read `helpers/door-matrix.ts` for the row's exact field names first.
   - Update `tool-names.ts`, then 14.555's literal list (`register.test.ts:87-110`, `toHaveLength(64)`), then every other literal tool list the grep finds.
+
+  Kills (27.060): (a) register `link_tickets` anywhere but directly after `rank_ticket` (14.555 compares the exact ordered list); (b) the tool sends `link_added` for a stranger without the server's gate deciding (the door row's `stranger` leg reads the server refusal, so a tool that swallows a refusal into `{ result: null }` goes red); (c) the tool files on `targetId` (the door row's `allowed.eventType` lands on the wrong ticket's stream; assert the row's entity if `door-matrix.ts` exposes it).
 
   Run (LOCAL): mcp-server WHOLE, then server `test/mcp`.
   Expected: PASS. Flip 27.055–27.060 ✅.
@@ -1430,6 +1545,15 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   Commit.
 
 - [ ] **Step 5: Features, help, sweeps, DONE**
+
+  **Prose to sweep:** (fix in this task's commits)
+  - `apps/server/src/routes/ticket-history.ts:9-15` — "Nine fields … Nothing is summarised and nothing is derived … a field this route computed would make it something else": `linkTarget` is a tenth, DERIVED field. Say so, and point at its own docblock.
+  - `apps/server/src/routes/ticket-history.ts:25-27` — "Provenance is untouched … every claim-bearing field above goes out whole": a link event's `payload.targetId` is now withheld when the viewer cannot see the target (spec A §2.4). Name the one exception.
+  - `packages/mcp-server/src/tools/read-tools.ts:151-154` — `get_ticket`'s description lists what it returns, without links (Step 4 already rewrites it; check the new text names `links`).
+  - `packages/mcp-server/test/register.test.ts:87` — the 14.555 title "the final registry is the 63 tools" (the count moves to 64 with the list).
+  - `test-cases/14-mcp-server.md:938` — "14.555 — the final registry is the 63 tools in the plan's order" → 64, `link_tickets` after `rank_ticket`.
+  - `apps/server/test/integration/soft-delete-client-surface.test.ts:843-847` — the running history of `MEMBERS`' count ends at "27 until … `getGroups`"; add "28 until typed links T4 added `getTicketLinks`".
+
   - **Features:** replace `<!-- A T4 bullet -->` with `- ✅ **Typed links: reads, History and MCP** (typed-links T4; `apps/server/src/read/ticket-links.ts`, `routes/ticket-links.ts`, `routes/ticket-history.ts`, `packages/mcp-server/src/tools/ticket-tools.ts`, `read-tools.ts`, `packages/app-core/src/replica/replica-data-source.ts`) — …`. Name: both directions, visible ends only, no count; History withholds a hidden target; `link_tickets` add/remove from either end; `get_ticket.links`; offline reads. Cases 27.050–27.064.
   - **MCP help:** if `pnpm help:generate` lists MCP tools, regenerate, then `pnpm check:help`.
   - **Sweeps:** server WHOLE, app-core, sync-client, mcp-server, web WHOLE (stub-services changed).
@@ -1450,6 +1574,8 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
 
 **Lane prompt names `frontend-design`.**
 
+**Needs: reference-index (KG-B) T3 merged into `release/knowledge-graph` first** (planner ruling 2026-10-04): this task stacks on its sheet-subscription and `MEMBERS` counts and on its `ui.css` block (see Step 3's ratchet bullet and the Files' `ui.css` line).
+
 **Files:**
 - Create:
   - `packages/app-core/src/views/ticket-links-section.tsx` (copy `ticket-notes-section.tsx`: props shape, `make({...})` → `dataSource.ingest([event])` → result switch → `reload()`, `Popover`, `Toast` with `undo`)
@@ -1458,7 +1584,7 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
   - `packages/app-core/src/views/ticket-sheet.tsx`:
     - next to the notes query (`:1026-1028`), add the links query;
     - mount the section between `{phone ? descriptionSection : null}` (`:4197`) and the rollup progress line (`:4199`), so Subtasks → Notes → Comments stays adjacent (18.241a).
-  - `packages/ui/src/ui.css`: a `/* Knowledge Graph A: ticket links */` block directly after the last `.gn-ticket-sheet__note-badges` rule (grep it). Not at end of file: plans B, C and E append there on the same release.
+  - `packages/ui/src/ui.css`: a `/* Knowledge Graph A: ticket links */` block directly after reference-index (KG-B) T3's `/* Knowledge Graph B: "Linked from" */` block, i.e. after its last rule `.gn-linked-from__glyph { … }` (grep it), not after `.gn-ticket-sheet__note-badges` (planner ruling 2026-10-04: KG-B T3 lands first and anchors there). Not at end of file: plans B, C and E append there on the same release.
   - `docs/manual.md` §5 (tickets, `:503`): a "Linking tickets" paragraph.
 
 **Interfaces:**
@@ -1526,26 +1652,52 @@ The permission gate is symmetric (both ends visible), so filing on the other str
   const COMMIT: IngestScript = (events) => events.map((e) => ({ status: 'committed', eventId: e.id, seq: 1, serverTime: '2026-10-03T10:00:00.000Z' }));
   afterEach(() => cleanup());
 
-  it('27.068 one remove per double click; Undo re-adds once', async () => {
+  /** An ingest the test releases by hand, so a second click lands while the first is still IN FLIGHT. */
+  function deferredIngest(onCommit: (events: Parameters<IngestScript>[0]) => void) {
+    const releases: Array<() => void> = [];
+    const script: IngestScript = (events) => new Promise((resolve) => {
+      releases.push(() => { onCommit(events); resolve(COMMIT(events) as Awaited<ReturnType<IngestScript>>); });
+    });
+    return { script, releaseAll: async () => { await act(async () => { for (const r of releases.splice(0)) r(); }); } };
+  }
+
+  it('27.068 one remove per double click; Undo re-adds once; control: the row is gone from the reloaded list', async () => {
     let stored = [row('blocks', 'out', 'GN-142')];
-    const source = createFakeDataSource({ getTicketLinks: async () => stored }, (events) => { stored = []; return COMMIT(events); });
+    const ingest = deferredIngest((events) => { stored = events[0]!.type === 'ticket.link_removed' ? [] : [row('blocks', 'out', 'GN-142')]; });
+    const source = createFakeDataSource({ getTicketLinks: async () => stored }, ingest.script);
     render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} />);
     const remove = await screen.findByRole('button', { name: 'Remove: blocks GN-142' });
-    await userEvent.dblClick(remove);
+    await userEvent.dblClick(remove); // both clicks land before the first ingest settles: only the inFlight guard stops the second
     expect(source.ingested.flat().map((e) => [e.type, e.entity.id, e.payload])).toEqual([
       ['ticket.link_removed', TICKET, { kind: 'blocks', targetId: OTHER }],
     ]);
+    await ingest.releaseAll();
     await screen.findByText('Removed link: blocks GN-142');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove: blocks GN-142' })).toBeNull()); // the reload dropped it
     await userEvent.dblClick(screen.getByRole('button', { name: 'Undo' }));
-    expect(source.ingested.flat().filter((e) => e.type === 'ticket.link_added')).toHaveLength(1);
+    expect(source.ingested.flat().slice(1).map((e) => [e.type, e.entity.id, e.payload])).toEqual([
+      ['ticket.link_added', TICKET, { kind: 'blocks', targetId: OTHER }], // ONE add, same stream, same payload
+    ]);
+    await ingest.releaseAll();
+    await screen.findByRole('button', { name: 'Remove: blocks GN-142' }); // the re-add reloads the row
   });
   ```
+  If the `Toast` unmounts its Undo button on the first click (read `packages/ui/src/components/toast.tsx`), the second click of the Undo double click lands on nothing and kill (c) below is not proven by this leg: then hold the Undo's ingest with `deferredIngest` and keep the toast open until release, as the Remove leg does.
+
+  Kills (27.068): (a) drop the `inFlight` guard (two removals while the first is pending); (b) the Undo event built with `targetId: ticketId` / on the other stream (the exact Undo triple); (c) the Undo not filed through `file` (a second add on the double click); (d) no `links.reload()` on commit (the Remove button stays).
   - Read `IngestResult` (`packages/domain/src/ingest-result.ts:22`) and the 18.24x notes ingest scripts for the exact committed shape, and match them.
   - Read the `Toast` component for its Undo button's accessible name (`undo.label ?? …`) before asserting `'Undo'`.
   - Write the other cases in the same shape:
-    - **27.066:** `queryTickets: async () => [{ ticketId: OTHER, projectId: 'p', key: 'GN-133', title: 'Chiller' }]`. Pick "Is blocked by" in the Select (`getByLabelText('Link type')`), type in `Find a ticket`, click `GN-133 Chiller`. Assert the pending row's `aria-busy` BEFORE resolving a deferred ingest promise, then the payload and stream.
-    - **27.067:** ingest answers `{ status: 'refused', eventId, rule: 'link.reverse', reason: '"Chiller" already blocks "Ice maker".' }`. The pending row is gone, and `getByRole('alert')` has that text. Precheck variant: pass `precheck: async () => ({ kind: 'refused', rule: 'link.self', reason: 'A ticket cannot be linked to itself.' })` and assert `source.ingested` stays empty.
-    - **27.070:** `viewport({ phone: true })` as `board-phone.test.tsx:29-40` defines it, then `getByRole('dialog', { name: 'Add link' })`.
+    - **27.065:** `getTicketLinks` answers, in THIS order, `[row('relates','in','GN-3'), row('blocks','out','GN-1'), row('blocks','in','GN-2'), row('relates','out','GN-4')]` (ids distinct) — not already in group order, so the grouping and its order can fail. Assert `getAllByRole('region').map((r) => r.getAttribute('aria-label'))` equals `['Blocks', 'Is blocked by', 'Relates to']`; `within(region 'Relates to')` holds both GN-3 (incoming) and GN-4 rows; each row has the link (`href` from a `resolveTicketHref` stub) and its `Remove: <reading> <key>` button; `queryByRole('region', { name: 'Duplicates' })` is null (the control: a group with no rows is not drawn, while three are). A second render with `[]` shows `No links yet.` and no region.
+    - **27.066:** `queryTickets: async () => [{ ticketId: OTHER, projectId: 'p', key: 'GN-133', title: 'Chiller' }]`. Pick "Is blocked by" in the Select (`getByLabelText('Link type')`), type in `Find a ticket`, click `GN-133 Chiller`. With `deferredIngest` still unreleased, assert the pending row sits INSIDE `region 'Is blocked by'` with `aria-busy="true"` (not merely somewhere), and the one ingested event is `['ticket.link_added', OTHER, { kind: 'blocks', targetId: TICKET }]`. Release; after the reload, `getTicketLinks` answers the row and no `[aria-busy="true"]` remains. Control in the same `it`: "Blocks" files `['ticket.link_added', TICKET, { kind: 'blocks', targetId: OTHER }]`.
+    - **27.067:** ingest answers `{ status: 'refused', eventId, rule: 'link.reverse', reason: '"Chiller" already blocks "Ice maker".' }`. The pending row is gone (`container.querySelector('[aria-busy="true"]')` null, AFTER a check, with `deferredIngest` unreleased, that it was present), and `getByRole('alert')` has exactly that text. Precheck variant: pass `precheck: async () => ({ kind: 'refused', rule: 'link.self', reason: 'A ticket cannot be linked to itself.' })` and assert `source.ingested` stays empty and the alert reads that sentence. Control in the same `it`: a following Add that commits clears the alert (`queryByRole('alert')` null) — the alert was present a step earlier, so this can fail.
+    - **27.069:** rows `[row('blocks','in','GN-133')]`: Remove files `['ticket.link_removed', OTHER, { kind: 'blocks', targetId: TICKET }]`; control: with `[row('blocks','out','GN-142')]` it files `['ticket.link_removed', TICKET, { kind: 'blocks', targetId: OTHER }]`.
+    - **27.070:** `viewport({ phone: true })` as `board-phone.test.tsx:29-40` defines it, then `getByRole('dialog', { name: 'Add link' })` AND `toHaveClass('gn-dialog')`. **`Popover` is also `role="dialog"` with the same `aria-label`** (`packages/ui/src/components/popover.tsx:51-53`), so the role query alone passes on desktop too. Control: `viewport({ phone: false })` gives a dialog with `gn-popover` and no `.gn-dialog`. Then Add works the same on the phone (one event, as 27.066).
+    - **27.071:** with one row and `canEdit={false}`: no `Add link` button and no `Remove: …` button; control in the same `it` (re-render with `canEdit`): both present.
+    - **27.072:** `getTicketLinks: async () => { throw new Error('boom'); }` → the `role="alert"` text, and `queryByText('No links yet.')` null; control in the same `it`: a settled `[]` read shows `No links yet.` and no alert.
+    - **27.073:** `queryTickets` answers `[{ ticketId: TICKET, key: 'GN-1', … }, { ticketId: OTHER, key: 'GN-133', … }]`: the listbox's options are exactly `['GN-133 Chiller']` (this ticket's `GN-1 …` absent, the other present).
+
+  Kills (27.065–27.073 except 27.068, against Step 2's code): 27.065 (a) groups drawn in data order instead of `GROUP_ORDER`; (b) `readingOf` ignores `direction` (GN-2 lands in "Blocks"); (c) every group in `GROUP_ORDER` drawn (an empty "Duplicates"). 27.066 (a) "Is blocked by" files on this ticket (`onOther: false`); (b) the pending row's `direction` is `'out'` for an `onOther` choice (it sits in "Blocks"); (c) `setPending(null)` never called after commit (a busy row remains). 27.067 (a) keep the pending row on refusal; (b) ignore `precheck` (one event filed); (c) the refusal never cleared on the next Add. 27.069 (a) Remove passes `onOther: false` for every row. 27.070 (a) always the Popover (no `gn-dialog` on the phone); (b) always the Dialog (the desktop control). 27.071 (a) drop `canEdit &&` before Remove; (b) render Add link regardless of `canEdit`. 27.072 (a) render "No links yet." when the read has `error` set. 27.073 (a) drop `.filter((r) => r.ticketId !== ticketId)`.
 
   Run: app-core `test/views/ticket-links-section.test.tsx`, LOCAL.
   Expected: FAIL (module not found).
@@ -1706,13 +1858,25 @@ The permission gate is symmetric (both ends visible), so filing on the other str
   - `- ❌ **27.076 — with a cache, the sheet's precheck refuses a link to a ticket that already blocks this one without filing anything.**`
 
   Add these to `packages/app-core/test/views/ticket-sheet*.test.tsx`, beside the notes-section sheet cases. Use `createFakeDataSource({ getTicket: async () => MINIMAL_READ, getTicketLinks: async () => [...] })`, and for 27.076 a `ClientStateCache` holding both tickets with `links`.
+  - **27.074 legs:** the links region's DOM position: `fields.compareDocumentPosition(links) & Node.DOCUMENT_POSITION_FOLLOWING` and the same from links to `.gn-ticket-sheet__subtasks` (both non-zero), where `fields` is the sheet's field `<dl>`; 18.241a's `.gn-ticket-sheet__subtasks + .gn-ticket-sheet__notes + .gn-comments` still matches; control in the same `it`: two links render the heading `Links (2)`.
+  - **27.075:** jsdom loads no `ui.css`, so "rows meet 44px" cannot be measured here; a computed-style assertion would read jsdom's defaults and prove nothing. Pin it in the Step 4 browser check instead (at 390px, every `.gn-ticket-sheet__link-row`'s `getBoundingClientRect().height` ≥ 44, LOCAL, quoted in the PR). In jsdom keep the other legs: under `viewport({ phone: true })` the section is present and Add link opens a dialog with class `gn-dialog`; control: desktop gives `gn-popover` (see 27.070 for why the role alone cannot tell them apart).
+  - **27.076 legs:** the cache holds this ticket ("Ice maker") and OTHER ("Chiller") with OTHER's `links: [{ kind: 'blocks', targetId: TICKET }]`; choosing "Blocks" + `GN-133 Chiller` shows the alert `"Chiller" already blocks "Ice maker".` and `source.ingested` stays `[]`. Control in the same `it`: the same sheet WITHOUT `cache` files exactly one `ticket.link_added` for the same choice (so the refusal is the precheck's, from the cache).
+  - **The subscription ratchet (planner ruling 2026-10-04):** `packages/app-core/test/views/ticket-sheet.test.tsx:322-347` pins `expect(source.subscriptions).toHaveLength(…)`. **Needs: reference-index (KG-B) T3**, which lands first and takes it 8→9 for its `linkedFrom` read. The new `${ticketId}:links` `useLiveQuery` makes it 10: set `10` and extend the comment so its list and its "four until door F, … seven until the notes section" history name BOTH reads (KG-B's `linkedFrom`, this task's `links`). Likewise `apps/server/test/integration/soft-delete-client-surface.test.ts:848` `MEMBERS` must read 30 (KG-B T3 took it 28→29 for `getLinkedFrom`; this plan's `getTicketLinks` is the 30th), its `:843-847` history naming both `getLinkedFrom` and `getTicketLinks`. The member is ADDED in T4, so T4's census bullet makes that edit; if T4 landed before KG-B T3 and wrote 29, this task sets 30 on the merged tree. ⚠ A clean tipmerge with both at 9/29 is WRONG; re-measure on the merged tree.
+
+  Kills (against Steps 2–3): 27.074 (a) mount the section after the comment thread or between Notes and Comments (18.241a or the position leg); (b) the heading ignores the count. 27.075 (a) the sheet passes no phone flag through (`usePhoneBoard` unused: a Popover on the phone). 27.076 (a) drop the `cache === undefined ? {} : { precheck: … }` spread (one event filed); (b) route `precheckEvent` links to `notEvaluated()` (T3's code; the event is filed).
 
   Run: app-core WHOLE, ui WHOLE, web WHOLE (ui.css ⇒ all three), LOCAL.
-  Expected: PASS. Flip ✅.
+  Expected: PASS. Flip ✅, except 27.075, which is 🧪 (planner ruling 2026-10-04): its 44px leg is a LOCAL manual browser check quoted in the PR, not a committed Playwright spec that the gate or CI runs. ✅ only if a lane commits that spec instead.
 
   Commit.
 
 - [ ] **Step 4: Manual, browser check, Features, DONE**
+
+  **Prose to sweep:** (fix in this task's commits)
+  - `packages/app-core/test/views/ticket-sheet.test.tsx:322-343` — "eight live reads … EIGHT reads ride this sheet — ticket, workflow, members, history, …, the ticket's NOTES section … The count was four until door F, … seven until the notes section": the links read is a ninth (Step 3's ratchet bullet; the number at `:347` moves with it).
+  - `docs/manual.md:984-987` — "**"Blocked" is a property of the column, not of one ticket.** … There is no switch you flip on an individual ticket to say it is stuck": after this task a ticket can carry an "Is blocked by" link. Still true for the card's Blocked mark (spec §7: no card mark), but it now reads as "tickets cannot record a blocker". Add one sentence pointing at "Linking tickets": a link records what blocks the ticket and does not mark the card or move it.
+  - (searched, nothing else false: `Links`, `link`, `blocks`, `duplicate`, `relates`, `No links`, `live reads`, `subscriptions` in `docs/manual.md`, `packages/app-core/src/views/ticket-sheet.tsx`, `packages/app-core/test/views/ticket-*.test.tsx`; the manual's other "blocked" lines (`:865`, `:958`, `:1198`, `:1216-1217`) describe the column/attention Blocked and stay true.)
+
   - **Manual:** `docs/manual.md` §5, a "Linking tickets" paragraph in the manual's voice (read the neighbours):
     - the five readings;
     - Add link from either side;
