@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHUNK_DAYS,
+  IDLE_MS,
   MAX_CHUNKS,
   RangeCache,
   ScopeCaches,
@@ -41,7 +42,7 @@ describe('29.020 chunks', () => {
 
 describe('29.021 what to fetch', () => {
   const view = { start: 100, end: 120 }; // V = 21
-  it('29.021 still: one viewport either side; moving: ahead by max(V, 1.5 s of travel) and half a viewport behind; exactly 1 day/s already moves', () => {
+  it('29.021 still: one viewport either side; moving: ahead by max(V, 1.5 s of travel) and half a viewport behind; exactly 1 day/s already moves; a fractional look-ahead rounds up', () => {
     expect(wantedRange(view, 0).range).toEqual({ start: 79, end: 141 });
     expect(wantedRange(view, 0.5).side).toBe(0);
     expect(wantedRange(view, 10)).toEqual({ range: { start: 100 - 11, end: 120 + 21 }, side: 1 });
@@ -49,6 +50,8 @@ describe('29.021 what to fetch', () => {
     expect(wantedRange(view, -40)).toEqual({ range: { start: 100 - 60, end: 120 + 11 }, side: -1 });
     // the threshold itself: below 1 day/s is still, so 1 day/s either way is travel
     expect([wantedRange(view, 1).side, wantedRange(view, -1).side]).toEqual([1, -1]);
+    // a fractional look-ahead rounds UP: 15 x 1.5 = 22.5 days becomes 23, so rounding outward never leaves the leading edge short
+    expect([wantedRange(view, 15).range.end, wantedRange(view, -15).range.start]).toEqual([143, 77]);
   });
 
   it('29.021 at most two in flight; the visible chunks first; low-priority behind-the-travel fetches are cancelled when a visible one needs the slot, and only as many as it needs; then the nearer chunk first', () => {
@@ -124,10 +127,15 @@ describe('29.021 what to fetch', () => {
 });
 
 describe('29.022 widening, eviction, neighbours', () => {
-  it('29.022 idle widening alternates sides outward and stops at 40 chunks, 10,000 entries or the index extent; control: nothing loaded plans nothing', () => {
+  it('29.022 idle widening (after 200 ms still) alternates sides outward, may land on the index\'s first or last chunk, and stops at 40 chunks, 10,000 entries or the index extent; control: nothing loaded plans nothing', () => {
     const loaded = new Set([10, 11]);
     expect(planWiden({ loaded, bounds, lastSide: 1, entryCount: 5 })).toEqual({ chunk: 9, side: -1 });
     expect(planWiden({ loaded, bounds, lastSide: -1, entryCount: 5 })).toEqual({ chunk: 12, side: 1 });
+    // widening may land ON the index's first or last chunk: loaded 10-11 inside bounds 9-12, either side
+    expect(planWiden({ loaded, bounds: { first: 9, last: 12 }, lastSide: 1, entryCount: 5 })).toEqual({ chunk: 9, side: -1 });
+    expect(planWiden({ loaded, bounds: { first: 9, last: 12 }, lastSide: -1, entryCount: 5 })).toEqual({ chunk: 12, side: 1 });
+    // PR-3's "nothing has moved for 200 ms": the published contract Part 4's hook reads
+    expect(IDLE_MS).toBe(200);
     expect(planWiden({ loaded, bounds: { first: 10, last: 11 }, lastSide: 0, entryCount: 5 })).toBeNull();
     // one side at the index extent: the other side is taken instead of stopping
     expect(planWiden({ loaded, bounds: { first: 10, last: 100 }, lastSide: 1, entryCount: 5 })).toEqual({ chunk: 12, side: 1 });
@@ -159,10 +167,12 @@ describe('29.022 widening, eviction, neighbours', () => {
     expect(chunksToEvict(new Set([0, 5, -5]), { start: 4, end: 31 }, () => 6000)).toEqual([5, -5]);
   });
 
-  it('29.023 the next coarser preset (a zoom a hair above a preset counts as that preset), the same centre at another scale, the neighbouring packing scales, the mount range', () => {
+  it('29.023 the next coarser preset (a zoom a hair above a preset counts as that preset, one more than a hair above does not), the same centre at another scale, the neighbouring packing scales, the mount range', () => {
     expect([nextCoarserPpd(56), nextCoarserPpd(24), nextCoarserPpd(8), nextCoarserPpd(30)]).toEqual([24, 8, null, 24]);
     // 24.01 is Week (within 0.05 of it), so the next coarser is Month, not Week again
     expect(nextCoarserPpd(24.01)).toBe(8);
+    // 24.1 is more than a hair above Week, so the next coarser preset is Week itself: 24.01 pins the lower side, this the upper
+    expect(nextCoarserPpd(24.1)).toBe(24);
     expect(rangeAtPpd({ start: 100, end: 123 }, 24, 8)).toEqual({ start: 75, end: 148 });
     expect(neighbourScales(16)).toEqual([32, 8]);
     expect(neighbourScales(64)).toEqual([32]);
