@@ -20,6 +20,7 @@ SPINNER = re.compile(r"^[^\s\w⏺⎿❯|─-]\s+\S+…\s+\((?:(\d+h) )?(?:(\d+m)
 DONE_STAMP = re.compile(r"done (\d{1,2}):(\d{2})(?: ?([AaPp])[Mm])?")                  # "✻ Sautéed for 1s · done 1:53 AM · …"
 CTX = re.compile(r"Ctx (\d+)%")
 EFFORT = re.compile(r"effort: (\w+)")
+WEEKLY = re.compile(r"(?:^| \| )weekly (\d+)%")   # the status line's weekly-usage segment; ctl autopilot's budget guard reads it (13.2105)
 SHELLS = re.compile(r"(\d+) shells?\b")
 MONITORS = re.compile(r"(\d+) monitors?\b")
 PREFIX = r"^[\s⏺⎿·•-]*"
@@ -105,7 +106,7 @@ def parse_seat(idx, pane, meta, now):
     plain = [plain_of(l) for l in lines]
     name = meta.get("name", f"w{idx}")
     status = status_index(plain)
-    ctx = model = effort = None
+    ctx = model = effort = weekly = None
     shells = monitors = 0
     if status is not None:
         ctx = int(CTX.search(plain[status]).group(1))
@@ -113,6 +114,7 @@ def parse_seat(idx, pane, meta, now):
             if model is None and re.fullmatch(r"(?:opus|sonnet|haiku|fable)[\w.-]*", seg): model = seg
             m = EFFORT.fullmatch(seg)   # the status line's own "effort: high" segment (statusline-command.sh); absent on the DeepSeek backend
             if effort is None and m: effort = m.group(1)
+        m = WEEKLY.search(plain[status]); weekly = int(m.group(1)) if m else None
         foot = " ".join(plain[status + 1:status + 4])
         m = SHELLS.search(foot); shells = int(m.group(1)) if m else 0
         m = MONITORS.search(foot); monitors = int(m.group(1)) if m else 0
@@ -135,7 +137,7 @@ def parse_seat(idx, pane, meta, now):
     seat = {"window": idx, "name": name, "role": role_of(name), "state": state,
             "elapsed": elapsed if state == "busy" else None, "done_at": done_at if state == "idle" else None,
             "shells": shells, "monitors": monitors, "box": "text" if text else "empty", "box_text": text[:120], "copy_mode": copy_mode,
-            "ctx": ctx, "model": model, "effort": effort, "worktree": meta.get("wt") or None, "branch": meta.get("branch") or None,
+            "ctx": ctx, "model": model, "effort": effort, "weekly": weekly, "worktree": meta.get("wt") or None, "branch": meta.get("branch") or None,
             "head": meta.get("head") or None, "unpushed": num("unpushed"), "dirty": num("dirty"),
             "last": last_signal(plain, meta.get("wt"), now)}
     seat["flags"] = flags_of(seat)

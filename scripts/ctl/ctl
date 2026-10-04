@@ -24,6 +24,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   close <window>                  close an idle lane whose worktree is clean and pushed
   archive [--apply] [--list]      move stale lanes-dir working files to archive/<date>/ + roll the notes (dry-run by default; refuses while a landing is in flight)
   dispatch <window> <file>        two pastes + proof of delivery
+  autopilot once|run|start [--shadow]  the matchmaking loop: free reviewers pull queue items, free lanes take their pool's next task (FIX, tip-ready, stack <= 2) or review; --shadow logs WOULD only
   prune-gate-locks [--apply] [--list]  remove gate-lock-* run dirs > 24 h and gate logs > 7 days from the log dir, never a live one (dry-run by default)
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify

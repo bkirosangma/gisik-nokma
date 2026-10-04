@@ -41,5 +41,6 @@ step "tipmerge refuses main as the branch" "out=\$('$HERE/ctl' tipmerge main --b
 step "close refuses window 0" "! '$HERE/ctl' close 0 --dry-run"
 step "archive suite (exclusions with controls, notes roll, landing guard, dry-run default)" "bash '$HERE/test/archive.test.sh'"
 step "prune-gate-locks suite (age lines, newest/live-pid/in-ps guards with controls, dry-run default, mutants)" "bash '$HERE/test/prune-gate-locks.test.sh'"
+step "autopilot suite (guards with controls, pull order, needs/stacks/FIX, shadow writes nothing + its mutant, make-lane-ptr)" "bash '$HERE/test/autopilot.test.sh'"
 step "archive refuses an unknown argument" "out=\$('$HERE/ctl' archive --nope 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
 [ "$fails" -eq 0 ] && ctl_ok selftest "$n steps" || ctl_fail selftest "$fails steps red"
