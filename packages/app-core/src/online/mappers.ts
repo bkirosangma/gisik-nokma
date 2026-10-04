@@ -2179,8 +2179,11 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  * false.** `visibility.set` carries `userIds` in its own payload
  * (`packages/domain/src/events/visibility.ts:36`), and the history read serves
  * payloads verbatim: `toHistoryEvent` maps `payload: row.payload` with no
- * redaction (`routes/ticket-history.ts:176-194`), and `/events` does the same
- * (`routes/tickets.ts:519-527`). **This is not a leak to close.** The route's own
+ * redaction (`routes/ticket-history.ts`), and `/events` does the same
+ * (`routes/tickets.ts`), with one per-viewer exception on both that is not this
+ * one: a link's other end the viewer cannot see goes out `null` (typed-links
+ * T4/T4b, spec A §2.4, `visibility/withhold-link-targets.ts`). **This is not a
+ * leak to close.** The route's own
  * allow-list docblock draws the line and says which way to cut it — *"Those are
  * PROVENANCE — an attributed claim somebody made ... Cut derived state; never cut
  * a claim."* What is cut is the resolved COLUMN; what is served is the event that

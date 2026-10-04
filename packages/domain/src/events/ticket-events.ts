@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
+import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString, type EventEnvelope } from '../envelope.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
 import { dueDateValueSchema, estimateValueSchema, prioritySchema } from '../ticket-types.js';
 
@@ -242,6 +242,26 @@ export const ticketLinkRemovedPayload = z.object({ kind: z.enum(TICKET_LINK_KIND
 export const TICKET_LINK_EVENT_TYPES = ['ticket.link_added', 'ticket.link_removed'] as const;
 export function isTicketLinkEvent(type: string): boolean {
   return (TICKET_LINK_EVENT_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * The payload a link event is SERVED with when this viewer may not be told
+ * its target (typed-links T4b; spec A §2.4). Never stored: the ledger holds
+ * the real id, and the server builds this per viewer at every door
+ * (`apps/server/src/visibility/withhold-link-targets.ts`). One constructor and
+ * one key order, so a hidden, a purged and a never-minted target serialise
+ * byte for byte the same. The purge precedent is `redactedTicketCreatedPayload`
+ * (`purge.ts`).
+ */
+export function withheldLinkPayload(kind: TicketLinkKind): { kind: TicketLinkKind; targetId: null } {
+  return { kind, targetId: null };
+}
+
+/** True exactly for a served-withheld link event; `=== null`, as `isRedactedTicketCreated` uses `=== true`. */
+export function isWithheldLinkEvent(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
+  if (!isTicketLinkEvent(env.type)) return false;
+  const p = env.payload;
+  return p !== null && typeof p === 'object' && (p as { targetId?: unknown }).targetId === null;
 }
 const READINGS: Record<TicketLinkKind, { out: string; in: string }> = {
   blocks: { out: 'blocks', in: 'is blocked by' },

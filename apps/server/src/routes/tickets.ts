@@ -10,6 +10,7 @@ import { sanitizeFilename } from '../attachments/filename.js';
 import { listTicketComments } from '../read/ticket-comments.js';
 import { canSee } from '../visibility/can-see.js';
 import { canOpen } from '../visibility/can-open.js';
+import { targetSight, withholdEvent, withholdLinks } from '../visibility/withhold-link-targets.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { ticketNumber } from '../read/ticket-numbers.js';
@@ -275,7 +276,7 @@ export type LedgerRow = {
 /**
  * A ledger row on the wire. Every field of the stored event, unchanged.
  *
- * ## There is no redacting path, and that is the point
+ * ## This serializer has no redacting path, and that is the point
  *
  * Provenance is never withheld from someone entitled to the state (spec §6).
  * `actor_id` goes out even when the actor shares no project — indeed no
@@ -283,6 +284,15 @@ export type LedgerRow = {
  * client/server skew the product reports stays visible. There is deliberately
  * no second serializer here that "anonymizes": a redacting path that exists is
  * a path something can drift into.
+ *
+ * ONE fact is withheld per viewer, at the door and not here (typed-links T4b,
+ * spec A §2.4, owner ruling Q2 2026-10-04): a link event whose other end this
+ * viewer cannot see goes out with `targetId: null`, and a contest of such a
+ * claim with the gate's cause, because a `link.reverse` reason names the hidden
+ * ticket's title. The claim is not cut: the event, its id, type, actor, origin,
+ * both clocks and seq all go out. Only the other end's id and a contest's cause
+ * are withheld, by `visibility/withhold-link-targets.ts`, which the `/events`
+ * handler applies to this function's output.
  *
  * Both instants are rendered with `.toISOString()` rather than left to the JSON
  * serializer, for the reason `sync/contests-route.ts` gives at the same spot:
@@ -707,13 +717,9 @@ export function registerTicketRoutes(
 
       // Spec A §2.4: the folded links are the engine's whole truth; a reader gets
       // only the targets they can see, and no key at all when none remain (the
-      // reducer's absent-not-empty shape), so nothing counts a hidden one.
-      const seen = await Promise.all(
-        (state.links ?? []).map(async (l) => ((await canSee(deps.pool, request.currentUserId, l.targetId)) ? l : null)),
-      );
-      const visibleLinks = seen.filter((l): l is NonNullable<typeof l> => l !== null);
-      const { links: _all, ...stateWithoutLinks } = state;
-      const servedState: TicketState = visibleLinks.length > 0 ? { ...stateWithoutLinks, links: visibleLinks } : stateWithoutLinks;
+      // reducer's absent-not-empty shape), so nothing counts a hidden one. The
+      // one predicate every door uses (`withhold-link-targets.ts`, typed-links T4b).
+      const servedState: TicketState = await withholdLinks(state, targetSight(deps.pool, request.currentUserId));
 
       return {
         ticket: toTicketView(ticket),
@@ -755,7 +761,13 @@ export function registerTicketRoutes(
          ORDER BY seq`,
         [ticketId],
       );
-      return { events: rows.map(toEventView) };
+      // A link whose target this viewer cannot see goes out at its own seq
+      // with `targetId: null`, and a contest of such a claim with the gate's
+      // cause (typed-links T4b, spec A §2.4): never skipped, so there is no gap.
+      const sees = targetSight(deps.pool, request.currentUserId);
+      const events: LedgerEventView[] = [];
+      for (const row of rows) events.push(await withholdEvent(toEventView(row), sees));
+      return { events };
     },
   );
 
