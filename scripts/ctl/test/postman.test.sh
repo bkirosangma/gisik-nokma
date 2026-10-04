@@ -431,12 +431,12 @@ sp_reason() { # ARM [X-SECS-AGO] → the real 09:11 'MERGETIP 1 task/wtg1-stress
     later) au_q FIX 1 1500 s2 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll;;
     noise) au_q FIX 1 1500 s2 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll; au_dl 2700 15; au_dl 1950 14; au_dl 1300 15;;
     other) au_q FIX 2 1500 s2 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll;;
-    earlier) au_q FIX 1 2600 s0 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll;;
+    earlier) au_q FIX 1 2450 s0 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll;;
     orch) au_q FIX 1 1500 s2 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll; au_dl 1950 15;;
     dis) au_q FIX 1 2600 w1 "" BRIEF-w-fix-1.md ""; au_q FIX 1 1500 s2 "" BRIEF-wtg1-scroll-fix-1.md task/wtg1-scroll; au_d 1950 "FIX 1 w-fix delivered to lane 1, saw echoed";;
   esac
   au --parity | sed -n 's/^EXTRA .* MERGETIP 1 task\/wtg1-stress-output-ignored .*reason=//p'; }
-check "13.2076 the superseded rule, clause by clause: the real 09:11 MERGETIP 1 task/wtg1-stress-output-ignored followed 15 min later by a queue record to lane 1 is superseded — also with BY-ORCH acks naming lane 1 BEFORE it and AFTER the later record, and one naming lane 7 between them, and 2600 s apart; CONTROL in the same check, each leaves it reason=?: the later record goes to lane 2; the only other lane-1 record is EARLIER; the later record is 2800 s after it (over 45 min); a BY-ORCH ack naming lane 1 lies between them (the real 04:17 'ACK ctl tipmerge FIX 1 … (lane 1)'); a dispatcher delivery to lane 1 lies between them (it pairs an earlier record)" \
+check "13.2076 the superseded rule, clause by clause: the real 09:11 MERGETIP 1 task/wtg1-stress-output-ignored followed 15 min later by a queue record to lane 1 is superseded — also with BY-ORCH acks naming lane 1 BEFORE it and AFTER the later record, and one naming lane 7 between them, and 2600 s apart; CONTROL in the same check, each leaves it reason=?: the later record goes to lane 2; the only other lane-1 record is EARLIER, 50 s before it (inside the pairing window, so only the later-than clause refuses it); the later record is 2800 s after it (over 45 min); a BY-ORCH ack naming lane 1 lies between them (the real 04:17 'ACK ctl tipmerge FIX 1 … (lane 1)'); a dispatcher delivery to lane 1 lies between them (it pairs an earlier record)" \
   '[ "$(sp_reason later)" = superseded ] && [ "$(sp_reason noise)" = superseded ] && [ "$(sp_reason later 4100)" = superseded ] && [ "$(sp_reason other)" = "?" ] && [ "$(sp_reason earlier)" = "?" ] && [ "$(sp_reason later 4300)" = "?" ] && [ "$(sp_reason orch)" = "?" ] && [ "$(sp_reason dis)" = "?" ]'
 hd_reason() { # BRIEF dl:N|q:N → a shadow FIX 4 record for BRIEF (2000 s ago) and one real line 60 s later (dl-real.txt or q-real.txt line N); prints its reason
   au_reset; au_q FIX 4 2000 h1 "" "$1" ""; case "$2" in dl:*) au_dl 1940 "${2#dl:}";; q:*) au_ql 1940 "${2#q:}";; esac
