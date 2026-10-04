@@ -17,7 +17,7 @@
 
 **Release and identity**
 - **Release:** `release/knowledge-graph`, cut from `release/smoothness` after PR #952. Every task branch is cut from `origin/release/knowledge-graph`, and its PR has base `release/knowledge-graph`. Never `main`.
-- **Catalogue:** Features.md §24 "Knowledge Graph" ↔ `test-cases/27-knowledge-graph.md`. Task 1 creates both, with the series block table. This plan owns `27.001`–`27.079`: T1 `27.001–27.019`, T2 `27.020–27.034`, T3 `27.035–27.049`, T4 `27.050–27.064`, T5 `27.065–27.079`. Unused ids stay free for that task's follow-ups.
+- **Catalogue:** Features.md §24 "Knowledge Graph" ↔ `test-cases/27-knowledge-graph.md`. Task 1 creates both, with the series block table. This plan owns `27.001`–`27.094`: T1 `27.001–27.019`, T2 `27.020–27.034`, T3 `27.035–27.049`, T4 `27.050–27.064`, T5 `27.065–27.079`, T4b `27.080–27.094` (added 2026-10-04 after T5's block, so its ids sit above T5's). Unused ids stay free for that task's follow-ups. `27.095`–`27.099` are free; spec B starts at `27.100`.
 - **Case lines are id lines:** `- ❌ **27.001 — …**`. Each starts ❌ and flips ✅ in the same commit as its test. Test names or comments carry the id. `pnpm check:citations` must pass.
 - **Before allocating,** re-grep every live release tip for `27-knowledge-graph.md` and `## 24.` (`git for-each-ref refs/remotes/origin/release --format='%(refname:short)'`, then `git grep -l` on each). On 2026-10-03 none had either.
 - **Ledger:** plan id `typed-links` (`scripts/check-task-ledger.mjs:263` strips the date). Rows are given at the end of this plan.
@@ -85,7 +85,7 @@
 ## Review Focus
 
 1. **Removing a link from the "wrong" end.** An incoming link removed from the target's sheet, and a `relates` stored as B→A removed from A, must file `ticket.link_removed` on the STORED source's stream, with the stored kind and target. Otherwise `link.absent` refuses it, or a link silently survives. Pinned by 27.042 (T3), 27.056 (T4) and 27.069 (T5); 27.054 (T4) is supporting evidence (planner ruling 2026-10-04).
-2. **A link into a ticket the viewer cannot see** must be absent everywhere: the Links section, `ticketState.links` on the detail read, History (the target is withheld), `get_ticket`, `get_ticket_history`, the event history `/tickets/:id/events` (T4b) and sync (T4b) (planner ruling 2026-10-04). No count, no key, no title. Pinned by 27.050, 27.052, 27.053, 27.058 and 27.059 (T4); the two (T4b) doors are typed-links T4b's.
+2. **A link into a ticket the viewer cannot see** must be absent everywhere: the Links section, `ticketState.links` on the detail read, History (the target is withheld), `get_ticket` and `get_ticket_history` (T4); and the event history `/tickets/:id/events`, the stream, both bootstraps (snapshot `links` and tail), and a contested link claim on History and `GET /v1/contests` (T4b, planner ruling 2026-10-04). On the T4b doors the event stays at its seq with `targetId: null`, and a contest's cause is the gate's own. No count, no key, no title. Pinned by 27.050, 27.052, 27.053, 27.058 and 27.059 (T4), and 27.081, 27.083–27.087 and 27.089 (T4b).
 3. **A purged ticket at either end.** The live table and a rebuild agree (`verifyProjections` is clean). A replayed `link_added` toward an erased id writes no row. A new link to an erased id is refused. Pinned by 27.023, 27.024 and 27.025 (T2).
 4. **A refusal arriving after the optimistic row is drawn** (for example, the other user added the reverse a second earlier). The pending row disappears, nothing stays half-drawn, and the server's own sentence shows beside the Add control. Pinned by 27.067 (T5).
 5. **A double click on Remove or Undo** files exactly one event. Pinned by 27.068 (T5).
@@ -119,6 +119,7 @@
 | `packages/mcp-server/src/tools/ticket-tools.ts`, `read-tools.ts` | `link_tickets`; `get_ticket.links` | 4 |
 | `packages/app-core/src/data-source.ts`, `online/*`, `replica/replica-data-source.ts` | `getTicketLinks`; mappers | 4 |
 | `packages/app-core/src/views/ticket-links-section.tsx` (new), `ticket-sheet.tsx` | the Links section | 5 |
+| `apps/server/src/visibility/withhold-link-targets.ts` (new); `isWithheldLinkEvent` / `withheldLinkPayload` in `ticket-events.ts`, `foldTicketEvent` | per-viewer withholding of a hidden target on `/events`, the stream, bootstrap, History contests and `/v1/contests`; the replica folds a withheld event to nothing | 4b |
 | `packages/ui/src/ui.css` | links block after the notes rules | 5 |
 | `docs/manual.md` §5 | the Links paragraph | 5 |
 | `Features.md` §24, `test-cases/27-knowledge-graph.md`, `test-cases/README.md`, `scripts/fixtures/check-case-citations-baseline.json` | catalogue | 1 opens; each task its own lines |
@@ -128,6 +129,7 @@
 - **T2 then T3.** T3's server tests read `links` off `proj_tickets` (T2's column), and the engine needs the TARGET's state.
 - **T4 after T2.** Its read parts (route, MCP `get_ticket`, replica) can run in parallel with T3. Its `link_tickets` refusal case (27.057) needs T3, so if T4 starts first, T4 lands after T3.
 - **T5 after T3 and T4.**
+- **T4b after T4 (and T3, for `LINK_TARGET_NOT_VISIBLE_REASON`).** It may run beside T5. At least its Step 1 must land before `release/knowledge-graph` merges to `main` (T4b **Needs**).
 - **Shared files:**
   - `ticket-tools.ts`: T1 touches `redactedPayload`, T4 adds the tool.
   - `test-cases/27-knowledge-graph.md` and Features §24: T1 seeds one anchor per task (step 1), and each task writes only below its own anchor.
@@ -188,7 +190,7 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
 
   | Block | Spec | Plan |
   |---|---|---|
-  | 27.001–27.079 | A, typed links | `2026-10-03-typed-links.md`: T1 27.001–27.019 · T2 27.020–27.034 · T3 27.035–27.049 · T4 27.050–27.064 · T5 27.065–27.079 |
+  | 27.001–27.094 | A, typed links | `2026-10-03-typed-links.md`: T1 27.001–27.019 · T2 27.020–27.034 · T3 27.035–27.049 · T4 27.050–27.064 · T5 27.065–27.079 · T4b 27.080–27.094 |
   | 27.100–27.179 | B, reference index and backlinks | `2026-10-03-reference-index.md` |
   | 27.200–27.349 | C, Knowledge Graph view | `2026-10-03-knowledge-graph-view.md` |
   | 27.400–27.549 | D, MCP graph query and semantic layer | `2026-10-03-mcp-graph-semantic-layer.md` |
@@ -1092,7 +1094,7 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
         return precheckTicketLink(submitted, cache, deps);
       }
     ```
-  - Add beside `precheckTicketRanked` (its docblock's filtering sentence corrected, planner ruling 2026-10-04: the event history and sync still carry hidden targets until typed-links T4b):
+  - Add beside `precheckTicketRanked` (its docblock's filtering sentence corrected, planner ruling 2026-10-04: the detail read is filtered by T4, and the event history, the stream and bootstrap serve a hidden target WITHHELD (`targetId: null`) once typed-links T4b lands; T4b's Prose to sweep re-checks the sentence against what landed):
     ```ts
     /**
      * Typed links (spec A): the SHARED engine, on the cache, and nothing typed
@@ -1100,9 +1102,10 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
      * with, because every reason is the engine's own (`checks/links.ts`). The
      * guard is the cache: both tickets must be held, or "I have never heard of
      * it" would read as `link.unknown-target`. The online detail read's `links`
-     * is filtered (typed-links T4); the event history and sync are filtered by
-     * typed-links T4b. The rules compare only the pair, and both ends of the
-     * pair are visible.
+     * is filtered (typed-links T4); the event history, the stream and bootstrap
+     * serve a hidden target withheld (`targetId: null`, typed-links T4b), which
+     * the cache folds to nothing. So the cache holds only links whose both ends
+     * this viewer sees, and the rules compare only the pair.
      */
     async function precheckTicketLink(submitted: SubmittedEvent, cache: ClientStateCache, deps: PrecheckDeps): Promise<PrecheckResult> {
       const parsed = ticketLinkAddedPayload.safeParse(submitted.payload);
@@ -1570,6 +1573,416 @@ The dual-client rig's `toEqual` (`apps/server/test/dual-client/rig.ts:753`) ther
 
 ---
 
+### Task 4b: Withhold a hidden link target on the event history, the stream, bootstrap and contests (cases 27.080–27.094)
+
+**Needs:**
+- **T4 merged:** its detail-read filter, History labeller, replica `getTicketLinks` and 27.052/27.053/27.064.
+- **T3 merged:** `LINK_TARGET_NOT_VISIBLE_REASON` (`check-permission.ts`, beside `TICKET_NOT_VISIBLE_REASON` `:198`).
+- `PERMISSION_VISIBILITY_RULE` exists already (`check-permission.ts:54`).
+- **Planner rulings (2026-10-04, owner informed):** design D1 (withhold in place, per viewer) approved; Q1 = (a), the widening staleness is a recorded residual (Step 5); Q2 = the contest cause rewrite is approved.
+- **Ships in T1's release.** At least Step 1 must land before `release/knowledge-graph` merges to `main`. A client built before T1 never parses a link payload (refold filters by `TICKET_EVENT_TYPES`, `replica.ts:952`), but a build with T1's strict link arms and without Step 1's withheld clause stalls on the first withheld frame, and an open tab or an installed mobile build does not reload with the deploy.
+
+**Why (spec A §2.4 on the doors that serve stored claims).** T4 filters the detail read and labels History, but a hidden target's id still reaches the client through `GET …/tickets/:ticketId/events` (`routes/tickets.ts:714-741`, full stored envelopes), the stream (`visibility/visible-events-for.ts:574`, `yield env`), and bootstrap (`sync/sync-routes.ts:201-227`: the snapshot's `state.links` is the full fold, plus the tail). A `claim.contested` wrapping a refused link claim is filed on the SOURCE (`sync/sync-service.ts:197-213`), is always backfilled (`sync-routes.ts:96-104`) and is served by `GET /v1/contests` to every viewer of the source (`sync/contests-route.ts:283-299`). Its embedded payload names the target, and once T3 lands its `link.duplicate` / `link.reverse` reason names the target's TITLE (`linkExistsRefusal`, T3 Step 2).
+
+**The mechanism.** The ledger keeps the real id. Each door builds a per-viewer copy:
+- a link event whose target the viewer cannot see goes out as `{ kind, targetId: null }` at its own `seq` and `workspaceSeq`, so there is no gap;
+- a contest wrapping such a claim goes out with that payload embedded and the gate's cause, `permission.visibility` / `LINK_TARGET_NOT_VISIBLE_REASON`;
+- a snapshot's `state.links` keeps only visible targets.
+
+The predicate is `canSee` alone. It answers a never-minted, a purged (`purge/table-rules.ts:74-78` erases its `proj_visibility` row) and a hidden id identically (`visibility/can-see.ts:271-276`), and one constructor builds each withheld shape. So the three serialise byte for byte the same, and their causes are byte-identical.
+
+The domain folds a withheld event to nothing, following the purge precedent: `isRedactedTicketCreated` → `foldTicketEvent` returns the state, and `applyTicketEvent` refuses it by name (`packages/domain/src/purge.ts:32-43`, `ticket-state.ts:125-140`, `:504-510`).
+
+**"Never cut a claim" still holds (owner ruling Q2, 2026-10-04).** The house rule (`routes/tickets.ts:276-283`, `routes/ticket-history.ts:17-27`) is that a claim is never redacted from someone entitled to the state. Here the claim is NOT cut: the event, its id, type, actor, origin, both clocks and seq all go out, and so does the contest. What is withheld, per viewer, is the one fact §2.4 forbids: the other end's id. For a contest, its CAUSE is withheld too, because a `link.reverse` / `link.duplicate` reason names the hidden ticket's title, and `link.target-deleted` / `purge.erased` disclose its state. A claim naming a never-minted id earns `permission.visibility`, so that is the cause every viewer who cannot see the target is served. Keeping the rule id and swapping only the reason would still be an existence oracle: a never-minted target can never produce `link.reverse`.
+
+**Not here:** `parentId` (the detail read itself serves a restricted parent's id, `routes/tickets.ts:420-469`, so `visible-events-for.ts:425-433`'s "two answers to one question" keeps it on the wire). The same reasoning withholds a link's id, which the detail read does NOT serve. `my-work` (`routes/my-work.ts:303-375`) and the contest notification (`notifications/fanout.ts:308-320`) are claimant-only, and the claimant passed `canSee(target)` at claim time. `note.attached {ticketId}` on `/v1/notes/:id/events` is pre-existing and out of this plan.
+
+**Files:**
+- Create:
+  - `apps/server/src/visibility/withhold-link-targets.ts`. Its docblock is modelled on `visible-events-for.ts`'s "What the filter does NOT hide": it says why links differ from `parentId`.
+  - `apps/server/test/visibility/withhold-link-targets.test.ts` (27.081–27.082; world: `buildReadTestApp`, as T4's `test/routes/ticket-links.test.ts`).
+  - `apps/server/test/routes/ticket-link-doors.test.ts` (27.083–27.087; same world).
+- Modify:
+  - **Domain:**
+    - `packages/domain/src/events/ticket-events.ts`: after `isTicketLinkEvent` (`:221`), add `withheldLinkPayload` and `isWithheldLinkEvent`.
+    - `packages/domain/src/ticket-state.ts`: the link arms (`:463-474`) refuse a withheld event by name; `foldTicketEvent` (`:504-510`) skips it; docblock `:494-503`.
+  - **Server:**
+    - `apps/server/src/routes/tickets.ts`:
+      - the `/events` handler (`:714-741`, its `return` at `:740`);
+      - T4's inline detail-read filter (before the `return` at `~:700`) becomes `withholdLinks`;
+      - docblocks `:270-283`.
+    - `apps/server/src/visibility/visible-events-for.ts`: a `TargetSight` after `resolveEffectiveRole` (`:457`); the ticket arm's `yield env` (`:574`); docblock `:425-433`.
+    - `apps/server/src/sync/sync-routes.ts`:
+      - `bootstrapTicket` (`:201-227`) takes a `TargetSight`;
+      - `ticketBootstrapFor` (`:304-321`) takes `viewerId`;
+      - the callers `:439` and `:500`;
+      - docblock `:186-200`.
+    - `apps/server/src/routes/ticket-history.ts`: T4's labeller runs over `withholdEvent` output, and contests are included.
+    - `apps/server/src/sync/contests-route.ts`: `toView` rows through `withholdContest` (`:291-296`).
+  - **App-core:**
+    - `packages/app-core/src/replica/replica-data-source.ts:1672-1689` (`getTicketHistory`: a withheld link event gets `linkTarget: null`);
+    - `packages/app-core/src/precheck.ts` (T3's `precheckTicketLink` docblock, T3 Step 4: re-check its T4b sentence against what landed).
+  - **Rig:**
+    - `apps/server/test/dual-client/rig.ts`: delete the restated `bootstrapTicket` (`:250-273`) and import the product's; `bootstrapFor` (`:306`) passes the client's sight; the transport's `ticketBootstrapFor(client, ws, ticketId)` (`:465`) gains `userId`.
+    - `apps/server/test/dual-client/scenarios.test.ts`: one describe, 27.089.
+  - **Tests:**
+    - `packages/domain/test/ticket-link-events.test.ts` (T1's file; 27.080);
+    - the replica's `applyServerItem` test file in `packages/sync-client/test/replica/` (grep `applyServerItem(` there and add to the file holding the stream-arm cases; 27.088);
+    - `packages/app-core/test/replica/replica-data-source.test.ts` (27.090).
+  - **Catalogue:**
+    - `Features.md` §24: replace `<!-- A T4b bullet -->` (Step 5).
+    - `test-cases/27-knowledge-graph.md`: the header table (27.001–27.094) and the eleven ❌ case lines under `<!-- A T4b -->` were seeded by the planner on 2026-10-04. Flip each to ✅ in the commit that adds its test, and correct a line's wording in that commit if the test pins something narrower.
+    - `scripts/fixtures/check-case-citations-baseline.json`, if the count is pinned there.
+    - The plan's `:20` / T1 Step 1 tables and the ledger row (`typed-links	4b`) were updated with the seed; nothing to do.
+
+**Interfaces:**
+- **Consumes:**
+  - T1: `isTicketLinkEvent`, `TicketLinkKind`, `TicketState.links?`, absent-not-empty.
+  - T3: `LINK_TARGET_NOT_VISIBLE_REASON`; `PERMISSION_VISIBILITY_RULE`.
+  - T4: `TicketHistoryEvent.linkTarget`, its labeller, its detail filter.
+- **Produces** (`@gisik-nokma/domain`):
+  - `withheldLinkPayload(kind: TicketLinkKind): { kind: TicketLinkKind; targetId: null }`. The ONLY constructor; fixed key order.
+  - `isWithheldLinkEvent(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean`. A link type AND `payload.targetId === null`.
+- **Produces** (server, `visibility/withhold-link-targets.ts`):
+  - `type TargetSight = (targetId: string) => Promise<boolean>`; `targetSight(db: Queryable, viewerId: string): TargetSight` (memoised `canSee`).
+  - `withholdEvent<E extends { type: string; payload: unknown }>(e: E, sees: TargetSight): Promise<E>`. It returns the SAME reference when nothing is withheld.
+  - `withholdContest<C extends { rule: string; reason: string; originalEvent: unknown }>(c: C, sees: TargetSight): Promise<C>`.
+  - `withholdLinks(state: TicketState, sees: TargetSight): Promise<TicketState>`.
+- **Changes:**
+  - `bootstrapTicket(client, ticketId, sees: TargetSight)`;
+  - `ticketBootstrapFor(client, workspaceId, ticketId, viewerId)`.
+- **Wire:** unchanged shapes. A link event's `payload.targetId` may now be `null` on `/events`, the stream, bootstrap and History. A `claim.contested` payload or contest view may carry the rewritten cause.
+
+- [ ] **Step 1: The withheld link event in the domain (27.080)**
+
+  Case line:
+  - `- ❌ **27.080 — a link event served with its target withheld (`targetId: null`) folds to the unchanged state through `foldTicketEvent` (add and remove), and `applyTicketEvent` refuses it by name;** control: the same event with a real target folds into `links`, and `isWithheldLinkEvent` is false for a non-link event whose payload has `targetId: null`.`
+
+  In `packages/domain/test/ticket-link-events.test.ts` (reuse T1's `makeEnvelope` helpers and a deps object from `ticket-state.test.ts`'s top):
+  ```ts
+  it('27.080 a withheld link folds to nothing, applyTicketEvent names it; control: a real target folds', () => {
+    const born = applyTicketEvent(undefined, created(S), deps);
+    const add = (targetId: string | null, type = 'ticket.link_added') =>
+      makeEnvelope({ type, entity: { kind: 'ticket', id: S }, workspaceId: WS, payload: targetId === null ? withheldLinkPayload('blocks') : { kind: 'blocks', targetId } });
+    expect(withheldLinkPayload('blocks')).toEqual({ kind: 'blocks', targetId: null });
+    expect(JSON.stringify(withheldLinkPayload('blocks'))).toBe('{"kind":"blocks","targetId":null}');
+    expect(foldTicketEvent(born, add(null), deps)).toBe(born);
+    expect(foldTicketEvent(born, add(null, 'ticket.link_removed'), deps)).toBe(born);
+    expect(() => applyTicketEvent(born, add(null), deps)).toThrow(/withheld/);
+    const linked = foldTicketEvent(born, add(T), deps)!;
+    expect(linked.links).toEqual([{ kind: 'blocks', targetId: T }]);
+    expect(foldTicketEvent(linked, add(null), deps)).toBe(linked); // a withheld one leaves a held link alone
+    expect(isWithheldLinkEvent({ type: 'ticket.field_set', payload: { fieldId: 'x', targetId: null } })).toBe(false);
+    expect(isWithheldLinkEvent({ type: 'ticket.link_added', payload: { kind: 'blocks', targetId: T } })).toBe(false);
+  });
+  ```
+  Kills:
+  - (a) drop the `isWithheldLinkEvent` clause from `foldTicketEvent` (a ZodError is thrown);
+  - (b) `isWithheldLinkEvent` without the `isTicketLinkEvent(type)` test (the field_set leg reads true);
+  - (c) delete the named throw in `applyTicketEvent` (`/withheld/` fails on the ZodError text);
+  - (d) `withheldLinkPayload` returns `{ kind }` or `{ targetId: null, kind }` (the exact JSON string);
+  - (e) the reducer's remove arm treats `null` as "remove every link of this kind" (the `toBe(linked)` leg).
+
+  Implementation (`events/ticket-events.ts`, after `:221`):
+  ```ts
+  /**
+   * The payload a link event is SERVED with when this viewer may not be told
+   * its target (typed-links T4b; spec A §2.4). Never stored: the ledger holds
+   * the real id, and the server builds this per viewer at every door. One
+   * constructor and one key order, so a hidden, a purged and a never-minted
+   * target serialise byte for byte the same. The purge precedent is
+   * `redactedTicketCreatedPayload` (`purge.ts`).
+   */
+  export function withheldLinkPayload(kind: TicketLinkKind): { kind: TicketLinkKind; targetId: null } {
+    return { kind, targetId: null };
+  }
+
+  /** True exactly for a served-withheld link event; `=== null`, as `isRedactedTicketCreated` uses `=== true`. */
+  export function isWithheldLinkEvent(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
+    if (!isTicketLinkEvent(env.type)) return false;
+    const p = env.payload;
+    return p !== null && typeof p === 'object' && (p as { targetId?: unknown }).targetId === null;
+  }
+  ```
+  - **`ticket-state.ts`.** `foldTicketEvent`: `if (isRedactedTicketCreated(env) || isWithheldLinkEvent(env)) return state;`.
+  - **Both link arms**, first line:
+
+    ```ts
+    if (isWithheldLinkEvent(env)) throw new Error(`applyTicketEvent: ${env.type} on ticket ${env.entity.id} carries a withheld target (a served copy, never a ledger row); fold it with foldTicketEvent`);
+    ```
+  - **The `foldTicketEvent` docblock (`:494-503`)** gains the second case.
+  - **Import type.** Check whether `EventEnvelope` is importable into `ticket-events.ts` without a cycle (`purge.ts:2` imports it from `./envelope.js`).
+
+  Run (LOCAL): build domain, then domain `test/ticket-link-events.test.ts` and `test/ticket-state.test.ts`. Expected: PASS. Flip 27.080 ✅. Commit.
+
+- [ ] **Step 2: One predicate, one rewrite (27.081–27.082)**
+
+  Case lines:
+  - `- ❌ **27.081 — `withholdEvent` serves a link event whose target the viewer cannot see as `{kind, targetId: null}`, byte-identical for a hidden target and a never-minted one, and a `claim.contested` wrapping such a claim with its embedded payload withheld and its cause rewritten to `permission.visibility` / "The other ticket does not exist in this workspace, or you cannot see it." (no id, no title);** control: the owner's copies, a link to a ticket the member sees, a contest wrapping a visible-target link, and a non-link event all come back as the same reference.`
+  - `- ❌ **27.082 — `withholdLinks` keeps only visible targets, drops the key when none remain, and `targetSight` asks `canSee` once per distinct target;** control: the owner's state is returned whole.`
+
+  World: `buildReadTestApp` (S = `taskInEpicId`, SH = `sharedTaskId`, H = `hiddenTaskId`, titled `'Salary review — keep private'`, `read-scenario.ts:177-180`). NEVER = a fresh `newUlid()` that nothing creates.
+
+  ```ts
+  const link = (target: string) => ({ type: 'ticket.link_added', payload: { kind: 'duplicates', targetId: target } });
+  const contest = (target: string, rule: string, reason: string) => ({
+    type: 'claim.contested',
+    payload: { originalEvent: { ...newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket', id: S }, type: 'ticket.link_added', payload: { kind: 'blocks', targetId: target }, actorId: owner, origin: 'web' }) }, rule, reason },
+  });
+
+  it('27.081 hidden and never-minted withheld byte for byte, contest cause rewritten; control: visible and owner untouched', async () => {
+    const member = targetSight(db.pool, memberId);
+    const hidden = await withholdEvent(link(H), member);
+    const never = await withholdEvent(link(NEVER), member);
+    expect(JSON.stringify(hidden.payload)).toBe('{"kind":"duplicates","targetId":null}');
+    expect(JSON.stringify(never.payload)).toBe(JSON.stringify(hidden.payload));
+    const titled = contest(H, 'link.reverse', '"Salary review — keep private" already blocks "File the GST return".');
+    const out = await withholdEvent(titled, member);
+    expect(out.payload).toMatchObject({ rule: 'permission.visibility', reason: 'The other ticket does not exist in this workspace, or you cannot see it.' });
+    expect((out.payload as any).originalEvent.payload).toEqual({ kind: 'blocks', targetId: null });
+    expect(JSON.stringify(out)).not.toContain(H);
+    expect(JSON.stringify(out)).not.toContain('Salary review');
+    const neverContest = await withholdEvent(contest(NEVER, 'permission.visibility', 'The other ticket does not exist in this workspace, or you cannot see it.'), member);
+    const cause = (e: { payload: unknown }) => { const p = e.payload as any; return JSON.stringify([p.rule, p.reason, p.originalEvent.payload]); };
+    expect(cause(neverContest)).toBe(cause(out)); // byte-identical causes
+    // controls: same reference back
+    const visible = link(SH); expect(await withholdEvent(visible, member)).toBe(visible);
+    const visContest = contest(SH, 'link.reverse', '"Renew the trade licence" already blocks "File the GST return".');
+    expect(await withholdEvent(visContest, member)).toBe(visContest);
+    const other = { type: 'ticket.transitioned', payload: { to: 'done', targetId: H } }; expect(await withholdEvent(other, member)).toBe(other);
+    const ownerSight = targetSight(db.pool, ownerId);
+    const h = link(H); expect(await withholdEvent(h, ownerSight)).toBe(h);
+    expect(await withholdEvent(titled, ownerSight)).toBe(titled);
+  });
+
+  it('27.082 withholdLinks filters, drops the key, memoises; control: owner whole', async () => {
+    const state = { ...(await getTicketStateFromDb(db.pool, WS, S))!, links: [{ kind: 'blocks', targetId: SH }, { kind: 'duplicates', targetId: H }] } as TicketState;
+    expect((await withholdLinks(state, targetSight(db.pool, memberId))).links).toEqual([{ kind: 'blocks', targetId: SH }]);
+    const onlyHidden = { ...state, links: [{ kind: 'duplicates', targetId: H }] } as TicketState;
+    expect('links' in (await withholdLinks(onlyHidden, targetSight(db.pool, memberId)))).toBe(false);
+    expect(await withholdLinks(state, targetSight(db.pool, ownerId))).toBe(state);
+    // Memo: a counting Queryable. One sight asked about H three times costs what ONE canSee(H) costs.
+    const counting = (n: { q: number }): Queryable => ({ query: (...a: Parameters<Queryable['query']>) => { n.q += 1; return db.pool.query(...a); } }) as Queryable;
+    const once = { q: 0 }; await canSee(counting(once), memberId, H);
+    const thrice = { q: 0 }; const sight = targetSight(counting(thrice), memberId);
+    for (let i = 0; i < 3; i += 1) await withholdEvent(link(H), sight);
+    expect(once.q).toBeGreaterThan(0); // precondition: the counter sees canSee's queries
+    expect(thrice.q).toBe(once.q);
+  });
+  ```
+  Read `db/queryable.ts` for `Queryable`'s exact `query` signature before writing `counting`.
+
+  Kills:
+  - **27.081:**
+    - (a) predicate `canSee(viewer, e.entity.id)` / the SOURCE instead of `targetId` (hidden stays raw);
+    - (b) withhold only when the target exists and is hidden (`SELECT 1 FROM proj_tickets` gate): NEVER passes raw, so the byte-identity leg fails;
+    - (c) the contest arm rewrites the payload but keeps `rule` / `reason` (title leg);
+    - (d) rewrite `rule` only (reason leg);
+    - (e) no contest arm (`originalEvent.payload` holds H);
+    - (f) rewrite every contest whatever its target (the `visContest` reference leg);
+    - (g) return a shallow copy instead of the same reference when nothing changed (every `toBe` control). This one matters because T4's labeller mutates `e.payload` in place.
+  - **27.082:**
+    - (a) `links: []` when none remain;
+    - (b) filter on `sees(state.id)`;
+    - (c) no memo (the query count triples).
+
+  Implementation, `visibility/withhold-link-targets.ts`:
+  ```ts
+  import { isTicketLinkEvent, withheldLinkPayload, type TicketLinkKind, type TicketState } from '@gisik-nokma/domain';
+  import type { Queryable } from '../db/queryable.js';
+  import { LINK_TARGET_NOT_VISIBLE_REASON, PERMISSION_VISIBILITY_RULE } from '../permissions/check-permission.js';
+  import { canSee } from './can-see.js';
+
+  /**
+   * Spec A §2.4 on the doors that serve STORED claims (typed-links T4b): a link's
+   * other end is withheld from a viewer who cannot see it. ONE predicate,
+   * `canSee`, which answers a never-minted, a purged and a hidden id the same
+   * (`can-see.ts`, "Unknown and invisible are the same answer"), so the withheld
+   * copy cannot tell them apart. `parentId` is NOT withheld, and the difference
+   * is the read door's: the detail read serves a restricted parent's id
+   * (`parent: {kind:'restricted', id}`), and it withholds a link's.
+   * See `visible-events-for.ts`, "What the filter does NOT hide".
+   */
+  export type TargetSight = (targetId: string) => Promise<boolean>;
+
+  /** `canSee`, memoised for one request or one drain: a page or a range names the same target many times. */
+  export function targetSight(db: Queryable, viewerId: string): TargetSight {
+    const memo = new Map<string, Promise<boolean>>();
+    return (targetId) => {
+      let answer = memo.get(targetId);
+      if (answer === undefined) { answer = canSee(db, viewerId, targetId); memo.set(targetId, answer); }
+      return answer;
+    };
+  }
+
+  async function withheldOrSame(type: string, payload: unknown, sees: TargetSight): Promise<unknown> {
+    if (!isTicketLinkEvent(type) || payload === null || typeof payload !== 'object') return payload;
+    const p = payload as { kind: TicketLinkKind; targetId?: unknown };
+    if (typeof p.targetId !== 'string' || (await sees(p.targetId))) return payload;
+    return withheldLinkPayload(p.kind);
+  }
+
+  /**
+   * A contested LINK claim whose target this viewer cannot see: the embedded
+   * payload is withheld AND the cause is the gate's own (owner ruling
+   * 2026-10-04). A `link.duplicate`/`link.reverse` reason names the hidden
+   * ticket's title, and `link.target-deleted` / `purge.erased` name its
+   * state; the cause a never-minted target earns is `permission.visibility`
+   * with this sentence. The claim itself is not cut: only its cause is
+   * withheld, per viewer. Same reference back when nothing is withheld.
+   */
+  export async function withholdContest<C extends { rule: string; reason: string; originalEvent: unknown }>(c: C, sees: TargetSight): Promise<C> {
+    const o = c.originalEvent as { type?: unknown; payload?: unknown } | null;
+    if (o === null || typeof o !== 'object' || typeof o.type !== 'string') return c;
+    const payload = await withheldOrSame(o.type, o.payload, sees);
+    if (payload === o.payload) return c;
+    return { ...c, rule: PERMISSION_VISIBILITY_RULE, reason: LINK_TARGET_NOT_VISIBLE_REASON, originalEvent: { ...o, payload } };
+  }
+
+  /** One stored event as this viewer may be served it. Same reference back when nothing is withheld. */
+  export async function withholdEvent<E extends { type: string; payload: unknown }>(e: E, sees: TargetSight): Promise<E> {
+    if (e.type === 'claim.contested') {
+      const c = e.payload as { rule: string; reason: string; originalEvent: unknown };
+      const out = await withholdContest(c, sees);
+      return out === c ? e : { ...e, payload: { originalEvent: out.originalEvent, rule: out.rule, reason: out.reason } };
+    }
+    const payload = await withheldOrSame(e.type, e.payload, sees);
+    return payload === e.payload ? e : { ...e, payload };
+  }
+
+  /** A folded state's links, visible targets only; the key absent when none remain (T1's absent-not-empty rule). */
+  export async function withholdLinks(state: TicketState, sees: TargetSight): Promise<TicketState> {
+    if (state.links === undefined) return state;
+    const kept: NonNullable<TicketState['links']> = [];
+    for (const l of state.links) if (await sees(l.targetId)) kept.push(l);
+    if (kept.length === state.links.length) return state;
+    const { links: _all, ...rest } = state;
+    return kept.length > 0 ? { ...rest, links: kept } : rest;
+  }
+  ```
+  - **Contest key order.** Check `claimContestedPayloadSchema`'s key order (`contest-events.ts:40-46`: `originalEvent`, `rule`, `reason`, strict) and build the rebuilt contest payload in that order.
+  - **The import cycle.** `check-permission.ts` must not import this module back (it does not today; grep).
+
+  Run (LOCAL): build domain, then server `test/visibility/withhold-link-targets.test.ts`. Expected: PASS. Flip 27.081–27.082 ✅. Commit.
+
+- [ ] **Step 3: The doors (27.083–27.087)**
+
+  Case lines:
+  - `- ❌ **27.083 — `GET …/tickets/:id/events` serves a member the link event to a hidden target withheld (`targetId: null`) at its own `seq`, the member's event ids and seqs for S equal History's for S, and the response carries no trace of the id;** control: the owner gets the id.`
+  - `- ❌ **27.084 — the stream (`visibleEventsFor`) yields the member the withheld envelope at the same `seq` and `workspaceSeq` as the owner's, so the member's list of S's seqs equals the owner's (no gap);** control: the owner's envelope carries the id.`
+  - `- ❌ **27.085 — bootstrap, workspace and per-ticket, serves the member S's snapshot `state.links` without the hidden target, its tail link events withheld, and its backfilled link contest with the rewritten cause; nothing in either body contains H or H's title;** control: the owner's bodies contain H.`
+  - `- ❌ **27.086 — History serves a contest wrapping a hidden-target link claim with the rewritten cause and a withheld embedded payload;** control: the owner's History serves it whole.`
+  - `- ❌ **27.087 — `GET /v1/contests` serves the member the same rewritten contest, with no id and no title;** control: a contest whose link target the member sees is served whole, and the owner's roster is whole.`
+
+  **The doors' tests.** Put them in `apps/server/test/routes/ticket-link-doors.test.ts`.
+  - **Seed:** `applyCommitted` with `link(S,'duplicates',H)`, `link(S,'blocks',SH)` and a `claim.contested` on S whose `originalEvent` is `newSubmittedEvent({ …, entity: S, type: 'ticket.link_added', payload: { kind: 'blocks', targetId: H } })`, `rule: 'link.reverse'`, and a reason naming `'Salary review — keep private'`. Seed a second contest the same way whose target is SH.
+  - **The bootstrap legs need a real `pg.Pool` with `.connect()`** (`sync-routes.ts:251-255` docblock). Copy the app construction from `test/sync/ticket-bootstrap-route.test.ts` for them.
+  - **Snapshot leg:** call `runSnapshotPass(db.pool, { minEvents: 1 })` (as `rig.ts:771-773`) before the bootstrap legs, so `state.links` is in a snapshot. Assert the snapshot is non-null first (precondition).
+  - **27.084:** call `visibleEventsFor(db.pool, memberId, WS, 0)` directly and keep the S envelopes; also call it for the owner. Assert `memberSeqs` equals `ownerSeqs`, and that the member's duplicates envelope is `{ kind: 'duplicates', targetId: null }`.
+
+  Kills:
+  - **27.083:** (a) `/events` keeps `rows.map(toEventView)` (H in the JSON); (b) `continue` past a withheld row instead of rewriting it (the seq leg fails; 5.73's world has no links, so it stays green and is not the instrument).
+  - **27.084:** (a) `yield env` unchanged at `:574`; (b) the generator skips withheld envelopes (the seq lists differ); (c) the sight built for `env.actorId` instead of `userId` (the owner authored the link, so the member gets H).
+  - **27.085:** (a) `bootstrapTicket` serves `snapshot.state` unfiltered; (b) it withholds the snapshot but not `events` (tail or backfilled contest); (c) `ticketBootstrapFor` ignores `viewerId` (passes `async () => true`): the per-ticket leg fails while the workspace leg passes.
+  - **27.086:** the History labeller handles only `isTicketLinkEvent` rows (T4's original code): the contest keeps the title.
+  - **27.087:** `toView(row)` pushed without `withholdContest`.
+
+  **Implementation:**
+  - **`/events`:**
+
+    ```ts
+    const sees = targetSight(deps.pool, request.currentUserId);
+    const events = [];
+    for (const row of rows) events.push(await withholdEvent(toEventView(row), sees));
+    return { events };
+    ```
+  - **Detail read:** replace T4's inline filter with `ticketState: await withholdLinks(state, targetSight(deps.pool, request.currentUserId))`. This keeps T4's 27.052 green with the single predicate.
+  - **`visibleEventsFor`:** `const sees = targetSight(db, userId);` after `eff` (`:457`), and in the ticket arm `yield await withholdEvent(env, sees);` (`:574`). The other `yield env` lines are other audience classes and stay as they are.
+  - **`bootstrapTicket(client, ticketId, sees)`:**
+    - `snapshot.state` → `await withholdLinks(snapshot.state as unknown as TicketState, sees)`;
+    - `events` → `withholdEvent` each.
+    - The workspace route builds ONE `targetSight(client, userId)` per request (`:500`).
+    - `ticketBootstrapFor(client, workspaceId, ticketId, viewerId)` builds its own.
+    - Route `:439` passes `userId`.
+  - **History (T4's code):** run `withholdEvent` over every row FIRST with one `targetSight`. Then label the link events: a withheld one (`isWithheldLinkEvent`) gets `linkTarget: null`; a string target gets T4's `{ key }` lookup. T4's own `else { … targetId: null }` branch goes; the shared constructor replaces it.
+  - **`/v1/contests`:** `contests.push(await withholdContest(toView(row), sees))`.
+
+  Run (LOCAL): server `test/routes/ticket-link-doors.test.ts`, `test/routes/ticket-history.test.ts` (5.73), `test/routes/tickets-read.test.ts`, `test/sync`, `test/routes/ticket-links.test.ts` (T4's 27.050–27.054 unchanged). Expected: PASS. Flip 27.083–27.087 ✅. Commit.
+
+- [ ] **Step 4: The replica and the rig (27.088–27.090)**
+
+  Case lines:
+  - `- ❌ **27.088 — the replica applies a withheld `link_added` and a withheld `link_removed` from the stream without stalling: both are stored at their seqs, the ticket's confirmed state has no `links` key, and the cursor advances past both;** control: a visible `link_added` in the same run folds into `links`.`
+  - `- ❌ **27.089 — the dual-client rig, a target hidden from client A: after the admin links T1 blocks H and T1 relates T2, A's confirmed T1 equals A's served detail state (`withholdLinks(projTicket(T1), sight(A))`: `links: [relates T2]`), and no row A holds (events, snapshots, contests, tickets) contains H; the same after a snapshot pass and a FRESH client's bootstrap;** control: the admin's client holds H and equals `projTicket(T1)` whole; 27.062 is unchanged.`
+  - `- ❌ **27.090 — offline History labels a withheld link event `linkTarget: null`, so `describeEvent` reads "a ticket you can't see";** control: a link event with a real target carries no `linkTarget` key.`
+
+  **Tests:**
+  - **27.088:** in the sync-client replica test file that drives `applyServerItem` (grep `applyServerItem(` in `packages/sync-client/test`), copy its seeded-ticket + envelope helpers.
+  - **27.089:** a new describe in `scenarios.test.ts`.
+    - **H's visibility:** H is created by `USER_ADMIN` with `visibility.set {mode:'explicit', userIds:[USER_ADMIN]}`. Copy the shape from `read-scenario.ts:179-180`, through the rig's admin door.
+    - **Do NOT call `expectConverged`.** Its event-log and `projTicket` legs compare readers of different sight. Assert explicitly.
+    - **Scan the rows.** Scan A's storage tables with `JSON.stringify` of every row.
+  - **27.090:** in `replica-data-source.test.ts`, seed a withheld event via the replica's stream door.
+
+  Kills:
+  - **27.088:** none from this step's code; it guards Step 1 end to end (Step 1's kill (a) shows here as a stall in `lastApplyFailure()`, not a pass).
+  - **27.089:** (a) the rig keeps its restated `bootstrapTicket` (a fresh client's snapshot holds H). The other legs guard Step 3's code end to end (its 27.084 kill (a) and 27.085 kill (a) also redden here).
+  - **27.090:** (a) no mapping (the line reads "another ticket"); (b) every link event mapped to `linkTarget: null` (the control leg).
+
+  **Implementation:**
+  - **`getTicketHistory`:** add `...(isWithheldLinkEvent(event) ? { linkTarget: null } : {})`.
+  - **`rig.ts`:**
+    - Delete `:250-273` and import `bootstrapTicket` from `../../src/sync/sync-routes.js`.
+    - `bootstrapFor` (`:306`) passes `targetSight(client, userId)`.
+    - The transport's `ticketBootstrapFor(client, ws, ticketId, userId)` (`:465`).
+    - Its docblock (`:250-255`, "Restated rather than imported only because the route does not export it") is false at the tip (`sync-routes.ts:201` exports it), and it goes with the function.
+    - **The swap changes more than withholding.** The product's `bootstrapTicket` passes `snapshot.provenance` (`sync-routes.ts:217-224`); the rig's copy drops it (`rig.ts:268`). Every scenario's fresh-client bootstrap changes, and the rig's "A PRODUCT DEFECT SURFACES THROUGH THIS" note (`rig.ts:755-769`, a `ReplicaGapError` for `stateProvenance` after a snapshot pass) may stop reproducing. Run `test/dual-client` WHOLE, grep it for any case pinning that gap, and record what changed.
+
+  Run (LOCAL):
+  - **Build:** domain, rule-engine, app-core, sync-client.
+  - **Suites:** sync-client WHOLE, app-core WHOLE, server WHOLE (`test/dual-client` WHOLE included, for the bootstrap swap). An app-core replica change means the server integration files run too.
+  - **Mobile bundle:** domain changed, so regenerate it (the script is in `apps/mobile/package.json`).
+
+  Expected: PASS. Flip 27.088–27.090 ✅. Commit.
+
+- [ ] **Step 5: Features, prose, residuals, DONE**
+
+  **Prose to sweep:** (fix in this task's commits)
+  - **`apps/server/src/routes/tickets.ts:270-283`.** "A ledger row on the wire. Every field of the stored event, unchanged." and "There is no redacting path, and that is the point": name the one withheld field (a link's hidden target and its contest's cause, spec A §2.4) and the module that does it.
+  - **`apps/server/src/visibility/visible-events-for.ts:425-433`** ("What the filter does NOT hide"). Keep the `parentId` paragraph. Add the links exception: the read door withholds a link's id while it serves a restricted parent's, so the stream follows each.
+  - **`apps/server/src/routes/ticket-history.ts:17-27`.** "every claim-bearing field above goes out whole": T4 adds the link exception; T4b extends it to contests' causes.
+  - **`apps/server/src/sync/sync-routes.ts:186-200`.** `bootstrapTicket`'s "Three callers … `rig.ts`'s `bootstrapFor` — which used to restate it" was false until this task; it now holds. Add that the payload is per viewer (`sees`).
+  - **`apps/server/test/dual-client/rig.ts:755-769`** ("A PRODUCT DEFECT SURFACES THROUGH THIS"): re-measure after the bootstrap swap; correct it or record it as closed.
+  - **`apps/server/src/sync/contests-route.ts:272-282`.** "this roster is gated per row by `canSee`, which is the whole audience decision here": add the link-target rewrite.
+  - **`apps/server/src/notifications/fanout.ts:314-318`.** "carries no title": false for `link.duplicate`/`link.reverse` reasons. The claimant could see both ends at claim time, so the exemption stands; correct the sentence.
+  - **`packages/app-core/src/online/mappers.ts:2143-2150`.** "`/events` does the same" (serves payloads verbatim): except a withheld link target.
+  - **`packages/domain/src/ticket-state.ts:494-503`** (`foldTicketEvent`): it names only the purged creation.
+  - **`packages/app-core/src/precheck.ts`** (`precheckTicketLink`'s docblock, T3 Step 4). It says the event history, the stream and bootstrap serve a hidden target withheld (typed-links T4b) and the cache folds it to nothing. Make it name `withhold-link-targets.ts` and `isWithheldLinkEvent` as landed.
+  - **`apps/server/src/routes/tickets.ts:276-283`** again, for the ruling's wording: the claim is not cut, only the other end's id and a contest's cause are withheld per viewer.
+  - (Searched; nothing else is false: `verbatim`, `unchanged`, `whole`, `no redacting`, `targetId` in `apps/server/src/routes`, `apps/server/src/sync`, `apps/server/src/visibility`; `apps/server/test/integration/soft-deleted-attachments.test.ts:103-107` is about the trash guard and stays true.)
+
+  - **Residuals.** Record these in the helper's docblock and in Features, each with an owner:
+    - **Widening staleness (owner ruling Q1 = (a), 2026-10-04).** The replica dedupes by id and never rewrites a held event (`replica.ts:1453-1456`), and a held source is not re-pulled (`localHeadSeq < headSeq`, `:2125`). So when a hidden target later becomes visible, the offline Links section lacks that link until the next full re-bootstrap. Online reads are correct. Owner: **TL4c widening refresh (post-KG-release)**.
+    - **Narrowing.** A device keeps an id it held; this is not a disclosure (reconcile reasoning).
+    - **`my-work` and the claimant's stored notification** keep the original cause (the claimant authored it).
+  - **Features.** Replace `<!-- A T4b bullet -->` with `- ⚙️ **Typed links: hidden targets withheld on every door** (typed-links T4b; `apps/server/src/visibility/withhold-link-targets.ts`, `packages/domain/src/events/ticket-events.ts`) — …`. Name the doors (`/events`, the stream, both bootstraps, History, `/v1/contests`), the withheld shape, the rewritten contest cause, the replica's no-op fold, and the residuals. Cases 27.080–27.090.
+  - **Sweeps.** Server WHOLE, sync-client, app-core, mcp-server (27.006/27.059 read the withheld shape), web WHOLE (domain changed).
+  - **Mutations:**
+
+    | Case | Mutation |
+    |---|---|
+    | 27.080 | drop the withheld clause from `foldTicketEvent` |
+    | 27.081 | withhold only when the target row exists (no byte identity) |
+    | 27.081 | keep the contest's rule and reason |
+    | 27.083 | `/events` unwithheld |
+    | 27.084 | skip withheld envelopes instead of rewriting |
+    | 27.085 | `ticketBootstrapFor` ignores `viewerId` |
+    | 27.089 | the rig keeps its restated `bootstrapTicket` |
+
+  Push. DONE.
+
+---
+
 ### Task 5: The Links section, desktop and phone (cases 27.065–27.079)
 
 **Lane prompt names `frontend-design`.**
@@ -1913,7 +2326,7 @@ The permission gate is symmetric (both ends visible), so filing on the other str
 | §2.3 rules 1–5 | T3 engine + precheck |
 | §2.3 rules 6–7 | T3 permission (7 collapses to "both visible"; see the gaps) |
 | §2.3 refusal text house shape | T4 27.057 |
-| §2.4 visibility | T4 27.050–27.053, 27.058–27.059 |
+| §2.4 visibility | T4 27.050–27.053, 27.058–27.059; T4b 27.080–27.090 (event history, stream, bootstrap, contests, replica) |
 | §2.5 table, order after proj_tickets | T2 |
 | §2.5 trash keeps, purge erases | T2 27.022–27.025 |
 | §2.6 vocabulary.ts | T1 |
@@ -1953,12 +2366,12 @@ No TBD remains.
 - `checkTicketLink`, `linkExistsRefusal`;
 - `LINK_TARGET_NOT_VISIBLE_REASON`, `ticketLinksProjection`, `payloadIds`, `redactedPayload`.
 
-**4. Review focus.** Each line has its case in the owning task: 27.042/27.056/27.069; 27.050–27.053/27.058/27.059; 27.023–27.025; 27.067; 27.068.
+**4. Review focus.** Each line has its case in the owning task: 27.042/27.056/27.069; 27.050–27.053/27.058/27.059 and T4b's 27.081/27.083–27.087/27.089; 27.023–27.025; 27.067; 27.068.
 
 ## Execution handoff
 
 Execution follows the gisik orchestration: the orchestrator dispatches each task to a lane as one fresh session, with reviewers and `ctl gate <sha> --base release/knowledge-graph`, landing into `release/knowledge-graph`.
-- **Order:** T1 → T2 → (T3 ∥ T4's read steps) → T4 MCP → T5.
+- **Order:** T1 → T2 → (T3 ∥ T4's read steps) → T4 MCP → (T5 ∥ T4b).
 - **Pointers:** T5 carries `NEEDS: browser` and names `frontend-design`.
 - **Reviewer focus:** the Review Focus lines.
 - I recommend **subagent-driven**: five tasks with hard interface hand-offs (T1's types feed everything, T2's column feeds T3's engine reads), and a shipped mistake here leaks a hidden ticket's existence.
@@ -1970,11 +2383,18 @@ typed-links	1	todo	-	-	not started (events, every census, opens Features §24 + 
 typed-links	2	todo	-	-	not started (waits for T1)
 typed-links	3	todo	-	-	not started (waits for T2)
 typed-links	4	todo	-	-	not started (waits for T2; MCP refusal case after T3)
+typed-links	4b	todo	-	-	not started (Needs TL3+TL4; rung H; at least Step 1 lands before release/knowledge-graph → main)
 typed-links	5	todo	-	-	not started (waits for T3 + T4)
 ```
 
 ## Planner rulings on the writer's findings (2026-10-03)
 
-- **Raw `targetId` on the sync stream, bootstrap and `/events`** (`tickets.ts:714`): accepted as a known limit, the same as `parentId` today. An id alone is not shown anywhere a viewer reads, and §2.4's rule (no row, no count) holds in every UI and MCP read. Closing the id leak for links AND parents together is a separate task, not this release.
+- **Raw `targetId` on the sync stream, bootstrap and `/events`** (`tickets.ts:714`): ~~accepted as a known limit~~ **superseded 2026-10-04: closed for links by Task 4b** (see below); the original text follows. Accepted as a known limit, the same as `parentId` today. An id alone is not shown anywhere a viewer reads, and §2.4's rule (no row, no count) holds in every UI and MCP read. Closing the id leak for links AND parents together is a separate task, not this release.
 - **The target's own History does not show the link** (`ticket-history.ts:300-307` reads one stream): accepted. Spec A §5.2 case 5 is narrowed to the source's History. The target shows the link in its Links section ("is blocked by").
 - **Every other writer decision stands:** dotted `link.*` refusal ids, `link.absent`, the rule-engine check, `link_tickets` taking `workspaceId`, Links above Subtasks (18.241a), and no bootstrap-backfill entry.
+
+## Planner rulings (2026-10-04): Task 4b
+
+- **Hidden link targets are withheld on every door that serves stored claims** (Task 4b, design D1, owner-approved): `/events`, the stream, both bootstraps, History's contests and `GET /v1/contests`. The event stays at its seq with `targetId: null`, so there is no gap and no oracle; `canSee` is the one predicate. `parentId` stays on the wire (the detail read serves a restricted parent's id).
+- **Q1 = (a).** Widening staleness is a recorded residual: offline Links miss a link whose target later becomes visible, until the next re-bootstrap. Online reads are correct. Owner: **TL4c widening refresh (post-KG-release)**.
+- **Q2 = rewrite.** A viewer who cannot see a contested link claim's target gets `permission.visibility` with the generic sentence. "Never cut a claim" holds: the claim is not cut, only its cause is withheld per viewer.
