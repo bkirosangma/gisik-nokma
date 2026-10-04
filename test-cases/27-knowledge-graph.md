@@ -88,6 +88,7 @@ Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpow
 - ✅ **27.123 — a purge starts while the boot backfill holds a survivor's entity lock and the survivor already has a row to the purged item: both complete, the backfill's rows equal a rebuild, no 40P01 escapes (FIX 1, F2: the purge takes every survivor's lock BEFORE it erases rows, so it never waits for a lock while holding rows the backfill's DELETE needs; the test drives the real `purgeItem`);** control: the same backfill run with no purge. Mutation: `lockSurvivors` after `eraseRows` (deadlock detected). (`apps/server/test/purge/purge-references.test.ts`)
 - 27.124 reserved, unused (T1).
 <!-- KG-B T2 -->
+- ✅ **27.125 — the "Linked from" wire helpers: a source title per kind (`GN-118 Phone pass`, `Note: Phone pass rulings`, `Comment on GN-118`, `Comment on note Rulings`), a ticket with no key falls back to its title; `splitSnippet` takes the first `[[` and the first `]]` AFTER it, null without both (control: a plain marker splits); `parseLinkedFromTarget` takes `ticket:` / `note:` + a ULID, anything else is null.** (`packages/domain/test/linked-from.test.ts`)
 <!-- KG-B T3 -->
 <!-- KG-B T4 -->
 
