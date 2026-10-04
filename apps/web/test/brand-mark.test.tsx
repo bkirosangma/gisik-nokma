@@ -7,7 +7,7 @@ import { BrandMark } from '../src/brand-mark.js';
  * "make it the favico[n]" and "put it on the nav bar"). Extracted verbatim from
  * `app/sign-in/page.tsx`'s `.gn-page-header__icon` tile — the folder outline plus
  * ITS TWO CROSSBARS, three `<path>` elements in total, not one. The favicon
- * (13.1473) and the nav brand tile (13.1474–13.1475) both render this component
+ * (13.1473) and the nav brand (13.1474; a link to `/` since spec E, 27.620) both render this component
  * rather than a second copy of the markup, so the three cannot drift apart.
  */
 describe('BrandMark', () => {

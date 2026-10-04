@@ -597,6 +597,7 @@ typed-links	1	todo	-	-	not started (events, every census, opens Features §24 + 
 typed-links	2	todo	-	-	not started (waits for T1)
 typed-links	3	todo	-	-	not started (waits for T2)
 typed-links	4	todo	-	-	not started (waits for T2; MCP refusal case after T3)
+typed-links	4b	todo	-	-	not started (Needs TL3+TL4; rung H; at least Step 1 lands before release/knowledge-graph → main)
 typed-links	5	todo	-	-	not started (waits for T3 + T4)
 reference-index	1	todo	-	-	not started (needs plan A T1 merged into release/knowledge-graph; stops at Step 11 if the floor run misses the bar)
 reference-index	2	todo	-	-	not started (waits for T1)

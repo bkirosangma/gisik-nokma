@@ -914,40 +914,88 @@
   - `packages/workflow-canvas-browser/tests/fullscreen.spec.ts`
 - Modify:
   - `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx` (the root `div`, the header, the layout)
-  - `packages/app-core/src/workflow-builder/ui/workflow-canvas.tsx` (accept `onEscape` priority via the ladder; corner Full screen button)
+  - `packages/app-core/src/workflow-builder/ui/workflow-canvas.tsx` (corner Full screen button; the drag keeps Task 1's own `useDragEscape` listener, unchanged) (planner ruling 2026-10-04 Q1)
+  - `packages/app-core/src/workflow-builder/ui/builder-panels.tsx` (`:21`: `const STACKED_QUERY` → `export const STACKED_QUERY`, the builder's existing narrow query, reused for the toolbar's fold) (planner ruling 2026-10-04 Q2)
+  - `packages/workflow-canvas-browser/harness/main.tsx` (`:23`: an opt-in FIXED draft id, so a reload reads the same storage key) (planner ruling 2026-10-04 Q3)
   - `packages/ui/src/ui.css` (`/* G-9: T5 fullscreen */`)
   - `docs/manual.md` (the workflow-builder section: one paragraph on Full screen and one on Add transition; run `check:help`)
   - `test-cases/25-smoothness.md` (`<!-- G-9 T5 -->`)
+  - `test-cases/21-mobile-web.md` (`:160`, 21.176: say its desktop-negative leg is OUTSIDE full screen) (planner ruling 2026-10-04 Q5)
   - `Features.md` §22 (the final G-9 bullet: drag, collisions, full screen, Add transition)
 
 **Interfaces:**
 - **Produces:**
-  - `useEscapeLadder(): { push(layer: { id: string; close: () => void }): () => void }`. The last pushed layer closes first. One window `keydown` listener lives in the screen.
+  - `useEscapeLadder(layers: { open: boolean; close: () => void }[])`, with the layers innermost first (`[panel, fullScreen]`). One `keydown` listener lives in the screen, on `window`, in the BUBBLE phase. On an `Escape` with `!event.defaultPrevented`, it closes the first open layer and calls `event.preventDefault()`. On a prevented `Escape` it does nothing. It never calls `stopPropagation()`. (planner ruling 2026-10-04 Q1: no capture-phase listener, and no push/pop stack.)
   - `FloatingPanel` props `{ open: boolean; tab: 'selection' | 'lists' | 'system' | 'issues'; onTab(t): void; onClose(): void; phone: boolean }`.
-- **Consumes:** `TidyControl`, `AddTransitionForm`, the existing panels; `cancelDrag` from Task 1 (the drag layer pushes itself onto the ladder on drag start).
+- **Consumes:** `TidyControl`, `AddTransitionForm`, the existing panels. The drag's Escape stays Task 1's `useDragEscape` (window capture plus `stopPropagation`, `use-working-nodes.ts:75-93`), so a drag-cancelling Escape never reaches the ladder. (planner ruling 2026-10-04 Q1)
 
 - [ ] **Step 1: Failing unit tests** (`fullscreen.test.tsx`, jsdom, which is fine for state, focus and the DOM)
+  Shared setup: render the full `WorkflowBuilderScreen` and `await findByRole('textbox', { name: 'Workflow name' })` first, as `phone-builder-hooks.test.tsx`'s `renderBuilder` does. `beforeEach`: `sessionStorage.clear()` and a `matchMedia` stub (`matches: false` unless a case says otherwise). jsdom applies no CSS, so the left column's `BuilderPanels` (with its inspectors and `IssuesPanel`) stays in the DOM in full screen: **scope every panel query `within(getByRole('region', { name: 'Workflow panel' }))`**, or the left column answers it.
+
   - **25.545:** clicking "Full screen" sets `data-fullscreen="true"` on `.workflow-builder-screen`, and focus moves to the toolbar's first control (the name field). "Exit full screen" clears it, and focus returns to the "Full screen" button.
+    - **Before:** `data-fullscreen="false"` and no `role` on the root (so the "on" leg cannot pass on an attribute that is always there).
+    - **On, from the header's button:** `data-fullscreen="true"`, `role="region"`, `aria-label="Workflow editor, full screen"`; the `Workflow name` textbox `toHaveFocus()` (`user.click` left focus on the button, so this leg needs the move).
+    - **Off:** "Exit full screen" → `data-fullscreen="false"`; the header's "Full screen" button (re-queried) `toHaveFocus()`.
+    - **Return goes to the button that entered:** enter again from the canvas corner's "Full screen" (the one inside `getByRole('region', { name: 'Canvas' })`), exit, and the CORNER button has focus, not the header's.
+
+    Kills: (a) drop the focus move to the toolbar's first control on entry; (b) restore focus to a fixed header-button ref instead of the button that entered (the corner leg); (c) `role` / `aria-label` left off the root in full screen.
   - **25.546:** the choice persists in `sessionStorage` under `<draftStorageKey>:fullscreen`. Remounting restores it. Control: a different draft key does not.
-  - **25.547:** the toolbar contains, in order: the name, Add state, Add transition, a zoom group, Tidy, Issues (with the error count from `validateWorkflowDef`), Publish, Exit full screen. A narrow width (mock `matchMedia('(max-width: 720px)')` true) moves zoom and Tidy into a "More" menu.
+    - Render with a FIXED `workspaceId` and ONE `initialDraft` object for every mount (not `newUlid()` per render, and not a fresh `draftFromTemplate`, which mints a new def id, `templates.ts:69`), or the remount reads another key and the restore leg is red for the wrong reason.
+    - **Restore:** enter, unmount, mount again with the same props → `data-fullscreen="true"` before any click.
+    - **Control:** mount with a different `workspaceId` (another draft key) → `data-fullscreen="false"`.
+    - **Exit is remembered too:** exit, unmount, mount with the first props → `data-fullscreen="false"`.
+
+    Kills: (a) initialise `fullscreen` to `false` instead of reading sessionStorage (restore leg); (b) store under a fixed key such as `'gn-workflow-fullscreen'` instead of `<draftStorageKey>:fullscreen` (control leg); (c) write only when turning on, never on exit (exit leg).
+  - **25.547:** the toolbar contains, in order: the name, Add state, Add transition, a zoom group, Tidy, Issues (with the error count from `validateWorkflowDef`), Publish, Exit full screen. A narrow width (mock `matchMedia` true for the exported `STACKED_QUERY`, `builder-panels.tsx:21`, `'(max-width: 64rem)'`; import the CONSTANT, never a literal) moves zoom and Tidy into a "More" menu; the Issues badge stays in the row, and folds into More only at phone width (`PHONE_BOARD_QUERY`, 25.554, spec §4.5). (planner ruling 2026-10-04 Q2)
+    - **Order (wide, every query `false`):** take the eight controls `within(.gn-wf-toolbar)` and assert each consecutive pair with `a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING`, so any one swap is red; there is no `More` button.
+    - **The count is the validator's:** mount two drafts whose `validateWorkflowDef(def).length` values `a` and `b` differ and are both > 0 (for example one and two extra `addState()` calls on the kanban store, then `select({ kind: 'none' })`, `getState()` as `initialDraft`); preconditions `expect(a).toBeGreaterThan(0)` and `expect(b).not.toBe(a)`; the badge's accessible name contains `String(a)`, then `String(b)`.
+    - **Narrow** (stub `matches: query === STACKED_QUERY`, the imported constant; `PHONE_BOARD_QUERY` stays false): `within(toolbar).queryByRole('button', { name: 'Tidy' })` is null and no zoom button is in the row; a `More` button is; after clicking it, the menu holds the zoom buttons and Tidy; the Issues badge IS still in the row. (planner ruling 2026-10-04 Q2)
+    - **Phone** (stub `matches` true for `STACKED_QUERY` and `PHONE_BOARD_QUERY`): the Issues badge is NOT in the row and IS in the opened More menu. (planner ruling 2026-10-04 Q2)
+
+    Kills: (a) swap Add state and Add transition in the toolbar; (b) the badge counts `adviseWorkflowDef` or a constant (count leg); (c) always fold into More (wide leg) / never fold (narrow leg); (d) fold Issues at `STACKED_QUERY` (narrow leg) / never fold Issues (phone leg). (planner ruling 2026-10-04 Q2)
   - **25.548:** the Escape ladder.
     - **Order:** with a rule editor's menu open inside the panel, in full screen: one Escape closes only the menu, the next closes the panel, the next exits full screen.
+      - Setup: select a transition, then click `Add rule` within the panel region. Precondition, all three present: `role="menu"` `Add rule`, the `Workflow panel` region, `data-fullscreen="true"`.
+      - Press with `user.keyboard('{Escape}')` at the focused element, never `fireEvent.keyDown(window, …)`: a window-dispatched event never reaches React's own `onKeyDown` handlers (`add-rule-menu.tsx:46-54`), so it tests a path the user does not take.
+      - The real order is innermost first, each layer handling its own key (planner ruling 2026-10-04 Q1): press 1 is `AddRuleMenu`'s own handler (`add-rule-menu.tsx:48-53`, which already calls `preventDefault()` and `stopPropagation()`, so it needs no edit); presses 2 and 3 are the ladder, the panel and then full screen.
+      - After press 1: the menu is gone, the region is present, `"true"`. After press 2: the region is gone, `"true"`. After press 3: `"false"`.
+      - **Consumed:** a `window` bubble-phase spy, added AFTER the screen mounts (so it runs after the ladder's listener), records `event.defaultPrevented` for each Escape that reaches it. After presses 1–3 and a 4th press with nothing open, the record is exactly `[true, true, false]`. Press 1 never reaches it (the menu stops it); presses 2 and 3 arrive prevented by the ladder; the 4th arrives unprevented. This proves the spy is wired, and that a ladder with nothing open leaves the key alone. (planner ruling 2026-10-04 Q1)
+    - **A prevented Escape is ignored** (the `Dialog` path: `dialog.tsx:71-114` closes on a `document` capture listener and calls `preventDefault()` without `stopPropagation()`, so its Escape reaches the ladder prevented): in full screen with the panel open, dispatch `const e = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }); e.preventDefault(); document.body.dispatchEvent(e)`. The region is still present and `"true"`. (planner ruling 2026-10-04 Q1)
+    - **A Popover closes alone** (the `Popover` path: react-aria's `useOverlay` Escape shortcut returns `undefined`, so `createKeyboardShortcutHandler` calls `preventDefault()` and does not continue propagation, `react-aria@3.52.1` `dist/private/interactions/createKeyboardShortcutHandler.mjs:110-119`): in full screen with the panel open, open the toolbar's Add transition popover and press Escape. The popover is gone, the region is present, `"true"`. (planner ruling 2026-10-04 Q1)
     - **Control:** with nothing open, a single Escape exits full screen.
+
+    Kills: (a) the ladder lists `[fullScreen, panel]` (outermost first: press 2 exits full screen with the panel up); (b) drop the `!event.defaultPrevented` guard (the prevented-press leg); (c) drop the ladder's `preventDefault()` (the spy record reads `[false, false, false]`); (d) full screen left out of the ladder (the control). (planner ruling 2026-10-04 Q1)
   - **25.549:**
     - **opens on selection:** selecting a state opens the panel on the Selection tab with `StateInspector`; selecting a transition shows `TransitionInspector` (rules);
+      - Precondition, in full screen before any selection: no `Workflow panel` region (the template draft's selection is `none`, `draft-store.ts:75`).
+      - Click `findByTestId('state-node-doing')`. Within the region: the Selection tab is the current one (`aria-selected="true"` if the shared tab component is used, `aria-pressed="true"` otherwise), and the other three tabs are not; the `State name` textbox has the value `Doing`.
+      - Select a transition (its Transitions row). Within the region: the heading `From <from name> to <to name>` of THAT transition (`transition-inspector.tsx:18`).
     - **the Issues badge** opens the Issues tab;
+      - After × has closed the panel: the badge brings the region back with the Issues tab current, and `IssuesPanel`'s text inside the region.
     - **× closes it.**
+      - × within the region: the region is gone.
+    - **Both widths (spec §4.3):** the legs above run on the desktop stub (every query false). Repeat the canvas click with `PHONE_BOARD_QUERY` true: the region opens there too. One subscription serves both. (planner ruling 2026-10-04 Q5)
+    - **Control:** outside full screen, the same canvas click renders no `Workflow panel` region (Step 3's rule: the drawer stays as it is). On the desktop stub, the drawer's `aside` keeps `data-open="false"`; this is 21.176's leg, which stays valid because it is outside full screen. (planner ruling 2026-10-04 Q5)
+
+    Kills: (a) the panel open by default (precondition); (b) the Selection tab renders `StateInspector` for the first state rather than the selected one (`Doing`); (c) the badge opens the panel on the Selection tab; (d) `FloatingPanel` rendered outside full screen (control); (e) keep the `matchMedia(PHONE_BOARD_QUERY)` condition (`workflow-builder-screen.tsx:129`) on the full-screen arm too, so the floating panel opens on selection only on a phone (the desktop legs). (planner ruling 2026-10-04 Q5)
   - **25.550:** the panel is a `role="region"` labelled `Workflow panel`, not `dialog`. While it is open, the canvas section stays in the tab order (no `inert` / `aria-hidden` on it).
+    - Same `it`: open the panel first (select a state), with the precondition that the region is present; otherwise every leg below passes against a closed panel.
+    - `getByRole('region', { name: 'Workflow panel' })` is an `ASIDE` with no `aria-modal`; `queryByRole('dialog', { name: 'Workflow panel' })` is null.
+    - `getByRole('region', { name: 'Canvas' }).closest('[inert], [aria-hidden="true"]')` is null. This checks the section AND its ancestors: `inert` on the layout wrapper hides the canvas too. (jsdom does not implement `inert` for focus, so a `.focus()` leg would prove nothing.)
+
+    Kills: (a) `role="dialog"` on the panel; (b) `inert` on the canvas section while the panel is open; (c) `aria-hidden="true"` on `.workflow-builder-screen__layout` while the panel is open.
 
   Run. Expected: FAIL.
 
 - [ ] **Step 2: Implement the ladder, full screen and the toolbar**
-  - **`use-escape-ladder.ts`:** a ref'd stack. One `keydown` listener on `window` in capture phase; on `Escape`, if the stack is non-empty, call the top's `close()`, `stopPropagation()` and `preventDefault()`.
-  - **What pushes onto the ladder:**
-    - the drag, while dragging (Task 1's Escape listener moves here: `push({ id: 'drag', close: cancel })` on drag start, popped on stop);
-    - any open menu, popover or dialog in the builder: `AddTransitionForm`, the More menu, `AddRuleMenu` (wrap it at its call site in the panel; do not edit the component), and the `StateMappingDialog` (same);
-    - the panel, when open;
-    - full screen, when on.
+  - **`use-escape-ladder.ts`** (planner ruling 2026-10-04 Q1): one `keydown` listener on `window` in the BUBBLE phase, reading the layers from a ref (innermost first: `[panel, fullScreen]`). On `Escape` with `!event.defaultPrevented`, close the first open layer and call `preventDefault()`. Never `stopPropagation()`. A prevented Escape is left alone.
+  - **Each inner layer handles its own Escape and marks it handled** (planner ruling 2026-10-04 Q1). Nothing is wrapped at the panel.
+    - **The drag:** Task 1's `useDragEscape` stays as it is (window capture plus `stopPropagation`, `use-working-nodes.ts:75-93`), so the ladder never sees a drag's Escape.
+    - **`AddRuleMenu`:** its handler already calls `preventDefault()` and `stopPropagation()` (`add-rule-menu.tsx:48-53`). No edit is needed; the one-line edit the ruling allows is not required on the ref.
+    - **`Popover`** (`AddTransitionForm`, the More menu): react-aria's `useOverlay` Escape calls `preventDefault()` and stops propagation (`react-aria@3.52.1` `dist/private/interactions/createKeyboardShortcutHandler.mjs:110-119`).
+    - **`Dialog`** (`StateMappingDialog`): closes on a `document` capture listener and calls `preventDefault()` without stopping the event (`packages/ui/src/components/dialog.tsx:71-114`). It reaches the ladder prevented, and the guard ignores it.
+    - **The ladder's own layers:** the panel when open, then full screen when on.
+  - **The More menu** (planner ruling 2026-10-04 Q6): there is no shared `Menu` component (`packages/ui/src/components` has `dialog`, `popover`, `segmented-control`, … and no menu; spec §4.2's "the shared `Menu`" names nothing real). Build it as the existing `Popover` (`@gisik-nokma/ui`) holding a `role="menu"` list of `role="menuitem"` buttons, following `AddRuleMenu`'s pattern (`add-rule-menu.tsx:46-110`: trigger `aria-expanded`, a named `role="menu"`, arrow-key stepping).
   - **Full screen:**
     - **state:** in `WorkflowBuilderScreen`, `fullscreen` state (initialised from sessionStorage) on the root `div`: `data-fullscreen={fullscreen ? 'true' : 'false'}` and `role={fullscreen ? 'region' : undefined}` with `aria-label="Workflow editor, full screen"`;
     - **header:** when on, the header renders the floating toolbar instead of the title row; when off, as today plus a "Full screen" button;
@@ -972,6 +1020,8 @@
     - **System rules:** `<SystemRulesPanel />`;
     - **Issues:** `<IssuesPanel />`.
   - **`phone` true:** the same content in a bottom sheet (fixed bottom, max-height 70vh, rounded top). Reuse the existing phone-drawer open-on-selection subscription in the screen, by moving it into `FloatingPanel`'s parent logic; do not duplicate it.
+    - (planner ruling 2026-10-04 Q5, spec §4.3 wins) The one subscription (`workflow-builder-screen.tsx:126-131`) gains a full-screen arm. On a new non-`none` selection: in full screen, open the floating panel on the Selection tab at EVERY width; outside full screen, keep today's phone-only `setPanelsOpen(true)` (`:129`).
+    - 21.176's desktop-negative leg (`test-cases/21-mobile-web.md:160`, `phone-builder-hooks.test.tsx`) runs outside full screen, so it stays as it is. T5 adds to that catalogue line that in full screen the floating panel opens at both widths (25.549). This is so the two lines do not read as contradicting each other.
   - **The rule:** in full screen the floating panel replaces the drawer. Outside full screen the existing drawer stays exactly as it is.
 
   Run the unit tests. Expected: PASS 25.545–25.550.
@@ -981,23 +1031,62 @@
 - [ ] **Step 4: Browser cases** (`fullscreen.spec.ts`)
   - **25.551:** desktop.
     - **Covers the window:** enter full screen; the screen's bounding box equals the viewport (0, 0, w, h).
+      - Precondition: before entering, the box is NOT (0, 0, w, h). The harness `body` keeps its default 8 px margin (`harness/index.html`); if a later harness change makes the normal layout cover the window too, this leg proves nothing.
+    - **Carries over (spec §4.1, no re-fit):** the `.react-flow__viewport` `transform` read just before entering equals the one read just after (±0.5 px on translate).
     - **Every toolbar control works:**
+      - (Each one is clicked inside `.gn-wf-toolbar` and has its own observable.)
       - rename via the name field;
+        - The draft in sessionStorage has `def.name` equal to the typed text.
       - Add state adds a node;
+        - `.react-flow__node` count is exactly +1.
       - Add transition adds an edge;
+        - Use a pair that does not exist yet; `.react-flow__edge` count is exactly +1.
       - zoom in changes the viewport scale;
+        - The `scale(...)` in `.react-flow__viewport`'s transform is strictly greater.
       - Tidy;
+        - First drag two states onto each other with `dragBy`. After Tidy, "Undo tidy" is visible and no two `.react-flow__node` boxes overlap (25.541's check).
       - the Issues badge opens the Issues tab;
+        - The Issues tab is current and `IssuesPanel`'s text is inside the `Workflow panel` region.
       - Publish opens its flow (the fake gateway accepts);
+        - The banner reads `Version 1 published.` (`publish-controls.tsx:296`; a template draft has `base === null`).
       - Exit restores the normal layout.
+        - `data-fullscreen="false"`, and the box equals the precondition's box (±1).
+
+    Kills: (a) drop `inset: 0` (or `position: fixed`) from the T5 CSS block (cover leg); (b) key the layout on `fullscreen` (`<div key={String(fullscreen)}>`), so the canvas remounts and re-fits (carries-over leg); (c) the toolbar's Tidy wired to nothing (the Undo tidy leg); (d) the badge opens the Selection tab.
   - **25.552:** read-only (`?role=member` or whatever role `canAuthorRole` refuses; read it). Full screen is available, and there is no Add state, Add transition or Tidy.
+    - `canAuthorRole` is `owner || admin` (`builder-context.tsx:20-22`), so `openHarness(page, { role: 'member' })` works.
+    - **Control first, same `it`:** with `openHarness(page)` (owner) in full screen, `Add state`, `Add transition` and `Tidy` each count ≥ 1, which proves the locators.
+    - **Member:** the "Full screen" button exists and clicking it gives `data-fullscreen="true"`. The three locators each count 0 on the whole page: the toolbar, the canvas corner and (when present) the opened More menu.
+
+    Kills: (a) render the Full screen buttons only when `canAuthor`; (b) the toolbar or More menu mounts its own "Tidy" `Button` instead of `TidyControl` (whose guard is `tidy-control.tsx:121`) without a `canAuthor` check.
   - **25.553:** a drag inside full screen works live (25.500's assertion, re-run in full screen).
+    - Assert before `mouse.up()`: the box moved 192–204 px, and `edgePath(page, 0)` changed (`drag.spec.ts:26-35`).
+
+    Kills: (a) a full-screen CSS rule that puts `transform` or `zoom` on `.workflow-builder-screen[data-fullscreen="true"]` (the box no longer tracks the pointer 1:1). Otherwise this guards existing behaviour (T1's live drag).
   - **25.554:** phone 390×844 with `hasTouch`.
     - **Toolbar:** it shows name, Add state, Add transition, Publish, More and Exit.
+      - Exactly these are visible in `.gn-wf-toolbar`. Tidy, the zoom buttons and the Issues badge are not visible in the row.
+      - After tapping More, the opened menu holds the zoom buttons, Tidy and the Issues badge (Issues folds at phone width only, matching 25.547). (planner ruling 2026-10-04 Q2)
     - **Bottom sheet:** a tap on a state opens it with the Selection tab.
+      - The `Workflow panel` region's box: its bottom is 844 (±1) and its width is 390 (±1), not the 280–480 aside. Its height is ≤ 0.7 × 844 + 1. The tapped state's `State name` value is inside it.
     - **Touch drag:** a touch drag (`page.touchscreen` cannot drag; use `page.dispatchEvent` pointer events with `pointerType: 'touch'`, or `locator.dispatchEvent('pointerdown'…)` sequences, checking React Flow's handler first) moves the state live.
+      - Assert before `pointerup`: the box moved by the dragged distance ±6, and `edgePath(page, 0)` changed.
+
+    Kills: (a) the phone sheet replaced by the desktop aside (width leg); (b) the phone arm does not fold (Tidy visible in the row); (c) the sheet does not open on selection on a phone (the open-on-selection logic not reached under `phone`); (d) Issues not folded at `PHONE_BOARD_QUERY` (the Issues badge stays in the row) (planner ruling 2026-10-04 Q2). The touch-drag leg guards existing behaviour (T1 drag under `pointerType: 'touch'`).
   - **25.555:** the Escape ladder in the real browser: open the More menu, press Escape (only the menu closes), Escape (the panel closes), Escape (full screen exits).
+    - The More menu exists only at narrow widths (25.547), so run at a viewport that `STACKED_QUERY` (64rem) matches and `PHONE_BOARD_QUERY` (40rem) does not (for example 700×800). (planner ruling 2026-10-04 Q2)
+    - Open the panel first by clicking a state; precondition: the menu, the region and `data-fullscreen="true"` are all present.
+    - After each press, assert the layers that must remain are still there. After press 1: the region and `"true"`. After press 2: `"true"`.
+
+    Kills (planner ruling 2026-10-04 Q1): (a) the ladder lists `[fullScreen, panel]` (press 2 exits full screen with the panel up); (b) the More menu built as a bare list without the `Popover` (no Escape handler of its own: press 1 reaches the ladder unprevented, the panel closes and the menu stays); (c) drop the ladder's `!event.defaultPrevented` guard (press 1 closes the menu AND the panel).
   - **25.556:** a reload in the same tab keeps full screen on (sessionStorage).
+    - ⚠ The harness mints a fresh def id on every load (`harness/main.tsx:23` → `draftFromTemplate` → `cloneTemplate`'s `newUlid()`, `templates.ts:69`). The screen keys on that id (`workflow-builder-screen.tsx:81`), so as the harness stands, a reload reads a different key and this case cannot pass. See the report's QUESTIONS; the harness needs a stable draft id first.
+    - **Harness change, T5** (planner ruling 2026-10-04 Q3): `harness/main.tsx` declares `const HARNESS_DRAFT_ID = 'harness-draft'`. With `?stableDraft=1` it uses `{ ...draft, def: { ...draft.def, id: HARNESS_DRAFT_ID } }` as `initialDraft`; without it, it keeps today's fresh id.
+      - It is OPT-IN because an unconditional fixed id would make every second `openHarness` in one test restore the first one's stored draft (E5-41, `workflow-builder-screen.tsx:94-96`). That breaks `collision.spec.ts:285` (25.526, re-opens expecting the seeded layout) and `tidy-transition.spec.ts:65` (25.541, "from a fresh seeded layout", whose control asserts the seeded overlap).
+      - 25.556 opens `/?stableDraft=1&…` and `page.reload()` keeps the query.
+    - **Control, same `it`:** exit, reload, and full screen is off.
+
+    Kills: (a) initialise from `false` instead of sessionStorage; (b) exit not written (control); (c) the harness ignores `stableDraft` and mints a fresh id on each load (the reload leg reads another key) (planner ruling 2026-10-04 Q3).
 
   Run. Expected: PASS.
 
@@ -1012,13 +1101,27 @@
     |---|---|
     | 25.545 | focus not moved |
     | 25.546 | storage key not read |
-    | 25.548 | ladder pops the bottom instead of the top |
+    | 25.548 | the ladder's layers listed outermost first (`[fullScreen, panel]`); the `!event.defaultPrevented` guard dropped (planner ruling 2026-10-04 Q1) |
     | 25.550 | `role="dialog"` |
-    | 25.552 | the `canAuthor` guard removed from the toolbar |
+    | 25.552 | the Full screen buttons rendered only when `canAuthor`; the toolbar or More menu mounting its own "Tidy" `Button` instead of `TidyControl` without a `canAuthor` check (planner ruling 2026-10-04 Q4) |
     | 25.554 | phone sheet replaced by the desktop aside |
 
   - 25.557–25.559 are reserved and unused.
   - Sweeps (`ui.css` ⇒ ui + app-core + web WHOLE), checks, the browser suite.
+
+  **Prose to sweep:** this task makes these lines false. All were read on `origin/release/knowledge-graph`.
+  - `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:104-106`: the column "is a bottom sheet opened from the "Panels" button. Above 40rem … this state paints nothing". In full screen the floating panel and the phone sheet replace it.
+  - `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:122-125`: "a NEW selection opens the sheet … above 40rem the column is always on screen". The subscription moves (Step 3), and in full screen the column is `display: none` at every width.
+  - `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:216-222`: "The prototype's header is one row carrying the title on the left and the actions on the right". In full screen the header renders the floating toolbar instead.
+  - `Features.md:3709`: "Not yet: Tidy, Add transition and full screen (G-9 T4, T5; T5's final G-9 bullet absorbs this one)". It is already stale for Tidy and Add transition (`Features.md:3732`), and false after T5.
+  - `Features.md:3731`: the `<!-- G-9 bullet -->` placeholder (Step 5 replaces it).
+  - `Features.md:2738`: "the right-hand inspector rail (… the "Select a state or a transition…" hint) is gone". The floating panel is a right-hand panel again, carrying `Select a state or a transition` (Step 3).
+  - `Features.md:3618`: "the States / Transitions / System rules / Issues column becomes a bottom sheet opened by a **Panels** button (… above 40rem the column is always on screen …)". In full screen the floating panel or sheet replaces the column.
+  - `docs/manual.md:1436-1444`: "The left-hand column lists everything … On a wide screen the column stays beside the canvas". This is false in full screen. Qualify it next to the new Full screen paragraph.
+  - `test-cases/25-smoothness.md:359`: the `<!-- G-9 T5 -->` marker; the 25.545–25.556 lines go under it.
+  - `test-cases/21-mobile-web.md:160`: 21.176, "with the window above 40rem a canvas selection leaves `panelsOpen` false". This stays true outside full screen, but in full screen the floating panel opens at both widths (25.549). Qualify the line. (planner ruling 2026-10-04 Q5)
+  - `docs/superpowers/specs/2026-10-03-workflow-canvas-design.md:127`: "fold into a **More** menu (the shared `Menu`)". There is no shared `Menu`; the More menu is a `Popover` and a `role="menu"` list. (planner ruling 2026-10-04 Q6)
+  - (Checked, still true under ruling Q1, so NOT listed: `use-working-nodes.ts:71-73`, where the drag keeps its own capture listener; and `add-rule-menu.tsx:39-45`, where the menu still consumes its own Escape.)
 
   Push. DONE + REVIEW (`NEEDS: browser`, desktop + 390 px).
 

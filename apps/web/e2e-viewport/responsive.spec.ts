@@ -1614,23 +1614,33 @@ for (const route of UNAUTHED_ROUTES) {
 }
 
 /**
- * `/` — a redirect assertion and nothing more.
- *
- * `app/page.tsx` is four lines whose entire body is `redirect('/workspaces')`.
- * Measured: `GET /` answers 307 with `Location: /workspaces`. `/workspaces` is
- * one of the thirteen routes that need an authed stack, so this test asserts
- * where `/` GOES and stops. Measuring `/workspaces`'s unauthenticated layout and
- * filing the numbers under `/` would be reporting coverage this suite does not
- * have.
+ * `/` — Home since Knowledge Graph spec E (27.629). This suite has no API and no session, so the page renders its
+ * frame (the nav, the h1) and then sends the signed-out reader to `/sign-in?next=/` (27.626) — measured on all four
+ * projects: Enter on the brand passes through `/` and settles there. What is asserted is that `/` is no longer a
+ * redirect to `/workspaces`, and that the brand is the keyboard's way to `/` from a signed-out page: the settled
+ * `next` must be exactly `/`, since ANY signed-out target bounces to `/sign-in` (a brand pointing at `/workspaces`
+ * settles on `next=/workspaces`).
  */
-test('/ redirects to /workspaces and renders no layout of its own', async ({ page }, testInfo) => {
+test('27.629 / renders Home (no redirect), and the brand reached by Tab + Enter from /help lands on /', async ({ page }, testInfo) => {
   const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
-  expect(response, 'no response for /').toBeTruthy();
-  expect(new URL(page.url()).pathname).toBe('/workspaces');
-  // The viewport gate still runs — a redirect measured at the wrong width would
-  // be just as untrustworthy, and this proves the gate is reachable on a route
-  // that renders no `.gn-shell` of its own.
+  expect(response?.status()).toBe(200);
+  expect(new URL(page.url()).pathname).not.toBe('/workspaces');
   await assertViewportTookEffect(page, testInfo);
+  await page.goto('/help', { waitUntil: 'networkidle' });
+  const brand = page.getByRole('link', { name: 'Gisik Nokma, Home' });
+  await expect(brand).toBeVisible();
+  // The skip link (`SkipLink`) is the first stop; the brand must follow within three presses.
+  let focused = false;
+  for (let presses = 0; presses < 3 && !focused; presses += 1) {
+    await page.keyboard.press('Tab');
+    focused = await brand.evaluate((el) => el === document.activeElement);
+  }
+  await expect(brand).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.waitForURL((url) => url.pathname === '/sign-in');
+  const landed = new URL(page.url());
+  expect(landed.pathname).toBe('/sign-in');
+  expect(landed.searchParams.get('next')).toBe('/');
 });
 
 /**
