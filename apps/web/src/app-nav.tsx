@@ -292,11 +292,9 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           what mirrors `.gn-shell`'s max-width/centring, so the bar's content
           still lines up with the page content beneath it. */}
       <div className="gn-nav__inner">
-      {/* The brand group (owner request 2026-09-23, widened 2026-09-24 to a
-          tile + wordmark — `NavBrand`, shared with `LegalNav`): decorative
-          furniture, NOT a control — no link, no button, no tabindex —
-          rendered whether or not a session exists, which is why it sits
-          here rather than inside `.gn-nav__links` (gated content below). */}
+      {/* The brand group (`NavBrand`): a link to Home (`/`, Knowledge Graph spec E, 27.620), rendered whether or
+          not a session exists — which is why it sits here rather than inside `.gn-nav__links` (gated content
+          below). */}
       <NavBrand />
       {/* Everything that may need a second (or third) line at a narrow
           viewport — the destination links and the scope note. Sign-out is

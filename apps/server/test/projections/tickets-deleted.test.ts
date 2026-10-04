@@ -201,6 +201,7 @@ describe('proj_tickets carries deleted_at / deleted_by, and restore clears them'
       draft_author_id: null,
       draft_at: null,
       draft_discarded: null,
+      links: [],
     };
     expect(rowToTicketState(shaped).deleted).toBeNull();
     // The positive control through the same call: set the second column and the
