@@ -73,7 +73,7 @@ export type LastWorkspace =
  *
  * Keyed by user, for the same reason the stored record is: a cache that
  * outlived a sign-out would hand the next person the previous one's workspace,
- * bypassing the guard in `readFor` entirely by never reaching it.
+ * bypassing the guard in `readLastWorkspace` entirely by never reaching it.
  */
 let cache: { userId: string; value: LastWorkspace } | null = null;
 
@@ -103,7 +103,7 @@ export function useLastWorkspace(
     }
 
     // THE VIEWER CHANGED. Both module caches hold what the PREVIOUS person was
-    // served, and neither is reached through `readFor`'s user guard — the
+    // served, and neither is reached through `readLastWorkspace`'s user guard — the
     // remembered-workspace cache is checked before it, and the name cache is
     // keyed by workspace id alone. So they are dropped here, at the one place
     // in the shell that observes the identity changing.
@@ -139,14 +139,17 @@ export function useLastWorkspace(
       return;
     }
 
-    remember(readFor(userId));
+    remember(readLastWorkspace(userId));
   }, [routeWorkspaceId, userId]);
 
   return remembered;
 }
 
-/** Every failure answers `none`: an unreadable memory is no memory. */
-function readFor(userId: string): LastWorkspace {
+/**
+ * Every failure answers `none`: an unreadable memory is no memory. Exported for Home (`src/home/home-screen.tsx`),
+ * which reads it synchronously for the user who is signed in NOW (27.628).
+ */
+export function readLastWorkspace(userId: string): LastWorkspace {
   let raw: string | null;
   try {
     raw = window.localStorage.getItem(LAST_WORKSPACE_KEY);

@@ -114,6 +114,8 @@ describe('proj_entity_heads', () => {
       // whose rows it reads inside the same transaction, and still ABOVE
       // proj_memberships.
       'proj_rollups',
+      // Typed links T2, directly under the proj_tickets/proj_rollups pair. See test/projection-order.test.ts.
+      'proj_ticket_links',
       'proj_memberships',
       // Plan 4 Task 14, §8 amended to slot it directly after proj_memberships,
       // so it too INSERTS rather than appends. This copy of the pin is exactly

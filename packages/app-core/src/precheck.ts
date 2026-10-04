@@ -6,6 +6,7 @@ import {
   statesWithBacklog,
   ticketClosedPayload,
   ticketCreatedPayload,
+  ticketLinkAddedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
@@ -183,6 +184,9 @@ export async function precheckEvent(
   if (submitted.type === 'ticket.closed') return precheckTicketClosed(submitted, cache);
   if (submitted.type === 'ticket.reopened') return precheckTicketReopened(submitted, cache);
   if (submitted.type === 'ticket.ranked') return precheckTicketRanked(submitted, cache);
+  if (submitted.type === 'ticket.link_added' || submitted.type === 'ticket.link_removed') {
+    return precheckTicketLink(submitted, cache, deps);
+  }
 
   // Every other type: the shared engine has no case for it, so an accept from
   // it would mean only "this engine had nothing to say", which is not a
@@ -332,10 +336,11 @@ export function contextFromCache(cache: ClientStateCache, overlay?: PendingOverl
     // A throw rather than `null`, and the server's counter-example does not
     // transfer: `apps/server/src/engine-context.ts` answers `null` because it
     // is LIVE and a throw would turn an ingest into a 500. No live path here
-    // can reach this. `precheckEvent` routes only `ticket.transitioned` to this
-    // context, and `getTicketTypeDef` is reached only from the hierarchy and
-    // field checks — `ticket.created`, `ticket.reparented`, `ticket.field_set`
-    // — none of which is on the transitioned path.
+    // can reach this. `precheckEvent` routes `ticket.transitioned` and the two
+    // typed-link events (`precheckTicketLink`) to this context, and
+    // `getTicketTypeDef` is reached only from the hierarchy and field checks —
+    // `ticket.created`, `ticket.reparented`, `ticket.field_set` — none of
+    // which is on either path (`checks/links.ts` reads only `getEntityState`).
     //
     // THE ABSENCES, enumerated rather than called partial. None is this plan's:
     //  1. `ClientStateCache` has no ticket-type store, and nothing feeds it
@@ -571,6 +576,31 @@ function precheckTicketRanked(submitted: SubmittedEvent, cache: ClientStateCache
     };
   }
   return { kind: 'passed' };
+}
+
+/**
+ * Typed links (spec A): the SHARED engine, on the cache, and nothing typed
+ * twice. Unlike `precheckTicketRanked`, there is no second literal to agree
+ * with, because every reason is the engine's own (`checks/links.ts`). The
+ * guard is the cache: both tickets must be held, or "I have never heard of
+ * it" would read as `link.unknown-target`. The online detail read's `links`
+ * is filtered (typed-links T4); the event history, the stream and bootstrap
+ * serve a hidden target withheld (`targetId: null`, typed-links T4b), which
+ * the cache folds to nothing. So the cache holds only links whose both ends
+ * this viewer sees, and the rules compare only the pair.
+ *
+ * A removal needs only the SOURCE: `link.absent` is decided from the links
+ * the source holds, and the engine never reads the target on that path.
+ */
+async function precheckTicketLink(submitted: SubmittedEvent, cache: ClientStateCache, deps: PrecheckDeps): Promise<PrecheckResult> {
+  const parsed = ticketLinkAddedPayload.safeParse(submitted.payload);
+  if (!parsed.success) return notEvaluated();
+  if (cache.getTicket(submitted.entity.id) === undefined) return notEvaluated();
+  if (submitted.type === 'ticket.link_added' && parsed.data.targetId !== submitted.entity.id
+      && cache.getTicket(parsed.data.targetId) === undefined) return notEvaluated();
+  const evaluate = deps.evaluate ?? evaluateEvent;
+  const verdict = await evaluate(completeForPrecheck(submitted, deps.now), contextFromCache(cache));
+  return verdict.refused ? { kind: 'refused', rule: verdict.rule, reason: verdict.reason } : { kind: 'passed' };
 }
 
 /**
