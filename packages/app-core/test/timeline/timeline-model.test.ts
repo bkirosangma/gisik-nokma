@@ -377,6 +377,19 @@ describe('29.094 the chart has no window: a dated ticket is never elsewhere', ()
     expect([none.firstDay, none.lastDay]).toEqual([null, null]);
   });
 
+  it('29.094 the extent is the min / max over EVERY lane: the earliest bar sits in the last lane visited ("No epic" sorts last), and it still sets firstDay; the latest end sits in the first lane and sets lastDay', () => {
+    const epic = ticket({ id: 'epic94', typeId: 'epic', fields: { title: claimField('Alpha') } });
+    const inEpic = ticket({
+      parentId: 'epic94',
+      fields: { title: claimField('In epic'), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField({ date: '2026-09-28' }) },
+    });
+    const m = model([epic, inEpic, dated('2025-03-03', '2025-03-07', 'Loose and early')]);
+    // control: the lane order this leg depends on
+    expect(m.groups.map((group) => group.epicTitle)).toEqual(['Alpha', 'No epic']);
+    expect(m.firstDay).toBe(dayNumberOf('2025-03-03'));
+    expect(m.lastDay).toBe(dayNumberOf('2026-09-28'));
+  });
+
   it('29.094 a custom date claim neither extends a row nor adds one', () => {
     const stretch = ticket(
       {

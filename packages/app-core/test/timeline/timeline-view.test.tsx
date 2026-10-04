@@ -278,6 +278,9 @@ describe('29.099 there are no pages: no Earlier / Later, a Today button, a zoom 
     expect(periodAt(mon + 8)?.textContent).toBe('Sep 2026');
     expect(periodAt(mon + 8)).toHaveClass('gn-timeline__axis-label--month');
     expect(periodAt(mon + 9)).toBeUndefined();
+    // The surface starts on a Monday: the stylesheet's weekend tile is seven days wide and tints days 5-6 of each tile from
+    // the surface's left edge, so a surface that started on any other day would tint weekdays.
+    expect(mon % 7).toBe(0);
     // The chart itself is one focusable group named EXACTLY "Timeline" (the name a screen reader announces on entering it).
     expect(screen.getByRole('group', { name: 'Timeline' })).toHaveClass('gn-timeline__canvas');
   });
@@ -594,6 +597,18 @@ describe('29.097 a bar is placed by three numbers and one scale', () => {
     expect(Number(/\* (\d+) \*/.exec(width)?.[1])).toBeGreaterThan(730);
   });
 
+  it('29.097 the surface spans the pan limits EXACTLY, from the Monday on or before their start: one bar 24 Jul - 22 Oct 2026 with today 23 Aug draws 177 days (the unmeasured canvas keeps the 960 px fallback: 40 days of margin at 24 px/day)', () => {
+    // today 2026-08-23 is day 20688; the bar is days 20658-20748. panLimits: start = min(20688 - 56, 20658 - 40) = 20618 (a
+    // Sunday), end = max(20688 + 56, 20748 + 40) = 20788; the surface starts on Monday 20612 (8 Jun), so it is 20788 - 20612 + 1
+    // = 177 days. Literals, not a re-derivation: a margin of 4 days (96 px) or 41 (961 px), a missing `+ 1` or a surface that
+    // does not start on a Monday each give another number.
+    const { container } = renderTimeline([bar('Near', '2026-07-24', '2026-10-22')]);
+    expect(dayNumberOf('2026-08-23')).toBe(20688);
+    expect((container.querySelector('.gn-timeline__surface') as HTMLElement).style.width).toBe('calc(var(--tl-ppd) * 177 * 1px)');
+    // the bar sits at its day's offset from that Monday
+    expect(prop('Near', '--d0')).toBe(String(20658 - 20612));
+  });
+
   it('29.097 no stylesheet number leaks into the markup: the scale is one custom property on the canvas, and no inline grid template exists', () => {
     const { container } = renderTimeline([bar('Mon to Wed', '2026-08-24', '2026-08-26')]);
     expect((container.querySelector('.gn-timeline__canvas') as HTMLElement).style.getPropertyValue('--tl-ppd')).toBe('24');
@@ -744,6 +759,27 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     expect(comparisons('const outside = measure(row.key) > barPx;')).toBe(1);
   });
 
+  it('29.055 the view packs with the key width it measures: GN-13 (jsdom: 5 x 6.5 + 12 = 45 px) on a one-day bar reserves days 0-4 at the Week bucket (16 px/day), so a bar on day 4 takes a second row and one on day 5 shares; a 9-character key (71 px) sits inside a 3-day bar (72 px at 24 px/day)', () => {
+    // The premise: jsdom has no OffscreenCanvas, so the view measures with its 6.5 px per character estimate.
+    expect(typeof OffscreenCanvas).toBe('undefined');
+    const keyedBar = (title: string, key: string, start: string, due: string): TicketDatesInput => ({
+      ...ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } }),
+      key,
+    });
+    const rowOf = (title: string) => (screen.getByRole('button', { name: title }).closest('.gn-timeline__row') as HTMLElement).style.getPropertyValue('--row');
+    // ceil((4 + 45) / 16) = 4 days after the bar: days 0-4
+    renderTimeline([keyedBar('Short', 'GN-13', '2026-08-24', '2026-08-24'), keyedBar('Day four', 'GN-14', '2026-08-28', '2026-08-29')]);
+    expect(rowOf('Day four')).toBe('1');
+    document.body.innerHTML = '';
+    renderTimeline([keyedBar('Short', 'GN-13', '2026-08-24', '2026-08-24'), keyedBar('Day five', 'GN-15', '2026-08-29', '2026-08-30')]);
+    expect(rowOf('Day five')).toBe('0');
+    document.body.innerHTML = '';
+    // 9 x 6.5 + 12 = 70.5, so 71 px: a 72 px bar holds it (alone in its lane, so its packing footprint disturbs nothing)
+    const { container } = renderTimeline([keyedBar('Three days', 'GN-123456', '2026-08-24', '2026-08-26')]);
+    expect(screen.getByRole('button', { name: 'Three days' }).querySelector('.gn-timeline__key')).toHaveTextContent('GN-123456');
+    expect(container.querySelector('.gn-timeline__key--outside')).toBeNull();
+  });
+
   it('29.055 ui.css draws the outside key KEY_GAP_PX (4 px) after the bar\'s end; the literal is pinned too, so a gap scaled on both sides still reddens', () => {
     const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
     const body = /^\.gn-timeline__key--outside \{([^}]*)\}/m.exec(css)?.[1] ?? '';
@@ -751,6 +787,34 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     expect(left).toBe(`calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + ${KEY_GAP_PX}px)`);
     expect(KEY_GAP_PX).toBe(4);
     expect(left).toBe('calc((var(--d0) + var(--dn)) * var(--tl-ppd) * 1px + 4px)');
+  });
+});
+
+/**
+ * 29.088 — TV-11: the panel fills the window under its own top edge, 16 px short of the bottom, never below 320 px, and fits
+ * again when the window resizes. jsdom lays nothing out (every rect's top is 0) and its window is 768 px tall, so the numbers
+ * are literals: 768 - 0 - 16 = 752, and a 300 px window gives the 320 px floor. T10's 29.040 measures the same rule in a real
+ * browser (where the floor never binds at 800 px). Collect, restore the window, then assert.
+ */
+describe('29.088 the panel fills the window below it, 16 px short, never under 320 px', () => {
+  it('29.088 752 px in jsdom\'s 768 px window, 320 px when the window is 300 px tall, and 752 px again after the window comes back; each read follows a resize event', () => {
+    const { container } = renderTimeline([]);
+    const panel = container.querySelector('.gn-timeline') as HTMLElement;
+    const windowHeight = window.innerHeight;
+    const tall = panel.style.height;
+    const saved = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 300 });
+    fireEvent(window, new Event('resize'));
+    const short = panel.style.height;
+    if (saved === undefined) delete (window as { innerHeight?: number }).innerHeight;
+    else Object.defineProperty(window, 'innerHeight', saved);
+    fireEvent(window, new Event('resize'));
+    const back = panel.style.height;
+    expect(windowHeight).toBe(768);
+    expect(window.innerHeight).toBe(768);
+    expect(tall).toBe('752px');
+    expect(short).toBe('320px');
+    expect(back).toBe('752px');
   });
 });
 
