@@ -23,10 +23,10 @@ const find = (session: Session, name: string) => {
 const get = (s: Session) => find(s, 'get_notification_preferences').handler({});
 const set = (s: Session, args: Record<string, unknown>) => find(s, 'set_notification_preferences').handler(args);
 const puts = (requests: Recorded[]) => requests.filter((r) => r.method === 'PUT');
-/** A server that keeps the document: GET reads it, PUT replaces it, as `store.ts:37-55` does. */
+/** A server that keeps the document: GET reads it, PUT replaces it, as `apps/server/src/notification-preferences/store.ts:37-55` does. */
 function stateful(initial: string[]) {
   let stored = { mutedKinds: initial };
-  return recordingSession({ routes: { [`GET ${PREFS}`]: () => stored, [`PUT ${PREFS}`]: (body) => (stored = body as typeof stored) } });
+  return recordingSession({ routes: { [`GET ${PREFS}`]: () => stored, [`PUT ${PREFS}`]: (body: unknown) => (stored = body as typeof stored) } });
 }
 
 /** The app's labels (`packages/app-core/src/account/notifications-section.tsx:4-10`), restated here so a drift in the tool's copy reddens. */
