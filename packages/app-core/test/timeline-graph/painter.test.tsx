@@ -29,6 +29,8 @@ describe('29.303 TimelinePainter', () => {
     expect(container.querySelector('[data-draw-id="b0"]')).toBe(el0); // the same DOM node: no remount (no React churn)
     rerender(<TimelinePainter {...props} view={{ x0: 6_000, x1: 6_600, y0: 0, y1: 400 }} />);
     expect(ids().some((id) => first.includes(id))).toBe(false);
+    // the window CAUGHT UP (the painter defers its window): exactly the bars touching the new one, no stale and no missing id
+    expect(ids()).toEqual(draws.filter((d) => d.b.x1 >= 6_000 && d.b.x0 <= 6_600).map((d) => d.id));
     rerender(<TimelinePainter {...props} overscan={600} view={{ x0: 6_000, x1: 6_600, y0: 0, y1: 400 }} />);
     expect(ids().length).toBeGreaterThan(first.length);
   });
@@ -44,12 +46,32 @@ describe('29.303 TimelinePainter', () => {
     expect(names).toContain('Bar 0, done'); // control: the scan sees the painter's names
     expect(names.some((n) => /^(earlier|later|previous|next)$/i.test(n))).toBe(false);
   });
+  it('29.303 a bar whose ticket changed repaints in place (the primitives are memoised): new title and style, same DOM node; control: an unchanged bar keeps its node and text', () => {
+    const before: Draw[] = [{ ...bar(0, 0), long: true, title: 'Old title' }, { ...bar(1, 120), long: true, title: 'Kept title' }];
+    const view = { x0: 0, x1: 400, y0: 0, y1: 40 };
+    const { container, rerender } = render(<TimelinePainter draws={before} index={new DrawIndex(before)} overscan={0} width={400} height={40} view={view} />);
+    const el = (id: string) => container.querySelector(`[data-draw-id="${id}"]`) as HTMLElement;
+    const [b0, b1] = [el('b0'), el('b1')];
+    const after: Draw[] = [{ ...(before[0] as DrawBar), title: 'New title', style: 'active', mark: 'active' }, before[1] as DrawBar]; // a new object for the changed ticket only, as a scene rebuild makes
+    rerender(<TimelinePainter draws={after} index={new DrawIndex(after)} overscan={0} width={400} height={40} view={view} />);
+    expect([el('b0'), el('b0').querySelector('.gn-tlg-title')?.textContent, el('b0').dataset['style'], el('b0').querySelector('.gn-tlg-mark')?.textContent]).toEqual([b0, 'New title', 'active', '▶']);
+    expect([el('b1'), el('b1').querySelector('.gn-tlg-title')?.textContent]).toEqual([b1, 'Kept title']);
+  });
   it('29.303 a TICKET id selects that ticket\'s bars and diamond (Home selects tickets); control: the other ticket stays unpressed', () => {
     const two: Draw[] = [bar(0, 0), bar(1, 120), { kind: 'diamond', id: 'd1', ticketId: 't1', z: 1, b: { x0: 240, x1: 268, y0: 0, y1: 28 }, style: 'done', key: 'GN-1', title: 'D', mark: null, revised: false, pin: null, draft: false, ariaLabel: 'GN-1 D' }];
     const { container } = render(<TimelinePainter draws={two} index={new DrawIndex(two)} overscan={0} width={400} height={40} view={{ x0: 0, x1: 400, y0: 0, y1: 40 }} selectedId="t1" />);
     const pressed = (id: string) => container.querySelector(`[data-draw-id="${id}"]`)?.getAttribute('aria-pressed');
     expect([pressed('b1'), pressed('d1')]).toEqual(['true', 'true']);
     expect(pressed('b0')).toBe('false');
+  });
+  it('29.303 a diamond picks its TICKET and is selected by its own draw id too; control: the bar of the same ticket is not', () => {
+    const onPick = vi.fn();
+    const two: Draw[] = [bar(1, 0), { kind: 'diamond', id: 'd1', ticketId: 't1', z: 1, b: { x0: 240, x1: 268, y0: 0, y1: 28 }, style: 'done', key: 'GN-1', title: 'D', mark: null, revised: false, pin: null, draft: false, ariaLabel: 'GN-1 D' }];
+    const { container } = render(<TimelinePainter draws={two} index={new DrawIndex(two)} overscan={0} width={400} height={40} view={{ x0: 0, x1: 400, y0: 0, y1: 40 }} selectedId="d1" onPick={onPick} />);
+    const d1 = container.querySelector('[data-draw-id="d1"]') as HTMLElement;
+    expect([d1.getAttribute('aria-pressed'), container.querySelector('[data-draw-id="b1"]')?.getAttribute('aria-pressed')]).toEqual(['true', 'false']);
+    fireEvent.click(d1);
+    expect(onPick).toHaveBeenCalledWith('t1');
   });
   it('29.303 what each primitive shows, exactly: key or "Draft", title only on a long bar, chip, pin counts, ✓ / ▶, "revised"; placed at its bounds; every edge in ONE svg; control: no edge in view, no svg', () => {
     const scene: Draw[] = [

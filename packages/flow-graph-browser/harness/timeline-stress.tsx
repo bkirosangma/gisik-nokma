@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { DrawIndex, TimelinePainter, attachDriver, type View, type Windowed } from '@gisik-nokma/app-core/timeline-graph';
+import { DrawIndex, TimelinePainter, attachDriver, type BarStyle, type View, type Windowed } from '@gisik-nokma/app-core/timeline-graph';
 import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import '@gisik-nokma/ui/ui.css';
 import { DESKTOP, PHONE, PPD, makeHomeScene, type HomeScene } from './timeline-scene';
@@ -28,6 +28,12 @@ export type Result = {
   overscan: number;
   quantisePx: number;
   stage: { w: number; h: number };
+  /**
+   * After the pan stops and the painter settles: the DOM's mounted ids against the model's window (the final scroll position,
+   * quantised as `attachDriver` does, widened by the overscan, asked of the same index). `missing` and `extra` are both 0 when the
+   * deferred window caught up exactly (planner ruling 21:11, leg 2).
+   */
+  settled: { expected: number; mounted: number; missing: number; extra: number };
   /** Step 7 diagnosis: each window change's render + commit (the `flushSync` inside the adapter's frame), and the frames over 50 ms. */
   diag: { renders: number; renderMaxMs: number; renderMeanMs: number; over50: number; p95Ms: number; long: Array<{ i: number; ms: number; renderMs: number }> };
 };
@@ -61,8 +67,11 @@ function Stage({ scene, overscan }: { scene: HomeScene; overscan: number }): Rea
   const ref = useRef<HTMLDivElement>(null);
   const index = useMemo(() => new DrawIndex(scene.draws), [scene]);
   const [view, setView] = useState<View>({ x0: 0, x1: 0, y0: 0, y1: 0 });
+  const days = useRef(scene.days);
+  days.current = scene.days;
+  // Attached once per stage: a `patch` hands the same stage a new scene (the same pan session), it does not re-attach.
   useLayoutEffect(() => {
-    const w = attachDriver(ref.current as HTMLDivElement, { quantisePx: quantum, firstDay: 0, ppd: PPD, extentDays: () => scene.days });
+    const w = attachDriver(ref.current as HTMLDivElement, { quantisePx: quantum, firstDay: 0, ppd: PPD, extentDays: () => days.current });
     setView(w.current());
     // flushSync: the window change renders inside the frame the adapter reported it in, so the frame that paints the
     // new scroll position also paints its bars.
@@ -77,7 +86,7 @@ function Stage({ scene, overscan }: { scene: HomeScene; overscan: number }): Rea
       off();
       w.destroy();
     };
-  }, [scene]);
+  }, []);
   return (
     <div ref={ref} id="tlg-stage" className="gn-tlg-scroller" style={{ height: window.innerHeight - 120 }}>
       <TimelinePainter draws={scene.draws} index={index} view={view} overscan={overscan} width={scene.width} height={scene.height} />
@@ -87,6 +96,8 @@ function Stage({ scene, overscan }: { scene: HomeScene; overscan: number }): Rea
 
 const root = createRoot(document.getElementById('tlg-stage-host') as HTMLElement);
 let generation = 0;
+/** The scene on the stage now, so `patch` can hand the same stage a changed one. */
+let current: { scene: HomeScene; overscan: number } | null = null;
 const frames = (n: number): Promise<void> => new Promise((resolve) => {
   const step = (k: number): void => { if (k === 0) resolve(); else requestAnimationFrame(() => step(k - 1)); };
   step(n);
@@ -97,9 +108,20 @@ async function mountScene(scene: HomeScene, overscan: number): Promise<void> {
   await new Promise<Windowed>((resolve) => {
     onReady = resolve;
     generation += 1;
+    current = { scene, overscan };
     root.render(<Stage key={generation} scene={scene} overscan={overscan} />);
   });
   await frames(2);
+}
+
+/** One ticket's bar changes (a live edit arriving mid-session): the same stage gets a scene with a new object for that bar only. */
+async function patch(ticketId: string, change: { title?: string; style?: BarStyle }): Promise<void> {
+  if (current === null) throw new Error('patch: no scene on the stage');
+  const draws = current.scene.draws.map((d) => (d.kind === 'bar' && d.ticketId === ticketId ? { ...d, ...change } : d));
+  current = { ...current, scene: { ...current.scene, draws } };
+  root.render(<Stage key={generation} scene={current.scene} overscan={current.overscan} />);
+  await frames(2);
+  await settle(document.querySelector('.gn-tlg-canvas') as HTMLElement);
 }
 
 /** Frames until the canvas's children have not changed for 10 frames in a row (the painter's deferred window has caught up), at most 5 s. */
@@ -184,6 +206,14 @@ async function run(mode: Mode): Promise<Result> {
     requestAnimationFrame(tick);
   });
   watch.disconnect();
+  await settle(canvas);
+  const sx = stage.scrollLeft;
+  const sy = stage.scrollTop;
+  const q = (n: number): number => Math.floor(n / quantum) * quantum;
+  // firstDay 0: attachDriver's x, `(offset() - firstDay) * scale()`, is the scroller's scrollLeft
+  const model = new Set(index.query({ x0: q(sx) - overscan, x1: q(sx + vw) + quantum + overscan, y0: q(sy) - overscan, y1: q(sy + vh) + quantum + overscan }).map((d) => d.id));
+  const dom = new Set([...canvas.querySelectorAll('[data-draw-id]')].map((e) => e.getAttribute('data-draw-id') ?? ''));
+  const settled = { expected: model.size, mounted: dom.size, missing: [...model].filter((id) => !dom.has(id)).length, extra: [...dom].filter((id) => !model.has(id)).length };
   const round = (n: number): number => Math.round(n * 10) / 10;
   const sorted = gaps.map((g) => g.ms).sort((a, b) => a - b);
   const renderIn = (g: { now: number; ms: number }): number => renders.filter((r) => r.at > g.now - g.ms && r.at <= g.now).reduce((t, r) => t + r.ms, 0);
@@ -197,11 +227,11 @@ async function run(mode: Mode): Promise<Result> {
   };
   return {
     mode, fps: round((count * 1000) / (performance.now() - t0)), worstMs: round(worst), frames: count, maxMounted: maxM, minMounted: minM,
-    emptyFrames: empty, scrollYBefore, scrollYAfter: window.scrollY, count: scene.count, overscan, quantisePx: quantum, stage: { w: vw, h: vh }, diag,
+    emptyFrames: empty, scrollYBefore, scrollYAfter: window.scrollY, count: scene.count, overscan, quantisePx: quantum, stage: { w: vw, h: vh }, settled, diag,
   };
 }
 
-(window as unknown as { __tlg: { run(mode: Mode): Promise<Result> } }).__tlg = { run };
+(window as unknown as { __tlg: { run(mode: Mode): Promise<Result>; patch: typeof patch } }).__tlg = { run, patch };
 
 async function go(): Promise<void> {
   out.textContent = '';

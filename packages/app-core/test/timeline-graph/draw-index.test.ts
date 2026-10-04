@@ -32,4 +32,8 @@ describe('29.303 DrawIndex', () => {
     const apart = { x0: 1_001, x1: 1_999, y0: 201, y1: 399 }; // control: each edge is now one px away
     expect(new DrawIndex(edges).query(apart).map((d) => d.id)).toEqual([]);
   });
+  it('29.303 answers in paint order: z first, then id (the DOM order is the stacking order of equal z-index)', () => {
+    const layered: Draw[] = [{ ...bar(1, 0, 50, 0), z: 2 }, { ...bar(2, 0, 50, 0), z: 0 }, { ...bar(3, 0, 50, 0), z: 1 }, { ...bar(0, 0, 50, 0), z: 1 }];
+    expect(new DrawIndex(layered).query({ x0: 0, x1: 100, y0: 0, y1: 40 }).map((d) => d.id)).toEqual(['b2', 'b0', 'b3', 'b1']);
+  });
 });

@@ -3881,6 +3881,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 ### Timeline graph and Home's Timeline (Part 4)
 <!-- WTG4 bullet T1 -->
 <!-- WTG4 bullet T2 -->
+- ⚙️ **Timeline painter** (WTG Part 4 T2; cases 29.300–29.303; `packages/app-core/src/timeline-graph/` (`@gisik-nokma/app-core/timeline-graph`), `packages/flow-graph-browser/harness/timeline-stress.*`) — a windowed React painter (`TimelinePainter`) over a pure draw list (`Draw`: bars, Decision diamonds, connectors, edges, headings, strips, today, weekends) and a bucket index (`DrawIndex`); it mounts only the primitives within an overscan of the view, its primitives are memoised and its window is deferred, so a window change never holds a frame. `attachDriver` wires Part 1's scroll adapter to the scroller and reports a quantised px window; `days.ts` is the clock-free IST day arithmetic (Mondays, 28-day chunks). Bars use the state chips' category colours with inverted text (three CONTRAST_PAIRS rows); a ghost is a pale fill with a dashed edge, never faded; the scroller contains its own overscroll. Measured on a Home-shaped scene in a second stress page beside Part 1's `stress.html`: `timeline-stress.html?scene=desktop|phone` (desktop GPU 29.300, Pixel 7 proxy 29.301, the owner's phone 29.302).
 <!-- WTG4 bullet T3 -->
 <!-- WTG4 bullet T4 -->
 <!-- WTG4 bullet T5 -->
