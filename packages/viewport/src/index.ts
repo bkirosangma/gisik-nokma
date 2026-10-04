@@ -5,3 +5,4 @@ export * from './anchored-zoom.js';
 export * from './wheel.js';
 export * from './calendar-days.js';
 export * from './driver.js';
+export * from './route.js';
