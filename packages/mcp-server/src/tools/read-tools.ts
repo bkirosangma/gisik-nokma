@@ -187,7 +187,7 @@ export function readTools(session: Session): ToolDefinition[] {
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`,
           'ticket',
         )) as { ticketState?: { fields?: Record<string, { value: unknown }>; links?: unknown } } & Record<string, unknown>;
-        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded outbound `ticketState.links`.
+        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded `ticketState.links` (this stream's ids only).
         const linked = (await readOrNotFound(
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/links`,
