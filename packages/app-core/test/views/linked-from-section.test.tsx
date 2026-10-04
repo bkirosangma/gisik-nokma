@@ -279,6 +279,24 @@ describe('27.150 the sheet scrolls to #comment-<id> once the thread arrives, onc
     });
     expect(screen.getByTestId('comment-c1')).toBeTruthy();
     expect(scroll).not.toHaveBeenCalled();
+    cleanup();
+
+    // The comments answer BEFORE the ticket, so the thread is drawn after its read answered. On a lane
+    // port (2026-10-04) a fresh load at #comment-<id> never scrolled while the effect was keyed on
+    // `comments.data` (the element appeared 117 ms after the read); jsdom redraws in an order that
+    // scrolls either way, so this leg pins the ordering, and the live probe (HANDOFF) is the regression evidence.
+    window.location.hash = '#comment-c1';
+    render(
+      sheet(
+        createFakeDataSource({
+          getTicket: () => new Promise((resolve) => setTimeout(() => resolve(MINIMAL_READ), 50)),
+          getTicketComments: vi.fn(async () => [comment('c1')]),
+        }),
+      ),
+    );
+    await screen.findByTestId('comment-c1');
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById('comment-c1'));
   });
 });
 

@@ -1016,19 +1016,25 @@ export function TicketSheet({
   const comments = useLiveQuery(dataSource, workspaceId, `${ticketId}:comments`, () =>
     dataSource.query.getTicketComments(workspaceId, ticketId),
   );
-  // A "Linked from" row (or a notification) opens `<sheet>#comment-<id>`. The thread
-  // is fetched after the sheet paints, so once it is here bring the named comment
-  // into view — once per hash, so a later reload does not pull the reader back.
+  // A "Linked from" row (or a notification) opens `<sheet>#comment-<id>`. Once the
+  // named comment is drawn, bring it into view — once per hash, so a later reload
+  // does not pull the reader back. This runs after EVERY render, not on
+  // `comments.data`: the thread is drawn later than its read answers (measured on a
+  // lane port, 2026-10-04: the comments answered at 668 ms and the comment element
+  // appeared at 785 ms, after another of the sheet's reads), and an effect keyed on
+  // the data had already run and found nothing. Once scrolled, a render pays one
+  // string comparison. No `comments.data` test either: until the thread is drawn
+  // `getElementById` answers null, which is the same early return.
   const scrolledCommentHash = useRef<string | null>(null);
   useEffect(() => {
-    if (comments.data == null || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
     const hash = window.location.hash;
     if (!hash.startsWith('#comment-') || scrolledCommentHash.current === hash) return;
     const target = document.getElementById(hash.slice(1));
     if (target === null) return;
     scrolledCommentHash.current = hash;
     target.scrollIntoView?.({ block: 'center' });
-  }, [comments.data]);
+  });
   /**
    * The ticket's attached notes (Plan 7 Task 5, spec §14.3) — LIFTED here from
    * `TicketNotesSection`, which used to own this query itself (Plan 6). The
