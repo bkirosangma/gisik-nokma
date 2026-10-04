@@ -21,7 +21,7 @@ const run = (from: { x: number; y: number; ratio: number }, to: typeof from, ms:
 };
 
 describe('the camera spring (port of loop/zoomAt/settle/panBy, knowledge-graph-sigma.html:823-839)', () => {
-  it('27.240 critically damped, τ = 85 ms: 95% of the way by about 300 ms, and it settles exactly on the target; control: it never overshoots', () => {
+  it('27.240 critically damped, τ = 85 ms: 95% of the way by about 300 ms, and it settles exactly on the target once x and y are within 1e-5 and the ratio within 1e-4; control: it never overshoots, a vertical-only move is still partial after one frame, and each threshold decides alone: a residue just over it (for x and y, exactly on it too) is not settled, just under it settles', () => {
     expect(TAU_MS).toBe(85);
     const a = { x: 0, y: 0, ratio: 1 }, b = { x: 1, y: 0, ratio: 1 };
     expect(run(a, b, 300).s.x).toBeGreaterThan(0.95);
@@ -32,6 +32,35 @@ describe('the camera spring (port of loop/zoomAt/settle/panBy, knowledge-graph-s
     let s = a, max = 0;
     for (let i = 0; i < 100; i += 1) ({ state: s } = springStep(s, b, 16, false)), (max = Math.max(max, s.x));
     expect(max).toBeLessThanOrEqual(1);
+    // springStep's snap needs ALL of its clauses, so each one can refuse it alone. One 16 ms frame keeps e^(−16/85) ≈ 0.83 of a
+    // gap: a gap of 2× a threshold leaves ≈1.66× it (not settled), a gap of 1× leaves ≈0.83× (settled, exactly on the target)
+    const frame = (from: typeof a, to: typeof a, ms = 16) => springStep(from, to, ms, false);
+    const y1 = { x: 0, y: 1, ratio: 1 };
+    const down = frame(a, y1); // vertical only: x and the ratio already match, so only the y clause refuses the snap
+    expect(down.settled).toBe(false);
+    expect(down.state.y).toBeGreaterThan(0);
+    expect(down.state.y).toBeLessThan(1);
+    // x: 2e-5 off is not settled, 1e-5 off is; exactly 1e-5 off (dt 0 leaves the gap as it is) is not, as the snap is strict
+    const xOut = frame({ x: 1 - 2e-5, y: 0, ratio: 1 }, b);
+    expect(xOut.settled).toBe(false);
+    expect(1 - xOut.state.x).toBeGreaterThan(1e-5);
+    expect(frame({ x: 1 - 1e-5, y: 0, ratio: 1 }, b)).toEqual({ state: b, settled: true });
+    expect(frame(a, { x: 1e-5, y: 0, ratio: 1 }, 0).settled).toBe(false);
+    // y, the same
+    const yOut = frame({ x: 0, y: 1 - 2e-5, ratio: 1 }, y1);
+    expect(yOut.settled).toBe(false);
+    expect(1 - yOut.state.y).toBeGreaterThan(1e-5);
+    expect(frame({ x: 0, y: 1 - 1e-5, ratio: 1 }, y1)).toEqual({ state: y1, settled: true });
+    expect(frame(a, { x: 0, y: 1e-5, ratio: 1 }, 0).settled).toBe(false);
+    // the ratio, 2e-4 off from either side, is not settled (zooming out, n/t − 1 is negative, so only the |…| refuses it); 1e-4 off
+    // is. Exactly 1e-4 off is unreachable: near 1e-4, |n/t − 1| is a multiple of 2^-53 and the double 1e-4 is not.
+    const zoomIn = frame({ x: 0, y: 0, ratio: 1.0002 }, a);
+    expect(zoomIn.settled).toBe(false);
+    expect(zoomIn.state.ratio - 1).toBeGreaterThan(1e-4);
+    const zoomOut = frame({ x: 0, y: 0, ratio: 0.9998 }, a);
+    expect(zoomOut.settled).toBe(false);
+    expect(1 - zoomOut.state.ratio).toBeGreaterThan(1e-4);
+    expect(frame({ x: 0, y: 0, ratio: 1.0001 }, a)).toEqual({ state: a, settled: true });
   });
 
   it('27.241 dt is clamped to 100 ms (a stalled tab does not jump); control: a 100 ms step and a 1,000 ms step move the same, 99 ms moves less, and a negative dt does not move', () => {
