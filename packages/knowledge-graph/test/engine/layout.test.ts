@@ -30,6 +30,8 @@ describe('layout (port of CFG/radius/layout, knowledge-graph-sigma.html:602-617)
     const angle = (ref: string) => (Math.atan2(pos.get(ref)!.y / 290, pos.get(ref)!.x / 440) * 180) / Math.PI;
     const ks = ['k1', 'k2', 'k3'].map((k) => angle(T(k))).sort((x, y) => x - y);
     expect(ks[1]! - ks[0]!).toBeCloseTo(13, 6); // min[2] = 13°, not the 6° wedge share
+    const aAngle = (Math.atan2(pos.get(T('a'))!.y / 185, pos.get(T('a'))!.x / 300) * 180) / Math.PI;
+    expect(ks[1]!).toBeCloseTo(aAngle, 6); // the middle child sits on its parent's angle
     const parentAngle = (Math.atan2(pos.get(T('b'))!.y / 185, pos.get(T('b'))!.x / 300) * 180) / Math.PI;
     expect(angle(T('only'))).toBeCloseTo(parentAngle, 6);
   });

@@ -60,9 +60,10 @@ describe('zones (port of zones(), knowledge-graph-sigma.html:898)', () => {
   });
 
   it('27.222 an out-of-scope item is fog only beside a clear parent, and counted as outside; control: an in-scope one at the same place is clear', () => {
-    const s = storeOf([item('c'), item('x', { project: 'p2' }), item('b')], [edge('relates', T('c'), T('x')), edge('relates', T('c'), T('b'))]);
-    const z = zones(s, { ...base, reach: 2, inScope: (r) => r !== T('x') });
+    const s = storeOf([item('c'), item('x', { project: 'p2' }), item('b'), item('bb')], [edge('relates', T('c'), T('x')), edge('relates', T('c'), T('b')), edge('parent', T('b'), T('bb'))]);
+    const z = zones(s, { ...base, reach: 1, inScope: (r) => r !== T('x') });
     expect(z.fogSet.has(T('x'))).toBe(true);
+    expect(z.fog).toHaveLength(2); // x (outside) and bb (the next ring): only x counts as outside
     expect(z.clearSet.has(T('x'))).toBe(false);
     expect(z.outN).toBe(1);
     expect(z.clearSet.has(T('b'))).toBe(true);
