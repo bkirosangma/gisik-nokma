@@ -3134,7 +3134,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " and "
+                      "text": ", "
                     },
                     {
                       "kind": "bold",
@@ -3142,7 +3142,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — optional, empty by default. Leave either blank to claim no date. - "
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Estimate (days)"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — optional, empty by default. Leave any blank to claim nothing; an estimate is a whole number of days from 1 to 365. - "
                     },
                     {
                       "kind": "bold",
@@ -3275,7 +3283,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "five things"
+                    "text": "six things"
                   },
                   {
                     "kind": "text",
@@ -3375,6 +3383,24 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " row's date box, like Due. (§5)"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set or clear its estimate"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Estimate"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row's number box, like Start: a whole number of days from 1 to 365, or blank for no estimate. (§5)"
                     }
                   ]
                 ]
