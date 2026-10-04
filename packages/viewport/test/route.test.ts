@@ -32,14 +32,15 @@ describe('29.065 edge routing on packed rows', () => {
     expect(axisAligned(r.points)).toBe(true);
     expect(r.crossings).toBe(0);
     // a gap of 8 px on another row: the gutter before the target (x = 58) is behind the source end (64), so the path takes
-    // the channel between the rows instead of running backwards in it
+    // the channel instead of running backwards in it, in the middle of the gap below the SOURCE row (28 + 6 = 34), not
+    // half-way to the target row (54, the middle of row 1's bars)
     expect(routeEdge(bar(0, 0, 4), { x: 72, y: 80, w: 48, h: 28 }, []).points).toEqual([
-      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 58, y: 54 }, { x: 58, y: 94 }, { x: 72, y: 94 },
+      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 34 }, { x: 58, y: 34 }, { x: 58, y: 94 }, { x: 72, y: 94 },
     ]);
     // a gap of exactly the gutter (14 px): neither gutter is used (one would leave the end anchor straight down along the
     // source's edge, the other would come down onto the start anchor from above); the arrowhead still enters from the left
     expect(routeEdge(bar(0, 0, 4), { x: 78, y: 80, w: 48, h: 28 }, []).points).toEqual([
-      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 64, y: 54 }, { x: 64, y: 94 }, { x: 78, y: 94 },
+      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 34 }, { x: 64, y: 34 }, { x: 64, y: 94 }, { x: 78, y: 94 },
     ]);
     // a gap of 15 px, one pixel more than the gutter: the gutter before the target (x = 65) is just past the source end and
     // is used (the guard is strict: vx > s.x, not vx > s.x + 1, which would take the gutter after the source at x = 78)
@@ -108,7 +109,7 @@ describe('29.065 edge routing on packed rows', () => {
     expect(tight.crossings).toBe(0);
   });
 
-  it('29.065 the target starts before the source ends: a channel between the rows, five corners at most; a target on a higher row: between the rows too; a target on the same row past a bar: the channel in the middle of the gap below the row, carrying the label; mixed heights (a target below or above): no repeated point, no collinear corner', () => {
+  it('29.065 the target starts before the source ends: a channel in the middle of the gap below the source row, five corners at most; a target two rows higher: the gap above the source row; a target on the same row past a bar: the channel in the middle of the gap below the row, carrying the label; mixed heights (a target below or above): no repeated point, no collinear corner', () => {
     const from = bar(10, 0, 6);
     const to = bar(12, 1, 3);
     const r = routeEdge(from, to, []);
@@ -116,13 +117,13 @@ describe('29.065 edge routing on packed rows', () => {
     expect(r.points.length).toBeLessThanOrEqual(6);
     expect(r.points[0]).toEqual({ x: from.x + from.w, y: 14 });
     expect(r.points[r.points.length - 1]).toEqual({ x: to.x, y: to.y + 14 });
-    // the channel runs half-way between the source's bottom (28) and the target's top (40), out past the source end (256 + 14)
+    // the channel runs in the middle of the 12 px gap below the source row (28 + 6 = 34), out past the source end (256 + 14)
     // and back to the gutter before the target (192 - 14)
     expect(r.points).toEqual([{ x: 256, y: 14 }, { x: 270, y: 14 }, { x: 270, y: 34 }, { x: 178, y: 34 }, { x: 178, y: 54 }, { x: 192, y: 54 }]);
-    // a target on a HIGHER row: the channel runs half-way between the target's bottom (28) and the source's top (80), not on
-    // the target row's edge (FD-1)
+    // a target two rows HIGHER: the channel runs in the middle of the 12 px gap above the source row (80 - 6 = 74), not on
+    // the target row's edge (28, FD-1) and not half-way between the rows (54, the middle of row 1's bars)
     expect(routeEdge(bar(10, 2, 6), bar(12, 0, 3), []).points).toEqual([
-      { x: 256, y: 94 }, { x: 270, y: 94 }, { x: 270, y: 54 }, { x: 178, y: 54 }, { x: 178, y: 14 }, { x: 192, y: 14 },
+      { x: 256, y: 94 }, { x: 270, y: 94 }, { x: 270, y: 74 }, { x: 178, y: 74 }, { x: 178, y: 14 }, { x: 192, y: 14 },
     ]);
     // a target LATER on the same row with a bar between them (x 96-112): the channel runs in the middle of the 12 px gap below
     // the row (28 + 6 = 34), not along the row's bottom edge (28), which only grazes the bar; the label pill rides the channel
@@ -133,12 +134,13 @@ describe('29.065 edge routing on packed rows', () => {
     expect(sameRow.label).toEqual({ x: 112, y: 34 });
     expect(sameRow.crossings).toBe(0);
     // bars of mixed height, a target BELOW (a 40 px box whose middle is level with the channel, y = 34) and a target ABOVE (a
-    // 20 px box whose bottom is level with the source's middle, y = 14): the channel's zero-length step and collinear corner are
-    // dropped, so no two points repeat and no three lie on one line (below, the collinear triple is the LAST one; above, the
-    // FIRST). The geometry is deliberately not asserted: on these inputs the route runs leftwards inside the target (below)
-    // or backwards inside the source (above), which breaks the "from the left" rule. Part 1 feeds only uniform 28 px bars on
-    // 40 px rows, where this cannot happen; mixed heights are Part 3's to settle (E6; lane 1 NOTE and reviewer B QUESTION to
-    // the planner, 2026-10-04)
+    // 20 px box whose bottom is level with the source's middle, y = 14): no two points repeat and no three lie on one line
+    // (below, the channel's zero-length step and the LAST collinear triple are dropped; above, the channel now sits in the gap
+    // above the source row, y = -6, so nothing collapses since the 13:30 ruling and the input stays as a minimality check).
+    // The geometry is deliberately not asserted: on these inputs the route runs leftwards inside the target (below) or along
+    // the target's top edge (above), which breaks the "from the left" and "never on an edge" rules. Part 1 feeds only uniform
+    // 28 px bars on 40 px rows, where this cannot happen; mixed heights are Part 3's to settle (E6; lane 1 NOTE and reviewer B
+    // QUESTION to the planner, 2026-10-04)
     const mixedBelow = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: 14, w: 48, h: 40 }, []).points;
     const mixedAbove = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: -6, w: 48, h: 20 }, []).points;
     expect(mixedBelow[0]).toEqual({ x: 64, y: 14 });
@@ -153,7 +155,7 @@ describe('29.065 edge routing on packed rows', () => {
     }
   });
 
-  it('29.065 every horizontal segment lies strictly inside a row gap or on a bar middle, never on a bar edge: uniform rows, every pair among bars on two rows (same row and next row, later and earlier, the rest in the way); control: a route along an edge is caught', () => {
+  it('29.065 every horizontal segment lies strictly inside a row gap or on a bar middle, never on a bar edge: uniform rows, every pair among bars on two rows (same row and next row, later and earlier, the rest in the way); control: a route along an edge is caught; on three rows, every pair (two rows apart too): every horizontal segment but the route\'s own first and last lies strictly inside a row gap, never inside a row\'s bars; control: a channel at row 1\'s bar middle is caught', () => {
     // 28 px bars on 40 px rows: tops 0 / 40, bottoms 28 / 68
     const bars = [bar(0, 0, 4), bar(6, 0, 1), bar(10, 0, 2), bar(2, 1, 3), bar(12, 1, 3)];
     const edges = new Set(bars.flatMap((b) => [b.y, b.y + b.h]));
@@ -175,6 +177,31 @@ describe('29.065 edge routing on packed rows', () => {
     // the fixture reaches a channel in the gap below each row (34 under row 0, 74 under row 1), so the check is not vacuous
     // (a containment, not an equality: a channel moved ONTO an edge must fail the edge leg above, not this one)
     expect([...channels]).toEqual(expect.arrayContaining([34, 74]));
+    // THREE rows (planner 13:30): a channel uses the gap next to the SOURCE row, on the target's side, so every horizontal
+    // segment but the route's own first and last (by index: they leave and enter at the bars' middles) lies strictly inside
+    // the 12 px gap below some row (40 px pitch - 28 px bar): (28,40), (68,80), (108,120). No bar middle is exempted: the old
+    // channel of a span of two rows, half-way between them (54), is exactly row 1's bar middle
+    const rows3 = [bar(0, 0, 4), bar(6, 0, 1), bar(10, 0, 2), bar(2, 1, 3), bar(12, 1, 3), bar(1, 2, 4), bar(9, 2, 3)];
+    const gaps = [...new Set(rows3.map((b) => b.y + b.h))].map((bottom) => [bottom, bottom + 12] as const);
+    const inner = (pts: readonly Pt[]) => pts.filter((p, i) => i >= 2 && i <= pts.length - 2 && p.y === (pts[i - 1] as Pt).y);
+    const outsideGap = (pts: readonly Pt[]) => inner(pts).some((p) => !gaps.some(([lo, hi]) => p.y > lo && p.y < hi));
+    // CONTROL, same it: the check sees the old row 0 -> row 2 route, whose channel runs through row 1's bars at y = 54
+    expect(outsideGap([{ x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 58, y: 54 }, { x: 58, y: 94 }, { x: 72, y: 94 }])).toBe(true);
+    const channels3 = new Set<number>();
+    let twoRowSpans = 0;
+    for (const from of rows3) {
+      for (const to of rows3) {
+        if (from === to) continue;
+        const pts = routeEdge(from, to, rows3.filter((b) => b !== from && b !== to)).points;
+        expect(outsideGap(pts), `${JSON.stringify(from)} -> ${JSON.stringify(to)}: ${JSON.stringify(pts)}`).toBe(false);
+        for (const p of inner(pts)) channels3.add(p.y);
+        if (inner(pts).length > 0 && Math.abs(from.y - to.y) === 80) twoRowSpans += 1;
+      }
+    }
+    // not vacuous: the fixture reaches a channel in the gaps under rows 0 and 1, and at least one route between rows 0 and 2
+    // has a channel (counted whatever its y, so a channel moved out of the gaps fails the leg above, not these)
+    expect([...channels3]).toEqual(expect.arrayContaining([34, 74]));
+    expect(twoRowSpans).toBeGreaterThan(0);
   });
 
   it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above; a bar in the way is transposed with it and a crossing is reported', () => {
