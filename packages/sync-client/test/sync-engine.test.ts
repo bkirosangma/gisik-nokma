@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newSubmittedEvent, newUlid, parseEvent, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newSubmittedEvent, newUlid, parseEvent, withheldLinkPayload, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
 import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
 import { createReplica, type BootstrapResponse, type Replica, type TicketBootstrap } from '../src/replica/replica.js';
 import type { SyncItem } from '../src/replica/sync-item.js';
@@ -2985,3 +2985,40 @@ describe('12.317-12.318 the 404 drop, keyed to the notice (ruling P37.3)', () =>
  * reason. Two witnesses is the better outcome, and the correction is recorded
  * rather than quietly widened.*
  */
+
+describe('27.088 a withheld link from the stream folds to nothing and does not stall', () => {
+  it('27.088 withheld add and remove are stored at their seqs, no links key, cursor past both; control: a visible add folds', async () => {
+    const { script, replica, engine } = await fixture();
+    await engine.start(WS);
+    script.handlers!.onCaughtUp(9);
+    await vi.waitFor(async () => expect(await replica.getCursor(WS)).toBe(9));
+
+    const T = newUlid();
+    const OTHER = newUlid();
+    const at = (e: LedgerEvent, workspaceSeq: number): LedgerEvent => ({ ...e, workspaceSeq });
+    const add = at(envelope({ kind: 'ticket', id: T }, 'ticket.link_added', withheldLinkPayload('blocks'), { seq: 2 }), 11);
+    const remove = at(envelope({ kind: 'ticket', id: T }, 'ticket.link_removed', withheldLinkPayload('blocks'), { seq: 3 }), 12);
+    script.handlers!.onItem(at(created(T), 10));
+    script.handlers!.onItem(add);
+    script.handlers!.onItem(remove);
+    // The cursor is written by the caught-up frame queued BEHIND the items, and only when nothing stalled.
+    script.handlers!.onCaughtUp(12);
+    await engine.settled();
+
+    expect(engine.lastApplyFailure()).toBeNull(); // not stalled
+    expect(await replica.getCursor(WS)).toBe(12); // past both
+    const stored = (await replica.listEntityEvents(T)).map((e) => [e.id, e.seq, e.payload]);
+    expect(stored).toContainEqual([add.id, 2, { kind: 'blocks', targetId: null }]);
+    expect(stored).toContainEqual([remove.id, 3, { kind: 'blocks', targetId: null }]);
+    const confirmed = (await replica.getTicket(T))?.confirmed;
+    expect(confirmed?.id).toBe(T); // precondition: the ticket folded
+    expect('links' in confirmed!).toBe(false);
+
+    // control: a visible add in the same run folds into `links`
+    script.handlers!.onItem(at(envelope({ kind: 'ticket', id: T }, 'ticket.link_added', { kind: 'relates', targetId: OTHER }, { seq: 4 }), 13));
+    script.handlers!.onCaughtUp(13);
+    await engine.settled();
+    expect((await replica.getTicket(T))?.confirmed?.links).toEqual([{ kind: 'relates', targetId: OTHER }]);
+    expect(await replica.getCursor(WS)).toBe(13);
+  });
+});

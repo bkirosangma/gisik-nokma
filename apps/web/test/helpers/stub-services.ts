@@ -165,6 +165,7 @@ export function stubServices(
     getDeletedNotes: unstubbed('getDeletedNotes'),
     getNote: unstubbed('getNote'),
     getNotesForTicket: unstubbed('getNotesForTicket'),
+    getTicketLinks: unstubbed('getTicketLinks'),
     getNoteComments: unstubbed('getNoteComments'),
     getNoteHistory: unstubbed('getNoteHistory'),
     getNoteVersion: unstubbed('getNoteVersion'),
