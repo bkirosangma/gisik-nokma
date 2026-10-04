@@ -24,6 +24,8 @@
     "check:help": "node scripts/help-content.mjs --check"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "pg": "^8.13.0",
     "turbo": "^2.5.0"
   }
