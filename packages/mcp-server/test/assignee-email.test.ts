@@ -307,6 +307,12 @@ describe('create_ticket by email (package)', () => {
       await expect(createWith(s, { ...extra }), label).rejects.toThrow(sentence);
       expect(s.requests, `${label}: nothing sent`).toEqual([]);
     }
+    // The tool's own description carries the email clause exactly (MCP text an assistant reads), and the older clauses survive.
+    const described = writeTools(stub().session).find((t) => t.name === 'create_ticket')!.description;
+    expect(described).toContain(
+      'To assign someone by their email address instead, pass assignee_email (and no assigneeId): the first call looks the address up and answers a PREVIEW naming the person and saying whether they are already in the workspace or WILL BE ADDED AS A GUEST (who would then see only this ticket) - no ticket is created; repeat the call with confirm_assignee set to that person\'s userId to create it. ',
+    );
+    expect(described).toContain('`assigneeId` ("me" is you)');
     // assigneeId alone, "me" included, and neither: ONE event, no lookup, no read.
     const alone = stub();
     const make = writeTools(alone.session).find((t) => t.name === 'create_ticket')!;
@@ -328,6 +334,11 @@ describe('create_ticket by email (package)', () => {
       expect(writes(s.requests)).toEqual([]);
       expect(s.requests.map((r) => r.path), 'the lookup, then the directory read for the names; nothing else').toEqual([LOOKUP, '/v1/me/workspaces']);
     }
+    // A project the directory does not list is named by its id, and a workspace it does not list by its id (`?? a.projectId`, `?? a.workspaceId`).
+    const unlisted = recordingSession({ routes: { [`POST ${LOOKUP}`]: { user: ASHA }, 'GET /v1/me/workspaces': DIRECTORY } });
+    expect(((await createWith({ ...stub(), ...unlisted }, { projectId: 'P9' })) as Preview).wouldChange).toBe(`Creates "Fix login" in P9 (Corner Shop) and assigns it to Asha Rao (asha@example.com). Asha Rao is already in this workspace.`);
+    const nowhere = recordingSession({ routes: { [`POST ${LOOKUP}`]: { user: ASHA }, 'GET /v1/me/workspaces': { workspaces: [] } } });
+    expect(((await createWith({ ...stub(), ...nowhere })) as Preview).wouldChange).toBe(`Creates "Fix login" in ${P} (${WS}) and assigns it to Asha Rao (asha@example.com). Asha Rao is already in this workspace.`);
     // CONTROL, same `it`: call 2 with the userId creates.
     const s = stub();
     await createWith(s, { confirm_assignee: ASHA.userId });
