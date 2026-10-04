@@ -1,18 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseRules, ruleExactly, rulesNaming, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
 import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns.js';
 
-vi.mock('next/navigation', () => ({ redirect: vi.fn() }));
-
-import { redirect } from 'next/navigation';
-import Home from '../app/page.js';
-
 /**
  * The web app on phones, Plan Task 12 — sign-in, invite accept, MCP connect/authorize, the root page
- * (cases 21.190–21.192, §21.12; 21.193 is the owner's real-phone pass).
+ * (cases 21.190–21.191, §21.12; 21.192 reversed by spec E; 21.193 is the owner's real-phone pass).
  *
  * Every phone rule is drawn inside the ONE `@media (max-width: 40rem)` arm and AFTER the base rule it
  * overrides: at equal specificity source order decides, so the order is asserted, not assumed.
@@ -179,14 +174,5 @@ describe('21.191 invite accept, /mcp/connect and /mcp/authorize on a phone', () 
   });
 });
 
-describe('21.192 the root page on a phone', () => {
-  it('21.192 renders nothing (so nothing can overflow at 360) and its redirect still fires', () => {
-    const rendered: unknown = Home();
-    expect(rendered).toBeUndefined();
-    expect(redirect).toHaveBeenCalledWith('/workspaces');
-    // The page's code carries no markup and no stylesheet class at all.
-    expect(codeOf('app/page.tsx')).not.toMatch(/<[A-Za-z]|className/);
-    // CONTROL — the same scan does see markup on a page that has some.
-    expect(codeOf('app/sign-in/page.tsx')).toMatch(/className/);
-  });
-});
+// 21.192 (the root page renders nothing and redirects) is 🚫: `/` became Home (Knowledge Graph spec E, 27.625); the
+// viewport suite's 27.629 reaches it at every width.

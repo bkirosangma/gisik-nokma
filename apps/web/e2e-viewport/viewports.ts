@@ -185,17 +185,15 @@ export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as readonly ViewportName[];
  *
  * Reachability was MEASURED, not inferred, against the running app:
  *
- *     /                     307 → /workspaces
+ *     /                     200 (Home, spec E; was 307 → /workspaces)
  *     /help                 200
  *     /privacy              200
  *     /terms                200
  *     /sign-in              200
  *     /this-does-not-exist  404
  *
- * `/` renders no layout of its own — `app/page.tsx` is four lines and its whole
- * body is `redirect('/workspaces')`. Its target is an AUTHED route. So `/` is
- * covered as a redirect assertion only; measuring `/workspaces` and filing the
- * numbers under `/` would be reporting a route this suite cannot reach.
+ * `/` answers 200 and renders Home's frame (the nav and an h1) since Knowledge Graph spec E; the workspace read behind it
+ * needs the API, so it stays out of `UNAUTHED_ROUTES` and is covered by 27.629 (no redirect; the brand's Tab + Enter).
  *
  * 13.352 (Task 15, neo restyle) — `/privacy` and `/terms` are both swept by
  * every check this file drives (accessible-names, tap-target, type-scale),
