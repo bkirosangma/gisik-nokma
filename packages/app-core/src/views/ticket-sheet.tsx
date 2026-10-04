@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import {
   PRIORITIES,
+  claimedEstimate,
+  estimateValueSchema,
   newUlid,
   prioritySchema,
   statesWithBacklog,
@@ -566,8 +568,8 @@ export type TicketSheetProps = {
 
 /**
  * How many field rows the sheet draws BEFORE the generic custom-field loop — the
- * fixed rows `State · Assignee · Priority · Due · Start · Type · Visibility`, in
- * that order (spec 2026-09-22, decision 12). It exists so the loop's tint index
+ * fixed rows `State · Assignee · Priority · Due · Start · Estimate · Type ·
+ * Visibility`, in that order (spec 2026-09-22, decision 12; Estimate since wtg2 T4). It exists so the loop's tint index
  * continues the fixed rows' alternation instead of restarting at zero, which
  * would put two tinted rows side by side at the seam.
  *
@@ -585,11 +587,13 @@ export type TicketSheetProps = {
  * The lesson is in the constant's history: a count with no fixture that exercises
  * it is a number, not a guarantee.
  */
-const FIXED_FIELD_ROWS = 7;
+const FIXED_FIELD_ROWS = 8;
 
 /**
  * The field ids that have their OWN row on this sheet, so the generic loop must
- * skip them — `title`, `description`, `dueDate`, `startDate` and `priority`.
+ * skip them — `title`, `description`, `dueDate`, `startDate`, `priority` and
+ * `estimate`, plus `reworkEstimate` and `waitForAll` (wtg2 T4), which have NO row
+ * here yet (Part 3 draws their controls) and must not fall to a raw-id row.
  *
  * A `Set` rather than the chain of `||` comparisons it replaces, and the reason is
  * the tint index rather than taste: the loop now FILTERS on these ids before
@@ -605,6 +609,9 @@ const OWN_ROW_FIELD_IDS: ReadonlySet<string> = new Set([
   'dueDate',
   'startDate',
   'priority',
+  'estimate',
+  'reworkEstimate',
+  'waitForAll',
 ]);
 
 /**
@@ -869,6 +876,11 @@ export function TicketSheet({
   const [startDraft, setStartDraft] = useState<string | null>(null);
   const [startSaving, setStartSaving] = useState(false);
   const startSubmittingRef = useRef(false);
+  /** The Estimate row (wtg2 T4): the Start row's draft / saving / re-entrancy trio, plus the invalid flag its whole-day check raises. */
+  const [estimateDraft, setEstimateDraft] = useState<string | null>(null);
+  const [estimateSaving, setEstimateSaving] = useState(false);
+  const [estimateInvalid, setEstimateInvalid] = useState(false);
+  const estimateSubmittingRef = useRef(false);
   /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
@@ -2312,6 +2324,65 @@ export function TicketSheet({
     }
   };
 
+  /**
+   * The Estimate row's commit (wtg2 T4), `submitStartDate`'s twin: a blank is the clearing claim, a whole number of
+   * days from 1 to 365 is the claim, anything else files NOTHING and says why. Checked with the domain's
+   * `estimateValueSchema`, the one origin the engine also holds the claim to.
+   */
+  const submitEstimate = async (raw: string): Promise<void> => {
+    const next = raw.trim() === '' ? null : Number(raw);
+    if (next !== null && !estimateValueSchema.safeParse(next).success) {
+      setEstimateInvalid(true);
+      return;
+    }
+    setEstimateInvalid(false);
+    if (next === estimate) {
+      setEstimateDraft(null);
+      return;
+    }
+    if (estimateSubmittingRef.current) return;
+    estimateSubmittingRef.current = true;
+    setEstimateSaving(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.field_set',
+        payload: { fieldId: 'estimate', value: next },
+      });
+      optimistic.begin({ estimate: next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('estimate');
+        throw cause;
+      }
+      const result = results[0];
+      if (result === undefined) {
+        optimistic.drop('estimate');
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        optimistic.settle('estimate');
+        setServerRefusal(null);
+        setTransportError(null);
+        setEstimateDraft(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      optimistic.drop('estimate');
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } finally {
+      estimateSubmittingRef.current = false;
+      setEstimateSaving(false);
+    }
+  };
+
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
     submitTicketEvent(
@@ -2436,6 +2507,9 @@ export function TicketSheet({
    */
   const dueDate = dateClaimOf({ state, pendingFieldIds: [] }, 'dueDate');
   const startDate = dateClaimOf({ state, pendingFieldIds: [] }, 'startDate');
+  /** Read through the domain's total reader: a stored claim that fails the schema shows as no estimate, never a crash. */
+  const estimate = claimedEstimate(state.fields, 'estimate');
+  const estimateClaim = state.fields['estimate'];
   const priorityClaim = state.fields['priority'];
   /**
    * The level the SELECTED segment shows, or `null` when this read carries no
@@ -4070,7 +4144,51 @@ export function TicketSheet({
                 )}
               </dd>
             </div>
-            <div className={fieldRowClass(5)} data-testid="field-type">
+            {/* The Estimate row (wtg2 T4, spec ES-1): whole days, beside Start and Due, the Start row's commit on
+                blur and Enter and its Escape that abandons the draft. An invalid number files nothing and says why. */}
+            <div className={fieldRowClass(5)} data-testid="field-estimate">
+              <dt>Estimate</dt>
+              <dd>
+                <input
+                  className="gn-field__input gn-ticket-sheet__estimate-input"
+                  type="number"
+                  min={1}
+                  max={365}
+                  step={1}
+                  inputMode="numeric"
+                  aria-label="Estimate (days)"
+                  value={estimateDraft ?? (estimate === null ? '' : String(estimate))}
+                  disabled={estimateSaving}
+                  onChange={(event) => setEstimateDraft(event.target.value)}
+                  onBlur={() => {
+                    if (estimateDraft !== null) void submitEstimate(estimateDraft);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (estimateDraft !== null) void submitEstimate(estimateDraft);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      // The Start row's reason: `Sheet` listens for Escape on the document.
+                      event.preventDefault();
+                      setEstimateDraft(null);
+                      setEstimateInvalid(false);
+                    }
+                  }}
+                />
+                {estimateInvalid ? (
+                  <span role="alert" className="gn-refusal gn-refusal--preview">
+                    Estimate must be a whole number of days from 1 to 365.
+                  </span>
+                ) : estimate === null ? (
+                  <span className="gn-ticket-sheet__absent">No estimate</span>
+                ) : (
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('estimate') || estimateClaim === undefined ? SAVING_CLAIM : `set by ${nameOf(estimateClaim.actorId)} on ${formatDate(estimateClaim.serverTime)}`}</span>
+                )}
+              </dd>
+            </div>
+            <div className={fieldRowClass(6)} data-testid="field-type">
               <dt>Type</dt>
               <dd>
                 {/* The NAME from the workspace ladder, or the id when the
@@ -4102,7 +4220,7 @@ export function TicketSheet({
               actually known. The loop below now skips `description`, so the row
               is drawn once.
             */}
-            <div className={fieldRowClass(6)} data-testid="field-visibility">
+            <div className={fieldRowClass(7)} data-testid="field-visibility">
               <dt>Visibility</dt>
               <dd>
                 {/*

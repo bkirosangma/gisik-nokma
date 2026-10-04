@@ -86,6 +86,22 @@ async function typeTitle(user: ReturnType<typeof userEvent.setup>, text: string)
 }
 
 describe('the sheet shows a write the moment it is made (spec S5)', () => {
+  it('29.164 an estimate shows at once with Saving… and survives a stale reload', async () => {
+    const user = userEvent.setup();
+    const { writes } = await mount();
+    const row = () => screen.getByTestId('field-estimate');
+    expect(within(row()).getByText('No estimate')).toBeInTheDocument(); // control
+    await user.type(within(row()).getByLabelText('Estimate (days)'), '3');
+    await user.tab();
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(within(row()).getByLabelText('Estimate (days)')).toHaveValue(3);
+    expect(row().textContent).toContain('Saving…');
+    writes[0]!.resolve([committed]);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(within(row()).getByLabelText('Estimate (days)')).toHaveValue(3);
+    expect(row().textContent).not.toContain('No estimate');
+  });
+
   it('25.092 a committed title shows the new title at once and never flashes the old one back while the reload is slow', async () => {
     const user = userEvent.setup();
     const { writes } = await mount();

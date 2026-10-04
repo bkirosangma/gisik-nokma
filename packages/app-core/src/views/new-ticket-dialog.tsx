@@ -5,6 +5,7 @@ import {
   PRIORITIES,
   docToPlainText,
   dueDateValueSchema,
+  estimateValueSchema,
   newUlid,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -206,6 +207,8 @@ export type NewTicketDraft = {
    */
   startDate?: string;
   dueDate?: string;
+  /** The birth estimate in whole days (wtg2 T4, spec ES-1). Absent means no claim: an empty input is omitted, like the dates. */
+  estimate?: number;
 };
 
 export type NewTicketDialogProps = {
@@ -492,6 +495,8 @@ export function NewTicketDialog({
    */
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  /** The birth estimate's input text (wtg2 T4), empty by default; turned into a number only when it is valid. */
+  const [estimate, setEstimate] = useState('');
   /**
    * ⚠ THE SEED RUNS ONCE, AND THE LADDER'S IDENTITY LEGITIMATELY CHANGES UNDER
    * IT (E2-33a, 2026-09-21).
@@ -615,6 +620,7 @@ export function NewTicketDialog({
       );
       setStartDate(restoreDraft.startDate ?? '');
       setDueDate(restoreDraft.dueDate ?? '');
+      setEstimate(restoreDraft.estimate === undefined ? '' : String(restoreDraft.estimate));
       setDraftTicketId(restoreDraft.ticketId as ReturnType<typeof newUlid>);
       setDescription(restoreDraft.description);
       setAssigneeId(restoreDraft.assigneeId === null || restoreDraft.assigneeIsOutsider === true ? UNASSIGNED : restoreDraft.assigneeId);
@@ -713,6 +719,7 @@ export function NewTicketDialog({
     // every other field on this list follows.
     setStartDate('');
     setDueDate('');
+    setEstimate('');
     // The rest of the draft (owner request 2026-09-23). A NEW id with them: the
     // previous ticket's id already resolves, and reusing it would be refused.
     setDraftTicketId(newUlid());
@@ -813,6 +820,7 @@ export function NewTicketDialog({
    */
   const startDateInvalid = startDate !== '' && !dueDateValueSchema.safeParse({ date: startDate }).success;
   const dueDateInvalid = dueDate !== '' && !dueDateValueSchema.safeParse({ date: dueDate }).success;
+  const estimateInvalid = estimate.trim() !== '' && !estimateValueSchema.safeParse(Number(estimate)).success;
 
   /**
    * TWO flags, on purpose, because they answer different questions at different
@@ -929,6 +937,7 @@ export function NewTicketDialog({
         // always carries a real day or nothing.
         ...(startDate === '' ? {} : { startDate }),
         ...(dueDate === '' ? {} : { dueDate }),
+        ...(estimate.trim() === '' ? {} : { estimate: Number(estimate) }),
       }),
     ).finally(() => {
       submittingRef.current = false;
@@ -946,7 +955,9 @@ export function NewTicketDialog({
         ? 'Choose a type to create the ticket'
         : startDateInvalid || dueDateInvalid
           ? 'Fix the dates to create the ticket'
-          : null;
+          : estimateInvalid
+            ? 'Fix the estimate to create the ticket'
+            : null;
 
   return (
     <Dialog
@@ -967,9 +978,10 @@ export function NewTicketDialog({
             variant="primary"
             // `submitting` is the render half of the duplicate-submit guard (the ref is what actually stops one):
             // a control that looks pressable while a request is on the wire is a lie. The other terms are the
-            // three reasons `disabledHint` names. The type term is MEMBERSHIP, not emptiness (E2-33a): `typeId ===
+            // four reasons `disabledHint` names. The type term is MEMBERSHIP, not emptiness (E2-33a): `typeId ===
             // ''` passes for an id the list no longer offers, and a payload may only carry a type the picker offers.
-            // The two date inputs (addendum, 2026-09-23): a submit must carry a real day or nothing.
+            // The two date inputs (addendum, 2026-09-23): a submit must carry a real day or nothing; the estimate
+            // (wtg2 T4) a whole number of days from 1 to 365 or nothing.
             disabled={disabledHint !== null || submitting}
             aria-describedby={disabledHint === null ? undefined : hintId}
             onClick={create}
@@ -1155,6 +1167,27 @@ export function NewTicketDialog({
         {dueDateInvalid ? (
           <p role="alert" className="gn-refusal gn-refusal--preview">
             Due date must be a real day in YYYY-MM-DD form.
+          </p>
+        ) : null}
+      </label>
+      {/* The birth ESTIMATE (wtg2 T4, spec ES-1): whole days beside the two dates, empty by default and omitted
+          when empty. Checked with the domain's `estimateValueSchema`, the same origin the engine holds it to. */}
+      <label className="gn-new-ticket__field">
+        Estimate (days)
+        <input
+          className="gn-field__input"
+          type="number"
+          min={1}
+          max={365}
+          step={1}
+          inputMode="numeric"
+          aria-label="Estimate (days)"
+          value={estimate}
+          onChange={(event) => setEstimate(event.target.value)}
+        />
+        {estimateInvalid ? (
+          <p role="alert" className="gn-refusal gn-refusal--preview">
+            Estimate must be a whole number of days from 1 to 365.
           </p>
         ) : null}
       </label>

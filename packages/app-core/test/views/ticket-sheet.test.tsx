@@ -3105,6 +3105,7 @@ describe('sheet prototype parity — the details body order and chrome', () => {
       'field-priority',
       'field-due',
       'field-start',
+      'field-estimate',
       'field-type',
       'field-visibility',
       'sheet-subtasks',
@@ -3228,8 +3229,8 @@ describe('sheet prototype parity — the details body order and chrome', () => {
             serverTime: '2026-08-18T08:00:00.000Z',
           },
           // A field the loop does NOT exclude, so `rowIndex` really runs. Its
-          // name is arbitrary: what matters is that it is not one of the seven
-          // fixed rows' ids nor one of the loop's four exclusions.
+          // name is arbitrary: what matters is that it is not one of the eight
+          // fixed rows' ids nor one of the loop's exclusions.
           counterparty: {
             value: 'Anselma Marak',
             actorId: 'user_kiro',
@@ -3248,7 +3249,7 @@ describe('sheet prototype parity — the details body order and chrome', () => {
     // seam to read, and every assertion below would be about the fixed rows
     // only — which is exactly how the constant went unconstrained.
     expect(screen.getByTestId('field-counterparty')).toBeInTheDocument();
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(9);
 
     // (1) The grid alternates END TO END, loop rows included.
     rows.forEach((row, index) => {
@@ -3257,16 +3258,16 @@ describe('sheet prototype parity — the details body order and chrome', () => {
       );
     });
     // (2) AND THE SEAM ITSELF, named rather than left to the loop above: the last
-    // FIXED row (Visibility, index 6) is untinted and the first LOOP row is
-    // tinted. This is the pair a stale `FIXED_FIELD_ROWS` collapses, and it is
+    // FIXED row (Visibility, index 7 since wtg2 T4's Estimate row) is tinted and
+    // the first LOOP row is untinted. This is the pair a stale `FIXED_FIELD_ROWS` collapses, and it is
     // asserted on the two elements by id so a mis-set constant reports the seam
     // rather than an opaque index.
     expect(
       screen.getByTestId('field-visibility').classList.contains('gn-ticket-sheet__field--tinted'),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       screen.getByTestId('field-counterparty').classList.contains('gn-ticket-sheet__field--tinted'),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 
@@ -3658,6 +3659,42 @@ describe('G — Priority, Due and Type as rows', () => {
     const row = screen.getByTestId('field-start');
     expect(within(row).getByLabelText('Start date')).toHaveValue('2026-08-20');
     expect(within(row).getByText('set by Anselma Marak on 18 Aug 2026')).toBeInTheDocument();
+  });
+
+  it('29.164 the Estimate row: between Start and Type; whole days file field_set, blank files null, invalid files nothing', async () => {
+    const source = renderSheet(ticketRead());
+    await settled();
+    const row = screen.getByTestId('field-estimate');
+    expect(row.querySelector('dt')?.textContent).toBe('Estimate');
+    expect(within(row).getByText('No estimate')).toBeInTheDocument(); // the absent copy, exact
+    expect(screen.getByTestId('field-start').compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(row.compareDocumentPosition(screen.getByTestId('field-type')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const input = within(row).getByLabelText('Estimate (days)');
+    fireEvent.change(input, { target: { value: '3' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'estimate', value: 3 });
+    for (const bad of ['2.5', '0', '366']) {
+      fireEvent.change(input, { target: { value: bad } });
+      fireEvent.blur(input);
+      expect((await within(row).findByRole('alert', {}, { timeout: 4_000 })).textContent, bad).toBe('Estimate must be a whole number of days from 1 to 365.');
+    }
+    expect(source.ingested).toHaveLength(1);
+  });
+  it('29.164 a claimed estimate clears with a blank; the flow built-ins draw no generic rows', async () => {
+    const claimOf = (value: unknown) => ({ value, actorId: 'user_anselma', clientTime: '2026-08-18T08:04:00.000Z', serverTime: '2026-08-18T08:05:00.000Z' });
+    const source = renderSheet(ticketRead({ ticket: ticketStateSeed({ fields: { ...ticketRead().ticket.fields, estimate: claimOf(4), reworkEstimate: claimOf(2), waitForAll: claimOf(true), counterparty: claimOf('Anselma Marak') } }) }));
+    await settled();
+    const row = screen.getByTestId('field-estimate');
+    expect(within(row).getByLabelText('Estimate (days)')).toHaveValue(4);
+    expect(within(row).getByText('set by Anselma Marak on 18 Aug 2026')).toBeInTheDocument();
+    expect(screen.queryByTestId('field-reworkEstimate')).toBeNull();
+    expect(screen.queryByTestId('field-waitForAll')).toBeNull();
+    expect(screen.getByTestId('field-counterparty')).toBeInTheDocument(); // control
+    fireEvent.change(within(row).getByLabelText('Estimate (days)'), { target: { value: '' } });
+    fireEvent.blur(within(row).getByLabelText('Estimate (days)'));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'estimate', value: null });
   });
 
   /**
