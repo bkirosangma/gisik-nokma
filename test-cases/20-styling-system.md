@@ -262,7 +262,7 @@ Owner, 2026-10-01: *"yes, add it as recommended."* Every other board suite mocks
 
 ## 20.28 Plan B — the Timeline tab
 
-- ✅ **20.271 — the timeline's Earlier / Today / Later navigation is a quiet outlined 44px control with its hover wash and agrees with the calendar's navigation on every value (the pair 13.1147 compares), and its weeks band and side panel are recessed tracks;** control: the clipped-bar dashed edges and the side-entry marker edge are still declared. Mutation: restore `min-height: 2.25rem` on `.gn-timeline__nav`.
+- ✅ **20.271 — the timeline's Today control is a quiet outlined 44px control with its hover wash and agrees with the calendar's navigation on every value (the pair 13.1147 compares), and its side panel is a recessed track (Earlier / Later and the weeks band were retired with the paging by Workflow and Timeline graphs Part 1 T9, 29.106);** control: the pending bar's dashed outline and the side-entry marker edge are still declared. Mutation: restore `min-height: 2.25rem` on `.gn-timeline__nav`.
 - ✅ **20.272 — no timeline rule paints a flat boundary or the retired constant;** control: the scan reads more than 25 timeline rules. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-timeline__side`.
 ## 20.35 Plan B — settings and the workspace settings form
 

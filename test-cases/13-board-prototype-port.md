@@ -743,7 +743,7 @@ declared. **No live cross-style/cross-theme visual check was performed** — the
 section calls for one ("A live read of the board, list, calendar and timeline in all three styles × both
 themes") and it is named here as a gap for whoever reviews this before merge, not silently skipped.
 
-- **13.474** 🟡 The timeline restyles to the prototype's metrics: 230px title column + `trayBg`/
+- **13.474** 🚫 RETIRED by Workflow and Timeline graphs Part 1 T9 (the 230px title column and the week tracks no longer exist; replaced by 29.106): The timeline restyles to the prototype's metrics: 230px title column + `trayBg`/
   `trayShadow` header grid, `minmax(0, 1fr)` week tracks, 42px zebra rows, a 6px-radius `accent`/
   `accentText` bar (still `0` on the clipped side only), and a `trayBg`/`trayShadow` undrawn footer.
   **Covered:** the three literals `timeline-view.test.tsx` pins by exact equality/substring
@@ -808,7 +808,7 @@ failures earlier this session (a different pair each of three prior runs) are no
 environmental flakes rather than anything this work touched, since the identical suite is clean here with
 no `apps/server` changes at all.
 
-- **13.477** ❌ The Timeline's "Row title" metric (`padding 6px 12px; 15px/20px`, the spec table's fourth
+- **13.477** 🚫 RETIRED by Workflow and Timeline graphs Part 1 T9 (the grid's Row title cell no longer exists; replaced by 29.106): The Timeline's "Row title" metric (`padding 6px 12px; 15px/20px`, the spec table's fourth
   row, dropped by the plan before reaching this task's brief) lands on `.gn-timeline__title`. All eight
   Timeline spec rows re-checked row by row against the shipped CSS and confirmed matching. Not verified
   by a live render in any style or theme. — (`packages/ui/src/ui.css`) — uncited on 2026-09-18: no test found; was ✅ on owner/workspace-edits d958ab8f. `timeline-view.test.tsx` uses `.gn-timeline__title` only for DOM structure (`closest()`), never for its padding, and no test reads that rule out of `ui.css`.
