@@ -98,6 +98,7 @@ describe('28.122 a publisher who can no longer see S', () => {
 
     const single = await w.send('member', 'ticket.published', d, { projectId: w.PROJECT() });
     expect(single).toMatchObject({ status: 'refused', rule: DRAFT_LINK_REFILE_REFUSED_RULE, reason: GONE });
+    expect(DRAFT_LINK_REFILE_REFUSED_RULE).toBe('draft.link-refile-refused'); // P20 2d: the id is user-visible (MCP's "refused by <rule>")
     const set = await w.publishSet('member', [d]);
     expect(set.statusCode, set.body).toBe(409);
     expect(set.json()).toEqual({
