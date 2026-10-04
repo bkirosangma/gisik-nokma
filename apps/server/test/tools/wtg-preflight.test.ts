@@ -47,7 +47,7 @@ async function workspaceCreatedRaw(workspaceId: string): Promise<void> {
   await appendTestEvent(db.pool, testEnvelope({ workspaceId, actorId: ACTOR, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'W' } }));
 }
 async function workflowRaw(workspaceId: string, workflowId: string, version: number, initialStateId: string): Promise<void> {
-  const states = [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }];
+  const states = [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }, { id: 'shipped', name: 'Shipped', category: 'terminal' }];
   await db.pool.query(
     `INSERT INTO proj_workflows (workspace_id, workflow_id, version, name, definition, defined_by, defined_at, published_workspace_seq)
      VALUES ($1, $2, $3::integer, 'wf', $4, $5, now(), $3::integer)`,
@@ -114,7 +114,7 @@ describe('29.148 existing decision types', () => {
 
 describe('29.149 terminal-initial workflows', () => {
   it('29.149 reports only the highest version, with its bound types', async () => {
-    const ws = newUlid(); const open = newUlid(); const term = newUlid(); const fixed = newUlid(); const broke = newUlid();
+    const ws = newUlid(); const open = newUlid(); const term = newUlid(); const fixed = newUlid(); const broke = newUlid(); const shipped = newUlid();
     await workflowRaw(ws, open, 1, 'todo');
     await workflowRaw(ws, term, 1, 'done');
     await projectRaw(ws, def('chore', { workflowId: term }));
@@ -122,10 +122,12 @@ describe('29.149 terminal-initial workflows', () => {
     await workflowRaw(ws, fixed, 2, 'todo');
     await workflowRaw(ws, broke, 1, 'todo');
     await workflowRaw(ws, broke, 2, 'done');
+    await workflowRaw(ws, shipped, 1, 'shipped'); // a different terminal state id, so the reported initialStateId is read, not assumed
     const found = (await wtgPreflight(db.pool)).terminalInitialWorkflows.filter((w) => w.workspaceId === ws);
     expect(found).toContainEqual({ workspaceId: ws, workflowId: term, version: 1, initialStateId: 'done', boundTypes: 1 });
     expect(found).toContainEqual({ workspaceId: ws, workflowId: broke, version: 2, initialStateId: 'done', boundTypes: 0 });
-    expect(found.map((w) => w.workflowId).sort()).toEqual([broke, term].sort());
+    expect(found).toContainEqual({ workspaceId: ws, workflowId: shipped, version: 1, initialStateId: 'shipped', boundTypes: 0 });
+    expect(found.map((w) => w.workflowId).sort()).toEqual([broke, shipped, term].sort());
   });
 });
 
@@ -194,6 +196,11 @@ describe('29.151 report, exit code, read-only', () => {
       expect(withShadow.stdout).toMatch(/wtg-preflight: database gisik_test_\w+ \(\d+ workspaces\)/);
       expect(withShadow.stdout).toMatch(/shadowing custom fields: 1 \(BLOCKS wtg2 T4\)/);
       expect(withShadow.stdout).toMatch(/field-claim\s+\S+ field estimate \(1 claims\)/);
+      // Import safety: loading the module (as the tests do) must not run main(). `tsx -e` has no argv[1] either, so the entry guard is read in both its halves.
+      const imported = spawnSync('pnpm', ['exec', 'tsx', '-e', "import('./src/tools/wtg-preflight.ts').then(() => console.log('imported-only'))"],
+        { cwd: join(dirname(fileURLToPath(import.meta.url)), '../..'), encoding: 'utf8', env: { ...process.env, DATABASE_URL: shadowed.url }, timeout: 90_000 });
+      expect(imported.status).toBe(0);
+      expect(imported.stdout.trim()).toBe('imported-only'); // control: the same database, run as the CLI above, prints the report and exits 1
       const clean = run({ ...process.env, DATABASE_URL: fresh.url }); // control: the same CLI, a database with nothing to report
       expect(clean.status).toBe(0);
       expect(clean.stdout).toContain('shadowing custom fields: none');

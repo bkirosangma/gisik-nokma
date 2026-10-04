@@ -95,7 +95,14 @@ describe('29.150 terminal-category readers', () => {
     writeFileSync(join(dir, 'src', 'notes.md'), "state 'terminal'\n");
     writeFileSync(join(dir, 'src', 'query.sql'), "SELECT 1 WHERE state_category = 'terminal';\n");
     writeFileSync(join(dir, 'src', 'cell.tsx'), "export const C = (s: string) => s === 'terminal';\n");
-    expect([...scanTerminalReaders(dir, ['src']).keys()].sort()).toEqual(['src/cell.tsx', 'src/planted.ts', 'src/query.sql']);
+    // One planted file per pattern alternative, each matching ONLY that alternative, so dropping one is seen without a real file to lean on.
+    writeFileSync(join(dir, 'src', 'dot.ts'), 'export const n = (t: { terminal: number }) => t.terminal;\n');
+    writeFileSync(join(dir, 'src', 'kids.ts'), 'export const c = { terminalChildren: 3 };\n');
+    writeFileSync(join(dir, 'src', 'snake.sql'), 'SELECT count(*) AS terminal_children FROM t;\n');
+    writeFileSync(join(dir, 'src', 'list.ts'), "export const m = { terminal: ['done'] };\n");
+    writeFileSync(join(dir, 'src', 'cap.ts'), 'export const k = { terminal: Done };\n');
+    // A listed directory that does not exist is skipped, not a crash (a package that was removed).
+    expect([...scanTerminalReaders(dir, ['src', 'missing']).keys()].sort()).toEqual(['src/cap.ts', 'src/cell.tsx', 'src/dot.ts', 'src/kids.ts', 'src/list.ts', 'src/planted.ts', 'src/query.sql', 'src/snake.sql']);
 
     const found = scanTerminalReaders(ROOT, SCAN_DIRS);
     expect([...found.keys()].sort()).toEqual(Object.keys(TERMINAL_READERS).sort());
