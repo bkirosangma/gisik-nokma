@@ -105,7 +105,7 @@ describe('28.123 S in the trash, and S erased', () => {
 });
 
 describe('28.125 the listeners hear the publish and then each re-filed event, after the COMMIT', () => {
-  it('in order on a publish; nothing for a publish or a set that is refused', async () => {
+  it('in order on a publish, single and atomic; nothing for a publish or a set that is refused', async () => {
     const db = await createTestDatabase();
     try {
       const { app, ingest } = buildTestApp(db);
@@ -126,6 +126,12 @@ describe('28.125 the listeners hear the publish and then each re-filed event, af
       // and the single path: the same refused publish is heard by nobody either
       expect((await ingest.ingestBatch([x.publish(x.d2)]))[0]).toMatchObject({ status: 'refused', rule: DRAFT_LINK_REFILE_REFUSED_RULE });
       expect(heard).toEqual([]);
+
+      // the atomic path's success: S2 restored, the set [D2] commits and the listeners hear the re-file after the publish
+      expect((await ingest.ingestBatch([x.submit('ticket.restored', x.s2, {})]))[0]?.status).toBe('committed');
+      heard.length = 0;
+      expect(await ingest.ingestAtomic([x.publish(x.d2)])).toMatchObject({ status: 'committed' });
+      expect(heard).toEqual([['ticket.published', x.d2], ['ticket.link_added', x.s2]]);
       stop();
       await app.close();
     } finally {

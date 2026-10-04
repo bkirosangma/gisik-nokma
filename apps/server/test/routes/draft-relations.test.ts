@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { DRAFT_LINK_REFILE_REFUSED_RULE } from '../../src/ingest/ingest-service.js';
+import { LINK_TARGET_NOT_VISIBLE_REASON, PERMISSION_VISIBILITY_RULE } from '../../src/permissions/check-permission.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -115,6 +116,35 @@ describe('28.128 a published child under a draft parent (owner ruling O1)', () =
 
     expect(await publish(d)).toMatchObject(committed); // CONTROL
     expect((await db.pool.query('SELECT parent_id FROM proj_tickets WHERE ticket_id = $1', [c])).rows[0].parent_id).toBe(d);
+  });
+  it('refuses holding a child the author cannot open at the gate, in a link\'s words; the author\'s own draft passes the gate and the engine refuses it', async () => {
+    const [p, c, d, mine, theirs] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+    await family(p, c);
+    await draftEpic(d);
+    await draftEpic(mine);
+    expect(
+      await w.send('owner', 'ticket.created', theirs, {
+        typeId: 'task', projectId: w.PROJECT(), parentId: null, title: `Owner draft ${theirs.slice(-4)}`, start: 'backlog', draft: true,
+      }),
+    ).toMatchObject(committed);
+    const notVisible = { status: 'refused', rule: PERMISSION_VISIBILITY_RULE, reason: LINK_TARGET_NOT_VISIBLE_REASON };
+    expect(LINK_TARGET_NOT_VISIBLE_REASON).toBe('The other ticket does not exist in this workspace, or you cannot see it.');
+
+    // C hidden from the author: the engine reads every ticket and would hold it, so only the gate refuses this
+    expect(await w.send('owner', 'visibility.set', c, { ticketId: c, mode: 'explicit', userIds: [read.userIds.owner] })).toMatchObject(committed);
+    expect(await hold(d, c)).toMatchObject(notVisible);
+    // another person's draft reads exactly like a ticket that does not exist
+    expect(await hold(d, theirs)).toMatchObject(notVisible);
+    // the author's own draft is openable (canOpen, not canSee): the gate lets it through and the engine says no
+    expect(await hold(d, mine)).toMatchObject({
+      status: 'refused', rule: 'hierarchy.unknown-parent', reason: 'The chosen parent ticket does not exist in this workspace.',
+    });
+    expect((await w.stateOf('member', d)).ticketState).not.toHaveProperty('pendingChildren');
+
+    // CONTROL: C visible again, the same hold is committed
+    expect(await w.send('owner', 'visibility.set', c, { ticketId: c, mode: 'inherit' })).toMatchObject(committed);
+    expect(await hold(d, c)).toMatchObject(committed);
+    expect(((await w.stateOf('member', d)).ticketState as Record<string, unknown>)['pendingChildren']).toEqual([c]);
   });
 });
 
