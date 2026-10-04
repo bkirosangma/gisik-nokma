@@ -92,8 +92,9 @@ describe('29.051 multi-segment items', () => {
     expect([tie.rows, tie.strategy]).toEqual([2, 'segments']);
   });
 
-  it("29.051 an item's segments may come in any order (its first day is its earliest), and its own label footprints merge so no other item slips inside them; control: the same items with sorted segments, and without the label", () => {
-    // u starts on day 0 whichever order its segments come in, so it packs before w (day 1) and keeps row 0; v fits u's gap.
+  it("29.051 an item's segments may come in any order (its first day is its earliest), and its own label footprints merge so no other item slips inside them (a bar inside a swollen label footprint, before or after the segment it swallows); control: the same items with sorted segments, and without the label", () => {
+    // The SEGMENT packing (the hull packing ties at 2 rows here, and a tie keeps the segments): u starts on day 0 whichever
+    // order its segments come in, so it packs before w (day 1) and keeps row 0; v fits u's gap.
     const uSorted: PackItem = { id: 'u', key: 'GN-1', segments: [{ start: 0, end: 2 }, { start: 10, end: 12 }] };
     const u: PackItem = { ...uSorted, segments: [{ start: 10, end: 12 }, { start: 0, end: 2 }] };
     const w: PackItem = { id: 'w', key: 'GN-2', segments: [{ start: 1, end: 1 }] };
@@ -102,12 +103,23 @@ describe('29.051 multi-segment items', () => {
     expect([sorted.rowOf.get('u'), sorted.rowOf.get('w'), sorted.rowOf.get('v')]).toEqual([0, 1, 0]);
     const unsorted = packLane([u, w, v], { ppd: 16 });
     expect([unsorted.rowOf.get('u'), unsorted.rowOf.get('w'), unsorted.rowOf.get('v')]).toEqual([0, 1, 0]);
-    // a's first segment swells to days 0-9 with a 160 px label and swallows its own second segment (days 2-3); b on day 5
-    // collides with the swollen footprint. Left unmerged, the row's end-sorted search skips past it and b slips in.
+    // a's first segment swells to days 0-9 with a 160 px label and swallows its own second segment (days 2-3); normalise
+    // merges the two into one footprint, days 0-9.
     const a: PackItem = { id: 'a', key: 'GN-4', segments: [{ start: 0, end: 0 }, { start: 2, end: 3 }] };
-    const b: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 5, end: 5 }] };
-    expect(packLane([a, b], { ppd: 16 }).rows).toBe(1);
-    expect(packLane([a, b], { ppd: 16, labelPx: (item, i) => (item.id === 'a' && i === 0 ? 160 : 0) }).rows).toBe(2);
+    const labelled = { ppd: 16, labelPx: (item: PackItem, i: number) => (item.id === 'a' && i === 0 ? 160 : 0) };
+    // The SEGMENT search: b on day 1 sits inside the swollen footprint, before the swallowed segment. Left unmerged, the row
+    // holds [2-3] then [0-9] (sorted by end); the search for the first interval ending on or after day 1 stops at [2-3],
+    // which starts after b, so b slips in beside a (the unmerged hull, days 0-3, still refuses b, but packLane keeps the
+    // fewer rows). Control: without the label b fits a's gap on day 1.
+    const early: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 1, end: 1 }] };
+    expect(packLane([a, early], { ppd: 16 }).rows).toBe(1);
+    expect(packLane([a, early], labelled).rows).toBe(2);
+    // The HULL: b on day 5 sits inside the swollen footprint, after the swallowed segment, so the segment search reaches
+    // [0-9] and refuses b merged or not. Left unmerged, the hull ends where the swallowed segment ends (day 3), b fits
+    // beside it, and packLane takes the hull's 1 row. Control: without the label b fits after a.
+    const late: PackItem = { id: 'b', key: 'GN-5', segments: [{ start: 5, end: 5 }] };
+    expect(packLane([a, late], { ppd: 16 }).rows).toBe(1);
+    expect(packLane([a, late], labelled).rows).toBe(2);
   });
 });
 
