@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { listMyDrafts } from '../../src/read/drafts.js';
+import { visibleProjects } from '../../src/read/visible-projects.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { testEnvelope } from '../helpers/envelope.js';
 import { DRAFT_TITLE, seedDraftWorld, type DraftWorld } from '../helpers/draft-world.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
-import { seedMember, seedTicket } from '../helpers/seed.js';
+import { applyAll, seedMember, seedTicket } from '../helpers/seed.js';
 
 /**
  * Drafts T4, door G8 (spec §12.2, §13): the two reads of "my drafts". The subject is the session user; nobody
@@ -75,7 +78,7 @@ describe('28.078 G8: GET /v1/workspaces/:id/drafts', () => {
     }
   });
 
-  it('R18 and the discard flag: an author who is no longer a member lists nothing; a discarded draft is not listed', async () => {
+  it('R18 and the discard flag: an author who is a guest (on the project or not) or no longer a member lists nothing; a discarded draft is not listed', async () => {
     const { workspaceId, projectId } = read.world;
     const author = newUlid();
     const ticketId = newUlid();
@@ -98,6 +101,21 @@ describe('28.078 G8: GET /v1/workspaces/:id/drafts', () => {
     expect(await listMyDrafts(db.pool, author, workspaceId)).toHaveLength(1); // CONTROL: the role was the difference
     await db.pool.query('DELETE FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2', [workspaceId, author]);
     expect(await listMyDrafts(db.pool, author, workspaceId)).toEqual([]);
+
+    // A guest still ON the project (a re-grant writes the workspace row alone, so the explicit project row stays):
+    // the project is one they may be told the name of, so only R18's role half keeps the draft off their list.
+    const rostered = newUlid();
+    const rosteredDraft = newUlid();
+    await seedMember(db.pool, workspaceId, rostered, 'member', [{ projectId }]);
+    await seedTicket(db.pool, { workspaceId, projectId, ticketId: rosteredDraft, draftBy: rostered });
+    expect((await listMyDrafts(db.pool, rostered, workspaceId)).map((i) => i.ticketId)).toEqual([rosteredDraft]);
+    await applyAll(db.pool, [testEnvelope({
+      workspaceId, entity: { kind: 'membership', id: membershipId(workspaceId, rostered) },
+      type: 'membership.granted', payload: { userId: rostered, role: 'guest' }, actorId: newUlid(),
+    })]);
+    const demoted = await resolveEffectiveRole(db.pool, rostered, workspaceId);
+    expect((await visibleProjects(db.pool, demoted, workspaceId)).map((p) => p.projectId)).toContain(projectId); // CONTROL: the name is theirs to read
+    expect(await listMyDrafts(db.pool, rostered, workspaceId)).toEqual([]);
   });
 });
 
@@ -121,5 +139,13 @@ describe('28.079 G8: GET /v1/me/drafts', () => {
     expect(await items('member', `/v1/me/drafts?projectId=${nb.projectId}`)).toEqual([]);
     expect((await items('member', `/v1/me/drafts?projectId=${read.world.projectId}`)).length).toBe(mine.length);
     for (const role of ['owner', 'admin', 'guest', 'outsider', 'stranger'] as const) expect(await items(role, '/v1/me/drafts'), role).toEqual([]);
+
+    // a workspace in the trash lists nothing; restored, it lists again
+    const trash = (at: string | null) =>
+      db.pool.query('UPDATE proj_workspaces SET deleted_at = $2 WHERE workspace_id = $1', [nb.workspaceId, at]);
+    expect((await trash(new Date().toISOString())).rowCount).toBe(1);
+    expect(await items('neighbour', '/v1/me/drafts')).toEqual([]);
+    await trash(null);
+    expect(await items('neighbour', '/v1/me/drafts')).toHaveLength(1);
   });
 });

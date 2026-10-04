@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { canOpen, isOpenableDraft, ticketAccess } from '../../src/visibility/can-open.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { testEnvelope } from '../helpers/envelope.js';
 import { seedDraftWorld, withDraftsOpened, type DraftWorld } from '../helpers/draft-world.js';
 import { buildReadTestApp, type ReadWorld } from '../helpers/read-app.js';
-import { seedMember, seedProject, seedTicket } from '../helpers/seed.js';
+import { applyAll, seedMember, seedProject, seedTicket } from '../helpers/seed.js';
 
 /**
  * Drafts T4, case 28.070 (spec §4.2, group D): the door predicate. `canSee` is closed for every draft (T3), the
@@ -62,7 +64,7 @@ describe('28.070 ticketAccess, canOpen and isOpenableDraft', () => {
     });
   });
 
-  it('R18: demoted to guest, revoked, discarded or with the project in the trash, the author no longer opens it; restored, they do', async () => {
+  it('R18: demoted to guest (on the project or not), revoked, discarded or with the project in the trash, the author no longer opens it; restored, they do', async () => {
     const { workspaceId, projectId } = read.world;
     const author = newUlid();
     const ticketId = newUlid();
@@ -81,6 +83,22 @@ describe('28.070 ticketAccess, canOpen and isOpenableDraft', () => {
     expect(await isOpenableDraft(db.pool, author, ticketId)).toBe(false);
     await setRole('member');
     expect(await access()).toBe('own-draft'); // CONTROL: the role was the only difference
+
+    // A guest who is still ON the project: a re-grant writes the workspace row alone (proj-memberships.ts:88), so a
+    // member explicitly added to the project and then made a guest keeps the project row. The create door refuses a
+    // guest whatever their projects (check-permission.ts:858), and R18's role half says the same.
+    const rostered = newUlid();
+    const rosteredDraft = newUlid();
+    await seedMember(db.pool, workspaceId, rostered, 'member', [{ projectId }]);
+    await seedTicket(db.pool, { workspaceId, projectId, ticketId: rosteredDraft, draftBy: rostered });
+    expect(await ticketAccess(db.pool, rostered, rosteredDraft)).toBe('own-draft');
+    await applyAll(db.pool, [testEnvelope({
+      workspaceId, entity: { kind: 'membership', id: membershipId(workspaceId, rostered) },
+      type: 'membership.granted', payload: { userId: rostered, role: 'guest' }, actorId: newUlid(),
+    })]);
+    const demoted = await resolveEffectiveRole(db.pool, rostered, workspaceId);
+    expect([demoted.workspaceRole, demoted.projects.has(projectId)]).toEqual(['guest', true]); // CONTROL: the project half alone admits them
+    expect(await ticketAccess(db.pool, rostered, rosteredDraft)).toBe('none');
 
     await db.pool.query('UPDATE proj_tickets SET draft_discarded = true WHERE ticket_id = $1', [ticketId]);
     expect(await access()).toBe('none');
