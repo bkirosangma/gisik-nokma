@@ -117,7 +117,7 @@ describe('29.037 the camera', () => {
     expect(cam.getCamera().x).toBe(20);
   });
 
-  it('29.038 drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | frames say moving while pressed | a right-button press and a hover do not pan (control: a pen barrel press does) | a middle button does not pan | the pointer is captured and released | at zoom 2 a drag and a flick move half as far, on both axes | a vertical flick | a cancelled flick leaves no momentum | the release velocity is the newest 12 samples | a stray pointerup leaves a pinch alone; the pinch clamps; two fingers on one point move nothing | a press, a wheel and camera() each stop a flick; a press stops a glide', () => {
+  it('29.038 drag pans (touch too); two fingers pinch about their midpoint; a flick keeps going and stops; control: a rested release does not | frames say moving while pressed | a right-button press and a hover do not pan (control: a pen barrel press does) | a middle button does not pan | a hover from an unpressed pointer is ignored during a drag | the pointer is captured and released | at zoom 2 a drag and a flick move half as far, on both axes | a vertical flick | a cancelled flick leaves no momentum | the release velocity is the newest 12 samples | a stray pointerup leaves a pinch alone; the pinch clamps; two fingers on one point move nothing | a press, a wheel and camera() each stop a flick; a press stops a glide', () => {
     const { el, cam, fc, frames } = mount();
     el.dispatchEvent(pointer('pointerdown', { x: 400, y: 300, id: 1, kind: 'touch' }));
     el.dispatchEvent(pointer('pointermove', { x: 350, y: 280, id: 1, kind: 'touch' }));
@@ -202,6 +202,16 @@ describe('29.037 the camera', () => {
     el.dispatchEvent(pointer('pointermove', { x: 450, y: 300, kind: 'pen' }));
     expect(cam.getCamera().x).toBe(50);
     el.dispatchEvent(pointer('pointerup', { x: 450, y: 300, kind: 'pen' }));
+    // a hover from a pointer that never pressed (mouse 9) during a touch drag is ignored: it neither freezes the drag
+    // nor keeps the frames moving after the drag ends
+    cam.camera({ x: 0, y: 0, zoom: 1 }, { instant: true });
+    el.dispatchEvent(pointer('pointerdown', { x: 400, y: 300, id: 1, kind: 'touch' }));
+    el.dispatchEvent(pointer('pointermove', { x: 390, y: 300, id: 9 }));
+    el.dispatchEvent(pointer('pointermove', { x: 350, y: 300, id: 1, kind: 'touch' }));
+    expect(cam.getCamera().x).toBe(50);
+    el.dispatchEvent(pointer('pointerup', { x: 350, y: 300, id: 1, kind: 'touch' }));
+    fc.advance(500);
+    expect(frames[frames.length - 1]?.moving).toBe(false);
     // the press captures its pointer, so a drag that leaves the view still reaches it, and the release lets go
     const captured: number[] = [];
     const freed: number[] = [];
