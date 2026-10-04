@@ -193,8 +193,8 @@ reset; hold 1; plant_gate >/dev/null; gslots '  2  '; outw=$(rt -- true)
 reset; hold 1; gp=$(plant_gate); gslots $'1\n'; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; outc=$(rt -- true)
 check "13.2270 the gate-slots file sets the cap when the env is unset: file 2 (or '  2  ', whitespace trimmed) with one slot held and a live gate is granted at 0 s; CONTROL — the same state with file 1 waits (20 s, reason gate) until the holder exits" 'printf "%s" "$outf" | grep -q "^queue wait: 0s (slot " && printf "%s" "$outw" | grep -q "^queue wait: 0s (slot " && printf "%s" "$outc" | grep -q "^queue wait: 20s (waited for: gate)\$"'
 reset; gp=$(plant_gate); gslots $'3\n'; script_line "1040 rm -f \"$CTL_SEM_DIR/gate-$gp\""; oute=$(CTL_SEM_GATE_SLOTS=0 rt -- true)
-reset; hold 1; gp=$(plant_gate); gslots $'3\n'; script_line "1020 rm -f \"$CTL_SEM_DIR/gate-$gp\""; outn=$(CTL_SEM_GATE_SLOTS=abc rt -- true)
-check "13.2271 the env wins over the file: CTL_SEM_GATE_SLOTS=0 with file 3 and a live gate grants nothing (40 s, reason gate); a non-numeric env falls to the file — abc with file 3 and one slot held is granted at 0 s" 'printf "%s" "$oute" | grep -q "^queue wait: 40s (waited for: gate)\$" && printf "%s" "$outn" | grep -q "^queue wait: 0s (slot "'
+reset; gp=$(plant_gate); gslots $'0\n'; script_line "1040 rm -f \"$CTL_SEM_DIR/gate-$gp\""; outn=$(CTL_SEM_GATE_SLOTS=abc rt -- true)
+check "13.2271 the env wins over the file: CTL_SEM_GATE_SLOTS=0 with file 3 and a live gate grants nothing (40 s, reason gate); a non-numeric env falls to the file — abc with file 0 and none held waits like 0 (40 s, reason gate)" 'printf "%s" "$oute" | grep -q "^queue wait: 40s (waited for: gate)\$" && printf "%s" "$outn" | grep -q "^queue wait: 40s (waited for: gate)\$"'
 for bad in abc ''; do
   reset; plant_gate >/dev/null; gslots "$bad"; eval "out_none_${bad:-empty}=\$(rt -- true)"
   reset; hold 1; gp=$(plant_gate); gslots "$bad"; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; eval "out_held_${bad:-empty}=\$(rt -- true)"

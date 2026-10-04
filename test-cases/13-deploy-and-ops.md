@@ -834,7 +834,7 @@ Block `13.2230`–`13.2239` for `task/ctl-sem-gate-slot` (planner 2026-10-04, pr
 Block `13.2270`–`13.2279` for `task/ctl-sem-gate-slots-file` (planner 2026-10-04, P31: the gate cap from a file so the owner can retune it without restarting the lanes; measured 2026-10-04: `13.2270`–`13.2279` unused across the KG / WG release tips; `13.2276`–`13.2279` are unused). 🧪 as above: arms in `scripts/ctl/test/run-tests.test.sh`, each check's name starting with its id.
 
 - 13.2270 🧪 The `gate-slots` file in the semaphore dir sets the gate cap when `CTL_SEM_GATE_SLOTS` is unset: file `2` (or `  2  `, whitespace trimmed) with one slot held and a live gate is granted at once; CONTROL — the same state with file `1` waits (reason `gate`) until the holder exits. The marker globs are `gate-[0-9]*`, so the file is never reclaimed as a stale gate marker.
-- 13.2271 🧪 The env wins over the file: `CTL_SEM_GATE_SLOTS=0` with file `3` and a live gate grants nothing; a non-numeric env (`abc`) falls through to the file.
+- 13.2271 🧪 The env wins over the file: `CTL_SEM_GATE_SLOTS=0` with file `3` and a live gate grants nothing; a non-numeric env (`abc`) falls through to the file (abc with file `0` and none held waits like 0).
 - 13.2272 🧪 A file that is not a number (`abc`) or is empty behaves as 1, never 0: none held and a live gate is granted, one held waits (reason `gate`).
 - 13.2273 🧪 File `0` is a valid cap: nothing is granted while the gate is live; CONTROL — file `1` with the same state is granted at once.
 - 13.2274 🧪 The file is re-read on every poll: rewritten from 1 to 2 while a run waits behind one held slot and a live gate, that run is granted at the next poll with no restart.
