@@ -89,6 +89,7 @@ export const SWEEP: Record<string, SweepEntry> = {
   update_ticket: { args: { workspaceId: 'w', ticketId: 't', title: 'Renamed' } },
   close_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
   reopen_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
+  close_tickets: { args: { workspaceId: 'w', ticketIds: ['t'], confirm_count: '1' } },
   delete_ticket: { args: { workspaceId: 'w', ticketId: 't', confirm_name: 'W-1' }, session: { get: async () => TICKET_DETAIL } },
   restore_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
   get_ticket_history: { args: { ticketId: 't' }, session: { get: async () => ({ ticketId: 't', events: [] }) } },
