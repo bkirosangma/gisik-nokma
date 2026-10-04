@@ -45,7 +45,7 @@ function isEventResult(value: unknown): value is EventResult {
 /**
  * Several events in ONE `POST /v1/events`, every outcome returned index-aligned and NONE thrown (MCP sweep 2 PL-2).
  * `POST /v1/events` commits each event in its own transaction, so a refusal in the middle leaves its neighbours
- * committed (`ingest/ingest-service.ts:331-340`); `submitBatch` throws at the first one and would report an error
+ * committed (`ingest/ingest-service.ts:368-378`); `submitBatch` throws at the first one and would report an error
  * for a batch that had in part succeeded. This throws only when the ANSWER cannot be trusted (a rejected call, a
  * short, long, holed or missing `results`), with `whenUnknown` in front: nothing may then be claimed either way.
  */
@@ -147,7 +147,7 @@ export function putJson(session: Session, path: string, body: unknown): Promise<
 }
 
 /**
- * `POST /v1/workspaces/:id/assign-outsider { userId, event }` (`routes/people.ts:112-221`). The route nests its
+ * `POST /v1/workspaces/:id/assign-outsider { userId, event }` (`routes/people.ts:151-245`). The route nests its
  * ingest result under `result`, on 200 AND on a 422 refusal, so the refusal is returned here as an answer and never
  * thrown (as the app's gateway does, `packages/app-core/src/online/people.ts:48-63`): the caller spells it with
  * `resultError`. A 404 (the caller is not a member) is rethrown as it came.

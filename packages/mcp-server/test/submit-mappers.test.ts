@@ -20,6 +20,8 @@ describe('the response mappers', () => {
     for (const [status, body, words] of [
       [400, { error: 'invalid_notification_preferences', message: 'Not a preferences document.' }, 'invalid_notification_preferences: Not a preferences document.'],
       [400, {}, 'gisik-nokma answered 400: {}'],
+      // A message with no `error` is the message alone (kills dropping `typeof b.error === 'string'`: that answers `undefined: …`).
+      [400, { message: 'Only the message.' }, 'Only the message.'],
       [422, REFUSED, 'refused by permission.role: That person is not in this workspace.'],
       [422, { status: 'invalid', code: 'malformed', message: 'bad' }, 'malformed: bad'],
     ] as const) {
@@ -44,6 +46,8 @@ describe('the response mappers', () => {
     expect(await postOutsider(refused, 'W', 'U2', claim(refused))).toEqual(REFUSED);
     // A 422 with no `result` is not an answer: it is worded like any other 422.
     await expect(postOutsider(throwing(422, { nope: true }), 'W', 'U2', claim(refused))).rejects.toThrow('gisik-nokma answered 422: {"nope":true}');
+    // An empty body arrives as `null` (`readBody`, `http-client.ts:34`): a 422 with one is worded too, never a TypeError (kills `?.result` → `.result`).
+    await expect(postOutsider(throwing(422, null), 'W', 'U2', claim(refused))).rejects.toThrow(/^gisik-nokma answered 422: null$/);
     await expect(postOutsider(throwing(400, { error: 'bad_request', message: 'The claim must be your own ticket.created or ticket.assigned in this workspace, naming this person as the assignee.' }), 'W', 'U2', claim(refused)))
       .rejects.toThrow('bad_request: The claim must be your own ticket.created or ticket.assigned');
     // Only a 422 carries an answer: a 400 that happens to hold a `result` is still the server's refusal of the request (kills dropping `status === 422`).
@@ -51,6 +55,8 @@ describe('the response mappers', () => {
     await expect(postOutsider(throwing(404, { error: 'not_found' }), 'W', 'U2', claim(refused))).rejects.toMatchObject({ status: 404 });
     // 200 without a result is a fault, not a success.
     await expect(postOutsider({ ...ok, post: async () => ({}) }, 'W', 'U2', claim(ok))).rejects.toThrow(/without a result/);
+    // So is a 200 with an empty (null) body (kills `?.result` → `.result` on the 200 arm).
+    await expect(postOutsider({ ...ok, post: async () => null }, 'W', 'U2', claim(ok))).rejects.toThrow(/without a result/);
     // The request: the route, and { userId, event } exactly.
     const rec = recordingSession({ routes: { 'POST /v1/workspaces/W%201/assign-outsider': { result: COMMITTED } } });
     await postOutsider(rec.session, 'W 1', 'U2', claim(rec.session));
@@ -64,10 +70,13 @@ describe('the response mappers', () => {
       .toBe('Looking people up by email is rate limited right now. Wait about 42 seconds and call this again; nothing was changed.');
     expect(rateLimitedError(new HttpError(429, { error: 'rate_limited', retryAfterSeconds: 1 }), 'X')!.message).toContain('about 1 second and');
     expect(rateLimitedError(new HttpError(429, {}), 'X')!.message).toContain('Wait a minute and');
-    // The edges of `retryAfterSeconds`: zero is no wait to name, a fraction rounds UP, and only a number counts.
+    // The edges of `retryAfterSeconds`: zero is no wait to name, a fraction rounds UP (0.5 → 1 and 1.2 → 2: only 1.2 tells
+    // `ceil` from `round` and `floor`), only a number counts, and a proxy's empty body (`null`) is no wait either, not a TypeError.
     expect(rateLimitedError(new HttpError(429, { retryAfterSeconds: 0 }), 'X')!.message).toContain('Wait a minute and');
     expect(rateLimitedError(new HttpError(429, { retryAfterSeconds: 0.5 }), 'X')!.message).toContain('Wait about 1 second and');
+    expect(rateLimitedError(new HttpError(429, { retryAfterSeconds: 1.2 }), 'X')!.message).toContain('Wait about 2 seconds and');
     expect(rateLimitedError(new HttpError(429, { retryAfterSeconds: '42' }), 'X')!.message).toContain('Wait a minute and');
+    expect(rateLimitedError(new HttpError(429, null), 'X')!.message).toContain('Wait a minute and');
     expect(rateLimitedError(new HttpError(500, {}), 'X')).toBeNull(); // CONTROL
     // postJson itself, not the constructor: a 429 still comes out of it as the untouched HttpError (the sentence this replaces).
     await expect(postJson(throwing(429, { error: 'rate_limited', retryAfterSeconds: 42 }), '/x', {})).rejects.toMatchObject({ status: 429, message: 'gisik-nokma answered 429' });
