@@ -81,7 +81,7 @@ describe('POST /v1/workspaces — the envelope origin follows how the request au
     const mcpRows = await ledger((viaMcp.json() as { workspaceId: string }).workspaceId);
     expect(mcpRows.find((r) => r.type === 'workspace.created')?.origin).toBe('mcp');
     // The founding sequence the ingest path appends beside it (`bootstrapWorkspace`: the default workflow, the
-    // four built-in types, the founder's owner grant) is the SERVER's own record and stays `server` — the fix
+    // five built-in types, the founder's owner grant) is the SERVER's own record and stays `server` — the fix
     // moves the caller's act, not the server's seeds.
     expect(mcpRows.length).toBeGreaterThan(1);
     expect(mcpRows.filter((r) => r.type !== 'workspace.created').map((r) => r.origin)).toEqual(

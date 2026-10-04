@@ -32,7 +32,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * ## How the failure is injected, and why this way
  *
- * `bootstrapWorkspace` appends its six events through the INTERNAL door, one
+ * `bootstrapWorkspace` appends its seven events through the INTERNAL door, one
  * transaction each. A projection registered behind the real ones therefore gets
  * to fail a single event of the sequence while its predecessors stay committed —
  * which is exactly the shape 6.53 describes and the shape no ordinary error can
@@ -59,7 +59,7 @@ const MISSING_FUNCTION = 'gisik_nokma_injected_bootstrap_fault';
 
 /**
  * Fails the SECOND built-in ticket-type definition of the founding sequence —
- * the fourth event of the seven — and only while armed.
+ * the fourth event of the eight — and only while armed.
  *
  * Mid-sequence rather than at either end, and that is the point: the residue it
  * leaves is a workspace with a real ledger prefix (`workspace.created`, the
@@ -248,13 +248,14 @@ describe('POST /v1/workspaces — a founding sequence that fails partway', () =>
     ]);
     expect(await workspaceMembers(residue)).toEqual([]);
 
-    // The new one is COMPLETE — all seven events, in order, and its founder
+    // The new one is COMPLETE — all eight events (five built-in types since wtg2 T5), in order, and its founder
     // owning it. This is the positive control that stops "every founding 500s
     // now" from passing this file, and it is taken through the same door, by the
     // same person, one armed flag apart from the failure above.
     expect(await streamTypes(founded)).toEqual([
       'workspace.created',
       'workflow.defined',
+      'ticket-type.defined',
       'ticket-type.defined',
       'ticket-type.defined',
       'ticket-type.defined',

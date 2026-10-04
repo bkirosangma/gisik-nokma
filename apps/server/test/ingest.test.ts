@@ -24,7 +24,7 @@ afterAll(async () => {
  *
  * Plan 4 Task 5 made `workspace.created` a compound act: a committed one is
  * followed, inside the same ingest path and through the same internal door, by
- * the founding sequence (default workflow, four built-in ticket types, the
+ * the founding sequence (default workflow, five built-in ticket types, the
  * founder's owner grant — `src/workspaces/bootstrap-workspace.ts`). It is
  * therefore no longer a neutral "some valid event", and using it as filler
  * makes a test that counts commits count seven.

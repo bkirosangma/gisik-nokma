@@ -7,6 +7,7 @@ import {
   isRedactedTicketPublished,
   workflowDefinedPayloadSchema,
   type LedgerEvent,
+  type PassRecord,
   type TicketLink,
   type TicketState,
   type TicketStateDeps,
@@ -133,6 +134,10 @@ type TicketRow = {
   links: TicketLink[];
   /** `TicketState.pendingChildren`' column (drafts T6, owner ruling O1): `[]` on every ticket that holds none. */
   pending_children: string[];
+  /** `TicketState.outcome`'s column (wtg2 T5, DC-4): a Decision's current outcome, NULL when none. */
+  outcome: string | null;
+  /** `TicketState.passes`' column (wtg2 T5, PS-2): a Decision's pass records, `[]` until the first choice. */
+  passes: PassRecord[];
 };
 
 /**
@@ -250,6 +255,10 @@ export function rowToTicketState(row: TicketRow): TicketState {
     // column's `[]` reads back as no key at all.
     ...(row.links.length > 0 ? { links: row.links } : {}),
     ...(row.pending_children.length > 0 ? { pendingChildren: row.pending_children } : {}),
+    // Absent, never null/[]: the reducer's shape (wtg2 T5). The reducer drops `outcome` on a clear and writes no `passes`
+    // until the first choice, so a NULL / '[]' column reads back as no key at all.
+    ...(row.outcome === null ? {} : { outcome: row.outcome }),
+    ...(row.passes.length === 0 ? {} : { passes: row.passes }),
   };
 }
 
@@ -323,8 +332,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
         closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by,
-        draft_author_id, draft_at, draft_discarded, links, pending_children)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        draft_author_id, draft_at, draft_discarded, links, pending_children, outcome, passes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -347,7 +356,9 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        draft_at = EXCLUDED.draft_at,
        draft_discarded = EXCLUDED.draft_discarded,
        links = EXCLUDED.links,
-       pending_children = EXCLUDED.pending_children`,
+       pending_children = EXCLUDED.pending_children,
+       outcome = EXCLUDED.outcome,
+       passes = EXCLUDED.passes`,
     [
       next.id,
       next.workspaceId,
@@ -406,6 +417,10 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // removal's absent key clear an existing row rather than leave it holding a stale link.
       JSON.stringify(next.links ?? []),
       JSON.stringify(next.pendingChildren ?? []),
+      // A Decision's outcome and passes (wtg2 T5). Both keys are ABSENT on a ticket never decided, so the `?? null` / `?? []`
+      // are the columns' empty values, not reachability guards; the ON CONFLICT list above makes a clear reach the row.
+      next.outcome ?? null,
+      JSON.stringify(next.passes ?? []),
     ],
   );
 }

@@ -69,3 +69,14 @@ describe('29.127 the link label census', () => {
     expect(unaccounted([...domainRegistry.registrations(), planted])).toEqual(['ticket.planted_for_census']);
   });
 });
+
+describe('29.137 the decision census', () => {
+  it('29.137 ticket.decided is folded and in no backfill list; payloadIds names every closeStarted id and nothing else', () => {
+    const folded = (TICKET_EVENT_TYPES as readonly string[]).includes('ticket.decided');
+    const backfilled = (BOOTSTRAP_BACKFILL_TYPES as readonly string[]).includes('ticket.decided');
+    expect([folded, backfilled]).toEqual([true, false]);
+    const [a, b] = ['01J9GTKB000000000000000000', '01J9GTKC000000000000000000'];
+    expect(payloadIds('ticket.decided', { outcome: 'Yes', closeStarted: [a, b] })).toEqual([['ticket', a], ['ticket', b]]);
+    expect(payloadIds('ticket.decided', { outcome: 'Yes' })).toEqual([]); // control: no request, no ids
+  });
+});
