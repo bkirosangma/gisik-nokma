@@ -89,6 +89,13 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 - ✅ **27.211 — the ring read: a link between two ring items, and the page's card keys:** ring 1 of a parent with two children and a `relates` link BETWEEN the children (a `proj_ticket_links` shim insert) holds the `relates|…` edge (the `among` read) next to the two `parent` edges; control, same `it`: with `relates` off the ring has only the two `parent` edges. The page labels a ticket with its card key from the ENTERED prefixes (`GK` + `PL` + the ledger number), while `title` stays the title. Mutations: `among` emptied → RED; `label: item.label` (the page keys dropped) → RED. (`apps/server/test/graph/perf.test.ts`)
 <!-- KG-C T2 -->
 <!-- KG-C T3 -->
+- ✅ **27.240 — the camera spring:** critically damped, τ = 85 ms: 95% of the way by about 300 ms, and it settles exactly on the target; control: it never overshoots (`packages/knowledge-graph/test/engine/camera.test.ts`)
+- ✅ **27.241 — the camera spring:** dt is clamped to 100 ms, so a stalled tab does not jump; control: a 100 ms and a 1,000 ms step move the same, a 99 ms step moves less, and a negative dt does not move (`packages/knowledge-graph/test/engine/camera.test.ts`)
+- ✅ **27.242 — the camera spring:** prefers-reduced-motion makes the move instant; control: without it, one frame is partial (`packages/knowledge-graph/test/engine/camera.test.ts`)
+- ✅ **27.243 — the camera spring:** the zoom ratio eases geometrically, so equal steps feel equal; control: half way in time, 4× → 1× passes 2 (the geometric mean), not 2.5 (`packages/knowledge-graph/test/engine/camera.test.ts`)
+- ✅ **27.244 — zoom limits:** 0.5×–4× of the fit; past one, a soft zoom rubber-bands with power 0.3 at either end; control: inside the range nothing changes, and the limits scale with the fit (`packages/knowledge-graph/test/engine/camera.test.ts`)
+- ✅ **27.245 — zoom keeps the anchor fixed:** the anchor's offset from the camera scales with the ratio, also when an over-zoom stops at the limit (or rubber-bands when soft); control: zooming about the camera centre leaves x,y alone (`packages/knowledge-graph/test/engine/camera.test.ts`)
+- ✅ **27.246 — settling after an over-zoom:** the factor back to the limit at either end, 160 ms after the last input; control: a target inside the limits (which scale with the fit) needs none, and a pan only moves x,y (`packages/knowledge-graph/test/engine/camera.test.ts`)
 <!-- KG-C T4 -->
 <!-- KG-C T5 -->
 <!-- KG-C T6 -->
