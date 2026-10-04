@@ -285,6 +285,12 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       '/v1/me/invitations/:inviteId/decline',
       'POST',
     ],
+    [
+      'the draft SET publish (drafts T5b)',
+      '/v1/workspaces/01JQ0000000000000000000000/drafts/publish',
+      '/v1/workspaces/:workspaceId/drafts/publish',
+      'POST',
+    ],
   ];
 
   /**
