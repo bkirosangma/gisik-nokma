@@ -220,8 +220,8 @@ describe('27.210 p95 per ring (spec §2.2, §7)', () => {
 type CorpusSize = { tickets: number; notes: number; people: number; links: number; references: number };
 
 /**
- * A deterministic corpus (fixed-seed LCG) seeded through the ledger, so every projection runs, plus plain INSERTs into the shimmed
- * link and reference tables. The hub is ticket 0: 24 extra subtasks on top of the tree's 8, 8 attached notes, 6 typed links and
+ * A deterministic corpus (fixed-seed LCG) seeded through the ledger, so every projection runs, plus plain bulk INSERTs into the
+ * migrated link and reference tables. The hub is ticket 0: 24 extra subtasks on top of the tree's 8, 8 attached notes, 6 typed links and
  * 4 references, and each of those neighbours gets 16 more neighbours, so ring 2 holds more than the 500 items the bar is about.
  */
 async function seedGraphCorpus(database: TestDatabase, size: CorpusSize) {

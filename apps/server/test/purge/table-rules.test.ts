@@ -9,7 +9,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
  * Spec §5.5 — every table has a purge rule, and a guard that proves it.
- * Cases 19.081–19.083 (`test-cases/19-trash.md` §19.9).
+ * Cases 19.081–19.083 (`test-cases/19-trash.md` §19.9); 27.026 (typed links, `test-cases/27-knowledge-graph.md`) at the end.
  *
  * The schema is read from `information_schema` of a freshly MIGRATED database,
  * never from a list in this file: a table added next month must redden this
