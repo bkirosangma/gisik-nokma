@@ -147,4 +147,24 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpow
 
 <!-- WTG4 -->
 
+## 29.4 Part 4 — The Timeline graph and Home's Timeline (29.290–29.349)
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part4-timeline-graph-home.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md` §11–13. Ids tile 29.290–29.349: T1 290–299 · T2 300–303 · T3 304–307 · T4 308–312 · T5 313–326 · T6 327–334 · T7 335–349.
+
+<!-- WTG4 T1 -->
+
+<!-- WTG4 T2 -->
+
+<!-- WTG4 T3 -->
+
+<!-- WTG4 T4 -->
+
+<!-- WTG4 T5 -->
+
+<!-- WTG4 T6 -->
+
+<!-- WTG4 T7 -->
+
+<!-- WTG4 end -->
+
 <!-- wtg-part5-mcp -->

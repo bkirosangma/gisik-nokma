@@ -3879,5 +3879,13 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part3-workflow-graph bullets -->
 
 <!-- WTG4 bullets -->
+### Timeline graph and Home's Timeline (Part 4)
+<!-- WTG4 bullet T1 -->
+<!-- WTG4 bullet T2 -->
+<!-- WTG4 bullet T3 -->
+<!-- WTG4 bullet T4 -->
+<!-- WTG4 bullet T5 -->
+<!-- WTG4 bullet T6 -->
+<!-- WTG4 bullet T7 -->
 
 <!-- wtg-part5-mcp bullets -->
