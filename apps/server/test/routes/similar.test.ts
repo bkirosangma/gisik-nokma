@@ -145,6 +145,9 @@ describe('27.430 similar (KG-D T2)', () => {
     expect(await similar('guest', `item=ticket:${TP}`)).toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
     expect(await similar('stranger', `item=ticket:${TP}`)).toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
     expect((await similar('outsider', `item=ticket:${TP}`)).status).toBe(200);
+    // Not a member HERE: the neighbour owns a second workspace and sees its own ticket there, so only the
+    // membership check stands between them and this workspace's items. Same 404, same body.
+    expect(await similar('neighbour', `item=ticket:${world.neighbour.ticketId}`)).toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
 
     // The guest's own: TE's neighbours include the explicit note, never TP or the project note.
     const guest = (await hitsOf('guest', `item=ticket:${TE}`)).map((hit) => hit.id);
