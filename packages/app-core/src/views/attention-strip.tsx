@@ -1,8 +1,9 @@
-import { useId, useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { Button, Chip, type ChipTone } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
 import type { AttentionItem, AttentionKind } from '../view-types.js';
+import type { WorkspaceGroup } from './my-work-global.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 
 /**
@@ -64,8 +65,33 @@ export function orderAttention(items: AttentionItem[]): AttentionItem[] {
 
 export type AttentionStripProps = {
   items: AttentionItem[];
+  /**
+   * The global My work page's grouping (my-work-global T3): given, the strip draws an `<h2>`
+   * per workspace and an `<h3>` per project over that project's rows, and the rows come
+   * from the GROUPS (`items` is not read). Absent, the strip is today's flat list.
+   */
+  groups?: WorkspaceGroup<AttentionItem>[];
   onOpenTicket: (ticketId: string) => void;
 };
+
+/**
+ * The shown rows, filed under their groups. Each project keeps the rows that are both SHOWN
+ * and its own, in the strip's severity order, and a project or workspace left with none is
+ * not drawn — its heading over zero rows would be refusal 3's fabricated all-clear in small.
+ */
+function fileUnderGroups(groups: WorkspaceGroup<AttentionItem>[], shown: AttentionItem[]): WorkspaceGroup<AttentionItem>[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      projects: group.projects
+        .map((project) => {
+          const own = new Set(project.items);
+          return { ...project, items: shown.filter((row) => own.has(row)) };
+        })
+        .filter((project) => project.items.length > 0),
+    }))
+    .filter((group) => group.projects.length > 0);
+}
 
 /**
  * Computed, never authored (spec §7).
@@ -106,17 +132,45 @@ export type AttentionStripProps = {
  * if they disagree, so, plainly: a sectioned strip needs one heading per kind,
  * and a kind with no rows has nothing honest to put under its own heading. The
  * heading this component draws names the WHOLE strip, not a kind, and it can
- * never outlive its rows — `items.length === 0` returns `null` above, before
- * any of this is reached. A banner heading over zero rows would be the
- * fabricated all-clear refusal 3 already forbids; that is the case this
- * paragraph rules out, and the flat list above is what keeps it impossible.
+ * never outlive its rows — `source.length === 0` (the flat `items`, or every
+ * row the `groups` hold) returns `null` above, before any of this is reached.
+ * A banner heading over zero rows would be the fabricated all-clear refusal 3
+ * already forbids; that is the case this paragraph rules out, and the flat
+ * list above is what keeps it impossible. The global page's grouped arm
+ * (my-work-global T3) draws per-WORKSPACE and per-PROJECT headings, never
+ * per-kind ones, and keeps the same rule by construction: `fileUnderGroups`
+ * drops a project or workspace left with no shown row, so no heading of its
+ * outlives its rows either.
  */
-export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
+export function AttentionStrip({ items, groups, onOpenTicket }: AttentionStripProps) {
   const [showAll, setShowAll] = useState(false);
   const listId = useId();
-  if (items.length === 0) return null;
-  const rows = orderAttention(items);
+  const source = groups === undefined ? items : groups.flatMap((group) => group.projects.flatMap((project) => project.items));
+  if (source.length === 0) return null;
+  // ONE ordering for both arms, and the cap is taken from it before any grouping: grouped,
+  // the strip still shows the strongest ATTENTION_CAP rows across ALL workspaces, each under
+  // its own headings — never the first five in name order, which would hide an overdue row
+  // in "Zeta" behind a due-soon one in "Alpha" (planner ruling, 2026-10-05).
+  const rows = orderAttention(source);
   const shown = showAll ? rows : rows.slice(0, ATTENTION_CAP);
+  const row = (item: AttentionItem) => (
+    <li key={item.ticketId} className="gn-attention__item">
+      <button
+        type="button"
+        className="gn-attention__title"
+        onClick={() => onOpenTicket(item.ticketId)}
+      >
+        {item.title}
+      </button>
+      <Chip tone={KIND_TONE[item.kind]}>{KIND_LABEL[item.kind]}</Chip>
+      <span className="gn-attention__reason">{item.reason}</span>
+      {item.claim !== null ? (
+        <span className="gn-attention__claim">
+          {`claimed by ${actorLabel(item.claim.actorId, item.claim.actorName)} on ${formatDate(item.claim.serverTime)}`}
+        </span>
+      ) : null}
+    </li>
+  );
   return (
     /* The accessible name is the visible heading, character for character.
        WCAG 2.5.3 fails on a visible label that its accessible name does not
@@ -150,26 +204,28 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
         </svg>
         Needs your attention
       </p>
-      <ul id={listId} className="gn-attention__items">
-        {shown.map((item) => (
-          <li key={item.ticketId} className="gn-attention__item">
-            <button
-              type="button"
-              className="gn-attention__title"
-              onClick={() => onOpenTicket(item.ticketId)}
-            >
-              {item.title}
-            </button>
-            <Chip tone={KIND_TONE[item.kind]}>{KIND_LABEL[item.kind]}</Chip>
-            <span className="gn-attention__reason">{item.reason}</span>
-            {item.claim !== null ? (
-              <span className="gn-attention__claim">
-                {`claimed by ${actorLabel(item.claim.actorId, item.claim.actorName)} on ${formatDate(item.claim.serverTime)}`}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      {groups === undefined ? (
+        <ul id={listId} className="gn-attention__items">
+          {shown.map(row)}
+        </ul>
+      ) : (
+        /* The strip's banner is a <p>, so under the page's <h1> the workspace is the first
+           heading level, <h2>, and its projects <h3> (plan AMEND 16:3x). `listId` moves to the
+           wrapper so "Show all" still controls every row it reveals. */
+        <div id={listId} className="gn-attention__groups">
+          {fileUnderGroups(groups, shown).map((group) => (
+            <div key={group.workspaceId} className="gn-attention__group">
+              <h2 className="gn-attention__workspace">{group.workspaceName}</h2>
+              {group.projects.map((project) => (
+                <Fragment key={project.projectId}>
+                  <h3 className="gn-attention__project">{project.projectName}</h3>
+                  <ul className="gn-attention__items">{project.items.map(row)}</ul>
+                </Fragment>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
       {/* NP-05: five rows, then the rest on request — the strip must not bury the person's own list under it. */}
       {rows.length > ATTENTION_CAP ? (
         <Button className="gn-attention__more" aria-expanded={showAll} aria-controls={listId} onClick={() => setShowAll((open) => !open)}>

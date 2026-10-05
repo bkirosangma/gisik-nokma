@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { createOnlineDataSource, type FetchLike } from '@gisik-nokma/app-core/online';
 import {
   membershipId,
   newUlid,
@@ -59,6 +60,11 @@ import { signInWithPhone } from '../helpers/session.js';
  * Ticket ids are hand-built so they sort in Postgres as they sort here, and the
  * attention route returns a bucket in `ORDER BY t.ticket_id`: every list below
  * is asserted in that order, unsorted, so a ticket served twice is visible.
+ *
+ * The last block is the CLIENT's leg of case 30.027 (my-work-global T3): the
+ * online data source's `getAttention`, over `app.inject`, against these two
+ * routes and this rig, so the `show` it joins by hand and the contest rows'
+ * `workspaceId` it reads strictly meet the real server, not a fixture.
  */
 
 let db: TestDatabase;
@@ -395,5 +401,48 @@ describe('30.060 contests refuse a role the viewer does not hold', () => {
 describe('30.061 contests on the projects the viewer administers', () => {
   it('30.061 show=project-admin returns only the contest on P1’s visible ticket', async () => {
     expect(await contestTicketIds(tokenV, W1, '&show=project-admin')).toEqual([tp]);
+  });
+});
+
+describe('30.027 the online client against these two routes (my-work-global T3)', () => {
+  /**
+   * `createOnlineDataSource` over `app.inject`, shaped like
+   * `list-narrowing-roundtrip.test.ts`'s `injectFetch`: only `status`, `ok` and
+   * `json()`, with `ok` derived from the status the server set. GET only, the one
+   * method `getAttention` sends; every URL it asks is recorded.
+   */
+  function clientAs(token: string, calls: string[]) {
+    const fetchImpl = (async (input: string) => {
+      calls.push(input);
+      const res = await app.inject({ method: 'GET', url: input, headers: { authorization: `Bearer ${token}` } });
+      return {
+        ok: res.statusCode >= 200 && res.statusCode < 300,
+        status: res.statusCode,
+        json: async () => res.json() as unknown,
+      } as Response;
+    }) as FetchLike;
+    return createOnlineDataSource({ baseUrl: '', fetchImpl });
+  }
+
+  it('30.027 getAttention(W1, [created, assigned]) maps the swept tc, ta, tb and the contests on tc and ta, each carrying W1; with no show, every contest V may see', async () => {
+    const calls: string[] = [];
+    const client = clientAs(tokenV, calls);
+    // CONTROL, same `it`: no show is today's strip, so the contests on tp and tw
+    // (neither created by nor assigned to V) are there; th's is hidden by `canSee`.
+    const all = await client.query.getAttention(W1);
+    expect(all.filter((item) => item.kind === 'contested').map((item) => item.ticketId)).toEqual([tc, ta, tp, tw]);
+
+    const filtered = await client.query.getAttention(W1, ['created', 'assigned']);
+    expect(filtered.map((item) => [item.kind, item.ticketId, item.workspaceId])).toEqual([
+      ['blocked', tc, W1],
+      ['blocked', ta, W1],
+      ['blocked', tb, W1],
+      ['contested', tc, W1],
+      ['contested', ta, W1],
+    ]);
+    // ...asked with 30.026's spelling: a literal comma, on BOTH routes. (The server
+    // also decodes `%2C`, so only this line tells the two spellings apart.)
+    expect(calls).toContain(`/v1/workspaces/${W1}/attention?show=created,assigned`);
+    expect(calls).toContain(`/v1/contests?workspaceId=${W1}&open=true&show=created,assigned`);
   });
 });

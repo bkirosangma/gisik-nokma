@@ -881,6 +881,13 @@ export type AttentionKind = 'overdue' | 'blocked' | 'stale' | 'due-soon' | 'cont
 export type AttentionItem = {
   kind: AttentionKind;
   ticketId: string;
+  /**
+   * The workspace the item belongs to (my-work-global T3): the global My work page merges
+   * every workspace's strip into one, and groups and opens each row by its OWN workspace.
+   * Read off the swept card (`TicketCard.workspaceId`) or the contest row, never the
+   * workspace that was asked, so a row cannot be filed under the wrong one.
+   */
+  workspaceId: string;
   projectId: string;
   title: string;
   reason: string;
