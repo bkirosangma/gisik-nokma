@@ -9870,6 +9870,9 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   .gn-kg:not(.gn-kg--phone) .gn-kg-insp { grid-row: 1 / span 2; }
   .gn-kg:not(.gn-kg--phone) .gn-kg__below { grid-column: 1; grid-row: 2; }
 }
+/* One column: the keys line 10px under the inspector, as it sat before it moved into the body, whose 1.125rem gap is the
+   canvas's to the inspector. */
+@media (max-width: 57.5rem) { .gn-kg:not(.gn-kg--phone) .gn-kg__below { margin-top: calc(0.625rem - 1.125rem); } }
 .gn-kg--phone .gn-kg__body { grid-template-columns: minmax(0, 1fr); gap: 0.625rem; }
 .gn-kg__below { display: grid; gap: 0.625rem; }
 .gn-kg-insp { display: grid; gap: 1rem; align-content: start; min-width: 0; font-size: 0.875rem; color: var(--gn-text); }

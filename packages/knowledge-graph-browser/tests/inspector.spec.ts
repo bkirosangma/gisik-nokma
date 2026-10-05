@@ -220,9 +220,10 @@ test('27.660 one column (920, 768 and 360 wide) and a phone keep canvas, inspect
     await expect(page.locator('.gn-kg-insp__title')).toHaveText('Phone pass rulings');
     expect(await placement(page)).toEqual(STACKED);
     const c = await pageBox(page, '.gn-kg__canvas'), a = await pageBox(page, '.gn-kg-insp'), k = await pageBox(page, '.gn-kg__keys'), l = await pageBox(page, '.gn-kg-list');
-    expect(a.top).toBeGreaterThanOrEqual(c.bottom);
-    expect(k.top).toBeGreaterThanOrEqual(a.bottom);
-    expect(l.top).toBeGreaterThanOrEqual(k.bottom);
+    // as before the list moved into the body: the inspector 18 px under the canvas, the keys line 10 px under it, the list 10 px on
+    expect(a.top - c.bottom).toBeCloseTo(18, 1);
+    expect(k.top - a.bottom).toBeCloseTo(10, 1);
+    expect(l.top - k.bottom).toBeCloseTo(10, 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   }
   // a phone: the card and then the list, in a wide window too (its own layout, not the breakpoint's), and at 360
