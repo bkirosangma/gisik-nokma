@@ -32,7 +32,7 @@ const remove = (kind: 'ticket' | 'note', id: string, commentId: string): LedgerE
 describe('26.090–26.093 the replica sees comment edits and deletions', () => {
   it('26.090 schema v4 has comment_changes, ruled `erase`; a version-3 database migrates with its rows intact', async () => {
     const { storage } = await freshReplica();
-    expect(LOCAL_SCHEMA_VERSION).toBe(4);
+    expect(LOCAL_SCHEMA_VERSION).toBe(5); // wtg2 T9 raised it (no DDL)
     expect(
       (await storage.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'comment_changes'", [])).length,
     ).toBe(1);
@@ -51,7 +51,7 @@ describe('26.090–26.093 the replica sees comment edits and deletions', () => {
     await migrateLocal(v3);
     expect((await v3.all("SELECT name FROM sqlite_master WHERE name = 'comment_changes'", [])).length).toBe(1);
     expect(await count(v3, 'SELECT count(*) AS n FROM note_comments')).toBe(1);
-    expect((await v3.all("SELECT value FROM meta WHERE key = 'schema_version'", []))[0]?.['value']).toBe('4');
+    expect((await v3.all("SELECT value FROM meta WHERE key = 'schema_version'", []))[0]?.['value']).toBe('5');
   });
 
   it('26.091 a note comment: edited, then deleted; a sibling is unchanged', async () => {

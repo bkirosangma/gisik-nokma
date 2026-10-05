@@ -411,6 +411,12 @@ const FOLDING_TICKET_TYPES: readonly string[] = TICKET_EVENT_TYPES;
 
 export async function createReplica(deps: { storage: SyncStorage }): Promise<Replica> {
   const { storage } = deps;
+  // The version this file was last opened at, read BEFORE `migrateLocal` stamps the current one (wtg2 T9). A file that
+  // has no `meta` table yet is a fresh replica: NaN, which owes nothing below.
+  const metaExists = (await storage.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'meta'", [])).length > 0;
+  const priorVersion = metaExists
+    ? Number((await storage.all("SELECT value FROM meta WHERE key = 'schema_version'", []))[0]?.['value'] ?? NaN)
+    : NaN;
   await migrateLocal(storage);
   const listeners = new Set<() => void>();
   const notify = (): void => {
@@ -2146,6 +2152,19 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         await replica.addPendingPulls(instruction.workspaceId, missingNotes, 'note');
         return { applied: true };
       }
+    }
+  }
+
+  // Schema 5 (wtg2 T9): every ticket this file held was folded, or snapshotted by the server, before work periods
+  // existed, and the replica has no ALTER path for state. Owing a pull per held ticket makes the next catch-up load
+  // each one's current snapshot, whose periods then reach the confirmed state. `headSeq: 0`: no notice names a head.
+  if (priorVersion < 5) {
+    const held = await storage.all('SELECT ticket_id, workspace_id FROM tickets', []);
+    for (const ws of new Set(held.map((row) => row['workspace_id'] as string))) {
+      await replica.addPendingPulls(
+        ws,
+        held.filter((row) => row['workspace_id'] === ws).map((row) => ({ id: row['ticket_id'] as string, headSeq: 0 })),
+      );
     }
   }
 

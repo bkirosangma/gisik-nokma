@@ -5,20 +5,23 @@ import type { SyncStorage } from './storage.js';
  * `note_comments`.
  *
  * **The number is a version stamp; it is not an upgrade path.** `migrateLocal`
- * runs `CREATE TABLE IF NOT EXISTS` and nothing else, and this constant is
- * written into `meta` and never read back by anything — checked across
- * `sync-client`, `app-core` and both shells. So the bump records that the shape
- * changed and is not what makes a device converge: the two new TABLES are, and
- * they are safe on an existing device precisely because they are new. The day
- * this schema must ALTER rather than CREATE, the version needs a reader and a
- * migration step, and `snapshot_provenance`'s docblock below already records
+ * runs `CREATE TABLE IF NOT EXISTS` and nothing else. So the bump records that
+ * the shape changed and is not what makes a device converge: the two new
+ * TABLES are, and they are safe on an existing device precisely because they
+ * are new. Until version 5 this constant was written into `meta` and never
+ * read back; its one reader now is `createReplica`, which reads the PRIOR
+ * value before `migrateLocal` overwrites it (Workflow and Timeline graphs T9,
+ * below). The day this schema must ALTER rather than CREATE, the version still
+ * needs a migration step, and `snapshot_provenance`'s docblock below records
  * that as unowned.
  * Raised to 3 by trash series Plan 3, which added `purged_ids`, `sync_notices`
  * and `deleted_items_cache` — three NEW tables, for the same reason the notes
  * tables were: `CREATE TABLE IF NOT EXISTS` is the only DDL this file runs.
  * Raised to 4 by MCP-everything T4, which added `comment_changes` — a NEW table, for the same reason.
+ * Raised to 5 by Workflow and Timeline graphs T9: no DDL; `createReplica` re-pulls every held ticket because its
+ * stored snapshot predates work periods (the replica's state has no ALTER path, so the pending-pull queue is its seam).
  */
-export const LOCAL_SCHEMA_VERSION = 4;
+export const LOCAL_SCHEMA_VERSION = 5;
 
 // ULID discipline: no column here carries a hand-written shape constraint.
 // `events.id`, `outbox.event_id` and the entity ids are ULIDs, but the ONE
@@ -67,10 +70,10 @@ const TABLES = [
    * than a preference.
    *
    * `migrateLocal` runs `CREATE TABLE IF NOT EXISTS` and nothing else. There is
-   * no `ALTER` path and **`LOCAL_SCHEMA_VERSION` is written into `meta` and
-   * never read back by anything** — checked across `sync-client`, `app-core`
-   * and both shells — so a version stamp exists and an upgrade mechanism does
-   * not. Adding a column to `snapshots` would therefore work on a fresh device
+   * no `ALTER` path: **`LOCAL_SCHEMA_VERSION` was written into `meta` and never
+   * read back** when this table was added (its one reader since version 5 is
+   * `createReplica`'s re-pull of held tickets, which converges STATE, not
+   * columns), so a version stamp exists and an upgrade mechanism does not. Adding a column to `snapshots` would therefore work on a fresh device
    * and fail on an existing one with `no such column: provenance`, at the first
    * write, at runtime. A new table is created by the same idempotent DDL on
    * both, and an existing device simply has no rows in it until its next
