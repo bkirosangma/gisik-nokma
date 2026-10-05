@@ -1648,11 +1648,12 @@ describe('29.420-29.427 an old instance\'s write to a ticket snapshot is demoted
 
   it('29.424 a new-code UPDATE that forgets the token is demoted even when it stamps the current fold: the pre-token overwriteSnapshot statement and a bare UPDATE (the fail-safe direction: one restate, never a stale serve)', async () => {
     const past = await hourAgo();
+    // A stale row the token-less path restates: it stamps the current fold over fold 1, and the row stays stale.
     const viaOverwrite = newUlid();
-    await plantRow('ticket', viaOverwrite, 4, RESTATED, TICKET_FOLD_VERSION, randomUUID(), past);
+    await plantRow('ticket', viaOverwrite, 4, OLD_SHAPE, 1, randomUUID(), past);
     await db.pool.query(TOKENLESS_NEW_OVERWRITE_SQL, ['ticket', viaOverwrite, 4, JSON.stringify(RESTATED), null, TICKET_FOLD_VERSION]);
     const overwritten = await raw('ticket', viaOverwrite, 4);
-    expect(overwritten.fold_version).toBe(1);
+    expect(overwritten).toMatchObject({ state: RESTATED, fold_version: 1 });
     expect(overwritten.created_at.getTime()).toBeGreaterThan(past.getTime());
 
     const viaUpdate = newUlid();
