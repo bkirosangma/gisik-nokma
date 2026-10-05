@@ -554,7 +554,7 @@ export type ListRow = {
    * after them by `ticketId`, so the distinction is the whole sort.
    */
   rank: string | null;
-  /** wtg2 T17 (Q1): closed "Not taken" by the flow; ABSENT otherwise. Optional (unlike `closed`) so no legacy literal changes; `countRows` is its reader. */
+  /** wtg2 T17 (Q1): closed "Not taken" by the flow; ABSENT otherwise. Optional (unlike `closed`) so no legacy literal changes; read by `countRows` and `toTicketDatesInput` (the web Timeline's mark, 29.440). */
   notTaken?: true;
 };
 
