@@ -48,7 +48,7 @@ export function parseTraceQuery(raw: RawTraceQuery): GraphTraceRequest | null {
 /**
  * Spec D §5.1's graph queries beside the ring (`routes/graph.ts`), for `graph_path` and `graph_trace`:
  * - `GET /v1/graph/path?from=<kind>:<id>&to=<kind>:<id>[&maxHops=1..6][&groups=g,…]` (`maxHops` defaults to 6, `groups`
- *   to every group but `projects` and `concepts`, `PATH_DEFAULT_GROUPS`);
+ *   to every group but the hubs `projects`, `concepts` and `people`, `PATH_DEFAULT_GROUPS`);
  * - `GET /v1/graph/trace?from=<kind>:<id>&kind=blocks|parent|duplicates|ref&direction=out|in[&maxDepth=1..10]`.
  *
  * The viewer is the session, never a parameter, and who may see what is decided inside the reads, by the ring read's
