@@ -123,7 +123,7 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
   // sentence reads "Assigned to ". Routing through `actorLabel` is the same
   // floor the actor line one span to the right uses, INCLUDING the system-actor
   // map (`SYSTEM_ACTOR_AUTO_CLOSE` and friends name themselves), so a sentence and the actor beside it cannot
-  // disagree about who somebody is (an `mcp` event's actor line adds "Claude, for " through `attributionLabel`,
+  // disagree about who somebody is (an `mcp` event's actor line adds "Assistant, for " through `attributionLabel`,
   // around this same floor). Caught by 3.181, which was written for a different reason.
   const nameOf = (id: string): string => actorLabel(id, ctx.nameOf?.(id));
 

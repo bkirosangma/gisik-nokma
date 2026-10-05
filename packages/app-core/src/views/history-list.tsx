@@ -27,7 +27,7 @@ import { describeEvent, type HistoryCopyContext } from './history-copy.js';
  *
  * `nameOf` is a display convenience and the floor does not depend on it: the
  * label goes through `actorLabel`, then `attributionLabel` (an `mcp` event reads
- * "Claude, for <name>", spec D §5.2), so a resolver that answers with nothing —
+ * "Assistant, for <name>", spec D §5.2), so a resolver that answers with nothing —
  * a roster that 404'd, a member since removed — still names the actor
  * (`Unknown person`). A history entry never becomes anonymous, and it never becomes "system".
  *

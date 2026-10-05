@@ -6,7 +6,7 @@ import type { TicketHistoryEvent } from '../src/view-types.js';
 import { HistoryList } from '../src/views/history-list.js';
 
 /**
- * 27.519 (KG-D Task 7, spec D §5.2, D2): History names an MCP write "Claude, for Ama Rangsa". The ledger records
+ * 27.519 (KG-D Task 7, spec D §5.2, D2): History names an MCP write "Assistant, for Ama Rangsa". The ledger records
  * `origin: 'mcp'` and the session's user, never which assistant, so the assistant is one label,
  * `MCP_ASSISTANT_LABEL` (domain). `'mobile'` and `'server'` legs as well as `'web'`: a `'web'` control alone cannot
  * tell `origin === 'mcp'` from `origin !== 'web'` (`ORIGINS`, `packages/domain/src/envelope.ts`).
@@ -31,18 +31,18 @@ function actorOf(event: TicketHistoryEvent, nameOf: (userId: string) => string):
   return text;
 }
 
-describe('27.519 History names an MCP write "Claude, for <name>"', () => {
+describe('27.519 History names an MCP write "Assistant, for <name>"', () => {
   it('27.519 attributionLabel prefixes the assistant for origin mcp only, and HistoryList renders it over the actorLabel floor', () => {
-    expect(MCP_ASSISTANT_LABEL).toBe('Claude');
-    expect(attributionLabel('Ama Rangsa', 'mcp')).toBe('Claude, for Ama Rangsa');
+    expect(MCP_ASSISTANT_LABEL).toBe('Assistant');
+    expect(attributionLabel('Ama Rangsa', 'mcp')).toBe('Assistant, for Ama Rangsa');
     expect(attributionLabel('Ama Rangsa', 'mobile')).toBe('Ama Rangsa');
     expect(attributionLabel('Ama Rangsa', 'server')).toBe('Ama Rangsa');
     expect(attributionLabel('Ama Rangsa', 'web')).toBe('Ama Rangsa');
 
-    expect(actorOf(MCP_EVENT, () => 'Ama Rangsa')).toBe('Claude, for Ama Rangsa');
+    expect(actorOf(MCP_EVENT, () => 'Ama Rangsa')).toBe('Assistant, for Ama Rangsa');
     expect(actorOf({ ...MCP_EVENT, origin: 'web' }, () => 'Ama Rangsa')).toBe('Ama Rangsa'); // control
     // The inner `actorLabel` floor still applies: a roster that names nobody, or answers with the id itself.
-    expect(actorOf(MCP_EVENT, () => '')).toBe('Claude, for Unknown person');
-    expect(actorOf(MCP_EVENT, (id) => id)).toBe('Claude, for Unknown person');
+    expect(actorOf(MCP_EVENT, () => '')).toBe('Assistant, for Unknown person');
+    expect(actorOf(MCP_EVENT, (id) => id)).toBe('Assistant, for Unknown person');
   });
 });
