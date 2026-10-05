@@ -3232,8 +3232,8 @@ export function TicketSheet({
   //
   // Drafts T8: a draft has no key, so the pill stands where the key goes and the title is not repeated in the crumb.
   const lastCrumb: ReactNode = isDraft ? <span className="gn-draft-pill">{DRAFT_PILL_LABEL}</span> : (ticketRead.key ?? ticketRead.title);
-  // Drafts T8 (decision 8): what a draft cannot do is disabled, not removed, and says why; the id is in the document
-  // once (the state row), and the header's phone Move points at the same copy.
+  // Drafts T8 (decision 8): what a draft cannot do is disabled, not removed, and says why; the id is once in the document, on
+  // the footer's copy (mounted on every tab, unlike the state row's), and all three controls point at that copy.
   const draftReasonId = `draft-reason-${ticketId}`;
   const draftDescribedBy = isDraft ? draftReasonId : undefined;
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
@@ -4120,7 +4120,7 @@ export function TicketSheet({
                     <span className="gn-sheet__closed-note">Closed. Reopen it first</span>
                   ) : null}
                   {isDraft ? (
-                    <span id={draftReasonId} className="gn-draft-reason">
+                    <span className="gn-draft-reason">
                       {DRAFT_DISABLED_REASON}
                     </span>
                   ) : null}
@@ -4992,7 +4992,7 @@ export function TicketSheet({
         >
           Delete
         </button>
-        {isDraft ? <span className="gn-draft-reason">{DRAFT_DISABLED_REASON}</span> : null}
+        {isDraft ? <span id={draftReasonId} className="gn-draft-reason">{DRAFT_DISABLED_REASON}</span> : null}
       </footer>
 
       {/*

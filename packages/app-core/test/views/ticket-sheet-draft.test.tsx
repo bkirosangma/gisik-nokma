@@ -154,9 +154,20 @@ describe('28.173 disabled, not removed', () => {
       expect(control).toHaveAccessibleDescription('Available after you publish');
     }
     expect(screen.getByTestId('field-state')).toBeInTheDocument();
-    // Two visible copies, exactly: the state row (with the id) and the footer. The header `Move this ticket` points
-    // at the state row's copy and adds none; the visibility block carries none (it is replaced on a draft, 28.195).
+    // Two visible copies, exactly: the state row and the footer (with the id). The header `Move this ticket` points
+    // at the footer's copy and adds none; the visibility block carries none (it is replaced on a draft, 28.195).
     expect(screen.getAllByText('Available after you publish')).toHaveLength(2);
+  });
+  it('28.173 on the Attachments tab the header Move and Delete keep the reason (its id is not inside the Details panel)', async () => {
+    renderSheet(source({ getTicket: async () => draftRead() }));
+    await screen.findByTestId('sheet-crumb-ticket');
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Attachments' }));
+    // The state row went with the Details panel, so this IS the other tab.
+    expect(screen.queryByRole('button', { name: 'Move…' })).toBeNull();
+    for (const control of [screen.getByRole('button', { name: 'Move this ticket' }), screen.getByRole('button', { name: 'Delete' })]) {
+      expect(control).toBeDisabled();
+      expect(control).toHaveAccessibleDescription('Available after you publish');
+    }
   });
   it('28.173 control: on a published ticket each is enabled and no reason is drawn', async () => {
     renderSheet(source({ getTicket: async () => ticketRead() }));
