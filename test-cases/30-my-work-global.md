@@ -7,9 +7,9 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 
 ## 30.2 Preferences (T2)
 
-`GET`/`PUT /v1/me/my-work-preferences` — the page's "Show" filter and "Group" toggle, one document per user (`user_my_work_preferences`, keyed by `user_id` alone). All six in `apps/server/test/routes/my-work-preferences.test.ts`, built through `buildTestApp` so `app.ts`'s registration is under test.
+`GET`/`PUT /v1/me/my-work-preferences` — the page's "Show" filter and "Group" toggle, one document per user (`user_my_work_preferences`, keyed by `user_id` alone). All six in `apps/server/test/routes/my-work-preferences.test.ts`, built through `buildTestApp` so `app.ts`'s registration is under test; 30.013's frozen default also in `packages/domain/test/my-work-preferences.test.ts`.
 
-- ✅ **30.013 — GET with no row answers `DEFAULT_MY_WORK_PREFERENCES`** (`{show:['created','assigned'], grouping:'workspace-project'}`), asserted as the literal and as the domain constant. Mutation: the store returns `null` for no row → red.
+- ✅ **30.013 — GET with no row answers `DEFAULT_MY_WORK_PREFERENCES`** (`{show:['created','assigned'], grouping:'workspace-project'}`), asserted as the literal and as the domain constant; the default and its `show` array are frozen (a push into `show` throws, and the default is unchanged after it; control: a parsed copy of the same doc is not frozen). Mutations: the store returns `null` for no row → red; either `Object.freeze` dropped → red.
 - ✅ **30.014 — PUT a valid doc answers it, and GET answers it after, for the same user;** a second PUT replaces the first whole.
 - ✅ **30.015 — user B never sees user A's doc:** B reads the default after A's PUT; control: A reads its own doc; B's own PUT then leaves A's alone. Mutation: the store keyed on a constant instead of `user_id` → red.
 - ✅ **30.016 — a bad body is a 400 `invalid_my_work_preferences` and stores nothing:** `show:[]`, `show:['bogus']`, an extra key, `grouping:'tree'`, and five `show` entries (`.max(4)` bounds the raw body, before the de-dupe), each otherwise valid; for a fresh user GET still answers the default and for a user with a prior doc GET still answers that doc. Controls: a one-value doc and a four-value doc are taken. Mutations: `.min(1)` dropped, `.strict()` dropped, `.max(4)` dropped → red.
