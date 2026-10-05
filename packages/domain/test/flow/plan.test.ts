@@ -319,9 +319,11 @@ describe('29.196 passes: a loop re-runs its body', () => {
     expect(get(q, B).intervals.map((i) => i.pass)).toEqual([1]);
     // a reset ticket whose Decision is not in the read (a hole) still owes its pass: with no ready day it is "no-dates",
     // which wins over a missing estimate (B has none)
-    const hole = planOf([fnode(A, { explicitStart: '2026-10-05', estimate: 3, rounds: 2 }), fnode(B, { rounds: 2 })], [edge(A, B)]);
+    const hole = planOf([fnode(A, { explicitStart: '2026-10-05', estimate: 3, rounds: 2 }), fnode(B, { rounds: 2 }), fnode(C)], [edge(A, B)]);
     expect([get(hole, A).intervals.map((i) => i.pass), get(hole, A).unscheduled]).toEqual([[1], 'no-dates']);
     expect(get(hole, B)).toEqual({ intervals: [], unscheduled: 'no-dates', onTimeline: false });
+    // C runs in pass 1 only: its reason is its own last pass's, not blanked by the pass 2 the others owe
+    expect(get(hole, C)).toEqual({ intervals: [], unscheduled: 'no-dates', onTimeline: false });
     // pass 1 is planned for every node, whatever its round reads
     expect(span(planOf([fnode(A, { explicitDue: '2026-10-05', rounds: 0 })]), A)).toBe('2026-10-05..2026-10-05 explicit');
   });
