@@ -215,6 +215,11 @@ export const LIVE_BASE_WHERE =
  *    ticket SELECT is the sixth) and 16 import lines — **23 uses of the
  *    constant**. The longhand sweep (`deleted_at +IS +NULL`) was NOT re-run
  *    here: its count above is the earlier tree's.
+ *    ⚠ **Re-measured at wtg4 T1 (the Timeline load, `../timeline/load.ts`), same
+ *    grep, superseding the figure above:** **23** executable `${LIVE_TICKET_WHERE}`
+ *    sites across 17 files (the docblock hits in this file, this paragraph's
+ *    included, are not counted), **6** array members across 5 files and 21 import lines:
+ *    **29 uses of the constant**. The longhand sweep was again not re-run.
  *
  * AND it into every SELECT that serves a VIEW. Do NOT add it to
  * `../projections/tickets.ts`'s `getTicketStateFromDb` /

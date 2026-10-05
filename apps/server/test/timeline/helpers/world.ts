@@ -32,51 +32,53 @@ export async function insertUser(pool: Pool, id: string, name: string): Promise<
   await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1, $2, $3, true, now(), now())`, [id, name, `${id}@timeline.test`]);
 }
 
+/** One workspace: `owner` owns it, `members` are members; every one of them is on both projects; the workflow and the two ticket types. */
+export async function seedWorkspace(pool: Pool, owner: string, members: readonly string[]): Promise<TWorkspace> {
+  const w: TWorkspace = { workspaceId: newUlid(), wf: `wf-${newUlid()}`, p1: newUlid(), p2: newUlid() };
+  const ws = { workspaceId: w.workspaceId, actorId: owner };
+  const ev: LedgerEvent[] = [
+    makeCommitted({ ...ws, entity: { kind: 'workspace', id: w.workspaceId }, type: 'workspace.created', payload: { name: 'W' } }),
+    makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(w.workspaceId, owner) }, type: 'membership.granted', payload: { userId: owner, role: 'owner' } }),
+    ...members.map((m) =>
+      makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(w.workspaceId, m) }, type: 'membership.granted', payload: { userId: m, role: 'member' } }),
+    ),
+    makeCommitted({ ...ws, entity: { kind: 'project', id: w.p1 }, type: 'project.created', payload: { name: 'Client pitches' } }),
+    makeCommitted({ ...ws, entity: { kind: 'project', id: w.p2 }, type: 'project.created', payload: { name: 'Website' } }),
+    ...[owner, ...members].flatMap((u) =>
+      [w.p1, w.p2].map((p) => makeCommitted({ ...ws, entity: { kind: 'project', id: p }, type: 'project.member_added', payload: { userId: u, projectAdmin: u === owner } })),
+    ),
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'workflow', id: w.wf },
+      type: 'workflow.defined',
+      payload: {
+        id: w.wf,
+        version: 1,
+        name: 'Flow',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'To do', category: 'open' },
+          { id: 'doing', name: 'Doing', category: 'active' },
+          { id: 'done', name: 'Done', category: 'terminal' },
+        ],
+        transitions: ['todo', 'doing', 'done'].map((to) => ({ from: '*', to, rules: [] })),
+      },
+    }),
+    makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: 'task' }, type: 'ticket-type.defined', payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: w.wf, fields: [] } }),
+    makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: 'decision' }, type: 'ticket-type.defined', payload: { id: 'decision', name: 'Decision', icon: 'diamond', rank: 3, workflowId: w.wf, fields: [] } }),
+  ];
+  await applyCommitted(pool, ev);
+  return w;
+}
+
 export async function seedTimelineWorld(pool: Pool): Promise<TimelineWorld> {
   const ama = newUlid();
   const bo = newUlid();
   const cy = newUlid();
   for (const [id, name] of [[ama, 'Ama'], [bo, 'Bo'], [cy, 'Cy']] as const) await insertUser(pool, id, name);
-  const mk = async (owner: string, members: string[]): Promise<TWorkspace> => {
-    const w: TWorkspace = { workspaceId: newUlid(), wf: `wf-${newUlid()}`, p1: newUlid(), p2: newUlid() };
-    const ws = { workspaceId: w.workspaceId, actorId: owner };
-    const ev: LedgerEvent[] = [
-      makeCommitted({ ...ws, entity: { kind: 'workspace', id: w.workspaceId }, type: 'workspace.created', payload: { name: 'W' } }),
-      makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(w.workspaceId, owner) }, type: 'membership.granted', payload: { userId: owner, role: 'owner' } }),
-      ...members.map((m) =>
-        makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(w.workspaceId, m) }, type: 'membership.granted', payload: { userId: m, role: 'member' } }),
-      ),
-      makeCommitted({ ...ws, entity: { kind: 'project', id: w.p1 }, type: 'project.created', payload: { name: 'Client pitches' } }),
-      makeCommitted({ ...ws, entity: { kind: 'project', id: w.p2 }, type: 'project.created', payload: { name: 'Website' } }),
-      ...[owner, ...members].flatMap((u) =>
-        [w.p1, w.p2].map((p) => makeCommitted({ ...ws, entity: { kind: 'project', id: p }, type: 'project.member_added', payload: { userId: u, projectAdmin: u === owner } })),
-      ),
-      makeCommitted({
-        ...ws,
-        entity: { kind: 'workflow', id: w.wf },
-        type: 'workflow.defined',
-        payload: {
-          id: w.wf,
-          version: 1,
-          name: 'Flow',
-          initialStateId: 'todo',
-          states: [
-            { id: 'todo', name: 'To do', category: 'open' },
-            { id: 'doing', name: 'Doing', category: 'active' },
-            { id: 'done', name: 'Done', category: 'terminal' },
-          ],
-          transitions: ['todo', 'doing', 'done'].map((to) => ({ from: '*', to, rules: [] })),
-        },
-      }),
-      makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: 'task' }, type: 'ticket-type.defined', payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: w.wf, fields: [] } }),
-      makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: 'decision' }, type: 'ticket-type.defined', payload: { id: 'decision', name: 'Decision', icon: 'diamond', rank: 3, workflowId: w.wf, fields: [] } }),
-    ];
-    await applyCommitted(pool, ev);
-    return w;
-  };
-  const A = await mk(ama, [bo]);
-  const B = await mk(bo, [ama]);
-  const C = await mk(cy, []);
+  const A = await seedWorkspace(pool, ama, [bo]);
+  const B = await seedWorkspace(pool, bo, [ama]);
+  const C = await seedWorkspace(pool, cy, []);
   const t = Object.fromEntries(
     ['dated', 'mine', 'collab', 'other', 'hidden', 'step1', 'step2', 'draft', 'fStart', 'fDec', 'fYes', 'fNo', 'bTask'].map((k) => [k, newUlid()]),
   ) as TimelineWorld['t'];
@@ -127,7 +129,7 @@ export async function seedTimelineWorld(pool: Pool): Promise<TimelineWorld> {
  */
 export async function seedDraft(
   pool: Pool,
-  o: { authorId: string; workspaceId: string; projectId: string; title: string; explicitStart?: string; estimate?: number; id?: string },
+  o: { authorId: string; workspaceId: string; projectId: string; title: string; explicitStart?: string; estimate?: number; assigneeId?: string; id?: string },
 ): Promise<string> {
   const id = o.id ?? newUlid();
   await applyCommitted(pool, [
@@ -145,6 +147,7 @@ export async function seedDraft(
         draft: true,
         ...(o.explicitStart === undefined ? {} : { startDate: { date: o.explicitStart } }),
         ...(o.estimate === undefined ? {} : { estimate: o.estimate }),
+        ...(o.assigneeId === undefined ? {} : { assigneeId: o.assigneeId }),
       },
     }),
   ]);

@@ -19,7 +19,7 @@ export function capIds(ids: readonly string[]): string[] {
   return ids.slice(0, HOME_ID_CAP);
 }
 
-const byDayThenId = (a: Dated, b: Dated): number =>
+export const byDayThenId = (a: Dated, b: Dated): number =>
   a.day < b.day ? -1 : a.day > b.day ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 
 /**

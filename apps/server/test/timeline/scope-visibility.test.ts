@@ -6,7 +6,7 @@ import { loadWorkspace } from '../../src/timeline/load.js';
 import { readTimelineChunk } from '../../src/timeline/read-chunk.js';
 import { readTimelineIndex } from '../../src/timeline/read-index.js';
 import { readTimelineTray } from '../../src/timeline/read-tray.js';
-import { MAX_PROJECTS, MAX_WORKSPACES, parseTimelineScope, readableWorkspaces, type TimelineScope } from '../../src/timeline/scope.js';
+import { MAX_PROJECTS, MAX_WORKSPACES, parseTimelineScope, readableWorkspaces, scopeKey, type TimelineScope } from '../../src/timeline/scope.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedDraft, seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
@@ -27,9 +27,9 @@ afterAll(async () => {
   await db.drop();
 });
 
-const scopeOf = (ws: string[], mine = false): TimelineScope => ({ workspaceIds: [...ws].sort(), projectIds: [], mine });
-async function core(viewer: string, ws: string[], mine = false) {
-  const scope = scopeOf(ws, mine);
+const scopeOf = (ws: string[], mine = false, projectIds: string[] = []): TimelineScope => ({ workspaceIds: [...ws].sort(), projectIds, mine });
+async function core(viewer: string, ws: string[], mine = false, projectIds: string[] = []) {
+  const scope = scopeOf(ws, mine, projectIds);
   return computeScope(db.pool, await readableWorkspaces(db.pool, viewer, scope), viewer, scope, NOW);
 }
 const ids = (c: Awaited<ReturnType<typeof core>>) => new Set(c.entries.map((e) => e.id));
@@ -71,6 +71,11 @@ describe('29.296 scope gate and visibility', () => {
     expect(parseTimelineScope({ ws: a, proj: 'nope' })).toBeNull();
     expect(parseTimelineScope({ ws: [a, b] })).toBeNull(); // `?ws=a&ws=b` arrives as an array
     expect(parseTimelineScope({ ws: a, proj: '' })).toEqual({ workspaceIds: [a], projectIds: [], mine: false }); // an empty proj is every project
+    // the cache key of a canonical scope: two spellings of one scope are one key; Me and the projects are part of it
+    const one = parseTimelineScope({ ws: `${b},${a}`, proj: `${w.A.p2},${w.A.p1}`, mine: '1' }) as TimelineScope;
+    expect(scopeKey(one)).toBe(`${a},${b}|${[w.A.p1, w.A.p2].sort().join(',')}|1`);
+    expect(scopeKey(parseTimelineScope({ ws: `${a},${b}`, proj: `${w.A.p1},${w.A.p2}`, mine: '1' }) as TimelineScope)).toBe(scopeKey(one));
+    expect(scopeKey({ ...one, mine: false })).toBe(`${a},${b}|${[w.A.p1, w.A.p2].sort().join(',')}|0`);
   });
 
   it('29.296 Me = assigned OR collaborating; Everyone adds the rest', async () => {
@@ -80,6 +85,16 @@ describe('29.296 scope gate and visibility', () => {
     expect(me.has(w.t.other)).toBe(false); // assigned to bo, ama not on it
     const everyone = ids(await core(w.ama, [w.A.workspaceId], false));
     expect(everyone.has(w.t.other)).toBe(true); // control
+  });
+
+  it("29.296 a project narrowing: the project's tickets are items, another project's are not, and a flow with no member in scope is not served", async () => {
+    const p1 = await core(w.ama, [w.A.workspaceId], false, [w.A.p1]);
+    expect(ids(p1).has(w.t.dated)).toBe(true);
+    expect(ids(p1).has(w.t.fStart)).toBe(false); // the diamond is project 2's
+    expect(p1.flows.some((f) => f.nodes.some((n) => n.id === w.t.fStart))).toBe(false);
+    const p2 = await core(w.ama, [w.A.workspaceId], false, [w.A.p2]);
+    expect(ids(p2).has(w.t.fStart)).toBe(true); // control: its own project lists it
+    expect(ids(p2).has(w.t.dated)).toBe(false);
   });
 
   it('29.296 a hidden ticket is a hole: bo sees two flows-of-one, ama sees one flow of three', async () => {
@@ -118,6 +133,34 @@ describe('29.296 scope gate and visibility', () => {
     const bo = await core(w.bo, [w.A.workspaceId], false);
     expect(text(bo)).not.toContain(draftId);
     expect(bo.entries.some((e) => e.id === w.t.dated)).toBe(true); // control: bo's core is loaded, so the absence is the draft's privacy
+
+    // a draft is narrowed like any ticket: Me = assigned OR collaborating, and the project list
+    const assigned = await seedDraft(db.pool, { authorId: w.ama, workspaceId: w.A.workspaceId, projectId: w.A.p1, title: 'My draft, assigned', explicitStart: '2026-10-06', estimate: 1, assigneeId: w.ama });
+    const collab = await seedDraft(db.pool, { authorId: w.ama, workspaceId: w.A.workspaceId, projectId: w.A.p1, title: 'My draft, collaborating', explicitStart: '2026-10-06', estimate: 1, assigneeId: w.bo });
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: w.A.workspaceId, actorId: w.ama, entity: { kind: 'ticket', id: collab }, type: 'ticket.collaborator_added', payload: { userId: w.ama } })]);
+    const me = ids(await core(w.ama, [w.A.workspaceId], true));
+    expect(me.has(assigned)).toBe(true);
+    expect(me.has(collab)).toBe(true);
+    expect(me.has(draftId)).toBe(false); // nobody's: out of Me
+    expect(ids(await core(w.ama, [w.A.workspaceId], false, [w.A.p2])).has(draftId)).toBe(false); // project 1's draft under project 2
+    expect(ids(await core(w.ama, [w.A.workspaceId], false, [w.A.p1])).has(draftId)).toBe(true); // control
+  });
+
+  it('29.296 a ticket whose workflow version the load cannot fold is a loud error, not a silent hole; control: restored, the read answers', async () => {
+    const [{ workflow_version: was }] = (await db.pool.query<{ workflow_version: number }>('SELECT workflow_version FROM proj_tickets WHERE ticket_id = $1', [w.t.other])).rows as [{ workflow_version: number }];
+    await db.pool.query('UPDATE proj_tickets SET workflow_version = 99 WHERE ticket_id = $1', [w.t.other]);
+    let failure: unknown = null;
+    try {
+      await core(w.ama, [w.A.workspaceId]);
+    } catch (e) {
+      failure = e;
+    } finally {
+      await db.pool.query('UPDATE proj_tickets SET workflow_version = $2 WHERE ticket_id = $1', [w.t.other, was]);
+    }
+    expect((failure as Error | null)?.message).toBe(
+      `loadWorkspace: no workflow definition ${w.A.wf}@99 for ticket ${w.t.other}; the projection and the ledger disagree`,
+    );
+    expect(ids(await core(w.ama, [w.A.workspaceId])).has(w.t.other)).toBe(true);
   });
 });
 
@@ -127,6 +170,9 @@ describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
   const D = newUlid();
   const T = newUlid();
   const N = newUlid();
+  /** S -> Q: Q is ama's, S is nobody's, so under her Me S is a flow member out of scope (it rides `flows`). */
+  const S = newUlid();
+  const Q = newUlid();
   const WINDOW = { from: '2026-08-01', to: '2026-12-31' };
   const reads = async (viewer: string, mine = false) => {
     const scope = scopeOf([w.A.workspaceId], mine);
@@ -149,6 +195,10 @@ describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
       ev(N, 'ticket.created', { typeId: 'task', projectId: w.A.p2, parentId: null, title: 'Stopped', assigneeId: w.bo }),
       ev(D, 'ticket.link_added', { kind: 'leads_to', targetId: T, label: 'Go' }),
       ev(D, 'ticket.link_added', { kind: 'leads_to', targetId: N, label: 'Stop' }),
+      ev(N, 'ticket.link_added', { kind: 'blocks', targetId: T }),
+      ev(S, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Source', startDate: { date: '2026-10-20' }, estimate: 1 }),
+      ev(Q, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Mine after', estimate: 1, assigneeId: w.ama }),
+      ev(S, 'ticket.link_added', { kind: 'leads_to', targetId: Q }),
       // the settle's "Not taken": the state moves to Done and the close flag carries the cause (`ticketClosedPayload`, wtg2 T8)
       ev(N, 'ticket.transitioned', { to: 'done' }, SYSTEM_ACTOR_FLOW),
       ev(
@@ -178,10 +228,14 @@ describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
     expect(ama.index.items.find((e) => e.id === N)?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: D, outcome: 'Stop', pass: 1 });
     const flow = ama.index.flows.find((f) => f.nodes.some((n) => n.id === N));
     expect(flow?.nodes.find((n) => n.id === N)?.notTaken).toMatchObject({ decisionTicketId: D });
+    expect(flow?.edges).toContainEqual({ from: N, to: T, kind: 'blocks', label: null }); // a blocks link between two members rides the flow
     expect(ama.chunk.items.some((d) => d.id === D)).toBe(true);
     expect(ama.tray.items.find((r) => r.id === T)?.reachedBy).toMatchObject({ decisionTicketId: D, outcome: 'Go' });
     // ama under Me: D is hers, N is bo's and out of her scope, yet N rides D's flow with the id she may see
     const amaMe = await reads(w.ama, true);
     expect(amaMe.index.flows.find((f) => f.nodes.some((n) => n.id === N))?.nodes.find((n) => n.id === N)?.notTaken).toMatchObject({ decisionTicketId: D });
+    // the load admits an out-of-scope SOURCE as well as a target: S is nobody's, Q is hers
+    expect(amaMe.index.flows.find((f) => f.nodes.some((n) => n.id === Q))?.nodes.map((n) => n.id).sort()).toEqual([S, Q].sort());
+    expect(amaMe.index.items.some((e) => e.id === S)).toBe(false);
   });
 });

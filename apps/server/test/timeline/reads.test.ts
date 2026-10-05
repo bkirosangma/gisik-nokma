@@ -18,14 +18,19 @@ import { insertUser, seedTimelineWorld, type TimelineWorld } from './helpers/wor
 /**
  * 29.299 (the index, chunk and tray slice one core) and 29.293 (Home's numbers over a scope, and `asOf`) on
  * `seedTimelineWorld`, plus, filed here: three undated tickets in A (the tray has pages), a workspace-level note
- * (`home_project_id = ''`) and a note homed in A.p2, and `gus`, a GUEST in C who owns a fifth workspace D.
+ * (`home_project_id = ''`) and a note homed in A.p2, `gus`, a GUEST in C who owns a fifth workspace D, and in B two tickets
+ * whose ids are minted BEFORE the world's (an undated one and a dated one: across workspaces the merged order is not the
+ * concatenation) and three due dates that interleave A's across the workspaces (B 10-05, B 09-10, A 09-20).
  */
+const earlyUndated = newUlid();
+const earlyDated = newUlid();
 
 const NOW = new Date('2026-10-03T06:00:00.000Z');
 let db: TestDatabase;
 let w: TimelineWorld;
 const undated = [newUlid(), newUlid(), newUlid()];
 const notes = { ws: newUlid(), p2: newUlid() };
+const due = { bSoon: newUlid(), bPast: newUlid(), aPast: newUlid() };
 const gus = newUlid();
 const D = newUlid();
 
@@ -43,6 +48,17 @@ beforeAll(async () => {
     makeCommitted({ workspaceId: w.C.workspaceId, actorId: w.cy, entity: { kind: 'membership', id: membershipId(w.C.workspaceId, gus) }, type: 'membership.granted', payload: { userId: gus, role: 'guest' } }),
     makeCommitted({ workspaceId: D, actorId: gus, entity: { kind: 'workspace', id: D }, type: 'workspace.created', payload: { name: 'D' } }),
     makeCommitted({ workspaceId: D, actorId: gus, entity: { kind: 'membership', id: membershipId(D, gus) }, type: 'membership.granted', payload: { userId: gus, role: 'owner' } }),
+    ...(
+      [
+        [w.B, earlyUndated, 'Early, undated', {}],
+        [w.B, earlyDated, 'Early, dated', { startDate: { date: '2026-10-06' }, estimate: 1 }],
+        [w.B, due.bSoon, 'B due soon', { dueDate: { date: '2026-10-05' } }],
+        [w.B, due.bPast, 'B past due', { dueDate: { date: '2026-09-10' } }],
+        [w.A, due.aPast, 'A past due', { dueDate: { date: '2026-09-20' } }],
+      ] as const
+    ).map(([ws, id, title, extra]) =>
+      makeCommitted({ workspaceId: ws.workspaceId, actorId: w.bo, entity: { kind: 'ticket', id }, type: 'ticket.created', payload: { typeId: 'task', projectId: ws.p1, parentId: null, title, ...extra } }),
+    ),
   ]);
 }, 120_000);
 afterAll(async () => {
@@ -99,9 +115,23 @@ describe('29.299 the index, chunk and tray slice one core', () => {
     expect(idx.tray.count).toBe(rows.length);
     expect(rows.map((r) => r.id)).toEqual((await tray(w.ama, scope)).items.map((r) => r.id)); // the pages' union is the unpaged read
     expect(rows.filter((r) => undated.includes(r.id)).map((r) => r.reason)).toEqual(['no-dates', 'no-dates', 'no-dates']);
+    expect(idx.today).toBe('2026-10-03');
+    // today is the IST day: 19:00Z is already the 4th in India
+    expect((await readTimelineIndex(db.pool, await readable(w.ama, scope), w.ama, scope, new Date('2026-10-03T19:00:00.000Z'))).today).toBe('2026-10-04');
     // the last page boundary: a page size of exactly the total has no next page; one less has one
     expect((await tray(w.ama, scope, undefined, rows.length)).nextCursor).toBeNull();
     expect((await tray(w.ama, scope, undefined, rows.length - 1)).nextCursor).toBe(rows[rows.length - 2]?.id);
+  });
+
+  it("29.299 across workspaces the tray and the chunk page in ONE id order: B's earlier id is neither skipped nor out of place", async () => {
+    const scope = scopeOf([w.A.workspaceId, w.B.workspaceId]);
+    const rows = (await allPages((cursor) => tray(w.ama, scope, cursor, 2))).flat().map((r) => r.id);
+    expect(rows.filter((id) => id === earlyUndated)).toHaveLength(1);
+    expect(rows).toEqual([...rows].sort());
+    expect(rows).toHaveLength((await index(w.ama, scope)).tray.count);
+    const items = (await chunk(w.ama, scope, { from: '2026-10-05', to: '2026-10-11' })).items.map((d) => d.id);
+    expect(items[0]).toBe(earlyDated);
+    expect(items).toEqual([...items].sort());
   });
 
   it('29.299 a chunk is the details of the entries overlapping its window, in id order, paged by keyset; control: a window with no overlap is []', async () => {
@@ -113,7 +143,7 @@ describe('29.299 the index, chunk and tray slice one core', () => {
     expect(allIds).not.toContain(w.t.bTask); // workspace B is in scope only when listed
     expect(allIds).not.toContain(w.t.step1); // 10-12: after the window
     expect(allIds).toEqual([...allIds].sort());
-    expect(all.find((d) => d.id === w.t.dated)).toMatchObject({ title: 'Dated', dueDate: '2026-10-07', basis: 'explicit' });
+    expect(all.find((d) => d.id === w.t.dated)).toMatchObject({ title: 'Dated', stateName: 'To do', dueDate: '2026-10-07', basis: 'explicit' });
     const pages = await allPages((cursor) => chunk(w.ama, scope, win, cursor, 2));
     expect(pages[0]).toHaveLength(2);
     expect(pages.length).toBe(Math.ceil(all.length / 2));
@@ -188,6 +218,8 @@ describe("29.293 Home's numbers over a scope", () => {
     expect((hA.counts.members ?? 0) + (hB.counts.members ?? 0)).toBe(4); // control: the per-workspace sum differs
     expect([...two.ids.members].sort()).toEqual([w.ama, w.bo].sort());
     expect(two.ids.tickets).toEqual([...two.ids.tickets].sort().reverse()); // newest first across workspaces
+    expect(two.ids.dueSoon).toEqual([due.bSoon, w.t.dated]); // by day across workspaces (B's 10-05 before A's 10-07)
+    expect(two.ids.pastDue).toEqual([due.bPast, due.aPast]); // 09-10 (B) before 09-20 (A)
 
     expect(await summary(w.ama, scopeOf([w.A.workspaceId, w.B.workspaceId, w.C.workspaceId]))).toEqual(two); // C is not ama's: dropped, no key anywhere
   });

@@ -1,13 +1,11 @@
-import { HOME_ID_CAP, type HomeSummaryResponse } from '@gisik-nokma/domain';
+import type { HomeSummaryResponse } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
-import { collectHome, type Dated, type HomeCollected } from '../routes/home.js';
+import { byDayThenId, capIds, collectHome, type HomeCollected } from '../routes/home.js';
 import { readAsOf } from './as-of.js';
 import type { ReadableWorkspace, TimelineScope } from './scope.js';
 
-const byDayThenId = (a: Dated, b: Dated): number => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 /** ULIDs sort by time, so this is newest first, as `readHome`'s `ORDER BY t.ticket_id DESC`. */
 const newestFirst = (a: string, b: string): number => (a < b ? 1 : a > b ? -1 : 0);
-const cap = (ids: readonly string[]): string[] => ids.slice(0, HOME_ID_CAP);
 
 /**
  * HM-2 (D-W4-8): Home's six numbers over a scope. Each readable workspace is collected by `collectHome` (the one code path
@@ -48,12 +46,12 @@ export async function readHomeSummary(
       notes: notes.length,
     },
     ids: {
-      tickets: cap(tickets),
-      open: cap(open),
-      pastDue: cap(pastDue.map((d) => d.id)),
-      dueSoon: cap(dueSoon.map((d) => d.id)),
-      members: cap(members ?? []),
-      notes: cap(notes),
+      tickets: capIds(tickets),
+      open: capIds(open),
+      pastDue: capIds(pastDue.map((d) => d.id)),
+      dueSoon: capIds(dueSoon.map((d) => d.id)),
+      members: capIds(members ?? []),
+      notes: capIds(notes),
     },
   };
 }

@@ -189,9 +189,15 @@ function reachedBy(
 
 const endOf = (e: TimelineEntry): string => e.segments.reduce((m, s) => (s.end > m ? s.end : m), '');
 
-/** Merge per-workspace cores and apply PR-0's cap: the entries that ended longest ago go first. */
+const byIdAsc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : 1);
+
+/**
+ * Merge per-workspace cores and apply PR-0's cap: the entries that ended longest ago go first. Entries and tray rows are
+ * put back in `ticket_id` order ACROSS workspaces: each core is sorted on its own, and the tray's keyset pager
+ * (`id > cursor`) would skip a later workspace's smaller id if the merged list were only concatenated.
+ */
 export function mergeCores(today: string, cores: readonly ScopeCore[], limits: Limits = DEFAULT_LIMITS): ScopeCore {
-  const all = cores.flatMap((c) => c.entries);
+  const all = cores.flatMap((c) => c.entries).sort(byIdAsc);
   let entries = all;
   let truncated: ScopeCore['truncated'] = null;
   if (all.length > limits.index) {
@@ -204,7 +210,7 @@ export function mergeCores(today: string, cores: readonly ScopeCore[], limits: L
     today,
     entries,
     flows: cores.flatMap((c) => c.flows),
-    tray: cores.flatMap((c) => c.tray),
+    tray: cores.flatMap((c) => c.tray).sort(byIdAsc),
     details: new Map(cores.flatMap((c) => [...c.details])),
     truncated,
   };
