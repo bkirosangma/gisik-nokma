@@ -45,7 +45,7 @@ export function describeResult(r: EventResult, index: number): string {
  * (`apps/server/src/ingest/ingest-service.ts:432-445`), so a refused add leaves the remove standing and the link gone.
  * Two pre-checks here make that rare (not the current label, not another outgoing branch's label; the schema refuses a
  * blank one); the race that remains (another writer between the read and the write) is compensated: the old link is
- * added back, and if even that is refused the error says which label to re-add.
+ * added back, and if even that is refused the error says to re-add it, with its label when it had one.
  */
 export async function relabelStored(
   session: Session,
@@ -71,7 +71,8 @@ export async function relabelStored(
       `${describeResult(added, 1)}. ` +
         (restored
           ? 'The previous link was put back, so nothing changed.'
-          : `The previous link could NOT be put back: add it again with link_tickets (action "add", label "${stored.label ?? ''}").`),
+          : // an unlabelled link is re-added without a label: `label ""` would be refused by the 1..60 schema (reviewer B N1)
+            `The previous link could NOT be put back: add it again with link_tickets (action "add"${stored.label === undefined ? '' : `, label "${stored.label}"`}).`),
     );
   }
   throw new Error(`${describeResult(removed, 0)}.${added.status === 'committed' ? ' The link with the new label was added.' : ''}`);

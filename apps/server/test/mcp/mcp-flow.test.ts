@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { newUlid, SYSTEM_ACTOR_FLOW } from '@gisik-nokma/domain';
 import { NOT_A_MEMBER_REASON, PERMISSION_ROLE_RULE } from '../../src/permissions/check-permission.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { runDoorMatrix } from './helpers/door-matrix.js';
-import { buildDoorWorld, callTool, mk, ok } from './helpers/flow-world.js';
+import { buildDoorWorld, callTool, mk, ok, rawEvents, until } from './helpers/flow-world.js';
 
 /** Graph Part 5, hosted door. Every call is a `tools/call` on `POST /mcp`. Run LOCALLY. */
 let db: TestDatabase;
@@ -60,5 +62,92 @@ describe('29.375–29.378 the simple writes through the hosted door', () => {
       { tool: 'link_tickets', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, targetId: x.secondTicketId, kind: 'leads_to', action: 'add' }), stranger: 'ticket not found or not visible to you', allowed: { caller: 'member', eventType: 'ticket.link_added' } },
       { tool: 'set_wait_for_all', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, value: true }), stranger: NOT_MEMBER, allowed: { caller: 'member', eventType: 'ticket.field_set' } },
     ]);
+  });
+});
+
+describe('29.380 29.381 get_flow and get_ticket through the hosted door', () => {
+  /** Hide a ticket from the world's member: explicit visibility naming the owner alone (the 28.196 precedent; a member sees every project). */
+  const hide = async (w: Awaited<ReturnType<typeof buildDoorWorld>>, ticketId: string) => {
+    const key = ((await ok(w, w.owner, 'get_ticket', { workspaceId: w.workspaceId, ticketId })) as { key: string }).key;
+    await ok(w, w.owner, 'set_visibility', { workspaceId: w.workspaceId, ticketId, mode: 'explicit', userIds: [w.owner.userId], confirm_name: key });
+    // the control that the hide worked: the member cannot read it
+    expect((await callTool(w.app, w.member.token, 'get_ticket', { workspaceId: w.workspaceId, ticketId })).isError).toBe(true);
+  };
+
+  it('29.380 a member who cannot see the Decision sees neither its id nor its arrows; the owner sees both', async () => {
+    const w = await buildDoorWorld(db, '3763');
+    const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
+    await hide(w, decision);
+    const visible = await mk(w, w.owner, 'Pitch');
+    await ok(w, w.owner, 'link_tickets', { workspaceId: w.workspaceId, ticketId: decision, targetId: visible, kind: 'leads_to', action: 'add', label: 'Yes' });
+    const asMember = await ok(w, w.member, 'get_flow', { workspaceId: w.workspaceId, ticketId: visible });
+    expect(JSON.stringify(asMember)).not.toContain(decision);
+    expect((asMember['nodes'] as Array<{ id: string }>).map((n) => n.id)).toEqual([visible]);
+    const asOwner = await ok(w, w.owner, 'get_flow', { workspaceId: w.workspaceId, ticketId: visible });
+    expect((asOwner['nodes'] as Array<{ id: string }>).map((n) => n.id)).toEqual([decision, visible]);
+    expect((asOwner['edges'] as Array<{ label: string }>)[0]?.label).toBe('Yes');
+  });
+
+  it('29.381 get_ticket carries passes after a decision and list_ticket_types lists the Decision', async () => {
+    const w = await buildDoorWorld(db, '3764');
+    const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
+    const next = await mk(w, w.owner, 'Pitch');
+    await ok(w, w.owner, 'link_tickets', { workspaceId: w.workspaceId, ticketId: decision, targetId: next, kind: 'leads_to', action: 'add', label: 'Yes' });
+    const [decided] = await rawEvents(w, w.owner, [{ entityId: decision, type: 'ticket.decided', payload: { outcome: 'Yes' } }]);
+    expect(decided?.status, decided?.reason).toBe('committed');
+    const got = (await ok(w, w.owner, 'get_ticket', { workspaceId: w.workspaceId, ticketId: decision })) as { passes: Array<{ pass: number; outcome: string }>; ticketState: Record<string, unknown> };
+    expect(got.passes.map((p) => [p.pass, p.outcome])).toEqual([[1, 'Yes']]);
+    expect(got.ticketState).not.toHaveProperty('passes');
+    expect(got.ticketState['outcome']).toBe('Yes');
+    const types = (await ok(w, w.owner, 'list_ticket_types', { workspaceId: w.workspaceId })) as { ticketTypes: Array<{ id: string; rank: number }> };
+    expect(types.ticketTypes.find((t) => t.id === 'decision')?.rank).toBe(3);
+  });
+
+  // The unit test's fake `ticketState` holds exactly the members `withFlowFacts` strips, so it cannot catch an id Part 2
+  // carries somewhere else (Review Focus 3): this reads the REAL detail of a Not-taken step.
+  it('29.381 get_ticket on a Not-taken step never carries the id of a Decision the member cannot read; the owner sees it', async () => {
+    const w = await buildDoorWorld(db, '3765');
+    const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
+    await hide(w, decision);
+    const yes = await mk(w, w.owner, 'Pitch', { estimate: 3 });
+    const no = await mk(w, w.owner, 'Rework');
+    await rawEvents(w, w.owner, [
+      { entityId: decision, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: yes, label: 'Yes' } },
+      { entityId: decision, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: no, label: 'No' } },
+    ]);
+    const [decided] = await rawEvents(w, w.owner, [{ entityId: decision, type: 'ticket.decided', payload: { outcome: 'Yes' } }]);
+    expect(decided?.status, decided?.reason).toBe('committed');
+    // The flow actor's close of the branch not taken. Part 3's settle cascade, which files it, is not on this release yet, so
+    // the close is applied as SYSTEM_ACTOR_FLOW the way flow-view.test.ts seeds one (after the ticket's own events).
+    const last = async (sql: string, arg: string) => (await db.pool.query<{ n: number }>(sql, [arg])).rows[0]!.n;
+    const seq = await last('SELECT COALESCE(MAX(seq), 0)::int AS n FROM events WHERE entity_id = $1', no);
+    const workspaceSeq = await last('SELECT COALESCE(MAX(workspace_seq), 0)::int AS n FROM events WHERE workspace_id = $1', w.workspaceId);
+    const now = new Date().toISOString();
+    await applyCommitted(db.pool, [makeCommitted({
+      workspaceId: w.workspaceId, actorId: SYSTEM_ACTOR_FLOW, entity: { kind: 'ticket', id: no }, type: 'ticket.closed', seq: seq + 1, workspaceSeq: workspaceSeq + 1, clientTime: now, serverTime: now,
+      payload: { cause: { kind: 'branch-not-taken', decisionTicketId: decision, outcome: 'Yes', pass: 1, decidedBy: w.owner.userId, decisionEventId: newUlid() } },
+    })]);
+    const read = (who: typeof w.owner) => until('the Not-taken close', async () => {
+      const r = await callTool(w.app, who.token, 'get_ticket', { workspaceId: w.workspaceId, ticketId: no });
+      return r.isError || !(r.json as { resolution?: unknown }).resolution ? null : r;
+    });
+    const asOwner = await read(w.owner);
+    expect((asOwner.json as { resolution: unknown }).resolution).toMatchObject({ kind: 'not-taken', outcome: 'Yes', pass: 1, decision: { id: decision } }); // control: the owner can read the Decision
+    const asMember = await read(w.member);
+    expect((asMember.json as { resolution: unknown }).resolution).toEqual({ kind: 'not-taken', outcome: 'Yes', pass: 1, decision: null });
+    expect(asMember.text).not.toContain(decision); // the WHOLE reply, not just the member this tool knows about
+    // the real flow answer parses with passes, a Not-taken resolution, alternates, an estimate and the automatic close in it
+    const flow = (await ok(w, w.owner, 'get_flow', { workspaceId: w.workspaceId, ticketId: no })) as {
+      nodes: Array<{ id: string; estimate: number | null; passes: unknown[]; resolution: { decisionTicketId: string | null } | null }>;
+      autoMoves: Array<{ ticketId: string; kind: string; becauseTicketId: string | null }>;
+    };
+    expect(flow.nodes.map((n) => n.id).sort()).toEqual([decision, yes, no].sort());
+    expect(flow.nodes.find((n) => n.id === decision)?.passes).toHaveLength(1);
+    expect(flow.nodes.find((n) => n.id === yes)?.estimate).toBe(3);
+    expect(flow.nodes.find((n) => n.id === no)?.resolution?.decisionTicketId).toBe(decision);
+    expect(flow.autoMoves).toContainEqual(expect.objectContaining({ ticketId: no, kind: 'branch-not-taken', becauseTicketId: decision }));
+    // and the member's flow from the same step: the Decision is a hole, so its id is nowhere
+    const memberFlow = await ok(w, w.member, 'get_flow', { workspaceId: w.workspaceId, ticketId: no });
+    expect(JSON.stringify(memberFlow)).not.toContain(decision);
   });
 });

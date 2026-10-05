@@ -76,7 +76,10 @@ describe('get_ticket and the notes attached to the ticket', () => {
       '(`links`: kind, direction "out"/"in" and the other ticket, visible ends only). ' +
       '`notes` lists the notes attached to it that you can read (noteId, title, authorId, updatedAt; newest first, at most 50) and ' +
       '`notesTotal` counts them all; read one in full with get_note. ' +
-      'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found.',
+      'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found. ' +
+      // the flow facts sentence (Graph Part 5 T2, 29.381)
+      'Also: for a Decision its `passes`; for a ticket in its second round or later, `round` and `periods`; for a ticket closed as Not taken, ' +
+      'its `resolution` (the Decision is named only if you can read it); `leads_to` links carry their `label`.',
     );
   });
 

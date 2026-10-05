@@ -127,7 +127,7 @@ describe('the read tools', () => {
     expect(paths).toEqual([`/v1/projects/p1/tickets?${expected.toString()}`]);
   });
 
-  it('14.66 get_ticket passes both casings through untouched', async () => {
+  it('14.66 get_ticket passes both casings through as served', async () => {
     const body = {
       ticket: { ticket_id: 't1', workspace_id: 'w1', project_id: 'p1', parent_id: null, own_mode: 'inherit', resolved_mode: 'project', seq: 3 },
       ticketState: { kind: 'ticket', id: 't1', assigneeId: null, collaboratorIds: [] },
@@ -135,7 +135,7 @@ describe('the read tools', () => {
     };
     const { session, paths } = sessionRecording(body, { ...NO_LINKS, ...NO_NOTES });
     // T9 adds ONE key (`description`, as Markdown), typed links T4 one more (`links`) and MCP sweep 2 T3 two (`notes`,
-    // `notesTotal`); everything else is the server's, untouched.
+    // `notesTotal`); Graph Part 5 T2 lifts the flow facts out of `ticketState` (this one has none, 29.381); everything else is the server's.
     expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] }, links: [], notes: [], notesTotal: 0 });
     expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', '/v1/workspaces/w1/tickets/t1/links', '/v1/workspaces/w1/tickets/t1/notes']);
     // The mixed casing is the SERVER's contract. Normalising it here would be
