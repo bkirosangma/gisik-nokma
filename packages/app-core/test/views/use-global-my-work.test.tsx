@@ -156,6 +156,27 @@ describe('useGlobalMyWork', () => {
     expect(attentionCalls[1]).toEqual(['w-live', ['created', 'assigned']]);
   });
 
+  it('30.031 live re-asks are ordered by ISSUE: an older read answering after a newer one never overwrites it', async () => {
+    // Each attention read waits on its own gate, so the test decides the arrival order.
+    const gates: Array<(items: AttentionItem[]) => void> = [];
+    const source = createFakeDataSource({
+      getAttention: () => new Promise<AttentionItem[]>((resolve) => gates.push(resolve)),
+      getMyWork: async (workspaceId) => myWorkOf(workspaceId),
+    });
+    const { result } = renderHook(() => useGlobalMyWork(source, [workspace('w1')], ['created', 'assigned']));
+    await waitFor(() => expect(gates).toHaveLength(1));
+    // A frame re-asks while the first read is still out.
+    act(() => source.pushStreamItem({ type: 'refresh', workspaceId: 'w1' } as never));
+    await waitFor(() => expect(gates).toHaveLength(2));
+
+    // The NEWER read answers first...
+    await act(async () => gates[1]?.([attentionItem('w1', 'newer')]));
+    expect(ids(result.current.attention.data)).toEqual(['newer']);
+    // ...and the older one, answering late, describes a moment that has passed: dropped.
+    await act(async () => gates[0]?.([attentionItem('w1', 'older')]));
+    expect(ids(result.current.attention.data)).toEqual(['newer']);
+  });
+
   it('30.032 one workspace failing does not blank the others: its error is in byWorkspace and the rest render', async () => {
     const { source } = recordingSource({ attention: ['w-bad'], myWork: ['w-bad'] });
     const { result } = renderHook(() =>

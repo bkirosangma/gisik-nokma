@@ -119,6 +119,8 @@ describe('getAttention and show', () => {
 
 describe('the My work preferences document', () => {
   it('30.028 getMyWorkPreferences GETs /v1/me/my-work-preferences; putMyWorkPreferences PUTs the doc as JSON and answers the stored doc', async () => {
+    // The server de-duplicates `show` on store (T2, case 30.018), so what it answers differs
+    // from what was sent — which is what lets this case tell the stored doc from an echo.
     const stored = { show: ['created', 'ws-admin'], grouping: 'flat' };
     const { fetchImpl, calls } = recordingFetch({
       'GET /v1/me/my-work-preferences': { show: ['assigned'], grouping: 'workspace-project' },
@@ -130,10 +132,10 @@ describe('the My work preferences document', () => {
     expect(calls[0]?.input).toBe('/v1/me/my-work-preferences');
     expect(calls[0]?.init?.method).toBe('GET');
 
-    const answer = await source.query.putMyWorkPreferences({ show: ['created', 'ws-admin'], grouping: 'flat' });
+    const answer = await source.query.putMyWorkPreferences({ show: ['created', 'created', 'ws-admin'], grouping: 'flat' });
     expect(calls[1]?.input).toBe('/v1/me/my-work-preferences');
     expect(calls[1]?.init?.method).toBe('PUT');
-    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({ show: ['created', 'ws-admin'], grouping: 'flat' });
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({ show: ['created', 'created', 'ws-admin'], grouping: 'flat' });
     // The SERVER's answer, not the argument echoed back: it is what was stored.
     expect(answer).toEqual(stored);
   });
