@@ -1451,6 +1451,11 @@ It is a drawing canvas. Each state is a box. **Add state** makes a new one. Each
 **To connect two states, drag from the edge of one box to the edge of another.** That makes an arrow,
 which means "a ticket can go this way".
 
+**Or press Add transition.** It opens a small form: pick where the arrow starts under **From** (a state,
+or **Any state** for a move allowed from anywhere) and where it ends under **To**, then press **Add**. If
+that arrow already exists, or you picked the same state twice, the form says so and **Add** stays greyed
+out. The new arrow is selected, so its rules are right there to edit.
+
 **The canvas opens showing the whole drawing**, zoomed out as far as it needs to be to fit (never past a
 quarter size). After you have panned or zoomed, the **Fit to screen** button at the bottom left brings
 the whole drawing back. The tick boxes on a state are big enough to tap, and when one is stuck on, the
@@ -1463,8 +1468,18 @@ rules, **Add rule** and **Delete transition**. Only one row is open at a time â€
 the first â€” and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the
 canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas.
 An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide
-screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so
-the canvas and the page do not move while you read down it.
+screen (outside full screen, below) the column stays beside the canvas and scrolls by itself when it is
+longer than the window, so the canvas and the page do not move while you read down it.
+
+**Full screen gives the drawing the whole window.** Press **Full screen**, at the top or in the canvas's
+top-right corner, and the editor covers the window, keeping your zoom and where you were. The controls
+float in one row along the top: the name, **Add state**, **Add transition**, zoom, **Tidy**, **Issues**
+(with the number of problems that stop you publishing), **Publish** and **Exit full screen**; on a
+narrower window zoom and Tidy are under **More**. The left-hand column is not shown. In its place a panel
+on the right opens when you click a box or an arrow, or press **Issues**; its tabs are **Selection**,
+**States & transitions**, **System rules** and **Issues**, and you can drag its left edge to make it wider
+or narrower. **Escape** closes one thing at a time: an open menu first, then the panel, then full screen.
+A reload keeps you in full screen until you exit it. On a phone the panel rises from the bottom instead.
 Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
 them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
 

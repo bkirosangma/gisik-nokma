@@ -144,6 +144,7 @@ describe('25.546 full screen and the panel width are remembered for the session,
     expect(await widthAfterMount('279')).toBe('280px');
     expect(await widthAfterMount('280')).toBe('280px');
     expect(await widthAfterMount('junk')).toBe('360px');
+    expect(await widthAfterMount('')).toBe('360px'); // not Number('') = 0, which would clamp to 280
 
     window.sessionStorage.setItem(`${key}:panelWidth`, '300');
     await renderBuilder({ workspaceId, initialDraft });
@@ -375,6 +376,24 @@ describe('25.549 the floating panel opens on a selection and on the Issues badge
     expect(within(reopened).getByRole('tab', { name: 'Issues' })).toHaveAttribute('aria-selected', 'true');
     expect(within(reopened).getByRole('tab', { name: 'Selection' })).toHaveAttribute('aria-selected', 'false');
     expect(reopened.querySelector('.issues-panel')).not.toBeNull();
+  });
+
+  it('25.549 a row picked in the panel\'s own States & transitions tab opens in place there (the tab stays); a canvas pick after × reopens on Selection', async () => {
+    const user = userEvent.setup();
+    const { header } = await renderBuilder();
+    await enterFullScreen(user, header);
+    await user.click(await screen.findByTestId('state-node-doing'));
+    const region = panel()!;
+    await user.click(within(region).getByRole('tab', { name: 'States & transitions' }));
+    const rows = within(region).getAllByRole('button').filter((button) => button.hasAttribute('aria-expanded'));
+    await user.click(rows[kanban.def.states.length]!); // the first transition: a NEW selection, made from the list
+    expect(within(region).getByRole('tab', { name: 'States & transitions' })).toHaveAttribute('aria-selected', 'true');
+    expect(rows[kanban.def.states.length]).toHaveAttribute('aria-expanded', 'true');
+    // control: the lists tab is kept only while the panel is OPEN on it. Closed on it, a canvas pick reopens on Selection.
+    await user.click(within(region).getByRole('button', { name: 'Close panel' }));
+    await user.click(await screen.findByTestId('state-node-done'));
+    expect(within(panel()!).getByRole('tab', { name: 'Selection' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(panel()!).getByRole('textbox', { name: 'State name' })).toHaveValue('Done');
   });
 
   it('25.549 with nothing selected the Selection tab says so', async () => {

@@ -216,7 +216,8 @@ test('25.555 the Escape ladder in Chromium at 700 px: the More menu, then the pa
   // at this width the toolbar wraps, and the panel still starts below it (its tabs are not under the toolbar)
   const bar = await boxOf(toolbar(page));
   expect(bar.height).toBeGreaterThan(70); // control: two rows, so the clearance is measured, not the one-row default
-  expect((await boxOf(panel(page))).y).toBeGreaterThanOrEqual(bar.y + bar.height);
+  // 12 px clear of the toolbar's measured bottom (the toolbar's own inset), not the one-row default's 72 px from the top
+  expect(Math.abs((await boxOf(panel(page))).y - (bar.y + bar.height) - 12)).toBeLessThanOrEqual(0.5);
 
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
