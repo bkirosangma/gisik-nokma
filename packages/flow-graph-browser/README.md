@@ -31,6 +31,6 @@ A page run posts its record to `/__results`, which appends a line to `test-resul
 | `stress.html?scene=flow&n=` | n nodes and about 1.3 edges each under one transformed layer (the Workflow and Timeline graph shape) |
 | `stress.html?scene=view&n=` | the product's own `TimelineView` at n dated tickets |
 | `timeline-stress.html?scene=desktop\|phone` | the Home-shaped Timeline graph scene (10,000 bars on desktop, 11,000 on the phone) in the product's scroller, `attachDriver` and `TimelinePainter`; `window.__tlg.run(mode)` pans 10 viewports and answers fps, worst frame, mounted bars and short frames (`tests/timeline-stress.spec.ts`, cases 29.300–29.302); added by Part 4 T2 |
-| `timeline.html?n=&span=&theme=` | the product's `TimelineView`, for the behaviour specs (`tests/timeline*.spec.ts`); added by Part 1 T10 |
+| `timeline.html?n=&span=&h=&theme=&style=` | the product's `TimelineView` over `n` synthetic tickets spread over `span` days, in a flex-column host `h` tall (default `70vh`), today fixed at 2026-10-02; `window.__opened` holds the last opened ticket id. For the behaviour specs (`tests/timeline*.spec.ts`); added by Part 1 T10 |
 | `timeline-geometry.html` | the product's `TimelineView` over a fixed seed (a keyless one-day draft row, keyed one-day bars), for the layout case 29.089 (`tests/timeline.spec.ts`); added by the ERRATA E11 follow-up, moved off `timeline.html` by Part 1 T10 |
 | `camera.html` | a `CameraAdapter` over a transformed layer (`tests/camera.spec.ts`); added by Part 1 T7 |
