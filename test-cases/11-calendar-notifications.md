@@ -250,7 +250,7 @@ it stayed in `apps/web` when the gateway left.*
   `/account` into `AccountMenu`, so the arrays in `app-nav.test.tsx` — not the sentences here — are
   the authority today (without a workspace they are `/workspaces`, `/notes`, `/inbox`); and the new
   link is a prefix match (`/notes/<id>` keeps it current), which is a ROUTE rule and not a link-set
-  one, so it is 18.182's subject rather than this case's. — (`app-nav.test.tsx`)
+  one, so it is 18.182's subject rather than this case's. **AMENDED 2026-10-05 (drafts T8, spec §12.2): `/w/<id>/drafts` joins right after `/w/<id>/my-work` in every arm that has a workspace; the no-workspace arm is unchanged.** — (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)
 - **11.186** ✅ The Calendar tab says "Loading…" and draws NO grid before the list read answers — the

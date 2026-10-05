@@ -9,6 +9,7 @@ import { isWithin } from './path-within.js';
 import {
   BAR_DESTINATIONS,
   DEFAULT_BAR,
+  DRAFTS_NAV_LABEL,
   MAX_SLOTS,
   readBottomBar,
   rememberBottomBar,
@@ -40,7 +41,7 @@ import {
  * per project. So Board / List / Calendar / Timeline / Backlog are links to the last project that
  * `useLastProject` knows (`/w/<ws>/p/<project>`), and a click first writes the tab with
  * `rememberProjectTab`, which is what the page reads on arrival. With no project yet they go to the
- * workspace home, whose project grid is the way to pick one. My work and Members are plain routes.
+ * workspace home, whose project grid is the way to pick one. My work, Drafts and Members are plain routes.
  * Notes and Inbox are global.
  *
  * ## It does not offer a link that cannot resolve (plan FD5, case 21.027)
@@ -78,6 +79,8 @@ const DESTINATIONS: Record<BarDestination, Destination> = {
   timeline: { id: 'timeline', label: 'Timeline', scope: 'tab', tab: 'timeline', icon: <Icon><path d="M4 7h9M8 12h12M6 17h8" /></Icon> },
   backlog: { id: 'backlog', label: 'Backlog', scope: 'tab', tab: 'backlog', icon: <Icon><path d="M4 6h16M4 11h16M4 16h8" /><path d="M16 16h4M18 14v4" /></Icon> },
   'my-work': { id: 'my-work', label: 'My work', scope: 'workspace', icon: <Icon><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" /></Icon> },
+  // Drafts T8 FIX 1 (planner ruling B, 28.198): the top bar's Drafts link is not painted at ≤1024px, so More offers it here.
+  drafts: { id: 'drafts', label: DRAFTS_NAV_LABEL, scope: 'workspace', icon: <Icon><path d="M12.5 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-6" /><path d="M17.4 3.9a1.7 1.7 0 0 1 2.4 2.4l-6.6 6.6-3.2.8.8-3.2z" /></Icon> },
   members: { id: 'members', label: 'Members', scope: 'workspace', icon: <Icon><circle cx="9" cy="9" r="3" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><circle cx="17" cy="9.5" r="2.2" /><path d="M16.5 14.2c2.6 0 4 1.7 4 4.3" /></Icon> },
   notes: { id: 'notes', label: 'Notes', scope: 'global', icon: <Icon><path d="M6 3.5h8.5L19 8v12.5H6z" /><path d="M14 3.5V8h5M9 12.5h7M9 16h7" /></Icon> },
   inbox: { id: 'inbox', label: 'Inbox', scope: 'global', icon: <Icon><path d="M3.5 13.5l2.4-7.2A1.5 1.5 0 0 1 7.3 5.2h9.4a1.5 1.5 0 0 1 1.4 1.1l2.4 7.2" /><path d="M3.5 13.5V18a1.5 1.5 0 0 0 1.5 1.5h14a1.5 1.5 0 0 0 1.5-1.5v-4.5h-5l-1.2 2h-5.6l-1.2-2z" /></Icon> },
