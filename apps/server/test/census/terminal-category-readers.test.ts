@@ -80,7 +80,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'apps/server/src/routes/tickets.ts': 'done-meaning',
   'apps/server/src/visibility/rollup.ts': 'done-meaning',
   'packages/app-core/src/online/mappers.ts': 'done-meaning',
-  'packages/app-core/src/timeline/timeline-view.tsx': 'done-meaning', // not-taken aware (T17): stateMark via resolutionOf, 29.440
+  'packages/app-core/src/timeline/timeline-view.tsx': 'done-meaning', // not-taken aware (T17): stateMark via the input's notTaken (server notTakenOf) or resolutionOf, 29.440
   'packages/app-core/src/view-types.ts': 'done-meaning',
   'packages/app-core/src/views/list-model.ts': 'done-meaning',
   'packages/app-core/src/views/rollup-text.ts': 'done-meaning',
