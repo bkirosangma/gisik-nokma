@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { HELP_CONTENT } from '../../src/help/content.generated.js';
@@ -43,7 +43,11 @@ type AllowedPhrase = { phrase: string; reason: string };
 const DOC_ALLOWED: readonly AllowedPhrase[] = [];
 
 /** "job" / "stage" in UI source strings that do not name a product thing. */
-const UI_GLOSSARY_ALLOWED: readonly AllowEntry[] = [];
+const UI_GLOSSARY_ALLOWED: readonly AllowEntry[] = [
+  { file: 'packages/knowledge-graph/src/render/renderer.ts', contains: 'stage', reason: "the PickEvent kind for a click on Sigma's stage (the empty canvas), a type tag no person reads" },
+  { file: 'packages/knowledge-graph/src/render/sigma/adapter.ts', contains: 'stage', reason: "the adapter emits the PickEvent kind 'stage' on Sigma's clickStage; never rendered" },
+  { file: 'packages/knowledge-graph/src/react/knowledge-graph.tsx', contains: 'stage', reason: "the view compares a PickEvent kind with 'stage' (a click on the empty canvas); never rendered" },
+];
 
 const GLOSSARY = /\b(jobs?|stages?)\b/i;
 
@@ -115,6 +119,14 @@ describe('23.191 no " · " and no " — " in the strings a person reads', () => 
       { file: 'apps/web/b.tsx', line: 2, text: 'x · y' },
     ];
     expect(withoutAllowed(hits, [{ file: 'a.tsx', contains: 'x · y', reason: 'control' }])).toEqual([hits[1]]);
+  });
+
+  it('control: the default roots read the Knowledge Graph view, so a " · " planted in one of its files is reported', () => {
+    const planted = 'packages/knowledge-graph/src/react/knowledge-graph.tsx';
+    const read = (file: string): string =>
+      readFileSync(file, 'utf8') + (relative(REPO_ROOT, file) === planted ? "\nexport const plantedTell = 'a · b';\n" : '');
+    const hits = withoutAllowed(uiStringsMatching(MIDDLE_DOT_OR_DASH, undefined, read), TELL_ALLOWED);
+    expect(hits.map((hit) => `${hit.file}: ${hit.text}`)).toEqual([`${planted}: a · b`]);
   });
 
   it('the UI roots hold none, apart from the reasoned allow-list', () => {

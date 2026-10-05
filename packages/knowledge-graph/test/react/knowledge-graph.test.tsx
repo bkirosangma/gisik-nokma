@@ -646,7 +646,7 @@ describe('KnowledgeGraph: the empty state and the scope note name their cause (K
     ring: async (q): Promise<GraphRingResponse> => ({ hop: q.hops, center: { ...center, hop: 0 }, items: [], edges: [], frontier: [], truncated: false, cursor: null }),
   });
 
-  it('27.661 every chip off with a centre that has links: the chips-off sentence and no Add link; control: Blocks back on draws its link and the empty block is gone', async () => {
+  it('27.661 every chip off with a centre that has links: the chips-off sentence and no Add link; control: Blocks back on draws its link and the empty block is gone; some chips on but the carrying one off: the carry sentence (control: every chip off)', async () => {
     const onAddLink = vi.fn();
     const { fake } = setup({ onAddLink });
     await drawn(fake, T('t126'));
@@ -676,6 +676,32 @@ describe('KnowledgeGraph: the empty state and the scope note name their cause (K
     await everyChipOff(userEvent.setup());
     expect(await screen.findByText("Every link type is turned off. Turn one on to see GN-9's links.")).toBeInTheDocument();
     expect(screen.queryByText('Nothing is linked to GN-9 yet.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
+    cleanup();
+    // some chips still on, but the one carrying the centre's links is off: the sentence names that cause, not "every link type"
+    const blocksOnly: GraphSource = {
+      ring: async (q): Promise<GraphRingResponse> => ({
+        hop: q.hops, center: { ...centre9, hop: 0 }, frontier: [], truncated: false, cursor: null,
+        items: q.hops === 1 ? [{ ...item('t5', { label: 'GN-5', ws: 'gn', project: 'j_mw' }), hop: 1 }] : [],
+        edges: q.hops === 1 ? [link('blocks', 't5')] : [],
+      }),
+    };
+    setup({ centre: T('t9'), onAddLink }, { source: blocksOnly });
+    const someOn = userEvent.setup();
+    await someOn.click(await screen.findByRole('button', { name: /^Blocks/ }));
+    await settle();
+    const chips = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('.gn-kg__chip')];
+    expect(chips().filter((b) => b.getAttribute('aria-pressed') === 'true').length).toBe(CHIP_GROUPS.length - 1);
+    const carry = "The link types that carry GN-9's links are turned off. Turn one on to see them.";
+    expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe(carry);
+    expect(screen.queryByText("Every link type is turned off. Turn one on to see GN-9's links.")).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull(); // a ticket centre and onAddLink given: only the state hides it
+    // control: the chips still on turned off too, so every chip is off: the every-link-type sentence, still no Add link
+    for (const b of chips().filter((x) => x.getAttribute('aria-pressed') === 'true')) await someOn.click(b);
+    await settle();
+    expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(CHIP_GROUPS.map(() => 'false'));
+    expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe("Every link type is turned off. Turn one on to see GN-9's links.");
+    expect(screen.queryByText(carry)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
   });
 
