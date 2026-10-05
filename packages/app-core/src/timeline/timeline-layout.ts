@@ -1,4 +1,4 @@
-import { packLane, packScale, type PackItem } from '@gisik-nokma/viewport';
+import { ROW_GAP_PX, packLane, packScale, type PackItem } from '@gisik-nokma/viewport';
 
 /** The row pitch and bar height of the time views (spec TG-13: a 28 px bar in a 40 px pitch, 12 px of gap). */
 export const ROW_PITCH = 40;
@@ -7,6 +7,16 @@ export const BAR_HEIGHT = 28;
 export const LANE_HEADING = 34;
 /** Portrait (PK-7): a lane's column is `rows x COLUMN_WIDTH` wide; time runs down. */
 export const COLUMN_WIDTH = 112;
+/**
+ * Portrait (ERRATA E9, owner 2026-10-04): a bar is 100 px wide inside its 112 px column, inset half the gap on each side, so a
+ * `ROW_GAP_PX` (12 px) gutter runs between columns, the transposed twin of landscape's 28 px bar in its 40 px row, and an edge's
+ * channel can run between bars (`routeEdge`, TG-5). ui.css draws the same numbers (`--row` x 112 px + 6 px, 100 px wide); 29.109
+ * pins its copies against these. Part 4's painter imports them.
+ */
+export const PORTRAIT_BAR_WIDTH = COLUMN_WIDTH - ROW_GAP_PX;
+export const PORTRAIT_BAR_INSET = (COLUMN_WIDTH - PORTRAIT_BAR_WIDTH) / 2;
+/** Portrait: the day labels ride a sticky gutter this wide at the left of the surface (`--tl-gutter` in ui.css, 29.109). */
+export const PORTRAIT_GUTTER_PX = 80;
 /** TG-11: the paper pin adds this much to a key's label footprint. */
 export const PIN_PX = 14;
 

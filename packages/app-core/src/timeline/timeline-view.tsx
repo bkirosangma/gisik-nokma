@@ -23,7 +23,7 @@ import type { TicketDatesInput } from '../claims/ticket-dates.js';
 import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
 import { isoDayOf } from './timeline-days.js';
-import { barsInRange, layoutLanes, type KeyMeasure, type LayoutLane } from './timeline-layout.js';
+import { PORTRAIT_GUTTER_PX, barsInRange, layoutLanes, type KeyMeasure, type LayoutLane, type Orientation } from './timeline-layout.js';
 import {
   buildTimelineModel,
   type TimelineCustomClaim,
@@ -37,8 +37,10 @@ import {
  * One axis, no pages. The surface is a native scroll container (`ScrollAdapter`, `@gisik-nokma/viewport`) holding one tall
  * element; every bar is placed by CSS from three custom properties (`--d0`, `--dn`, `--row`) and ONE scale property
  * (`--tl-ppd`, px per day), so a zoom frame is a property write and a scroll write and never a React render. React re-renders
- * on three slow events only: the data changes, the zoom SETTLES (rows may re-pack, PK-4), or the view nears the edge of the
- * mounted band (PR-5).
+ * on five slow events only: the data changes, the zoom SETTLES (rows may re-pack, PK-4), the view nears the edge of the
+ * mounted band (PR-5), the "Nothing in view" verdict flips (it is false while moving and decided again at rest, TV-9), or the
+ * panel turns between landscape and portrait (PK-7: the canvas is keyed on the orientation, so the scroller and its adapter
+ * are rebuilt on the other axis).
  *
  * Everything this component decides is ARRANGEMENT. What a claim is, what it says, which lane a ticket sits in, why the
  * timeline is empty and which heading the side list carries are the model's answers, rendered verbatim.
@@ -92,6 +94,10 @@ const KEY_PADDING_PX = MIN_BAR_PX;
 /** TG-13: the panel fills the height under the filters, but never less than this. */
 const MIN_PANEL_PX = 320;
 const PANEL_BOTTOM_GAP_PX = 16;
+/** PK-7: a container narrower than 40rem (`ui.css:1059`) lays the chart out in portrait, time running down. */
+const PORTRAIT_BELOW_PX = 640;
+/** In portrait a key is a line of text down a column, so its footprint along the time axis is a line height, not a width. */
+const PORTRAIT_KEY_FOOTPRINT_PX = 16;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /**
@@ -209,6 +215,23 @@ function useFillHeight(ref: RefObject<HTMLElement | null>): void {
   }, [ref]);
 }
 
+/** PK-7: portrait below 40rem of container width; read on mount and on resize. An unmeasured container (jsdom) is landscape. */
+function useOrientation(ref: RefObject<HTMLElement | null>): Orientation {
+  const [orientation, setOrientation] = useState<Orientation>('landscape');
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null) return undefined;
+    const read = (): void => {
+      const width = el.clientWidth;
+      setOrientation(width > 0 && width < PORTRAIT_BELOW_PX ? 'portrait' : 'landscape');
+    };
+    read();
+    window.addEventListener('resize', read);
+    return () => window.removeEventListener('resize', read);
+  }, [ref]);
+  return orientation;
+}
+
 /** Month and week labels for the days in [first, last]: `month` marks the 1st, `week` marks each Monday ("W 28 Sep"). */
 function axisLabels(first: number, last: number): Array<{ day: number; month: string | null; week: string | null; number: string }> {
   const out: Array<{ day: number; month: string | null; week: string | null; number: string }> = [];
@@ -306,6 +329,8 @@ export function TimelineView(props: TimelineViewProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   useFillHeight(panelRef);
+  const orientation = useOrientation(panelRef);
+  const portrait = orientation === 'portrait';
   const adapterRef = useRef<ScrollAdapter | null>(null);
   const measure = useKeyMeasure();
   const openRef = useRef(props.onOpenTicket);
@@ -338,10 +363,13 @@ export function TimelineView(props: TimelineViewProps) {
   const [moving, setMoving] = useState(false);
   const [band, setBand] = useState<DayRange>(() => mountRange({ start: anchorDay - 27, end: anchorDay + 26 }));
   const [unmeasured, setUnmeasured] = useState(false);
+  const [nothingInView, setNothingInView] = useState(false);
+  const visibleRef = useRef<DayRange>({ start: 0, end: 0 });
   const bandRef = useRef(band);
   bandRef.current = band;
-  const stateRef = useRef({ firstDay, extentDays, anchorDay });
-  stateRef.current = { firstDay, extentDays, anchorDay };
+  const allRows = useMemo(() => model.groups.flatMap((group) => group.rows), [model.groups]);
+  const stateRef = useRef({ firstDay, extentDays, anchorDay, rows: allRows });
+  stateRef.current = { firstDay, extentDays, anchorDay, rows: allRows };
 
   // ---- the layout: packed once per lane, re-packed only when the zoom SETTLES in another bucket ----
   const layout = useMemo(() => {
@@ -349,8 +377,9 @@ export function TimelineView(props: TimelineViewProps) {
       laneId: group.epicId ?? 'no-epic',
       items: group.rows.map((row) => ({ id: row.ticketId, key: row.key, startDay: row.startDay, endDay: row.endDay })),
     }));
-    return layoutLanes(lanes, { ppd, measure });
-  }, [model.groups, ppd, measure]);
+    const portraitMeasure: KeyMeasure = (key) => (key === null || key === '' ? 0 : PORTRAIT_KEY_FOOTPRINT_PX);
+    return layoutLanes(lanes, { ppd, measure: portrait ? portraitMeasure : measure, orientation });
+  }, [model.groups, ppd, measure, orientation, portrait]);
   const rowById = useMemo(() => {
     const byId = new Map<string, TimelineRow>();
     for (const group of model.groups) for (const row of group.rows) byId.set(row.ticketId, row);
@@ -367,7 +396,7 @@ export function TimelineView(props: TimelineViewProps) {
     if (width > 0) setWidthPx(width);
     const adapter = new ScrollAdapter({
       element: canvas,
-      axis: 'x',
+      axis: portrait ? 'y' : 'x',
       firstDay: stateRef.current.firstDay,
       scale: DEFAULT_PPD,
       extentDays: () => stateRef.current.extentDays,
@@ -383,6 +412,11 @@ export function TimelineView(props: TimelineViewProps) {
       canvas.style.setProperty('--tl-fade-weeks', String(crossFade(frame.scale, 16)));
       canvas.dataset['weekend'] = levels.weekendTint ? 'on' : 'off';
       const range = adapter.visibleRange();
+      visibleRef.current = range;
+      // TV-9: the pill is a verdict about where the view has COME TO REST, never about a gap passing under a pan.
+      const rows = stateRef.current.rows;
+      const none = frame.moving ? false : rows.length > 0 && !rows.some((row) => row.endDay >= range.start && row.startDay <= range.end);
+      setNothingInView((current) => (current === none ? current : none));
       const held = bandRef.current;
       const days = range.end - range.start + 1;
       if (range.start < held.start + days / 4 || range.end > held.end - days / 4) setBand(mountRange(range));
@@ -399,7 +433,7 @@ export function TimelineView(props: TimelineViewProps) {
       adapter.destroy();
       adapterRef.current = null;
     };
-  }, []);
+  }, [portrait]);
 
   // The first day of the surface moved (data arrived to the left): keep the same day at the viewport edge.
   useLayoutEffect(() => {
@@ -414,16 +448,36 @@ export function TimelineView(props: TimelineViewProps) {
     if (adapter !== null) adapter.animateTo({ offset: anchorDay + 0.5 - adapter.viewportDays() / 2 });
   };
 
+  const jump = (direction: 1 | -1): void => {
+    const adapter = adapterRef.current;
+    if (adapter === null) return;
+    const seen = visibleRef.current;
+    const target =
+      direction === 1
+        ? allRows.filter((row) => row.startDay > seen.end).sort((a, b) => a.startDay - b.startDay)[0]
+        : allRows.filter((row) => row.endDay < seen.start).sort((a, b) => b.endDay - a.endDay)[0];
+    if (target !== undefined) adapter.animateTo({ offset: (target.startDay + target.endDay) / 2 - adapter.viewportDays() / 2 });
+  };
+  const hasNext = allRows.some((row) => row.startDay > visibleRef.current.end);
+  const hasPrevious = allRows.some((row) => row.endDay < visibleRef.current.start);
+
   // ---- what to mount ----
   const range: DayRange = unmeasured ? { start: firstDay, end: firstDay + extentDays - 1 } : band;
   const labelDays = useMemo(() => axisLabels(Math.max(firstDay, range.start), Math.min(firstDay + extentDays - 1, range.end)), [firstDay, extentDays, range.start, range.end]);
-  const surfaceStyle = {
-    width: `calc(var(--tl-ppd) * ${extentDays} * 1px)`,
-    height: `calc(var(--tl-axis-height) + ${layout.extent}px)`,
-  } as CSSProperties;
+  const surfaceStyle = (
+    portrait
+      ? {
+          width: `${PORTRAIT_GUTTER_PX + layout.extent}px`,
+          height: `calc(var(--tl-axis-height) + var(--tl-ppd) * ${extentDays} * 1px)`,
+        }
+      : {
+          width: `calc(var(--tl-ppd) * ${extentDays} * 1px)`,
+          height: `calc(var(--tl-axis-height) + ${layout.extent}px)`,
+        }
+  ) as CSSProperties;
 
   return (
-    <div ref={panelRef} className="gn-timeline" data-zooming={moving ? 'true' : undefined}>
+    <div ref={panelRef} className="gn-timeline" data-orientation={orientation} data-zooming={moving ? 'true' : undefined}>
       <header className="gn-timeline__toolbar">
         <button type="button" className="gn-timeline__nav" onClick={goToday}>
           Today
@@ -452,7 +506,7 @@ export function TimelineView(props: TimelineViewProps) {
       )}
 
       <div className="gn-timeline__stage">
-      <div ref={canvasRef} className="gn-timeline__canvas" role="group" aria-label="Timeline" tabIndex={0} style={{ ['--tl-ppd' as string]: DEFAULT_PPD }}>
+      <div ref={canvasRef} key={orientation} className="gn-timeline__canvas" role="group" aria-label="Timeline" tabIndex={0} style={{ ['--tl-ppd' as string]: DEFAULT_PPD }}>
         <div className="gn-timeline__surface" style={surfaceStyle}>
           <div className="gn-timeline__axis" aria-hidden="true">
             <div className="gn-timeline__axis-row gn-timeline__axis-row--period">
@@ -518,6 +572,17 @@ export function TimelineView(props: TimelineViewProps) {
           })}
         </div>
       </div>
+      {nothingInView && (
+        <div className="gn-timeline__nothing" role="status">
+          <span>Nothing in view</span>
+          <button type="button" className="gn-timeline__nav" disabled={!hasPrevious} onClick={() => jump(-1)}>
+            Jump to the previous bar
+          </button>
+          <button type="button" className="gn-timeline__nav" disabled={!hasNext} onClick={() => jump(1)}>
+            Jump to the next bar
+          </button>
+        </div>
+      )}
       </div>
 
       {/*
