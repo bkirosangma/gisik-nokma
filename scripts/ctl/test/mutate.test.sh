@@ -321,6 +321,23 @@ half_ok() { local R="$T/r3$1" out rc; mkrepo "$R"; mkfake "$R"; rm "$R/node_modu
   || { echo "       ($1 only: rc $rc, $(wc -l < "$R.fake/calls" 2>/dev/null || echo 0) run-tests calls: $(printf '%s' "$out" | tail -1 | cut -c1-160))"; return 1; }; }
 check "13.2221 Stryker HALF installed is 'not installed' too, before any slot is taken: a real @stryker-mutator dir holding only core/bin/stryker.js (no vitest-runner), then one holding only vitest-runner/ (no core), each exit 2 with 'Stryker is not installed in' as the last line and ZERO run-tests calls" 'half_ok core && half_ok runner'
 
+# ---- FIX 4 (13.2219's and 13.2220's legs): a first changed line above the cap, and the estimated count when the instrumenter cannot count ----
+first_ok() { local out n; out="$(CTL_MUTATE_SPLIT=1 mut "$R2" --dry-run)"
+  n="$(printf '%s\n' "$out" | sed -nE 's/.* run [0-9]+: stryker on src\/small\.ts:1-1 \(~([0-9]+) mutants\).*/\1/p')"
+  [ "${n:-0}" -gt 1 ] && ! printf '%s\n' "$out" | grep -q "src/small.ts:: " \
+  || { echo "       (small.ts line 1 as a run alone: ~${n:-no} mutants against a cap of 1)"; printf '%s\n' "$out" | grep "src/small.ts" | sed -n 1,4p | cut -c1-160 | sed 's/^/       /'; return 1; }; }
+check "13.2220 first line: a FIRST changed line that alone holds more mutants than the cap (small.ts line 1 at CTL_MUTATE_SPLIT=1) is a run alone, 'run N: stryker on src/small.ts:1-1', never preceded by an empty chunk ('src/small.ts:: no mutant on these lines')" 'first_ok'
+est_ok() { local R="$T/r9" out one; mkrepo "$R"; mkfake "$R"; cp "$FX/small.ts" "$R/packages/calc/src/"; $G -C "$R" add -A; $G -C "$R" commit -q -m small
+  rm "$R/node_modules/@stryker-mutator"   # mutate-ast.mjs cannot load Stryker's instrumenter (countError set); --dry-run returns before the install guard
+  out="$(mut "$R" --dry-run)"; one="$(CTL_MUTATE_SPLIT=1 mut "$R" --dry-run)"
+  printf '%s\n' "$out" | grep -q "^  note: packages/calc/src/small.ts: mutant count estimated (instrumenter: " \
+  && printf '%s\n' "$out" | grep -q "run 1: stryker on src/small.ts:1-12 (~24 mutants)" \
+  && printf '%s\n' "$one" | grep -q "run 1: stryker on src/small.ts:1-1 (~2 mutants)" && ! printf '%s\n' "$one" | grep -q -e "src/small.ts: (" -e "(~0 mutants)" \
+  && printf '%s\n' "$one" | grep -q "^mutate: dry-run, 1 files, 12 slot-runs planned, nothing run" \
+  || { printf '%s\n' "$out" | grep -e "note: " -e "stryker on" | cut -c1-160 | sed 's/^/       (cap 300) /'
+       printf '%s\n' "$one" | grep -e "stryker on" -e "dry-run, " | sed -n '1,2p;$p' | cut -c1-160 | sed 's/^/       (cap 1) /'; return 1; }; }
+check "13.2219 estimate: when Stryker's instrumenter cannot count (no @stryker-mutator in the repo, a dry run), each changed line counts 2 and the plan says 'mutant count estimated': small.ts's 12 changed lines are one run of ~24; at CTL_MUTATE_SPLIT=1 run 1 is line 1 alone (~2), 12 runs, never an empty one" 'est_ok'
+
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"
 realrun() { ( cd "$1" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" "$CTL" mutate --repo "$1" --base HEAD~1 2>&1 ); }
