@@ -17,7 +17,7 @@ import { buildTestApp } from '../helpers/app.js';
 // `no-http-in-views.test.ts` enforces a seam between views and HTTP code, and
 // the mappers live behind it — so this import uses the door the package already
 // provides instead of widening its root surface for a test.
-import { mapListPage, mapTicketRead } from '@gisik-nokma/app-core/online';
+import { mapFlow, mapListPage, mapTicketRead } from '@gisik-nokma/app-core/online';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { fakeSocket } from '../helpers/stream-socket.js';
@@ -1806,6 +1806,43 @@ describe('GET /v1/workspaces/:ws/attention vs AttentionItem', () => {
     for (const item of body.items) {
       expect(['blocked', 'stale', 'due-soon']).toContain(item.kind);
     }
+  });
+});
+
+describe('GET /v1/workspaces/:ws/tickets/:id/flow vs FlowRead', () => {
+  /**
+   * 29.245 — AGREEMENT, executed: the wire IS the view type (`FlowRead` lives in `@gisik-nokma/domain` and both halves import
+   * it), so the client's `mapFlow` is a guard and not a reshape. What can still drift is the guard: a key the route stops
+   * sending, or one it renames, is a `mapFlow` refusal here rather than an empty graph on a page.
+   */
+  it('29.245 the REAL route body passes the REAL mapper unchanged, and carries every FlowRead key', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${ticketId}/flow`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual([
+      'autoMoves',
+      'draftCount',
+      'edges',
+      'end',
+      'flowId',
+      'nodes',
+      'order',
+      'reached',
+      'rootId',
+      'start',
+      'truncated',
+    ]);
+    // non-vacuity: a ticket in no flow is a flow of one, so the round trip carries a real node and not an empty list
+    const view = mapFlow(body);
+    expect(view).toEqual(body);
+    expect(view.nodes.map((n) => [n.id, n.title])).toEqual([[ticketId, 'Sweep the aisle']]);
+    // control, same run: the same body without its nodes is refused by name
+    const { nodes: _nodes, ...spineless } = body;
+    expect(() => mapFlow(spineless)).toThrow(new Error('mapFlow: nodes is missing or not an array'));
   });
 });
 

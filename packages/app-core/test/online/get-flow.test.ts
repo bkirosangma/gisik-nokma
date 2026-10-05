@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { FlowRead } from '@gisik-nokma/domain';
+import { HttpError } from '../../src/online/http.js';
 import { mapFlow } from '../../src/online/mappers.js';
 import { createOnlineDataSource } from '../../src/online/online-data-source.js';
 
@@ -34,7 +35,7 @@ describe('29.245 mapFlow', () => {
     expect(() => mapFlow('a flow')).toThrow(new Error('mapFlow: the flow body is not an object'));
   });
 
-  it('29.245 the online source reads GET /v1/workspaces/:ws/tickets/:id/flow and hands back its body through mapFlow', async () => {
+  it('29.245 the online source reads GET /v1/workspaces/:ws/tickets/:id/flow and hands back its body through mapFlow; a 404 is re-raised as HttpError 404', async () => {
     const calls: string[] = [];
     const answers: Record<string, unknown> = { '/v1/workspaces/ws1/tickets/t2/flow': body, '/v1/workspaces/ws1/tickets/t9/flow': { ...body, nodes: undefined } };
     const fetchImpl = async (input: string) => {
@@ -49,5 +50,10 @@ describe('29.245 mapFlow', () => {
     expect(calls).toEqual(['http://server.test/v1/workspaces/ws1/tickets/t2/flow']);
     // the mapper is on the path: a body without its nodes is refused, not drawn as an empty flow
     await expect(source.query.getFlow('ws1', 't9')).rejects.toThrow('mapFlow: nodes is missing or not an array');
+    // `Promise<FlowRead>` has no absence value: the route's 404 (a deleted ticket, one the viewer cannot see, another's draft)
+    // comes back as the STATUS it was (`getBoard`'s rule), never as a mapping failure about a body that never came
+    const gone = source.query.getFlow('ws1', 'gone');
+    await expect(gone).rejects.toBeInstanceOf(HttpError);
+    await expect(gone).rejects.toMatchObject({ status: 404, message: 'HTTP 404 for /v1/workspaces/ws1/tickets/gone/flow' });
   });
 });

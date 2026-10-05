@@ -1,4 +1,4 @@
-import type { GroupRow, LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
+import type { FlowRead, GroupRow, LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
 import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, TICKET_LINK_KINDS, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
@@ -3157,3 +3157,19 @@ export function mapPurgedLookup(raw: unknown): PurgedRef[] {
 }
 
 
+
+/**
+ * `FlowRead` as `GET /v1/workspaces/:ws/tickets/:id/flow` sends it (Workflow graph, Part 3 T3). A guard, not a reshape: the wire
+ * IS the view type, and nothing in it is renamed for the client. A body without its spine is an error here, never an empty graph.
+ */
+export function mapFlow(raw: unknown): FlowRead {
+  if (typeof raw !== 'object' || raw === null) throw new Error('mapFlow: the flow body is not an object');
+  const body = raw as Record<string, unknown>;
+  for (const key of ['flowId', 'rootId'] as const) {
+    if (typeof body[key] !== 'string') throw new Error(`mapFlow: ${key} is missing or not a string`);
+  }
+  for (const key of ['nodes', 'edges', 'order', 'start', 'end', 'autoMoves'] as const) {
+    if (!Array.isArray(body[key])) throw new Error(`mapFlow: ${key} is missing or not an array`);
+  }
+  return body as unknown as FlowRead;
+}

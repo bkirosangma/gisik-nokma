@@ -23,6 +23,7 @@ import type { TicketComment } from './views/comments-thread.js';
 // second definition of a body only the server can produce. `TicketComment` is
 // the opposite case and lives in `views/comments-thread.js` because the union
 // IS the component's — a note's read models have no such component in Plan 1.
+import type { FlowRead } from '@gisik-nokma/domain';
 import type {
   NoteComment,
   NoteDetail,
@@ -437,6 +438,12 @@ export type DataSourceQuery = {
   /** The caller's own drafts in this workspace, newest first. Online: `GET /v1/workspaces/:id/drafts`. Offline: the replica's `listDrafts`. */
   getMyDrafts(workspaceId: string): Promise<DraftRow[]>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
+  /**
+   * One ticket's whole flow, read for the signed-in viewer (Workflow graph). Online: `GET /v1/workspaces/:ws/tickets/:id/flow`.
+   * Replica: rejects with `ReplicaGapError`: a flow is a walk over tickets this device may not hold, over a roster, attachment
+   * counts and other people's notes it does not hold either, and a partial flow would be drawn as if it were whole.
+   */
+  getFlow(workspaceId: string, ticketId: string): Promise<FlowRead>;
   /**
    * The workspace's thresholds and auto-close window, as `/settings`'s Workspace
    * tab shows them (second wave, Task 6).

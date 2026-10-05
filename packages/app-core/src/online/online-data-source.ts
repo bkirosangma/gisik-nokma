@@ -9,6 +9,7 @@ import {
   mapActorNames,
   mapActors,
   mapAttention,
+  mapFlow,
   mapPurgedLookup,
   mapWorkspaceSettings,
   mapBoardView,
@@ -590,6 +591,18 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         workspaceRoster(workspaceId),
       ]);
       return mapAttention(raw, contests, roster);
+    },
+
+    /**
+     * The Workflow graph's read (Part 3 T3): the route's `FlowRead`, guarded by `mapFlow` and not reshaped. `Promise<FlowRead>`
+     * has no absence value, so the route's one 404 (a deleted ticket, one this viewer cannot see, someone else's draft) is
+     * re-raised as the status it was, `getBoard`'s rule, and never reaches `mapFlow` as a body that was never sent.
+     */
+    getFlow: async (workspaceId, ticketId) => {
+      const path = `/v1/workspaces/${workspaceId}/tickets/${ticketId}/flow`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return mapFlow(raw);
     },
 
     /**

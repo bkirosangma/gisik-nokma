@@ -96,6 +96,9 @@ export function createFakeDataSource(
     getMyWork: async () => ({ assigned: [], inTransit: [], contested: [], shared: [] }),
     getMyDrafts: async () => [],
     getAttention: async () => [],
+    getFlow: async () => {
+      throw new Error('fake-data-source: getFlow is not stubbed');
+    },
     // The server's REAL answer for a workspace nobody has configured, not an
     // invented blank (second wave, Task 6): `getWorkspaceSettings` applies the
     // domain's defaults and answers `provenance: null` when no row exists, so

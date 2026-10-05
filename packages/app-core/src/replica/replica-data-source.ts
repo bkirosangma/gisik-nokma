@@ -488,6 +488,16 @@ const ATTENTION_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+/** Workflow graph, Part 3 T3 (case 29.245). The whole method: see `DataSourceQuery.getFlow`. */
+const FLOW_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'FlowRead (the flow around a ticket, read for one viewer)',
+    because:
+      'a flow is every ticket reachable by leads_to links in both directions, with titles, keys, assignee names, other people\'s notes and attachment counts; this device holds what was already visible to it, no roster, no attachment counts and no notes of others, so a walk here would draw a partial flow as if it were whole',
+    owner: 'Workflow graph plan: a local flow fold in the replica (packages/sync-client), not a /v1 route',
+  },
+];
+
 /**
  * Second wave, Task 6. The local store DOES mirror the ledger the settings live
  * in, so unlike the attention strip this is a real "could be built" rather than
@@ -711,6 +721,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   searchNotes: NOTE_SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
+  getFlow: FLOW_ABSENCES,
   getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
   getPreferences: PREFERENCES_ABSENCES,
   putPreferences: PREFERENCES_ABSENCES,
@@ -1452,6 +1463,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         parentId: d.parentId, updatedAt: d.updatedAt, attachmentCount: null, pending: d.pending,
       })),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
+    getFlow: () => Promise.reject(new ReplicaGapError('getFlow', FLOW_ABSENCES)),
     getWorkspaceSettings: () =>
       Promise.reject(new ReplicaGapError('getWorkspaceSettings', WORKSPACE_SETTINGS_ABSENCES)),
     getPreferences: () => Promise.reject(new ReplicaGapError('getPreferences', PREFERENCES_ABSENCES)),
