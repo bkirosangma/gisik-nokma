@@ -449,4 +449,25 @@ describe('29.199 a half-applied cascade still plans', () => {
     expect(all.length).toBeGreaterThan(0);
     expect(all.every((i) => i.start <= i.end)).toBe(true);
   });
+
+  it('29.199 each cell is computed once: a ladder of ten forks and merges reads every estimate once, not once per path', () => {
+    // hub0 -> a1, b1 -> hub1 -> a2, b2 -> hub2 ...: without the memo every hub re-plans both paths back to the root, so the
+    // work doubles per layer (20 layers, 61 tickets, ran 19 s on the memo-less planner; the flow cap is 300 tickets)
+    let reads = 0;
+    const counted = (n: FlowNode): FlowNode =>
+      new Proxy(n, { get: (t, k) => (k === 'estimate' && (reads += 1), Reflect.get(t, k)) });
+    const hub = (i: number) => uid(10 + 3 * i);
+    const nodes: FlowNode[] = [counted(fnode(hub(0), { explicitDue: '2026-10-01' }))];
+    const edges: FlowEdge[] = [];
+    for (let i = 1; i <= 10; i += 1) {
+      const [a, b] = [uid(10 + 3 * i - 2), uid(10 + 3 * i - 1)];
+      nodes.push(counted(fnode(a, { estimate: 1 })), counted(fnode(b, { estimate: 2 })), counted(fnode(hub(i), { estimate: 1 })));
+      edges.push(edge(hub(i - 1), a), edge(hub(i - 1), b), edge(a, hub(i)), edge(b, hub(i)));
+    }
+    const p = planOf(nodes, edges);
+    // the plan is real (two days a layer: the one-day branch, then the hub), so the count below is not of an empty run
+    expect(span(p, hub(10))).toBe('2026-10-21..2026-10-21 chained');
+    // one pass-1 cell per ticket, so one read of its estimate each
+    expect(reads).toBe(nodes.length);
+  });
 });
