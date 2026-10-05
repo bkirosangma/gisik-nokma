@@ -244,11 +244,13 @@ check "13.2313 a NEW sample keeps the two-window rule: two consecutive high wind
 
 dreset; verdict 995 ok; CTL_SEM_SWAP_TTL=3 rtd -- true >/dev/null; s_t3=$(sleeps)
 dreset; verdict 995 ok; CTL_SEM_SWAP_TTL=abc rtd -- true >/dev/null; s_tabc=$(sleeps)
+dreset; verdict 990 ok; CTL_SEM_SWAP_TTL=abc rtd -- true >/dev/null; s_tabc10=$(sleeps)
+dreset; verdict 989 ok; CTL_SEM_SWAP_TTL=abc rtd -- true >/dev/null; s_tabc11=$(sleeps)
 dreset; verdict 1005 high; rtd -- true >/dev/null; s_fut=$(sleeps)
 dreset; echo "x ok" > "$CTL_SEM_DIR/swap.verdict"; rtd -- true >/dev/null; s_gx=$(sleeps)
 dreset; verdict +1000 high; rtd -- true >/dev/null; s_gp=$(sleeps)
 dreset; verdict 1000 maybe; rtd -- true >/dev/null; s_gm=$(sleeps)
-check "13.2314 CTL_SEM_SWAP_TTL=3 makes a 5 s old verdict stale (one 3 s sample); a TTL that is not a number (abc) falls to 10 (the same verdict reused, no sleep); a verdict stamped in the FUTURE (1005 high at clock 1000), a non-numeric stamp (x, and +1000 which shell arithmetic would read as 1000) and an unknown word are not verdicts (one sample each, no block)" '[ "$s_t3" = "3 " ] && [ -z "$s_tabc" ] && [ "$s_fut" = "3 " ] && [ "$s_gx" = "3 " ] && [ "$s_gp" = "3 " ] && [ "$s_gm" = "3 " ]'
+check "13.2314 CTL_SEM_SWAP_TTL=3 makes a 5 s old verdict stale (one 3 s sample); a TTL that is not a number (abc) falls to exactly 10 (the 5 s old verdict reused, no sleep; at 10 s old still reused, at 11 s old one 3 s sample); a verdict stamped in the FUTURE (1005 high at clock 1000), a non-numeric stamp (x, and +1000 which shell arithmetic would read as 1000) and an unknown word are not verdicts (one sample each, no block)" '[ "$s_t3" = "3 " ] && [ -z "$s_tabc" ] && [ -z "$s_tabc10" ] && [ "$s_tabc11" = "3 " ] && [ "$s_fut" = "3 " ] && [ "$s_gx" = "3 " ] && [ "$s_gp" = "3 " ] && [ "$s_gm" = "3 " ]'
 
 dreset; hold 1; hold 2; verdict 1000 ok; script_line "1001 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_poll=$(rtd -- true); s_poll=$(sleeps)
 check "13.2315 the default poll is 1 s: both slots full, one freed when the fake clock reaches 1001 (the integer clock's stand-in for t+0.5), the waiter is granted at the next poll — queue wait exactly 1s, reason slots, one 1 s sleep (5 s polls would wait 5s)" 'printf "%s" "$o_poll" | grep -q "^queue wait: 1s (waited for: slots)\$" && [ "$s_poll" = "1 " ]'
