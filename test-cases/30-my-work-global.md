@@ -1,6 +1,6 @@
 # §30 — My work, global and filtered
 
-**Opened 2026-10-05 by my-work-global T1** (`docs/superpowers/plans/2026-10-05-my-work-global.md`; spec `docs/superpowers/specs/2026-10-05-my-work-global-design.md`, owner-approved 2026-10-05). Ships on `release/my-work-global`. Mirrors the My Work bullets in `Features.md` §3 ("My Work and the attention strip" and the bullets after it) and §11 ("My work preferences").
+**Opened 2026-10-05 by my-work-global T2, the first task to land; this header is T1’s (planner 17:04 layout)** (`docs/superpowers/plans/2026-10-05-my-work-global.md`; spec `docs/superpowers/specs/2026-10-05-my-work-global-design.md`, owner-approved 2026-10-05). Ships on `release/my-work-global`. Mirrors the My Work bullets in `Features.md` §3 ("My Work and the attention strip" and the bullets after it) and §11 ("My work preferences").
 3-DIGIT PADDED `30.001`–`30.099`, blocks per task: T1 30.001–30.012 (+ 30.012b) and 30.059–30.061 (plan AMEND 16:26) · T2 30.013–30.018 · T3 30.019–30.035 · T4 30.036–30.050 · T5 30.051–30.058. Unused ids in a block stay free for that task's follow-ups. A later task adds its own § below; on a tipmerge conflict in this file, keep both sections.
 
 Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · 🚫 out of scope, with a reason.
