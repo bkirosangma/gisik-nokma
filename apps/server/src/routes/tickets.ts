@@ -292,7 +292,10 @@ export type LedgerRow = {
  * ticket's title. The claim is not cut: the event, its id, type, actor, origin,
  * both clocks and seq all go out. Only the other end's id and a contest's cause
  * are withheld, by `visibility/withhold-link-targets.ts`, which the `/events`
- * handler applies to this function's output.
+ * handler applies to this function's output. The same module withholds a flow
+ * cause's ticket and person from a viewer who cannot see that ticket, on
+ * `ticket.transitioned` / `ticket.closed` / `ticket.reopened`
+ * (`withholdFlowCause`, wtg-flow-cause-withhold).
  *
  * Both instants are rendered with `.toISOString()` rather than left to the JSON
  * serializer, for the reason `sync/contests-route.ts` gives at the same spot:

@@ -37,7 +37,8 @@ export const isFlowCause = (c: unknown): c is FlowCause => flowCauseSchema.safeP
 export const viewerSafeCause = (c: FlowCause): { kind: FlowCause['kind'] } => ({ kind: c.kind });
 
 /**
- * A flow cause as the History route serves it to a viewer who cannot see the ticket it names (wtg2 T17, AMEND 2): the
+ * A flow cause as every server door serves it to a viewer who cannot see the ticket it names (wtg2 T17, AMEND 2; the
+ * doors: `withholdFlowCause`, `apps/server/src/visibility/withhold-link-targets.ts`, wtg-flow-cause-withhold): the
  * ticket id and the person are NULL, their keys kept, as `withholdEvent` serves a hidden link target (`targetId: null`)
  * and MCP's `redactedPayload` reads a null as "a ticket you can't see" / "someone you can't see". Only the keys the
  * kind has: a `led-to` cause gains no decision keys. The kind, the label or outcome, the pass and the opaque decision

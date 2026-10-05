@@ -58,7 +58,11 @@ import { canOpen } from './can-open.js';
  *   (the reconcile reasoning). Owner: none (accepted).
  * - **The claimant's own copies** keep the original cause: `my-work` and the
  *   stored contest notification are claimant-only, and the claimant passed
- *   `canSee(target)` at the gate. Owner: none (accepted).
+ *   `canSee(target)` at the gate. Owner: none (accepted). The same holds for a
+ *   contested claim carrying a flow cause: only the flow actor may file one
+ *   (`cause.forged`), so a person's refused copy holds only ids they typed, and
+ *   `my-work` serves it to them whole (wtg-flow-cause-withhold census row 7).
+ *   The stored notification carries no payload at all.
  */
 export type TargetSight = (targetId: string) => Promise<boolean>;
 
