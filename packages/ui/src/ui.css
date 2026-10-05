@@ -6220,6 +6220,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  /* Sized to its content: placed by `left: 50%`, an absolute box would otherwise shrink to the room right of that edge (half the
+     stage; 195 px on a 390 px phone, three stacked rows). Capped 1rem inside each side, padding and border included. */
+  box-sizing: border-box;
+  width: max-content;
   max-width: calc(100% - 2rem);
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gn-border);

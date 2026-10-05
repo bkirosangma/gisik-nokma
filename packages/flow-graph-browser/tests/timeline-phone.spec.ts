@@ -73,6 +73,26 @@ test('29.111 on a 390 px phone the view is portrait: time runs down, bars are 10
   expect(box!.first).toEqual([6, 100]);
   expect(box!.laneLeft).toBe(80);
   expect(Number.isInteger(box!.laneColumns) && box!.laneColumns >= 2).toBe(true);
+  // A key is a line down the column: every mounted bar at least a line tall shows its key INSIDE (the portrait packer reserved a
+  // line for it, not the key's width), however short the bar is along time.
+  const keys = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.gn-timeline__bar')].filter((b) => b.offsetHeight >= 16).map((b) => b.querySelector('.gn-timeline__key') !== null));
+  expect(keys.length).toBeGreaterThan(10);
+  expect(keys.every(Boolean)).toBe(true);
+  // The Nothing-in-view pill on the phone (3 bars in the first 20 days, today at day 60): centred over the stage and sized to its
+  // content (wider than the half-stage a `left: 50%` box shrinks to), inside the stage's 1rem margins, its jumps 44 px targets.
+  await page.goto('/timeline.html?n=3&span=20&theme=light');
+  await expect(page.getByRole('status')).toContainText('Nothing in view');
+  const chip = await page.evaluate(() => {
+    const stage = (document.querySelector('.gn-timeline__stage') as HTMLElement).getBoundingClientRect();
+    const pill = (document.querySelector('.gn-timeline__nothing') as HTMLElement).getBoundingClientRect();
+    const jumps = [...document.querySelectorAll<HTMLElement>('.gn-timeline__nothing button')].map((b) => b.offsetHeight);
+    return { stageW: stage.width, offCentre: Math.abs((pill.left + pill.right) / 2 - (stage.left + stage.right) / 2), w: pill.width, left: pill.left - stage.left, right: stage.right - pill.right, bottom: stage.bottom - pill.bottom, jumps };
+  });
+  expect(chip.offCentre).toBeLessThan(1);
+  expect(chip.w).toBeGreaterThan(chip.stageW / 2 + 1);
+  expect(Math.min(chip.left, chip.right)).toBeGreaterThanOrEqual(16 - 0.5);
+  expect(Math.abs(chip.bottom - 16)).toBeLessThan(0.5);
+  expect(chip.jumps).toEqual([44, 44]);
   await ctx.close();
 });
 

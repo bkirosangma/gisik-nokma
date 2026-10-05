@@ -140,4 +140,30 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
     expect(orientationAt(1280)).toBe('landscape');
     expect(orientationAt(0)).toBe('landscape');
   });
+
+  it('29.110 in portrait a key is a line down a 100 px column, so a bar a line tall or more carries its key INSIDE (the portrait packer reserved a line, not the key\'s width); control: the same bar in landscape, shorter than its key, puts the key outside', () => {
+    // Two days at the Week preset: 48 px along time. The key's measured width (jsdom's estimate, 7 characters + the bar's padding)
+    // is wider than 48 px, so landscape puts it outside the bar; in portrait the bar is 100 px wide and 46 px tall, room for a line.
+    const short: TicketState = { ...ticket, fields: { title: claim('A short one'), startDate: claim({ date: '2026-08-23' }), dueDate: claim({ date: '2026-08-24' }) } };
+    const keysAt = (width: number) => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      try {
+        const { container } = render(
+          <TimelineView tickets={[{ key: 'GN-1234', state: short, pendingFieldIds: [], customDateFields: [] }]} today="2026-08-23" userName={(id) => id} onOpenTicket={vi.fn()} />,
+        );
+        const bar = container.querySelector('.gn-timeline__bar');
+        return {
+          orientation: container.querySelector('.gn-timeline')?.getAttribute('data-orientation'),
+          inside: bar?.querySelector('.gn-timeline__key')?.textContent ?? null,
+          outside: container.querySelector('.gn-timeline__key--outside')?.textContent ?? null,
+        };
+      } finally {
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    expect(keysAt(390)).toEqual({ orientation: 'portrait', inside: 'GN-1234', outside: null });
+    // CONTROL, same it: landscape keeps T9's decision on the bar's drawn LENGTH, so this short bar's key is outside it.
+    expect(keysAt(1280)).toEqual({ orientation: 'landscape', inside: null, outside: 'GN-1234' });
+  });
 });

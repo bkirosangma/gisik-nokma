@@ -127,6 +127,11 @@ describe('29.109 portrait runs time down a sticky gutter, and the Nothing-in-vie
     expect(valueOf(pill, 'border-radius')).toBe('999px');
     expect(valueOf(pill, 'z-index')).toBe('4');
     expect(valueOf(pill, 'background')).toBe('var(--gn-surface-raised)');
+    // Placed by `left: 50%`, an absolute box shrinks to the room RIGHT of that edge (half the stage: 195 px on a 390 px phone, where
+    // the sentence and both jumps stacked into three rows). It sizes to its content instead, capped 1rem inside each side.
+    expect(valueOf(pill, 'width')).toBe('max-content');
+    expect(valueOf(pill, 'max-width')).toBe('calc(100% - 2rem)');
+    expect(valueOf(pill, 'box-sizing')).toBe('border-box');
     expect(valueOf(ruleExactly(ui, '.gn-timeline__stage'), 'position')).toBe('relative');
     const disabled = ruleExactly(ui, '.gn-timeline__nothing .gn-timeline__nav:disabled');
     expect(valueOf(disabled, 'cursor')).toBe('default');

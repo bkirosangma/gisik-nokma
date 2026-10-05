@@ -98,6 +98,12 @@ const PANEL_BOTTOM_GAP_PX = 16;
 const PORTRAIT_BELOW_PX = 640;
 /** In portrait a key is a line of text down a column, so its footprint along the time axis is a line height, not a width. */
 const PORTRAIT_KEY_FOOTPRINT_PX = 16;
+/**
+ * The portrait key measure: the packer reserves it, and each bar decides inside or outside with it (the one-predicate rule of
+ * E10/E11). A 100 px column holds any key across, so only a bar shorter than a line along time puts its key outside, where portrait
+ * hides it (ui.css) and the bar's title and description still carry it.
+ */
+const portraitMeasure: KeyMeasure = (key) => (key === null || key === '' ? 0 : PORTRAIT_KEY_FOOTPRINT_PX);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /**
@@ -377,7 +383,6 @@ export function TimelineView(props: TimelineViewProps) {
       laneId: group.epicId ?? 'no-epic',
       items: group.rows.map((row) => ({ id: row.ticketId, key: row.key, startDay: row.startDay, endDay: row.endDay })),
     }));
-    const portraitMeasure: KeyMeasure = (key) => (key === null || key === '' ? 0 : PORTRAIT_KEY_FOOTPRINT_PX);
     return layoutLanes(lanes, { ppd, measure: portrait ? portraitMeasure : measure, orientation });
   }, [model.groups, ppd, measure, orientation, portrait]);
   const rowById = useMemo(() => {
@@ -561,7 +566,7 @@ export function TimelineView(props: TimelineViewProps) {
                       firstDay={firstDay}
                       ppd={ppd}
                       category={categoryById.get(row.ticketId) ?? 'open'}
-                      measure={measure}
+                      measure={portrait ? portraitMeasure : measure}
                       detailId={`${idPrefix}-detail-${row.ticketId}`}
                       onOpen={openTicket}
                     />
