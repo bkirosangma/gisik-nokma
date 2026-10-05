@@ -486,12 +486,15 @@ describe('30.038 the choices are the user\'s own document', () => {
       await settle();
       return view;
     };
-    const saveRefusal = (): Element | null => screen.queryByText(/Your choice for this page/)?.closest('[role="status"]') ?? null;
+    // The refusal carrying the PUT's own wire string: found by what failed, never by its wording,
+    // so a load refusal that wrongly takes the save sentence cannot make this lookup ambiguous.
+    const saveRefusal = (): Element | null =>
+      Array.from(document.querySelectorAll('.gn-shell__refusal')).find((panel) => (panel.textContent ?? '').includes('/v1/me/my-work-preferences')) ?? null;
 
     // CONTROL: the PUT lands, and nothing is said about it.
     const landed = await pressAssignedOff(null);
     expect(pressed()).toEqual(['Created by me']);
-    expect(saveRefusal()).toBeNull();
+    expect(screen.queryByText(/Your choice for this page/)).toBeNull();
     landed.unmount();
     clearMyWorkspacesCache();
 

@@ -190,10 +190,10 @@ describe('30.037 MyWork with placeOf', () => {
       shared: [],
     };
     const { container, rerender } = render(<MyWork view={renamed} placeOf={placeLookup(WORKSPACES)} onOpenTicket={() => {}} />);
-    expect(parts(cardTitled(container, 'a-renamed').querySelector('.gn-my-work__place') as Element).names).toEqual([
-      'Coastal Freight',
-      'Dockside',
-    ]);
+    const place = cardTitled(container, 'a-renamed').querySelector('.gn-my-work__place');
+    // No label at all is its own failure here, never a TypeError inside `parts`.
+    expect(place).not.toBeNull();
+    expect(parts(place as Element).names).toEqual(['Coastal Freight', 'Dockside']);
     // CONTROL: the two sources really differ here, so the leg above can tell them apart.
     rerender(<MyWork view={renamed} onOpenTicket={() => {}} />);
     expect(cardTitled(container, 'a-renamed').querySelector('.gn-my-work__project')?.textContent).toBe('Dock (old name)');
