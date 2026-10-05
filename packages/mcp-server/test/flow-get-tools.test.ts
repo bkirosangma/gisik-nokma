@@ -69,6 +69,20 @@ describe('29.379 get_flow', () => {
     );
     await expect(tool(fakeFlow({ [FLOW]: wire() }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })).resolves.toMatchObject({ flowId: 'f1', draftCount: 1 }); // the parsed flow, not just "something"
     await expect(tool(fakeFlow({}), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })).rejects.toThrow(/^ticket not found or not visible to you$/);
+    // every bound the schema holds is a mismatch too, named by its path (each one just outside; the wire above is just inside)
+    const outside: Array<[string, (w: ReturnType<typeof wire>) => void]> = [
+      ['nodes.0.round', (w) => { w.nodes[0]!.round = 0; }],
+      ['nodes.1.passes.1.pass', (w) => { w.nodes[1]!.passes[1]!.pass = 0; }],
+      ['nodes.0.estimate', (w) => { w.nodes[0]!.estimate = 2.5; }],
+      ['edges.0.taken', (w) => { w.edges[0]!.taken = -1; }],
+      ['autoMoves.0.at', (w) => { w.autoMoves[0]!.at = ''; }],
+      ['draftCount', (w) => { w.draftCount = -1; }],
+    ];
+    for (const [path, mutate] of outside) {
+      const w = structuredClone(wire()); // a copy: PASSES is shared by every wire()
+      mutate(w);
+      await expect(tool(fakeFlow({ [FLOW]: w }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 }), path).rejects.toThrow(`(${path}: `);
+    }
   });
 });
 
@@ -175,6 +189,10 @@ describe('29.381 get_ticket flow facts', () => {
     expect(notNotTaken.ticketState['closed']).toEqual({ actorId: 'flow', at: '2026-10-03T10:00:00.000Z' });
     const servedOther = await read(fakeFlow(routes(T2, { resolution: { kind: 'taken', decisionTicketId: D, outcome: 'Approved', pass: 1 } }, { [`${tw}/${D}`]: detail({ key: 'GN-145' }) })), T2);
     expect(servedOther).not.toHaveProperty('resolution');
+    // the Decision is read in the caller's workspace, path-encoded
+    const otw = '/v1/workspaces/w%20s/tickets';
+    const odd = fakeFlow({ [`${otw}/${T2}`]: stateOf({ closed }), [`${otw}/${T2}/links`]: { links: [] }, [`${otw}/${T2}/notes`]: { notes: [] }, [`${otw}/${D}`]: detail({ key: 'GN-145' }) });
+    expect(((await getTicket(odd).handler({ workspaceId: 'w s', ticketId: T2 })) as Out)['resolution']).toMatchObject({ decision: { id: D, key: 'GN-145' } });
     // an open ticket's `closed: null` is kept as served
     expect((await read(fakeFlow(routes(T2, { closed: null })), T2)).ticketState['closed']).toBeNull();
   });
