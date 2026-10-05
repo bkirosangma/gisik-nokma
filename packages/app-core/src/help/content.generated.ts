@@ -4285,6 +4285,144 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "linking-tickets",
+            "title": "Linking tickets",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A ticket can be linked to other tickets, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Links"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " section on its sheet, just under the fields, lists them. A link has one of three kinds, and reads differently from each end:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Blocks"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Is blocked by"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": this ticket has to be finished before the other can go ahead."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Relates to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": the two tickets are connected. It reads the same from both."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Duplicates"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Is duplicated by"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": this ticket repeats the other."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", pick how this ticket relates ("
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Is blocked by"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", say), search for the other ticket by its key or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and GN-133 is blocked by GN-142, added on GN-133, make the same link. The new row shows at once, faded, and settles when it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block each other), the reason appears beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and nothing is added."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Remove"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " takes a link away, from either end, and a message offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " for a few seconds. Links to tickets you cannot see are not shown, and neither is a count of them."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A link only records the relationship. It does not mark the card, move it, or close a duplicate: close or move the tickets yourself."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "why-it-shows-who-claimed-everything",
             "title": "Why it shows who claimed everything",
             "blocks": [
@@ -5645,7 +5783,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Whoever built your workflow can mark a state as a waiting or blocked one — \"Waiting on parts\", \"Waiting on customer\". Every ticket in that column is in that state by definition. There is no switch you flip on an individual ticket to say it is stuck; you need a state built for it."
+                    "text": " Whoever built your workflow can mark a state as a waiting or blocked one — \"Waiting on parts\", \"Waiting on customer\". Every ticket in that column is in that state by definition. There is no switch you flip on an individual ticket to say it is stuck; you need a state built for it. To record what a ticket is waiting on, link it to the blocking ticket (see Linking tickets in §5): a link notes the blocker and does not mark the card or move it."
                   }
                 ]
               },
