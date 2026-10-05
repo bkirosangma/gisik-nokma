@@ -65,6 +65,8 @@ describe('29.139 the outcome rules', () => {
     expect(await checkTicketDecided(decided('Maybe'), world(['Yes', 'No']))).toEqual({ refused: true, rule: 'decision.unknown-outcome', reason: '"Maybe" is not one of this decision\'s outcomes: "Yes", "No".' });
     expect(await checkTicketDecided(decided('Yes'), world([]))).toEqual({ refused: true, rule: 'decision.unknown-outcome', reason: 'This decision has no outcomes yet. Link it to the next steps, with a label on each, first.' });
     expect(await checkTicketDecided(decided('Maybe'), world(['Yes']))).toEqual({ refused: true, rule: 'decision.unknown-outcome', reason: '"Maybe" is not one of this decision\'s outcomes: "Yes".' }); // one label: still the list form
+    // a label-less leads_to (LK-3 refuses one from a Decision; the fold does not) is no outcome and is not listed
+    expect(await checkTicketDecided(decided('Maybe'), world([], leadsTo(undefined), leadsTo('Yes', NEXT2)))).toEqual({ refused: true, rule: 'decision.unknown-outcome', reason: '"Maybe" is not one of this decision\'s outcomes: "Yes".' });
     // a blocks link is not a branch, even with a label-shaped neighbour
     expect(await checkTicketDecided(decided('Yes'), world([], on(D, 'ticket.link_added', { kind: 'blocks', targetId: NEXT })))).toMatchObject({ rule: 'decision.unknown-outcome' });
     expect(await checkTicketDecided(decided('  yes '), world(['Yes', 'No']))).toEqual({ refused: false }); // control: trim and case fold
