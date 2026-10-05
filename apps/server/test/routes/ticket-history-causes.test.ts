@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { keysForAncestors } from '../../src/read/ancestry.js';
+import { annotateFlowCauses } from '../../src/read/history-causes.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
@@ -19,6 +20,22 @@ afterAll(async () => {
 type Served = { id: string; payload: { cause?: Record<string, unknown> }; causeTicket?: { key: string | null } | null };
 
 describe('29.373 History annotates a flow cause per viewer', () => {
+  it('29.373 a page with no flow cause asks the database nothing more; one flow cause costs one lookup', async () => {
+    const calls: unknown[] = [];
+    const fake = { query: async (...args: unknown[]) => (calls.push(args), { rows: [] }) } as unknown as Parameters<typeof annotateFlowCauses>[0];
+    const sees = async (): Promise<boolean> => true;
+    type Events = Parameters<typeof annotateFlowCauses>[2];
+    const plain = [{ id: 'a', payload: {} }, { id: 'b', payload: { cause: { kind: 'reopened-for-child', childTicketId: newUlid() } } }] as unknown as Events;
+    await annotateFlowCauses(fake, sees, plain);
+    expect(calls).toEqual([]);
+    expect(plain[0]).not.toHaveProperty('causeTicket');
+    // CONTROL: the same fake is reached when the page holds a flow cause (unknown ticket: withheld)
+    const caused = [{ id: 'c', payload: { cause: { kind: 'led-to', sourceTicketId: newUlid(), triggeredBy: newUlid() } } }] as unknown as Events;
+    await annotateFlowCauses(fake, sees, caused);
+    expect(calls).toHaveLength(1);
+    expect(caused[0]?.causeTicket).toBeNull();
+  });
+
   it('29.373 a visible ticket is keyed with the cause whole; a hidden one is null and its ids and people are nulled, the keys kept', async () => {
     const { workspaceId: WS, taskInEpicId: S, sharedTaskId: SH, hiddenTaskId: H } = read.world;
     // Two deciders: the visible close goes out WHOLE (its `decidedBy` is in the member's body by design), so the
