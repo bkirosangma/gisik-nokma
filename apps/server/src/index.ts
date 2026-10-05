@@ -306,7 +306,8 @@ async function main(): Promise<void> {
   const stopSnapshots = startSnapshotWriter(pool, {
     intervalMs: config.snapshotIntervalMs,
     minEvents: config.snapshotMinEvents,
-    // wtg2 T9: the first pass runs at boot, so snapshots written before work periods are restated at deploy.
+    // wtg2 T9: the first pass runs at boot, so snapshots written before work periods are restated at deploy. Until it
+    // settles, a ticket whose row is still stale is refused with a 503 (`bootRestate`, wtg2 fold-version bootstrap).
     immediate: true,
     log: (msg) => {
       app.log.warn(msg);

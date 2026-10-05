@@ -2158,8 +2158,9 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
   // Schema 5 (wtg2 T9): every ticket this file held was folded, or snapshotted by the server, before work periods
   // existed, and the replica has no ALTER path for state. Owing a pull per held ticket makes the next catch-up load
   // each one's latest snapshot. Its periods reach the confirmed state once the server serves a current-fold snapshot
-  // for that ticket; a row the snapshot pass has not restated yet is served without periods and spends this one owed
-  // pull (the stale-row window the follow-up wtg2-fold-version-bootstrap closes). `headSeq: 0`: no notice names a head.
+  // for that ticket: until its boot restate pass has settled, the server refuses a row it has not restated yet with a
+  // 503, so the pull stays owed and the next catch-up retries it (wtg2-fold-version-bootstrap, ruling D). A null
+  // snapshot would not do: `refoldTicket` resumes from this file's own baseline. `headSeq: 0`: no notice names a head.
   if (priorVersion < 5) {
     const held = await storage.all('SELECT ticket_id, workspace_id FROM tickets', []);
     for (const ws of new Set(held.map((row) => row['workspace_id'] as string))) {
