@@ -3281,4 +3281,37 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
       vi.useRealTimers();
     }
   });
+
+  it('29.412 a second start() while the first attempt is still in flight (desktop `online`, no stop()): the late answer arms nothing and loads nothing', async () => {
+    for (const outcome of ['fail', 'succeed'] as const) {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      const { script, engine } = await fixture();
+      let answerFirst!: () => void;
+      script.bootstrapImpl = () =>
+        script.bootstraps === 1
+          ? new Promise<BootstrapResponse>((resolve, reject) => {
+              answerFirst = () =>
+                outcome === 'fail' ? reject(new HttpStatusError('bootstrap failed: 503', 503)) : resolve(bootstrapOf());
+            })
+          : Promise.resolve(bootstrapOf());
+      const first = begin(engine);
+      await drain();
+      expect(script.bootstraps).toBe(1);
+      const second = begin(engine);
+      await drain();
+      expect(second.state.settled).toBe(true);
+      expect(script.bootstraps).toBe(2);
+      expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+      answerFirst();
+      await drain();
+      expect(first.state.settled).toBe(true);
+      expect(first.state.error).toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+      await advance(120_000);
+      expect(script.bootstraps).toBe(2);
+      expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+      vi.useRealTimers();
+    }
+  });
 });
