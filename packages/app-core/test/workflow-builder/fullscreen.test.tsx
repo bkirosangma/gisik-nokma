@@ -1,8 +1,9 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { newUlid, validateWorkflowDef } from '@gisik-nokma/domain';
-import { createDraftStore, type WorkflowDraft } from '../../src/workflow-builder/draft-store.js';
+import { newUlid, validateWorkflowDef, type PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { createDraftStore, draftFromPublished, type WorkflowDraft } from '../../src/workflow-builder/draft-store.js';
+import type { WorkflowAuthoringGateway } from '../../src/workflow-builder/gateway.js';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { PHONE_BOARD_QUERY } from '../../src/views/use-phone-board.js';
@@ -38,12 +39,14 @@ afterEach(() => {
   delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
 });
 
-async function renderBuilder(opts: { workspaceId?: string; initialDraft?: WorkflowDraft; role?: 'admin' | 'member' } = {}) {
+async function renderBuilder(
+  opts: { workspaceId?: string; initialDraft?: WorkflowDraft; role?: 'admin' | 'member'; gateway?: WorkflowAuthoringGateway } = {},
+) {
   const view = render(
     <WorkflowBuilderScreen
       workspaceId={opts.workspaceId ?? newUlid()}
       session={{ ...admin, role: opts.role ?? 'admin' }}
-      gateway={createFakeGateway()}
+      gateway={opts.gateway ?? createFakeGateway()}
       initialDraft={opts.initialDraft ?? draftFromTemplate(kanban)}
     />,
   );
@@ -59,6 +62,42 @@ const cornerFullScreen = () => within(screen.getByRole('region', { name: 'Canvas
 
 async function enterFullScreen(user: ReturnType<typeof userEvent.setup>, header: HTMLElement) {
   await user.click(within(header).getByRole('button', { name: 'Full screen' }));
+}
+
+/**
+ * G-9 T5 FIX 1: the state-mapping dialog. A draft edited down from published version 2 with Review removed (publish.test.tsx's
+ * `draftDroppingReview`), so Publish opens the mapping; four tickets sit in Review, and every occupancy read is counted.
+ */
+function droppingReview() {
+  const workflowId = newUlid();
+  const published: PublishedWorkflowDef = {
+    id: workflowId,
+    version: 2,
+    name: 'Kanban',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'review', name: 'Review', category: 'active' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [
+      { from: 'todo', to: 'review', rules: [] },
+      { from: 'review', to: 'done', rules: [] },
+      { from: 'done', to: 'todo', rules: [] },
+    ],
+  };
+  const store = createDraftStore(draftFromPublished(published));
+  store.actions.addTransition('todo', 'done'); // keep the graph sound without Review
+  store.actions.removeState('review');
+  store.actions.select({ kind: 'none' });
+  return { workflowId, initialDraft: store.getState() };
+}
+const MAPPING = 'Every dropped state needs a destination';
+const mappingDialog = () => screen.queryByRole('dialog', { name: MAPPING });
+const reviewTarget = () => within(mappingDialog()!).getByRole('button', { name: /Send tickets from Review to/ });
+async function pickToDo(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(reviewTarget());
+  await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
 }
 
 describe('25.545 entering and leaving full screen moves focus', () => {
@@ -89,6 +128,91 @@ describe('25.545 entering and leaving full screen moves focus', () => {
     await user.click(within(toolbar()).getByRole('button', { name: 'Exit full screen' }));
     expect(cornerFullScreen()).toHaveFocus();
     expect(within(header).getByRole('button', { name: 'Full screen' })).not.toHaveFocus();
+  });
+
+  // G-9 T5 FIX 1 (planner ruling 2026-10-05 09:42, option (b); reviewer B's probe E made a case): the toggle moves Publish between the
+  // floating toolbar and the title row, and an open mapping goes with it, held above the toggle. Kill: the flow back inside
+  // PublishControls (its own `useState`) → red.
+  it('25.545 the toggle keeps an open publish mapping: its pick, its count and its phase, out of full screen and back, and it then publishes; a new attempt starts empty', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const gateway = createFakeGateway({ occupancy: { [workflowId]: { review: 4 } } });
+    let occupancyReads = 0;
+    const readOccupancy = gateway.getStateOccupancy;
+    gateway.getStateOccupancy = (...args) => {
+      occupancyReads += 1;
+      return readOccupancy(...args);
+    };
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    await enterFullScreen(user, header);
+    await user.click(within(toolbar()).getByRole('button', { name: 'Publish' }));
+    expect(await within(mappingDialog()!).findByText('4 tickets sit here today')).toBeInTheDocument();
+    await pickToDo(user);
+    // control, before the toggle: the mapping is open in the floating toolbar, picked and ready
+    expect(toolbar().contains(mappingDialog())).toBe(true);
+    expect(reviewTarget()).toHaveTextContent('To do');
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' })).toBeEnabled();
+
+    await user.click(within(toolbar()).getByRole('button', { name: 'Exit full screen' }));
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
+    expect(header.querySelector('.workflow-builder-screen__title-row')!.contains(mappingDialog())).toBe(true);
+    expect(reviewTarget()).toHaveTextContent('To do');
+    // the phase came across with its count (not "counting tickets…"), and nobody read it again
+    expect(within(mappingDialog()!).getByText('4 tickets sit here today')).toBeInTheDocument();
+    expect(occupancyReads).toBe(1);
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' })).toBeEnabled();
+
+    await enterFullScreen(user, header);
+    expect(toolbar().contains(mappingDialog())).toBe(true);
+    expect(reviewTarget()).toHaveTextContent('To do');
+    await user.click(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' }));
+    expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
+    expect((gateway.submitted[0]!.payload as PublishedWorkflowDef).stateMapping).toEqual({ review: 'todo' });
+
+    // the picks belong to one attempt: the next Publish opens the mapping empty
+    await user.click(within(toolbar()).getByRole('button', { name: 'Publish' }));
+    expect(reviewTarget()).not.toHaveTextContent('To do');
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' })).toBeDisabled();
+  });
+
+  it('25.545 the toggle keeps the outcome shown on an open mapping, a refusal and then an unreadable claim, with the pick under each', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const reason = 'Only an owner or admin may publish a workflow.';
+    const message = 'The event type workflow.defined is not registered.';
+    const gateway = createFakeGateway({
+      occupancy: { [workflowId]: { review: 4 } },
+      submitResults: [
+        { status: 'refused', eventId: 'evt', rule: 'permission.role', reason },
+        { status: 'invalid', eventId: null, code: 'unknown-event-type', message },
+      ],
+    });
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    await enterFullScreen(user, header);
+    await user.click(within(toolbar()).getByRole('button', { name: 'Publish' }));
+    await pickToDo(user);
+    await user.click(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' }));
+    expect(await within(mappingDialog()!).findByText(reason)).toBeInTheDocument();
+
+    await user.click(within(toolbar()).getByRole('button', { name: 'Exit full screen' }));
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
+    expect(within(mappingDialog()!).getByText('The server refused this publish.')).toBeInTheDocument();
+    expect(within(mappingDialog()!).getByText(reason)).toBeInTheDocument();
+    expect(within(mappingDialog()!).getByText('rule: permission.role')).toBeInTheDocument();
+    expect(reviewTarget()).toHaveTextContent('To do');
+
+    await user.click(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' }));
+    expect(await within(mappingDialog()!).findByText(message)).toBeInTheDocument();
+    await enterFullScreen(user, header);
+    expect(toolbar().contains(mappingDialog())).toBe(true);
+    expect(within(mappingDialog()!).getByText('The server could not read this claim.')).toBeInTheDocument();
+    expect(within(mappingDialog()!).getByText(message)).toBeInTheDocument();
+    expect(reviewTarget()).toHaveTextContent('To do');
+    // both attempts carried the pick
+    expect(gateway.submitted.map((event) => (event.payload as PublishedWorkflowDef).stateMapping)).toEqual([
+      { review: 'todo' },
+      { review: 'todo' },
+    ]);
   });
 });
 
@@ -162,6 +286,32 @@ describe('25.546 full screen and the panel width are remembered for the session,
     await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
     expect(panel()!.style.width).toBe('280px'); // 268 clamps
     expect(window.sessionStorage.getItem(`${key}:panelWidth`)).toBe('280');
+  });
+
+  it('25.546 the handle follows the pointer: dragged 32 px left of where it was pressed the panel is 32 px wider (and stored), 32 px right of it 32 px narrower; released, a move does nothing', async () => {
+    const user = userEvent.setup();
+    const workspaceId = newUlid();
+    const initialDraft = draftFromTemplate(kanban);
+    const key = draftStorageKey(workspaceId, initialDraft.def.id);
+    window.sessionStorage.setItem(`${key}:fullscreen`, 'true');
+    await renderBuilder({ workspaceId, initialDraft });
+    await user.click(await screen.findByTestId('state-node-doing'));
+    const handle = within(panel()!).getByRole('separator', { name: 'Resize the panel' });
+    // jsdom has no PointerEvent, and `fireEvent.pointerDown` drops `clientX` on the plain Event it falls back to: a MouseEvent of
+    // the pointer type carries it, and React reads it off that.
+    const pointer = (type: 'pointerdown' | 'pointermove' | 'pointerup', clientX: number) =>
+      fireEvent(handle, new MouseEvent(type, { bubbles: true, cancelable: true, clientX }));
+    expect(panel()!.style.width).toBe('360px'); // the start: the default
+    pointer('pointerdown', 600);
+    pointer('pointermove', 568);
+    expect(panel()!.style.width).toBe('392px');
+    expect(window.sessionStorage.getItem(`${key}:panelWidth`)).toBe('392');
+    pointer('pointermove', 632);
+    expect(panel()!.style.width).toBe('328px');
+    expect(window.sessionStorage.getItem(`${key}:panelWidth`)).toBe('328');
+    pointer('pointerup', 632);
+    pointer('pointermove', 500);
+    expect(panel()!.style.width).toBe('328px');
   });
 });
 
@@ -245,6 +395,32 @@ describe('25.547 the floating toolbar: its order, the validator\'s count, and th
     expect(more).toHaveAttribute('aria-expanded', 'true');
     const menu = screen.getByRole('menu', { name: 'More' });
     expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Zoom out', 'Zoom in', 'Fit to screen', 'Tidy']);
+  });
+
+  it('25.547 narrow: the More menu steps with the arrow keys, wrapping both ways, and Home and End go to the first and the last item', async () => {
+    stubMatchMedia((query) => query === STACKED_QUERY);
+    const user = userEvent.setup();
+    const { header } = await renderBuilder();
+    await enterFullScreen(user, header);
+    await user.click(within(toolbar()).getByRole('button', { name: 'More' }));
+    const items = within(screen.getByRole('menu', { name: 'More' })).getAllByRole('menuitem');
+    expect(items.map((item) => item.textContent)).toEqual(['Zoom out', 'Zoom in', 'Fit to screen', 'Tidy']);
+    items[0]!.focus();
+    expect(items[0]).toHaveFocus(); // control: the keys start from the first item
+    const steps: Array<[string, number]> = [
+      ['{ArrowDown}', 1],
+      ['{ArrowDown}', 2],
+      ['{ArrowDown}', 3],
+      ['{ArrowDown}', 0], // from the last to the first
+      ['{ArrowUp}', 3], // from the first to the last
+      ['{ArrowUp}', 2],
+      ['{Home}', 0],
+      ['{End}', 3],
+    ];
+    for (const [press, at] of steps) {
+      await user.keyboard(press);
+      expect(items[at], `${press} → ${items[at]!.textContent}`).toHaveFocus();
+    }
   });
 
   it('25.547 phone (STACKED_QUERY and PHONE_BOARD_QUERY): the Issues badge folds into More too', async () => {
@@ -350,6 +526,119 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
     expect(root).toHaveAttribute('data-fullscreen', 'true');
     await user.keyboard('{Escape}');
     expect(root).toHaveAttribute('data-fullscreen', 'false');
+  });
+
+  it('25.548 Escape that closes the panel while focus is in the toolbar (the name field) leaves focus there', async () => {
+    const user = userEvent.setup();
+    const { root, header } = await renderBuilder();
+    await enterFullScreen(user, header);
+    await user.click(await screen.findByTestId('state-node-doing'));
+    expect(panel()).not.toBeNull();
+    const name = within(toolbar()).getByRole('textbox', { name: 'Workflow name' });
+    await user.click(name);
+    expect(name).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(panel()).toBeNull();
+    expect(root).toHaveAttribute('data-fullscreen', 'true');
+    expect(name).toHaveFocus();
+  });
+
+  // G-9 T5 FIX 1 (F1): ruling Q1 took the state-mapping dialog for the shared Dialog. It is an inline role="dialog" rendered by
+  // PublishControls inside the toolbar, with no Escape of its own, so the ladder exited full screen under it.
+  it('25.548 the state-mapping dialog takes one Escape as its Cancel: the mapping closes, full screen and the panel stay, and the key is marked before the ladder hears it; the next Escape is the ladder\'s', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const gateway = createFakeGateway({ occupancy: { [workflowId]: { review: 4 } } });
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    await enterFullScreen(user, header);
+    const publish = () => within(toolbar()).getByRole('button', { name: 'Publish' });
+    // control first: with nothing open and focus on Publish, one Escape is the ladder's and exits full screen
+    publish().focus();
+    await user.keyboard('{Escape}');
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
+
+    await enterFullScreen(user, header);
+    await user.click(await screen.findByTestId('state-node-todo'));
+    expect(panel()).not.toBeNull();
+    await user.click(publish());
+    // the mapping is open in the toolbar beside the panel, and focus stayed on Publish (the dialog takes none)
+    expect(toolbar().contains(mappingDialog())).toBe(true);
+    expect(publish()).toHaveFocus();
+    // A DOCUMENT bubble spy hears the key after React's handlers and before the ladder's WINDOW listener, so it records the
+    // dialog's own mark: a window spy would also see the ladder's preventDefault, and pass with the dialog marking nothing.
+    const seen: boolean[] = [];
+    const spy = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') seen.push(event.defaultPrevented);
+    };
+    document.addEventListener('keydown', spy);
+    try {
+      await user.keyboard('{Escape}');
+      expect(mappingDialog()).toBeNull();
+      expect(root).toHaveAttribute('data-fullscreen', 'true');
+      expect(panel()).not.toBeNull();
+      expect(publish()).toHaveFocus();
+      expect(seen).toEqual([true]);
+
+      await user.keyboard('{Escape}');
+      expect(panel()).toBeNull();
+      expect(root).toHaveAttribute('data-fullscreen', 'true');
+      expect(seen).toEqual([true, false]);
+    } finally {
+      document.removeEventListener('keydown', spy);
+    }
+    expect(gateway.submitted).toEqual([]);
+  });
+
+  it('25.548 inside the mapping an open Select takes its own Escape (the list closes, the mapping stays), and the next Escape cancels the mapping with focus back on Publish', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const { root, header } = await renderBuilder({
+      initialDraft,
+      gateway: createFakeGateway({ occupancy: { [workflowId]: { review: 4 } } }),
+    });
+    await enterFullScreen(user, header);
+    await user.click(within(toolbar()).getByRole('button', { name: 'Publish' }));
+    await user.click(reviewTarget());
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(mappingDialog()).not.toBeNull();
+    expect(root).toHaveAttribute('data-fullscreen', 'true');
+
+    reviewTarget().focus(); // focus inside the dialog, said outright
+    await user.keyboard('{Escape}');
+    expect(mappingDialog()).toBeNull();
+    expect(within(toolbar()).getByRole('button', { name: 'Publish' })).toHaveFocus();
+    expect(root).toHaveAttribute('data-fullscreen', 'true');
+  });
+
+  it('25.548 while the publish is on the wire the mapping\'s Cancel rests, so Escape is not the dialog\'s: the ladder exits full screen, and the dialog, still Publishing…, carries the verdict', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const gateway = createFakeGateway({ occupancy: { [workflowId]: { review: 4 } } });
+    const submit = gateway.submit;
+    let release: () => void = () => {};
+    gateway.submit = (events) =>
+      new Promise((resolve) => {
+        release = () => resolve(submit(events));
+      });
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    await enterFullScreen(user, header);
+    await user.click(within(toolbar()).getByRole('button', { name: 'Publish' }));
+    await pickToDo(user);
+    await user.click(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' }));
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Publishing…' })).toBeDisabled();
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    reviewTarget().focus(); // an enabled control inside the controls, so the key reaches their handler
+    await user.keyboard('{Escape}');
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Publishing…' })).toBeDisabled();
+    expect(reviewTarget()).toHaveTextContent('To do');
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
+    expect(mappingDialog()).toBeNull();
   });
 });
 

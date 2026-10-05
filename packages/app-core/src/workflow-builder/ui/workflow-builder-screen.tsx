@@ -17,7 +17,7 @@ import { AddTransitionForm } from './add-transition-form.js';
 import { BuilderPanels, STACKED_QUERY } from './builder-panels.js';
 import { FloatingPanel, type PanelTab } from './floating-panel.js';
 import { IssuesPanel } from './issues-panel.js';
-import { PublishControls } from './publish-controls.js';
+import { PublishControls, usePublishFlow, type PublishFlow } from './publish-controls.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
 import type { CanvasApi } from './use-canvas-api.js';
@@ -208,6 +208,7 @@ function FullScreenToolbar(props: {
   onIssues: () => void;
   onExit: () => void;
   onPublished: (payload: PublishedWorkflowDef) => void;
+  publishFlow: PublishFlow;
 }) {
   const sizes = () => props.canvas.current?.sizes() ?? {};
   return (
@@ -232,7 +233,7 @@ function FullScreenToolbar(props: {
         </>
       )}
       {props.phone ? null : <IssuesBadge onOpen={props.onIssues} />}
-      <PublishControls onPublished={props.onPublished} />
+      <PublishControls onPublished={props.onPublished} flow={props.publishFlow} />
       {props.narrow ? <MoreMenu canvas={props.canvas} withIssues={props.phone} onIssues={props.onIssues} /> : null}
       <Button className="gn-wf-toolbar__exit" onClick={props.onExit}>
         Exit full screen
@@ -282,6 +283,9 @@ export function WorkflowBuilderScreen(props: {
   const fullscreenNow = useRef(fullscreen);
   fullscreenNow.current = fullscreen;
   const [panel, setPanel] = useState<{ open: boolean; tab: PanelTab }>({ open: false, tab: 'selection' });
+  // G-9 T5 FIX 1 (planner ruling 2026-10-05 09:42): the toggle remounts PublishControls (toolbar or title row), so the publish
+  // attempt (its phase, the mapping's picks, the refusal or outcome on it) is held here, above the toggle, and handed to both.
+  const publishFlow = usePublishFlow();
   const narrow = useMediaQuery(STACKED_QUERY);
   const phone = useMediaQuery(PHONE_BOARD_QUERY);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -495,6 +499,7 @@ export function WorkflowBuilderScreen(props: {
               onIssues={() => openPanel('issues')}
               onExit={exitFullScreen}
               onPublished={onPublished}
+              publishFlow={publishFlow}
             />
           ) : (
             <div className="workflow-builder-screen__title-row">
@@ -512,7 +517,7 @@ export function WorkflowBuilderScreen(props: {
                 >
                   Panels
                 </Button>
-                <PublishControls onPublished={onPublished} />
+                <PublishControls onPublished={onPublished} flow={publishFlow} />
                 <Button ref={headerFullScreenRef} className="workflow-builder-screen__fullscreen" onClick={() => enterFullScreen('header')}>
                   Full screen
                 </Button>

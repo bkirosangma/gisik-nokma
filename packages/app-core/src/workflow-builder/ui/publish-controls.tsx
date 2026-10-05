@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import { selectIssues } from '../draft-store.js';
@@ -6,20 +6,22 @@ import { buildPublishPayload, buildWorkflowDefinedEvent, droppedStates } from '.
 import { useBuilderEnv, useDraft } from './builder-context.js';
 import { StateMappingDialog } from './state-mapping-dialog.js';
 
-type PublishPhase =
+export type PublishPhase =
   | { phase: 'idle' }
   /**
-   * E5-28 — the dialog's phase now carries TWO more facts, and both exist
-   * because of what the removed version threw away:
+   * E5-28 — the dialog's phase carries the authority's answer too:
    *
-   * - `mapping` — what the person has chosen so far. It lives HERE rather than
-   *   in the dialog's own state so a REFUSAL can hand it back: the dialog used
-   *   to hold its own `useState` and was unmounted the instant `submitting` was
-   *   set, so a refusal returned the person to an idle Publish button with the
-   *   work the dialog exists to collect gone, and pressing Publish again
-   *   reopened an EMPTY dialog. A refusal must not cost somebody their mapping.
    * - `refusal` — the authority's answer, when this phase was re-entered FROM
    *   one. `null` on the ordinary open.
+   *
+   * What the person has chosen so far is NOT here any more: it is the flow's
+   * `picks` (see `PublishFlow`), beside the phase rather than inside one arm of
+   * it. E5-28 put it in this arm so a REFUSAL could hand it back (the dialog
+   * used to hold its own `useState` and was unmounted the instant `submitting`
+   * was set, so a refusal cost the person their mapping); held beside the
+   * phase it survives every arm the dialog is open in, `submitting` and
+   * `invalid` included, which is what the full-screen toggle needs (G-9 T5
+   * FIX 1).
    *
    * `occupancy`/`occupancyFailed` are carried back unchanged, never refetched
    * and never reset to `null`: `null` with `occupancyFailed: false` is the
@@ -30,7 +32,6 @@ type PublishPhase =
       phase: 'mapping';
       occupancy: Record<string, number> | null;
       occupancyFailed: boolean;
-      mapping: Record<string, string>;
       refusal: { rule: string; reason: string } | null;
     }
   | { phase: 'submitting' }
@@ -55,6 +56,28 @@ type PublishPhase =
    * refusal (nobody refused), so it says exactly that and nothing more.
    */
   | { phase: 'unknown'; status: string };
+
+/**
+ * One publish attempt's state: its phase, and the destinations picked in the mapping dialog so far.
+ *
+ * G-9 T5 FIX 1 (planner ruling 2026-10-05 09:42): full screen shows `PublishControls` in its floating toolbar and the normal layout
+ * in its title row, so switching between them REMOUNTS it, and an attempt held in its own `useState` died with the switch: the open
+ * mapping, the author's picks, the phase and the refusal or outcome on it. `WorkflowBuilderScreen` therefore calls
+ * `usePublishFlow()` ABOVE the toggle and hands the same flow to both mounts. Mounted on its own (the tests), the control holds one
+ * itself. `picks` is reset when a new attempt opens the dialog, never by a remount.
+ */
+export type PublishFlow = {
+  state: PublishPhase;
+  setState: Dispatch<SetStateAction<PublishPhase>>;
+  picks: Record<string, string>;
+  setPicks: Dispatch<SetStateAction<Record<string, string>>>;
+};
+
+export function usePublishFlow(): PublishFlow {
+  const [state, setState] = useState<PublishPhase>({ phase: 'idle' });
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  return { state, setState, picks, setPicks };
+}
 
 /**
  * Publish: the version bump from the PUBLISHED base, the mapping dialog when
@@ -95,24 +118,27 @@ type PublishPhase =
  * token-discipline.test.ts, `.css` included, so a literal in either place fails
  * the build rather than shipping.
  */
-export function PublishControls(props: { onPublished?: (payload: PublishedWorkflowDef) => void }) {
+export function PublishControls(props: { onPublished?: (payload: PublishedWorkflowDef) => void; flow?: PublishFlow }) {
   const env = useBuilderEnv();
   const draft = useDraft();
-  const [state, setState] = useState<PublishPhase>({ phase: 'idle' });
+  const own = usePublishFlow();
+  const { state, setState, picks, setPicks } = props.flow ?? own;
   /** The id the disabled Publish button is described by — see its note below. */
   const publishReasonId = useId();
+  const publishRef = useRef<HTMLButtonElement>(null);
   if (!env.canAuthor) return null;
 
   const issues = selectIssues(draft);
   const dropped = droppedStates(draft);
 
   async function submitPayload(stateMapping?: Record<string, string>): Promise<void> {
-    // Captured BEFORE the `submitting` set, because that set is what unmounted
-    // the dialog: whatever it was showing when the person confirmed is what a
-    // refusal must hand back. Read off the render closure, which is correct
-    // here — this function is called from the `mapping` phase's own onConfirm
-    // (or from `idle`, when nothing was dropped, in which case there is nothing
-    // to hand back and `priorMapping` is null).
+    // Captured BEFORE the `submitting` set: the `mapping` arm (its occupancy
+    // and count state) is what a refusal must hand back. Read off the render
+    // closure, which is correct here — this function is called from the
+    // `mapping` phase's own onConfirm (or from `idle`, when nothing was
+    // dropped, in which case there is nothing to hand back and `priorMapping`
+    // is null). The picks need no capture: they are the flow's, untouched by
+    // the phase.
     const priorMapping = state.phase === 'mapping' ? state : null;
     setState({ phase: 'submitting' });
     const payload = buildPublishPayload(draft, stateMapping);
@@ -137,18 +163,15 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
         return;
       }
       if (result.status === 'refused') {
-        // E5-28 — a refusal KEEPS the mapping and reopens the dialog on it,
-        // with the authority's words above it. `result.rule`/`result.reason`
+        // E5-28 — a refusal KEEPS the mapping (the flow's `picks`, never
+        // cleared here) and reopens the dialog on it, with the authority's
+        // words above it. `result.rule`/`result.reason`
         // are carried VERBATIM, the same discipline the `refused` banner
         // already keeps: this client meets rule names it has never heard of,
         // and a paraphrase would be the board knowing something the user does
         // not.
         if (priorMapping !== null && stateMapping !== undefined) {
-          setState({
-            ...priorMapping,
-            mapping: stateMapping,
-            refusal: { rule: result.rule, reason: result.reason },
-          });
+          setState({ ...priorMapping, refusal: { rule: result.rule, reason: result.reason } });
           return;
         }
         setState({ phase: 'refused', rule: result.rule, reason: result.reason });
@@ -177,7 +200,8 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       await submitPayload();
       return;
     }
-    setState({ phase: 'mapping', occupancy: null, occupancyFailed: false, mapping: {}, refusal: null });
+    setPicks({});
+    setState({ phase: 'mapping', occupancy: null, occupancyFailed: false, refusal: null });
     try {
       const occupancy = await env.gateway.getStateOccupancy(env.workspaceId, draft.def.id);
       setState((current) => (current.phase === 'mapping' ? { ...current, occupancy } : current));
@@ -196,12 +220,16 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
    * It used to render only while `state.phase === 'mapping'`, and `submitPayload`
    * opens with `setState({ phase: 'submitting' })` — so PRESSING the dialog's own
    * confirm unmounted it, in the instant before the request had even been sent.
-   * `StateMappingDialog` holds the authored mapping in its own `useState`, so a
+   * `StateMappingDialog` held the authored mapping in its own `useState`, so a
    * REFUSED publish cost the admin every row they had just filled in, and the
    * refusal banner rendered where the dialog had been. Restoring `'mapping'` on a
    * refusal is not enough (the remount would still have lost the map): the fix is
    * to mount it for the WHOLE attempt and dismiss it only on `committed`, which
    * is what `mappingDialogOpen` below says.
+   *
+   * G-9 T5 FIX 1: the dialog's own copy is now seeded from, and reports every
+   * pick to, the flow's `picks`, so a remount (the full-screen toggle) keeps
+   * the map too. Within one layout it still stays mounted for the attempt.
    *
    * `dropped.length > 0` is the discriminator and it is DERIVED, not a second
    * state value: `onPublishClick` only ever enters `'mapping'` when there are
@@ -216,12 +244,38 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       state.phase === 'refused' ||
       state.phase === 'invalid');
 
+  /**
+   * Cancel, from its button or from Escape: back to idle, and focus back on Publish, so focus that was inside the dialog does not
+   * fall to the body with it.
+   */
+  const cancelMapping = () => {
+    publishRef.current?.focus();
+    setState({ phase: 'idle' });
+  };
+
   return (
-    <div className="publish-controls">
+    /*
+      G-9 T5 FIX 1 (F1). Escape with the mapping open is the dialog's Cancel, at every width. The dialog is an inline
+      `role="dialog"`, not the shared `Dialog` (whose document listener closes it and prevents the key), so in full screen the
+      window Escape ladder heard the key first and exited full screen. This handler is on the controls, not on the dialog,
+      because focus stays on Publish after the click that opened it; React runs it before the ladder's window listener, and
+      `preventDefault()` is what the ladder obeys. While the publish is on the wire Cancel rests, so the key is not taken: the
+      ladder may exit full screen, and the attempt survives that (the flow is held above the toggle). An open Select inside the
+      dialog stops its own Escape (react-aria), so one press closes the list and leaves the mapping.
+    */
+    <div
+      className="publish-controls"
+      onKeyDown={(keyEvent) => {
+        if (keyEvent.key !== 'Escape' || !mappingDialogOpen || state.phase === 'submitting') return;
+        keyEvent.preventDefault();
+        cancelMapping();
+      }}
+    >
       {/* E4-27 — the shared `Button`, not a page-local control. The class
           stays for `align-self: flex-start` (the one thing the shared
           component does not supply); the paint is `gn-button--primary`'s. */}
       <Button
+        ref={publishRef}
         variant="primary"
         className="publish-controls__publish"
         disabled={issues.length > 0 || state.phase === 'submitting'}
@@ -286,8 +340,9 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
                   }
                 : null
           }
-          initialMapping={state.phase === 'mapping' ? state.mapping : undefined}
-          onCancel={() => setState({ phase: 'idle' })}
+          initialMapping={picks}
+          onMappingChange={setPicks}
+          onCancel={cancelMapping}
           onConfirm={(mapping) => void submitPayload(mapping)}
         />
       ) : null}
