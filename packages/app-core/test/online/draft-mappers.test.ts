@@ -17,6 +17,14 @@ describe('28.151 draft mappers', () => {
       .toThrow(/draft\.authorId/);
   });
 
+  it('28.197 pendingChildren is mapped from ticketState, strict when present; absent on a ticket that holds none', () => {
+    const held = mapTicketRead(ticketBody({ key: null, ticketState: { draft: { authorId: 'u1', at: '2026-10-03T08:00:00.000Z' }, pendingChildren: ['c1', 'c2'] } }));
+    expect(held.ticket.pendingChildren).toEqual(['c1', 'c2']);
+    expect('pendingChildren' in mapTicketRead(ticketBody({ key: 'RP-1' })).ticket).toBe(false);
+    expect(() => mapTicketRead(ticketBody({ ticketState: { pendingChildren: ['c1', 7] } }))).toThrow(/pendingChildren\[1\]/);
+    expect(() => mapTicketRead(ticketBody({ ticketState: { pendingChildren: 'c1' } }))).toThrow(/pendingChildren/);
+  });
+
   it('28.151 mapDraftRows keeps the named fields and drops a planted key', () => {
     const rows = mapDraftRows({
       items: [

@@ -63,6 +63,7 @@ import {
   DRAFT_COUNTS_UNREADABLE,
   DRAFT_DISABLED_REASON,
   DRAFT_DISCARD_LABEL,
+  DRAFT_PENDING_CHILD_NOTE,
   DRAFT_PENDING_LABEL,
   DRAFT_PILL_LABEL,
   DRAFT_PUBLISH_LABEL,
@@ -1197,7 +1198,10 @@ export function TicketSheet({
     const current = read.data?.ticket ?? null;
     if (current === null) return [];
     const page = await dataSource.query.getTickets(current.projectId, {}, 'flat');
-    return page.rows.filter((row) => row.parentId === ticketId);
+    // Drafts T8 (AMEND-drafts-t8-pending-children): a draft's pending children are rows of the SAME page, kept
+    // here and split off below, so drawing them asks the server nothing new.
+    const pending = current.pendingChildren ?? [];
+    return page.rows.filter((row) => row.parentId === ticketId || pending.includes(row.ticketId));
   });
   /**
    * The workspace's ticket type ladder (door G, 2026-09-19) — read ONLY to put a
@@ -2518,6 +2522,8 @@ export function TicketSheet({
     afterDraftAction(outcome, () => {
       read.reload();
       history.reload();
+      // Publishing files the pending children's parent, so the sub-items list changes too (28.197).
+      subtasks.reload();
     });
   };
   const askDiscard = async (): Promise<void> => {
@@ -2675,7 +2681,15 @@ export function TicketSheet({
    * the model.
    */
   const subtasksUnread = subtasks.data === null;
-  const subtaskRows = subtasks.data ?? [];
+  const subtaskRows = (subtasks.data ?? []).filter((row) => row.parentId === ticketId);
+  /**
+   * Drafts T8 (AMEND-drafts-t8-pending-children): the published tickets placed under this draft, held on its own
+   * stream (`pendingChildren`, drafts T6) until it is published. Listed after its own children, in the page's order,
+   * with `Joins when published`; they are not children yet, so they stay out of the reconciliation's count. Publishing
+   * clears `pendingChildren` and files their parent, so they come back as ordinary rows above.
+   */
+  const pendingChildIds = state.pendingChildren ?? [];
+  const pendingChildRows = (subtasks.data ?? []).filter((row) => row.parentId !== ticketId && pendingChildIds.includes(row.ticketId));
   const subtaskExpected =
     ticketRead.rollup === null
       ? 0
@@ -4552,7 +4566,7 @@ export function TicketSheet({
               >
                 {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read, so this list is not shown rather than shown short.`}
               </p>
-            ) : subtaskRows.length === 0 ? (
+            ) : subtaskRows.length === 0 && pendingChildRows.length === 0 ? (
               <p className="gn-ticket-sheet__subtasks-empty" data-testid="sheet-subtasks-empty">
                 No subtasks. A subtask is a ticket of its own: it gets a state, an assignee, a date
                 and a history.
@@ -4607,6 +4621,22 @@ export function TicketSheet({
                           ? `, ${row.typeId}`
                           : `, ${row.typeId}, Due ${formatDate(row.dueDate.date)}`}
                       </span>
+                    </span>
+                  </li>
+                ))}
+                {pendingChildRows.map((row) => (
+                  <li
+                    key={row.ticketId}
+                    data-testid={`subtask-pending-${row.ticketId}`}
+                    className="gn-ticket-sheet__subtask-card gn-ticket-sheet__subtask-card--pending"
+                  >
+                    {/* The key, then a TEXT space (two adjacent spans are one run of glyphs; see the card above). */}
+                    {row.key === null ? null : <span className="gn-ticket-sheet__subtask-key">{row.key}</span>}
+                    {row.key === null ? null : ' '}
+                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    <span className="gn-ticket-sheet__subtask-meta">
+                      <Chip tone={row.stateCategory}>{row.stateName}</Chip>
+                      <span className="gn-ticket-sheet__subtask-pending">{DRAFT_PENDING_CHILD_NOTE}</span>
                     </span>
                   </li>
                 ))}

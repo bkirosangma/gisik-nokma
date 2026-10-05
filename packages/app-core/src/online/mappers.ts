@@ -2150,6 +2150,11 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // Drafts T8, the SAME lesson a fifth time (13.603): `draft` reaches this body (G7 sends `ticketState.draft`) and a
     // hand-enumerated mapper drops what it does not name. Strict when present: a draft with no author is not a draft.
     ...(record['draft'] === undefined ? {} : { draft: mapDraftMarker(record['draft'], `${path}.draft`) }),
+    // A draft's pending children (drafts T6, owner ruling O1), served on its author's read and drawn on its sheet
+    // (AMEND-drafts-t8-pending-children). Tolerant when absent (the server spreads it only when non-empty), strict ids.
+    ...(record['pendingChildren'] === undefined
+      ? {}
+      : { pendingChildren: asArray(record['pendingChildren'], `${path}.pendingChildren`).map((id, index) => asString(id, `${path}.pendingChildren[${index}]`)) }),
   };
 }
 
