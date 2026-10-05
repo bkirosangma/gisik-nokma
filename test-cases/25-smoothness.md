@@ -357,6 +357,20 @@ Tidy and Undo tidy, Add transition, and their header and canvas-corner buttons (
 - ✅ **25.543 — in Chromium the duplicate pair shows "That transition already exists" and a disabled Add, From = To shows "Pick two different states", and a fresh pair removes the reason and enables Add (control, same `it`; the edge count stays 4).** Mutation: `transitionExists` returns false → red.
 - ✅ **25.544 — on a 390 px phone with touch, Add transition is in the header and Tidy is in the canvas corner (both inside the viewport and at least 44 px tall), the header's own Tidy is hidden so there is exactly one Tidy, a tap on Tidy offers "Undo tidy" and a tap on that clears it, and the Add transition popover fits the viewport.** Mutations: the corner `<TidyControl />` removed → red (no Tidy at all); the phone arm's `.workflow-builder-screen__actions > .gn-tidy { display: none }` removed → red (two Tidy buttons).
 <!-- G-9 T5 -->
+Full-screen editing, the floating toolbar and panel, the Escape ladder, the phone sheet (G-9 T5, owner 2026-10-03: *"allow for full screen editing"*). Tests: `packages/app-core/test/workflow-builder/fullscreen.test.tsx` (jsdom), `packages/workflow-canvas-browser/tests/fullscreen.spec.ts` (real Chromium, Vite harness on :3190, on the gate). Block 25.500–25.559 (G-9 only); 25.545–25.556 used here (25.557–25.559 stay unused).
+
+- ❌ **25.545 — "Full screen" (header or canvas corner) sets `data-fullscreen="true"`, `role="region"` and `aria-label="Workflow editor, full screen"` on the screen and focuses the toolbar's name field; "Exit full screen" clears them and returns focus to the button that entered.**
+- ❌ **25.546 — full screen is remembered for the session under `<draftStorageKey>:fullscreen` (a remount restores it, exit is remembered, another draft key does not share it); the panel width under `<draftStorageKey>:panelWidth`, clamped to 280–480.**
+- ❌ **25.547 — the toolbar holds, in order, the name, Add state, Add transition, the zoom group, Tidy, the Issues badge (the `validateWorkflowDef` count), Publish and Exit full screen; at `STACKED_QUERY` zoom and Tidy fold into a More menu, and the Issues badge folds too only at `PHONE_BOARD_QUERY`.**
+- ❌ **25.548 — the Escape ladder closes the innermost layer first: an open rule menu, then the panel, then full screen; a prevented Escape is left alone, a popover closes alone, and with nothing open one Escape exits.**
+- ❌ **25.549 — in full screen a selection opens the floating panel on the Selection tab at every width, the Issues badge opens the Issues tab, and × closes it; control: outside full screen no panel opens.**
+- ❌ **25.550 — the panel is an `aside` region labelled "Workflow panel", not a dialog, and nothing over the canvas is `inert` or `aria-hidden`.**
+- ❌ **25.551 — in Chromium full screen covers the window, keeps the viewport transform, and every toolbar control works; Exit restores the normal box.**
+- ❌ **25.552 — a member can enter full screen and is offered no Add state, Add transition or Tidy anywhere; control first: the owner is.**
+- ❌ **25.553 — a drag inside full screen moves the state live with its arrow.**
+- ❌ **25.554 — on a 390×844 touch phone the toolbar row is name, Add state, Add transition, Publish, More and Exit; a tap on a state opens a bottom sheet; a touch drag moves a state live.**
+- ❌ **25.555 — in Chromium at 700 px wide, Escape closes the More menu, then the panel, then full screen.**
+- ❌ **25.556 — a reload in the same tab keeps full screen on (`?stableDraft=1`); control: after Exit a reload keeps it off.**
 
 ## 25.42 The phone ticket-sheet header compacts with the scroll, with no jitter (G-8)
 
