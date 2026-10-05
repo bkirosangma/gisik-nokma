@@ -16,6 +16,7 @@ import { buildProjectionRegistry } from './projections/index.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
 import { startSnapshotWriter } from './sync/snapshot-writer.js';
 import { startEmbedWorker } from './search/embed-worker.js';
+import { startSuggestionScheduler } from './semantic/scheduler.js';
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
@@ -125,6 +126,9 @@ async function main(): Promise<void> {
     // compose stack, not inferred.
     webOrigin: config.webOrigin,
   });
+  // KG-D T5: the suggestion scheduler, created below with the embed worker (and
+  // only with it), is held here for the reason the next comment gives.
+  let suggestionScheduler: ReturnType<typeof startSuggestionScheduler> | null = null;
   // The embedding worker (notes series, Plan 3 of 6, spec §7.6) is created
   // BELOW, beside the snapshot writer, but `buildApp` registers its commit
   // listener at build time — so the callback has to exist first, and the loop
@@ -146,6 +150,11 @@ async function main(): Promise<void> {
       webOrigin: config.webOrigin,
       mcpPublicUrl: config.mcpPublicUrl,
       inviteMailer: selectInviteMailer(config, smtpLog),
+      // KG-D T5: the suggestion job's 200-change trigger, on the same commit-feed listener as the nudge below. Null
+      // (and so a no-op) when `EMBED_WORKER_ENABLED=false`: the job's input is the worker's output.
+      onSemanticChange: (workspaceId) => {
+        suggestionScheduler?.change(workspaceId);
+      },
       // The commit-feed listener `app.ts` registers when this is given. It
       // forwards to the worker created below; `EMBED_WORKER_ENABLED=false`
       // leaves the worker uncreated, and this closure then drops the nudge on
@@ -316,7 +325,8 @@ async function main(): Promise<void> {
   // `EMBED_WORKER_ENABLED=false` is the operator's escape from the model's
   // 130 MB: without this loop a box short on memory serves the whole product
   // except `mode=meaning` search and `similar` (KG-D T2), which then answer
-  // from chunks that stop being refreshed rather than failing. The interval is ALSO the backfill and
+  // from chunks that stop being refreshed rather than failing, and concept
+  // suggestions (KG-D T5), whose scheduler is then never started. The interval is ALSO the backfill and
   // the re-index after a model change, so a disabled worker means a database
   // that has never embedded anything stays that way until it is re-enabled.
   const embedWorker = config.embedWorkerEnabled
@@ -333,8 +343,19 @@ async function main(): Promise<void> {
       : (noteId) => {
           embedWorker.nudge(noteId);
         };
+  // Knowledge Graph spec D §4.1 (KG-D Task 5): the suggestion job's scheduler, nightly at 02:00 IST and after 200
+  // embedded-text changes in a workspace. Only where the embed worker runs, because the job reads what it wrote.
+  suggestionScheduler =
+    embedWorker === null
+      ? null
+      : startSuggestionScheduler(pool, {
+          log: (msg) => {
+            app.log.warn(msg);
+          },
+        });
   app.addHook('onClose', () => {
     embedWorker?.stop();
+    suggestionScheduler?.stop();
   });
 
   // Knowledge Graph B: the one-shot proj_references backfill. Started AFTER listen and
