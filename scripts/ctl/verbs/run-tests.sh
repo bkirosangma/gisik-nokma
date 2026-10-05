@@ -138,6 +138,9 @@ timed_out=0
 if [ "$cap_fired" = 1 ] && kill -0 "$child" 2>/dev/null; then
   timed_out=1; cap_stop; { wait "$child"; } 2>/dev/null; rc=124
   echo "TIMEOUT after $max_min min" >> "$log"
+elif [ "$cap_fired" = 1 ]; then
+  # the cap fired as the job ended: the first wait was interrupted by USR1 (rc 128+USR1); the job is already gone, so reap it for its own rc
+  { wait "$child"; } 2>/dev/null; rc=$?
 fi
 stop_timer
 child=""
