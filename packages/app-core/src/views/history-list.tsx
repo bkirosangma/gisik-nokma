@@ -1,5 +1,5 @@
 import { IST_CLOCK_NOTE } from '@gisik-nokma/domain';
-import { actorLabel, formatDateTime } from '../provenance.js';
+import { actorLabel, attributionLabel, formatDateTime } from '../provenance.js';
 import type { TicketHistoryEvent } from '../view-types.js';
 import { describeEvent, type HistoryCopyContext } from './history-copy.js';
 
@@ -26,9 +26,10 @@ import { describeEvent, type HistoryCopyContext } from './history-copy.js';
  * naming two moments that never happened.
  *
  * `nameOf` is a display convenience and the floor does not depend on it: the
- * label goes through `actorLabel`, so a resolver that answers with nothing —
- * a roster that 404'd, a member since removed — still renders the raw actor
- * id. A history entry never becomes anonymous, and it never becomes "system".
+ * label goes through `actorLabel`, then `attributionLabel` (an `mcp` event reads
+ * "Claude, for <name>", spec D §5.2), so a resolver that answers with nothing —
+ * a roster that 404'd, a member since removed — still names the actor
+ * (`Unknown person`). A history entry never becomes anonymous, and it never becomes "system".
  *
  * ## The headline is a sentence, and the wire name sits beside it (E4-19 / E5-8)
  *
@@ -72,7 +73,7 @@ export function HistoryList({
                 <span className="gn-history__slug">{event.type}</span>
               )}
               <span className="gn-history__actor">
-                {actorLabel(event.actorId, nameOf(event.actorId))}
+                {attributionLabel(actorLabel(event.actorId, nameOf(event.actorId)), event.origin)}
               </span>
               <span className="gn-history__origin">from {event.origin}</span>
             </div>
