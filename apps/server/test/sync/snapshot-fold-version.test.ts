@@ -12,6 +12,8 @@ import {
 import { insertEvent, readEntityEvents } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot, writeSnapshot } from '../../src/ledger/snapshot-store.js';
 import { buildLedgerDeps } from '../../src/sync/ledger-deps.js';
+import { bootstrapTicket } from '../../src/sync/sync-routes.js';
+import { targetSight } from '../../src/visibility/withhold-link-targets.js';
 import { bootRestate, foldTicketHead, runSnapshotPass, startSnapshotWriter } from '../../src/sync/snapshot-writer.js';
 import { makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -382,6 +384,19 @@ describe('29.404 the boot restate flag', () => {
       TICKET_FOLD_VERSION,
     ]);
 
+    // The row the failed restate left is now served as stored, and the warning lands on the WRITER's log.
+    const client = await db.pool.connect();
+    try {
+      expect((await bootstrapTicket(client, POISON, targetSight(client, ACTOR))).snapshot?.seq).toBe(1);
+    } finally {
+      client.release();
+    }
+    expect(logged.slice(1)).toEqual([
+      `bootstrap: ticket ${POISON} is served a snapshot from fold ${TICKET_FOLD_VERSION - 1} (current ${TICKET_FOLD_VERSION}): its restate failed`,
+    ]);
+    // Control: a pass run without the hook still ends at the throw.
+    await expect(runSnapshotPass(db.pool, { minEvents: 1_000_000 })).rejects.toThrow('has no state "nowhere"');
+
     // The pass rejects before any ticket (its due query fails): the flag is still set, after the failure is logged.
     bootRestate.complete = false;
     const down: string[] = [];
@@ -401,5 +416,43 @@ describe('29.404 the boot restate flag', () => {
       stopBroken();
     }
     expect(down).toEqual(['snapshot pass failed: Error: due query down']);
+
+    // The flag is the BOOT pass's: later passes (the wrapper is not re-entrant) that settle while the first is still
+    // held do not set it. The first pass's due query is held until released; every later call goes through.
+    bootRestate.complete = false;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let queries = 0;
+    const slowFirst = new Proxy(db.pool, {
+      get(pool, prop) {
+        if (prop === 'query') {
+          return async (...args: unknown[]): Promise<unknown> => {
+            queries += 1;
+            if (queries === 1) await held;
+            return (pool.query as (...a: unknown[]) => Promise<unknown>).apply(pool, args);
+          };
+        }
+        const value = Reflect.get(pool, prop) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(pool) : value;
+      },
+    });
+    const later: string[] = [];
+    const stopSlow = startSnapshotWriter(slowFirst, { intervalMs: 20, minEvents: 1_000_000, immediate: true, log: (msg) => later.push(msg) });
+    try {
+      // Each later pass meets POISON and logs it; three logs mean later passes have run to the end of their due set.
+      await vi.waitFor(() => {
+        expect(later.length).toBeGreaterThanOrEqual(3);
+      }, { timeout: 10_000, interval: 20 });
+    } finally {
+      stopSlow();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300)); // the later passes in flight settle
+    expect(bootRestate.complete).toBe(false);
+    release();
+    await vi.waitFor(() => {
+      expect(bootRestate.complete).toBe(true);
+    }, { timeout: 10_000, interval: 20 });
   });
 });
