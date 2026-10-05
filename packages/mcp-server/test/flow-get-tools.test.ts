@@ -179,6 +179,9 @@ describe('29.381 get_ticket flow facts', () => {
     // a served resolution wins over a cause that disagrees with it
     const both = await read(fakeFlow(routes(T2, { closed, resolution: { kind: 'not-taken', decisionTicketId: D, outcome: 'Later', pass: 2 } })), T2);
     expect(both['resolution']).toEqual({ kind: 'not-taken', outcome: 'Later', pass: 2, decision: null });
+    // the cause's own outcome and pass are carried, not the first pass's (every cause above is pass 1)
+    const later = { ...closed, cause: { ...closed.cause, outcome: 'Later', pass: 2 } };
+    expect((await read(fakeFlow(routes(T2, { closed: later })), T2))['resolution']).toEqual({ kind: 'not-taken', outcome: 'Later', pass: 2, decision: null });
     // a resolution with no Decision id asks nothing more
     const noId = fakeFlow(routes(T2, { resolution: { kind: 'not-taken', decisionTicketId: null, outcome: 'Approved', pass: 1 } }));
     expect((await read(noId, T2))['resolution']).toEqual({ kind: 'not-taken', outcome: 'Approved', pass: 1, decision: null });
