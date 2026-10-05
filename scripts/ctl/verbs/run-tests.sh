@@ -32,10 +32,10 @@ if [ "$explicit_repo" = 1 ]; then rundir="$CTL_REPO"; else rundir="$PWD"; fi
 shown="${cmd[*]}"; [ "${#shown}" -le 120 ] || shown="${shown:0:119}…"
 # Playwright ports (13.2281-13.2282): the two browser packages pin their dev-server port (KG 3191, FG 3192) with `reuseExistingServer: false`, so a second run of
 # the same package on the same port is RED ("already used"), not a wait. A command that names Playwright or either package (or runs in its directory, or through
-# turbo) gets a FREE port of its own in KG_PW_PORT / FG_PW_PORT (verbs/pw-ports.py: the window of its slot, first port nothing listens on); a value the caller already
-# exported stays. Anything else runs with its environment untouched.
+# turbo) gets a FREE port of its own in KG_PW_PORT / FG_PW_PORT (verbs/pw-ports.py: the window of its slot, first port nothing listens on, wildcard listeners included); a value the caller already
+# exported stays. Anything else runs with its environment untouched. The trigger reads the WHOLE command, never $shown (cut to 120 characters for display).
 pw_ports=""
-case "$shown $rundir" in *playwright*|*graph-browser*|*turbo*) pw_ports=1;; esac
+case "${cmd[*]} $rundir" in *playwright*|*graph-browser*|*turbo*) pw_ports=1;; esac
 pw_exports() {   # $1 = slot (0 = a dry-run holds none): sets KG_PW_PORT / FG_PW_PORT unless the caller's own are exported; prints the pair
   local pair kg fg; pair="$(python3 "$HERE/verbs/pw-ports.py" "$1")" || return 1
   kg="${pair% *}"; fg="${pair#* }"
