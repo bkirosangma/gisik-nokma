@@ -175,7 +175,11 @@ describe('27.511–27.514 the MCP graph tools (KG-D T6)', () => {
     const schema = z.object(tool.inputSchema);
     expect(schema.safeParse({ center: { kind: 'concept', id: 'c' }, hops: 4 }).success).toBe(true);
     expect(schema.safeParse({ center: { kind: 'ticket', id: 't' }, hops: 5 }).success).toBe(false);
+    expect(schema.safeParse({ center: { kind: 'ticket', id: 't' }, hops: 0 }).success).toBe(false);
     expect(schema.safeParse({ center: { kind: 'ticket', id: 't' }, scope: { workspaces: [] } }).success).toBe(false);
+    const ws = (n: number) => Array.from({ length: n }, (_, i) => `w${String(i)}`);
+    expect(schema.safeParse({ center: { kind: 'ticket', id: 't' }, scope: { workspaces: ws(20) } }).success).toBe(true);
+    expect(schema.safeParse({ center: { kind: 'ticket', id: 't' }, scope: { workspaces: ws(21) } }).success).toBe(false);
 
     // Control: a scope is used as given (no directory read), with its projects and the named groups; hops defaults to 2.
     paths.length = 0;
@@ -185,6 +189,10 @@ describe('27.511–27.514 the MCP graph tools (KG-D T6)', () => {
       '/v1/graph/neighbours?center=note%3An&hops=1&ws=w9&proj=p1%2Cp2&groups=blocks%2Cconcepts&cursor=2000',
       '/v1/graph/neighbours?center=note%3An&hops=2&ws=w9&proj=p1%2Cp2&groups=blocks%2Cconcepts',
     ]);
+    // An empty project list is no project scope: no `proj=` at all.
+    paths.length = 0;
+    await tool.handler({ center: { kind: 'note', id: 'n' }, hops: 1, scope: { workspaces: ['w9'], projects: [] } });
+    expect(paths).toEqual(['/v1/graph/neighbours?center=note%3An&hops=1&ws=w9', '/v1/graph/neighbours?center=note%3An&hops=1&ws=w9&cursor=2000']);
   });
 
   it('27.511 — graph_neighbours: a centre the route does not carry labels nothing; more than 20 workspaces is a sentence; a 404 is the item sentence', async () => {
