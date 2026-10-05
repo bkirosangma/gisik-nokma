@@ -117,11 +117,13 @@ check "13.2325 GISIK_RUN_MAX_MIN=2 caps a hung run (rc 124, TIMEOUT after 2 min)
 # ---- 13.2326 no timer outlives its run ----
 # The timer sleeps the scaled cap: `--max-min $TM` (a value of this run's own, 5000-9999) makes it a process whose LAST argument is $TM (the perl
 # timer's seconds; a subshell timer's `sleep $TM` as well), which nothing else on the machine runs, a leftover of an earlier run of this suite included.
+# The verb forks the timer AFTER it starts the job, so both counts taken while the job runs settle 1 s first (inside the job, before its `ps`;
+# outside, after the job's .up file): with no settle a loaded machine can count 0 before the fork.
 TM=$(( 5000 + ($$ * 7 + RANDOM) % 5000 ))
 ntimers() { ps -axo command= | awk -v t="$TM" '$NF == t && $1 != "awk"' | wc -l | tr -d ' '; }   # not the counting awk itself (ps shows it as `awk -v t <TM>`)
-reset; rt --label tnorm --max-min "$TM" -- sh -c 'ps -axo command= | awk -v t="$1" '"'"'$NF == t && $1 != "awk"'"'"' | wc -l | tr -d " " > "$2.during"' x "$TM" "$fx/j.t" > /dev/null; after_norm=$(ntimers); during_norm=$(cat "$fx/j.t.during" 2>/dev/null)
+reset; rt --label tnorm --max-min "$TM" -- sh -c 'sleep 1; ps -axo command= | awk -v t="$1" '"'"'$NF == t && $1 != "awk"'"'"' | wc -l | tr -d " " > "$2.during"' x "$TM" "$fx/j.t" > /dev/null; after_norm=$(ntimers); during_norm=$(cat "$fx/j.t.during" 2>/dev/null)
 reset; ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_RUN_SECS_PER_MIN=1 CTL_DRY_RUN=0 exec "$HERE/ctl" run-tests --repo "$repo" --label tterm --max-min "$TM" -- sh -c 'echo $$ >> "$FXP"; : > "$1.up"; sleep 60' x "$fx/j.u" > "$fx/j.u.out" 2>&1 ) & vp=$!
-n=0; while [ ! -f "$fx/j.u.up" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; during_term=$(ntimers); kill -TERM "$vp"; wait "$vp"; rterm=$?; sleep 0.3; after_term=$(ntimers)
+n=0; while [ ! -f "$fx/j.u.up" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; sleep 1; during_term=$(ntimers); kill -TERM "$vp"; wait "$vp"; rterm=$?; sleep 0.3; after_term=$(ntimers)
 check "13.2326 the timer is there while the job runs (CONTROL: one process ending in its scaled cap, seen from inside the job, and from outside before the TERM) and gone after the run: after a normal end, and after a TERM to the verb (exit 143, slot released)" \
   '[ "$during_norm" = 1 ] && [ "$after_norm" = 0 ] && [ "$during_term" = 1 ] && [ $rterm -eq 143 ] && [ "$after_term" = 0 ] && [ "$(slots_left)" = 0 ]'
 # Jobs that end AT ONCE put the timer's stop inside its start-up: the first (subshell) timer left its `sleep` orphaned in 25 of 40 such runs.
