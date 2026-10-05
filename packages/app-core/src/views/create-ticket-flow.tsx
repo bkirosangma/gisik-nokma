@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { DRAFT_NO_OUTSIDERS_RULE, newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
 import { Button, PlusIcon } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -12,6 +12,9 @@ import {
 } from '../flows/guarded-child-event.js';
 import { PARENT_TERMINAL_RULE, precheckEvent } from '../precheck.js';
 import { makeSubmittedFactory } from '../submit.js';
+import { OfflineAcceptError } from '../replica/replica-data-source.js';
+import { addPendingDraft, removePendingDraft } from './draft-optimism.js';
+import { DRAFT_NO_OUTSIDERS } from './drafts-copy.js';
 import { outsiderIngest } from '../people/outsider-ingest.js';
 import type { AssignOutsider, LookupPerson } from '../people/types.js';
 import type { TicketRead } from '../view-types.js';
@@ -73,6 +76,12 @@ export type CreateTicketFlowProps = {
    * `ticket.already-exists` rather than filing a second ticket).
    */
   onRefused?: (ticketId: string) => void;
+  /**
+   * Drafts T8: a draft was saved (committed, or queued on this device). Called INSTEAD of `onCreated`, because nothing
+   * was added to a board; the shell narrates it with `DraftSavedToast`. ABSENT is normal: a saved draft then closes the
+   * dialog and says nothing.
+   */
+  onDraftSaved?: (ticketId: string) => void;
   /**
    * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
    *
@@ -201,6 +210,7 @@ export function CreateTicketFlow({
   onCreated,
   onPending,
   onRefused,
+  onDraftSaved,
   open,
   onOpenChange,
 }: CreateTicketFlowProps) {
@@ -291,6 +301,14 @@ export function CreateTicketFlow({
 
   const create = async (draft: NewTicketDraft): Promise<void> => {
     clearAnswers();
+    // Drafts T8 (decision 6): the forcing happens HERE, the one place that builds the event, whatever the dialog sent.
+    const isDraft = draft.draft === true;
+    // R8 in the flow, before anything is sent: the outsider door would grant a membership as a side effect of a
+    // private act.
+    if (isDraft && draft.assigneeIsOutsider === true) {
+      setFailure({ headline: null, refusal: { rule: DRAFT_NO_OUTSIDERS_RULE, reason: DRAFT_NO_OUTSIDERS }, origin: 'instant' });
+      return;
+    }
     const childEvent = make({
       workspaceId,
       /**
@@ -324,7 +342,8 @@ export function CreateTicketFlow({
         // client leaving an additive field out is a choice, not a compatible
         // silence. `NewTicketDraft.start` is itself required (never
         // optional) for the identical reason, one layer up.
-        start: draft.start,
+        start: isDraft ? 'backlog' : draft.start,
+        ...(isDraft ? { draft: true as const } : {}),
         // Spec 2026-09-22, and the same reasoning the line above records: the
         // birth priority is ALWAYS sent, never left to the wire's
         // absence-means-P2 fallback. `NewTicketDraft.priority` is itself
@@ -353,7 +372,7 @@ export function CreateTicketFlow({
         // equal to the workflow's initial state); this door just carries it
         // through, the identical "spread, don't name" treatment `description`
         // gets above, for the identical reason.
-        ...(draft.stateId === undefined ? {} : { stateId: draft.stateId }),
+        ...(isDraft || draft.stateId === undefined ? {} : { stateId: draft.stateId }),
         // The birth START and DUE date (addendum, 2026-09-23) — the dialog's
         // bare `YYYY-MM-DD` string wrapped as the `{date}` object the wire
         // expects (`dueDateValueSchema`'s own shape), omitted when the
@@ -412,7 +431,7 @@ export function CreateTicketFlow({
         ? undefined
         : (draft.stateId ?? workflowStates(ghostWorkflowId)?.initialStateId);
     const ghost =
-      onPending !== undefined && ghostWorkflowId !== undefined && ghostStateId !== undefined
+      !isDraft && onPending !== undefined && ghostWorkflowId !== undefined && ghostStateId !== undefined
         ? { ticketId: draft.ticketId, workflowId: ghostWorkflowId, stateId: ghostStateId, title: draft.title, typeId: draft.typeId, priority: draft.priority }
         : undefined;
     if (ghost !== undefined) {
@@ -421,24 +440,52 @@ export function CreateTicketFlow({
       onPending?.(ghost);
     }
     // Every answer that is not a commit takes the ghost back and hands the draft back to the dialog.
+    // A draft has no ghost, so its dialog was never closed; the re-assertion below is harmless and keeps the typed
+    // draft (and its SAME ticket id) for the retry.
     const takeBack = (): void => {
-      if (ghost === undefined) return;
-      onRefused?.(ghost.ticketId);
+      if (ghost === undefined && !isDraft) return;
+      onRefused?.(draft.ticketId);
       setRestoreDraft(draft);
       setDialogOpen(true);
+    };
+    // Drafts T8 (decision 5): the saved draft's row is in the pending store BEFORE the server answers.
+    const draftRow = isDraft
+      ? {
+          ticketId: draft.ticketId, projectId, projectName: null, typeId: draft.typeId, title: draft.title, parentId: draft.parentId,
+          updatedAt: childEvent.clientTime, attachmentCount: 0, pending: true,
+        }
+      : null;
+    if (draftRow !== null) addPendingDraft(workspaceId, draftRow);
+    const unwind = (): void => {
+      if (draftRow !== null) removePendingDraft(workspaceId, draftRow.ticketId);
+    };
+    const saved = (): void => {
+      setDialogOpen(false);
+      onDraftSaved?.(childEvent.entity.id);
     };
     let outcome: Awaited<ReturnType<typeof submitChildEvent>>;
     try {
       outcome = await submitChildEvent(via, childEvent);
     } catch (error) {
+      // Decision 4: an offline accept is not an error. The draft is queued; the replica lists it `pending`.
+      if (isDraft && error instanceof OfflineAcceptError) {
+        saved();
+        return;
+      }
+      unwind();
       takeBack();
       throw error;
     }
     if (outcome.kind === 'committed') {
+      if (isDraft) {
+        saved();
+        return;
+      }
       setDialogOpen(false);
       onCreated(childEvent.entity.id);
       return;
     }
+    unwind();
     takeBack();
     if (outcome.kind === 'needs-reopen' && draft.parentId !== null) {
       await openReopenPrompt(childEvent, draft.parentId, outcome.refusal, 'server');
