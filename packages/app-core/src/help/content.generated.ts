@@ -11401,7 +11401,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", like any other change in the ticket's history."
+                      "text": ": the ticket's history shows it as "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Claude, for"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " your name."
                     }
                   ]
                 ]

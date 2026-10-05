@@ -6,3 +6,5 @@ export * from './session.js';
 export * from './lazy-session.js';
 export { registerTools, allTools } from './tools/register.js';
 export type { RegisterHooks, ToolCallEvent } from './tools/register.js';
+export { KNOWN_D2_GAPS, MCP_READ_ONLY_TOOLS, MCP_WRITE_AUDIT } from './tools/write-audit.js';
+export type { D2Leg, WriteAudit } from './tools/write-audit.js';

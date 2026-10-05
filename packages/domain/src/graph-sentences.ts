@@ -51,10 +51,17 @@ export function formatGraphDate(iso: string): string {
   return DATE.format(new Date(iso));
 }
 
-/** "Added by X on D, via Claude." (§3.5). Kinds whose table records no author or date (parent, assignee, in) have none. */
+/**
+ * The assistant an `origin: 'mcp'` write is attributed to (spec D §5.2; KG-D T7, decision G3). The ledger records
+ * `origin: 'mcp'` and the session's user, never which assistant, so it is one label: History's actor line reads
+ * `Claude, for <name>` (`attributionLabel`, app-core) and an edge's provenance line `…, via Claude` (below).
+ */
+export const MCP_ASSISTANT_LABEL = 'Claude';
+
+/** "Added by X on D, via Claude." (§3.5; the assistant is `MCP_ASSISTANT_LABEL`). Kinds whose table records no author or date (parent, assignee, in) have none. */
 export function provenanceLine(edge: GraphEdgeView): string | null {
   if (edge.addedAt === null && edge.addedBy === null) return null;
   const who = edge.addedBy === null ? 'Added' : `Added by ${edge.addedBy}`;
   const when = edge.addedAt === null ? '' : ` on ${formatGraphDate(edge.addedAt)}`;
-  return `${who}${when}${edge.origin === 'mcp' ? ', via Claude' : ''}.`;
+  return `${who}${when}${edge.origin === 'mcp' ? `, via ${MCP_ASSISTANT_LABEL}` : ''}.`;
 }
