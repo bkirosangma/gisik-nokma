@@ -80,7 +80,8 @@ const refsOf = (r: GraphRingResponse) => r.items.map((item) => item.ref);
 const edgeIdsOf = (r: GraphRingResponse) => r.edges.map((edge) => edge.id);
 const itemOf = (r: GraphRingResponse, ref: string) => r.items.find((item) => item.ref === ref);
 const edgeOf = (r: GraphRingResponse, id: string) => r.edges.find((edge) => edge.id === id);
-const empty = (hop: number): GraphRingResponse => ({ hop, items: [], edges: [], frontier: [], truncated: false, cursor: null });
+/** An empty ring: still carries its centre (planner ruling Q1; its full shape is pinned by 27.363). */
+const empty = (hop: number, center: string): GraphRingResponse => ({ hop, center: expect.objectContaining({ ref: center, hop: 0, out: false }), items: [], edges: [], frontier: [], truncated: false, cursor: null });
 
 async function ticket(title: string, opts: { parentId?: string | null; explicit?: string[]; projectId?: string } = {}): Promise<string> {
   const id = newUlid();
@@ -196,7 +197,7 @@ describe('27.290–27.292 the door: session, query, the one 404', () => {
     // Controls, one input changed each: the just-inside values are accepted.
     expect((await ring('member', { ...q, cursor: '0' })).status).toBe(200);
     const far = await ring('member', { ...q, cursor: '9999999' });
-    expect(far).toEqual({ status: 200, body: empty(1) });
+    expect(far).toEqual({ status: 200, body: empty(1, T(w().epicId)) });
     // 20 workspaces parse; 19 of them are not the member's, so the answer is the workspace check's 404, not the parser's 400.
     const twenty = await ring('member', { ...q, ws: [ws(), ...twentyOthers.slice(1)].join(',') });
     expect(twenty).toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
@@ -235,7 +236,7 @@ describe('27.293–27.295 visibility and scope', () => {
     // V is the member-side control: the member's walk works, so what is missing below is about H.
     expect(refsOf(one.body)).toEqual([T(V)]);
     expect(JSON.stringify(one.body)).not.toContain(H);
-    expect(await ring('member', { ...q, hops: '2' })).toEqual({ status: 200, body: empty(2) });
+    expect(await ring('member', { ...q, hops: '2' })).toEqual({ status: 200, body: empty(2, T(A)) });
 
     const ownerOne = await ring('owner', { ...q, hops: '1' });
     expect([...refsOf(ownerOne.body)].sort()).toEqual([T(H), T(V)].sort());
@@ -466,7 +467,7 @@ describe('27.302–27.304 projects, workspaces, deleted items', () => {
     await link('relates', K, D);
     await ticketEvent(D, 'ticket.deleted', {});
     const q = { center: T(K), hops: '1', ws: ws(), groups: NO_PROJECTS };
-    expect(await ring('member', q)).toEqual({ status: 200, body: empty(1) });
+    expect(await ring('member', q)).toEqual({ status: 200, body: empty(1, T(K)) });
     await ticketEvent(D, 'ticket.restored', {});
     expect(refsOf((await ring('member', q)).body)).toEqual([T(D)]);
   });
@@ -497,8 +498,8 @@ describe('27.306–27.307 groups and hops', () => {
     await link('relates', C, D);
     await link('relates', D, E);
     const q = { center: T(C), ws: ws(), groups: NO_PROJECTS };
-    expect(await ring('member', { ...q, hops: '8' })).toEqual({ status: 200, body: empty(8) });
-    expect(await ring('member', { ...q, hops: '3' })).toEqual({ status: 200, body: empty(3) });
+    expect(await ring('member', { ...q, hops: '8' })).toEqual({ status: 200, body: empty(8, T(C)) });
+    expect(await ring('member', { ...q, hops: '3' })).toEqual({ status: 200, body: empty(3, T(C)) });
     const two = await ring('member', { ...q, hops: '2' });
     expect(refsOf(two.body)).toEqual([T(E)]);
     // The answer's `hop` and its item's `hop` are the ring asked for (the empty answers above pin only the first).
@@ -581,5 +582,36 @@ describe('27.308–27.309 trashed notes', () => {
     expect(restoredCentre.status).toBe(200);
     expect(refsOf(restoredCentre.body)).toEqual([T(K)]);
     expect([...refsOf(restoredAround.body)].sort()).toEqual([T(V), graphRef('note', homedLive), graphRef('note', homedInTrash)].sort());
+  });
+});
+
+describe('27.363 the centre on every ring (planner ruling Q1, 2026-10-05)', () => {
+  it('27.363 ring 1 and an empty ring both carry the centre, keyed and visibility-resolved, never among the items; control: a guest who sees only their own ticket gets the same keyed centre, never the title-labelled raw form', async () => {
+    const A = await ticket('Centre that carries its own key');
+    const B = await ticket('Its one neighbour');
+    await link('relates', A, B);
+    const q = { center: T(A), ws: ws(), groups: NO_PROJECTS };
+    // The keyed form of A, as a ring ITEM gives it (the page's keysFor): the haystack holds its subject.
+    const fromB = await ring('member', { ...q, center: T(B), hops: '1' });
+    const asItem = itemOf(fromB.body, T(A))!;
+    expect(asItem.label).toMatch(/-\d+$/);
+    expect(asItem.label).not.toBe('Centre that carries its own key');
+    const one = await ring('member', { ...q, hops: '1' });
+    expect(refsOf(one.body)).toEqual([T(B)]);
+    expect(one.body.center).toEqual({ ...asItem, hop: 0, out: false });
+    // an empty ring (past the end) still carries it, keyed
+    const past = await ring('member', { ...q, hops: '3' });
+    expect(past.body.items).toEqual([]);
+    expect(past.body.center).toEqual({ ...asItem, hop: 0, out: false });
+    // control: the guest's own ticket, centred by the guest and by the owner, is the same keyed item on ring 1 and on an empty ring
+    const g = { center: T(w().guestTaskId), ws: ws(), groups: NO_PROJECTS };
+    const ownerView = (await ring('owner', { ...g, hops: '1' })).body.center;
+    expect(ownerView.label).toMatch(/-\d+$/);
+    expect(ownerView.label).not.toBe(ownerView.title);
+    for (const hops of ['1', '8']) {
+      const guest = await ring('guest', { ...g, hops });
+      expect(guest.status).toBe(200);
+      expect(guest.body.center).toEqual(ownerView);
+    }
   });
 });

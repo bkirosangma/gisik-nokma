@@ -299,6 +299,13 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 <!-- KG-C T8 -->
 <!-- KG-C T9 -->
 
+### 27.3.3 The centre on every ring (`task/kg-c-t7-view`, planner ruling Q1 2026-10-05)
+
+The route never answered `hops=0`, and a ring is the items at exactly `hops` steps, so no answer held the centre itself: a view could not label it, nor a centre with no links at all. Every answer now carries `center`.
+
+- ✅ **27.363 — the centre on ring 1 and on an empty ring:** `center` equals the same ticket as a ring item gives it (keyed, `hop` 0, `out` false), on ring 1 and on an empty ring past the end, and is never in `items`; control: a guest who sees only their own ticket gets the same keyed centre as the owner on ring 1 and on an empty ring, never the title-labelled raw form (`apps/server/test/graph/neighbours.test.ts`)
+- ✅ **27.364 — the centre seeds the store:** an empty ring 1 leaves the store holding only its centre, with its label, and still marks the end; control: a later answer with another label keeps the first copy (`packages/knowledge-graph/test/engine/model.test.ts`)
+
 ### 27.3.1 The harness port (`task/ctl-pw-ports`, planner P35 2026-10-05)
 
 - ✅ **27.360 — `KG_PW_PORT` moves the harness:** with it set, the RESOLVED `playwright.config.ts` (read in a fresh node, so a config that ignored the variable cannot pass) has the webServer url, the base url and the vite `--port … --strictPort` on that port (`packages/knowledge-graph-browser/tests/port.spec.ts`)
