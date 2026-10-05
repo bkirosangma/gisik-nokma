@@ -41,14 +41,17 @@ export type Snapshot = {
    * The `TICKET_FOLD_VERSION` of the fold that wrote the row (wtg2 T9). 1 is every row written before work periods
    * existed: its `state` has no `periods` and no `rounds`, so the snapshot pass restates it from the ticket's full
    * history (`foldTicketHead`) instead of resuming from it. Never passed by a writer: both writes stamp the current
-   * version, because a row is always written by the current fold.
+   * version, because a row is always written by the current fold. The database also sets 1 on a ticket row whose UPDATE
+   * left `write_token` unchanged (an old instance's write during a rolling deploy; `writeSnapshot` below).
    */
   foldVersion: number;
   /**
-   * `snapshots.created_at`: when the row was first inserted, on the DATABASE clock. An `overwriteSnapshot` landing on
-   * the row's seq leaves it as it was. Read by `bootstrapTicket` (wtg2 fold-version overlap, planner ruling E): a stale
-   * row created after `bootRestate.dueAt` (the database clock the boot restate pass read before its due query) was
-   * written by an old instance during a rolling deploy, not left behind by a restate that failed. Never passed by a writer: the column's default stamps it.
+   * `snapshots.created_at`: when the row was first inserted, on the DATABASE clock (the insert's own,
+   * `clock_timestamp()`, not its transaction's start). An `overwriteSnapshot` landing on the row's seq leaves it as it
+   * was; a demoted UPDATE (an old instance's, `writeSnapshot` below) re-stamps it with that write's clock. Read by
+   * `bootstrapTicket` (wtg2 fold-version overlap, planner ruling E): a stale row created after `bootRestate.dueAt` (the
+   * database clock the boot restate pass read before its due query) was written by an old instance during a rolling
+   * deploy, not left behind by a restate that failed. Never passed by a writer: the column's default stamps it.
    */
   createdAt: Date;
 };
@@ -56,9 +59,18 @@ export type Snapshot = {
 /** What a writer hands over: a snapshot without its fold version, which the write stamps (`TICKET_FOLD_VERSION`), or its creation time. */
 export type SnapshotInput = Omit<Snapshot, 'foldVersion' | 'createdAt'>;
 
+/**
+ * Both writes set a fresh `write_token` (wtg2 fold-version writer token, planner ruling F,
+ * `migrations/1792100300000_snapshots-write-token.sql`). A rolling deploy runs the OLD instance's `overwriteSnapshot`
+ * beside this code, and its DO UPDATE sets no `fold_version`: on a row this code restated it would write old-shape state
+ * under the current fold. The trigger `snapshots_demote_tokenless_update` tells the two apart by the token: an UPDATE of
+ * a ticket row that leaves it as it was is demoted (`fold_version` 1 and `created_at` that write's clock), so the
+ * bootstrap refuses the row and the next pass restates it. A new UPDATE path that forgets the token is demoted too,
+ * which costs one restate and never serves a stale row. The INSERT carries one so every row a writer leaves has its own.
+ */
 export async function writeSnapshot(client: PoolClient, snapshot: SnapshotInput): Promise<void> {
   await client.query(
-    'INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version) VALUES ($1, $2, $3, $4, $5, $6)',
+    'INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version, write_token) VALUES ($1, $2, $3, $4, $5, $6, gen_random_uuid())',
     [
       snapshot.entityKind,
       snapshot.entityId,
@@ -88,10 +100,11 @@ export async function writeSnapshot(client: PoolClient, snapshot: SnapshotInput)
  */
 export async function overwriteSnapshot(client: PoolClient, snapshot: SnapshotInput): Promise<void> {
   await client.query(
-    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version)
-       VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version, write_token)
+       VALUES ($1, $2, $3, $4, $5, $6, gen_random_uuid())
      ON CONFLICT (entity_kind, entity_id, seq)
-       DO UPDATE SET state = excluded.state, provenance = excluded.provenance, fold_version = excluded.fold_version`,
+       DO UPDATE SET state = excluded.state, provenance = excluded.provenance, fold_version = excluded.fold_version,
+         write_token = excluded.write_token`,
     [
       snapshot.entityKind,
       snapshot.entityId,
