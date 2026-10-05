@@ -290,7 +290,7 @@ describe('Linked from (spec C §3.5)', () => {
 });
 
 describe('the edge inspector (spec C §3.5)', () => {
-  it('27.334 relates GN-142 → GN-160: its sentence, provenance via Claude, From and To; control: a parent edge says how it was set, with no Added by', async () => {
+  it('27.334 relates GN-142 → GN-160: its sentence, provenance via an assistant, From and To; control: a parent edge says how it was set, with no Added by', async () => {
     const { fake } = setup();
     await drawn(fake, T('t126'));
     expect(fake.last().view.keepView).toBe(false); // control: the rings, drawn, fit the view
@@ -298,7 +298,7 @@ describe('the edge inspector (spec C §3.5)', () => {
     expect(fake.last().view.keepView).toBe(true); // selecting a link keeps the zoom (§3.5)
     expect(insp().querySelector('.gn-kg-insp__head')!.textContent).toBe('Relates to');
     expect(title()).toBe('GN-142 relates to GN-160');
-    expect(insp().querySelector('.gn-kg-insp__prov')!.textContent).toBe('Added by Ama Rangsa on 2 Oct 2026, via Claude. A typed link.');
+    expect(insp().querySelector('.gn-kg-insp__prov')!.textContent).toBe('Added by Ama Rangsa on 2 Oct 2026, via an assistant. A typed link.');
     expect(insp().querySelector('blockquote')).toBeNull(); // a typed link has no snippet
     const user = userEvent.setup();
     await user.click(within(insp()).getByRole('button', { name: /^From/ }));

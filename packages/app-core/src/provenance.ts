@@ -63,9 +63,9 @@ export function actorLabel(actorId: string, actorName: string | null | undefined
 }
 
 /**
- * Knowledge Graph spec D §5.2 (D2): an MCP write reads "Claude, for Ama Rangsa". The ledger records origin 'mcp'
+ * Knowledge Graph spec D §5.2 (D2): an MCP write reads "Assistant, for Ama Rangsa". The ledger records origin 'mcp'
  * and the session's user, never which assistant, so the assistant is one label (`MCP_ASSISTANT_LABEL`). Wraps
- * `actorLabel`'s answer, so the floor (`Unknown person`) still names the person: "Claude, for Unknown person".
+ * `actorLabel`'s answer, so the floor (`Unknown person`) still names the person: "Assistant, for Unknown person".
  */
 export function attributionLabel(actorName: string, origin: string): string {
   return origin === 'mcp' ? `${MCP_ASSISTANT_LABEL}, for ${actorName}` : actorName;
