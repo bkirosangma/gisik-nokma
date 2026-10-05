@@ -255,6 +255,10 @@ describe('29.355 snapshot fold versions', () => {
     }
     expect(tailReadsFor(calls, TICKET_4)).toEqual([0]);
     expect(definitionScans(calls)).toBe(2); // one per definition epoch, not one per event
+    // The memo reads definition POSITIONS only past its horizon: each read starts where the last one stopped (1 first).
+    const horizons = calls.filter((call) => call.text.includes('SELECT workspace_seq FROM events')).map((call) => Number(call.values[1]));
+    expect(horizons.length).toBeGreaterThan(1); // precondition: more than one read, so "strictly rising" says something
+    expect([horizons[0], horizons.every((h, i) => i === 0 || h > horizons[i - 1]!)]).toEqual([1, true]);
     // Control: the newest definitions fold the same history to the other answer.
     expect((await foldPrefix(TICKET_4, Infinity, await buildLedgerDeps(db.pool, WS))).periods).toEqual([{ start: S3, end: S3, pass: 1 }]);
   });

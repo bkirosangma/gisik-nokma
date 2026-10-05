@@ -84,5 +84,20 @@ describe('29.360 schema 5 re-pull', () => {
       ticket: { ticketId: A, snapshot: { seq: 1, state: { ...held, periods: [{ start: TIME, end: null, pass: 1 }] }, provenance: null }, events: [] },
     });
     expect((await reopened.getTicket(A))!.confirmed!.periods).toEqual([{ start: TIME, end: null, pass: 1 }]);
+
+    // A file with no `meta` table reads as version NaN, which owes nothing even when the file holds a ticket row
+    // (`createReplica`'s own reading: such a file is fresh); control: the same file stamped 4 owes that row.
+    const D = newUlid();
+    const bare = async (stamp: string | null): Promise<string[]> => {
+      const file = createBetterSqliteStorage();
+      await file.run('CREATE TABLE tickets (ticket_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, state TEXT NOT NULL)', []);
+      await file.run('INSERT INTO tickets (ticket_id, workspace_id, parent_id, state) VALUES (?, ?, NULL, ?)', [D, WS, '{}']);
+      if (stamp !== null) {
+        await file.run('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)', []);
+        await file.run("INSERT INTO meta (key, value) VALUES ('schema_version', ?)", [stamp]);
+      }
+      return (await (await createReplica({ storage: file })).listPendingPulls(WS)).map((t) => t.id);
+    };
+    expect([await bare(null), await bare('4')]).toEqual([[], [D]]);
   });
 });
