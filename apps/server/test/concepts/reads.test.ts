@@ -206,6 +206,18 @@ describe('27.467 one concept', () => {
     expect(await answer('outsider', `/v1/concepts/${C0}`)).toEqual(random); // empty, so only the membership gate stands
     expect(await answer('owner', `/v1/concepts/${CD}`)).toEqual(random); // deleted
     expect(await answer('owner', `/v1/concepts/${CF}`)).toEqual(random); // another workspace
+    // A note is labelled by its title; a ticket with no key (here: its project has no prefix row) by its title alone.
+    const cw = (await get('owner', `/v1/concepts/${CW}`)).json() as { items: Array<{ label: string }> };
+    expect(cw.items.map((i) => i.label)).toEqual(['Workspace']);
+    const TK = newUlid();
+    const CK = newUlid();
+    await applyCommitted(db.pool, [
+      tev(TK, 'ticket.created', { typeId: 'task', projectId: newUlid(), parentId: null, title: 'Count the till' }),
+      cev(CK, 'concept.created', { name: 'Keyless' }),
+      cev(CK, 'concept.item_tagged', { itemKind: 'ticket', itemId: TK }),
+    ]);
+    const ck = (await get('owner', `/v1/concepts/${CK}`)).json() as { items: Array<{ label: string }> };
+    expect(ck.items.map((i) => i.label)).toEqual(['Count the till']);
     // The read itself answers null for an id with no row (the route asks for the workspace first; a purge between the
     // two would land here).
     const ownerEff = await resolveEffectiveRole(db.pool, ids.owner, world.WS);

@@ -191,8 +191,8 @@ describe('27.475 manage_concept', () => {
     await expect(manage.handler({ action: 'merge', conceptId: C, confirm_name: 'Scroll' })).rejects.toThrowError(/^merge needs intoId$/);
     expect(f.batches).toEqual([]);
     // Control: each with its argument posts.
-    await manage.handler({ action: 'describe', conceptId: C, summary: '' });
-    expect(f.batches.map((batch) => batch.map(shape))).toEqual([[{ entity: { kind: 'concept', id: C }, type: 'concept.described', payload: { summary: '' } }]]);
+    await manage.handler({ action: 'describe', conceptId: C, summary: 'Old scrolls' });
+    expect(f.batches.map((batch) => batch.map(shape))).toEqual([[{ entity: { kind: 'concept', id: C }, type: 'concept.described', payload: { summary: 'Old scrolls' } }]]);
   });
 
   it('27.475 a refusal in the merge comes back in the server\'s words, with its index', async () => {
