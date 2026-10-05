@@ -66,6 +66,7 @@ export const TOOL_NAMES_BY_MODULE = {
   flow: [
     // flow begin (wtg-part5 T1 to T5)
     'set_wait_for_all',
+    'get_flow',
     // flow end
   ],
 } satisfies Record<string, string[]>;

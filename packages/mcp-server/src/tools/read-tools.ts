@@ -4,6 +4,7 @@ import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import { bodyAsMarkdown } from './markdown-io.js';
 import { readOrNotFound } from './reads.js';
+import { withFlowFacts } from './ticket-flow-facts.js';
 
 export type ToolDefinition = {
   name: string;
@@ -179,7 +180,9 @@ export function readTools(session: Session): ToolDefinition[] {
         '(`links`: kind, direction "out"/"in" and the other ticket, visible ends only). ' +
         '`notes` lists the notes attached to it that you can read (noteId, title, authorId, updatedAt; newest first, at most 50) and ' +
         '`notesTotal` counts them all; read one in full with get_note. ' +
-        'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found.',
+        'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found. ' +
+        'Also: for a Decision its `passes`; for a ticket in its second round or later, `round` and `periods`; for a ticket closed as Not taken, ' +
+        'its `resolution` (the Decision is named only if you can read it); `leads_to` links carry their `label`.',
       inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1) },
       handler: async (args) => {
         const parsed = z.object({ workspaceId: z.string().min(1), ticketId: z.string().min(1) }).parse(args);
@@ -204,9 +207,13 @@ export function readTools(session: Session): ToolDefinition[] {
         // One representation of links: `ticketState.links` (the ids held on this ticket's stream: its outbound links, plus a
         // draft's inbound `from` entries) is dropped in favour of `links`.
         const { links: _held, ...state } = detail.ticketState ?? {};
+        // The flow facts (Graph Part 5 T2): passes, round, periods and a Not-taken resolution leave `ticketState` for the
+        // top level, and `closed.cause` is dropped, so a Decision the caller cannot read is named nowhere.
+        const flow = detail.ticketState === undefined ? undefined : await withFlowFacts(session, parsed.workspaceId, state);
         return {
           ...detail,
-          ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
+          ...(flow?.facts ?? {}),
+          ...(flow === undefined ? {} : { ticketState: { ...flow.state, ...(detail.ticketState?.fields === undefined ? {} : { fields }) } }),
           // The author's own draft says so at the top level, next to `key: null`; a published ticket has no such member.
           ...(detail.ticketState?.draft === undefined ? {} : { draft: true }),
           description: bodyAsMarkdown(description?.value ?? null),
