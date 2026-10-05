@@ -50,4 +50,7 @@ step "autopilot suite (guards with controls, pull order, needs/stacks/FIX, shado
 step "archive refuses an unknown argument" "out=\$('$HERE/ctl' archive --nope 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
 step "check-base suite (WRONG-BASE vs stale vs tie, main as a candidate, bad input)" "bash '$HERE/test/check-base.test.sh'"
 step "check-base refuses a missing stated base" "out=\$('$HERE/ctl' check-base task/x --repo '$repo' 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q usage"
+step "bundle-fresh suite (SKIP takes no slot, STALE exit 1, every build and the --check in a slot, --fix commits only the bundle, tool failures never STALE, trigger set vs the real package.json)" "bash '$HERE/test/bundle-fresh.test.sh'"
+# A dirty domain/editor tree is the verb working (it refuses before anything runs), so that named refusal is accepted here.
+step "bundle-fresh --dry-run" "out=\$('$HERE/ctl' bundle-fresh --repo '$repo' --dry-run 2>&1); [ \$? -eq 0 ] || printf '%s' \"\$out\" | grep -q 'uncommitted changes under'"
 [ "$fails" -eq 0 ] && ctl_ok selftest "$n steps" || ctl_fail selftest "$fails steps red"

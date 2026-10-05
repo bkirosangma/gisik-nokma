@@ -35,7 +35,7 @@ s=0; for h in "$CTL_SEM_DIR"/slot-*/holder; do [ -f "$h" ] && s=1; done
 echo "slot=$s|$*" >> "$FX_STATE/pnpm.log"
 case " $* " in
   *" run build:webview "*) [ -f "$FX_STATE/webview-empty" ] && exit 0; mkdir -p packages/editor/dist-webview; cat "$FX_STATE/html" > packages/editor/dist-webview/index.html;;
-  *" run build "*) [ -f "$FX_STATE/build-fail" ] && exit 1;;
+  *" run build "*) [ -f "$FX_STATE/build-fail" ] && { echo "src/a.ts(1,7): error TS2322: Type 'number' is not assignable to type 'string'."; exit 1; };;
 esac
 exit 0
 STUB
@@ -78,8 +78,8 @@ check "13.2334 bundle-fresh --fix on a branch already fresh: exit 0, \`OK bundle
   'reset; br fixfresh packages/editor/src/b.ts; h="$(/usr/bin/git -C "$W" rev-parse HEAD)"; o="$(bf --base release/kg --fix)" && [ "$(last "$o")" = "OK bundle-fresh fresh, nothing to commit" ] && [ "$(/usr/bin/git -C "$W" rev-parse HEAD)" = "$h" ]'
 check "13.2335 bundle-fresh never reads an OLD bundle: a build:webview that writes nothing (exit 0) while an old dist-webview/index.html MATCHING the checked-in file sits on disk is a tool failure — exit 2, no STALE line, never OK; CONTROL in the same check: the same old file with a build that rewrites it is OK" \
   'reset; br old packages/editor/src/b.ts; mkdir -p "$W/packages/editor/dist-webview"; echo "<html>A</html>" > "$W/packages/editor/dist-webview/index.html"; : > "$st/webview-empty"; o="$(bf --base release/kg)"; rc=$?; [ "$rc" = 2 ] && ! printf "%s" "$o" | grep -q STALE && [ "$(last "$o")" = "FAIL bundle-fresh the build or --check failed (rc=2) — read the run-tests log above" ] && printf "%s" "$o" | grep -q "build:webview wrote no packages/editor/dist-webview/index.html" && reset && mkdir -p "$W/packages/editor/dist-webview" && echo "<html>A</html>" > "$W/packages/editor/dist-webview/index.html" && bf --base release/kg >/dev/null'
-check "13.2336 bundle-fresh: a failed build is a tool failure, never STALE — exit 2, no STALE line, build:webview never ran" \
-  'reset "<html>E</html>"; br bfail packages/domain/src/a.ts; : > "$st/build-fail"; o="$(bf --base release/kg)"; rc=$?; [ "$rc" = 2 ] && ! printf "%s" "$o" | grep -q "STALE mobile bundle" && ! grep -q "build:webview" "$st/pnpm.log"'
+check "13.2336 bundle-fresh: a failed build (a tsc error, which the run-tests summary digests as its first error) is a tool failure, never STALE — exit 2, no STALE line, build:webview never ran, and the slot's own reason line \`bundle-fresh: build of @gisik-nokma/editor and its workspace deps FAILED\` is repeated from the log" \
+  'reset "<html>E</html>"; br bfail packages/domain/src/a.ts; : > "$st/build-fail"; o="$(bf --base release/kg)"; rc=$?; [ "$rc" = 2 ] && ! printf "%s" "$o" | grep -q "STALE mobile bundle" && ! grep -q "build:webview" "$st/pnpm.log" && printf "%s\n" "$o" | grep -qxF "bundle-fresh: build of @gisik-nokma/editor and its workspace deps FAILED"'
 check "13.2337 bundle-fresh refusals, each before any pnpm call or slot: uncommitted (untracked) file under packages/domain → exit 2 naming it; --base feat/x → 64; an unknown arg → 64; origin/release/nope missing → 2; CONTROL in the same check: the clean tree runs" \
   'reset; br dirty packages/domain/src/a.ts; echo n > "$W/packages/domain/src/new.ts"; { o="$(bf --base release/kg)"; [ $? = 2 ]; } && printf "%s" "$o" | grep -q "uncommitted changes under packages/domain or packages/editor .*packages/domain/src/new.ts" && rm "$W/packages/domain/src/new.ts" && { bf --base feat/x >/dev/null; [ $? = 64 ]; } && { bf --base release/kg --nope >/dev/null; [ $? = 64 ]; } && { bf --base release/nope >/dev/null; [ $? = 2 ]; } && noslot && bf --base release/kg >/dev/null'
 check "13.2339 bundle-fresh: a --check that CRASHES (rc 1, a stack trace, no STALE line — the generated path is a directory) is a tool failure: exit 2, never the STALE line; CONTROL in the same check: the real file restored, the same branch is fresh" \
