@@ -1253,3 +1253,67 @@ describe('23.143 the undated list speaks to the person and offers "Add dates" (a
     expect(TIMELINE_SIDE_LIST_COPY).toBe('Add a start and a due date to place a ticket on the timeline.');
   });
 });
+
+describe('29.108 Nothing in view, and the jumps that glide to the next or previous bar', () => {
+  const bar = (title: string, start: string, due: string): TicketDatesInput =>
+    ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } });
+
+  it('29.108 with bars only far from today the pill reads exactly "Nothing in view" and offers both jumps, the one with no bar beyond it disabled; control: a bar around today shows no pill', () => {
+    // jsdom has no layout: the canvas is 0 px wide, so the view rests on [today, today] (TODAY = 2026-08-23) and the verdict is about that day.
+    renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
+    const pill = screen.getByRole('status');
+    expect(pill).toHaveTextContent('Nothing in view');
+    // Exact, not a substring (P20): the sentence is its own element and reads exactly this.
+    expect(within(pill).getByText('Nothing in view').textContent).toBe('Nothing in view');
+    // The pill hangs off the stage, never inside the scroller (29.109's "never inside the scroller", seen in the DOM).
+    expect(pill.closest('.gn-timeline__canvas')).toBeNull();
+    expect(pill.parentElement).toHaveClass('gn-timeline__stage');
+    expect(screen.getByRole('button', { name: 'Jump to the next bar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Jump to the previous bar' })).toBeDisabled();
+    document.body.innerHTML = '';
+    renderTimeline([bar('Around today', '2026-08-21', '2026-08-26')]);
+    expect(screen.getByRole('button', { name: 'Around today' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('29.108 the verdict is inclusive at both edges of the view: a bar ending on today or starting on today shows no pill, one ending the day before does', () => {
+    // The view rests on [today, today] in jsdom, so these three bars sit exactly on (and just off) both edges of the visible days.
+    renderTimeline([bar('Ends today', '2026-08-20', '2026-08-23')]);
+    expect(screen.queryByRole('status')).toBeNull();
+    document.body.innerHTML = '';
+    renderTimeline([bar('Starts today', '2026-08-23', '2026-08-25')]);
+    expect(screen.queryByRole('status')).toBeNull();
+    document.body.innerHTML = '';
+    // CONTROL, same it: one day earlier the bar no longer touches the view, the pill is up and only "previous" has a bar beyond it.
+    renderTimeline([bar('Ended yesterday', '2026-08-18', '2026-08-22')]);
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
+    expect(screen.getByRole('button', { name: 'Jump to the previous bar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Jump to the next bar' })).toBeDisabled();
+  });
+
+  it('29.108 no timeline control is named Earlier, Later, Previous or Next, with the pill up or down', () => {
+    const names = /^(Earlier|Later|Previous|Next)$/i;
+    renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
+    // Pill UP: its two jumps exist, so a jump renamed "Next" or "Previous" would be found.
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Jump to the (previous|next) bar$/ })).toHaveLength(2);
+    expect(screen.queryAllByRole('button', { name: names })).toHaveLength(0);
+    document.body.innerHTML = '';
+    // Pill DOWN: the toolbar alone (Today and the zoom switch) names none of them either.
+    renderTimeline([bar('Around today', '2026-08-21', '2026-08-26')]);
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: names })).toHaveLength(0);
+  });
+
+  it('29.108 an empty chart has no pill (the empty sentence speaks); control: bars elsewhere do', () => {
+    renderTimeline([]);
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_EMPTY_COPY);
+    document.body.innerHTML = '';
+    // CONTROL, same it: the same mount with one bar far from today DOES raise the pill, so the null above is the empty-chart rule
+    // and not a verdict that never runs in jsdom.
+    renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
+  });
+});

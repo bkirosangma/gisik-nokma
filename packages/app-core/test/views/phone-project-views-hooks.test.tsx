@@ -122,4 +122,22 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
     expect(root?.querySelector('.gn-timeline__weeks')).toBeNull();
     expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe('');
   });
+
+  it('29.110 the panel names its orientation: narrower than 40rem (640 px) is portrait, 640 and wider and an unmeasured panel (jsdom, a hidden tab) are landscape', () => {
+    const orientationAt = (width: number): string | null => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      try {
+        return renderIt().container.querySelector('.gn-timeline')?.getAttribute('data-orientation') ?? null;
+      } finally {
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    expect(orientationAt(390)).toBe('portrait');
+    expect(orientationAt(639)).toBe('portrait');
+    // CONTROLS, same it: the edge, a desktop width and no layout at all are landscape.
+    expect(orientationAt(640)).toBe('landscape');
+    expect(orientationAt(1280)).toBe('landscape');
+    expect(orientationAt(0)).toBe('landscape');
+  });
 });

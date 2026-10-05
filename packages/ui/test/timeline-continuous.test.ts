@@ -4,7 +4,7 @@ import { parseRules, ruleExactly, rulesNaming, valueOf } from './helpers/css-rul
 import { cssOf } from './helpers/style-patterns.js';
 import { CONTRAST_PAIRS, TOKEN_ROLES, colorOf, cssVariableName, themeStylesheet } from '../src/tokens.js';
 
-/** Workflow and Timeline graphs, Part 1, T9 — cases 29.104 (the weekend role) and 29.106 (the stylesheet contract). */
+/** Workflow and Timeline graphs, Part 1 — T9: 29.104 (the weekend role) and 29.106 (the stylesheet contract); T11: 29.109 (portrait and the pill). */
 const STYLES = ['hig', 'minimal', 'neo'] as const;
 const THEMES = ['light', 'dark'] as const;
 
@@ -80,5 +80,60 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
     expect(valueOf(nav, 'min-height')).toBe('2.75rem');
     const calm = ruleExactly(ui, ['.gn-timeline__bar', '.gn-timeline__key--outside'], '@media (prefers-reduced-motion: reduce)');
     expect(valueOf(calm, 'transition')).toBe('none');
+  });
+});
+
+describe('29.109 portrait runs time down a sticky gutter, and the Nothing-in-view pill floats over the stage', () => {
+  const ui = cssOf('ui');
+  const portrait = (selector: string): string => `.gn-timeline[data-orientation='portrait']${selector === '' ? '' : ` ${selector}`}`;
+
+  it('29.109 a lane is a 112 px column group placed by --lane-offset, the day labels ride an 80 px sticky gutter, a bar is 100 px wide inside its 112 px column (ERRATA E9) and as tall as its days, its title wraps in at most 3 lines (TG-7), and a re-pack glides only left, so reduced motion still stops it; control: the landscape bar is unchanged', () => {
+    expect(valueOf(ruleExactly(ui, portrait('')), '--tl-gutter')).toBe('80px');
+    const lane = ruleExactly(ui, portrait('.gn-timeline__lane'));
+    expect(valueOf(lane, 'left')).toBe('calc(var(--tl-gutter) + var(--lane-offset))');
+    expect(valueOf(lane, 'width')).toBe('var(--lane-extent)');
+    const bar = ruleExactly(ui, portrait('.gn-timeline__bar'));
+    expect(valueOf(bar, 'left')).toBe('calc(var(--row) * 112px + 6px)');
+    expect(valueOf(bar, 'width')).toBe('100px');
+    expect(valueOf(bar, 'top')).toBe('calc(var(--tl-axis-height) + var(--d0) * var(--tl-ppd) * 1px)');
+    expect(valueOf(bar, 'height')).toBe('max(6px, calc(var(--dn) * var(--tl-ppd) * 1px - 2px))');
+    // A re-pack moves a portrait bar sideways, and a zoom frame moves its top: only `left` glides. A `transition` SHORTHAND here would
+    // outrank the reduced-motion `transition: none` on `.gn-timeline__bar` (this selector is more specific than that one), so the
+    // portrait arm names the PROPERTY alone and keeps the base rule's duration, which reduced motion zeroes.
+    expect(valueOf(bar, 'transition-property')).toBe('left');
+    expect(valueOf(bar, 'transition')).toBeNull();
+    expect(valueOf(ruleExactly(ui, ['.gn-timeline__bar', '.gn-timeline__key--outside'], '@media (prefers-reduced-motion: reduce)'), 'transition')).toBe('none');
+    // TG-7 (ERRATA E9): the title wraps inside the 100 px bar, ellipsis after the third line.
+    const title = ruleExactly(ui, portrait('.gn-timeline__bar .gn-timeline__title-text'));
+    expect(valueOf(title, '-webkit-line-clamp')).toBe('3');
+    expect(valueOf(title, 'display')).toBe('-webkit-box');
+    const axis = ruleExactly(ui, portrait('.gn-timeline__axis'));
+    expect(valueOf(axis, 'position')).toBe('sticky');
+    expect(valueOf(axis, 'width')).toBe('var(--tl-gutter)');
+    expect(valueOf(ruleExactly(ui, portrait('.gn-timeline__today')), 'border-top')).toBe('2px solid var(--gn-accent)');
+    // The key outside a short bar has no room in a 100 px column; its words are in the bar's title.
+    expect(valueOf(ruleExactly(ui, portrait('.gn-timeline__key--outside')), 'display')).toBe('none');
+    // CONTROL, same it: the landscape bar is still placed by --d0 from the left, and portrait is NOT a media query.
+    expect(valueOf(ruleExactly(ui, '.gn-timeline__bar'), 'left')).toBe('calc(var(--d0) * var(--tl-ppd) * 1px)');
+    const portraitRules = parseRules(ui).filter((r) => r.selectors.some((s) => s.includes("[data-orientation='portrait']")));
+    expect(portraitRules.length).toBeGreaterThanOrEqual(10);
+    expect(portraitRules.filter((r) => r.atRule !== null).map((r) => `${r.atRule} ${r.selectors.join(', ')}`)).toEqual([]);
+  });
+
+  it('29.109 the pill is a rounded status chip over the bottom of the stage, never inside the scroller; the disabled jump is dimmed and not clickable', () => {
+    const pill = ruleExactly(ui, '.gn-timeline__nothing');
+    expect(valueOf(pill, 'position')).toBe('absolute');
+    expect(valueOf(pill, 'bottom')).toBe('1rem');
+    expect(valueOf(pill, 'border-radius')).toBe('999px');
+    expect(valueOf(pill, 'z-index')).toBe('4');
+    expect(valueOf(pill, 'background')).toBe('var(--gn-surface-raised)');
+    expect(valueOf(ruleExactly(ui, '.gn-timeline__stage'), 'position')).toBe('relative');
+    const disabled = ruleExactly(ui, '.gn-timeline__nothing .gn-timeline__nav:disabled');
+    expect(valueOf(disabled, 'cursor')).toBe('default');
+    expect(valueOf(disabled, 'opacity')).toBe('0.45');
+    // GUARD (T9's canvas, not a control of this task's rules): the canvas is itself a positioning parent that scrolls, so a pill inside
+    // it would be carried away; the pill's place OUTSIDE it is pinned in the DOM by 29.108 (`pill.closest('.gn-timeline__canvas')`).
+    expect(valueOf(ruleExactly(ui, '.gn-timeline__canvas'), 'position')).toBe('relative');
+    expect(ruleExactly(ui, '.gn-timeline__stage')).not.toContain('overflow');
   });
 });
