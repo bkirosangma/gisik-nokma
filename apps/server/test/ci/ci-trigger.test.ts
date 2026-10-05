@@ -151,3 +151,34 @@ describe('13.1728 the e2e job builds every workspace package its specs import', 
     expect(unbuilt(without)).toContain('domain');
   });
 });
+
+describe('13.2327 every ci.yml job carries a numeric timeout-minutes', () => {
+  // GitHub's default is 360 min a job: a hang on the release PR would bill up to 6 h per job (planner, 2026-10-05, P47's CI half). Each
+  // value is 3x the job's longest run in the green release PRs, rounded up to 5, at least 10 (the measured table is in the PR body).
+  const untimed = (text: string): string[] => {
+    const doc = parse(text) as { jobs: Record<string, { 'timeout-minutes'?: unknown }> };
+    return Object.entries(doc.jobs)
+      .filter(([, job]) => !(typeof job['timeout-minutes'] === 'number' && job['timeout-minutes'] > 0))
+      .map(([name]) => name);
+  };
+
+  it('no job is left on the 360-minute default', () => {
+    const jobs = Object.keys((parse(ciYml) as { jobs: Record<string, unknown> }).jobs);
+    expect(jobs.length, 'parsed fewer jobs than ci.yml has — the reader has drifted').toBeGreaterThanOrEqual(14);
+    expect(untimed(ciYml)).toEqual([]);
+  });
+
+  // CONTROL, same describe: with one job's line deleted the same reader names that job (an empty or wrong parse cannot pass the leg above).
+  it('CONTROL: with the e2e job\'s timeout-minutes line deleted, the reader reports e2e and only e2e', () => {
+    // Line-based, not a regex over the file: a lazy multi-line pattern that finds no match backtracks exponentially (it hung the kill run
+    // of this very leg for 10 min, stopped by `ctl run-tests --max-min`).
+    const lines = ciYml.split('\n');
+    const start = lines.indexOf('  e2e:');
+    const end = lines.findIndex((l, i) => i > start && /^  [a-z][a-z0-9-]*:\s*$/.test(l));
+    const at = lines.findIndex((l, i) => i > start && (end < 0 || i < end) && /^    timeout-minutes: \d+$/.test(l));
+    expect(start, 'ci.yml has no e2e job').toBeGreaterThan(0);
+    const without = at < 0 ? ciYml : [...lines.slice(0, at), ...lines.slice(at + 1)].join('\n');
+    expect(without).not.toBe(ciYml);
+    expect(untimed(without)).toEqual(['e2e']);
+  });
+});
