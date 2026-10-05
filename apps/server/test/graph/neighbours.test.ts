@@ -613,5 +613,9 @@ describe('27.363 the centre on every ring (planner ruling Q1, 2026-10-05)', () =
       expect(guest.status).toBe(200);
       expect(guest.body.center).toEqual(ownerView);
     }
+    // a centre outside the chosen projects is still the centre, flagged `out` (no `proj` above: false), on ring 1 and an empty ring
+    const outside = { ...q, proj: read.sibling.projectId };
+    expect((await ring('member', { ...outside, hops: '1' })).body.center).toEqual({ ...asItem, hop: 0, out: true });
+    expect((await ring('member', { ...outside, hops: '3' })).body.center).toEqual({ ...asItem, hop: 0, out: true });
   });
 });

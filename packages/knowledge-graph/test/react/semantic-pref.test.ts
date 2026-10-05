@@ -9,6 +9,7 @@ afterEach(() => {
 
 describe('the semantic-layer preference (spec §6.4)', () => {
   it('27.312 unset reads On, "off" reads Off, a write is read back; control: a store that THROWS on every access reads On and a write does not throw', () => {
+    expect(SEMANTIC_KEY).toBe('gn-kg-semantic'); // the stored key is a contract with every saved browser
     window.localStorage.clear();
     expect(readSemantic()).toBe(true);
     window.localStorage.setItem(SEMANTIC_KEY, 'off');

@@ -7,11 +7,12 @@ import { ALL_GROUPS, edge, item, N, storeOf, T } from '../engine/fixture.js';
 
 /*
  * The centre `c`; three chips at hop 1 (the note n1, the tickets a and b); two fog items at hop 2 (f1 past a, f2 past b).
- * Clear edges: blocks c→a, attached n1→c, relates c→b, relates a→b. Fog edges: blocks a→f1, parent b→f2.
+ * Clear edges: blocks c→a, attached n1→c, relates c→b, relates a→b. Fog edges: blocks a→f1, parent b→f2. `z` (hop 3) is held
+ * but past the fog: its edges f1→z and z→f2 touch one drawn end each and are not drawn.
  */
 const store = storeOf(
-  [item('c'), item('n1', { kind: 'note' }), item('a'), item('b'), item('f1'), item('f2')],
-  [edge('blocks', T('c'), T('a')), edge('attached', N('n1'), T('c')), edge('relates', T('c'), T('b')), edge('relates', T('a'), T('b')), edge('blocks', T('a'), T('f1')), edge('parent', T('b'), T('f2'))],
+  [item('c'), item('n1', { kind: 'note' }), item('a'), item('b'), item('f1'), item('f2'), item('z')],
+  [edge('blocks', T('c'), T('a')), edge('attached', N('n1'), T('c')), edge('relates', T('c'), T('b')), edge('relates', T('a'), T('b')), edge('blocks', T('a'), T('f1')), edge('parent', T('b'), T('f2')), edge('relates', T('f1'), T('z')), edge('relates', T('z'), T('f2'))],
 );
 const zonesAt = (center: string) => zones(store, { center, on: ALL_GROUPS, reach: 1, inScope: () => true, semantic: true });
 const model = (center: string, selected: string | null, selectedEdge: string | null = null) =>
@@ -38,6 +39,16 @@ describe('buildDrawModel (`render`, knowledge-graph-sigma.html:915-948)', () => 
     expect(edgeOf(`blocks|${T('a')}|${T('f1')}`).fog).toBe(true);
     expect(edgeOf(`parent|${T('b')}|${T('f2')}`).fog).toBe(true);
     expect(m.counts).toEqual({ blocks: 1, relates: 2, attached: 1 });
+    // the whole edge list: z's two edges (one drawn end each) are not in it
+    expect(m.edges.map((e) => e.id).sort()).toEqual(
+      [`attached|${N('n1')}|${T('c')}`, `blocks|${T('a')}|${T('f1')}`, `blocks|${T('c')}|${T('a')}`, `parent|${T('b')}|${T('f2')}`, `relates|${T('a')}|${T('b')}`, `relates|${T('c')}|${T('b')}`].sort(),
+    );
+    expect(m.nodes.map((n) => n.ref)).not.toContain(T('z'));
+    // the fit's four fog points sit on ring 2 (the desktop R table's [440, 290]) × 0.9, and the top band is the desktop's 40 px
+    expect(m.fit.slice(-4).map((f) => [f.x, f.y])).toEqual([[396, 0], [-396, 0], [0, 261], [0, -261]]);
+    expect(m.topPx).toBe(40);
+    const phone = buildDrawModel(store, zones(store, { center: T('c'), on: ALL_GROUPS, reach: 1, inScope: () => true, semantic: true }), { config: 'phone', centre: T('c'), selected: null, selectedEdge: null, on: ALL_GROUPS });
+    expect(phone.topPx).toBe(52);
     // the selected item's edges are lit; an edge not touching it is not
     expect(edgeOf(`blocks|${T('c')}|${T('a')}`).on).toBe(true);
     expect(edgeOf(`relates|${T('a')}|${T('b')}`).on).toBe(true);

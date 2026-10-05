@@ -130,8 +130,10 @@ test.describe('27.328 the phone (§5)', () => {
       });
       return Math.min(...runs);
     });
-    expect(run).toBeGreaterThanOrEqual(32);
-    expect(run).toBeLessThan(48);
+    // §5's floor is 32 px; the mockup's 10 px tap padding makes the card 39 (measured 2026-10-05: a 7 px pad makes it 33, still over
+    // the floor, so the floor alone cannot tell the two apart and the card's own height is pinned)
+    expect(run).toBeGreaterThanOrEqual(38);
+    expect(run).toBeLessThanOrEqual(40);
   });
 });
 
@@ -161,6 +163,9 @@ test('27.329 the edge tooltip: the sentence inside the canvas, clamped at the ri
   await expect(tip).toHaveText('GN-133 blocks GN-142');
   const t2 = await box(page, '.gn-kg__tip');
   expect(t2.left !== t1.left || t2.top !== t1.top).toBe(true);
+  // where it sits: 14 px right of the pointer, its 28 px box 10 px above it (tooltipPosition, unclamped mid-canvas)
+  expect(Math.abs(t2.left - (m2.x + 14))).toBeLessThanOrEqual(1);
+  expect(Math.abs(t2.top - (m2.y - 38))).toBeLessThanOrEqual(1);
   // leaving: an empty corner of the canvas
   await page.mouse.move(canvas.left + 6, canvas.bottom - 60);
   await expect(tip).toHaveCount(0);

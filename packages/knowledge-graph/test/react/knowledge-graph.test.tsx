@@ -104,6 +104,10 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     await drawn(fake, T('t126'));
     const blocks = 'blocks|ticket:t133|ticket:t142';
     expect(fake.last().edges.map((e) => e.id)).toContain(blocks);
+    // each chip shows its clear-edge count (the oracle's, both workspaces, two hops)
+    expect([...document.querySelectorAll('.gn-kg__chip')].map((b) => b.textContent)).toEqual(
+      ['Parent and subtasks6', 'Blocks1', 'Relates to2', 'Duplicates1', 'Attached notes1', 'Links in text5', 'People7', 'Concepts7'],
+    );
     const edgesBefore = fake.last().edges.map((e) => e.id).sort();
     const requests = fx.log.length;
     const user = userEvent.setup();
@@ -133,6 +137,14 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     expect(await screen.findByText(note)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Workflows' }));
     await waitFor(() => expect(screen.queryByText(note)).toBeNull());
+    // a project goes with its workspace: Workflows chosen again, then Gisik Nokma dropped, asks for Studio with no projects
+    await user.click(screen.getByRole('button', { name: /Projects/ }));
+    await user.click(await screen.findByRole('option', { name: 'Workflows' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(fx.log.at(-1)!.projectIds).toEqual(['j_wf']));
+    await user.click(screen.getByRole('button', { name: 'Remove Gisik Nokma' }));
+    await waitFor(() => expect(fx.log.at(-1)!).toMatchObject({ workspaceIds: ['st'], projectIds: [] }));
+    expect(screen.queryByRole('button', { name: 'Remove Workflows' })).toBeNull();
   });
 
   it('27.318 Review Focus 2: two centre changes in quick succession draw only the second; a late answer for the first is never drawn', async () => {
@@ -175,6 +187,7 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     const { fake, fx } = setup({}, { failHop: 2 });
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("Couldn't load the next hop. Retry");
+    expect(fake.calls.length).toBeGreaterThan(0); // ring 1 was drawn before the failure
     expect(refsOf(fake.last())).toEqual(expect.arrayContaining([T('t118'), T('t133'), T('t160')]));
     expect(count()).toBe('11 items within 2 hops'); // ring 1 still counted: the cache entry kept it
     expect(hopsOf(fx.log)).toEqual([1, 2]);
@@ -183,6 +196,17 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     await drawn(fake, T('t126'));
     expect(hopsOf(fx.log)).toEqual([1, 2, 2, 3]);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('27.319 control: a failure belongs to its centre: centring elsewhere shows no alert, Back to the failed centre shows it again', async () => {
+    const { fake, fx } = setup({}, { failHop: 2 });
+    await screen.findByRole('alert');
+    fx.ctl.failHop = 0;
+    doubleClick(fake, T('t133'));
+    await drawn(fake, T('t128'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Back to GN-142' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load the next hop. Retry");
   });
 });
 
@@ -194,6 +218,13 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     await drawn(fake, T('t126'));
     expect(screen.queryByText('Loading the Knowledge Graph')).toBeNull();
     expect(document.querySelector('.gn-kg__canvas')).not.toBeNull();
+    cleanup();
+    // a later hop still out: ring 1 is drawn, so no skeleton
+    const late = setup({}, { delayFor: (q) => (q.hops === 2 ? 300 : 0) });
+    await drawn(late.fake, T('t118'));
+    expect(hopsOf(late.fx.log)).toEqual([1, 2]);
+    expect(refsOf(late.fake.last())).not.toContain(T('t125')); // GN-125 is hop 2: ring 2 has not answered
+    expect(screen.queryByText('Loading the Knowledge Graph')).toBeNull();
   });
 
   it('27.321 an item with no links says so, and Add link hands the host the centre item; control: a note centre has the sentence and no button', async () => {
@@ -209,6 +240,17 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     setup({ centre: 'note:n9', onAddLink }, { source: lonely(item('n9', { kind: 'note', label: 'Release notes', ws: 'gn', project: 'j_mw' })) });
     expect(await screen.findByText('Nothing is linked to Release notes yet.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
+    cleanup();
+    // a centre whose one neighbour is outside the scope (in the fog) has a link: no sentence
+    const far = item('x1', { label: 'GN-77', ws: 'zz', project: null });
+    const fogOnly: GraphSource = {
+      ring: async (q): Promise<GraphRingResponse> => q.hops === 1
+        ? { hop: 1, center: { ...item('t9', { label: 'GN-9', ws: 'gn', project: 'j_mw' }), hop: 0 }, items: [{ ...far, hop: 1, out: true }], edges: [{ id: `relates|${T('t9')}|${far.ref}`, kind: 'relates', from: T('t9'), to: far.ref, snippet: null, addedBy: null, addedAt: null, origin: null, suggested: false }], frontier: [], truncated: false, cursor: null }
+        : { hop: q.hops, center: { ...item('t9', { label: 'GN-9', ws: 'gn', project: 'j_mw' }), hop: 0 }, items: [], edges: [], frontier: [], truncated: false, cursor: null },
+    };
+    setup({ centre: T('t9'), onAddLink }, { source: fogOnly });
+    await waitFor(() => expect(count()).toBe('0 items within 2 hops, 1 more in the fog (1 outside the scope)'));
+    expect(screen.queryByText('Nothing is linked to GN-9 yet.')).toBeNull();
   });
 
   it('27.322 keys: 3 sets three hops, c centres the selected item, Esc asks the host first; the zoom buttons drive the renderer; the canvas is a named image; control: 3 typed on the Workspaces picker changes nothing', async () => {
@@ -251,6 +293,31 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     expect(fake.cameras).toEqual(['fit']);
   });
 
+  it('27.322 more keys: 4 asks for ring 5 and 5 is ignored; C (shifted) centres too; control: a phone ignores c', async () => {
+    const { fake, fx } = setup();
+    await drawn(fake, T('t126'));
+    const canvas = screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-142' });
+    const user = userEvent.setup();
+    canvas.focus();
+    await user.keyboard('4');
+    await waitFor(() => expect(hopsOf(fx.log)).toEqual([1, 2, 3, 4, 5]));
+    await user.keyboard('5');
+    await settle();
+    expect(hopsOf(fx.log)).toEqual([1, 2, 3, 4, 5]);
+    act(() => fake.pick({ kind: 'node', ref: T('t133'), double: false }));
+    canvas.focus();
+    await user.keyboard('C');
+    await waitFor(() => expect(fx.log.some((q) => q.center === T('t133'))).toBe(true));
+    cleanup();
+    const p = setup({ config: 'phone' });
+    await drawn(p.fake, T('t125'));
+    act(() => p.fake.pick({ kind: 'node', ref: T('t133'), double: false }));
+    screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-142' }).focus();
+    await user.keyboard('c');
+    await settle();
+    expect(p.fx.log.some((q) => q.center === T('t133'))).toBe(false);
+  });
+
   it('27.323 the trail: t142 → t133 → t131 shows Back and three crumbs, and the first crumb goes back two steps; control: a new centre prop resets the trail', async () => {
     const { fake, rerender } = setup();
     await drawn(fake, T('t126'));
@@ -260,6 +327,12 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     await drawn(fake, T('t131'));
     const trail = () => [...document.querySelectorAll('.gn-kg__trail button')].map((b) => b.textContent);
     expect(trail()).toEqual(['‹ Back', 'GN-142', 'GN-133', 'GN-131']);
+    expect(screen.getByRole('button', { name: 'Back to GN-133' })).toBeInTheDocument();
+    // Esc (no host handler) goes back ONE step
+    screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-131' }).focus();
+    await userEvent.setup().keyboard('{Escape}');
+    await waitFor(() => expect(trail()).toEqual(['‹ Back', 'GN-142', 'GN-133']));
+    expect(screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-133' })).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'GN-142' }));
     expect(trail()).toEqual([]);
     expect(screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-142' })).toBeInTheDocument();
@@ -300,6 +373,44 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     window.localStorage.clear();
   });
 
+  it('27.325 jsdom: Off re-requests without Concepts, and a source that ignores the groups still draws no concept; control: On asks for them', async () => {
+    window.localStorage.clear();
+    try {
+      const fx2 = fixtureSource();
+      const ignoring: GraphSource = { ring: (q) => fx2.source.ring({ ...q, groups: CHIP_GROUPS }) };
+      const { fake } = setup({}, { source: ignoring });
+      await drawn(fake, T('t126'));
+      expect(fx2.log.every((q) => q.groups.includes('concepts'))).toBe(true);
+      expect(fake.last().nodes.some((n) => n.ref.startsWith('concept:'))).toBe(true); // or "none below" holds of nothing
+      const before = fake.calls.length;
+      await userEvent.setup().click(screen.getByRole('tab', { name: 'Off' }));
+      await waitFor(() => expect(fake.calls.length > before && refsOf(fake.last()).includes(T('t126'))).toBe(true));
+      await settle();
+      expect(fake.last().nodes.filter((n) => n.ref.startsWith('concept:'))).toEqual([]);
+      expect(fake.last().edges.filter((e) => e.grp === 'concepts')).toEqual([]);
+      cleanup();
+      // the view's own request leaves Concepts out once Off (the stored 'off' opens it Off)
+      const { fx } = setup();
+      await waitFor(() => expect(fx.log.length).toBeGreaterThan(0));
+      await settle();
+      expect(fx.log.at(-1)!.groups).toEqual(CHIP_GROUPS.filter((g) => g !== 'concepts'));
+      await userEvent.setup().click(screen.getByRole('tab', { name: 'On' }));
+      await waitFor(() => expect(fx.log.at(-1)!.groups).toEqual(CHIP_GROUPS));
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+
+  it('27.327 jsdom: a new highlight reaches the renderer with no new request; control: the first draw carries none', async () => {
+    const { fake, fx, rerender } = setup();
+    await drawn(fake, T('t126'));
+    expect(fake.last().states.highlight).toBeNull();
+    const requests = fx.log.length;
+    rerender({ highlight: new Set([T('t160')]) });
+    await waitFor(() => expect([...(fake.last().states.highlight ?? [])]).toEqual([T('t160')]));
+    expect(fx.log.length).toBe(requests);
+  });
+
   it('27.326 the count line, literal: two hops, a project chosen, a capped world, a phone; control: one hop is singular', async () => {
     const a = setup();
     await drawn(a.fake, T('t126'));
@@ -324,12 +435,17 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     };
     const s = setup({ centre: hub.ref }, { source: star });
     await waitFor(() => expect(count()).toBe('The 500 nearest are clear, 600 more in the fog, 101 further out'), { timeout: 10_000 });
-    expect(screen.getByRole('button', { name: '+101 further out' })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: '+101 further out' }));
+    expect(document.querySelector('.gn-kg__status')!.textContent).toBe('101 items are further than the 500 nearest. Turn off a link type, or Center closer to them.');
     expect(s.fake.calls.length).toBeGreaterThan(0);
     cleanup();
     const p = setup({ config: 'phone' });
     await drawn(p.fake, T('t125'));
     expect(count()).toBe('11 linked, 11 more in the fog');
+    cleanup();
+    const all = setup({ hops: 'all' });
+    await drawn(all.fake, T('t126'));
+    await waitFor(() => expect(count()).toBe('31 items, everything connected'));
     cleanup();
     // control
     const one = setup({ hops: 1 });
