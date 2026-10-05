@@ -49,7 +49,7 @@ mkfake() {
   cat > "$1.fake/fake-run-tests" <<'SH'
 #!/usr/bin/env bash
 d="$(dirname "$0")"; echo "$*" >> "$d/calls"; echo $$ > "$d/fake.pid"
-label="$2"; shift 2; [ "$1" = -- ] && shift
+label="$2"; shift 2; mm=(); [ "$1" = --max-min ] && { mm=(--max-min "$2"); shift 2; }; [ "$1" = -- ] && shift   # the verb's explicit cap (13.2328)
 wd=(); all=("$@"); i=0
 while [ "$i" -lt "${#all[@]}" ]; do if [ "${all[$i]}" = -- ]; then wd=("${all[@]:0:$((i + 1))}"); set -- "${all[@]:$((i + 1))}"; break; fi; i=$((i + 1)); done
 job=""
@@ -90,7 +90,7 @@ if [[ "$label" == mutate-*-control ]] && [ -n "${FAKE_LIST_FAIL_FILE:-}" ] && gr
   echo "queue wait: 0s"; echo "log: $d/fake.log"   # `vitest list` writes its full JSON, then exits 1
   exec ${wd[@]+"${wd[@]}"} bash -c 'd="$0" j="$1"; shift; python3 "$d/fake_report.py" "$@" || exit 9; cp "$j" "$d/list-fail.json"; exit 1' "$d" "$lj" "$@"
 fi
-[ -n "${FAKE_REAL_RUN_TESTS:-}" ] && exec "$FAKE_REAL_RUN_TESTS" run-tests --label "$label" -- ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
+[ -n "${FAKE_REAL_RUN_TESTS:-}" ] && exec "$FAKE_REAL_RUN_TESTS" run-tests --label "$label" ${mm[@]+"${mm[@]}"} -- ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
 echo "queue wait: 0s"; echo "log: $d/fake.log"
 exec ${wd[@]+"${wd[@]}"} python3 "$d/fake_report.py" "$@"
 SH
