@@ -31,6 +31,10 @@ describe('29.180 Start and End nodes', () => {
     const hole = analyzeFlow([fnode(A), fnode(B)], [edge(A, B), edge(B, uid(99))]);
     expect(hole.ends).toEqual([B]);
     expect(hole.order).toEqual([A, B]);
+    // a link FROM a hole is dropped too: A stays a Start, and the hidden id is in no list
+    const holeIn = analyzeFlow([fnode(A), fnode(B)], [edge(uid(99), A), edge(A, B)]);
+    expect(holeIn.starts).toEqual([A]);
+    expect(holeIn.order).toEqual([A, B]);
   });
 });
 

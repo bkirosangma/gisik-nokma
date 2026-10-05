@@ -34,6 +34,17 @@ describe('29.183 the effective graph and the live set', () => {
     const notTaken = { kind: 'not-taken' as const, decisionTicketId: A, outcome: 'Yes', pass: 1 };
     const withNotTaken = [decision(A), fnode(X), fnode(Y, { notTaken }), fnode(T), fnode(Z)];
     expect(effectiveEdges(withNotTaken, tailEdges)).toEqual(tailEdges);
+    // only a DECISION's outcome cuts: a task holding a stale outcome cuts nothing, and an edge out of a hole (no node,
+    // so no choice) is kept as it is
+    const stale = [decision(A), fnode(X, { outcome: 'Yes' }), fnode(Y), fnode(T), fnode(Z)];
+    const fromHole = edge(uid(99), X, 'No');
+    expect(effectiveEdges(stale, [fromHole, ...tailEdges])).toEqual([fromHole, ...tailEdges]);
+
+    // a hole neither roots, blocks nor joins the live set: a link from a hidden id into a does not take a's root,
+    // and a link from z to a hidden id does not bring the hidden id in
+    const holeNodes = tailNodes(null);
+    const holeEdges = [edge(uid(99), A), ...tailEdges, edge(Z, uid(98))];
+    expect(keysOfTail(liveSet(holeNodes, holeEdges, analyzeFlow(holeNodes, holeEdges)))).toEqual(['a', 't', 'x', 'y', 'z']);
 
     // a ticket cut off by the choice must not become a root and so live for free (z has no other way in)
     expect(live('Yes')).not.toContain('z');
@@ -81,5 +92,10 @@ describe('29.184 loop bodies and branches', () => {
     expect(branchOf(M['144'], 'Maybe', edges, analysis).size).toBe(0); // CONTROL: no such label, no branch
     // never through the Decision itself: 149 -> 150 -> 151 stops AT 151 (exact set, so a walk through it, which adds 151 and 152, fails)
     expect(keysOf(branchOf(M['151'], 'Need more info', edges, analysis))).toEqual(['149', '150']);
+    // the branch is THIS Decision's edge: GN-148's "No" is 148 -> 146 (146 -> 143 closes a loop), not GN-144's "No" -> 145
+    expect(keysOf(branchOf(M['148'], 'No', edges, analysis))).toEqual(['146']);
+    // a Decision's labelled link to itself leads nowhere new: the walk never passes through the Decision
+    const again = [edge(A, A, 'Again')];
+    expect(branchOf(A, 'Again', again, analyzeFlow([decision(A)], again)).size).toBe(0);
   });
 });
