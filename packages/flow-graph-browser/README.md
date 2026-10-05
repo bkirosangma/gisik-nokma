@@ -2,7 +2,7 @@
 
 Real-browser harness for the time and flow surfaces of the Workflow and Timeline graphs (spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`, Part 1). Private; never published. Same shape as `packages/knowledge-graph-browser`: a Vite page per scene, Playwright driving Chromium against the BUILT `@gisik-nokma/app-core`, `@gisik-nokma/viewport` and `@gisik-nokma/ui`.
 
-Port **3192**. Never 3190 (G-9's harness), 3191 (the Knowledge Graph's) or 3001 (the dev stack).
+Port `FG_PW_PORT`, else **3192**; the gate uses 3292 and `ctl run-tests` a free port (`scripts/ctl/README.md`, "Playwright ports"). Never 3190 (G-9's harness), 3191 (the Knowledge Graph's) or 3001 (the dev stack).
 
 ## Run
 
