@@ -238,7 +238,7 @@ describe('27.511–27.514 the MCP graph tools (KG-D T6)', () => {
     ]);
     // The bounds are the routes' (maxHops 1..6, maxDepth 1..10), refused before any request.
     for (const bad of [{ maxHops: 7 }, { maxHops: 0 }]) await expect(gPath.handler({ from: { kind: 'ticket', id: 't' }, to: { kind: 'note', id: 'n' }, ...bad })).rejects.toThrow();
-    for (const bad of [{ maxDepth: 11 }, { kind: 'relates' }, { direction: 'up' }]) {
+    for (const bad of [{ maxDepth: 11 }, { maxDepth: 0 }, { kind: 'relates' }, { direction: 'up' }]) {
       await expect(gTrace.handler({ from: { kind: 'ticket', id: 't' }, kind: 'blocks', direction: 'out', ...bad })).rejects.toThrow();
     }
     expect(paths).toHaveLength(5);

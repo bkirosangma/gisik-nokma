@@ -250,6 +250,9 @@ describe('27.509 graph/trace kind=blocks: breadth-first, stopping at a hidden it
       expect(await get('owner', traceUrl({ from: t(T1), kind: 'blocks', direction: 'out', ...q })), JSON.stringify(q)).toEqual(INVALID);
     }
     expect(await get('owner', traceUrl({ from: t(T1), kind: 'blocks' }))).toEqual(INVALID);
+    // A bad or missing `from` is 400, like the path's (reviewer A, mutant R1: the trace parser's `from === null` clause dropped).
+    expect(await get('owner', traceUrl({ from: 'widget:1', kind: 'blocks', direction: 'out' }))).toEqual(INVALID);
+    expect(await get('owner', traceUrl({ kind: 'blocks', direction: 'out' }))).toEqual(INVALID);
     expect(await get('owner', `${traceUrl({ from: t(T1), kind: 'blocks', direction: 'out' })}&kind=parent`)).toEqual(INVALID);
     expect(await get('memberIn', traceUrl({ from: t(T3), kind: 'blocks', direction: 'out' }))).toEqual(NOT_FOUND);
     expect((await get(null, traceUrl({ from: t(T1), kind: 'blocks', direction: 'out' }))).status).toBe(401);
