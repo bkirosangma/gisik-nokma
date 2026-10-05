@@ -55,6 +55,19 @@ describe('buildFlowRead (Part 3 T3)', () => {
     expect(single.nodes.find((n) => n.id === 'B')!.alternates).toEqual([]);
   });
 
+  it('29.240 an unlabelled edge out of a Decision is not a branch: it is never named as an alternate, and beside ONE label it makes no pair', () => {
+    const base = diamond();
+    const nodes = [...base.nodes, node('F')];
+    const withF = { ...base, nodes, facts: new Map(nodes.map((n) => [n.id, facts(n.id)])), analysis: { ...base.analysis, ends: ['E', 'F'], order: ['A', 'D', 'B', 'C', 'F', 'E'] } };
+    const read = buildFlowRead({ ...withF, edges: [...base.edges, edge('D', 'F')] });
+    const of = (r: typeof read, id: string) => r.nodes.find((n) => n.id === id)!.alternates;
+    expect(of(read, 'B')).toEqual([{ viaDecisionId: 'D', outcome: 'No', firstTicketId: 'C' }]);
+    expect(of(read, 'F')).toEqual([]);
+    // one label and one unlabelled edge are not two branches
+    const lone = buildFlowRead({ ...withF, edges: [edge('A', 'D'), edge('D', 'B', 'Yes'), edge('D', 'F'), edge('B', 'E')] });
+    expect(of(lone, 'B')).toEqual([]);
+  });
+
   it('29.240 alternates fold over every branch and every Decision: three labels name two others each; a ticket on one branch of two Decisions names both, in flow order', () => {
     // D has three forward labels: Yes -> B, No -> C, Later -> L; B, C and L each name the OTHER two, in edge order
     const t = diamond();

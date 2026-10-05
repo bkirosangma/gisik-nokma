@@ -248,4 +248,26 @@ describe('29.243 the flow read for one viewer', () => {
     expect(small.count()).toBeGreaterThan(0); // precondition: the counter sits on the path the read takes
     expect(big.count()).toBe(small.count());
   });
+
+  it('29.243 a note that is deleted, or homed in a deleted project, is absent from the read and uncounted; control: both are listed while live', async () => {
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+    const goneNote = newUlid();
+    const homedNote = newUlid();
+    const doomed = newUlid();
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'project', id: doomed }, type: 'project.created', payload: { name: 'Doomed errands' } }),
+      makeCommitted({ ...ws, entity: { kind: 'note', id: goneNote }, type: 'note.created', payload: { title: 'Scratch', homeProjectId: read.world.projectId, scope: { mode: 'workspace' }, attachTicketId: id.b } }),
+      makeCommitted({ ...ws, entity: { kind: 'note', id: homedNote }, type: 'note.created', payload: { title: 'Elsewhere', homeProjectId: doomed, scope: { mode: 'workspace' }, attachTicketId: id.b } }),
+    ]);
+    const bOf = async () => (await viewAs(read.world.owner)).nodes.find((n) => n.id === id.b)!;
+    // CONTROL: both are listed while live, newest first, beside the two the seed filed
+    expect((await bOf()).notes.map((n) => n.id)).toEqual([homedNote, goneNote, hiddenNoteId, noteId]);
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'note', id: goneNote }, type: 'note.deleted', payload: {} }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: doomed }, type: 'project.deleted', payload: {} }),
+    ]);
+    const b = await bOf();
+    expect(b.notes.map((n) => n.id)).toEqual([hiddenNoteId, noteId]);
+    expect(b.pin.notes).toBe(2);
+  });
 });
