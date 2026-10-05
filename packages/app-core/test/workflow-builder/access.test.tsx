@@ -96,6 +96,15 @@ function renderBuilder(session: BuilderSession, gateway = createFakeGateway()) {
  * point of the count assertions below is that a control added later is caught
  * by them, and a hand-maintained name list would silently stop covering it.
  */
+/**
+ * G-9 T5 FIX 1 (F4): the floating panel's tabs only switch what the panel shows, so the member sweep lets them through, but only
+ * THEM: a segmented item counts as a tab when it sits inside `.gn-wf-panel__tabs`, so a future authoring segmented control elsewhere
+ * in the builder still fails the sweep.
+ */
+function isPanelTab(button: HTMLElement): boolean {
+  return button.className.includes('gn-segmented__item') && button.closest('.gn-wf-panel__tabs') !== null;
+}
+
 function valueControls(): HTMLElement[] {
   return [
     ...screen.queryAllByRole('textbox'),
@@ -190,7 +199,9 @@ describe('read-only workflow views for non-admins', () => {
       // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
       // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
       // AMENDED 2026-10-05 (G-9 T5): the full-screen controls only change what is shown (see the member sweep below).
-      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close|gn-segmented__item/);
+      // AMENDED 2026-10-05 (G-9 T5 FIX 1): no segmented item here: this sweep never opens the floating panel, the only place one may
+      // stand (see `isPanelTab`), so any segmented control reaching a guest's screen fails.
+      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close/);
     }
     expect(gateway.submitted).toEqual([]);
   });
@@ -397,7 +408,9 @@ describe('no authoring action is reachable by any path the builder screen offers
         // AMENDED 2026-10-05 (G-9 T5, 25.552): Full screen (header, and the corner's on the Fit class), and inside it the toolbar's
         // zoom steps, Issues badge and Exit, the panel's tabs and its × only change what is shown. The sweep presses Full screen,
         // so everything after it runs IN full screen, where the left column and the floating panel both hold the inspectors.
-        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close|gn-segmented__item/);
+        // AMENDED 2026-10-05 (G-9 T5 FIX 1): a segmented item passes only as one of the panel's tabs (`isPanelTab`), not page-wide.
+        if (isPanelTab(button)) continue;
+        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close/);
       }
     }
 
