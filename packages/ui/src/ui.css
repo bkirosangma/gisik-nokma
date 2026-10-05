@@ -9862,7 +9862,16 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
    geometry, every colour a token. The inspector column has a FIXED width, so nothing selected in it moves or resizes the canvas. */
 .gn-kg__body { display: grid; grid-template-columns: minmax(0, 1fr) 18.75rem; gap: 1.125rem; align-items: start; min-width: 0; }
 @media (max-width: 57.5rem) { .gn-kg__body { grid-template-columns: minmax(0, 1fr); } }
+/* Two columns: the keys line and the list sit under the canvas, in its column (spec §3.5), the keys line 10px down as it was,
+   and the inspector spans both rows beside them. Row 1 is the canvas alone and row 2 takes whatever more the inspector needs,
+   so a selection never moves the list. A phone keeps its own stacking at any width. */
+@media (min-width: 57.5625rem) {
+  .gn-kg:not(.gn-kg--phone) .gn-kg__body { grid-template-rows: auto 1fr; row-gap: 0.625rem; }
+  .gn-kg:not(.gn-kg--phone) .gn-kg-insp { grid-row: 1 / span 2; }
+  .gn-kg:not(.gn-kg--phone) .gn-kg__below { grid-column: 1; grid-row: 2; }
+}
 .gn-kg--phone .gn-kg__body { grid-template-columns: minmax(0, 1fr); gap: 0.625rem; }
+.gn-kg__below { display: grid; gap: 0.625rem; }
 .gn-kg-insp { display: grid; gap: 1rem; align-content: start; min-width: 0; font-size: 0.875rem; color: var(--gn-text); }
 .gn-kg-insp--card { gap: 0.625rem; padding: 0.75rem; background: var(--gn-surface-well); border-radius: var(--gn-radius-card); }
 .gn-kg-insp p { margin: 0; }

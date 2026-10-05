@@ -396,11 +396,15 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
             </p>
           )}
         </aside>
+        {/* The keys line and the accessible list (§3.5): under the canvas, in its column, on a desktop, with the inspector
+            spanning both rows beside them, so its height never moves the list; after the inspector when the view is one column. */}
+        <div className="gn-kg__below">
+          {!phone && props.showHops !== false && (
+            <p className="gn-kg__keys">Keys: 1–4 hops, C center on the selected item, Esc back. Scroll or pinch to zoom, drag to pan, double-click an item to center on it.</p>
+          )}
+          {centreItem !== undefined && <GraphList centre={centre} store={rings.store} zones={z} selected={selectedEdge === null ? selected : null} label={label} onPick={pick} />}
+        </div>
       </div>
-      {!phone && props.showHops !== false && (
-        <p className="gn-kg__keys">Keys: 1–4 hops, C center on the selected item, Esc back. Scroll or pinch to zoom, drag to pan, double-click an item to center on it.</p>
-      )}
-      {centreItem !== undefined && <GraphList centre={centre} store={rings.store} zones={z} selected={selectedEdge === null ? selected : null} label={label} onPick={pick} />}
     </div>
   );
 }
