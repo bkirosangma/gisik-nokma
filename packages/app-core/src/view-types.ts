@@ -757,6 +757,12 @@ export type TicketRead = {
    * unchanged.
    */
   epic: ParentRef;
+  /**
+   * Drafts plan, Task 8: `true` exactly when the ticket is an unpublished draft the reader may open (its author).
+   * Mapped from `ticketState.draft` (`mapTicketRead`), never read from a second wire field. Absent for every
+   * other ticket, so a published ticket's read is byte-identical to what it was.
+   */
+  draft?: true;
 };
 
 /** Plan 3's history event: the ledger filtered, both clocks, no summarising. */
@@ -1054,3 +1060,20 @@ export function prefsOriginOf(prefs: ProjectViewPrefs): PrefsOrigin {
     ? 'stored'
     : 'default';
 }
+
+/**
+ * One row of the Drafts page (drafts plan, Task 8). Never carries a key: a draft has none. `projectName` and
+ * `attachmentCount` are `null` when the source cannot say (the offline copy has neither); `pending` is true while a
+ * claim about the draft is still in transit.
+ */
+export type DraftRow = {
+  ticketId: string;
+  projectId: string;
+  projectName: string | null;
+  typeId: string;
+  title: string;
+  parentId: string | null;
+  updatedAt: string;
+  attachmentCount: number | null;
+  pending: boolean;
+};

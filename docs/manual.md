@@ -135,6 +135,8 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 - **Gisik Nokma** — the logo at the far left. It takes you to **Home**: your workspace's numbers and its Knowledge Graph.
 - **Workspaces** — the list of every workspace you are in.
 - **My work** — the tickets assigned to you.
+- **Drafts** — the tickets you saved as drafts in this workspace, with how many there are. Only you can
+  see them (§5).
 - **Members** — the people in this workspace, and what they are.
 - **Settings** — this workspace's own screens: its ticket types, its workflows, its project groups,
   and the workspace itself (§11 and §12).
@@ -149,7 +151,7 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 - **Your avatar** — the round button with your initial on it, opening a menu with **Help**, **Account**
   and **Sign out**.
 
-**My work, Members and Settings appear only once a workspace is open**, and the workspace's name and its
+**My work, Drafts, Members and Settings appear only once a workspace is open**, and the workspace's name and its
 last project appear only once that name has arrived. With no workspace open the bar says so — *"No
 workspace selected. Pick one to reach its board, members and settings."* **Signed out there is no
 avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
@@ -526,6 +528,15 @@ settings are kept for about a month in case they come back.
    - **Assignee** — who the ticket is on, or leave it unassigned.
 4. Press **Create ticket**. On a phone the button stays at the bottom of the window while you scroll the
    form, and under it a short line says what is still missing (for example, that the ticket needs a title).
+   Or press **Save as draft** beside it, to keep the ticket to yourself until it is ready (below).
+
+**Saving a draft.** **Save as draft** keeps the ticket private: only you can see it, it has no number yet, and
+it starts in the backlog. A **Draft saved** message offers **Open**. Your drafts are listed on **Drafts** in the
+top bar (on a phone, under **More** in the bottom bar), where each one can be opened, published or discarded. A draft's own page shows a **Draft** label where
+the number goes and a banner that says *"Only you can see this draft."*, with **Publish** and **Discard**.
+History and comments are not offered yet, and **Move** and **Delete** say *"Available after you publish"*.
+**Publish** makes it an ordinary ticket with a number, last in the backlog. **Discard** first says what will be
+erased with it (its sub-drafts and uploaded files; linked notes are kept), and then erases it.
 
 **On the title:** a blank title, or one that is only spaces, is refused. But extra spaces around real
 words are kept exactly as you typed them, so check what you typed if you are fussy about tidiness.
@@ -2072,7 +2083,9 @@ Three things are worth knowing before you press it:
   read-only choice and no picking one workspace.
 - **It can never do more than you can.** A ticket you cannot see, it cannot see. A move your role does not
   allow is refused for the assistant in the same words it would be refused for you.
-- **Every change it makes is recorded under your name**, like any other change in the ticket's history.
+- **Every change it makes is recorded under your name**, like any other change in the ticket's history — adding
+  someone as a guest included. The exceptions are your own settings: muting a kind of notification, or marking
+  notifications read, changes a preference and leaves no history entry.
 
 ### What your assistant can do
 
@@ -2087,9 +2100,12 @@ do it yourself.
 - **People.** See who is in a workspace. If you are a guest, you are shown only the people on the tickets
   shared with you — never the full list, and never anyone's email address.
 - **Tickets.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
-  me* works — and add, move, comment on and assign them.
+  me* works — and add, move, comment on and assign them. A ticket shows the notes attached to it. You can have
+  several tickets closed at once: the assistant first tells you how many it is about to close and waits for you to
+  say that number, then closes the ones that can be closed and tells you which could not and why.
 - **Notes.** Read, write and change notes — the whole body, one section under a heading, or a few lines at the end —
-  move them, attach them to tickets, and delete or bring them back.
+  move them, attach them to tickets, and delete or bring them back. It can also put an earlier version of a note
+  back: the stored text is copied exactly, nothing is lost, and the version it replaces stays in the note's history.
 - **Comments.** Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete
   anyone's). Mentions like *@Asha* notify only people who can read the ticket or note.
 - **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
@@ -2100,11 +2116,19 @@ do it yourself.
   Backlog) and discard one. Before it discards anything it shows what would be erased, the draft, its sub-drafts
   and the files attached to them, and waits until it is given the draft's exact title.
 - **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
-  read), and invitations waiting for you.
+  read), and invitations waiting for you. It can show which kinds of notification you have muted, mute or unmute
+  kinds for you, and list the saved filters you made in a workspace so it can use one.
 - **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,
   who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing
   happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the
   item's current name.
+
+**Assigning someone by email address asks you first.** Ask the assistant to assign a ticket — or to create one — to
+someone by their email address and it looks the address up, then shows you who it found and what would happen, and
+waits. If the person is not yet in the workspace it says so in capitals: they will be **added as a guest** and will
+see only that ticket. Nothing is created, assigned or added until you confirm; then it does it in one step. If nobody
+has that address it says so, and you can ask for the person from the workspace's member list instead. A draft is the
+exception: it cannot be given to someone outside the workspace, and the assistant tells you so instead.
 
 **Formatting comes through.** The assistant writes in Markdown, so headings, lists, bold text, links, mentions and
 ticket links appear in comments and notes exactly as if you had typed them in the app.

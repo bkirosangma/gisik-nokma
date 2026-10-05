@@ -69,8 +69,12 @@ export {
   reboundSameWorkflowRefusal,
   reboundUnknownStateRefusal,
   reboundUnknownWorkflowRefusal,
+  sameOutcomeRefusal,
+  staleFromRefusal,
+  unknownOutcomeRefusal,
   workflowStateNotCreatableRefusal,
 } from './checks/refusals.js';
+export { branchesOf, checkTicketDecided, decisionOutcomeRequired, outcomeLabels } from './checks/decision.js';
 export { evaluateWorkflowDefined } from './workflow-defined.js';
 export { evaluateTicketTransitioned } from './transition.js';
 // `ContestLookup` needs no line of its own: it is declared in `engine.ts`,

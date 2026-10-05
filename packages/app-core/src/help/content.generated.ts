@@ -716,6 +716,16 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
+                  "text": "Drafts"
+                },
+                {
+                  "kind": "text",
+                  "text": " — the tickets you saved as drafts in this workspace, with how many there are. Only you can see them (§5)."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
                   "text": "Members"
                 },
                 {
@@ -814,7 +824,7 @@ export const HELP_CONTENT: HelpContent = [
             "spans": [
               {
                 "kind": "bold",
-                "text": "My work, Members and Settings appear only once a workspace is open"
+                "text": "My work, Drafts, Members and Settings appear only once a workspace is open"
               },
               {
                 "kind": "text",
@@ -3204,9 +3214,142 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the ticket needs a title)."
+                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the ticket needs a title). Or press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save as draft"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " beside it, to keep the ticket to yourself until it is ready (below)."
                     }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Saving a draft."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save as draft"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " keeps the ticket private: only you can see it, it has no number yet, and it starts in the backlog. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Draft saved"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Your drafts are listed on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Drafts"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the top bar (on a phone, under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the bottom bar), where each one can be opened, published or discarded. A draft's own page shows a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Draft"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " label where the number goes and a banner that says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Only you can see this draft.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Publish"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". History and comments are not offered yet, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " say "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Available after you publish\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Publish"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " makes it an ordinary ticket with a number, last in the backlog. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " first says what will be erased with it (its sub-drafts and uploaded files; linked notes are kept), and then erases it."
+                  }
                 ]
               },
               {
@@ -11257,7 +11400,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", like any other change in the ticket's history."
+                      "text": ", like any other change in the ticket's history — adding someone as a guest included. The exceptions are your own settings: muting a kind of notification, or marking notifications read, changes a preference and leaves no history entry."
                     }
                   ]
                 ]
@@ -11326,7 +11469,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " works — and add, move, comment on and assign them."
+                      "text": " works — and add, move, comment on and assign them. A ticket shows the notes attached to it. You can have several tickets closed at once: the assistant first tells you how many it is about to close and waits for you to say that number, then closes the ones that can be closed and tells you which could not and why."
                     }
                   ],
                   [
@@ -11336,7 +11479,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " Read, write and change notes — the whole body, one section under a heading, or a few lines at the end — move them, attach them to tickets, and delete or bring them back."
+                      "text": " Read, write and change notes — the whole body, one section under a heading, or a few lines at the end — move them, attach them to tickets, and delete or bring them back. It can also put an earlier version of a note back: the stored text is copied exactly, nothing is lost, and the version it replaces stays in the note's history."
                     }
                   ],
                   [
@@ -11426,7 +11569,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " What is on your plate, what needs attention, your notifications (and marking them read), and invitations waiting for you."
+                      "text": " What is on your plate, what needs attention, your notifications (and marking them read), and invitations waiting for you. It can show which kinds of notification you have muted, mute or unmute kinds for you, and list the saved filters you made in a workspace so it can use one."
                     }
                   ],
                   [
@@ -11439,6 +11582,27 @@ export const HELP_CONTENT: HelpContent = [
                       "text": " Inviting and removing people, roles, prefixes, groups, workflows, ticket types, who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the item's current name."
                     }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Assigning someone by email address asks you first."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Ask the assistant to assign a ticket — or to create one — to someone by their email address and it looks the address up, then shows you who it found and what would happen, and waits. If the person is not yet in the workspace it says so in capitals: they will be "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "added as a guest"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and will see only that ticket. Nothing is created, assigned or added until you confirm; then it does it in one step. If nobody has that address it says so, and you can ask for the person from the workspace's member list instead. A draft is the exception: it cannot be given to someone outside the workspace, and the assistant tells you so instead."
+                  }
                 ]
               },
               {

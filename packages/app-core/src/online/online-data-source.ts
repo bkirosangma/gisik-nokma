@@ -23,6 +23,7 @@ import {
   mapListPage,
   listWorkspaceId,
   mapMyWork,
+  mapDraftRows,
   mapNoteComments,
   mapNoteDetail,
   mapLinkedFromPage,
@@ -564,6 +565,8 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       ]);
       return mapMyWork(raw, roster);
     },
+    /** Drafts T8: the viewer's own drafts (T4's route, `apps/server/src/routes/drafts.ts`). Never a key. */
+    getMyDrafts: async (workspaceId) => mapDraftRows(await http.get(`/v1/workspaces/${workspaceId}/drafts`)),
 
     /**
      * TWO reads, and the join is the fourth item kind.
