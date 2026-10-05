@@ -15,6 +15,7 @@ const READERS: Record<string, string> = {
   'purge/table-rules.ts': 'declares the table erase-by-id for the purge registry',
   'read/graph-neighbours.ts': "the KG ring: an edge is shown only when both ends pass createGraphVisibility.resolve (LIVE_TICKET_WHERE and visibleTicketsWhere), so a draft end never shows, the author's included (28.117)",
   'read/ticket-links.ts': 'the links read: visible ends only, own drafts only on a draft sheet (28.117)',
+  'timeline/load.ts': "the Timeline load (wtg4 T1, 29.296): the scope statement's EXISTS reads leads_to links only to admit visible live tickets (LIVE_TICKET_WHERE and visibleTicketsWhere), and the edge read keeps a leads_to or blocks link only when both ends were loaded for this viewer (their own drafts included, nobody else's), so no edge to a hole or to someone else's draft",
 };
 
 export function filesNaming(table: string, root: string = SRC): string[] {

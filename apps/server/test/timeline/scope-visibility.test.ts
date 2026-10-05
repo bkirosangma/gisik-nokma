@@ -1,0 +1,187 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { newUlid, SYSTEM_ACTOR_FLOW } from '@gisik-nokma/domain';
+import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { computeScope } from '../../src/timeline/compute.js';
+import { loadWorkspace } from '../../src/timeline/load.js';
+import { readTimelineChunk } from '../../src/timeline/read-chunk.js';
+import { readTimelineIndex } from '../../src/timeline/read-index.js';
+import { readTimelineTray } from '../../src/timeline/read-tray.js';
+import { MAX_PROJECTS, MAX_WORKSPACES, parseTimelineScope, readableWorkspaces, type TimelineScope } from '../../src/timeline/scope.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
+import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedDraft, seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
+
+/**
+ * 29.296: the scope gate and what the load lets a viewer see, against a REAL database (`helpers/world.ts`). Every absence
+ * asserted here reads the same scope as a viewer who is allowed to see the thing, in the same `it`.
+ */
+
+const NOW = new Date('2026-10-03T06:00:00.000Z');
+let db: TestDatabase;
+let w: TimelineWorld;
+beforeAll(async () => {
+  db = await createTestDatabase();
+  w = await seedTimelineWorld(db.pool);
+}, 120_000);
+afterAll(async () => {
+  await db.drop();
+});
+
+const scopeOf = (ws: string[], mine = false): TimelineScope => ({ workspaceIds: [...ws].sort(), projectIds: [], mine });
+async function core(viewer: string, ws: string[], mine = false) {
+  const scope = scopeOf(ws, mine);
+  return computeScope(db.pool, await readableWorkspaces(db.pool, viewer, scope), viewer, scope, NOW);
+}
+const ids = (c: Awaited<ReturnType<typeof core>>) => new Set(c.entries.map((e) => e.id));
+const text = (v: unknown): string => JSON.stringify(v, (_k, x) => (x instanceof Map ? [...x] : x));
+const ulids = (n: number): string[] => Array.from({ length: n }, () => newUlid());
+
+describe('29.296 scope gate and visibility', () => {
+  it('29.296 an unreadable workspace is dropped; none readable is []; control: its own member reads it', async () => {
+    const scope = scopeOf([w.A.workspaceId, w.B.workspaceId, w.C.workspaceId]);
+    const r = await readableWorkspaces(db.pool, w.ama, scope);
+    expect(r.map((x) => x.workspaceId).sort()).toEqual([w.A.workspaceId, w.B.workspaceId].sort());
+    expect(await readableWorkspaces(db.pool, w.ama, scopeOf([w.C.workspaceId]))).toEqual([]);
+    expect(await readableWorkspaces(db.pool, w.cy, scopeOf([w.C.workspaceId]))).toHaveLength(1);
+    expect(parseTimelineScope({ ws: '' })).toBeNull();
+    expect(parseTimelineScope({})).toBeNull(); // no ws at all
+    expect(parseTimelineScope({ ws: `${w.A.workspaceId}`, mine: 'maybe' })).toBeNull();
+    expect(parseTimelineScope({ ws: `${w.A.workspaceId}`, mine: '1' })).toEqual({ workspaceIds: [w.A.workspaceId], projectIds: [], mine: true }); // control: the same scope with a valid mine parses
+    expect(parseTimelineScope({ ws: `${w.A.workspaceId}`, mine: '0' })).toEqual({ workspaceIds: [w.A.workspaceId], projectIds: [], mine: false });
+    expect(parseTimelineScope({ ws: `${w.A.workspaceId}` })).toEqual({ workspaceIds: [w.A.workspaceId], projectIds: [], mine: false }); // an omitted mine is Everyone (planner ruling 2026-10-04)
+  });
+
+  it('29.296 the lists are canonical and bounded: deduplicated, sorted, at most 20 workspaces and 200 projects; a malformed id or a repeated param is a 400', () => {
+    expect(MAX_WORKSPACES).toBe(20);
+    expect(MAX_PROJECTS).toBe(200);
+    const [a, b] = [w.A.workspaceId, w.B.workspaceId].sort() as [string, string];
+    expect(parseTimelineScope({ ws: `${b},${a},${b}`, proj: `${w.A.p2},${w.A.p1},${w.A.p2}` })).toEqual({
+      workspaceIds: [a, b],
+      projectIds: [w.A.p1, w.A.p2].sort(),
+      mine: false,
+    });
+    const ws20 = ulids(20);
+    expect(parseTimelineScope({ ws: ws20.join(',') })?.workspaceIds).toHaveLength(20); // control: at the bound
+    expect(parseTimelineScope({ ws: [...ws20, newUlid()].join(',') })).toBeNull();
+    expect(parseTimelineScope({ ws: [...ws20, ws20[0]].join(',') })?.workspaceIds).toHaveLength(20); // a duplicate is not a 21st
+    const p200 = ulids(200);
+    expect(parseTimelineScope({ ws: a, proj: p200.join(',') })?.projectIds).toHaveLength(200); // control: at the bound
+    expect(parseTimelineScope({ ws: a, proj: [...p200, newUlid()].join(',') })).toBeNull();
+    expect(parseTimelineScope({ ws: `${a},not-a-ulid` })).toBeNull();
+    expect(parseTimelineScope({ ws: a, proj: 'nope' })).toBeNull();
+    expect(parseTimelineScope({ ws: [a, b] })).toBeNull(); // `?ws=a&ws=b` arrives as an array
+    expect(parseTimelineScope({ ws: a, proj: '' })).toEqual({ workspaceIds: [a], projectIds: [], mine: false }); // an empty proj is every project
+  });
+
+  it('29.296 Me = assigned OR collaborating; Everyone adds the rest', async () => {
+    const me = ids(await core(w.ama, [w.A.workspaceId], true));
+    expect(me.has(w.t.mine)).toBe(true);
+    expect(me.has(w.t.collab)).toBe(true); // collaborator only: the Review Focus line
+    expect(me.has(w.t.other)).toBe(false); // assigned to bo, ama not on it
+    const everyone = ids(await core(w.ama, [w.A.workspaceId], false));
+    expect(everyone.has(w.t.other)).toBe(true); // control
+  });
+
+  it('29.296 a hidden ticket is a hole: bo sees two flows-of-one, ama sees one flow of three', async () => {
+    const bo = await core(w.bo, [w.A.workspaceId]);
+    expect(text(bo)).not.toContain(w.t.hidden);
+    expect(bo.entries.find((e) => e.id === w.t.step1)?.flowId).toBeNull();
+    expect(bo.entries.find((e) => e.id === w.t.step2)?.flowId ?? null).toBeNull();
+    const ama = await core(w.ama, [w.A.workspaceId]);
+    const f = ama.flows.find((x) => x.nodes.some((n) => n.id === w.t.hidden));
+    expect(f?.nodes.map((n) => n.id).sort()).toEqual([w.t.step1, w.t.hidden, w.t.step2].sort()); // control: the owner sees it whole
+    // the load itself keeps no edge to the hole: the assembler would drop one anyway, so only this leg sees a leak in load.ts
+    const loadAs = async (who: string) =>
+      loadWorkspace(db.pool, await resolveEffectiveRole(db.pool, who, w.A.workspaceId), who, w.A.workspaceId, scopeOf([w.A.workspaceId]));
+    expect(text((await loadAs(w.bo)).edges)).not.toContain(w.t.hidden);
+    expect((await loadAs(w.ama)).edges.some((e) => e.to === w.t.hidden)).toBe(true); // control: the owner's load has it
+  });
+
+  it('29.296 the diamond chains: Yes and No both start the day after the decision ends', async () => {
+    const a = await core(w.ama, [w.A.workspaceId]);
+    const seg = (id: string) => a.entries.find((e) => e.id === id)?.segments[0];
+    expect(seg(w.t.fStart)).toMatchObject({ start: '2026-10-05', end: '2026-10-07' });
+    expect(seg(w.t.fDec)).toMatchObject({ start: '2026-10-08', end: '2026-10-08' });
+    expect(seg(w.t.fYes)?.start).toBe('2026-10-09');
+    expect(seg(w.t.fNo)?.start).toBe('2026-10-09');
+  });
+
+  it("29.296 a draft is its author's alone: ama's core carries her draft with no key, bo's never names it; her deleted draft is gone", async () => {
+    // (planner ruling 2026-10-04): mandatory (spec CR-2 :663 "private to its author, with no key").
+    const draftId = await seedDraft(db.pool, { id: w.t.draft, authorId: w.ama, workspaceId: w.A.workspaceId, projectId: w.A.p1, title: 'Draft step', explicitStart: '2026-10-06', estimate: 1 });
+    const goneId = await seedDraft(db.pool, { authorId: w.ama, workspaceId: w.A.workspaceId, projectId: w.A.p1, title: 'Deleted draft', explicitStart: '2026-10-06', estimate: 1 });
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: w.A.workspaceId, actorId: w.ama, entity: { kind: 'ticket', id: goneId }, type: 'ticket.deleted', payload: {} })]);
+    const ama = await core(w.ama, [w.A.workspaceId], false);
+    expect(ama.entries.find((e) => e.id === draftId)).toMatchObject({ draft: true, key: null });
+    expect(ama.entries.find((e) => e.id === w.t.dated)?.key).not.toBeNull(); // control: a published ticket keeps its key
+    expect(text(ama)).not.toContain(goneId); // `listMyDrafts` still lists it; the row fetch drops it (control: draftId, same shape, is there)
+    const bo = await core(w.bo, [w.A.workspaceId], false);
+    expect(text(bo)).not.toContain(draftId);
+    expect(bo.entries.some((e) => e.id === w.t.dated)).toBe(true); // control: bo's core is loaded, so the absence is the draft's privacy
+  });
+});
+
+describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
+  // D is a Decision only ama sees. T (undated) is reached by D's labelled outcome; N was closed by the flow as D's branch not taken.
+  // bo sees T and N, never D: no response he gets may carry D's id, though N's resolution and T's reachedBy point at it.
+  const D = newUlid();
+  const T = newUlid();
+  const N = newUlid();
+  const WINDOW = { from: '2026-08-01', to: '2026-12-31' };
+  const reads = async (viewer: string, mine = false) => {
+    const scope = scopeOf([w.A.workspaceId], mine);
+    const readable = await readableWorkspaces(db.pool, viewer, scope);
+    return {
+      index: await readTimelineIndex(db.pool, readable, viewer, scope, NOW),
+      chunk: await readTimelineChunk(db.pool, readable, viewer, scope, NOW, WINDOW),
+      tray: await readTimelineTray(db.pool, readable, viewer, scope, NOW),
+    };
+  };
+
+  beforeAll(async () => {
+    const A = w.A.workspaceId;
+    const ev = (id: string, type: string, payload: Record<string, unknown>, actorId = w.ama) =>
+      makeCommitted({ workspaceId: A, actorId, entity: { kind: 'ticket', id }, type, payload });
+    await applyCommitted(db.pool, [
+      ev(D, 'ticket.created', { typeId: 'decision', projectId: w.A.p2, parentId: null, title: 'Secret call', startDate: { date: '2026-10-14' }, estimate: 1, assigneeId: w.ama }),
+      ev(D, 'visibility.set', { ticketId: D, mode: 'explicit', userIds: [w.ama] }),
+      ev(T, 'ticket.created', { typeId: 'task', projectId: w.A.p2, parentId: null, title: 'Go ahead' }),
+      ev(N, 'ticket.created', { typeId: 'task', projectId: w.A.p2, parentId: null, title: 'Stopped', assigneeId: w.bo }),
+      ev(D, 'ticket.link_added', { kind: 'leads_to', targetId: T, label: 'Go' }),
+      ev(D, 'ticket.link_added', { kind: 'leads_to', targetId: N, label: 'Stop' }),
+      // the settle's "Not taken": the state moves to Done and the close flag carries the cause (`ticketClosedPayload`, wtg2 T8)
+      ev(N, 'ticket.transitioned', { to: 'done' }, SYSTEM_ACTOR_FLOW),
+      ev(
+        N,
+        'ticket.closed',
+        { cause: { kind: 'branch-not-taken', decisionTicketId: D, outcome: 'Stop', pass: 1, decidedBy: w.ama, decisionEventId: newUlid() } },
+        SYSTEM_ACTOR_FLOW,
+      ),
+    ]);
+  });
+
+  it('29.296 a blind viewer: no index, chunk or tray body carries the Decision id; the resolution keeps its outcome; control: the seeing viewer gets it', async () => {
+    const bo = await reads(w.bo);
+    // the subjects are there, so an absent id is the blanking, not a missing row
+    expect(bo.index.items.find((e) => e.id === N)?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, outcome: 'Stop', pass: 1 });
+    expect(bo.chunk.items.some((d) => d.id === N)).toBe(true);
+    expect(bo.tray.items.find((r) => r.id === T)).toMatchObject({ reachedBy: null });
+    expect(JSON.stringify(bo.index)).not.toContain(D);
+    expect(JSON.stringify(bo.chunk)).not.toContain(D);
+    expect(JSON.stringify(bo.tray)).not.toContain(D);
+    // Me: N is bo's, the scope narrows, and the answer is still blind
+    const boMe = await reads(w.bo, true);
+    expect(boMe.index.items.find((e) => e.id === N)?.resolution).toMatchObject({ decisionTicketId: null, outcome: 'Stop' });
+    expect(JSON.stringify(boMe)).not.toContain(D);
+
+    const ama = await reads(w.ama);
+    expect(ama.index.items.find((e) => e.id === N)?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: D, outcome: 'Stop', pass: 1 });
+    const flow = ama.index.flows.find((f) => f.nodes.some((n) => n.id === N));
+    expect(flow?.nodes.find((n) => n.id === N)?.notTaken).toMatchObject({ decisionTicketId: D });
+    expect(ama.chunk.items.some((d) => d.id === D)).toBe(true);
+    expect(ama.tray.items.find((r) => r.id === T)?.reachedBy).toMatchObject({ decisionTicketId: D, outcome: 'Go' });
+    // ama under Me: D is hers, N is bo's and out of her scope, yet N rides D's flow with the id she may see
+    const amaMe = await reads(w.ama, true);
+    expect(amaMe.index.flows.find((f) => f.nodes.some((n) => n.id === N))?.nodes.find((n) => n.id === N)?.notTaken).toMatchObject({ decisionTicketId: D });
+  });
+});

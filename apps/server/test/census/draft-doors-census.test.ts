@@ -49,6 +49,7 @@ const DOORS: Record<string, Partial<Calls>> = {
   'sync/contests-route.ts': { canOpen: 1 }, // G6
   'sync/reconcile-route.ts': { canOpen: 1 }, // G5
   'sync/sync-routes.ts': { canOpen: 1, listMyDrafts: 1, noteEventVisibleTo: 1 }, // G3, G4, the bootstrap notes tail
+  'timeline/load.ts': { listMyDrafts: 1 }, // the Timeline load admits the viewer's own drafts (wtg4 T1, 29.296)
   'visibility/can-open.ts': { ticketAccess: 1, isOpenableDraft: 2, holdsDraftRights: 1, isClosedOrErasedDraft: 1 }, // canOpen is ticketAccess; ticketAccess is canSee then isOpenableDraft; R18; isClosedOrErasedDraft asks isOpenableDraft; noteEventVisibleTo asks isClosedOrErasedDraft
   'visibility/visible-events-for.ts': { canOpen: 1, ticketAccess: 1, noteEventVisibleTo: 1 }, // G2, C4's own-draft test, the note arm
   'visibility/withhold-link-targets.ts': { canOpen: 1 }, // targetSight: every door's link-end predicate; the author's own draft end is served (drafts T6, 28.117-28.119)
