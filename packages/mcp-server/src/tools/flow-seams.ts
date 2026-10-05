@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { stateCategorySchema } from '@gisik-nokma/domain';
 
 /**
  * THE SEAM FILE. Every route, wire shape and field name that Graph Parts 2 to 4 and the Drafts plan own is spelled
@@ -29,7 +30,8 @@ const passRecord = z.object({
 export const flowNodeSchema = z.object({
   id: z.string(), key: z.string().nullable(), draft: z.boolean(), title: z.string(), parentId: z.string().nullable(),
   kind: z.enum(['ticket', 'decision']),
-  state: z.object({ id: z.string(), name: z.string(), category: z.enum(['open', 'active', 'terminal']) }),
+  // the domain's category enum, imported and not restated: this seam relays a category and never reads what one means (29.150)
+  state: z.object({ id: z.string(), name: z.string(), category: stateCategorySchema }),
   assigneeId: z.string().nullable(), waitForAll: z.boolean(),
   estimate: z.number().int().nullable(), reworkEstimate: z.number().int().nullable(), round: z.number().int().min(1),
   outcome: z.string().nullable(), passes: z.array(passRecord),

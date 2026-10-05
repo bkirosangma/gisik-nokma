@@ -72,6 +72,7 @@ describe('29.379 get_flow', () => {
     // every bound the schema holds is a mismatch too, named by its path (each one just outside; the wire above is just inside)
     const outside: Array<[string, (w: ReturnType<typeof wire>) => void]> = [
       ['nodes.0.round', (w) => { w.nodes[0]!.round = 0; }],
+      ['nodes.1.state.category', (w) => { (w.nodes[1]!.state as { category: string }).category = 'finished'; }],
       ['nodes.1.passes.1.pass', (w) => { w.nodes[1]!.passes[1]!.pass = 0; }],
       ['nodes.0.estimate', (w) => { w.nodes[0]!.estimate = 2.5; }],
       ['edges.0.taken', (w) => { w.edges[0]!.taken = -1; }],
