@@ -83,8 +83,8 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
           routePosts += 1;
           return base.post(path, body);
         },
-        // add_attachment writes through postMultipart (attachment-tools.ts:39), not post: without this arm,
-        // misfiling it as read-only would pass both read-only legs.
+        // add_attachment uploads through postMultipart (attachment-tools.ts:39), not post, then posts attachment.added,
+        // so the `posted` leg catches it misfiled today; this arm catches a tool that would only upload.
         postMultipart: async (path, fields, file) => {
           routePosts += 1;
           return base.postMultipart(path, fields, file);
