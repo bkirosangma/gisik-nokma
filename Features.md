@@ -3892,7 +3892,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part2-model T11 bullet -->
 - ⚙️ **The flow planner** (wtg2 T11; `packages/domain/src/flow/plan.ts`) — plans every ticket in a flow as inclusive IST-day intervals: explicit dates win, otherwise the ticket starts the day after its predecessors end (earliest, or latest with Wait for all) and lasts its estimate; loops get a planned interval per pass, an un-chosen branch is a pruned ghost, and a reason is given for every ticket left unscheduled. Cases 29.190-29.199.
 <!-- wtg-part2-model T12 bullet -->
-- ⚙️ **Flow read** (wtg2 T12; `apps/server/src/flow/read-flow.ts`, `apps/server/src/routes/flow.ts`) — the connected component of a ticket over "leads to" links for one viewer, walked ring by ring: a ticket the viewer cannot read is a hole (no placeholder, no count, not walked through), the viewer's own drafts are included, at most 300 tickets and 30 rings with `truncated` and `reached`; `GET /v1/workspaces/:workspaceId/tickets/:ticketId/flow` serves it. Cases 29.187-29.189.
+- ⚙️ **Flow walk** (wtg2 T12; `apps/server/src/flow/read-flow.ts`) — the connected component of a ticket over "leads to" links for one viewer, walked ring by ring: a ticket the viewer cannot read is a hole (no placeholder, no count, not walked through), the viewer's own drafts are included, at most 300 tickets and 30 rings with `truncated` and `reached`; `GET /v1/workspaces/:workspaceId/tickets/:ticketId/flow` serves it inside Part 3's `FlowRead` (the Workflow graph's flow read, below). Cases 29.187-29.189.
 <!-- wtg-part2-model T13 bullet -->
 <!-- wtg-part2-model T14 bullet -->
 <!-- wtg-part2-model T15 bullet -->

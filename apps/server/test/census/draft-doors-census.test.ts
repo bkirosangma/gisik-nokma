@@ -40,6 +40,7 @@ const DOORS: Record<string, Partial<Calls>> = {
   'read/ticket-links.ts': { listMyDrafts: 1 }, // the author's own drafts as ends, on a draft's own sheet only (drafts T6, 28.117)
   'routes/attachments.ts': { canOpen: 2 }, // G10: upload, download
   'routes/drafts.ts': { listMyDrafts: 2 }, // G8, both reads
+  'routes/flow.ts': { ticketAccess: 1 }, // the flow route's seed: a visible ticket or the author's own draft, then its liveness in the PATH's workspace (wtg3 T3, 29.244; planner ruling 2026-10-04 T3-Q1)
   'routes/drafts-publish.ts': { ticketAccess: 1 }, // the set publish (drafts T5b): the first id the caller cannot open refuses the set before ingest (28.098)
   'routes/notes.ts': { isClosedOrErasedDraft: 1, noteEventVisibleTo: 1 }, // the ticket's notes list, the note events route
   'routes/people.ts': { isOpenableDraft: 1 }, // R8 (drafts T5): the outsider door refuses an assignment on the caller's own draft
