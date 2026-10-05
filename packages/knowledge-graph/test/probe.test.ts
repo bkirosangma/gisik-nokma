@@ -27,7 +27,7 @@ describe('the probe is a test hook only', () => {
 });
 
 describe('the camera spring on a stub Sigma', () => {
-  it('27.284 the first spring frame steps 16 ms (1 − e^(−16/85) ≈ 0.1717 of the way), not a snap; control: a second 16 ms frame moves again by the same fraction of what is left', async () => {
+  it('27.284 the first spring frame steps 16 ms (1 − e^(−16/85) ≈ 0.1717 of the way), not a snap; control: a second frame 40 ms later steps the measured 40 ms (1 − e^(−40/85) ≈ 0.3753 of what is left), not the 16 ms default', async () => {
     // this file mocks the driver for the adapter above; the REAL one is under test here
     const { createCameraDriver } = await vi.importActual<typeof import('../src/render/sigma/camera-driver.js')>('../src/render/sigma/camera-driver.js');
     const frames: FrameRequestCallback[] = [];
@@ -56,10 +56,11 @@ describe('the camera spring on a stub Sigma', () => {
       expect(set[0]).toEqual(springStep(start, target, 16, false).state);
       expect((set[0]!.x - start.x) / (target.x - start.x)).toBeCloseTo(1 - Math.exp(-16 / 85), 3);
       expect((set[0]!.x - start.x) / (target.x - start.x)).toBeCloseTo(0.1717, 3);
-      frames.shift()!(1016); // control: a real 16 ms frame
+      frames.shift()!(1040); // control: a real frame 40 ms later steps the measured dt, not the 16 ms default (a dt of 16 here could not tell them apart)
       expect(set).toHaveLength(2);
-      expect(set[1]).toEqual(springStep(set[0]!, target, 16, false).state);
-      expect((set[1]!.x - set[0]!.x) / (target.x - set[0]!.x)).toBeCloseTo(0.1717, 3);
+      expect(set[1]).toEqual(springStep(set[0]!, target, 40, false).state);
+      expect((set[1]!.x - set[0]!.x) / (target.x - set[0]!.x)).toBeCloseTo(1 - Math.exp(-40 / 85), 3);
+      expect((set[1]!.x - set[0]!.x) / (target.x - set[0]!.x)).toBeCloseTo(0.3753, 3);
       driver.destroy();
     } finally {
       vi.unstubAllGlobals();

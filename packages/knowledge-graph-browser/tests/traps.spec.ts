@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { RING_CONFIGS, radius } from '@gisik-nokma/knowledge-graph';
 import { openAdapter, pagePoint, stageAt, still, takePageErrors } from './helpers.js';
 
 /*
@@ -220,7 +221,7 @@ test('27.271 a click exactly on a dot picks it; control: a click in empty space 
   expect(await page.evaluate(() => window.__kg.picks)).toEqual([{ kind: 'node', ref: 'ticket:t160', double: false }, { kind: 'stage' }]);
 });
 
-test('27.276 trap 8: after load every clear item is inside the stage and the fit is real, with the two hop rings, their labels and the fog band drawn, and the rings follow a 2× zoom in the same frame; control: the same check after a 2× zoom finds items outside', async ({ page }) => {
+test('27.276 trap 8: after load every clear item is inside the stage and the fit is real, with the two hop rings, their labels and the fog band drawn outside the 2-hop ring, and the rings follow the camera after a 2× zoom; control: the same check after a 2× zoom finds items outside', async ({ page }) => {
   await openAdapter(page);
   // the ring layer (`rings.ts`), read from the DOM: the fixture has 2 clear hops and fog
   const rings = () =>
@@ -231,6 +232,7 @@ test('27.276 trap 8: after load every clear item is inside the stage and the fit
         rings: [...svg.querySelectorAll('ellipse.gn-kg__ring')].map((e) => ({ cx: num(e, 'cx'), cy: num(e, 'cy'), rx: num(e, 'rx'), ry: num(e, 'ry') })),
         labels: [...svg.querySelectorAll('text.gn-kg__ring-label')].map((t) => ({ text: t.textContent, x: num(t, 'x'), y: num(t, 'y') })),
         fogBands: svg.querySelectorAll('ellipse.gn-kg__fog-band').length,
+        bands: [...svg.querySelectorAll('ellipse.gn-kg__fog-band')].map((e) => ({ cx: num(e, 'cx'), cy: num(e, 'cy'), rx: num(e, 'rx'), ry: num(e, 'ry') })),
         fogNodes: window.__kg.scene().nodes.filter((n) => n.fog).length,
       };
     });
@@ -246,6 +248,16 @@ test('27.276 trap 8: after load every clear item is inside the stage and the fit
     expect(Math.abs(l.x - (r.cx + r.rx * Math.cos(-0.2)))).toBeLessThan(0.1);
     expect(Math.abs(l.y - (r.cy + r.ry * Math.sin(-0.2) - 8))).toBeLessThan(0.1);
   });
+  // the fog band is centred on the rings and drawn 1.08× the NEXT hop out (hop 3), not on the 2-hop ring: in viewport px it is
+  // 1.08 × 545/440 ≈ 1.3377 and 1.08 × 355/290 ≈ 1.3221 of the outer ring (desktop `RING_CONFIGS.R`, `engine/layout.ts:8`)
+  const [band] = ring0.bands, outer = ring0.rings[0]!;
+  expect(Math.abs(band!.cx - outer.cx)).toBeLessThan(0.1);
+  expect(Math.abs(band!.cy - outer.cy)).toBeLessThan(0.1);
+  const [h3x, h3y] = radius(RING_CONFIGS.desktop.R, 3), [h2x, h2y] = radius(RING_CONFIGS.desktop.R, 2);
+  expect(band!.rx / outer.rx).toBeCloseTo((1.08 * h3x) / h2x, 3);
+  expect(band!.rx / outer.rx).toBeCloseTo(1.3377, 3);
+  expect(band!.ry / outer.ry).toBeCloseTo((1.08 * h3y) / h2y, 3);
+  expect(band!.ry / outer.ry).toBeCloseTo(1.3221, 3);
   const check = () =>
     page.evaluate(() => {
       const k = window.__kg, p = k.probe!;
@@ -263,9 +275,10 @@ test('27.276 trap 8: after load every clear item is inside the stage and the fit
   await page.evaluate(() => window.__kg.renderer.zoomBy(2));
   await still(page);
   expect((await check()).out.length).toBeGreaterThan(0); // control: the check does see an item outside
-  // the rings are redrawn from the camera in the same frame: a 2× zoom doubles the outer ring and moves its label with it
+  // the rings are redrawn from the camera: after a 2× zoom the outer ring and the fog band have doubled, and the label moved with the ring
   const ring1 = await rings();
   expect(Math.abs(ring1.rings[0]!.rx / ring0.rings[0]!.rx - 2)).toBeLessThan(0.04);
+  expect(Math.abs(ring1.bands[0]!.rx / ring0.bands[0]!.rx - 2)).toBeLessThan(0.04);
   expect(Math.abs(ring1.labels[0]!.x - (ring1.rings[0]!.cx + ring1.rings[0]!.rx * Math.cos(-0.2)))).toBeLessThan(0.1);
 });
 
