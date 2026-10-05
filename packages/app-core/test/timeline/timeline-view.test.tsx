@@ -750,6 +750,32 @@ describe('29.440 the Timeline mark knows Not taken (wtg2 T17, AMEND-wtg2-t17-tim
     expect(button('Waiting')).not.toHaveAttribute('data-state');
     expect(button('Waiting')).toHaveAttribute('title', said);
   });
+
+  it('29.440 the input\'s own notTaken (the server\'s notTakenOf, carried by the web shell over a state with no closed) reads "⊘ Not taken"; the same bar without it reads "✓ Done"', () => {
+    const flagged = (title: string, flag: boolean): TicketDatesInput => ({
+      ...ticket({ stateCategory: 'terminal', fields: { title: claimField(title), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField({ date: '2026-08-28' }) } }),
+      ...(flag ? { notTaken: true as const } : {}),
+    });
+    const finished = flagged('Finished', false);
+    // the SECOND terminal bar decides, and its state carries no closed key, as the web adapter builds it
+    const skipped = flagged('Skipped', true);
+    expect('closed' in skipped.state).toBe(false);
+    const { rerender } = renderTimeline([finished, skipped]);
+    const button = (title: string) => screen.getByRole('button', { name: title });
+    const mark = (title: string) => button(title).querySelector('.gn-timeline__mark')?.textContent ?? null;
+    const said = "starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim";
+    expect(mark('Finished')).toBe('✓');
+    expect(button('Finished')).toHaveAttribute('data-state', 'done');
+    expect(mark('Skipped')).toBe('⊘');
+    expect(button('Skipped')).toHaveAttribute('data-state', 'not-taken');
+    expect(button('Skipped')).toHaveAttribute('title', `Not taken; ${said}`);
+    // control: the same bar without the flag reads Done
+    const { notTaken: _flag, ...unflagged } = skipped;
+    rerender(<TimelineView tickets={[finished, unflagged]} today={TODAY} userName={userName} onOpenTicket={vi.fn()} />);
+    expect(mark('Skipped')).toBe('✓');
+    expect(button('Skipped')).toHaveAttribute('data-state', 'done');
+    expect(button('Skipped')).toHaveAttribute('title', `Done; ${said}`);
+  });
 });
 
 describe('29.101 the today line is one line, on the prop\'s day', () => {
