@@ -84,11 +84,12 @@ stop_child() {
 }
 # The cap's timer: ONE process, `perl` exec'd in the background (no subshell, no child of its own), that sleeps the cap and then sends USR1 to
 # the verb only while its parent is still the verb (`getppid`: a timer whose verb died is reparented to launchd and signals nothing, whatever
-# reuses the verb's pid). It never signals the job: the verb does, in the job's own group only. Stopped by KILL to its own pid on every exit path,
+# reuses the verb's pid; 13.2329). It never signals the job: the verb does, in the job's own group only. Stopped by KILL to its own pid on every exit path,
 # so no timer outlives the run, and only while it has not fired (a fired timer has exited; its pid is never signalled). Measured 2026-10-05:
 # the first version, a `( … sleep N … ) &` subshell stopped through its group, left the subshell's `sleep` orphaned in 25 of 40 runs of a job
 # that ends at once, and once lost a TERM in the fork window and made the verb wait out the whole sleep (13.1752's `kill -TERM $$` job).
 timer=""; cap_fired=0
+# M19 (KILL a fired timer too) is EQUIVALENT under test: a fired timer has exited, so only a reused pid tells them apart; the guard stays (planner 16:50).
 stop_timer() { [ -z "$timer" ] && return 0; { [ "$cap_fired" = 1 ] || kill -KILL "$timer"; wait "$timer"; } 2>/dev/null; timer=""; return 0; }
 # The cap's stop: TERM the job's whole group, wait up to $grace s for the GROUP (not just the leader) to empty, then KILL it. Never a pid outside it.
 cap_stop() {

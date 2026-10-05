@@ -349,7 +349,8 @@ def backstop_secs(max_secs):
 
 def run_tests_cap_min(max_secs):
     """The explicit `--max-min` this verb hands run-tests (planner ruling 2026-10-05 14:36: every ctl internal caller names its cap): above the
-    watchdog's cap + GRACE by at least a minute, so the watchdog (exit 2, `stopped`) always fires first and run-tests' 124 is only a backstop."""
+    watchdog's cap + GRACE by at least 58 s (the worst case, 659 s: the watchdog's KILL at 662 s, the cap at 720 s), so the watchdog (exit 2,
+    `stopped`) always fires first and run-tests' 124 is only a backstop."""
     return max_secs // 60 + 2
 
 
