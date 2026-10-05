@@ -1,16 +1,16 @@
 import type { CameraState } from '../../src/engine/camera.js';
-import type { CreateRenderer, DrawEdge, DrawNode, DrawStates, GraphRenderer, HoverEvent, PickEvent } from '../../src/render/renderer.js';
+import type { CreateRenderer, DrawEdge, DrawNode, DrawStates, DrawView, GraphRenderer, HoverEvent, PickEvent } from '../../src/render/renderer.js';
 
 /** A `GraphRenderer` that records every `setGraph` and lets a test fire the callbacks the view registered. */
 export function fakeRenderer() {
-  const calls: { nodes: DrawNode[]; edges: DrawEdge[]; states: DrawStates }[] = [];
+  const calls: { nodes: DrawNode[]; edges: DrawEdge[]; states: DrawStates; view: DrawView }[] = [];
   let onPick: (e: PickEvent) => void = () => {}, onHover: (e: HoverEvent) => void = () => {};
   const zooms: number[] = [];
   const cameras: ('fit' | CameraState)[] = [];
   const r: GraphRenderer = {
     mount() {},
-    setGraph(nodes, edges, _positions, states) {
-      calls.push({ nodes: [...nodes], edges: [...edges], states });
+    setGraph(nodes, edges, _positions, states, view) {
+      calls.push({ nodes: [...nodes], edges: [...edges], states, view });
     },
     setStates() {},
     setCamera(target) {

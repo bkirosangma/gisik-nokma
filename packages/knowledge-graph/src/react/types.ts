@@ -33,8 +33,12 @@ export type KnowledgeGraphProps = {
   canOpen?: (item: GraphItemView) => boolean;
   /** Spec A's "Add link" for an empty ticket centre (§6.2). Absent = no button. */
   onAddLink?: (centre: GraphItemView) => void;
-  /** Task 8: spec A's "Remove link" on a typed link, with Undo. */
+  /**
+   * Spec A's "Remove link" on a typed link (blocks, relates, duplicates), in the edge inspector: the host submits A's
+   * `ticket.link_removed` and resolves with its `undo`, or throws the server's refusal (shown as is). Absent = no button.
+   */
   onRemoveLink?: (edge: GraphEdgeView) => Promise<{ undo: () => Promise<void> }>;
+  /** A typed link this viewer may not remove gets no button (A §2.3). Default: all. */
   canRemoveLink?: (edge: GraphEdgeView) => boolean;
   /** Hide the bar's Hops control (Home draws its own). */
   showHops?: boolean;

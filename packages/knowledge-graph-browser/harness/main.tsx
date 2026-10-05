@@ -3,12 +3,13 @@ import '@gisik-nokma/ui/ui.css';
 import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import { KnowledgeGraph, type GraphRenderer, type GraphZonesSummary, type RendererProbe, type ScopeChoices } from '@gisik-nokma/knowledge-graph';
 import { createSigmaRenderer } from '@gisik-nokma/knowledge-graph/sigma';
-import { fixtureDelay, fixtureRing } from './fixture-source.js';
+import { fixtureDelay, fixtureRing, setFixtureTitle } from './fixture-source.js';
 
 /*
  * The VIEW harness (KG-C T7): `KnowledgeGraph` on the fixture, centred on GN-142, with the REAL Sigma adapter injected, so
  * the probe is on (`data-kg-probe`). `?config=phone|desktop|home`, `?hl=<ref>,<ref>` (Home's highlight), `?delay=<ms>`
- * (every ring answers late). `window.__kgView` exposes the probe and the last `onZones` report.
+ * (every ring answers late), `?long=<ref>` (that item's title is 200 characters: Review Focus 4). `window.__kgView` exposes the
+ * probe and the last `onZones` report.
  */
 const style = document.createElement('style');
 style.textContent = themeStylesheet();
@@ -20,6 +21,8 @@ const hl = params.get('hl');
 /** The host's default workspaces (`?ws=st` leaves GN-142's own out: its scope note shows). */
 const ws = (params.get('ws') ?? 'gn').split(',');
 fixtureDelay.ms = Number(params.get('delay') ?? 0);
+const long = params.get('long');
+if (long !== null) setFixtureTitle(long, 'Move sheet loses its scroll position on phone when the board column jumps after a drag, '.repeat(3).slice(0, 200));
 
 const SCOPE: ScopeChoices = {
   workspaces: [

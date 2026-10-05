@@ -25,6 +25,8 @@
  *   chips the ticket TC, and TD's description links the note NB (a `wikiLink`).
  * - H1 and H2 are explicit `[owner]`: A1 → H1 ← B1 (both links INTO the hidden item) and A2 ← H2 → B2 (both OUT of it), so
  *   each end of the both-ends-resolved check is the only one that stops its walk.
+ * - PA and PB are both assigned to `admin` (no other item names them) and otherwise joined only by PA relates Q1 relates
+ *   Q2 relates PB, so a walk through `people` is two hops where the default's is three.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -54,6 +56,7 @@ const [U1, U4] = [newUlid(), newUlid()];
 const [G, S, SS, TA, TB] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
 const [NA, NB, TC, TD] = [newUlid(), newUlid(), newUlid(), newUlid()];
 const [A1, H1, B1, A2, H2, B2] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+const [PA, PB, Q1, Q2] = [newUlid(), newUlid(), newUlid(), newUlid()];
 const n = (id: string) => `note:${id}`;
 const t = (id: string) => `ticket:${id}`;
 
@@ -104,6 +107,7 @@ beforeAll(async () => {
     [D1, 'Duplicate report'], [D2, 'Original report'], [D3, 'Blocked by the duplicate'], [U1, 'Survey'], [U3, 'Quote B'], [U2, 'Quote A'], [U4, 'Choose a quote'],
     [G, 'Launch'], [S, 'Launch week', G], [SS, 'Launch day', S], [TA, 'Write the brief'], [TB, 'Read the brief'], [TC, 'Book the hall'], [TD, 'Print the menu'],
     [A1, 'Inbound one'], [H1, 'Hidden sink'], [B1, 'Inbound two'], [A2, 'Outbound one'], [H2, 'Hidden source'], [B2, 'Outbound two'],
+    [PA, 'Paint the sign'], [PB, 'Hang the sign'], [Q1, 'Buy the bracket'], [Q2, 'Drill the wall'],
   ];
   await applyCommitted(db.pool, [
     ...tickets.map(([id, title, parentId]) => created(id, title, parentId ?? null)),
@@ -114,6 +118,8 @@ beforeAll(async () => {
     // M4 first, so the walk's unsorted predecessors of Y are M4, M3, M2, M1.
     ...[M4, M3, M2, M1].flatMap((m) => [link('relates', X, m), link('relates', m, Y)]),
     link('blocks', T7, T8), link('blocks', T8, T7),
+    link('relates', PA, Q1), link('relates', Q1, Q2), link('relates', Q2, PB),
+    ...[PA, PB].map((id) => tev(id, 'ticket.assigned', { assigneeId: world.ids.admin })),
     link('duplicates', D1, D2), link('blocks', D1, D3),
     // U3 first at both depths, so an unsorted layer would credit U3.
     link('blocks', U1, U3), link('blocks', U1, U2), link('blocks', U3, U4), link('blocks', U2, U4),
@@ -194,11 +200,15 @@ describe('27.508 graph/path: up to three shortest paths, only through what the r
     expect(await path('owner', { from: t(T1), to: t(T1) })).toMatchObject({ paths: [{ refs: [t(T1)], edges: [], sentences: [] }] });
   });
 
-  it('27.508 the default groups leave out projects and concepts (each a two-hop shortcut), `groups` narrows the walk, and four tied paths answer the three lowest', async () => {
+  it('27.508 the default groups leave out projects, concepts and people (each a two-hop shortcut), `groups` narrows the walk, and four tied paths answer the three lowest', async () => {
     expect((await path('owner', { from: t(T1), to: t(T4), groups: 'projects' })).paths.map((p) => p.refs)).toEqual([[t(T1), `project:${world.P}`, t(T4)]]);
     expect((await path('owner', { from: t(T1), to: t(T4), groups: 'concepts' })).paths.map((p) => p.refs)).toEqual([[t(T1), `concept:${CX}`, t(T4)]]);
     expect((await path('owner', { from: t(T1), to: t(T4), groups: 'blocks' })).paths.map((p) => p.refs)).toEqual([[t(T1), t(T2), t(T3), t(T4)]]);
     expect((await path('owner', { from: t(T1), to: t(T4), groups: 'relates' })).paths.map((p) => p.refs)).toEqual([[t(T1), t(T5), t(T6), t(T4)]]);
+    // One assignee is a hub too ("PA is assigned to admin, admin is the assignee of PB"): the default walks the three
+    // relates hops; control: naming `people` beside `relates` answers the two hops through the person.
+    expect((await path('owner', { from: t(PA), to: t(PB) })).paths.map((p) => p.refs)).toEqual([[t(PA), t(Q1), t(Q2), t(PB)]]);
+    expect((await path('owner', { from: t(PA), to: t(PB), groups: 'people,relates' })).paths.map((p) => p.refs)).toEqual([[t(PA), `person:${world.ids.admin}`, t(PB)]]);
 
     const tied = await path('owner', { from: t(X), to: t(Y) });
     expect(tied.paths.map((p) => p.refs)).toEqual([[t(X), t(M1), t(Y)], [t(X), t(M2), t(Y)], [t(X), t(M3), t(Y)]]);

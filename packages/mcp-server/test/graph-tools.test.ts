@@ -118,7 +118,7 @@ const DIRECTORY = {
   ],
 };
 const NEIGHBOURS_DESCRIPTION =
-  'Items linked to one ticket, note, person, project or workspace, ring by ring up to 4 hops, with each link as a ' +
+  'Items linked to one ticket, note, person, project, workspace or concept, ring by ring up to 4 hops, with each link as a ' +
   'sentence ("GN-133 blocks GN-142"). Same visibility and scope rules as the Knowledge Graph: you never see an ' +
   'item you cannot open, nor a link into one.';
 const PATH_DESCRIPTION = 'Up to 3 shortest chains of links between two items (at most 6 hops), each as a list of sentences. Only through items you can see.';
