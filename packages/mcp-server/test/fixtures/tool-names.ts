@@ -60,7 +60,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   graph: [
     // graph begin (KG-D T2, T6)
-    'similar',
+    'graph_neighbours', 'graph_path', 'graph_trace', 'similar',
     // graph end
   ],
   concept: [

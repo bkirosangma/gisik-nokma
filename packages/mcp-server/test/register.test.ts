@@ -84,7 +84,7 @@ describe('the tools, registered', () => {
     }
   });
 
-  it('14.555 the final registry is the 72 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
+  it('14.555 the final registry is the 75 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
     // The plan's header order, spelled out HERE and not read from the fixture: editing the fixture alone cannot make this green.
     const FINAL = [
       'search', 'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
@@ -99,11 +99,11 @@ describe('the tools, registered', () => {
       'manage_members', 'change_prefix', 'manage_groups',
       'define_workflow', 'define_ticket_type', 'migrate_ticket_type', 'set_visibility', 'update_workspace_settings',
       'list_deleted',
-      'similar',
+      'graph_neighbours', 'graph_path', 'graph_trace', 'similar',
       'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts',
       'review_suggestions', 'resolve_suggestion',
     ];
-    expect(FINAL).toHaveLength(72); // 63 until typed links T4 added `link_tickets` (27.060); 65 since KG-D T2 added `similar` (27.432); 70 since KG-D T4's concept tools (27.479); 72 since KG-D T5's suggestion tools (27.500)
+    expect(FINAL).toHaveLength(75); // 63 until typed links T4 added `link_tickets` (27.060); 65 since KG-D T2 added `similar` (27.432); 70 since KG-D T4's concept tools (27.479); 73 since KG-D T6's graph tools (27.514); 75 since KG-D T5's suggestion tools (27.500)
     const tools = allTools(fakeSession());
     expect(tools.map((t) => t.name)).toEqual(FINAL);
     expect(TOOL_NAMES).toEqual(FINAL);
