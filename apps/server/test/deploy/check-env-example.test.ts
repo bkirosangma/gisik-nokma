@@ -64,6 +64,17 @@ describe('check:env', () => {
       const src = run(root);
       expect(src.rc).toBe(1);
       expect(src.out).toMatch(/CONTROL/);
+      // CONTROL: the skip is anchored on `.test.`/`.spec.`; a source file whose
+      // name merely CONTAINS `spec` (inspector.ts), `test.` (latest.ts) or
+      // `.spec` (a.specific.ts) is still scanned. Each runs alone.
+      rmSync(join(root, 'packages/a/src/port.ts'));
+      for (const name of ['inspector.ts', 'latest.ts', 'a.specific.ts']) {
+        put(root, `packages/a/src/${name}`, body);
+        const named = run(root);
+        expect(named.rc, name).toBe(1);
+        expect(named.out, name).toMatch(/CONTROL/);
+        rmSync(join(root, `packages/a/src/${name}`));
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
