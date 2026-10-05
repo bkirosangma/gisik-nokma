@@ -204,6 +204,11 @@ reset; rm -f "$FXP".b.*; obn=$(BASH_ENV="$fx/dbg.sh" REALPERL="$realperl" PATH="
 brec=$(cat "$FXP.b.rec" 2>/dev/null); batif=$(cat "$FXP.b.atif" 2>/dev/null)
 check "13.2355 the cap's USR1 landing just AFTER the verb's first wait returned the job's own 7 (the benign ordering) keeps that rc: rc 7 with 'FAIL … rc=7', no CAP RACE and no TIMEOUT in log or output (CONTROL: the verb held 7 when the worker sent the USR1 — its fd 2 off /dev/null, the job gone —, and at the if cap_fired was 1 with rc 7; the job's last line is in the log)" \
   'case "$brec" in "7 /dev/null "*) false;; "7 "*" gone 1"|"7 "*" Z"*" 1") true;; *) false;; esac && [ "$batif" = "1 7" ] && printf "%s\n" "$lbn" | grep -qx job-exits-7 && [ $brc -eq 7 ] && printf "%s\n" "$obn" | grep -q "^FAIL run-tests benign rc=7 " && ! printf "%s\n%s" "$lbn" "$obn" | grep -q "CAP RACE\|TIMEOUT"'
+# The arm's other clause: a job whose OWN rc is 128+USR1 under a cap that never fired logs nothing (with the rc test added, dropping
+# `cap_fired = 1` no longer shows on 13.2321's rc 0 / 1 / 124; only this rc reaches the arm).
+reset; oown=$(rt --label own158 --max-min 5 -- sh -c 'echo job-exits-own; exit "$1"' x "$usr1rc"); rown=$?; lown=$(logtext)
+check "13.2355 …and a job whose OWN rc is 128+USR1 ($usr1rc) under a cap that never fired keeps it with 'FAIL … rc=$usr1rc' and logs no CAP RACE and no TIMEOUT (CONTROL: the job's line is in the log)" \
+  'printf "%s\n" "$lown" | grep -qx job-exits-own && [ $rown -eq $usr1rc ] && printf "%s\n" "$oown" | grep -q "^FAIL run-tests own158 rc=$usr1rc " && ! printf "%s\n%s" "$lown" "$oown" | grep -q "CAP RACE\|TIMEOUT"'
 
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----
 cat > "$fx/rec-run-tests" <<'SH'
