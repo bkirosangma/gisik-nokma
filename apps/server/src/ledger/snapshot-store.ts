@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import type { EntityKind } from '@gisik-nokma/domain';
+import { TICKET_FOLD_VERSION, type EntityKind } from '@gisik-nokma/domain';
 
 /**
  * Snapshots bound per-entity replay: state as of seq, so a replay starts from
@@ -37,17 +37,28 @@ export type Snapshot = {
    * gave before this column existed rather than a new and quieter one.
    */
   provenance: SnapshotProvenance | null;
+  /**
+   * The `TICKET_FOLD_VERSION` of the fold that wrote the row (wtg2 T9). 1 is every row written before work periods
+   * existed: its `state` has no `periods` and no `rounds`, so the snapshot pass restates it from the ticket's full
+   * history (`foldTicketHead`) instead of resuming from it. Never passed by a writer: both writes stamp the current
+   * version, because a row is always written by the current fold.
+   */
+  foldVersion: number;
 };
 
-export async function writeSnapshot(client: PoolClient, snapshot: Snapshot): Promise<void> {
+/** What a writer hands over: a snapshot without its fold version, which the write stamps (`TICKET_FOLD_VERSION`). */
+export type SnapshotInput = Omit<Snapshot, 'foldVersion'>;
+
+export async function writeSnapshot(client: PoolClient, snapshot: SnapshotInput): Promise<void> {
   await client.query(
-    'INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance) VALUES ($1, $2, $3, $4, $5)',
+    'INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version) VALUES ($1, $2, $3, $4, $5, $6)',
     [
       snapshot.entityKind,
       snapshot.entityId,
       snapshot.seq,
       JSON.stringify(snapshot.state),
       snapshot.provenance === null ? null : JSON.stringify(snapshot.provenance),
+      TICKET_FOLD_VERSION,
     ],
   );
 }
@@ -68,12 +79,12 @@ export async function writeSnapshot(client: PoolClient, snapshot: Snapshot): Pro
  * `writeSnapshot`, because that would silence the pass's collision too — the
  * one `test/sync/snapshot-writer.test.ts` case 12.89 exists to observe.
  */
-export async function overwriteSnapshot(client: PoolClient, snapshot: Snapshot): Promise<void> {
+export async function overwriteSnapshot(client: PoolClient, snapshot: SnapshotInput): Promise<void> {
   await client.query(
-    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance)
-       VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version)
+       VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (entity_kind, entity_id, seq)
-       DO UPDATE SET state = excluded.state, provenance = excluded.provenance`,
+       DO UPDATE SET state = excluded.state, provenance = excluded.provenance, fold_version = excluded.fold_version`,
     [
       snapshot.entityKind,
       snapshot.entityId,
@@ -84,6 +95,9 @@ export async function overwriteSnapshot(client: PoolClient, snapshot: Snapshot):
       // good block. `writeSnapshotsForWorkspace` carries the previous row's
       // block forward for exactly that reason — see its capture logic.
       snapshot.provenance === null ? null : JSON.stringify(snapshot.provenance),
+      // A restate (wtg2 T9) lands on the seq a version-1 row already holds; the DO UPDATE above re-stamps it, so the
+      // restated ticket is not due again.
+      TICKET_FOLD_VERSION,
     ],
   );
 }
@@ -97,8 +111,9 @@ export async function readLatestSnapshot(
     seq: number;
     state: Record<string, unknown>;
     provenance: SnapshotProvenance | null;
+    fold_version: number;
   }>(
-    `SELECT seq, state, provenance FROM snapshots
+    `SELECT seq, state, provenance, fold_version FROM snapshots
      WHERE entity_kind = $1 AND entity_id = $2
      ORDER BY seq DESC LIMIT 1`,
     [kind, id],
@@ -118,5 +133,6 @@ export async function readLatestSnapshot(
     seq: row.seq,
     state: row.state,
     provenance: row.provenance ?? null,
+    foldVersion: row.fold_version,
   };
 }

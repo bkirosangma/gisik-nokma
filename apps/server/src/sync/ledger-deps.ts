@@ -1,10 +1,12 @@
 import {
   ticketTypeDefSchema,
   workflowDefinedPayloadSchema,
+  type LedgerEvent,
   type TicketStateDeps,
   type TicketTypeDef,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
+import type { PoolClient } from 'pg';
 import type { Queryable } from '../db/queryable.js';
 
 /**
@@ -61,8 +63,10 @@ import type { Queryable } from '../db/queryable.js';
  * ## `belowWorkspaceSeq` — the as-of reading, and why "below" is in the name
  *
  * With no options this loads the whole workspace and resolves the NEWEST
- * definition of everything. That is right for the background pass, whose tail
- * never spans a publish, and it is WRONG for the publish door itself
+ * definition of everything. That is right for the background pass's RESUME,
+ * whose tail never spans a publish (its RESTATE of a snapshot written by an
+ * older fold replays a whole history that can, and resolves each event through
+ * `depsAsOfEvent` below instead), and it is WRONG for the publish door itself
  * (`snapshot-refresh.ts`): the events it is about to re-fold were written in
  * the vocabulary in force before the publish, and resolving them against the
  * version being published is precisely the throw the whole refresh exists to
@@ -125,6 +129,67 @@ export async function buildLedgerDeps(
   return {
     getWorkflow: (id) => workflows.get(id),
     getTicketType: (id) => ticketTypes.get(id),
+  };
+}
+
+/**
+ * The definitions in force AT one event, from the ledger: `buildLedgerDeps` bounded strictly below the event's own
+ * workspace position (wtg2 T9; planner ruling 2026-10-04 Q9, its mechanism replaced 2026-10-05 10:38 by this ledger
+ * reading: Q9 moved the projection's `loadDeps`, which reads `proj_ticket_types` / `proj_workflows`, and this file's
+ * whole point is that a snapshot never depends on a projection).
+ *
+ * The snapshot writer's RESTATE path folds with it, one call per event (`foldTicketHead`, a snapshot written before
+ * work periods existed). That fold replays a ticket's WHOLE history, and a history that spans a state-dropping publish
+ * throws `applyTicketEvent: workflow "…" has no state "…"` under the newest definitions, which would leave the ticket
+ * stale and due on every pass. Resolving each event as of its own position is the proj_tickets projection's rule
+ * (`projections/tickets.ts`'s header, point 1), read from the ledger as everything in this file is, so the restated
+ * snapshot is still the state a client computes from the same events.
+ *
+ * Strict is safe here: a ticket event's own workspace position holds no definition, so `<` and `<=` load the same set.
+ */
+export async function depsAsOfEvent(client: PoolClient, event: LedgerEvent): Promise<TicketStateDeps> {
+  return buildLedgerDeps(client, event.workspaceId, { belowWorkspaceSeq: event.workspaceSeq });
+}
+
+/** `depsAsOfEvent`'s shape: the definitions in force at one event. */
+export type DepsAsOfEvent = (client: PoolClient, event: LedgerEvent) => Promise<TicketStateDeps>;
+
+/**
+ * `depsAsOfEvent` memoized for ONE pass (planner ruling 2026-10-05 10:38): keyed per workspace by the highest
+ * definition event's position below the event, so the events between two definition changes share one load. A
+ * restated tail of N events with no definition change in between loads once, not N times.
+ *
+ * The key needs the definition POSITIONS, and those are read as an index range over `events_workspace_seq_unique`:
+ * only the positions this memo has not yet covered, from the last event it saw up to this one. `below` is that
+ * horizon (every definition strictly below it is in `seqs`). A miss calls `depsAsOfEvent` with the event itself, whose
+ * strict bound loads exactly the definitions at or below the key, because none sits between the key and the event.
+ */
+export function memoizedDepsAsOfEvent(): DepsAsOfEvent {
+  const known = new Map<string, { below: number; seqs: number[] }>();
+  const loaded = new Map<string, TicketStateDeps>();
+  return async (client, event) => {
+    const ws = event.workspaceId;
+    const positions = known.get(ws) ?? { below: 1, seqs: [] };
+    known.set(ws, positions);
+    if (event.workspaceSeq > positions.below) {
+      const { rows } = await client.query<{ workspace_seq: string | number }>(
+        `SELECT workspace_seq FROM events
+          WHERE workspace_id = $1 AND workspace_seq >= $2 AND workspace_seq < $3
+            AND entity_kind IN ('workflow', 'ticket-type')
+            AND type IN ('workflow.defined', 'ticket-type.defined')
+          ORDER BY workspace_seq`,
+        [ws, positions.below, event.workspaceSeq],
+      );
+      positions.seqs.push(...rows.map((row) => Number(row.workspace_seq)));
+      positions.below = event.workspaceSeq;
+    }
+    const key = positions.seqs.filter((seq) => seq < event.workspaceSeq).reduce((highest, seq) => Math.max(highest, seq), 0);
+    const memoKey = `${ws}:${key}`;
+    const hit = loaded.get(memoKey);
+    if (hit !== undefined) return hit;
+    const deps = await depsAsOfEvent(client, event);
+    loaded.set(memoKey, deps);
+    return deps;
   };
 }
 
