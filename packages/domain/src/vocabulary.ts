@@ -4,6 +4,7 @@ import {
   groupRenamedPayload,
   groupReorderedPayload,
 } from './events/groups.js';
+import { CONCEPT_EVENT_TYPES, CONCEPT_PAYLOADS } from './events/concept-events.js';
 import {
   membershipGrantedPayload,
   membershipRevokedPayload,
@@ -510,6 +511,14 @@ domainRegistry.register({
   entityKind: 'group',
   payloadSchema: groupDeletedPayload,
 });
+
+/**
+ * The concept vocabulary (Knowledge Graph spec D §3.1). Nine types against a `concept` entity. Who may write is
+ * the door's `checkConceptPermission` (D4: the actor must see the concept and everything the event adds).
+ */
+for (const type of CONCEPT_EVENT_TYPES) {
+  domainRegistry.register({ type, version: 1, entityKind: 'concept', payloadSchema: CONCEPT_PAYLOADS[type] });
+}
 
 /**
  * The lifecycle vocabulary (trash series, Plan 1, spec

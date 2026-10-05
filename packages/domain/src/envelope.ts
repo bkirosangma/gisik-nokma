@@ -33,6 +33,8 @@ export const ENTITY_KINDS = [
   // registered against it in `vocabulary.ts`. A group is a workspace-level folder
   // projects are filed under, with its own stream like any other entity.
   'group',
+  // Knowledge Graph spec D §3.1: nine concept.* types in vocabulary.ts. Visibility is D4's, at read time.
+  'concept',
 ] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
