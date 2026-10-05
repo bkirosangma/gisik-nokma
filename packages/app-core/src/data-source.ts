@@ -36,6 +36,7 @@ import type {
   FilterSpec,
   Grouping,
   MyWorkView,
+  DraftRow,
   // The VIEW model, not `@gisik-nokma/domain`'s wire shape of the same name:
   // this return carries `source`, which the server does not send (it is the
   // mode of the request) and which the merged list (spec §7.8) needs per row.
@@ -433,6 +434,8 @@ export type DataSourceQuery = {
     options: NoteSearchQueryOptions,
   ): Promise<NoteSearchResult>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
+  /** The caller's own drafts in this workspace, newest first. Online: `GET /v1/workspaces/:id/drafts`. Offline: the replica's `listDrafts`. */
+  getMyDrafts(workspaceId: string): Promise<DraftRow[]>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
   /**
    * The workspace's thresholds and auto-close window, as `/settings`'s Workspace

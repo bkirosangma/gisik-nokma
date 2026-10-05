@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makeEnvelope, SYSTEM_ACTOR_FLOW, validateWorkflowDef, type EventEnvelope, type PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { DECISION_TYPE_ID, makeEnvelope, SYSTEM_ACTOR_FLOW, validateWorkflowDef, type EventEnvelope, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { evaluateEvent } from '../src/evaluate.js';
 import { flowExemptEdge } from '../src/index.js';
@@ -150,5 +150,40 @@ describe('29.363 the cause must fit the move', () => {
     // to `dropped` is a legal fixture.)
     const atDropped = buildMemoryContext([WF_TWO_TERMINALS], [typeDefined(TASK), createdIn('focus'), by(PERSON, 'ticket.transitioned', { to: 'doing' }), by(PERSON, 'ticket.transitioned', { to: 'dropped' })]);
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), atDropped)).toMatchObject({ rule: 'illegal-transition' });
+  });
+});
+
+/**
+ * wtg2 T8 Step 7 (spec PS-5, DC-5), wired by T6 (AMEND-wtg2-t6-dc5-exemption: T8 landed first): the flow's "Not taken"
+ * finishes a Decision that has branches and no outcome, and nothing else lifts DC-5. `T` is a Decision here, created
+ * in To do and moved to Doing, so `doing -> done` is WF_STRICT's DECLARED edge: the exemption is DC-5's alone, not the
+ * synthetic edge's (29.204).
+ */
+const DECISION: TicketTypeDef = { id: DECISION_TYPE_ID, name: 'Decision', icon: 'diamond', rank: 3, workflowId: 'wf-basic', fields: [] };
+const decisionWorld = (labels: string[], ...after: EventEnvelope[]) =>
+  buildMemoryContext([WF_STRICT], [typeDefined(TASK), typeDefined(DECISION), createdIn('focus', null, P), createdIn('focus', null, C),
+    makeEnvelope({ type: 'ticket.created', entity: { kind: 'ticket', id: T }, workspaceId: WS, payload: { typeId: DECISION_TYPE_ID, projectId: PROJECT, parentId: null, title: 'Go ahead?', start: 'focus' } }),
+    ...labels.map((label, i) => by(PERSON, 'ticket.link_added', { kind: 'leads_to', targetId: i === 0 ? P : C, label })),
+    by(PERSON, 'ticket.transitioned', { to: 'doing' }), ...after]);
+
+describe('29.205 the DC-5 exemption', () => {
+  it('29.205 branch-not-taken exempts DC-5 on both doors; nothing else does', async () => {
+    const dec = (actor: string, to: string, cause?: unknown) => by(actor, 'ticket.transitioned', cause === undefined ? { to } : { to, cause });
+    const outcomeRequired = { refused: true, rule: 'decision.outcome-required', reason: 'Choose an outcome before finishing this decision.' };
+    expect(await evaluateEvent(dec(FLOW, 'done', notTaken), decisionWorld(['Yes', 'No']))).toEqual({ refused: false });
+    expect(await evaluateEvent(dec(PERSON, 'done'), decisionWorld(['Yes', 'No']))).toEqual(outcomeRequired); // a person: still DC-5 (control)
+    // (planner ruling 2026-10-04, Q6: no `led-to` leg. `doing -> done` is declared on WF_STRICT, so it would answer
+    // decision.outcome-required here and cause.led-to-not-backlog after T13; the two legs below carry the case line.)
+    expect(await evaluateEvent(dec(FLOW, 'done', reopened), decisionWorld(['Yes', 'No']))).toEqual(outcomeRequired); // the flow with ANOTHER flow cause on the declared doing -> done edge: DC-5 still applies (the case line's and the table's mutant)
+    expect(await evaluateEvent(dec(FLOW, 'done'), decisionWorld(['Yes', 'No']))).toEqual(outcomeRequired); // the flow with no cause on the declared edge
+    const closing = decisionWorld(['Yes', 'No'], dec(FLOW, 'done', notTaken));
+    expect(await evaluateEvent(by(FLOW, 'ticket.closed', { cause: notTaken }), closing)).toEqual({ refused: false });
+    expect(await evaluateEvent(by(PERSON, 'ticket.closed', {}), closing)).toEqual(outcomeRequired); // control
+    expect(await evaluateEvent(by(FLOW, 'ticket.closed', {}), closing)).toEqual(outcomeRequired); // the flow closing with no cause
+    expect(await evaluateEvent(dec(FLOW, 'done', notTaken), decisionWorld(['Yes', 'No'], by(PERSON, 'ticket.decided', { outcome: 'Yes' })))).toEqual({ refused: false }); // control: an outcome never needed the exemption
+    // the exemption trusts only a cause the forgery guard has already proved: a PERSON's "Not taken" hears cause.forged
+    // at both doors, never the exemption's accept
+    expect(await evaluateEvent(dec(PERSON, 'done', notTaken), decisionWorld(['Yes', 'No']))).toEqual({ refused: true, rule: 'cause.forged', reason: FORGED });
+    expect(await evaluateEvent(by(PERSON, 'ticket.closed', { cause: notTaken }), closing)).toEqual({ refused: true, rule: 'cause.forged', reason: FORGED });
   });
 });

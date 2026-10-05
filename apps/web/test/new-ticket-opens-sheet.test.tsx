@@ -251,3 +251,38 @@ describe('13.1369 creating a ticket opens it', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
+
+/**
+ * 28.156, the project page's half (drafts T8): `Save as draft` does NOT open the sheet (a draft is on no board and
+ * the person may be saving several); the page shows `Draft saved` with `Open`, and Open pushes the draft's own id.
+ */
+describe('28.156 the project page shows Draft saved', () => {
+  it('28.156 a saved draft opens nothing, shows the toast, and Open pushes the ingested draft\'s id', async () => {
+    const ingested: SubmittedEvent[] = [];
+    const services = stubServices({
+      getBoard: async () => ({ projectId: PROJECT, groups: [] }),
+      getTickets: async () => ({ projectId: PROJECT, rows: [] }),
+      getTicketTypes: async () => TYPES,
+      getPreferences: async () => EMPTY_PREFERENCES,
+      getWorkflowDef: async () => WF,
+      getMembers: async () => [{ id: ANSELMA, name: 'Anselma Marak', role: 'owner' }],
+    });
+    services.dataSource.ingest = async (events: SubmittedEvent[]): Promise<IngestResult[]> => {
+      ingested.push(...events);
+      return events.map((event) => ({ status: 'committed' as const, eventId: event.id, seq: 1, serverTime: '2026-09-23T07:00:00.000Z' }));
+    };
+    render(<Providers services={services}><ProjectPage /></Providers>);
+    const user = userEvent.setup();
+    await user.click(await headerCreateTicket());
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the new sign' } });
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Save as draft' }));
+
+    expect(await screen.findByText('Draft saved')).toBeInTheDocument();
+    const created = ingested.find((event) => event.type === 'ticket.created');
+    expect(created?.payload).toMatchObject({ draft: true });
+    expect(push).not.toHaveBeenCalled(); // the sheet is not opened on a draft
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(push).toHaveBeenCalledWith(`/w/${WORKSPACE}/p/${PROJECT}?ticket=${created!.entity.id}`, { scroll: false });
+    await waitFor(() => expect(screen.queryByText('Draft saved')).toBeNull());
+  });
+});

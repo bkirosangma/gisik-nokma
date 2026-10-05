@@ -880,15 +880,22 @@ describe('29.056 the view draws and decides a bar at its floored width, written 
 /**
  * 29.088 — TV-11: the panel fills the window under its own top edge, 16 px short of the bottom, never below 320 px, and fits
  * again when the window resizes. jsdom lays nothing out (every rect's top is 0) and its window is 768 px tall, so the numbers
- * are literals: 768 - 0 - 16 = 752, and a 300 px window gives the 320 px floor. T10's 29.040 measures the same rule in a real
- * browser (where the floor never binds at 800 px). Collect, restore the window, then assert.
+ * are literals: 768 - 0 - 16 = 752; the panel's rect stubbed to top 100 (where filters above it would put it) gives
+ * 768 - 100 - 16 = 652; and a 300 px window gives the 320 px floor. T10's 29.040 measures the same rule in a real browser, with
+ * a block above the panel and with the floor binding (a window that leaves the panel 319 px). Collect, restore the window and
+ * the rect, then assert.
  */
 describe('29.088 the panel fills the window below it, 16 px short, never under 320 px', () => {
-  it('29.088 752 px in jsdom\'s 768 px window, 320 px when the window is 300 px tall, and 752 px again after the window comes back; each read follows a resize event', () => {
+  it('29.088 752 px in jsdom\'s 768 px window, 652 px when the panel\'s top is at 100 px, 320 px when the window is 300 px tall, and 752 px again after both come back; each read follows a resize event', () => {
     const { container } = renderTimeline([]);
     const panel = container.querySelector('.gn-timeline') as HTMLElement;
     const windowHeight = window.innerHeight;
     const tall = panel.style.height;
+    // the panel's own top edge counts: jsdom lays nothing out, so the panel's rect is told it sits 100 px down
+    const rect = vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({ top: 100 } as DOMRect);
+    fireEvent(window, new Event('resize'));
+    const under = panel.style.height;
+    rect.mockRestore();
     const saved = Object.getOwnPropertyDescriptor(window, 'innerHeight');
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 300 });
     fireEvent(window, new Event('resize'));
@@ -900,6 +907,7 @@ describe('29.088 the panel fills the window below it, 16 px short, never under 3
     expect(windowHeight).toBe(768);
     expect(window.innerHeight).toBe(768);
     expect(tall).toBe('752px');
+    expect(under).toBe('652px');
     expect(short).toBe('320px');
     expect(back).toBe('752px');
   });
