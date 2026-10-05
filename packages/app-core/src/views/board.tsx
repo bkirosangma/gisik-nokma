@@ -2264,7 +2264,7 @@ function BoardCardView({
           <Avatar name={actorLabel(card.assignee.id, card.assignee.name)} size="small" />
         ) : null}
         {card.pending ? <Chip tone="pending">claim in transit</Chip> : null}
-        {card.cause !== null ? (
+        {card.cause?.kind === 'reopened-for-child' ? (
           <Chip tone="active" title="This parent was reopened because it acquired live work">
             reopened, live work added
           </Chip>

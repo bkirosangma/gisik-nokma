@@ -56,9 +56,28 @@ const LINK_TICKETS_KINDS = TICKET_LINK_KINDS.filter((k) => k !== 'leads_to') as 
 
 /** The other end of a link the server withheld from this caller, as a line's payload names it. */
 const HIDDEN_END = "a ticket you can't see";
+/** A person the server withheld from this caller, as a flow cause's `triggeredBy` / `decidedBy` names them (wtg2 T8). */
+const HIDDEN_ACTOR = "someone you can't see";
+const FLOW_CAUSE_EVENT_TYPES: readonly string[] = ['ticket.transitioned', 'ticket.closed', 'ticket.reopened'];
+
+/**
+ * A flow cause with its withheld ids phrased (wtg2 T8, 29.208): a ticket id the server nulled (`sourceTicketId`,
+ * `decisionTicketId`) reads as a hidden ticket, a person it nulled (`triggeredBy`, `decidedBy`) as a hidden person. Every
+ * other member, the kind, outcome, label and pass among them, is kept. Any other cause passes through untouched.
+ */
+function phrasedCause(cause: unknown): unknown {
+  if (typeof cause !== 'object' || cause === null) return cause;
+  const phrased: Record<string, unknown> = { ...(cause as Record<string, unknown>) };
+  for (const key of ['sourceTicketId', 'decisionTicketId']) if (phrased[key] === null) phrased[key] = HIDDEN_END;
+  for (const key of ['triggeredBy', 'decidedBy']) if (phrased[key] === null) phrased[key] = HIDDEN_ACTOR;
+  return phrased;
+}
 
 /** A payload without any document in it (owner question Q4): the ledger's facts, never a body. One rule for a line and for a contested claim's original. */
-export function redactedPayload(type: string, eventId: string, payload: Record<string, unknown>): Record<string, unknown> {
+export function redactedPayload(type: string, eventId: string, rawPayload: Record<string, unknown>): Record<string, unknown> {
+  const payload = FLOW_CAUSE_EVENT_TYPES.includes(type) && 'cause' in rawPayload
+    ? { ...rawPayload, cause: phrasedCause(rawPayload['cause']) }
+    : rawPayload;
   if (type === 'ticket.link_added' || type === 'ticket.link_removed') {
     if (payload['targetId'] !== null) return payload;
     // Withheld (typed-links T4b). A draft-side `from` entry hides its SOURCE: its target is this ticket (drafts T6 FIX 1).

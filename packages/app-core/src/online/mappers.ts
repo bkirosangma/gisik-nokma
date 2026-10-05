@@ -597,8 +597,9 @@ export function withActorNames(
 
 /**
  * `StateProvenance.cause` is `TransitionCause | null` — REQUIRED and nullable
- * (`packages/domain/src/read-models.ts`), and `TransitionCause` has exactly one
- * member.
+ * (`packages/domain/src/read-models.ts`), and `TransitionCause` has two members:
+ * `reopened-for-child` with its child, and the three flow kinds (wtg2 T8), which
+ * the server serves as `{ kind }` only and which map to exactly that here.
  *
  * `null` therefore survives and is the TRUTH: the server is saying this
  * transition had no cause, which is what the card renders as an ordinary move.
@@ -609,12 +610,16 @@ export function withActorNames(
  * thing `TransitionCause` was added to prevent, produced by the code meant to
  * carry it.
  */
+const FLOW_KINDS = ['led-to', 'reopened-by-flow', 'branch-not-taken'] as const;
+
 function mapCause(raw: unknown, path: string): TransitionCause | null {
   if (raw === null) return null;
   const record = asRecord(raw, path);
   const kind = asString(record['kind'], `${path}.kind`);
+  const flow = FLOW_KINDS.find((k) => k === kind);
+  if (flow !== undefined) return { kind: flow };
   if (kind !== 'reopened-for-child') {
-    throw new MappingError(`${path}.kind`, `reopened-for-child (got ${kind})`);
+    throw new MappingError(`${path}.kind`, `reopened-for-child, ${FLOW_KINDS.join(', ')} (got ${kind})`);
   }
   return {
     kind: 'reopened-for-child',

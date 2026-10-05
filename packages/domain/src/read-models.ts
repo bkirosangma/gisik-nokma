@@ -31,8 +31,14 @@ import type { NoteScope, NoteScopeMode } from './note-state.js';
  * applied, and both replace a `null`/`0` the plan text carried.
  */
 
-/** Owner decision (coordination doc): a reopen names the child that caused it. */
-export type TransitionCause = { kind: 'reopened-for-child'; childTicketId: string };
+/**
+ * Owner decision (coordination doc): a reopen-for-child names the child that caused it. The three flow kinds (wtg2 T8,
+ * `flow/causes.ts`) name no child, and reach a viewer as their kind only: their ids may name a ticket or a person the
+ * viewer cannot see (spec FL-1, `viewerSafeCause`).
+ */
+export type TransitionCause =
+  | { kind: 'reopened-for-child'; childTicketId: string }
+  | { kind: 'led-to' | 'reopened-by-flow' | 'branch-not-taken' };
 
 /**
  * Who claimed the current state, and when — by both clocks. The provenance

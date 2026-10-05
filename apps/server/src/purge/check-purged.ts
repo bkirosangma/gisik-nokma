@@ -16,7 +16,7 @@ function refuse(reason: string): Refusal {
 }
 
 /**
- * The ids a payload names as a container or a link target, by type. Field names
+ * The ids a payload names as a container, a link target or a flow cause's ticket, by type. Field names
  * are the schemas' own (`events/ticket-events.ts` `ticketCreatedPayload`,
  * `ticketReparentedPayload`; `events/note-events.ts` `noteCreatedPayload`,
  * `noteMovedPayload`, `noteAttachedPayload`). Read defensively: the payload
@@ -62,6 +62,18 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       // at the door, the way a link to one is.
       const ids = payload['closeStarted'];
       if (Array.isArray(ids)) for (const id of ids) add('ticket', id);
+      break;
+    }
+    case 'ticket.transitioned':
+    case 'ticket.closed':
+    case 'ticket.reopened': {
+      // wtg2 T8: a flow cause names the ticket that led here (`led-to` sourceTicketId) or the Decision whose outcome
+      // moved it (`decisionTicketId`); an erased one refuses the move at the door, as a link to it does.
+      const cause = payload['cause'];
+      if (typeof cause === 'object' && cause !== null) {
+        add('ticket', (cause as Record<string, unknown>)['sourceTicketId']);
+        add('ticket', (cause as Record<string, unknown>)['decisionTicketId']);
+      }
       break;
     }
     case 'ticket.published':

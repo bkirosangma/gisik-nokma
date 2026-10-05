@@ -216,6 +216,19 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
     expect(screen.getByText('reopened, live work added')).toBeInTheDocument();
   });
 
+  /* 29.207 (wtg2 T8): the chip says "live work added", which only a reopen-for-child means. The flow kinds arrive as
+   * `{ kind }` and draw no chip here. */
+  it('29.207 draws the reopen chip for reopened-for-child only, never for a flow cause', () => {
+    for (const kind of ['led-to', 'reopened-by-flow', 'branch-not-taken'] as const) {
+      const { unmount } = render(<Board board={errandBoard([boardCardSeed({ cause: { kind } })])} onOpenTicket={() => {}} />);
+      expect(screen.queryByText('reopened, live work added'), kind).toBeNull();
+      unmount();
+    }
+    // Control: the same render with the old kind draws it.
+    render(<Board board={errandBoard([boardCardSeed({ cause: { kind: 'reopened-for-child', childTicketId: 't_child' } })])} onOpenTicket={() => {}} />);
+    expect(screen.getByText('reopened, live work added')).toBeInTheDocument();
+  });
+
   it('badges a claim in transit as visually distinct, and only then', () => {
     const board = errandBoard([boardCardSeed({ pending: true })]);
     const { rerender } = render(<Board board={board} onOpenTicket={() => {}} />);
