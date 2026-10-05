@@ -1,4 +1,13 @@
-import { isTicketLinkEvent, linkPayloadDirection, withheldLinkPayload, type TicketLinkKind, type TicketState } from '@gisik-nokma/domain';
+import {
+  isFlowCause,
+  isTicketLinkEvent,
+  linkPayloadDirection,
+  withheldLinkPayload,
+  withholdCauseTicket,
+  type TicketLinkKind,
+  type TicketState,
+  type WithheldFlowCause,
+} from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { LINK_TARGET_NOT_VISIBLE_REASON, PERMISSION_VISIBILITY_RULE } from '../permissions/check-permission.js';
 import { canOpen } from './can-open.js';
@@ -30,6 +39,13 @@ import { canOpen } from './can-open.js';
  * A served-withheld link event folds to nothing on the client
  * (`isWithheldLinkEvent` in the domain's `foldTicketEvent`).
  *
+ * The same doors withhold a FLOW CAUSE's ticket and person (wtg-flow-cause-withhold,
+ * planner rulings 2026-10-06 03:49): `withholdFlowCause` below, on the three
+ * event types that carry one (`withholdEvent`) and on a folded close
+ * (`withholdState`, the detail read and the snapshot). A served-withheld cause
+ * still folds on the client: the domain's `applyTicketEvent` parses the served
+ * shape (`isWithheldFlowCause`), and `notTakenOf` still reads it Not taken.
+ *
  * ## Residuals, each with an owner
  *
  * - **Widening staleness** (owner ruling Q1 = (a), 2026-10-04). The replica
@@ -59,8 +75,31 @@ export function targetSight(db: Queryable, viewerId: string): TargetSight {
   };
 }
 
+/**
+ * A flow cause as this viewer may be served it (wtg-flow-cause-withhold; spec FL-1). It names a ticket (`sourceTicketId`
+ * for `led-to`, else `decisionTicketId`) and a person (`triggeredBy` / `decidedBy`); a viewer who cannot see that ticket
+ * gets both NULLED with their keys kept, and the kind, label or outcome, pass and the opaque decision event id kept
+ * (`withholdCauseTicket`, T17 AMEND 2: the shape MCP's `phrasedCause` reads as "a ticket you can't see" / "someone you
+ * can't see"). The person goes with the ticket, never on their own: no person-sight rule exists, and a person's act on a
+ * ticket the viewer can see is already theirs to read in that ticket's History (planner ruling 2026-10-06 03:49, Q3).
+ * Anything that is not a flow cause (no cause, a person's `reopened-for-child`) comes back as the same reference, as does
+ * a cause naming a ticket the viewer can see.
+ */
+export async function withholdFlowCause<C>(cause: C, sees: TargetSight): Promise<C | WithheldFlowCause> {
+  if (!isFlowCause(cause)) return cause;
+  return (await sees(cause.kind === 'led-to' ? cause.sourceTicketId : cause.decisionTicketId)) ? cause : withholdCauseTicket(cause);
+}
+
+const FLOW_CAUSE_EVENT_TYPES: readonly string[] = ['ticket.transitioned', 'ticket.closed', 'ticket.reopened'];
+
 async function withheldOrSame(type: string, payload: unknown, sees: TargetSight): Promise<unknown> {
-  if (!isTicketLinkEvent(type) || payload === null || typeof payload !== 'object') return payload;
+  if (payload === null || typeof payload !== 'object') return payload;
+  if (FLOW_CAUSE_EVENT_TYPES.includes(type)) {
+    const p = payload as { cause?: unknown };
+    const cause = await withholdFlowCause(p.cause, sees);
+    return cause === p.cause ? payload : { ...p, cause };
+  }
+  if (!isTicketLinkEvent(type)) return payload;
   const p = payload as { kind: TicketLinkKind; targetId?: unknown; from?: unknown; label?: string };
   const other = p.from ?? p.targetId;
   if (typeof other !== 'string' || (await sees(other))) return payload;
@@ -84,6 +123,9 @@ export async function withholdContest<C extends { rule: string; reason: string; 
   if (o === null || typeof o !== 'object' || typeof o.type !== 'string') return c;
   const payload = await withheldOrSame(o.type, o.payload, sees);
   if (payload === o.payload) return c;
+  // A link's refusal names the hidden ticket, so its cause is the gate's own; a flow-cause claim's refusal
+  // (`cause.forged`) names nothing, so it keeps its own rule and reason and only its ids are withheld.
+  if (!isTicketLinkEvent(o.type)) return { ...c, originalEvent: { ...o, payload } };
   return { ...c, rule: PERMISSION_VISIBILITY_RULE, reason: LINK_TARGET_NOT_VISIBLE_REASON, originalEvent: { ...o, payload } };
 }
 
@@ -97,6 +139,20 @@ export async function withholdEvent<E extends { type: string; payload: unknown }
   }
   const payload = await withheldOrSame(e.type, e.payload, sees);
   return payload === e.payload ? e : { ...e, payload };
+}
+
+/**
+ * A folded state as this viewer may be served it: `withholdLinks`, then the close's flow cause (`withholdFlowCause`), the
+ * one state member that carries one. Every door that serves a `TicketState` calls this, not `withholdLinks` alone: the
+ * detail read (`routes/tickets.ts`) and the bootstraps' snapshot (`sync/sync-routes.ts`). Same reference back when
+ * nothing is withheld.
+ */
+export async function withholdState(state: TicketState, sees: TargetSight): Promise<TicketState> {
+  const linked = await withholdLinks(state, sees);
+  const closed = linked.closed ?? null;
+  if (closed === null || closed.cause === undefined) return linked;
+  const cause = await withholdFlowCause(closed.cause, sees);
+  return cause === closed.cause ? linked : { ...linked, closed: { ...closed, cause } };
 }
 
 /** A folded state's links, visible other ends only; the key absent when none remain (T1's absent-not-empty rule). */

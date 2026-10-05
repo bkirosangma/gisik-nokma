@@ -1,9 +1,10 @@
 import type { TicketState } from '../entity-state.js';
-import { isFlowCause } from './causes.js';
+import { isFlowCause, isWithheldFlowCause } from './causes.js';
 
 /** One interval of real work (WP-1). `start`/`end` are event `serverTime`s; `pass` is the ticket's round when it opened. */
 export type WorkPeriod = { start: string; end: string | null; pass: number };
-export type NotTakenResolution = { kind: 'not-taken'; decisionTicketId: string; outcome: string; pass: number };
+/** `decisionTicketId` is `null` on a close cause a server door withheld from this viewer (`isWithheldFlowCause`): still Not taken. */
+export type NotTakenResolution = { kind: 'not-taken'; decisionTicketId: string | null; outcome: string; pass: number };
 
 /** 1 plus the flow resets filed on the ticket (PS-2); absent reads as 1. */
 export function ticketRound(s: Pick<TicketState, 'rounds'>): number {
@@ -23,9 +24,13 @@ export function hasStarted(s: Pick<TicketState, 'periods'>): boolean {
   const last = s.periods?.[s.periods.length - 1];
   return last !== undefined && last.end === null;
 }
-/** The ONE reading of a close cause as "not taken" (PS-8): a well-formed `branch-not-taken` cause, and nothing else. */
+/**
+ * The ONE reading of a close cause as "not taken" (PS-8): a well-formed `branch-not-taken` cause, and nothing else. A
+ * close cause a server door WITHHELD from this viewer (the Decision and its decider nulled, `isWithheldFlowCause`) is
+ * still Not taken, with no Decision to name (29.447): Not taken is closed, never done, for every viewer.
+ */
 export function notTakenOf(cause: unknown): NotTakenResolution | null {
-  if (!isFlowCause(cause) || cause.kind !== 'branch-not-taken') return null;
+  if (!(isFlowCause(cause) || isWithheldFlowCause(cause)) || cause.kind !== 'branch-not-taken') return null;
   return { kind: 'not-taken', decisionTicketId: cause.decisionTicketId, outcome: cause.outcome, pass: cause.pass };
 }
 /** The ticket's resolution (PS-2): not-taken while its close carries that cause; `null` otherwise, and after a reopen. */

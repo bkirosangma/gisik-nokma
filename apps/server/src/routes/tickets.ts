@@ -10,7 +10,7 @@ import { sanitizeFilename } from '../attachments/filename.js';
 import { listTicketComments } from '../read/ticket-comments.js';
 import { canSee } from '../visibility/can-see.js';
 import { canOpen } from '../visibility/can-open.js';
-import { targetSight, withholdEvent, withholdLinks } from '../visibility/withhold-link-targets.js';
+import { targetSight, withholdEvent, withholdState } from '../visibility/withhold-link-targets.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { ticketNumber } from '../read/ticket-numbers.js';
@@ -721,7 +721,9 @@ export function registerTicketRoutes(
       // draft-side entry, else `targetId`), and no key at all when none remain (the
       // reducer's absent-not-empty shape), so nothing counts a hidden one. The
       // one predicate every door uses (`withhold-link-targets.ts`, typed-links T4b).
-      const servedState: TicketState = await withholdLinks(state, targetSight(deps.pool, request.currentUserId));
+      // A flow close cause naming a Decision this viewer cannot see goes out with
+      // that Decision and its decider nulled (`withholdState`, wtg-flow-cause-withhold).
+      const servedState: TicketState = await withholdState(state, targetSight(deps.pool, request.currentUserId));
 
       return {
         ticket: toTicketView(ticket),

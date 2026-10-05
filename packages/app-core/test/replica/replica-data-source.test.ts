@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   newSubmittedEvent,
   newUlid,
+  resolutionOf,
   SYSTEM_ACTOR_FLOW,
   type IngestResult,
   type LedgerEvent,
@@ -1707,5 +1708,44 @@ describe('29.374 the replica list row carries notTaken from the folded close cau
     expect(rows.find((r) => r.ticketId === skipped)?.notTaken).toBe(true);
     expect(rows.find((r) => r.ticketId === finished)).not.toHaveProperty('notTaken');
     expect(countRows(rows)).toEqual({ total: 2, terminal: 1 });
+  });
+});
+
+describe('29.447 the replica folds a SERVED withheld flow cause', () => {
+  it('29.447 a blind viewer folds the withheld not-taken pair without throwing and still reads Not taken with no decision link; control: the seeing viewer folds the decision id', async () => {
+    const decision = newUlid();
+    const decider = newUlid();
+    const decisionEvent = newUlid();
+    const raw = { kind: 'branch-not-taken', decisionTicketId: decision, outcome: 'Yes', pass: 1, decidedBy: decider, decisionEventId: decisionEvent };
+    // The shape the server's doors serve a viewer who cannot see the Decision (`withholdFlowCause`, T17 AMEND 2).
+    const withheld = { ...raw, decisionTicketId: null, decidedBy: null };
+    const fold = async (cause: unknown) => {
+      const { ds, replica } = await fixture();
+      const skipped = newUlid();
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: 'Skipped branch' }));
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.transitioned', { to: 'done', cause }, { actorId: SYSTEM_ACTOR_FLOW }));
+      // The card BEFORE the close: a closed ticket leaves the board.
+      const card = (await ds.query.getBoard(PROJECT)).groups.flatMap((g) => g.columns.flatMap((c) => c.cards)).find((c) => c.ticketId === skipped);
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.closed', { cause }, { actorId: SYSTEM_ACTOR_FLOW }));
+      const state = (await replica.getTicket(skipped))?.confirmed ?? null;
+      const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find((r) => r.ticketId === skipped);
+      return { state, row, card };
+    };
+    const seeing = await fold(raw);
+    expect(seeing.state?.closed?.cause).toEqual(raw); // control: the seeing viewer's fold holds the decision id
+    expect(resolutionOf(seeing.state ?? {})).toEqual({ kind: 'not-taken', decisionTicketId: decision, outcome: 'Yes', pass: 1 });
+    expect(seeing.row?.notTaken).toBe(true);
+    expect(seeing.card?.cause).toEqual({ kind: 'branch-not-taken' }); // precondition for the blind leg: the card is on the board
+
+    // A SERVED copy built on purpose: the setup's door guard (`test/setup.ts`) would refuse it, as the ingest door does (29.446).
+    (globalThis as Record<string, unknown>)['__gnAllowRefusedPayloads'] = true;
+    const blind = await fold(withheld);
+    expect(blind.state).not.toBeNull(); // the fold did not throw and the ticket is there
+    expect(blind.state?.closed?.cause).toEqual(withheld);
+    expect(resolutionOf(blind.state ?? {})).toEqual({ kind: 'not-taken', decisionTicketId: null, outcome: 'Yes', pass: 1 });
+    expect(blind.row?.notTaken).toBe(true);
+    expect(countRows(blind.row === undefined ? [] : [blind.row])).toEqual({ total: 1, terminal: 0 }); // Not taken is never done
+    expect(blind.card?.cause).toEqual({ kind: 'branch-not-taken' }); // the provenance cause, as the server serves it
+    expect(JSON.stringify([blind.row, blind.card])).not.toContain(decision);
   });
 });

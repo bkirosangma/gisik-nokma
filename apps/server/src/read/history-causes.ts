@@ -1,4 +1,4 @@
-import { isFlowCause, withholdCauseTicket, type FlowCause } from '@gisik-nokma/domain';
+import { isFlowCause, isWithheldFlowCause, withholdCauseTicket, type FlowCause } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { TicketHistoryEvent } from '../routes/ticket-history.js';
 import type { TargetSight } from '../visibility/withhold-link-targets.js';
@@ -23,11 +23,18 @@ export function causeTicketId(cause: FlowCause): string {
 
 /**
  * Sets `causeTicket` on every flow-caused event: `{ key }` when this viewer can see the cause's ticket, else `null`,
- * and then the payload's cause is served with its ticket id and people nulled (`withholdCauseTicket`, AMEND 2). An
- * event with no flow cause is left as it is, with no `causeTicket` key. A page is at most `MAX_LIMIT` events, so the
- * per-ticket lookups are bounded.
+ * and then the payload's cause is served with its ticket id and people nulled (`withholdCauseTicket`, AMEND 2). A cause
+ * the route's `withholdEvent` already withheld reads `null` with no lookup; the nulling here still answers a raw cause
+ * whose ticket has no row (unknown and invisible are one answer). An event with no flow cause is left as it is, with no
+ * `causeTicket` key. A page is at most `MAX_LIMIT` events, so the per-ticket lookups are bounded.
  */
 export async function annotateFlowCauses(db: Queryable, sees: TargetSight, events: TicketHistoryEvent[]): Promise<void> {
+  // The route's `withholdEvent` runs first, with the same sight, and has already withheld a cause naming a ticket this
+  // viewer cannot see (wtg-flow-cause-withhold): that event's ticket is hidden, and there is no id left to look up.
+  for (const event of events) {
+    const cause = typeof event.payload === 'object' && event.payload !== null ? (event.payload as { cause?: unknown }).cause : undefined;
+    if (isWithheldFlowCause(cause)) event.causeTicket = null;
+  }
   const caused = events.flatMap((event) => {
     const cause = causeOf(event.payload);
     return cause === null ? [] : [{ event, cause }];

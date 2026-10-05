@@ -1,6 +1,6 @@
 import type { TicketLinkKind } from './events/ticket-events.js';
 import type { StateCategory } from './workflow.js';
-import type { FlowCause } from './flow/causes.js';
+import type { FlowCause, WithheldFlowCause } from './flow/causes.js';
 import type { WorkPeriod } from './flow/derive.js';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
@@ -50,8 +50,10 @@ export type TicketState = {
    * `cause` is the flow's `branch-not-taken` close cause (wtg2 T8, PS-5), present only on such a close; the reducer
    * stores it and `ticket.reopened` drops it with the flag. The server projects it to `proj_tickets.closed_cause` and
    * `rowToTicketState` reads it back onto `closed` (wtg2 T9); `resolutionOf` (`flow/derive.ts`) reads it as "not taken".
+   * A CLIENT may hold the served `WithheldFlowCause` instead (the Decision and its decider null): every server door
+   * serves that to a viewer who cannot see the Decision (wtg-flow-cause-withhold); the server's own fold never does.
    */
-  closed?: { actorId: string; at: string; cause?: FlowCause } | null;
+  closed?: { actorId: string; at: string; cause?: FlowCause | WithheldFlowCause } | null;
   /**
    * The backlog rank key (spec §8.1): set by `ticket.ranked`, and `null` on a
    * ticket nobody has ranked — including one just created, which writes the
