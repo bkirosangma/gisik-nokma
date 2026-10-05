@@ -138,7 +138,7 @@
     // WTG Part 1 T1: the browser suite drives Chromium against the BUILT app-core, viewport and ui packages and reads the stylesheet the view ships.
     "@gisik-nokma/flow-graph-browser#test": {
       "dependsOn": ["^build"],
-      // The Playwright port (13.2290): `ctl gate` exports FG_PW_PORT=3292 and turbo's strict env mode would drop it. A pass-through variable is not hashed.
+      // The Playwright port (13.2293): `ctl gate` exports FG_PW_PORT=3292 and turbo's strict env mode would drop it. A pass-through variable is not hashed.
       "passThroughEnv": ["FG_PW_PORT"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/viewport/src/**", "$TURBO_ROOT$/packages/app-core/src/**", "$TURBO_ROOT$/packages/ui/src/ui.css"]
     },
