@@ -3128,7 +3128,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — a switch, remembered from your last answer. On means the ticket waits, unordered work with a Start button, until somebody starts it (§8); off means it is born straight into a state. - "
+                      "text": " — a switch, remembered from your last answer. On means the ticket waits, unordered work with a Start button, until somebody starts it, or its flow does (§8); off means it is born straight into a state. - "
                     },
                     {
                       "kind": "bold",
@@ -5757,7 +5757,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button that moves that ticket into its workflow."
+                    "text": " button that moves that ticket into its workflow. A ticket another one "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "leads to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " does not wait for the button: once what leads to it is finished, the flow starts it, as "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Flow"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Send it back here and it stays."
                   }
                 ]
               },

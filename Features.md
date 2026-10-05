@@ -3906,6 +3906,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part2-model T12 bullet -->
 - ⚙️ **Flow walk** (wtg2 T12; `apps/server/src/flow/read-flow.ts`) — the connected component of a ticket over "leads to" links for one viewer, walked ring by ring: a ticket the viewer cannot read is a hole (no placeholder, no count, not walked through), the viewer's own drafts are included, at most 300 tickets and 30 rings with `truncated` and `reached`; `GET /v1/workspaces/:workspaceId/tickets/:ticketId/flow` serves it inside Part 3's `FlowRead` (the Workflow graph's flow read, below). Cases 29.187-29.189.
 <!-- wtg-part2-model T13 bullet -->
+- ⚙️ **Auto-promotion** (wtg2 T13; `packages/domain/src/flow/promotion.ts`, `apps/server/src/flow/promote.ts`) — a Backlog ticket moves to its workflow's first state, as the reserved Flow actor with a `led-to` cause, when any incoming "leads to" source is finished (or all of them with Wait for all); a person's Send to backlog sticks; the engine accepts a `led-to` move only out of Backlog. Cases 29.210-29.221.
 <!-- wtg-part2-model T14 bullet -->
 <!-- wtg-part2-model T15 bullet -->
 <!-- wtg-part2-model T16 bullet -->
