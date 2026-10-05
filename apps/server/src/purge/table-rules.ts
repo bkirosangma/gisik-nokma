@@ -184,6 +184,17 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
     by: ['workspace_id', 'ticket_id'],
     why: 'Erased for the set by ticket_id (a comment row carries its ticket); a surviving ticket’s rows are deleted and the embed worker re-chunks it (KG-D Task 2).',
   },
+  proj_concepts: {
+    rule: 'erase',
+    by: ['workspace_id'],
+    why: 'A workspace’s concepts; erased with it. A concept is never purged on its own (spec D has no concept trash).',
+  },
+  proj_concept_items: {
+    rule: 'erase',
+    by: ['workspace_id'],
+    why: 'Rows naming an erased ticket or note are deleted by eraseRows on (item_kind, item_id); the projection skips a purged item on replay (KG-D Task 3).',
+  },
+  proj_concept_links: { rule: 'erase', by: ['workspace_id'], why: 'Concept-to-concept only; erased with the workspace.' },
   proj_workspaces: { rule: 'erase', by: ['workspace_id'], why: 'The workspace’s lifecycle row.' },
   purged_entities: {
     rule: 'purge-registry',

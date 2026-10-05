@@ -100,6 +100,11 @@ export async function eraseRows(db: PoolClient, set: ErasureSet): Promise<void> 
            OR (target_kind = 'note' AND target_id = ANY($2::text[]))`,
       [T, N],
     ],
+    // KG-D T3: a concept's tag naming an erased ticket or note (the concept and its other tags survive).
+    [
+      "DELETE FROM proj_concept_items WHERE (item_kind = 'ticket' AND item_id = ANY($1::text[])) OR (item_kind = 'note' AND item_id = ANY($2::text[]))",
+      [T, N],
+    ],
     ['DELETE FROM proj_memberships WHERE project_id = ANY($1::text[])', [P]],
     ['DELETE FROM proj_project_prefixes WHERE project_id = ANY($1::text[])', [P]],
     ['DELETE FROM proj_projects WHERE project_id = ANY($1::text[])', [P]],
