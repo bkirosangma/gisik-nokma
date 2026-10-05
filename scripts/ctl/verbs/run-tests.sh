@@ -82,11 +82,14 @@ stop_child() {
   wait "$child" 2>/dev/null
   return 0
 }
-# The cap's timer: a background subshell in its OWN group (set -m) that sleeps the cap and then sends USR1 to the verb, only while the verb is still
-# the process that started it (pid AND start time: a verb that died by SIGKILL leaves a timer that can signal nothing). It never signals the job: the
-# verb does, in its own group only. Stopped on every exit path, so no timer outlives the run.
+# The cap's timer: ONE process, `perl` exec'd in the background (no subshell, no child of its own), that sleeps the cap and then sends USR1 to
+# the verb only while its parent is still the verb (`getppid`: a timer whose verb died is reparented to launchd and signals nothing, whatever
+# reuses the verb's pid). It never signals the job: the verb does, in the job's own group only. Stopped by KILL to its own pid on every exit path,
+# so no timer outlives the run, and only while it has not fired (a fired timer has exited; its pid is never signalled). Measured 2026-10-05:
+# the first version, a `( … sleep N … ) &` subshell stopped through its group, left the subshell's `sleep` orphaned in 25 of 40 runs of a job
+# that ends at once, and once lost a TERM in the fork window and made the verb wait out the whole sleep (13.1752's `kill -TERM $$` job).
 timer=""; cap_fired=0
-stop_timer() { [ -z "$timer" ] && return 0; { kill -TERM -- "-$timer"; wait "$timer"; } 2>/dev/null; timer=""; return 0; }
+stop_timer() { [ -z "$timer" ] && return 0; { [ "$cap_fired" = 1 ] || kill -KILL "$timer"; wait "$timer"; } 2>/dev/null; timer=""; return 0; }
 # The cap's stop: TERM the job's whole group, wait up to $grace s for the GROUP (not just the leader) to empty, then KILL it. Never a pid outside it.
 cap_stop() {
   local n=0
@@ -125,8 +128,7 @@ set -m
 "${cmd[@]}" >> "$log" 2>&1 < /dev/null &
 child=$!
 if [ "$cap_secs" -gt 0 ]; then
-  verb_ls="$(ctl_sem_lstart $$)"
-  ( trap - EXIT INT TERM USR1; sleep "$cap_secs"; [ "$(ctl_sem_lstart $$)" = "$verb_ls" ] && kill -USR1 $$ ) < /dev/null > /dev/null 2>&1 &
+  perl -e '($v, $s) = @ARGV; sleep $s; kill "USR1", $v if getppid() == $v' "$$" "$cap_secs" < /dev/null > /dev/null 2>&1 &
   timer=$!
 fi
 { wait "$child"; } 2>/dev/null; rc=$?

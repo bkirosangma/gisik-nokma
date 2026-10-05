@@ -102,15 +102,22 @@ check "13.2325 GISIK_RUN_MAX_MIN=2 caps a hung run (rc 124, TIMEOUT after 2 min)
   '[ $re -eq 124 ] && printf "%s\n" "$oe" | tail -1 | grep -q "TIMEOUT after 2 min" && [ $rz -eq 0 ] && grep -qx outlived-the-env-cap "$lz" && ! grep -q TIMEOUT "$lz"'
 
 # ---- 13.2326 no timer outlives its run ----
-# The timer sleeps the scaled cap: `--max-min $TM` (a value of this run's own, 5000-9999) makes it a `sleep $TM` that nothing else on the machine
-# runs, a leftover of an earlier run of this suite included.
+# The timer sleeps the scaled cap: `--max-min $TM` (a value of this run's own, 5000-9999) makes it a process whose LAST argument is $TM (the perl
+# timer's seconds; a subshell timer's `sleep $TM` as well), which nothing else on the machine runs, a leftover of an earlier run of this suite included.
 TM=$(( 5000 + ($$ * 7 + RANDOM) % 5000 ))
-ntimers() { ps -eo args= | grep -cx "sleep $TM"; }
-reset; rt --label tnorm --max-min "$TM" -- sh -c 'ps -eo args= | grep -cx "sleep $2" > "$1.during"' x "$fx/j.t" "$TM" > /dev/null; after_norm=$(ntimers); during_norm=$(cat "$fx/j.t.during" 2>/dev/null)
+ntimers() { ps -axo command= | awk -v t="$TM" '$NF == t && $1 != "awk"' | wc -l | tr -d ' '; }   # not the counting awk itself (ps shows it as `awk -v t <TM>`)
+reset; rt --label tnorm --max-min "$TM" -- sh -c 'ps -axo command= | awk -v t="$1" '"'"'$NF == t && $1 != "awk"'"'"' | wc -l | tr -d " " > "$2.during"' x "$TM" "$fx/j.t" > /dev/null; after_norm=$(ntimers); during_norm=$(cat "$fx/j.t.during" 2>/dev/null)
 reset; ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_RUN_SECS_PER_MIN=1 CTL_DRY_RUN=0 exec "$HERE/ctl" run-tests --repo "$repo" --label tterm --max-min "$TM" -- sh -c 'echo $$ >> "$FXP"; : > "$1.up"; sleep 60' x "$fx/j.u" > "$fx/j.u.out" 2>&1 ) & vp=$!
 n=0; while [ ! -f "$fx/j.u.up" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; during_term=$(ntimers); kill -TERM "$vp"; wait "$vp"; rterm=$?; sleep 0.3; after_term=$(ntimers)
-check "13.2326 the timer is there while the job runs (CONTROL: one 'sleep <its scaled cap>' seen from inside the job, and from outside before the TERM) and gone after the run: after a normal end, and after a TERM to the verb (exit 143, slot released)" \
+check "13.2326 the timer is there while the job runs (CONTROL: one process ending in its scaled cap, seen from inside the job, and from outside before the TERM) and gone after the run: after a normal end, and after a TERM to the verb (exit 143, slot released)" \
   '[ "$during_norm" = 1 ] && [ "$after_norm" = 0 ] && [ "$during_term" = 1 ] && [ $rterm -eq 143 ] && [ "$after_term" = 0 ] && [ "$(slots_left)" = 0 ]'
+# Jobs that end AT ONCE put the timer's stop inside its start-up: the first (subshell) timer left its `sleep` orphaned in 25 of 40 such runs.
+reset; sbad=0; for k in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if [ $((k % 2)) = 0 ]; then RT_ALARM=10 rt --max-min "$TM" -- sh -c 'kill -TERM $$' > /dev/null; [ $? -eq 143 ] || sbad=$((sbad+1))
+  else RT_ALARM=10 rt --max-min "$TM" -- true > /dev/null; [ $? -eq 0 ] || sbad=$((sbad+1)); fi
+done; sleep 0.3; after_stress=$(ntimers)
+check "13.2326 20 jobs that end at once (true, and 13.1752's self-TERM \`sh -c 'kill -TERM \$\$'\`) each return their own code (0 / 143) within 10 s and leave NO timer process behind" \
+  '[ "$sbad" = 0 ] && [ "$after_stress" = 0 ]'
 
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----
 cat > "$fx/rec-run-tests" <<'SH'
