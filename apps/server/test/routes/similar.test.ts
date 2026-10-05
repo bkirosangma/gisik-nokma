@@ -22,6 +22,10 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * owner sees has an older id, so only a DISTANCE order can put `nNear` first. Twelve filler notes give the
  * owner more than 20 candidates, so `k`'s default (10) and its cap (20) both cut something.
  *
+ * Another tenant: the neighbour's ticket takes TP's description and comment word for word, and the neighbour
+ * gets `nbNote`, a note paraphrasing TP's three texts, both before `nNear`. An owner's visibility clause is
+ * `TRUE`, so `c.workspace_id` is the only fence that keeps them out of the owner's answers here.
+ *
  * One real worker pass with the real model fills the chunk caches (drained; its log must stay empty).
  */
 let db: TestDatabase;
@@ -32,6 +36,7 @@ let TP: string;
 let TE: string;
 let N: ReadWorldNotes['NOTES'];
 const nNear = { id: '' };
+const nbNote = { id: '' };
 
 function ticketEv(ticketId: string, type: string, payload: unknown): LedgerEvent {
   return makeCommitted({ workspaceId: WS, actorId: world.userIds.owner, entity: { kind: 'ticket', id: ticketId }, type, payload });
@@ -73,6 +78,20 @@ beforeAll(async () => {
     ticketEv(TP, 'comment.added', { body: docOf('Call the accountant about the late fee waiver') }),
     ...Array.from({ length: 12 }, (_, index) => noteCreated(newUlid(), `Shelf label ${String(index + 1)}`)),
   ]);
+  const nb = world.neighbour;
+  nbNote.id = newUlid();
+  const nbEv = (entity: { kind: 'ticket' | 'note'; id: string }, type: string, payload: unknown) =>
+    makeCommitted({ workspaceId: nb.workspaceId, actorId: world.userIds.neighbour, entity, type, payload });
+  await applyCommitted(db.pool, [
+    nbEv({ kind: 'ticket', id: nb.ticketId }, 'ticket.field_set', { fieldId: 'description', value: docOf('The municipal office wants the stamped renewal form before the end of March') }),
+    nbEv({ kind: 'ticket', id: nb.ticketId }, 'comment.added', { body: docOf('Call the accountant about the late fee waiver') }),
+    nbEv({ kind: 'note', id: nbNote.id }, 'note.created', {
+      title: 'GST and the renewal form',
+      homeProjectId: nb.projectId,
+      scope: { mode: 'workspace' },
+      body: docOf('Submit the GST return.', 'The council office needs the stamped renewal form by the end of March.', 'Ring the accountant to waive the late fee.'),
+    }),
+  ]);
   nNear.id = newUlid();
   await applyCommitted(db.pool, [
     noteCreated(
@@ -109,12 +128,12 @@ async function drain(): Promise<void> {
 
 type Hit = { kind: 'ticket' | 'note'; id: string; title: string; score: number };
 
-async function similar(role: ReadRole, qs: string): Promise<{ status: number; body: unknown }> {
-  const res = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/similar?${qs}`, headers: world.authOf(role) });
+async function similar(role: ReadRole, qs: string, workspaceId = WS): Promise<{ status: number; body: unknown }> {
+  const res = await app.inject({ method: 'GET', url: `/v1/workspaces/${workspaceId}/similar?${qs}`, headers: world.authOf(role) });
   return { status: res.statusCode, body: res.json() as unknown };
 }
-async function hitsOf(role: ReadRole, qs: string): Promise<Hit[]> {
-  const res = await similar(role, qs);
+async function hitsOf(role: ReadRole, qs: string, workspaceId = WS): Promise<Hit[]> {
+  const res = await similar(role, qs, workspaceId);
   expect(res.status, JSON.stringify(res.body)).toBe(200);
   return (res.body as { hits: Hit[] }).hits;
 }
@@ -156,6 +175,17 @@ describe('27.430 similar (KG-D T2)', () => {
     expect(guest).not.toContain(TP);
     expect(guest).not.toContain(N.nProject);
 
+    // A NOTE as the source: nNear paraphrases TP's three texts, so TP is its nearest item. The self-exclusion
+    // matches kind AND id, so nNear is never its own neighbour, and the other notes still answer.
+    const fromNote = await hitsOf('owner', `item=note:${nNear.id}`);
+    expect(fromNote.length, 'a note source answers').toBeGreaterThanOrEqual(1);
+    expect(fromNote[0], 'TP is nearest to its paraphrase').toMatchObject({ kind: 'ticket', id: TP });
+    expect(fromNote.map((hit) => hit.id), 'never the note itself').not.toContain(nNear.id);
+    expect(fromNote.some((hit) => hit.kind === 'note'), 'other notes still answer a note source').toBe(true);
+    // A note the guest cannot read is the same 404 as a ticket; control: their explicit note answers.
+    expect(await similar('guest', `item=note:${N.nProject}`), 'a note the guest cannot read').toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
+    expect((await similar('guest', `item=note:${N.nExplicit}`)).status).toBe(200);
+
     // 400: `invalid_query`, the search route's body.
     for (const qs of [`item=ticket:${TP}&k=21`, `item=ticket:${TP}&k=0`, `item=ticket:${TP}&k=1.5`, 'item=widget:x', 'k=3']) {
       expect(await similar('owner', qs), qs).toEqual({ status: 400, body: { error: 'invalid_query' } });
@@ -167,6 +197,42 @@ describe('27.430 similar (KG-D T2)', () => {
     expect(await similarItems(db.pool, eff!, world.userIds.owner, WS, { kind: 'ticket', id: TP }, 50)).toHaveLength(20);
     // An item with no chunks yet is not a refusal: `[]`.
     expect(await similarItems(db.pool, eff!, world.userIds.owner, WS, { kind: 'ticket', id: newUlid() }, 5)).toEqual([]);
+  });
+
+  it('27.430 — another workspace’s ticket and note never answer, though an owner’s visibility clause is TRUE', async () => {
+    const nb = world.neighbour;
+    // The haystack holds the subject: the neighbour's ticket (its title, TP's description, TP's comment) and note
+    // are embedded …
+    const { rows: nbRows } = await db.pool.query<{ item_kind: string; chunk_index: number; chunk_text: string }>(
+      'SELECT item_kind, chunk_index, chunk_text FROM search_item_chunks WHERE ticket_id = $1 ORDER BY item_kind DESC, chunk_index',
+      [nb.ticketId],
+    );
+    expect(nbRows).toEqual([
+      { item_kind: 'ticket', chunk_index: 0, chunk_text: nb.ticketTitle },
+      { item_kind: 'ticket', chunk_index: 1, chunk_text: 'The municipal office wants the stamped renewal form before the end of March' },
+      { item_kind: 'comment', chunk_index: 0, chunk_text: 'Call the accountant about the late fee waiver' },
+    ]);
+    expect((await db.pool.query('SELECT 1 FROM search_note_chunks WHERE note_id = $1', [nbNote.id])).rows.length).toBeGreaterThan(0);
+    // … and each is nearer to TP than the owner's 20th hit, so without the fence it would be inside k = 20: the
+    // absence below can fail. The score is computed here, apart from `similarItems`, as the route's source mean does.
+    const owner = await hitsOf('owner', `item=ticket:${TP}&k=20`);
+    expect(owner).toHaveLength(20);
+    const { rows: near } = await db.pool.query<{ ticket: number | null; note: number | null }>(
+      `WITH src AS (SELECT avg(embedding) AS v FROM search_item_chunks WHERE ticket_id = $1 AND chunk_text <> '')
+       SELECT (SELECT 1 - (avg(c.embedding) <=> src.v) FROM search_item_chunks c WHERE c.ticket_id = $2 AND c.chunk_text <> '') AS ticket,
+              (SELECT 1 - (avg(c.embedding) <=> src.v) FROM search_note_chunks c WHERE c.note_id = $3) AS note
+         FROM src`,
+      [TP, nb.ticketId, nbNote.id],
+    );
+    expect(near[0]!.ticket, 'the neighbour ticket would be inside k').toBeGreaterThan(owner.at(-1)!.score);
+    expect(near[0]!.note, 'the neighbour note would be inside k').toBeGreaterThan(owner.at(-1)!.score);
+
+    const ownerIds = owner.map((hit) => hit.id);
+    expect(ownerIds, 'tenancy: the owner never gets the neighbour ticket').not.toContain(nb.ticketId);
+    expect(ownerIds, 'tenancy: the owner never gets the neighbour note').not.toContain(nbNote.id);
+    // Control: in its own workspace the neighbour gets each from the other, the only two items there.
+    expect((await hitsOf('neighbour', `item=ticket:${nb.ticketId}`, nb.workspaceId)).map((hit) => hit.id)).toEqual([nbNote.id]);
+    expect((await hitsOf('neighbour', `item=note:${nbNote.id}`, nb.workspaceId)).map((hit) => hit.id)).toEqual([nb.ticketId]);
   });
 
   it('27.430 — a deleted ticket, note or comment, and a blank chunk, never count as neighbours', async () => {

@@ -23,7 +23,8 @@ function sessionWith(get: Session['get']): Session {
 
 const SIMILAR_DESCRIPTION =
   'The tickets and notes nearest to one item by MEANING (what they say, not the words they share), with a ' +
-  'similarity score from 0 to 1. Up to k (default 10, at most 20), only items you can see. A ticket counts ' +
+  'similarity score from −1 to 1 (cosine similarity; higher is closer; unrelated items sit near 0). ' +
+  'Up to k (default 10, at most 20), only items you can see. A ticket counts ' +
   'its comments. Items written in the last few seconds may not be indexed yet.';
 
 describe('27.431–27.432 the MCP graph reads (KG-D T2)', () => {

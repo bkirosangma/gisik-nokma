@@ -98,11 +98,11 @@ afterAll(async () => {
 
 type Hit = { card: { ticketId: string }; matchedIn: string; snippet: string };
 
-async function search(role: ReadRole, q: string, mode: 'meaning' | 'lexical', filter?: unknown): Promise<Hit[]> {
+async function search(role: ReadRole, q: string, mode: 'meaning' | 'lexical', filter?: unknown, workspaceId = WS): Promise<Hit[]> {
   const filterQs = filter === undefined ? '' : `&filter=${encodeURIComponent(JSON.stringify(filter))}`;
   const res = await app.inject({
     method: 'GET',
-    url: `/v1/search?workspaceId=${WS}&q=${encodeURIComponent(q)}&mode=${mode}${filterQs}`,
+    url: `/v1/search?workspaceId=${workspaceId}&q=${encodeURIComponent(q)}&mode=${mode}${filterQs}`,
     headers: world.authOf(role),
   });
   expect(res.statusCode, res.body).toBe(200);
@@ -144,6 +144,19 @@ describe('27.427–27.429 meaning search answers tickets (KG-D T2)', () => {
     // The filter spec applies to the meaning half, blocked CTE included: the world's one blocked ticket
     // (sharedTask, in the blocked-flagged state) is the only answer to `blocked: true`.
     expect(ids(await search('owner', DESCRIPTION, 'meaning', { blocked: true }))).toEqual([world.world.sharedTaskId]);
+
+    // Tenancy. For an owner `visibleTicketsWhere` is `TRUE`, so `c.workspace_id` is the only fence against another
+    // workspace's tickets. The neighbour's ticket is embedded too (the worker embeds every workspace), and its own
+    // title would put it first if it were a candidate.
+    const nb = world.neighbour;
+    const { rows: nbRows } = await db.pool.query<{ item_kind: string; chunk_index: number; chunk_text: string }>(
+      'SELECT item_kind, chunk_index, chunk_text FROM search_item_chunks WHERE ticket_id = $1',
+      [nb.ticketId],
+    );
+    expect(nbRows, 'the haystack holds the neighbour ticket').toEqual([{ item_kind: 'ticket', chunk_index: 0, chunk_text: nb.ticketTitle }]);
+    expect(ids(await search('owner', nb.ticketTitle, 'meaning')), 'tenancy: the owner never gets the neighbour ticket').not.toContain(nb.ticketId);
+    // Control: the neighbour, in its own workspace, gets it first.
+    expect(ids(await search('neighbour', nb.ticketTitle, 'meaning', undefined, nb.workspaceId))[0]).toBe(nb.ticketId);
   });
 
   it('27.428 — matchedIn for a meaning hit: chunk 0 is the title, a comment chunk is the comment', async () => {
