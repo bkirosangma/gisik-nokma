@@ -513,8 +513,8 @@ settings are kept for about a month in case they come back.
 3. A small window opens with these things:
    - **Title** — what the ticket is. "Fix Mrs. Patel's leaking pipe."
    - **Starts in the backlog?** — a switch, remembered from your last answer. On means the ticket waits,
-     unordered work with a Start button, until somebody starts it (§8); off means it is born straight
-     into a state.
+     unordered work with a Start button, until somebody starts it, or its flow does (§8); off means it
+     is born straight into a state.
    - **Type** — what kind of ticket this is, from your workspace's list.
    - **Starting status** — which state of the workflow the ticket is born in, defaulting to the workflow's
      own first state. Disabled, with a note explaining where the ticket will actually start, while "Starts
@@ -971,7 +971,8 @@ The first tab, and where a new ticket starts its life. It lists the tickets that
 you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Those buttons move a
 ticket in the order of the whole backlog, not only within the group it is listed under, and they stay
 visible when the backlog is grouped; hover one and it says so. Each row also has a **Start** button that
-moves that ticket into its workflow.
+moves that ticket into its workflow. A ticket another one *leads to* does not wait for the button: once
+what leads to it is finished, the flow starts it, as **Flow**. Send it back here and it stays.
 
 It does not leave closed tickets out, unlike the Calendar and the Timeline below. When it is empty it says
 so: *"Nothing in the backlog. Tickets you add land here."* — or, when the only thing it would have listed
