@@ -48,8 +48,8 @@ export type TicketState = {
    * `state.closed ?? null`. The wire types carry it required.
    *
    * `cause` is the flow's `branch-not-taken` close cause (wtg2 T8, PS-5), present only on such a close; the reducer
-   * stores it and `ticket.reopened` drops it with the flag. Reducer-only for now: `rowToTicketState` rebuilds `closed`
-   * from `closed_at` / `closed_by`, which hold no cause.
+   * stores it and `ticket.reopened` drops it with the flag. The server projects it to `proj_tickets.closed_cause` and
+   * `rowToTicketState` reads it back onto `closed` (wtg2 T9); `resolutionOf` (`flow/derive.ts`) reads it as "not taken".
    */
   closed?: { actorId: string; at: string; cause?: FlowCause } | null;
   /**

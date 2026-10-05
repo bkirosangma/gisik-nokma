@@ -2,15 +2,20 @@ import type { PoolClient } from 'pg';
 import {
   TICKET_EVENT_TYPES,
   applyTicketEvent,
+  endedAtOf,
   foldTicketToWorkflowVersion,
   isRedactedTicketCreated,
   isRedactedTicketPublished,
+  startedAtOf,
+  ticketRound,
   workflowDefinedPayloadSchema,
+  type FlowCause,
   type LedgerEvent,
   type PassRecord,
   type TicketLink,
   type TicketState,
   type TicketStateDeps,
+  type WorkPeriod,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
@@ -138,6 +143,18 @@ type TicketRow = {
   outcome: string | null;
   /** `TicketState.passes`' column (wtg2 T5, PS-2): a Decision's pass records, `[]` until the first choice. */
   passes: PassRecord[];
+  /**
+   * The actual start and end (wtg2 T9, ES-4): DERIVED from `periods` by `upsertTicket` (`startedAtOf` / `endedAtOf`)
+   * for the sweep and the index, and never read back: `rowToTicketState` rebuilds nothing from them.
+   */
+  started_at: Date | null;
+  ended_at: Date | null;
+  /** `TicketState.periods`' column (wtg2 T9, WP-1): `[]` for a ticket that never started. */
+  periods: WorkPeriod[];
+  /** `TicketState.rounds`' column (wtg2 T9, PS-2): 1 for a ticket the flow never reset. */
+  rounds: number;
+  /** `TicketState.closed.cause`'s column (wtg2 T9): the close's flow cause, NULL for a person's close or no close. */
+  closed_cause: FlowCause | null;
 };
 
 /**
@@ -195,10 +212,13 @@ export function rowToTicketState(row: TicketRow): TicketState {
     // columns are written from the same `next.closed`), but this reader does
     // not assume that of every row it is ever handed and answers `null` unless
     // BOTH columns agree there is a claim.
+    //
+    // `cause` (wtg2 T9) rides the claim only when `closed_cause` holds one: absent, never `undefined`, the reducer's
+    // shape for a person's close (29.206).
     closed:
       row.closed_at === null || row.closed_by === null
         ? null
-        : { actorId: row.closed_by, at: row.closed_at.toISOString() },
+        : { actorId: row.closed_by, at: row.closed_at.toISOString(), ...(row.closed_cause === null ? {} : { cause: row.closed_cause }) },
     // Read UNCONDITIONALLY, and the absent-versus-null distinction is the point
     // rather than a detail: `rank` is one column with one meaning (`NULL` = never
     // ranked), so there is no second field to disagree with and no fold to make.
@@ -259,6 +279,11 @@ export function rowToTicketState(row: TicketRow): TicketState {
     // until the first choice, so a NULL / '[]' column reads back as no key at all.
     ...(row.outcome === null ? {} : { outcome: row.outcome }),
     ...(row.passes.length === 0 ? {} : { passes: row.passes }),
+    // Absent when empty / 1, the reducer's shape (wtg2 T9, WP-1, PS-2): `periods` is dropped with the last period and
+    // `rounds` is written only by a flow reset, so the column defaults '[]' and 1 read back as no key at all.
+    // `started_at` / `ended_at` are not read: they are derived from `periods`.
+    ...(row.periods.length > 0 ? { periods: row.periods } : {}),
+    ...(row.rounds > 1 ? { rounds: row.rounds } : {}),
   };
 }
 
@@ -332,8 +357,10 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
         closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by,
-        draft_author_id, draft_at, draft_discarded, links, pending_children, outcome, passes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        draft_author_id, draft_at, draft_discarded, links, pending_children, outcome, passes,
+        started_at, ended_at, periods, rounds, closed_cause)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+             $27, $28, $29, $30, $31)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -358,7 +385,12 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        links = EXCLUDED.links,
        pending_children = EXCLUDED.pending_children,
        outcome = EXCLUDED.outcome,
-       passes = EXCLUDED.passes`,
+       passes = EXCLUDED.passes,
+       started_at = EXCLUDED.started_at,
+       ended_at = EXCLUDED.ended_at,
+       periods = EXCLUDED.periods,
+       rounds = EXCLUDED.rounds,
+       closed_cause = EXCLUDED.closed_cause`,
     [
       next.id,
       next.workspaceId,
@@ -421,6 +453,14 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // are the columns' empty values, not reachability guards; the ON CONFLICT list above makes a clear reach the row.
       next.outcome ?? null,
       JSON.stringify(next.passes ?? []),
+      // The work periods (wtg2 T9): the two dates DERIVED from the fold (ES-4), the fold itself (`[]` for the reducer's
+      // absent key), the round (1 when absent), and the close's flow cause. A reopen folds `closed: null`, so the ON
+      // CONFLICT list above clears the cause exactly as it clears `closed_at`.
+      startedAtOf(next),
+      endedAtOf(next),
+      JSON.stringify(next.periods ?? []),
+      ticketRound(next),
+      next.closed?.cause === undefined ? null : JSON.stringify(next.closed.cause),
     ],
   );
 }
