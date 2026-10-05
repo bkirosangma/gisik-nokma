@@ -587,7 +587,6 @@ describe('GET /v1/workspaces/:workspaceId/home â€” six numbers over the viewerâ€
     expect((await home('member')).ids.notes).not.toContain(fx.guestNote);
   });
 
-  // LAST in the file: it deletes a project, and every case above reads the shared workspace.
   it('27.632 the REAL /home body maps through the client mapper unchanged; control: a mapped body differs from a mutated one', async () => {
     // `home()` already returns the parsed body; `.json()` on it would throw.
     const body = await home('member');
@@ -603,6 +602,7 @@ describe('GET /v1/workspaces/:workspaceId/home â€” six numbers over the viewerâ€
     expect(() => mapHome({ ...body, dueSoonDays: '7' })).toThrow(/home\.dueSoonDays/);
   });
 
+  // LAST in the file: it deletes a project, and every case above reads the shared workspace.
   it('27.606 the trash: a trashed ticket is in no list, and deleting a project takes its tickets out of all four ticket lists', async () => {
     const before = await home('owner');
     expect(before.ids.tickets).not.toContain(fx.trashed);
