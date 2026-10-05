@@ -8,6 +8,7 @@ const A = ulid('AAA');
 const B = ulid('BBB');
 const D = ulid('DEC'); // a Decision
 const DR = ulid('DRF'); // a draft
+const DR2 = ulid('DR2'); // another of my drafts
 const tw = `/v1/workspaces/${WS}/tickets`;
 // The links route writes no `label` key when a row has none (29.126), so neither does this fixture.
 const row = (kind: string, direction: 'out' | 'in', id: string, label: string | null = null) => ({
@@ -15,7 +16,7 @@ const row = (kind: string, direction: 'out' | 'in', id: string, label: string | 
 });
 const ENDS = {
   [`${tw}/${A}`]: detail({ key: 'GN-1' }), [`${tw}/${B}`]: detail({ key: 'GN-2' }), [`${tw}/${D}`]: detail({ key: 'GN-3', typeId: 'decision' }),
-  [`${tw}/${DR}`]: detail({ key: null, draft: true }),
+  [`${tw}/${DR}`]: detail({ key: null, draft: true }), [`${tw}/${DR2}`]: detail({ key: null, draft: true }),
 };
 const tool = (s: Parameters<typeof ticketTools>[0]) => ticketTools(s).find((t) => t.name === 'link_tickets')!;
 const base = { workspaceId: WS, kind: 'leads_to', action: 'add' } as const;
@@ -65,6 +66,10 @@ describe('29.375 link_tickets: leads_to, label, draft ends', () => {
     // an end the caller cannot read is the uniform sentence, and nothing is sent
     await expect(tool(f.session).handler({ ...base, kind: 'blocks', ticketId: A, targetId: ulid('HID') })).rejects.toThrow(/^ticket not found or not visible to you$/);
     expect(f.batches).toHaveLength(3);
+    // draft -> draft: plain on the SOURCE draft (a draft source files as always, R42), never on the target draft with `from`
+    await tool(f.session).handler({ ...base, kind: 'blocks', ticketId: DR, targetId: DR2 });
+    expect(f.batches[3]![0]).toMatchObject({ entity: { id: DR }, payload: { kind: 'blocks', targetId: DR2 } });
+    expect(payload(f.batches[3]![0])['from']).toBeUndefined();
   });
 
   it('29.375 the description an assistant reads, word for word', () => {
