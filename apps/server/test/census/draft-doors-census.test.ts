@@ -33,6 +33,7 @@ export function countDoorCalls(text: string): Calls {
 
 /** Every door of group D, per file. G10 is routes/attachments.ts and the fourth canOpen of routes/tickets.ts; G11 is check-permission.ts's canOpen; the note-event doors are noteEventVisibleTo and isClosedOrErasedDraft. */
 const DOORS: Record<string, Partial<Calls>> = {
+  'flow/read-flow.ts': { listMyDrafts: 1 }, // the flow read admits the viewer's own drafts as walk ends; never called for viewerId null (wtg2 T12, 29.188)
   'permissions/check-permission.ts': { ticketAccess: 1, canOpen: 3 }, // G1; G11 (T9, 28.191); the link block's other ends (drafts T6, 28.114) and the pending child (28.128)
   'read/drafts.ts': { holdsDraftRights: 1 }, // listMyDrafts holds each row to R18, the same function the doors use
   'read/notes.ts': { holdsDraftRights: 1 }, // the note detail's own-draft rows (attachedTicketsByNote ownDrafts), R18
