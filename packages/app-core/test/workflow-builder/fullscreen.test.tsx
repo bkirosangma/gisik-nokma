@@ -573,7 +573,13 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
     const spy = (event: KeyboardEvent) => {
       if (event.key === 'Escape') seen.push(event.defaultPrevented);
     };
+    // and the brief's window bubble spy, added after mount (so after the ladder): it sees each press handled, by either owner
+    const seenAtWindow: boolean[] = [];
+    const windowSpy = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') seenAtWindow.push(event.defaultPrevented);
+    };
     document.addEventListener('keydown', spy);
+    window.addEventListener('keydown', windowSpy);
     try {
       await user.keyboard('{Escape}');
       expect(mappingDialog()).toBeNull();
@@ -581,14 +587,34 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
       expect(panel()).not.toBeNull();
       expect(publish()).toHaveFocus();
       expect(seen).toEqual([true]);
+      expect(seenAtWindow).toEqual([true]);
 
       await user.keyboard('{Escape}');
       expect(panel()).toBeNull();
       expect(root).toHaveAttribute('data-fullscreen', 'true');
       expect(seen).toEqual([true, false]);
+      expect(seenAtWindow).toEqual([true, true]);
     } finally {
       document.removeEventListener('keydown', spy);
+      window.removeEventListener('keydown', windowSpy);
     }
+    expect(gateway.submitted).toEqual([]);
+  });
+
+  it('25.548 outside full screen too, Escape with the mapping open is its Cancel: the dialog closes, focus is back on the title row\'s Publish, and nothing is submitted', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const gateway = createFakeGateway({ occupancy: { [workflowId]: { review: 4 } } });
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    const publish = () => within(header.querySelector<HTMLElement>('.workflow-builder-screen__title-row')!).getByRole('button', { name: 'Publish' });
+    await user.click(publish());
+    // control: the mapping is open, in the title row, with full screen off
+    expect(header.querySelector('.workflow-builder-screen__title-row')!.contains(mappingDialog())).toBe(true);
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
+    await user.keyboard('{Escape}');
+    expect(mappingDialog()).toBeNull();
+    expect(publish()).toHaveFocus();
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
     expect(gateway.submitted).toEqual([]);
   });
 
