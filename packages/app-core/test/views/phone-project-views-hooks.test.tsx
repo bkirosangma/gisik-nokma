@@ -239,6 +239,8 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
       // CONTROL first: keyed, the first bar's key line pushes the second bar a column over (the leg CAN fail).
       expect(await rowsAtMonth(['GN-1', 'GN-2'])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '1']] });
       expect(await rowsAtMonth([null, null])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '0']] });
+      // An empty key is no key either (the measure's second clause; reviewer B, P11: dropping it survived the null-only leg).
+      expect(await rowsAtMonth(['', ''])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '0']] });
     } finally {
       vi.unstubAllGlobals();
     }

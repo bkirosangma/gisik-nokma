@@ -110,7 +110,10 @@ describe('29.109 portrait runs time down a sticky gutter, and the Nothing-in-vie
     const axis = ruleExactly(ui, portrait('.gn-timeline__axis'));
     expect(valueOf(axis, 'position')).toBe('sticky');
     expect(valueOf(axis, 'width')).toBe('var(--tl-gutter)');
-    expect(valueOf(ruleExactly(ui, portrait('.gn-timeline__today')), 'border-top')).toBe('2px solid var(--gn-accent)');
+    const today = ruleExactly(ui, portrait('.gn-timeline__today'));
+    expect(valueOf(today, 'border-top')).toBe('2px solid var(--gn-accent)');
+    // Across the middle of today's day, as the landscape line runs down it (reviewer B, P11: `+ 0.5` x10 survived without this).
+    expect(valueOf(today, 'top')).toBe('calc(var(--tl-axis-height) + (var(--d0) + 0.5) * var(--tl-ppd) * 1px)');
     // The key outside a short bar has no room in a 100 px column; its words are in the bar's title.
     expect(valueOf(ruleExactly(ui, portrait('.gn-timeline__key--outside')), 'display')).toBe('none');
     // CONTROL, same it: the landscape bar is still placed by --d0 from the left, and portrait is NOT a media query.

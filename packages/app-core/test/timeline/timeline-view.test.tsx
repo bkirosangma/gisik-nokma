@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
-import { BAR_PAD_PX, KEY_GAP_PX, MIN_BAR_PX } from '@gisik-nokma/viewport';
+import { BAR_PAD_PX, KEY_GAP_PX, MIN_BAR_PX, ScrollAdapter } from '@gisik-nokma/viewport';
 import {
   TIMELINE_EMPTY_COPY,
   TIMELINE_SIDE_LIST_COPY,
@@ -1289,6 +1289,29 @@ describe('29.108 Nothing in view, and the jumps that glide to the next or previo
     expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
     expect(screen.getByRole('button', { name: 'Jump to the previous bar' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Jump to the next bar' })).toBeDisabled();
+  });
+
+  it('29.108 the next side mirrors it: a bar starting the day after the view raises the pill with only "Jump to the next bar" enabled, and that jump aims at THAT bar; control: one starting on today shows no pill', () => {
+    // CONTROL first, same it: a bar starting on the view's last day touches it, so there is no pill.
+    renderTimeline([bar('Starts today', '2026-08-23', '2026-08-25')]);
+    expect(screen.queryByRole('status')).toBeNull();
+    document.body.innerHTML = '';
+    // One day later it no longer touches the view (it rests on [today, today] in jsdom): the boundary that `> end + 1` in `hasNext`
+    // or in the jump's filter would skip (reviewer B, P11; both mutants survived every leg before this one).
+    const jumps = vi.spyOn(ScrollAdapter.prototype, 'animateTo');
+    try {
+      renderTimeline([bar('Starts tomorrow', '2026-08-24', '2026-08-26')]);
+      expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
+      expect(screen.getByRole('button', { name: 'Jump to the previous bar' })).toBeDisabled();
+      const next = screen.getByRole('button', { name: 'Jump to the next bar' });
+      expect(next).toBeEnabled();
+      jumps.mockClear();
+      fireEvent.click(next);
+      // The jump centres the bar: its middle day, less half of a 0-day jsdom viewport.
+      expect(jumps.mock.calls.map((call) => call[0])).toEqual([{ offset: (dayNumberOf('2026-08-24') + dayNumberOf('2026-08-26')) / 2 }]);
+    } finally {
+      jumps.mockRestore();
+    }
   });
 
   it('29.108 no timeline control is named Earlier, Later, Previous or Next, with the pill up or down', () => {
