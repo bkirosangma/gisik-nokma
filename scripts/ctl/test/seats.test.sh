@@ -11,7 +11,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$HERE/verbs/seats.py"
 FX="$HERE/test/fixtures/seats"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 export TZ=UTC
 NOW=$(python3 -c 'import calendar;print(calendar.timegm((2026,10,3,2,0,0)))')   # 2026-10-03 02:00 UTC
 T=$(cd "$(mktemp -d)" && pwd -P)
@@ -291,4 +291,5 @@ check "13.2105 weekly: the status line's \"weekly 2%\" reads 2 in --json, and a 
   '[ "$(jv "$(run "$d" --json)" 2 "d[\"weekly\"]")" = 2 ] && [ "$(jv "$(run "$d2" --json)" 2 "d[\"weekly\"]")" = None ] && [ "$(jv "$(run "$d2" --json)" 2 "d[\"ctx\"]")" = 12 ]'
 
 rm -rf "$T"
+ctl_test_only_end seats.test.sh
 [ "$fails" -eq 0 ] && echo "seats tests green" || { echo "$fails seats tests red"; exit 1; }

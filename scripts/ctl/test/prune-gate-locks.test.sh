@@ -8,7 +8,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 V="$HERE/ctl"
 fails=0
 grep() { /usr/bin/grep "$@"; }   # never the PATH grep (ugrep here: different -E / BRE semantics; a negated check must not pass on its error)
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 NOW=$(date -j -f '%Y-%m-%d %H:%M:%S' '2026-10-04 12:00:00' +%s)
 H=3600; DAY=86400
 TMPLIST=$(mktemp); trap 'while read -r d; do case "$d" in /*/tmp.*) rm -rf "$d";; esac; done < "$TMPLIST"; rm -f "$TMPLIST"' EXIT
@@ -74,4 +74,5 @@ kills() { local m; m=$(mutant "$1" "$2") || return 1; ! CTL_PRUNE_PY="$m" prune_
 check "13.2104 every guard is load-bearing: copies with the age test dropped, the live-pid guard dropped, the in-ps guard dropped, the newest guard dropped, and the 24 h line stepped to 0 each FAIL the 13.2100 assertion; CONTROL in the same check: the unmutated file passes it through the same seam" \
   'CTL_PRUNE_PY="$PYSRC" prune_ok && kills "elif age <= (DIR_AGE if is_dir else LOG_AGE): why = \"recent\"" "elif False: why = \"recent\"" && kills "elif int(m.group(2)) in pids: why = \"live-pid\"" "elif False: why = \"live-pid\"" && kills "for _, args in procs): why = \"in-ps\"" "for _, args in procs) and False: why = \"in-ps\"" && kills "if is_dir and n == newest: why = \"newest\"" "if False: why = \"newest\"" && kills "DIR_AGE = 24 * 3600" "DIR_AGE = 0"'
 
+ctl_test_only_end prune-gate-locks.test.sh
 [ "$fails" -eq 0 ] && { echo "prune-gate-locks tests: all ok"; exit 0; } || { echo "prune-gate-locks tests: $fails FAILED"; exit 1; }

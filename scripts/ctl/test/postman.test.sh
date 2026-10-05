@@ -7,7 +7,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 CTL="$HERE/ctl"
 . "$HERE/lib.sh"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 T="$(cd "$(mktemp -d)" && pwd -P)"; R="$T/roles"; L="$T/logs"; N="$T/notes.md"; S="ctlpm-$$"
 mkdir -p "$R" "$L"; : > "$N"
 export CTL_POSTMAN_ROOT="$R" CTL_LOG_DIR="$L" CTL_POSTMAN_NOTES="$N" CTL_TMUX_SESSION="$S" CTL_PROOF_TRIES=4 CTL_POSTMAN_CMD_RE='^(bash|cat)$'
@@ -602,4 +602,5 @@ check "13.1991 ctl restart whose dry-run exit is REMOVED (a stripped copy) reach
 check "13.1969 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail" \
   '( unset CTL_POSTMAN_CMD_RE; for c in 2.1.288 claude node; do ctl_cmd_is_claude "$c" || exit 1; done; for c in zsh bash sh fish less vim python3 ssh ""; do ! ctl_cmd_is_claude "$c" || exit 1; done )'
 
+ctl_test_only_end postman.test.sh
 [ "$fails" -eq 0 ] && { echo "postman tests: all ok"; exit 0; } || { echo "postman tests: $fails FAILED"; exit 1; }

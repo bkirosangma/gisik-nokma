@@ -10,7 +10,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 CTL="$HERE/ctl"
 . "$HERE/lib.sh"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 T="$(cd "$(mktemp -d)" && pwd -P)"; R="$T/roles"; L="$T/logs"; S="ctlrs-$$"; TL="$T/tmux.log"
 mkdir -p "$R" "$L" "$T/wt" "$T/shim" "$T/fakeclaude"; /usr/bin/git -C "$T/wt" init -q
 export CTL_POSTMAN_ROOT="$R" CTL_LOG_DIR="$L" CTL_TMUX_SESSION="$S"
@@ -102,4 +102,5 @@ lb=\"ctlr\$\$\";" && ! one_launch "$T/r12.sh" || return 1
   mutant "$v" "$T/sk.sh" 'ctl_press_enter "gisik:$win" ||' 'tmux send-keys -t "gisik:$win" "$launcher --permission-mode bypassPermissions \"\$(cat $pf)\""; ctl_press_enter "gisik:$win" ||' && ! one_launch "$T/sk.sh"; }
 check "13.2036 one launch line, pinned by structure (the live paste cannot run in a test): over verbs/restart.sh without comment lines, exactly one cmd= assignment, the dry-run echo prints \`paste: \$cmd;\`, the only load-buffer is \`printf '%s' \"\$cmd\" | tmux load-buffer\`, and no line but cmd= carries --permission-mode; CONTROL in the same check: a copy with a flagless cmd= re-assigned before the paste (own line, inline, and mid-line without --permission-mode), a copy whose dry-run echo prints the old literal, one whose echo prints a flagless line, one that pastes a string other than \$cmd and one that types a second launch with send-keys are all rejected" 'launch_pinned'
 
+ctl_test_only_end restart.test.sh
 [ "$fails" -eq 0 ] && { echo "restart tests: all ok"; exit 0; } || { echo "restart tests: $fails FAILED"; exit 1; }
