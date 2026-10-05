@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+// The `./online` subpath, for the reason `test/integration/client-contract.test.ts:16-20` gives.
+import { mapHome } from '@gisik-nokma/app-core/online';
 import { HOME_ID_CAP, newUlid, type AttentionResponse, type HomeResponse, type LedgerEvent } from '@gisik-nokma/domain';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { isWorkspaceAdmin } from '../../src/read/membership-roster.js';
@@ -586,6 +588,21 @@ describe('GET /v1/workspaces/:workspaceId/home â€” six numbers over the viewerâ€
   });
 
   // LAST in the file: it deletes a project, and every case above reads the shared workspace.
+  it('27.632 the REAL /home body maps through the client mapper unchanged; control: a mapped body differs from a mutated one', async () => {
+    // `home()` already returns the parsed body; `.json()` on it would throw.
+    const body = await home('member');
+    // Preconditions: the lists differ, so a field swap in the mapper cannot map to an equal object.
+    expect(body.ids.open.length).toBeGreaterThan(0);
+    expect(body.ids.open).not.toEqual(body.ids.tickets);
+    expect(typeof body.counts.members).toBe('number');
+    expect(mapHome(body)).toEqual(body);
+    // The guest's real body carries `members: null`; the mapper keeps it null.
+    const guestBody = await home('guest');
+    expect(guestBody.counts.members).toBeNull();
+    expect(mapHome(guestBody)).toEqual(guestBody);
+    expect(() => mapHome({ ...body, dueSoonDays: '7' })).toThrow(/home\.dueSoonDays/);
+  });
+
   it('27.606 the trash: a trashed ticket is in no list, and deleting a project takes its tickets out of all four ticket lists', async () => {
     const before = await home('owner');
     expect(before.ids.tickets).not.toContain(fx.trashed);

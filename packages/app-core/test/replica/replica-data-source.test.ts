@@ -488,7 +488,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 27.141 FOURTEEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 27.141 27.633 FIFTEEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -528,6 +528,9 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['searchNotes', () => ds.query.searchNotes(WS, 'x', { mode: 'lexical' })],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
+      // Added by Knowledge Graph E Task 3 (case 27.633), directly under `getAttention`: the position `REPLICA_GAPS`
+      // gained the key at. Home's numbers are a computed server read; a local count would disagree with the server's.
+      ['getHome', () => ds.query.getHome(WS)],
       // Added by second wave Task 6. This list is enumerated rather than
       // counted, and it is compared against `Object.keys(REPLICA_GAPS)` below,
       // so adding the method to the replica WITHOUT adding it here reddens this
@@ -655,6 +658,25 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     // separates "the note reads were implemented" from "the gap machinery was
     // switched off".
     await expect(ds.query.search(WS, 'x')).rejects.toBeInstanceOf(ReplicaGapError);
+  });
+
+  it('27.633 getHome refuses with its OWN absence, named for its own method; control: getAttention still refuses with its own', async () => {
+    const { ds } = await fixture();
+    await expect(ds.query.getHome(WS)).rejects.toThrow(/cannot answer getHome:/);
+    const err = await ds.query.getHome(WS).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(ReplicaGapError);
+    expect((err as ReplicaGapError).absences).toBe(REPLICA_GAPS['getHome']);
+    expect(REPLICA_GAPS['getHome']?.map((a) => a.field)).toEqual(['HomeResponse (every number)']);
+    // Control: the sibling the gap was copied from still answers with ITS absence, so the legs above are about getHome.
+    const attention = await ds.query.getAttention(WS).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((attention as ReplicaGapError).absences).toBe(REPLICA_GAPS['getAttention']);
+    expect(REPLICA_GAPS['getAttention']).not.toBe(REPLICA_GAPS['getHome']);
   });
 
   it('12.186 subscribe hands its callback a real ClientStreamFrame — the kind useLiveQuery acts on', async () => {
