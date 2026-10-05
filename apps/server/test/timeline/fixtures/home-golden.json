@@ -1,0 +1,177 @@
+owner
+{
+ "counts": {
+  "dueSoon": 2,
+  "members": 6,
+  "notes": 3,
+  "open": 8,
+  "pastDue": 1,
+  "tickets": 9
+ },
+ "dueSoonDays": 7,
+ "ids": {
+  "dueSoon": [
+   "hiddenTaskId",
+   "taskInEpicId"
+  ],
+  "members": [
+   "admin",
+   "guest",
+   "member",
+   "outsider",
+   "owner",
+   "projectLead"
+  ],
+  "notes": [
+   "#",
+   "#",
+   "#"
+  ],
+  "open": [
+   "#",
+   "#",
+   "#",
+   "epicId",
+   "guestTaskId",
+   "hiddenTaskId",
+   "sharedTaskId",
+   "taskInEpicId"
+  ],
+  "pastDue": [
+   "#"
+  ],
+  "tickets": [
+   "#",
+   "#",
+   "#",
+   "#",
+   "epicId",
+   "guestTaskId",
+   "hiddenTaskId",
+   "sharedTaskId",
+   "taskInEpicId"
+  ]
+ },
+ "workspaceId": "workspaceId"
+}
+member
+{
+ "counts": {
+  "dueSoon": 1,
+  "members": 5,
+  "notes": 2,
+  "open": 6,
+  "pastDue": 1,
+  "tickets": 7
+ },
+ "dueSoonDays": 7,
+ "ids": {
+  "dueSoon": [
+   "taskInEpicId"
+  ],
+  "members": [
+   "admin",
+   "member",
+   "outsider",
+   "owner",
+   "projectLead"
+  ],
+  "notes": [
+   "#",
+   "#"
+  ],
+  "open": [
+   "#",
+   "#",
+   "#",
+   "epicId",
+   "sharedTaskId",
+   "taskInEpicId"
+  ],
+  "pastDue": [
+   "#"
+  ],
+  "tickets": [
+   "#",
+   "#",
+   "#",
+   "#",
+   "epicId",
+   "sharedTaskId",
+   "taskInEpicId"
+  ]
+ },
+ "workspaceId": "workspaceId"
+}
+outsider
+{
+ "counts": {
+  "dueSoon": 1,
+  "members": 5,
+  "notes": 2,
+  "open": 5,
+  "pastDue": 1,
+  "tickets": 6
+ },
+ "dueSoonDays": 7,
+ "ids": {
+  "dueSoon": [
+   "taskInEpicId"
+  ],
+  "members": [
+   "admin",
+   "member",
+   "outsider",
+   "owner",
+   "projectLead"
+  ],
+  "notes": [
+   "#",
+   "#"
+  ],
+  "open": [
+   "#",
+   "#",
+   "#",
+   "epicId",
+   "taskInEpicId"
+  ],
+  "pastDue": [
+   "#"
+  ],
+  "tickets": [
+   "#",
+   "#",
+   "#",
+   "#",
+   "epicId",
+   "taskInEpicId"
+  ]
+ },
+ "workspaceId": "workspaceId"
+}
+guest
+{
+ "counts": {
+  "dueSoon": 0,
+  "members": null,
+  "notes": 0,
+  "open": 1,
+  "pastDue": 0,
+  "tickets": 1
+ },
+ "dueSoonDays": 7,
+ "ids": {
+  "dueSoon": [],
+  "members": [],
+  "notes": [],
+  "open": [
+   "guestTaskId"
+  ],
+  "pastDue": [],
+  "tickets": [
+   "guestTaskId"
+  ]
+ },
+ "workspaceId": "workspaceId"
+}
