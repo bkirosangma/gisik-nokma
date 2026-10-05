@@ -9,7 +9,8 @@ Exit codes: 0 no survivor, 1 survivors (triage expected), 2 a tool failure, any 
 green on a failure, and a traceback never passes for 1).
 Seams (tests): CTL_MUTATE_RUN_TESTS (the run-tests command), CTL_MUTATE_SPLIT (300 mutants per run), CTL_MUTATE_MAX_SECS (600 s per
 slot-run, counted from the moment the command holds its slot), CTL_MUTATE_BACKSTOP_SECS (slot_run's outer timeout, default backstop_secs),
-CTL_MUTATE_PG_HOST / CTL_MUTATE_PG_PORT (the test Postgres, 127.0.0.1:54329), CTL_MUTATE_INJECT_FAIL (mutate-ast.mjs).
+CTL_MUTATE_PG_HOST / CTL_MUTATE_PG_PORT (the test Postgres, 127.0.0.1:54329: closed = apps/server's files are tool failures), CTL_MUTATE_INJECT_FAIL
+(mutate-ast.mjs). Each file runs only its own tests (mutate-tests.mjs, planner ruling 19:25), or one sentinel test when it has none.
 Hidden sub-commands: `watchdog <secs> <dir> -- <cmd>...` (slot_run's wrapper inside the slot), and for the unit legs `ranges <diff-file>`,
 `filter <path>...`, `reconcile <plan-json> <report-json>`.
 """
@@ -30,6 +31,7 @@ import traceback
 HERE = os.path.dirname(os.path.abspath(__file__))
 CTL = os.path.join(os.path.dirname(HERE), 'ctl')
 AST = os.path.join(HERE, 'mutate-ast.mjs')
+TESTS = os.path.join(HERE, 'mutate-tests.mjs')
 
 
 class ToolFailure(Exception):
@@ -38,6 +40,10 @@ class ToolFailure(Exception):
 
 class NoSlot(ToolFailure):
     """run-tests exit 75: no slot came free; the whole sweep stops."""
+
+
+class OverCap(ToolFailure):
+    """The watchdog stopped a run that held its slot past the cap: run_file retries that chunk once without its statics."""
 
 
 def env_int(name, default):
@@ -158,6 +164,15 @@ def ast_plan(repo, pkg, relfile, ranges):
     r = subprocess.run(['node', AST, repo, os.path.join(repo, pkg), relfile, json.dumps(ranges)], capture_output=True, text=True)
     if r.returncode != 0:
         raise ToolFailure(f'mutate-ast {pkg}/{relfile}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}')
+    return json.loads(r.stdout)
+
+
+def own_tests(repo, pkg, relfile):
+    """The CAPPED test set (planner ruling 19:25): the test files in the package's own test dir that import RELFILE directly or through
+    one re-export (mutate-tests.mjs). -> {'testDir', 'tests': [{'file', 'via'}], 'scanned'}, paths relative to the package."""
+    r = subprocess.run(['node', TESTS, repo, os.path.join(repo, pkg), relfile], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise ToolFailure(f'mutate-tests {pkg}/{relfile}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}')
     return json.loads(r.stdout)
 
 
@@ -376,7 +391,7 @@ def slot_run_in(label, cwd, cmd, max_secs, d):
             raise NoSlot(f'{label}: no test slot within {backstop} s (still queued when the backstop fired); nothing was run')
         raise ToolFailure(f'{label}: the slot-run was still running {backstop} s after it was queued and was stopped (its watchdog did not stop it at {max_secs} s)')
     if os.path.exists(os.path.join(d, 'stopped')):
-        raise ToolFailure(f'{label}: the slot-run passed {max_secs} s in its slot and was stopped (P10: no slot-run over 10 min; the file needs a smaller split)')
+        raise OverCap(f'{label}: the slot-run passed {max_secs} s in its slot and was stopped (P10: no slot-run over 10 min; the file needs a smaller split)')
     wall = time.time() - t0
     m = re.search(r'queue wait: (\d+)s', out or '')
     wait = int(m.group(1)) if m else 0
@@ -408,21 +423,40 @@ def write(path, text):
 # so the repo's TZ CONTROLs ("setting process.env.TZ really does change local time") fail its dry run. vitest 3's own default is forks,
 # the pool those tests were written for: this per-run wrapper of the package's config sends every file to forks, one at a time
 # (poolMatchGlobs beats the runner's `pool` override; the runner's poolOptions.threads is left alone).
+# The same wrapper carries the CAP (planner ruling 19:25): `include` is exactly the file's own tests (own_tests), or the one sentinel test
+# when it has none, so the dry run, every mutant run and every STATIC mutant's whole-suite re-run see only those files. It is written
+# for every run, with an empty base when the package has no vitest config.
 FORKS_WRAPPER = '''// ctl mutate: generated per run, removed after it
-import base from {base};
+{base_line}
+const ONLY = {only};
 export default async (env) => {{
   const b = typeof base === 'function' ? await base(env) : await base;
   const t = b.test || {{}};
   const po = t.poolOptions || {{}};
-  return {{ ...b, test: {{ ...t, poolMatchGlobs: [['**', 'forks']], poolOptions: {{ ...po, forks: {{ ...(po.forks || {{}}), maxForks: 1, minForks: 1 }} }} }} }};
+  return {{ ...b, test: {{ ...t, include: ONLY, poolMatchGlobs: [['**', 'forks']], poolOptions: {{ ...po, forks: {{ ...(po.forks || {{}}), maxForks: 1, minForks: 1 }} }} }} }};
 }};
 '''
 VITEST_CONFIGS = ('vitest.config.ts', 'vitest.config.mts', 'vitest.config.js', 'vitest.config.mjs')
+# A file no own test imports (planner ruling 12:40, (A)): Stryker still runs it, with ONE test that imports nothing, so every mutant
+# reports NoCoverage (a SURVIVOR) and the custom mutants are counted. Never Stryker's `testFiles: []`, which means "no filter": the whole
+# related suite, silently.
+SENTINEL = 'sentinel.test.mjs'
+SENTINEL_TEXT = "import { it } from 'vitest';\nit('ctl mutate sentinel: no own test imports the mutated file', () => {});\n"
 
 
-def stryker_conf(repo, mutate, report, tempdir, vitest_config=None):
+def glob_escape(path):
+    """A literal path as a vitest include glob."""
+    return re.sub(r'([*?\[\]{}()!+@])', r'\\\1', path)
+
+
+def wrapper_text(base_cfg, only):
+    base_line = f'import base from {json.dumps(base_cfg)};' if base_cfg else 'const base = {};'
+    return FORKS_WRAPPER.format(base_line=base_line, only=json.dumps([glob_escape(p) for p in only]))
+
+
+def stryker_conf(repo, mutate, report, tempdir, vitest_config=None, ignore_static=False):
     runner = os.path.realpath(os.path.join(repo, 'node_modules', '@stryker-mutator', 'vitest-runner'))
-    vt = {'related': True}  # only the tests that import the mutated file (vitest related): a whole-package dry run of apps/server would pass P10's cap
+    vt = {'related': False}  # the cap is the wrapper's `include` (own tests only); vitest related would add nothing to it, and drops the sentinel
     if vitest_config:
         vt['configFile'] = vitest_config
     return {
@@ -434,7 +468,9 @@ def stryker_conf(repo, mutate, report, tempdir, vitest_config=None):
         'timeoutMS': 10000,
         'mutate': mutate,
         'incremental': False,
-        'ignoreStatic': False,  # module-level statics run (range O2: IDLE_MS = 200)
+        # module-level statics run (range O2: IDLE_MS = 200; ruling 19:25: never ignored up front). True only on run_file's one retry
+        # of a chunk the watchdog stopped: then its statics are reported `STATICS NOT SWEPT`.
+        'ignoreStatic': ignore_static,
         'reporters': ['json', 'clear-text'],
         'jsonReporter': {'fileName': report},
         'clearTextReporter': {'allowColor': False, 'logTests': False, 'allowEmojis': False},
@@ -469,7 +505,7 @@ def main_run(args):
     diff = git(repo, 'diff', '--unified=0', '--no-color', '--no-ext-diff', f'{base}..HEAD', '--', '*.ts', '*.tsx')
     ranges = parse_ranges(diff)
     lines = [f'ctl mutate: {branch} {head[:8]} against {base[:8]} ({how})']
-    excluded, skipped, files = [], [], []
+    excluded, skipped, files, pre_failures = [], [], [], []
     pg = None
     for path in sorted(ranges):
         why = source_verdict(path)
@@ -486,8 +522,8 @@ def main_run(args):
         if pkg == 'apps/server':
             if pg is None:
                 pg = pg_reachable()
-            if not pg[0]:
-                skipped.append((path, f'apps/server: the test Postgres {pg[1]} is not reachable'))
+            if not pg[0]:  # ruling 19:25: a loud tool failure (exit 2), never a skip; the other files are still swept
+                pre_failures.append((path, f'apps/server needs the test Postgres {pg[1]}, which is not reachable (start the shared test PG; a closed port is never a skip)'))
                 continue
         files.append((pkg, path[len(pkg) + 1:], ranges[path]))
     plan = []
@@ -502,17 +538,26 @@ def main_run(args):
             lines.append(f'  note: {pkg}/{rel}: mutant count estimated (instrumenter: {a["countError"]})')
         fallback = a['injectParse'] != 'ok'
         chunks = split_lines(rs, counts, cap)
-        plan.append({'pkg': pkg, 'rel': rel, 'ranges': rs, 'ast': a, 'fallback': fallback, 'chunks': chunks})
+        plan.append({'pkg': pkg, 'rel': rel, 'ranges': rs, 'ast': a, 'fallback': fallback, 'chunks': chunks, 'own': own_tests(repo, pkg, rel)})
     for path, why in excluded:
         lines.append(f'  excluded {path}: {why}')
     for path, why in skipped:
         lines.append(f'  SKIPPED  {path}: {why}')
+    for path, why in pre_failures:
+        lines.append(f'  TOOL-FAILURE {path}: {why}')
     lines.append('  custom literals not injected: ' + (', '.join(f'{k} {v}' for k, v in sorted(skipped_counts.items())) or 'none'))
     runs = 0
     for f in plan:
         cust = sum(len(c['alts']) for c in f['ast']['customs'])
         lines.append(f"  file {f['pkg']}/{f['rel']}: ranges {','.join(f'{a}-{b}' for a, b in f['ranges'])}; "
                      f"{len(f['ast']['customs'])} custom sites ({cust} mutants), {len(f['ast']['casts'])} casts stripped")
+        own = f['own']
+        if own['tests']:
+            lines.append(f"    own tests: {len(own['tests'])} of {own['scanned']} test files in {f['pkg']}/{own['testDir']} import it (directly or through one re-export): "
+                         + ', '.join(t['file'] + ('' if t['via'] == 'direct' else f" (via {t['via']})") for t in own['tests']))
+        else:
+            lines.append(f"    NO OWN TEST: none of the {own['scanned']} test files in {f['pkg']}/{own['testDir']} imports it (directly or through one re-export); "
+                         "it runs with one sentinel test, so every mutant reports no coverage")
         if f['fallback']:
             lines.append(f"    FALLBACK (A) for this file only: the injected copy is {f['ast']['injectParse']}; each custom mutant runs as one vitest run")
         for k, (rs, n) in enumerate(f['chunks']):
@@ -527,14 +572,14 @@ def main_run(args):
     print('\n'.join(lines), flush=True)
     if args.dry_run:
         print(f'mutate: dry-run, {len(plan)} files, {runs} slot-runs planned, nothing run')
-        return 0, None
+        return (2 if pre_failures else 0), None
     if plan:
         core = os.path.join(repo, 'node_modules', '@stryker-mutator', 'core', 'bin', 'stryker.js')
         if not os.path.isfile(core) or not os.path.isdir(os.path.join(repo, 'node_modules', '@stryker-mutator', 'vitest-runner')):
             raise ToolFailure(f'Stryker is not installed in {repo} (root devDependencies @stryker-mutator/core + vitest-runner: pnpm install)')
     man = Manifest(tmp)
-    st = {'slot_secs': 0.0, 'k': 0, 'runlog': []}
-    results, failures = [], []
+    st = {'slot_secs': 0.0, 'k': 0, 'runlog': [], 'statics': [], 'no_own': []}
+    results, failures = [], list(pre_failures)
     for f in plan:
         path = f'{f["pkg"]}/{f["rel"]}'
         try:
@@ -545,7 +590,8 @@ def main_run(args):
             failures.append((path, str(e)))
             st['runlog'].append(f'TOOL FAILURE {path}: {e}')
     return 0, {'repo': repo, 'branch': branch, 'head': head, 'base': base, 'how': how, 'lines': lines, 'results': results, 'failures': failures,
-               'slot_secs': st['slot_secs'], 'runlog': st['runlog'], 'skipped': skipped, 'excluded': excluded, 'skipped_counts': skipped_counts}
+               'slot_secs': st['slot_secs'], 'runlog': st['runlog'], 'skipped': skipped, 'excluded': excluded, 'skipped_counts': skipped_counts,
+               'statics': st['statics'], 'no_own': st['no_own']}
 
 
 def setup_files(pkgdir):
@@ -553,88 +599,145 @@ def setup_files(pkgdir):
 
 
 def run_file(repo, tmp, man, f, core, max_secs, st):
-    """Stryker run(s) for ONE file (one slot-run per chunk), then its fallback custom runs if any. -> the file's mutant results."""
+    """Stryker run(s) for ONE file (one slot-run per chunk), then its fallback custom runs if any. -> the file's mutant results.
+    A chunk the watchdog stops is retried ONCE with ignoreStatic (ruling 19:25 (2)): its statics are reported `STATICS NOT SWEPT`; a retry
+    that is stopped too is the tool failure it always was."""
     runlog = st['runlog']
     pkgdir = os.path.join(repo, f['pkg'])
     src = os.path.join(pkgdir, f['rel'])
+    path = f'{f["pkg"]}/{f["rel"]}'
     vitest = find_up(pkgdir, os.path.join('node_modules', 'vitest', 'vitest.mjs'))
     if not vitest:
         raise ToolFailure(f'{f["pkg"]}: node_modules/vitest/vitest.mjs not found above {pkgdir}')
     original = open(src).read()
     backup = man.backup(src)
+    only = [t['file'] for t in f['own']['tests']]
     file_res = []
+    statics, retried = 0, False
     for rs, n in f['chunks']:
+        span = ','.join(f'{a}-{b}' for a, b in rs)
         if n == 0 and f['ast']['strykerCount'] is not None:
-            runlog.append(f'{f["pkg"]}/{f["rel"]}:{",".join(f"{a}-{b}" for a, b in rs)}: no mutant on these lines, not run')
+            runlog.append(f'{path}:{span}: no mutant on these lines, not run')
             continue
-        st['k'] += 1
-        k = st['k']
         customs = [] if f['fallback'] else [c for c in f['ast']['customs'] if in_ranges(c['line'], rs)]
-        report = os.path.join(tmp, f'report-{k}.json')
-        tempdir = f'.stryker-tmp-ctlmutate-{os.getpid()}-{k}'
-        man.created(os.path.join(pkgdir, tempdir))
-        had = setup_files(pkgdir)  # the vitest runner writes stryker-setup-<worker>.js beside the config (inPlace: in the package itself)
-        man.setup_glob(pkgdir, had)
-        wrapper = None
-        base_cfg = next((c for c in VITEST_CONFIGS if os.path.isfile(os.path.join(pkgdir, c))), None)
-        if base_cfg:  # beside the package (its node_modules resolve), in a dir the manifest removes on any exit
-            cfgdir = os.path.join(pkgdir, f'{tempdir}-vitest')
-            man.created(cfgdir)
-            os.makedirs(cfgdir, exist_ok=True)
-            wrapper = os.path.join(cfgdir, 'vitest.config.mjs')
-            write(wrapper, FORKS_WRAPPER.format(base=json.dumps(os.path.join(pkgdir, base_cfg))))
-        conf = os.path.join(tmp, f'stryker-{k}.conf.json')
-        write(conf, json.dumps(stryker_conf(repo, [f"{f['rel']}:{a}-{b}" for a, b in rs], report, tempdir, wrapper), indent=1))
-        write(src, f['ast']['castOnly'] if f['fallback'] else f['ast']['transformed'])
         try:
-            rc, secs, log, _ = slot_run(f'mutate-{k}-{os.path.basename(f["rel"])}', pkgdir, ['node', core, 'run', conf], max_secs)
-        finally:
-            recover_stryker_backup(pkgdir, tempdir)
-            shutil.copy2(backup, src)
-            shutil.rmtree(os.path.join(pkgdir, tempdir), ignore_errors=True)
-            shutil.rmtree(os.path.join(pkgdir, f'{tempdir}-vitest'), ignore_errors=True)
-            for name in setup_files(pkgdir) - had:
-                os.remove(os.path.join(pkgdir, name))
-        st['slot_secs'] += secs
-        runlog.append(f'stryker run {k} {f["pkg"]}/{f["rel"]}:{",".join(f"{a}-{b}" for a, b in rs)}: rc {rc}, {secs:.0f} s, log {log}')
-        # CONTROL (ruling 16:40 (4)): Stryker's own dry run on the injected copy (every switch at the original) must be green and
-        # see as many tests as the same test files hold on the unmutated tree.
-        if rc != 0 or not os.path.isfile(report):
-            raise ToolFailure(f'{f["pkg"]}/{f["rel"]} run {k}: Stryker failed (rc {rc}: the dry run on the injected copy is red, or the config is wrong); log {log}')
-        rep = json.load(open(report))
-        tfiles = {os.path.normpath(os.path.join(pkgdir, t)): len(v.get('tests', [])) for t, v in rep.get('testFiles', {}).items()}
-        if tfiles:  # the same test files, listed on the RESTORED (unmutated) tree: collection only, no test runs
-            lj = os.path.join(tmp, f'list-{k}.json')
-            lrc, lsecs, llog, _ = slot_run(f'mutate-{k}-control', pkgdir, ['node', vitest, 'list', *sorted(os.path.relpath(t, pkgdir) for t in tfiles), f'--json={lj}'], max_secs)
-            st['slot_secs'] += lsecs
-            if lrc != 0 or not os.path.isfile(lj):
-                raise ToolFailure(f'{f["pkg"]}/{f["rel"]} run {k}: control: `vitest list` on the unmutated tree failed (rc {lrc}); log {llog}')
-            want = sum(1 for t in json.load(open(lj)) if os.path.normpath(t.get('file', '')) in tfiles)
-            seen = sum(tfiles.values())
-            runlog.append(f'  control: {seen} tests in {len(tfiles)} files on the injected copy, {want} unmutated')
-            if seen != want:
-                raise ToolFailure(f'{f["pkg"]}/{f["rel"]} run {k}: control: the injected copy registers {seen} tests, the unmutated tree {want} (an injected switch broke a test file\'s import?); log {log}')
-        entry = rep['files'].get(f['rel'])
-        mutants = entry['mutants'] if entry else []
-        custom, stryker, problems, injected, counted = reconcile(customs, mutants, entry['source'] if entry else '')
-        runlog.append(f'  custom injected {injected} == counted {counted}' if not problems and injected == counted else f'  custom injected {injected} != counted {counted}')
-        if problems or injected != counted:
-            raise ToolFailure(f'{f["pkg"]}/{f["rel"]} run {k}: custom injected {injected} != counted {counted}: ' + '; '.join(problems[:5]))
-        file_res += stryker + custom
+            res = stryker_chunk(repo, f, rs, customs, only, False, pkgdir, src, backup, vitest, tmp, man, core, max_secs, st)
+        except OverCap as e:
+            runlog.append(f'{path}:{span}: {e}; retried once without its statics (ruling 19:25: STATICS NOT SWEPT)')
+            res = stryker_chunk(repo, f, rs, customs, only, True, pkgdir, src, backup, vitest, tmp, man, core, max_secs, st)
+            retried = True
+            statics += sum(1 for m in res if m['status'] == 'Ignored')
+        file_res += res
     if f['fallback']:
         for c in f['ast']['customs']:
             for alt in c['alts']:
+                if not only:  # nothing imports the file: there is no run that could kill it
+                    file_res.append({'line': c['line'], 'mutator': f"custom:{c['kind']}", 'status': 'NoCoverage', 'original': c['original'], 'replacement': alt})
+                    continue
                 st['k'] += 1
                 k = st['k']
                 write(src, original[:c['origStart']] + alt + original[c['origEnd']:])
                 try:
-                    rc, secs, log, _ = slot_run(f'mutate-{k}-{os.path.basename(f["rel"])}-custom', pkgdir, ['node', vitest, 'run', '--maxWorkers=2'], max_secs)
+                    rc, secs, log, _ = slot_run(f'mutate-{k}-{os.path.basename(f["rel"])}-custom', pkgdir, ['node', vitest, 'run', '--maxWorkers=2', *only], max_secs)
                 finally:
                     shutil.copy2(backup, src)
                 st['slot_secs'] += secs
                 runlog.append(f'vitest run {k} {f["rel"]}:{c["line"]} {c["original"]} → {alt}: rc {rc}, {secs:.0f} s, log {log}')
                 file_res.append({'line': c['line'], 'mutator': f"custom:{c['kind']}", 'status': 'Survived' if rc == 0 else 'Killed', 'original': c['original'], 'replacement': alt})
+    if retried:
+        st['statics'].append((path, statics))
+    if not only:
+        st['no_own'].append((path, len(file_res)))
     return file_res
+
+
+def stryker_chunk(repo, f, rs, customs, only, ignore_static, pkgdir, src, backup, vitest, tmp, man, core, max_secs, st):
+    """ONE Stryker slot-run on the line ranges RS of a file, on its own tests ONLY (the wrapper's include), then the checks that make its
+    result trustworthy. -> the chunk's mutant results (Stryker's and the counted custom ones)."""
+    runlog = st['runlog']
+    path = f'{f["pkg"]}/{f["rel"]}'
+    st['k'] += 1
+    k = st['k']
+    report = os.path.join(tmp, f'report-{k}.json')
+    tempdir = f'.stryker-tmp-ctlmutate-{os.getpid()}-{k}'
+    man.created(os.path.join(pkgdir, tempdir))
+    had = setup_files(pkgdir)  # the vitest runner writes stryker-setup-<worker>.js beside the config (inPlace: in the package itself)
+    man.setup_glob(pkgdir, had)
+    base_cfg = next((c for c in VITEST_CONFIGS if os.path.isfile(os.path.join(pkgdir, c))), None)
+    cfgdir = os.path.join(pkgdir, f'{tempdir}-vitest')  # beside the package (its node_modules resolve), in a dir the manifest removes on any exit
+    man.created(cfgdir)
+    os.makedirs(cfgdir, exist_ok=True)
+    sentinel = None if only else f'{tempdir}-vitest/{SENTINEL}'
+    if sentinel:
+        write(os.path.join(pkgdir, sentinel), SENTINEL_TEXT)
+    wrapper = os.path.join(cfgdir, 'vitest.config.mjs')
+    write(wrapper, wrapper_text(os.path.join(pkgdir, base_cfg) if base_cfg else None, only or [sentinel]))
+    conf = os.path.join(tmp, f'stryker-{k}.conf.json')
+    write(conf, json.dumps(stryker_conf(repo, [f"{f['rel']}:{a}-{b}" for a, b in rs], report, tempdir, wrapper, ignore_static), indent=1))
+    write(src, f['ast']['castOnly'] if f['fallback'] else f['ast']['transformed'])
+    try:
+        rc, secs, log, _ = slot_run(f'mutate-{k}-{os.path.basename(f["rel"])}', pkgdir, ['node', core, 'run', conf], max_secs)
+    finally:
+        recover_stryker_backup(pkgdir, tempdir)
+        shutil.copy2(backup, src)
+        shutil.rmtree(os.path.join(pkgdir, tempdir), ignore_errors=True)
+        shutil.rmtree(cfgdir, ignore_errors=True)
+        for name in setup_files(pkgdir) - had:
+            os.remove(os.path.join(pkgdir, name))
+    st['slot_secs'] += secs
+    span = ','.join(f'{a}-{b}' for a, b in rs)
+    runlog.append(f'stryker run {k} {path}:{span}{" (ignoreStatic)" if ignore_static else ""}: rc {rc}, {secs:.0f} s, log {log}')
+    # CONTROL (ruling 16:40 (4)): Stryker's own dry run on the injected copy (every switch at the original) must be green and
+    # see as many tests as the same test files hold on the unmutated tree.
+    if rc != 0 or not os.path.isfile(report):
+        raise ToolFailure(f'{path} run {k}: Stryker failed (rc {rc}: the dry run on the injected copy is red, or the config is wrong); log {log}')
+    rep = json.load(open(report))
+    used = {os.path.relpath(os.path.normpath(os.path.join(pkgdir, t)), pkgdir): len(v.get('tests', [])) for t, v in rep.get('testFiles', {}).items()}
+    # THE CAP HELD (ruling 19:25 (1)): the run used only the file's own tests, or only the sentinel (ruling 12:40: never a fallback to the
+    # whole suite, so exactly ONE test ran)
+    allowed = set(only) if only else {sentinel}
+    if not used or not set(used) <= allowed:
+        what = f'used {", ".join(sorted(set(used) - allowed))} outside its {len(allowed)} own test file(s)' if used else 'used no test file'
+        raise ToolFailure(f'{path} run {k}: the test cap did not hold: the run {what}; log {log}')
+    if sentinel and sum(used.values()) != 1:
+        raise ToolFailure(f'{path} run {k}: the sentinel run saw {sum(used.values())} tests, not 1 (a whole-suite fallback?); log {log}')
+    tfiles = {os.path.join(pkgdir, t): c for t, c in used.items()}
+    if sentinel:
+        runlog.append(f'  control: none (NO OWN TEST: only the sentinel ran, 1 test)')
+    else:  # the same test files, listed on the RESTORED (unmutated) tree: collection only, no test runs
+        lj = os.path.join(tmp, f'list-{k}.json')
+        lrc, lsecs, llog, _ = slot_run(f'mutate-{k}-control', pkgdir, ['node', vitest, 'list', *sorted(os.path.relpath(t, pkgdir) for t in tfiles), f'--json={lj}'], max_secs)
+        st['slot_secs'] += lsecs
+        if lrc != 0 or not os.path.isfile(lj):
+            raise ToolFailure(f'{path} run {k}: control: `vitest list` on the unmutated tree failed (rc {lrc}); log {llog}')
+        want = sum(1 for t in json.load(open(lj)) if os.path.normpath(t.get('file', '')) in tfiles)
+        seen = sum(tfiles.values())
+        runlog.append(f'  control: {seen} tests in {len(tfiles)} files on the injected copy, {want} unmutated')
+        if seen != want:
+            raise ToolFailure(f'{path} run {k}: control: the injected copy registers {seen} tests, the unmutated tree {want} (an injected switch broke a test file\'s import?); log {log}')
+    entry = rep['files'].get(f['rel'])
+    mutants = entry['mutants'] if entry else []
+    custom, stryker, problems, injected, counted = reconcile(customs, mutants, entry['source'] if entry else '')
+    runlog.append(f'  custom injected {injected} == counted {counted}' if not problems and injected == counted else f'  custom injected {injected} != counted {counted}')
+    if problems or injected != counted:
+        raise ToolFailure(f'{path} run {k}: custom injected {injected} != counted {counted}: ' + '; '.join(problems[:5]))
+    if sentinel:  # nothing loaded the file, so Stryker has no coverage data and "ran" each mutant against the sentinel: no test reached it
+        for m in stryker + custom:
+            if m['status'] == 'Survived':
+                m['status'] = 'NoCoverage'
+    return stryker + custom
+
+
+NO_OWN_MEANING = 'a NO OWN TEST file\'s survivors mean "no test in reach", NOT "the tests are weak": hand-mutate it on the real suite (a route: through buildTestApp)'
+
+
+def flagged_lines(res):
+    """The table's notes (rulings 19:25 and 12:40): files whose statics a stopped run left unswept, and files no own test imports."""
+    out = [f'STATICS NOT SWEPT: {p} n={n}' for p, n in res['statics']]
+    out += [f'NO OWN TEST {p} n={n}' for p, n in res['no_own']]
+    if res['no_own']:
+        out.append(NO_OWN_MEANING)
+    return out
 
 
 def report(res, as_json):
@@ -657,6 +760,7 @@ def report(res, as_json):
     md += ['| file | mutants | killed | survived | no-coverage | timeout | runtime-error |', '|---|---|---|---|---|---|---|']
     for path, n, c in rows:
         md.append(f"| {path} | {n} | {c['Killed']} | {c['Survived']} | {c['NoCoverage']} | {c['Timeout']} | {c['RuntimeError'] + c['CompileError']} |")
+    md += [''] + flagged_lines(res) if res['statics'] or res['no_own'] else []
     md += ['', f'## Survivors ({len(surv)}: survived or no coverage)']
     md += [f"- `{p}:{m['line']}  {m['mutator']}  {m['original']} → {m['replacement']}`" + ('  (no coverage)' if m['status'] == 'NoCoverage' else '') for p, m in surv] or ['none']
     md += ['', f'## RuntimeError / CompileError ({len(trouble)}: triage items, NOT kills)']
@@ -678,10 +782,13 @@ def report(res, as_json):
                           'files': [{'path': p, 'mutants': n, **{k.lower(): v for k, v in c.items()}} for p, n, c in rows],
                           'survivors': [{'path': p, **m} for p, m in surv], 'triage': [{'path': p, **m} for p, m in trouble],
                           'skipped': [{'path': p, 'why': w} for p, w in res['skipped']],
+                          'statics_not_swept': [{'path': p, 'n': n} for p, n in res['statics']], 'no_own_test': [{'path': p, 'n': n} for p, n in res['no_own']],
                           'failures': [{'path': p, 'why': w} for p, w in res['failures']]}))
     else:
         for path_, n, c in rows:
             print(f"  {path_}: {n} mutants, {c['Killed']} killed, {c['Survived']} survived, {c['NoCoverage']} no-coverage, {c['Timeout']} timeout, {c['RuntimeError'] + c['CompileError']} runtime-error")
+        for line in flagged_lines(res):
+            print(f'  {line}')
         for p, w in res['skipped']:
             print(f'  SKIPPED {p}: {w}')
         for p, m in surv:
@@ -731,8 +838,11 @@ def main(argv):
             print(f'FAIL mutate unknown arg {x} — usage: ctl mutate [--repo <worktree>] [--base <ref>] [--dry-run] [--json]')
             return 2
     try:
-        _, res = main_run(a)
+        code, res = main_run(a)
         if res is None:
+            if code:
+                print('FAIL mutate dry-run: a planned file is a tool failure (its TOOL-FAILURE line above)')
+                return 2
             print('OK mutate dry-run')
             return 0
         code, n, path = report(res, a.json)

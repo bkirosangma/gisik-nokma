@@ -25,6 +25,7 @@ import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkCommentAuthority } from './check-comment-authority.js';
+import { checkConceptPermission } from './check-concept.js';
 import { checkLifecycle } from './check-lifecycle.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
@@ -1920,18 +1921,26 @@ export async function checkMembershipOwnerAuthority(
  * someone no longer in the workspace (see `./effective-role.ts`, and the table
  * comment on the migration). `resolveEffectiveRole` is the only safe reader.
  *
- * Four passes, one context, and the ORDER is load-bearing at every seam:
+ * One context, a chain of passes, and the ORDER is load-bearing at every seam:
  *
  * 1. `checkRolePermission` — pure, and first because a claim from someone who
  *    is not here at all should not cause a single lookup.
- * 2. `checkMembershipOwnerAuthority` — the owner-only act the role gate cannot
- *    finish, because it needs the TARGET's current row. Second rather than
- *    third so that a claim from below admin is still answered by the pure pass
- *    above without a read, which is the property pass 1 exists to hold.
- * 3. `checkProjectExists` — before any membership question about a project, so
+ * 2. `checkNotePermission` — the note kind's write authority, directly after
+ *    the role gate (its call site says why).
+ * 3. `checkConceptPermission` — the concept kind's (Knowledge Graph spec D
+ *    §3.3), for the note pass's reason. It reads nothing for any other kind.
+ * 4. `checkMembershipOwnerAuthority` — the owner-only act the role gate cannot
+ *    finish, because it needs the TARGET's current row. Before every other
+ *    reading pass, so that a claim from below admin is still answered by the
+ *    pure pass above without a read (passes 2 and 3 read nothing for a
+ *    membership claim), which is the property pass 1 exists to hold.
+ * 5. `checkProjectExists` — before any membership question about a project, so
  *    a nonexistent project is reported as one (owner decision 2026-08-26).
- * 4. `checkVisibilityPermission` — the audience questions, plus the two write-
+ * 6. `checkPrefixReservation`, `checkGroupRules`, `checkLifecycle` — the prefix,
+ *    group-tree and trash state questions, each placed as its call site says.
+ * 7. `checkVisibilityPermission` — the audience questions, plus the two write-
  *    authority questions that had to be sequenced after a database read.
+ * 8. `checkCommentAuthority` — last, after every audience question.
  *
  * The call site is unchanged: this is still the one `SubmissionGate` the ingest
  * pipeline applies at the client door.
@@ -1972,7 +1981,13 @@ export async function checkPermission(
   if (noteRefusal !== null) {
     return noteRefusal;
   }
-  // SECOND, and after the role gate on purpose: it is the question the role
+  // Knowledge Graph spec D §3.3: the concept kind's own pass, here for the note pass's reason (above).
+  const conceptRefusal = await checkConceptPermission(env, permissionContext);
+  if (conceptRefusal !== null) {
+    return conceptRefusal;
+  }
+  // After the role gate on purpose (and after the note and concept passes, which
+  // read nothing for a membership claim): it is the question the role
   // gate cannot finish. `checkRolePermission` settles "are you at least an
   // admin"; this settles "and are you an owner, for the one act that is
   // owner-only" — which needs the TARGET's row, so it is the first pass that
@@ -1986,7 +2001,7 @@ export async function checkPermission(
   if (projectRefusal !== null) {
     return projectRefusal;
   }
-  // FIFTH — the prefix a project is founded under, or moves to, must be free in
+  // The prefix a project is founded under, or moves to, must be free in
   // its workspace and not reserved to another project (owner ruling 2026-09-20;
   // reservation: prefixes/groups Task 3). Grouped with the project-shaped
   // questions above and, like them, strictly downstream of the role gates: a
@@ -2004,7 +2019,7 @@ export async function checkPermission(
   if (groupRefusal !== null) {
     return groupRefusal;
   }
-  // SIXTH — trash series, Plan 1 Task 4 (spec §4). State refusals ("already
+  // Trash series, Plan 1 Task 4 (spec §4). State refusals ("already
   // deleted", "delete it first", "unmark it first") for the eight lifecycle
   // types, answered from the item's own row. `now` is the wall clock at the
   // door; `checkLifecycle` itself takes it as a parameter so a test can pin it.
