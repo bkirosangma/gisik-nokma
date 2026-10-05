@@ -77,7 +77,8 @@ describe('29.191 explicit dates and the warning glyph', () => {
     // a start-less explicit due never carries the glyph
     const due = planOf([nodes[0] as FlowNode, fnode(B, { explicitDue: '2026-10-06', estimate: 1 })], [edge(A, B)]);
     // exact, so a missing interval cannot pass a `not.toHaveProperty` on `undefined`, and the flag is keyed on the explicit
-    // START (`from` is 10-06, before the ready day 10-08: a flag computed from `from` would appear here)
+    // START (`from` is 10-06, before the ready day 10-08: a flag computed from `from` without the start test would appear
+    // here; with the start test kept, `from` equals `start` on every row that has one, so that swap alone is equivalent)
     expect(get(due, B).intervals[0]).toEqual({ pass: 1, start: '2026-10-06', end: '2026-10-06', basis: 'explicit' });
     // a start ON the ready day (10-08) is not before it: no glyph (kills `<=`)
     const onDay = planOf([nodes[0] as FlowNode, fnode(D, { explicitStart: '2026-10-08', estimate: 1 })], [edge(A, D)]);
