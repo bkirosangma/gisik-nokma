@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainRegistry, TICKET_LINK_KINDS } from '@gisik-nokma/domain';
+import { domainRegistry, TICKET_LINK_KINDS, withholdCauseTicket } from '@gisik-nokma/domain';
 import { redactedPayload } from '../src/tools/ticket-tools.js';
 
 describe('27.006 redactedPayload and links', () => {
@@ -74,5 +74,25 @@ describe('29.208 redactedPayload phrases a flow cause the server withheld', () =
     expect(redactedPayload('ticket.transitioned', 'e1', { to: 'done', cause: null })).toStrictEqual({ to: 'done', cause: null });
     expect(redactedPayload('ticket.assigned', 'e1', { assigneeId: U, cause: { decisionTicketId: null } })).toStrictEqual({ assigneeId: U, cause: { decisionTicketId: null } });
     expect(redactedPayload('ticket.transitioned', 'e1', { to: 'doing', cause: { kind: 'reopened-for-child', childTicketId: S } })).toEqual({ to: 'doing', cause: { kind: 'reopened-for-child', childTicketId: S } });
+  });
+});
+
+describe('29.373 the seam: a cause the History route withheld is what MCP phrases (AMEND 2)', () => {
+  it("29.373 withholdCauseTicket nulls the ids and people, and redactedPayload reads them \"a ticket you can't see\" / \"someone you can't see\", for each kind", () => {
+    const T = '01J9GTKB000000000000000000';
+    const U = '01J9GUSA000000000000000000';
+    const E = '01J9GEVT000000000000000001';
+    const [END, ACTOR] = ["a ticket you can't see", "someone you can't see"];
+    const led = withholdCauseTicket({ kind: 'led-to', sourceTicketId: T, label: 'Yes', triggeredBy: U });
+    expect(redactedPayload('ticket.transitioned', 'e1', { to: 'todo', cause: led })).toEqual({
+      to: 'todo', cause: { kind: 'led-to', sourceTicketId: END, label: 'Yes', triggeredBy: ACTOR },
+    });
+    const decided = { decisionTicketId: T, outcome: 'No', pass: 2, decidedBy: U, decisionEventId: E };
+    expect(redactedPayload('ticket.reopened', 'e1', { cause: withholdCauseTicket({ kind: 'reopened-by-flow', ...decided }) })).toEqual({
+      cause: { kind: 'reopened-by-flow', decisionTicketId: END, outcome: 'No', pass: 2, decidedBy: ACTOR, decisionEventId: E },
+    });
+    expect(redactedPayload('ticket.closed', 'e1', { cause: withholdCauseTicket({ kind: 'branch-not-taken', ...decided }) })).toEqual({
+      cause: { kind: 'branch-not-taken', decisionTicketId: END, outcome: 'No', pass: 2, decidedBy: ACTOR, decisionEventId: E },
+    });
   });
 });

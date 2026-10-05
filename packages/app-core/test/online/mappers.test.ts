@@ -639,6 +639,14 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
 });
 
 describe('3.37 mapHistory and mapWorkflowDef — the two shapes that already agree', () => {
+  it('29.373 mapHistory carries causeTicket as {key}, null and absent', () => {
+    const wire = (id: string, extra: Record<string, unknown>) => ({ id, type: 'ticket.closed', version: 1, payload: {}, actorId: ANSELMA, origin: 'web', clientTime: 'c', serverTime: 's', seq: 1, ...extra });
+    const [keyed, withheld, bare] = mapHistory({ ticketId: 't', events: [wire('e1', { causeTicket: { key: 'GN-1' } }), wire('e2', { causeTicket: null }), wire('e3', {})] });
+    expect(keyed?.causeTicket).toEqual({ key: 'GN-1' });
+    expect(withheld?.causeTicket).toBeNull();
+    expect(bare).not.toHaveProperty('causeTicket');
+  });
+
   it('validates every history event rather than casting the array', () => {
     const events = mapHistory({
       ticketId: 't',
