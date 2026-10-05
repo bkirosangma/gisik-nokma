@@ -36,9 +36,6 @@ import { visibleNotesWhere } from './visible-where.js';
 /** Spec §7.4's default. */
 const SEARCH_LIMIT = 50;
 
-/** Spec §7.6's `LIMIT 200` — the inner bound on the client-side sort. */
-const MEANING_CANDIDATES = 200;
-
 /** Spec §7.6's first-20. Also KG-D T2's ticket meaning search (`item-search.ts`). */
 export const MEANING_LIMIT = 20;
 
@@ -284,13 +281,18 @@ export async function correctWords(
 /**
  * Spec §7.6's nearest-chunk query.
  *
- * ## `DISTINCT ON`, then sort in code
+ * ## `DISTINCT ON`, then an outer query that sorts and cuts
  *
- * The inner query takes the nearest chunk PER NOTE and cuts at 200; the sort is
- * finished here and the first 20 are kept. Two steps because the two orderings
- * are different questions: `DISTINCT ON (note_id)` needs `note_id` first in its
- * ORDER BY, and the answer needs distance first. Doing it in one statement
- * would need a window function over the whole candidate set.
+ * The inner query takes the nearest chunk PER NOTE; the outer one sorts those by
+ * distance and keeps the first 20. Two queries because the two orderings are
+ * different questions: `DISTINCT ON (note_id)` needs `note_id` first in its
+ * ORDER BY, and the answer needs distance first. The cut belongs to the outer
+ * query only: a `LIMIT` on the inner one cuts in `note_id` order, a ULID, so once
+ * a workspace held more chunked notes than the bound the newest were never
+ * candidates however near they were (18.496 — spec §7.6's `LIMIT 200` did that).
+ * `note_id` after distance makes equal distances come back in one order (18.497).
+ * KG-D T2's ticket meaning search (`meaningTicketHits`, `item-search.ts`) has the
+ * same shape.
  *
  * Deleted notes are excluded by the JOIN to `proj_notes` rather than by trusting
  * the worker to have removed their chunks: the worker does remove them (18.139),
@@ -329,28 +331,30 @@ export async function meaningNoteSearch(
     chunk_text: string;
     distance: number;
   }>(
-    `SELECT DISTINCT ON (c.note_id)
-            c.note_id, n.title, n.home_project_id, n.scope_mode, n.author_id, n.updated_at,
-            c.chunk_text, (c.embedding <=> ${query}::vector) AS distance
-       FROM search_note_chunks c
-       JOIN proj_notes n ON n.note_id = c.note_id
-      WHERE c.workspace_id = ${workspace} AND n.deleted = FALSE
-        AND ${visible}
-        ${filters.map((clause) => `AND ${clause}`).join('\n        ')}
-      ORDER BY c.note_id, distance
-      LIMIT ${MEANING_CANDIDATES}`,
+    `SELECT * FROM (
+       SELECT DISTINCT ON (c.note_id)
+              c.note_id, n.title, n.home_project_id, n.scope_mode, n.author_id, n.updated_at,
+              c.chunk_text, (c.embedding <=> ${query}::vector) AS distance
+         FROM search_note_chunks c
+         JOIN proj_notes n ON n.note_id = c.note_id
+        WHERE c.workspace_id = ${workspace} AND n.deleted = FALSE
+          AND ${visible}
+          ${filters.map((clause) => `AND ${clause}`).join('\n          ')}
+        ORDER BY c.note_id, distance
+     ) d
+     ORDER BY d.distance, d.note_id
+     LIMIT ${params.add(MEANING_LIMIT)}`,
     params.toArray(),
   );
 
-  const ordered = [...rows].sort((left, right) => Number(left.distance) - Number(right.distance)).slice(0, MEANING_LIMIT);
   const attached = await attachedTicketsByNote(
     db,
     eff,
     userId,
     workspaceId,
-    ordered.map((row) => row.note_id),
+    rows.map((row) => row.note_id),
   );
-  return ordered.map((row) => ({
+  return rows.map((row) => ({
     noteId: row.note_id,
     title: row.title,
     snippet: snippetOf(row.chunk_text),
