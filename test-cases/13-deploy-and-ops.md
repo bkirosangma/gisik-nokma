@@ -640,6 +640,7 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
   - A member GitHub did not mark is closed with a comment naming the batch PR and the landed sha.
   - A member whose head is not in the base after the landing, or whose PR head moved right after it, is never closed: it is left open and the FAIL names it.
   - A member whose head moved after the union was built is not landed: no PR, no land.
+  - Every ctl call's verdict is its stdout `OK|FAIL` line: the stub writes stderr after each one (as the real `pr open`'s push does), and every green leg still lands. A RELATIVE `CTL_LOG_DIR` still hands `ctl pr open` an absolute body path.
 - 13.2303 🧪 Red in one member's package.
   - The output prints `FIX candidate: #<pr>`, and the union is rebuilt WITHOUT that member: the second gate's tree differs and does not contain it.
   - The rebuilt union is gated again and landed.
@@ -654,6 +655,7 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
   - The predicted tree IS the tree the real run gates, and a predicted conflict is the real run's EJECT.
   - A dry-run with a refusal still prints the order for the rest, and exits 1.
   - `batch.py` holds no `git push`, `gh pr merge` / `create`, force, `reset --hard` or `branch -D`. CONTROL: the detector flags each.
+  - The REAL ctl verbs print what `batch.py` parses: `ctl_ok` / `ctl_fail` on stdout, `--repo` through lib.sh, gate's `(log X)` with `engine=` / `timeouts=` / `orphans=`, pr-open's un-quiet push and `#N`, land's merge commit (`--merge`). CONTROL: a copy with each one broken fails the leg.
   - `ctl help` lists `batch`, and `selftest.sh` runs the suite and a refusal step.
 
 ## `ctl archive` — stale lanes-dir files to `archive/<date>/` and a daily notes roll (`task/ctl-archive`, owner plan B13, 2026-10-03)

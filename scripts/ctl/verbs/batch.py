@@ -130,6 +130,14 @@ def last_line(r):
     return lines[-1] if lines else f'(no output, exit {r.returncode})'
 
 
+def verdict_line(r):
+    """A ctl verb's verdict: lib.sh's ctl_ok / ctl_fail echo `OK|FAIL <verb> …` on STDOUT as their last act. The verb's stderr (pr-open's
+    un-quiet `git push`, gh notices) is a separate stream that `last_line` puts AFTER it, so it is never the verdict; with no such line,
+    the last line of either stream."""
+    v = [l for l in r.stdout.splitlines() if re.match(r'(OK|FAIL) ', l)]
+    return v[-1] if v else last_line(r)
+
+
 def base_valid(b):
     """lib.sh ctl_base_valid: main or release/<name> — main is refused separately, by name."""
     seg = r'[A-Za-z0-9_][A-Za-z0-9._-]*'
@@ -197,7 +205,8 @@ def tree_guard(tree):
 
 
 def open_log():
-    d = os.environ.get('CTL_LOG_DIR') or os.path.expanduser('~/.cache/gisik-ctl')
+    # Absolute: the batch PR's body is written beside the log, and `ctl pr open` reads --body FILE after its cd into --repo.
+    d = os.path.abspath(os.environ.get('CTL_LOG_DIR') or os.path.expanduser('~/.cache/gisik-ctl'))
     os.makedirs(d, exist_ok=True)
     return open(os.path.join(d, f'batch-{datetime.now().strftime("%Y%m%dT%H%M%S")}-{os.getpid()}.log'), 'w')
 
@@ -405,10 +414,10 @@ def install_argv():
 
 
 def gate(sha):
-    """('green' | 'red' | 'refused', the gate's last line, the failing turbo tasks). A FAIL line with no `(log <file>)` is a refusal before
+    """('green' | 'red' | 'refused', the gate's verdict line, the failing turbo tasks). A FAIL line with no `(log <file>)` is a refusal before
     the run (HEAD, dirty tree, base moved, orphans): no gate ran."""
     r = run([CTL, 'gate', sha, '--base', BASE, '--repo', TREE])
-    last = last_line(r)
+    last = verdict_line(r)
     say(f'  {last}')
     if r.returncode == 0 and last.startswith('OK gate'):
         return 'green', last, []
@@ -482,7 +491,7 @@ def land(members, kept, union, stamp, gates):
     write_body(body, members, kept, union, gates)
     title = f'batch {branch[len("batch/"):]}: ' + ' '.join(f'#{m.n}' for m in kept)
     r = run([CTL, 'pr', 'open', branch, '--title', title, '--body', body, '--base', BASE, '--repo', TREE])
-    last = last_line(r)
+    last = verdict_line(r)
     say(f'  {last}')
     pm = re.match(r'OK pr-open #(\d+) ', last)
     if r.returncode != 0 or not pm:
@@ -490,7 +499,7 @@ def land(members, kept, union, stamp, gates):
         fail(f'ctl pr open {branch}: {last} — not landed')
     pr = pm.group(1)
     r = run([CTL, 'land', pr, '--base', BASE, '--repo', TREE])
-    last = last_line(r)
+    last = verdict_line(r)
     say(f'  {last}')
     if r.returncode != 0 or not last.startswith('OK land'):
         report(members)

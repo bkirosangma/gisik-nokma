@@ -60,6 +60,9 @@ opt = lambda k: a[a.index(k) + 1]
 git = lambda *x, cwd: subprocess.run(['git', *x], cwd=cwd, capture_output=True, text=True)
 def say(line, rc):
     print(line)
+    # As the real verbs do, write to stderr too (pr-open's un-quiet `git push`, gh notices): the streams are captured apart, and the
+    # verdict is the stdout OK/FAIL line, never whatever the merged text ends with.
+    sys.stderr.write(f'To {os.environ.get("BT_BARE", "origin")}\n * [new branch]      noise -> noise\n')
     sys.exit(rc)
 if a[0] == 'gate':
     sha, repo = a[1], opt('--repo')
@@ -321,6 +324,8 @@ check "13.2302 green: ONE gate (the union sha, --base, --repo the batch tree), O
    && grep -Eq "^pr open batch/test-20261005T1441 --title .* --base $BASE --repo $T\$" "$S/ctl.log" && grep -Fqx "land 900 --base $BASE --repo $T" "$S/ctl.log" \
    && [ "$(sha batch/test-20261005T1441)" = "$(gated 1)" ] && grep -Fq "#11 \`task/a\` \`$(sha task/a)\`" "$S/body-900.md" && grep -Fq "#12 \`task/b\` \`$(sha task/b)\`" "$S/body-900.md" \
    && [ "$(wc -l < "$S/install.log" | tr -d " ")" = 1 ]'
+check "13.2302 green with a RELATIVE CTL_LOG_DIR: the batch PR body is still handed to ctl pr open as an ABSOLUTE path (pr-open reads --body after its cd into --repo)" \
+  'mk && here=$PWD && cd "$root" && CTL_LOG_DIR=rel-logs b 11 12 && cd "$here" && [ $rc -eq 0 ] && [ "$(ncalls "pr open")" = 1 ] && grep -Eq " --body /[^ ]*/rel-logs/batch-[^ ]*-body\.md " "$S/ctl.log"'
 check "13.2302 green: members GitHub marked merged are reported merged and NOT closed; OK summary, exit 0, a MEMBER line each, every head in origin/<base>" \
   'mk && b 11 12 13 && [ $rc -eq 0 ] && summary "^OK batch #900 landed" && says "^MEMBER #11 task/a .* merged" && says "^MEMBER #13 task/c .* merged" && ! grep -q "pr close" "$S/mut.log" \
    && $G -C "$bare" merge-base --is-ancestor "$(sha task/a)" "$BASE" && $G -C "$bare" merge-base --is-ancestor "$(sha task/c)" "$BASE"'
@@ -380,5 +385,36 @@ check "13.2305 CONTROL — the detector flags each forbidden form" 'printf "%s\n
 check "13.2305 ctl help lists batch, and selftest.sh runs this suite and a batch refusal step as live (uncommented) steps" \
   '"$HERE/ctl" help | grep -q "^  batch " && /usr/bin/grep -Eq "^step .*batch\.test\.sh" "$HERE/verbs/selftest.sh" && /usr/bin/grep -Eq "^step \"batch [^\"]*refuses" "$HERE/verbs/selftest.sh"'
 
+# contract_live [DIR] — the REAL verbs' side of the seam the stub ctl stands in for (first use runs against them, never the stub): the verdict
+# is lib.sh's ctl_ok / ctl_fail on STDOUT; gate takes --repo through lib.sh and ends `(log X)` with engine/timeouts/orphans; pr-open's push
+# is un-quiet (the stderr the stub imitates) and prints `#N`; land merges with a merge commit (members' heads reach the base) and prints it.
+contract_live() { local D="${1:-$HERE}"
+  grep -qF 'ctl_ok()   { echo "OK $1 $2"; exit 0; }' "$D/lib.sh" && grep -qF 'ctl_fail() { echo "FAIL $1 $2"; exit 1; }' "$D/lib.sh" \
+  && grep -qF -- '--repo) CTL_REPO="$2"; shift 2;;' "$D/lib.sh" \
+  && grep -qF 'ctl_ok gate "$sha $summary (log $log)"' "$D/verbs/gate.sh" && grep -qF 'ctl_fail gate "$summary (log $log)"' "$D/verbs/gate.sh" \
+  && grep -qF 'engine=$eng timeouts=$to orphans=$orph"' "$D/verbs/gate.sh" \
+  && grep -qF 'ctl_run /usr/bin/git push -u origin "$branch"' "$D/verbs/pr-open.sh" && grep -qF 'ctl_ok pr-open "#$n head ${head:0:12} base $base"' "$D/verbs/pr-open.sh" \
+  && grep -qF -- '--merge > "$(ctl_log land)"' "$D/verbs/land.sh" && grep -qF 'ctl_ok land "#$pr merge ${mc:0:12}' "$D/verbs/land.sh"; }
+# contract_break FILE OLD NEW — FILE with EVERY literal OLD replaced by NEW (at least one), for the contract leg's control
+contract_break() { python3 - "$1" "$2" "$3" <<'PY'
+import sys
+p, old, new = sys.argv[1:]
+s = open(p).read()
+assert s.count(old) >= 1, (p, old)
+open(p, 'w').write(s.replace(old, new))
+PY
+}
+CB_LIB_OLD='echo "OK $1 $2"; exit 0'; CB_LIB_NEW='echo "OK $1 $2" >&2; exit 0'
+CB_LOG_OLD='ctl_fail gate "$summary (log $log)"'; CB_LOG_NEW='ctl_fail gate "$summary"'
+CB_PUSH_OLD='git push -u origin'; CB_PUSH_NEW='git push -q -u origin'
+CB_MERGE_OLD='--merge > "$(ctl_log land)"'; CB_MERGE_NEW='--squash > "$(ctl_log land)"'
+check "13.2305 the REAL ctl verbs print what batch.py parses: ctl_ok/ctl_fail on stdout, gate --repo + (log X) + engine/timeouts/orphans, pr-open's un-quiet push and #N, land's merge commit" \
+  'contract_live'
+check "13.2305 CONTROL — the contract leg fails on a copy whose ctl_ok writes to stderr, whose red gate lost its (log X), whose pr-open push is quiet, or whose land squashes" \
+  'c="$root/ctl-copy" && rm -rf "$c" && cp -R "$HERE" "$c" && contract_live "$c" \
+   && cp "$c/lib.sh" "$c/lib.bak" && contract_break "$c/lib.sh" "$CB_LIB_OLD" "$CB_LIB_NEW" && ! contract_live "$c" && mv "$c/lib.bak" "$c/lib.sh" \
+   && cp "$c/verbs/gate.sh" "$c/g.bak" && contract_break "$c/verbs/gate.sh" "$CB_LOG_OLD" "$CB_LOG_NEW" && ! contract_live "$c" && mv "$c/g.bak" "$c/verbs/gate.sh" \
+   && cp "$c/verbs/pr-open.sh" "$c/p.bak" && contract_break "$c/verbs/pr-open.sh" "$CB_PUSH_OLD" "$CB_PUSH_NEW" && ! contract_live "$c" && mv "$c/p.bak" "$c/verbs/pr-open.sh" \
+   && contract_break "$c/verbs/land.sh" "$CB_MERGE_OLD" "$CB_MERGE_NEW" && ! contract_live "$c"'
 ctl_test_only_end batch.test.sh
 [ "$fails" -eq 0 ] && echo "batch.test.sh: ok" || { echo "batch.test.sh: $fails FAILED"; exit 1; }
