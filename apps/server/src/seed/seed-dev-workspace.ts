@@ -23,7 +23,7 @@ import { seedUlid } from './seed-ulid.js';
  *    server provenance (`check-permission.ts`, `SERVER_ORIGIN_REASON`).
  * 3. **No re-founding.** `workspace.created` alone triggers
  *    `bootstrapWorkspace` (Plan 4), which appends the simple-Kanban workflow,
- *    the four built-in ticket types — including `epic` and `task`, both used
+ *    the five built-in ticket types — including `epic` and `task`, both used
  *    here — and the founder's owner grant, all through the internal door,
  *    regardless of which door received the founding event. This seed never
  *    emits its own `workflow.defined` or `ticket-type.defined`: doing so

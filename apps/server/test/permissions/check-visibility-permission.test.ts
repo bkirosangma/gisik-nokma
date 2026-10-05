@@ -987,3 +987,34 @@ describe('E6-17 — the person an assignment names must be in the workspace', ()
     });
   });
 });
+
+/**
+ * 29.135 (spec DC-4: "Permission: the same right as `ticket.field_set` on the ticket"). Nothing in the permission
+ * files names either type: `checkRolePermission` has no branch for them and `checkVisibilityPermission` judges every
+ * ticket-kind event it has no arm for by `canSee`. Both types walk the same three readers in ONE `it`, so a gate that
+ * answered `ticket.decided` by type in either direction goes red against `ticket.field_set`'s answer beside it.
+ */
+describe("29.135 ticket.decided has ticket.field_set's right", () => {
+  it('29.135 a guest who cannot see the ticket is refused both; the same guest shared explicitly, and a member, pass both', async () => {
+    for (const [type, payload] of [
+      ['ticket.decided', { outcome: 'Yes' }],
+      ['ticket.field_set', { fieldId: 'title', value: 'x' }],
+    ] as const) {
+      const { workspaceId, projectId } = await workspace();
+      const guest = newUlid();
+      const member = newUlid();
+      const ticketId = newUlid();
+      await seedGuest(db.pool, workspaceId, guest);
+      await seedMember(db.pool, workspaceId, member, 'member', [{ projectId }]);
+      await seedTicket(db.pool, { workspaceId, projectId, ticketId }); // project mode by default
+      expect(await gate(ticketEvent(workspaceId, type, ticketId, guest, payload), guest), type).toEqual({
+        refused: true,
+        rule: PERMISSION_VISIBILITY_RULE,
+        reason: TICKET_NOT_VISIBLE_REASON,
+      });
+      expect(await gate(ticketEvent(workspaceId, type, ticketId, member, payload), member), type).toBeNull(); // control: a member
+      await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'explicit', [guest])]);
+      expect(await gate(ticketEvent(workspaceId, type, ticketId, guest, payload), guest), type).toBeNull(); // control: shared
+    }
+  });
+});

@@ -163,7 +163,7 @@ export async function seedConvenienceCorner(deps: CcSeedDeps, options: CcSeedOpt
 
   // Founding is NOT re-implemented here. Ingesting `workspace.created` runs
   // Plan 4's bootstrap in the same transaction, which appends the simple-Kanban
-  // workflow, the four built-in ticket types bound to it, and the founder's
+  // workflow, the five built-in ticket types bound to it, and the founder's
   // owner grant — in that order, through the INTERNAL door, regardless of which
   // door the founding itself arrived at. A seed that emitted its own copies
   // would be a second founding sequence, free to drift from the real one, and

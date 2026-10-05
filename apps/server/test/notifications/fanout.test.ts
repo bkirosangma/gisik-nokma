@@ -194,6 +194,10 @@ describe('27.007 link events', () => {
         }),
       );
     }
+    // wtg2 T5 (29.137, NT-4): an outcome notifies nobody either
+    await fanout().onCommitted(
+      makeEnvelope({ type: 'ticket.decided', workspaceId: WS, actorId: KIRO, entity: { kind: 'ticket', id: TICKET }, payload: { outcome: 'Yes' } }),
+    );
     expect(await totalNotificationRows()).toBe(0);
     // control, same `it`: the same fan-out and the same visible set DO notify for an assignment
     await fanout().onCommitted(assigned());

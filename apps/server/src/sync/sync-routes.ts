@@ -32,12 +32,12 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * **This list plus `TICKET_EVENT_TYPES` must equal the registry's whole
  * `entityKind: 'ticket'` set**, or "snapshot + tail ≡ full replay" is false for
  * any ticket whose stream carries the missing type below its snapshot seq. The
- * registry binds TWENTY-FOUR types to that kind (`vocabulary.ts`; twenty-two until the
- * draft pair (drafts T1), twenty until the typed-link pair, eighteen until MCP-everything T2 registered `comment.edited` and
+ * registry binds TWENTY-FIVE types to that kind (`vocabulary.ts`; twenty-four until
+ * `ticket.decided` (wtg2 T5), twenty-two until the draft pair (drafts T1), twenty until the typed-link pair, eighteen until MCP-everything T2 registered `comment.edited` and
  * `comment.deleted` against both ticket and note; the three `purge.*` types name
  * `ticket` among four kinds but are the purge pass's, not a ticket stream's, and
  * are outside this count);
- * `TICKET_EVENT_TYPES` is nineteen of them, and the five it omits —
+ * `TICKET_EVENT_TYPES` is twenty of them, and the five it omits —
  * `visibility.set`, `claim.contested`, `claim.contested_resolved`,
  * `comment.edited`, `comment.deleted` — are exactly the five below that are not
  * also folded. `comment.added` and `attachment.added` appear in both lists on
@@ -46,19 +46,19 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * `comment.added` does (a replica's thread must show the edited text and the
  * deletion), so they travel in full below the cut too (case 26.057).
  *
- * **The pair has moved six times, and both numbers moved together every time but one** (18/15 → 20/15 moved only the first: the two comment events are backfilled, not folded),
+ * **The pair has moved seven times, and both numbers moved together every time but one** (18/15 → 20/15 moved only the first: the two comment events are backfilled, not folded),
  * which is why the arithmetic is restated here rather than left to be
  * re-derived: a reader who trusted an old pair would compute the wrong total for
  * the list below and conclude a type was missing. Measured at each commit, not
  * recalled: thirteen and ten before `253436d0`; fifteen and twelve at `253436d0`
  * (Task 2, the closed flag); sixteen and thirteen at `b26d9cd6` (Task 1,
  * `ticket.ranked`); **eighteen and fifteen at `18d7e391`** (the deleted/restored
- * pair); twenty and fifteen with MCP-everything T2 (the two comment events); twenty-two and seventeen with typed-links T1 (the link pair, which FOLDS into `TicketState.links` and rides the snapshot, so it is deliberately NOT backfilled below); **twenty-four and nineteen with drafts T1** (the draft pair, which FOLDS into `TicketState.draft` and rides the snapshot, so it is deliberately NOT backfilled below), which is the pair at HEAD. The numbers in the paragraph above are
+ * pair); twenty and fifteen with MCP-everything T2 (the two comment events); twenty-two and seventeen with typed-links T1 (the link pair, which FOLDS into `TicketState.links` and rides the snapshot, so it is deliberately NOT backfilled below); twenty-four and nineteen with drafts T1 (the draft pair, which FOLDS into `TicketState.draft` and rides the snapshot, so it is deliberately NOT backfilled below); **twenty-five and twenty with wtg2 T5** (`ticket.decided`, which FOLDS into `outcome` and `passes`, so it is deliberately NOT backfilled), which is the pair at HEAD. The numbers in the paragraph above are
  * that last pair; the earlier pair stood stale from `18d7e391` until it was
  * corrected. Re-derive them by parsing `vocabulary.ts`'s
  * `domainRegistry.register` blocks for `entityKind: 'ticket'` and by reading
  * `TICKET_EVENT_TYPES`, not by trusting this sentence — the union it describes
- * was checked the same way (twenty-four, empty symmetric difference) and is what
+ * was checked the same way (twenty-five, empty symmetric difference) and is what
  * makes the pair load-bearing.
  *
  * The closed flag's two events (backlog/closed spec §1.2, 2026-09-17) —

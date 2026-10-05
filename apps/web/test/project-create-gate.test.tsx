@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import { BUILTIN_TICKET_TYPE_SEEDS, type SubmittedEvent, type TicketTypeDef, type WorkflowDef } from '@gisik-nokma/domain';
 import { EMPTY_BOARD_COPY, type BoardView, type TicketListView } from '@gisik-nokma/app-core';
 import { HttpError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
@@ -446,9 +446,13 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
     );
     const user = userEvent.setup();
     await user.click(await findEnabledCreate());
-    expect(await typeOptionLabels(user)).toEqual(['Epic', 'Story', 'Task', 'Sub-task']);
-    // The sentence that stops the ladder from passing itself off as the answer.
+    // Derived from the seeds, not retyped (wtg2 T5: the fallback ladder is five, Decision last in seed order).
+    expect(await typeOptionLabels(user)).toEqual(BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name));
+    expect(BUILTIN_TICKET_TYPE_SEEDS.map((s) => s.name)).toEqual(['Epic', 'Story', 'Task', 'Sub-task', 'Decision']);
+    // The sentence that stops the ladder from passing itself off as the answer. No count since wtg2 T5 (29.134): the
+    // ladder is derived from the seeds, so a number in the sentence would go stale with the next seed.
     expect(screen.getByText(BUILTIN_LADDER_NOTICE)).toBeInTheDocument();
+    expect(BUILTIN_LADDER_NOTICE).toBe('Showing the built-in ticket types while this workspace’s own types load.');
   });
 
   it('a REFUSED types read withholds the control — the ladder does not stand in for an answer', async () => {

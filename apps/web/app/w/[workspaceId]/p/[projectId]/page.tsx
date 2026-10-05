@@ -192,7 +192,7 @@ const BUILTIN_TYPE_LADDER = BUILTIN_TICKET_TYPE_SEEDS.map((seed) => ({
 }));
 
 export const BUILTIN_LADDER_NOTICE =
-  'Showing the four built-in ticket types while this workspace’s own types load.';
+  'Showing the built-in ticket types while this workspace’s own types load.';
 
 /**
  * THE BACKLOG'S THREE EMPTY SENTENCES (owner ruling, 2026-09-20; the third added

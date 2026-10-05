@@ -72,6 +72,11 @@ export function redactedPayload(type: string, eventId: string, payload: Record<s
       ? { kind: payload['kind'], from: HIDDEN_END, ...kept }
       : { kind: payload['kind'], target: HIDDEN_END, ...kept };
   }
+  if (type === 'ticket.decided' && Array.isArray(payload['closeStarted'])) {
+    // wtg2 T5: the outcome label stays (it names the Decision's branch); a withheld id among the started tickets the
+    // person asked the settle to close is phrased like a link's hidden end (the route that nulls it is T17's).
+    return { ...payload, closeStarted: (payload['closeStarted'] as unknown[]).map((v) => (v === null ? HIDDEN_END : v)) };
+  }
   if (type === 'comment.added') return { commentId: eventId };
   if (type === 'comment.edited' || type === 'comment.deleted') return { commentId: payload['commentId'] };
   if (type === 'ticket.field_set' && payload['fieldId'] === 'description') return { fieldId: 'description' };

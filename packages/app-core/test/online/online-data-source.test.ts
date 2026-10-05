@@ -739,7 +739,7 @@ describe('3.140 getTicketTypes reads the route that shipped', () => {
   it('re-raises a 404 rather than answering [], because [] would be a claim no workspace can make', async () => {
     // A 404 here is `door(..., 'members-only')` — "you are not in this
     // workspace". `[]` would say "this workspace defines no ticket types", which
-    // Plan 4's bootstrap makes impossible: the four built-ins land as real
+    // Plan 4's bootstrap makes impossible: the built-ins land as real
     // `ticket-type.defined` events at creation. The dialog fed that `[]` would
     // offer no type at all.
     const { fetchImpl } = recordingFetch({});

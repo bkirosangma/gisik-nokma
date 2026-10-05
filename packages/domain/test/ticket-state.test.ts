@@ -695,6 +695,8 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
+    // TWENTY of the TWENTY-FIVE (wtg2 T5, 2026-10-04, case 29.135: 'ticket.decided' joined the list — it folds
+    // into `outcome` and `passes`).
     // NINETEEN of the TWENTY-FOUR (drafts T1, 2026-10-03, case 28.009: 'ticket.published' and
     // 'ticket.discarded' joined the list — both fold into `draft`).
     // SEVENTEEN of the TWENTY-TWO registered against entityKind 'ticket' (typed-links T1, 2026-10-03:
@@ -712,8 +714,8 @@ describe('TICKET_EVENT_TYPES', () => {
     // iterates. A pair added to the registry but not to this list would parse at
     // the door and then be skipped by every fold that iterates it — the two would
     // disagree with no error anywhere, which is why the count is asserted at all.
-    expect(TICKET_EVENT_TYPES).toHaveLength(19);
-    for (const type of ['ticket.published', 'ticket.discarded']) {
+    expect(TICKET_EVENT_TYPES).toHaveLength(20);
+    for (const type of ['ticket.published', 'ticket.discarded', 'ticket.decided']) {
       expect((TICKET_EVENT_TYPES as readonly string[]).includes(type), type).toBe(true);
     }
   });

@@ -44,13 +44,13 @@ const ENTITY_KIND_TICKET_UNIVERSE = [
 ] as const;
 
 /**
- * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20; the drafts pair, T1, made it 22). Pinned as a NUMBER so a
+ * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20; the drafts pair, T1, made it 22; `ticket.decided`, wtg2 T5, made it 23). Pinned as a NUMBER so a
  * change to the domain's lists fails loudly here rather than quietly shrinking
  * what this census covers: the failure message says to re-read the
  * registrations, which is the actual remedy. It is not a count of the
- * registrations (24), as the docblock above says.
+ * registrations (25), as the docblock above says.
  */
-const REGISTRATIONS_ON_2026_10_03 = 22;
+const REGISTRATIONS_ON_2026_10_03 = 23;
 
 /**
  * ONE VALID PAYLOAD PER TYPE, and the table is what makes this a census of
@@ -100,6 +100,7 @@ const VALID_PAYLOAD: Record<string, unknown> = {
   'ticket.link_removed': { kind: 'relates', targetId: '01J9GTKB000000000000000000' },
   'ticket.published': { projectId: '01J9GPRJ000000000000000000' },
   'ticket.discarded': {},
+  'ticket.decided': { outcome: 'Yes' },
   'comment.added': { body: {} },
   'attachment.added': { kind: 'upload', attachmentId: 'a1', filename: 'gst-return.pdf' },
   'claim.contested': { originalEvent: {}, rule: 'r', reason: 'why' },
@@ -131,7 +132,7 @@ describe('3.183 history copy — the census', () => {
     expect(
       TICKET_EVENT_TYPES.length,
       'TICKET_EVENT_TYPES changed shape: re-read packages/domain/src/vocabulary.ts and re-derive the universe',
-    ).toBe(19);
+    ).toBe(20);
     expect(CONTEST_EVENT_TYPES.length).toBe(2);
     expect(new Set(ENTITY_KIND_TICKET_UNIVERSE).size).toBe(REGISTRATIONS_ON_2026_10_03);
   });
@@ -413,5 +414,21 @@ describe('28.006 draft history sentences', () => {
     expect(describeEvent(created({ typeId: 'task' }), { typeName })).toBe('Created as Task'); // control
     expect(describeEvent(eventOf('ticket.published'))).toBe('Published');
     expect(describeEvent(eventOf('ticket.discarded'))).toBe('Discarded');
+  });
+});
+
+describe('29.137 ticket.decided in History', () => {
+  it('29.137 Decided, revised and cleared read as sentences; an empty or unreadable payload falls back to the wire name', () => {
+    const said = (payload: Record<string, unknown>) => describeEvent({ ...eventOf('ticket.decided'), payload });
+    expect(said({ outcome: 'Yes' })).toBe('Decided: Yes');
+    expect(said({ outcome: 'No', from: 'Yes' })).toBe('Decision revised: Yes → No');
+    expect(said({ outcome: null, from: 'Yes' })).toBe('Cleared the decision (was Yes)');
+    expect(said({ outcome: null })).toBe('Cleared the decision');
+    expect(said({ outcome: null, from: null })).toBe('Cleared the decision');
+    expect(said({ outcome: 'Yes', from: null })).toBe('Decided: Yes'); // a fill-in after a clear reads as a choice
+    expect(said({ outcome: 'Yes', from: '' })).toBe('Decided: Yes'); // a blank from reads as none
+    expect(said({})).toBe('ticket.decided'); // control: no payload, the wire name
+    expect(said({ outcome: '' })).toBe('ticket.decided');
+    expect(said({ outcome: 3 })).toBe('ticket.decided');
   });
 });

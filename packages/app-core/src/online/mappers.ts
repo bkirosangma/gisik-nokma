@@ -11,6 +11,7 @@ import type {
   NoteScopeMode,
   NoteSummary,
   NoteVersion,
+  PassRecord,
   Priority,
   PurgedRef,
   StateCategory,
@@ -1769,6 +1770,31 @@ function mapClosed(raw: unknown, path: string): { actorId: string; at: string } 
   };
 }
 
+/** `TicketState.passes` (wtg2 T5, PS-2), read member by member: a garbled record is refused by path, never cast. */
+function mapPasses(raw: unknown, path: string): PassRecord[] {
+  const nullableString = (value: unknown, at: string): string | null => (value === null ? null : asString(value, at));
+  return asArray(raw, path).map((entry, index) => {
+    const at = `${path}[${index}]`;
+    const record = asRecord(entry, at);
+    return {
+      pass: asNumber(record['pass'], `${at}.pass`),
+      outcome: nullableString(record['outcome'], `${at}.outcome`),
+      by: asString(record['by'], `${at}.by`),
+      at: asString(record['at'], `${at}.at`),
+      revisions: asArray(record['revisions'], `${at}.revisions`).map((raw, r) => {
+        const rat = `${at}.revisions[${r}]`;
+        const revision = asRecord(raw, rat);
+        return {
+          from: nullableString(revision['from'], `${rat}.from`),
+          to: nullableString(revision['to'], `${rat}.to`),
+          by: asString(revision['by'], `${rat}.by`),
+          at: asString(revision['at'], `${rat}.at`),
+        };
+      }),
+    };
+  });
+}
+
 /**
  * The wire's `rank` → `string | null` (spec §8.1, second wave 2026-09-18).
  * `null` survives as the truth — "nobody has ranked this ticket", which is a
@@ -2116,6 +2142,10 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // — is strict, and the two are read by the same surfaces.
     deleted: mapClosed(record['deleted'], `${path}.deleted`),
     ...mapTicketStateLinks(record['links'], `${path}.links`),
+    // A Decision's outcome and passes (wtg2 T5). Tolerant: absent when absent, the wire's own shape (`rowToTicketState`
+    // spreads them only when set); the VALUE is still policed.
+    ...(record['outcome'] === undefined || record['outcome'] === null ? {} : { outcome: asString(record['outcome'], `${path}.outcome`) }),
+    ...(record['passes'] === undefined ? {} : { passes: mapPasses(record['passes'], `${path}.passes`) }),
   };
 }
 

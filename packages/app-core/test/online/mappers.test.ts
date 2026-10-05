@@ -2005,6 +2005,31 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     ).toThrow(MappingError);
   });
 
+  it('29.358 mapTicketRead carries a Decision outcome and passes onto TicketState; absent when absent', () => {
+    const passes = [
+      {
+        pass: 1,
+        outcome: 'Yes',
+        by: 'u',
+        at: '2026-10-03T09:00:00.000Z',
+        revisions: [{ from: null, to: 'Yes', by: 'v', at: '2026-10-03T09:05:00.000Z' }],
+      },
+    ];
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+    const wire = body['ticketState'] as Record<string, unknown>;
+    const mapped = mapTicketRead({ ...body, ticketState: { ...wire, outcome: 'Yes', passes } }).ticket;
+    expect(mapped.outcome).toBe('Yes');
+    expect(mapped.passes).toEqual(passes);
+    // control: a ticket never decided maps to a state with neither key (the wire omits both)
+    expect(['outcome', 'passes'].filter((k) => k in mapTicketRead(body).ticket)).toEqual([]);
+    // a cleared outcome sent as null is absent too; the pass record stays
+    const cleared = mapTicketRead({ ...body, ticketState: { ...wire, outcome: null, passes } }).ticket;
+    expect('outcome' in cleared).toBe(false);
+    expect(cleared.passes).toEqual(passes);
+    // the VALUE is policed: a numeric pass is refused, not cast
+    expect(() => mapTicketRead({ ...body, ticketState: { ...wire, passes: [{ ...passes[0], pass: '1' }] } })).toThrow(MappingError);
+  });
+
   it('13.703 refuses a wire rank that is not a rank key, rather than passing it through', () => {
     // `mapRank` is not a `typeof raw === 'string'` check. A space is outside
     // the alphabet, so `''`-or-anything would let a key reach `compareByRank`,

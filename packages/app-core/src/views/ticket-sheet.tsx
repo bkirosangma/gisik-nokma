@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import {
+  DECISION_TYPE_ID,
   PRIORITIES,
   claimedEstimate,
   estimateValueSchema,
@@ -156,7 +157,9 @@ export const HISTORY_PAGE_LIMIT = 200;
  *    this section is otherwise a transcription of it, so departing where the
  *    prototype IS expressible would be a drift rather than a decision.
  * 2. **otherwise the SHALLOWEST legal type** — the nearest kind of work below
- *    the parent that the rank rule admits.
+ *    the parent that the rank rule admits — skipping the built-in Decision
+ *    unless it is the only legal type (wtg2 T5, case 29.134: a Decision is a
+ *    peer of Task by rank and would win the id tie-break).
  *
  * ⚠ **Rule 2 is the one judgement in this change that is not forced, and it is
  * flagged for a ruling rather than settled here.** The prototype's `Task` is
@@ -178,7 +181,10 @@ export function subtaskTypeFor(
   if (legal.length === 0) return null;
   const task = legal.find((def) => def.id === 'task');
   if (task !== undefined) return task;
-  return legal.reduce((best, def) =>
+  // A Decision is a peer of Task by rank and would win the id tie-break; it is chosen only when nothing else is legal.
+  const preferred = legal.filter((def) => def.id !== DECISION_TYPE_ID);
+  const candidates = preferred.length > 0 ? preferred : legal;
+  return candidates.reduce((best, def) =>
     def.rank < best.rank || (def.rank === best.rank && def.id < best.id) ? def : best,
   );
 }

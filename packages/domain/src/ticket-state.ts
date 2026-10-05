@@ -3,12 +3,13 @@ import type { EventEnvelope } from './envelope.js';
 // (coordination doc §4): this reducer PRODUCES the type, it does not redefine
 // it. Deliberately NOT re-exported from this module — the package index already
 // star-exports entity-state, and a second export of the same names collides.
-import type { FieldClaim, TicketLink, TicketState } from './entity-state.js';
+import type { FieldClaim, PassRecord, TicketLink, TicketState } from './entity-state.js';
 import {
   ticketAssignedPayload,
   ticketClosedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
+  ticketDecidedPayload,
   ticketDeletedPayload,
   ticketDiscardedPayload,
   ticketFieldSetPayload,
@@ -64,7 +65,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — NINETEEN of the TWENTY-FOUR registered against
+ * The event types this reducer folds — TWENTY of the TWENTY-FIVE registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -83,7 +84,7 @@ export type TicketStateDeps = {
  * stale count is the first half of that mistake. The link pair (spec A) moved both
  * numbers again, to seventeen and twenty-two: they fold into `links`, so they belong here
  * too. The draft pair (drafts spec §2.2) moved both numbers again, to nineteen and twenty-four:
- * `ticket.published` and `ticket.discarded` fold into `TicketState.draft`. (`comment.edited` and `comment.deleted` are the other two absent from this list;
+ * `ticket.published` and `ticket.discarded` fold into `TicketState.draft`. `ticket.decided` (wtg2 T5) moved both numbers again, to twenty and twenty-five: it folds into `outcome` and `passes`. (`comment.edited` and `comment.deleted` are the other two absent from this list;
  * `sync-routes.ts` backfills them with the three above.)
  *
  * `ticket-type.defined` is deliberately absent for a different reason: it is
@@ -107,6 +108,7 @@ export const TICKET_EVENT_TYPES = [
   'ticket.restored',
   'ticket.link_added',
   'ticket.link_removed',
+  'ticket.decided',
   'ticket.published',
   'ticket.discarded',
   'comment.added',
@@ -516,6 +518,10 @@ export function applyTicketEvent(
       const { links: _dropped, ...without } = state;
       return without;
     }
+    case 'ticket.decided': {
+      const p = ticketDecidedPayload.parse(env.payload);
+      return foldDecided(state, p.outcome, env);
+    }
     case 'ticket.published': {
       ticketPublishedPayload.parse(env.payload);
       if (state.draft === undefined) {
@@ -601,6 +607,40 @@ export function foldTicketEvent(
 ): TicketState | undefined {
   if (isRedactedTicketCreated(env) || isRedactedTicketPublished(env) || isWithheldLinkEvent(env)) return state;
   return applyTicketEvent(state, env, deps);
+}
+
+/**
+ * PS-2, rules 1-4. Rule 1 (a new pass) applies when a choice arrives with no current outcome AND the last pass is not an
+ * open one: there is no pass yet, or the last pass still holds the outcome a loop RELEASED. Otherwise the choice is a
+ * revision of the last pass, from the current outcome (null after a clear, which is rule 2's fill-in) to the new one (rule
+ * 3), or to null (rule 4). A clear with no pass at all is a ledger the engine would have refused; it records nothing.
+ */
+function foldDecided(state: TicketState, outcome: string | null, env: EventEnvelope): TicketState {
+  const current = state.outcome ?? null;
+  const passes = state.passes ?? [];
+  const last = passes[passes.length - 1];
+  const stamp = { by: env.actorId, at: env.serverTime };
+  let next: PassRecord[];
+  if (last === undefined || (current === null && last.outcome !== null)) {
+    if (outcome === null) return state;
+    next = [...passes, { pass: passes.length + 1, outcome, ...stamp, revisions: [] }];
+  } else {
+    const revised: PassRecord = { ...last, outcome, revisions: [...last.revisions, { from: current, to: outcome, ...stamp }] };
+    next = [...passes.slice(0, -1), revised];
+  }
+  const { outcome: _previous, ...rest } = state;
+  return { ...rest, ...(outcome === null ? {} : { outcome }), passes: next };
+}
+
+/**
+ * PS-2's last rule: a `reopened-by-flow` transition on the Decision itself releases the current outcome and leaves `passes`
+ * alone, so the next choice opens the next pass. Nothing calls this until T8 wires the transition arm; it is exported and
+ * tested here so the seam has a name and a contract.
+ */
+export function releaseOutcome(state: TicketState): TicketState {
+  if (state.outcome === undefined) return state;
+  const { outcome: _released, ...rest } = state;
+  return rest;
 }
 
 /**
