@@ -11,6 +11,8 @@ async function main(): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) { console.error('DATABASE_URL is required'); process.exit(2); }
   const pool = createPool(databaseUrl, { caCert: optionalDatabaseCaCert(process.env) });
+  // First line, as the pre-flight tools print it: against production it must read "ca" (docs/runbook.md, search:preflight).
+  console.log(JSON.stringify({ msg: 'database pool', tls: pool.options.ssl ? 'ca' : 'none' }));
   try {
     if (process.argv.includes('--dry-run')) {
       console.log(JSON.stringify({ msg: 'decision backfill dry run', candidates: await findDecisionBackfillCandidates(pool) }));

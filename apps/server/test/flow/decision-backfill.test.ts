@@ -9,7 +9,7 @@ import {
   builtinTicketTypeDefs, DECISION_TYPE_ID, newUlid, SYSTEM_ACTOR_FLOW, ticketTypeDefSchema, type TicketTypeDef,
 } from '@gisik-nokma/domain';
 import {
-  backfillDecisionType, decisionBackfillIntervalMs, findDecisionBackfillCandidates, firstThenEvery,
+  backfillDecisionType, DECISION_BACKFILL_BOOT_DELAY_MS, decisionBackfillIntervalMs, findDecisionBackfillCandidates, firstThenEvery,
 } from '../../src/flow/decision-backfill.js';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
@@ -123,13 +123,46 @@ describe('29.143 the Decision backfill', () => {
     const quick = firstThenEvery(300, 30_000);
     expect([quick(), quick()]).toEqual([300, 300]); // never later than the interval
     expect(() => firstThenEvery(0, 30_000)()).toThrow('DECISION_BACKFILL_INTERVAL_MS');
+    expect(DECISION_BACKFILL_BOOT_DELAY_MS).toBe(30_000); // the boot delay the daemon arms with (spec: "30 s after boot")
+  });
+
+  it('29.143 hands the door 100 definitions a batch, in workspace order, each answer logged against its own workspace; control: exactly 100 candidates is one batch', async () => {
+    // Candidate rows straight into the projection, inserted in DESCENDING id order so heap order is not the answer.
+    const seedTaskRows = (prefix: string, n: number) => db.pool.query(
+      `INSERT INTO proj_ticket_types (workspace_id, type_id, name, icon, rank, workflow_id, fields, defined_by, defined_at, defined_workspace_seq)
+       SELECT $1 || lpad(i::text, 3, '0'), 'task', 'Task', 'check', 3, 'wf-' || $1 || i, '[]'::jsonb, $2, now(), 1
+         FROM generate_series($3::int, 1, -1) AS i`, [prefix, HUMAN, n]);
+    // Every definition refused, its rule naming the workflow it carried: a line pairs the workspace the loop names with the
+    // workflow the event was built from, so an answer mapped to the wrong candidate reads as a mismatched pair.
+    const run = async () => {
+      const sizes: number[] = [];
+      const log = vi.fn();
+      const refusing = {
+        ingestBatch: async (events: Array<{ id: string; payload: { workflowId: string } }>) => {
+          sizes.push(events.length);
+          return events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: `r-${e.payload.workflowId}`, reason: 'nope' }));
+        },
+      };
+      const report = await backfillDecisionType({ pool: db.pool, ingest: refusing as never, log });
+      return { report, sizes, logged: log.mock.calls.map((call) => String(call[0])) };
+    };
+    const lineFor = (prefix: string, i: number) => `decision backfill refused for workspace ${prefix}${String(i).padStart(3, '0')}: r-wf-${prefix}${i}: nope`;
+    await seedTaskRows('a-', 100);
+    const exactly = await run();
+    expect(exactly.sizes).toEqual([100]);
+    expect(exactly.report).toEqual({ candidates: 100, defined: 0, refused: 100, alreadyHad: 0 });
+    await seedTaskRows('b-', 1);
+    const over = await run();
+    expect(over.sizes).toEqual([100, 1]);
+    expect(over.report).toEqual({ candidates: 101, defined: 0, refused: 101, alreadyHad: 0 });
+    expect(over.logged).toEqual([...Array.from({ length: 100 }, (_, k) => lineFor('a-', k + 1)), lineFor('b-', 1)]);
   });
 
   it('29.143 the spawned CLI: --dry-run lists the candidates and writes nothing, a run defines and exits 0, a refusal exits 1 naming the workspace, no DATABASE_URL exits 2, and importing the module runs nothing', async () => {
     // A process, not an import of main: the entry guard, the DATABASE_URL read and the exit code only exist when it runs as a CLI.
     const serverDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
     const spawnTsx = (args: string[], env: NodeJS.ProcessEnv) => spawnSync('pnpm', ['exec', 'tsx', ...args], { cwd: serverDir, encoding: 'utf8', env, timeout: 90_000 });
-    const cli = (...flags: string[]) => spawnTsx(['src/tools/backfill-decision-type.ts', ...flags], { ...process.env, DATABASE_URL: db.url });
+    const cli = (...flags: string[]) => spawnTsx(['src/tools/backfill-decision-type.ts', ...flags], { ...process.env, DATABASE_URL: db.url, DATABASE_CA_CERT: '' });
     const line = (stdout: string, msg: string): Record<string, unknown> | undefined => stdout.split('\n').flatMap((l) => {
       try { return [JSON.parse(l) as Record<string, unknown>]; } catch { return []; }
     }).find((entry) => entry['msg'] === msg);
@@ -141,6 +174,12 @@ describe('29.143 the Decision backfill', () => {
     expect(line(dry.stdout, 'decision backfill dry run')).toEqual({ msg: 'decision backfill dry run', candidates: [{ workspaceId: ws, workflowId: `wf-main-${ws}` }] });
     expect(line(dry.stdout, 'decision backfill complete')).toBeUndefined();
     expect(await decisionEvents(ws)).toEqual([]); // the dry run wrote nothing
+    expect(dry.stdout).toContain('"msg":"database pool","tls":"none"'); // control for the CA leg below
+    // DATABASE_CA_CERT reaches the pool (the 2026-09-23 production defect was a pool built without it). The test
+    // database speaks no TLS, so this run fails after the announcement; what it announces is the point.
+    const withCa = spawnTsx(['src/tools/backfill-decision-type.ts', '--dry-run'],
+      { ...process.env, DATABASE_URL: db.url, DATABASE_CA_CERT: '-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----\n' });
+    expect(withCa.stdout).toContain('"msg":"database pool","tls":"ca"');
 
     // Import safety: loading the module must not run main(). `tsx -e` has no `argv[1]`, and a script FILE has one that is not the
     // CLI's, so the entry guard is read in both its halves; DATABASE_URL is set, so a main() that ran would write the definition.

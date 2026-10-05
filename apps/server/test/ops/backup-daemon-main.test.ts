@@ -301,8 +301,25 @@ describe('backup-daemon-main — one scheduler for all eight jobs', () => {
       (out) => out.includes('"msg":"decision backfill complete"'),
     );
     expect(run.stdout, `stderr: ${run.stderr}`).toContain('"msg":"decision backfill complete"');
+    expect(run.stderr).not.toContain('"job":"decision-backfill"'); // the control for the failure case below
     const after = await db.pool.query<{ workflow_id: string }>(`SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = $2`, [ws, DECISION_TYPE_ID]);
     expect(after.rows).toEqual([{ workflow_id: wf }]);
+  }, 60_000);
+
+  it('29.143 a failing decision backfill is reported under its own job name "decision-backfill" and the daemon keeps running; control: the run above, on an intact database, logs completion and no failure', async () => {
+    const broken = await createTestDatabase();
+    try {
+      await broken.pool.query(`ALTER TABLE proj_ticket_types RENAME TO proj_ticket_types_renamed`);
+      const failed = await runDaemon(
+        { DATABASE_URL: broken.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000', DECISION_BACKFILL_INTERVAL_MS: '300' },
+        (_out, err) => err.includes('"job":"decision-backfill"'),
+      );
+      expect(failed.stderr).toContain('"msg":"backup job failed","job":"decision-backfill"');
+      expect(failed.stdout).toContain(SCHEDULED);
+      expect(failed.stdout).not.toContain('"msg":"decision backfill complete"');
+    } finally {
+      await broken.drop();
+    }
   }, 60_000);
 
   /**
