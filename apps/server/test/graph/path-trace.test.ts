@@ -23,10 +23,14 @@
  * - T7 ⇄ T8 (a `blocks` cycle); D1 duplicates D2 and blocks D3; U1 blocks U2 and U3, both block U4 (U2 < U3, linked
  *   U3 first); G ← S ← SS (parents); TA's description holds a chip to TB and a mention of `memberIn`; the note NA's body
  *   chips the ticket TC, and TD's description links the note NB (a `wikiLink`).
+ * - H1 and H2 are explicit `[owner]`: A1 → H1 ← B1 (both links INTO the hidden item) and A2 ← H2 → B2 (both OUT of it), so
+ *   each end of the both-ends-resolved check is the only one that stops its walk.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { edgeSentence, newUlid, type GraphPathResponse, type GraphRingResponse, type GraphTraceResponse, type LedgerEvent } from '@gisik-nokma/domain';
+import type { Queryable } from '../../src/db/queryable.js';
+import { shortestPaths } from '../../src/read/graph-path.js';
 import { buildTestApp } from '../helpers/app.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -47,6 +51,7 @@ const [U2, U3] = [newUlid(), newUlid()].sort();
 const [U1, U4] = [newUlid(), newUlid()];
 const [G, S, SS, TA, TB] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
 const [NA, NB, TC, TD] = [newUlid(), newUlid(), newUlid(), newUlid()];
+const [A1, H1, B1, A2, H2, B2] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
 const n = (id: string) => `note:${id}`;
 const t = (id: string) => `ticket:${id}`;
 
@@ -96,10 +101,12 @@ beforeAll(async () => {
     [T7, 'Cycle one'], [T8, 'Cycle two'], [X, 'Plan the fit-out'], [Y, 'Fit out the shop'], [M4, 'Shelving'], [M3, 'Lighting'], [M2, 'Flooring'], [M1, 'Counter'],
     [D1, 'Duplicate report'], [D2, 'Original report'], [D3, 'Blocked by the duplicate'], [U1, 'Survey'], [U3, 'Quote B'], [U2, 'Quote A'], [U4, 'Choose a quote'],
     [G, 'Launch'], [S, 'Launch week', G], [SS, 'Launch day', S], [TA, 'Write the brief'], [TB, 'Read the brief'], [TC, 'Book the hall'], [TD, 'Print the menu'],
+    [A1, 'Inbound one'], [H1, 'Hidden sink'], [B1, 'Inbound two'], [A2, 'Outbound one'], [H2, 'Hidden source'], [B2, 'Outbound two'],
   ];
   await applyCommitted(db.pool, [
     ...tickets.map(([id, title, parentId]) => created(id, title, parentId ?? null)),
-    tev(T3, 'visibility.set', { ticketId: T3, mode: 'explicit', userIds: [world.ids.owner] }),
+    ...[T3, H1, H2].map((id) => tev(id, 'visibility.set', { ticketId: id, mode: 'explicit', userIds: [world.ids.owner] })),
+    link('blocks', A1, H1), link('blocks', B1, H1), link('blocks', H2, A2), link('blocks', H2, B2),
     link('blocks', T1, T2), link('blocks', T2, T3), link('blocks', T3, T4),
     link('relates', T1, T5), link('relates', T5, T6), link('relates', T6, T4),
     // M4 first, so the walk's unsorted predecessors of Y are M4, M3, M2, M1.
@@ -176,6 +183,11 @@ describe('27.508 graph/path: up to three shortest paths, only through what the r
     expect((await get(null, pathUrl({ from: t(T1), to: t(T4) }))).status).toBe(401);
     // Control: the same reader's path to a ticket they see is answered.
     expect((await path('memberIn', { from: t(T1), to: t(T2) })).paths.map((p) => p.refs)).toEqual([[t(T1), t(T2)]]);
+    // A hidden item ends a branch whichever way its links point (A1 → H1 ← B1, A2 ← H2 → B2); control: the owner's path runs through it.
+    for (const [a, h, b] of [[A1, H1, B1], [A2, H2, B2]] as const) {
+      expect((await path('memberIn', { from: t(a), to: t(b) })).paths, h).toEqual([]);
+      expect((await path('owner', { from: t(a), to: t(b) })).paths.map((p) => p.refs), h).toEqual([[t(a), t(h), t(b)]]);
+    }
     // From an item to itself: one path of no edges.
     expect(await path('owner', { from: t(T1), to: t(T1) })).toMatchObject({ paths: [{ refs: [t(T1)], edges: [], sentences: [] }] });
   });
@@ -188,6 +200,26 @@ describe('27.508 graph/path: up to three shortest paths, only through what the r
 
     const tied = await path('owner', { from: t(X), to: t(Y) });
     expect(tied.paths.map((p) => p.refs)).toEqual([[t(X), t(M1), t(Y)], [t(X), t(M2), t(Y)], [t(X), t(M3), t(Y)]]);
+  });
+
+  it('27.508 the walk stops at the layer that reaches `to`: one link read for a one-hop pair, though maxHops allows six', async () => {
+    let linkReads = 0;
+    const counting = new Proxy(db.pool, {
+      get(target, prop, receiver) {
+        if (prop !== 'query') return Reflect.get(target, prop, receiver) as unknown;
+        return (text: unknown, params?: unknown[]) => {
+          if (String(text).includes('FROM proj_ticket_links')) linkReads += 1;
+          return target.query(text as string, params);
+        };
+      },
+    }) as Queryable;
+    const found = await shortestPaths(counting, world.ids.owner, { from: t(T1), to: t(T2), maxHops: 6, groups: new Set(['blocks']) });
+    expect(found?.paths.map((p) => p.refs)).toEqual([[t(T1), t(T2)]]);
+    expect(linkReads).toBe(1);
+    // Control: a three-hop pair reads one layer per hop, so the counter counts layers.
+    linkReads = 0;
+    await shortestPaths(counting, world.ids.owner, { from: t(T1), to: t(T4), maxHops: 6, groups: new Set(['blocks']) });
+    expect(linkReads).toBe(3);
   });
 });
 
@@ -223,6 +255,8 @@ describe('27.509 graph/trace kind=blocks: breadth-first, stopping at a hidden it
 
   it('27.509 a layer is sorted, so a node two items reach is credited to the lower one; a kind follows its own links only', async () => {
     expect(chainOf(await trace('owner', { from: t(U1), kind: 'blocks', direction: 'out' }))).toEqual([[t(U2), 1, t(U1)], [t(U3), 1, t(U1)], [t(U4), 2, t(U2)]]);
+    // Walked back, the rows of one target come in the order they were written (U3's first), so only the sort puts U2 first.
+    expect(chainOf(await trace('owner', { from: t(U4), kind: 'blocks', direction: 'in' }))).toEqual([[t(U2), 1, t(U4)], [t(U3), 1, t(U4)], [t(U1), 2, t(U2)]]);
     expect(chainOf(await trace('owner', { from: t(D1), kind: 'blocks', direction: 'out' }))).toEqual([[t(D3), 1, t(D1)]]);
     const dup = await trace('owner', { from: t(D1), kind: 'duplicates', direction: 'out' });
     expect(chainOf(dup)).toEqual([[t(D2), 1, t(D1)]]);

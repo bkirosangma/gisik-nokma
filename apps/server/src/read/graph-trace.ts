@@ -7,6 +7,7 @@ import { createGraphVisibility } from './graph-neighbours.js';
 
 /** Spec D §5.1 `graph_trace`: `maxDepth ≤ 10`. The route refuses a larger one with this bound. */
 export const TRACE_MAX_DEPTH = 10;
+/** `maxDepth` is 1..`TRACE_MAX_DEPTH`: the route's bound (`routes/graph-query.ts`), the one place it is checked. */
 export type GraphTraceRequest = { from: string; kind: GraphTraceKind; direction: GraphTraceDirection; maxDepth: number };
 
 type Step = { from: string; to: string };
@@ -60,7 +61,7 @@ export async function traceChain(db: Queryable, viewerId: string, req: GraphTrac
   const items = new Map(start);
   const chain: GraphTraceResponse['chain'] = [];
   let frontier = [from];
-  for (let depth = 1; depth <= Math.min(req.maxDepth, TRACE_MAX_DEPTH) && frontier.length > 0; depth += 1) {
+  for (let depth = 1; depth <= req.maxDepth && frontier.length > 0; depth += 1) {
     const steps = (await step(db, frontier, kind, direction)).filter((s) => !seen.has(s.to)).sort(byPair);
     const resolved = await vis.resolve(steps.map((s) => s.to));
     const next: string[] = [];

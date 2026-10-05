@@ -14,6 +14,7 @@ export const PATH_MAX_PATHS = 3;
 export const PATH_DEFAULT_GROUPS: readonly GraphGroup[] = GRAPH_GROUPS.filter((g) => g !== 'projects' && g !== 'concepts');
 
 type Raw = Awaited<ReturnType<typeof expandGraph>>[number];
+/** `maxHops` is 1..`PATH_MAX_HOPS`: the route's bound (`routes/graph-query.ts`), the one place it is checked. */
 export type GraphPathRequest = { from: string; to: string; maxHops: number; groups: ReadonlySet<GraphGroup> };
 
 /**
@@ -32,7 +33,7 @@ export async function shortestPaths(db: Queryable, viewerId: string, req: GraphP
   const dist = new Map([[from, 0]]);
   const parents = new Map<string, Array<{ ref: string; edge: Raw }>>();
   let frontier = [from];
-  for (let hop = 1; hop <= Math.min(req.maxHops, PATH_MAX_HOPS) && frontier.length > 0 && !dist.has(to); hop += 1) {
+  for (let hop = 1; hop <= req.maxHops && frontier.length > 0 && !dist.has(to); hop += 1) {
     const raw = await expandGraph(db, frontier, req.groups);
     for (const [ref, item] of await vis.resolve(raw.flatMap((e) => [e.from, e.to]).filter((r) => !known.has(r)))) known.set(ref, item);
     const inFrontier = new Set(frontier);

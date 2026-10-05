@@ -22,7 +22,7 @@ function bounded(raw: string | undefined, max: number, fallback: number): number
 
 /**
  * Null = 400. A REPEATED key reaches the handler as an array (Fastify's query parser), so a present non-string is
- * refused first, as `parseRingQuery` does (27.291).
+ * refused first, as `parseRingQuery` does (27.291): `groups` would otherwise reach `.split` and answer a 500.
  */
 export function parsePathQuery(raw: RawPathQuery): GraphPathRequest | null {
   if (PATH_KEYS.some((key) => raw[key] !== undefined && typeof raw[key] !== 'string')) return null;
@@ -35,8 +35,8 @@ export function parsePathQuery(raw: RawPathQuery): GraphPathRequest | null {
   return { from, to, maxHops, groups: new Set(groups as GraphGroup[]) };
 }
 
+/** Null = 400. A repeated key (an array) needs no refusal of its own: `parseGraphRef`, the digits pattern and the two enums refuse one. */
 export function parseTraceQuery(raw: RawTraceQuery): GraphTraceRequest | null {
-  if (TRACE_KEYS.some((key) => raw[key] !== undefined && typeof raw[key] !== 'string')) return null;
   const from = ref(raw.from);
   const maxDepth = bounded(raw.maxDepth, TRACE_MAX_DEPTH, TRACE_MAX_DEPTH);
   if (from === null || maxDepth === null) return null;
