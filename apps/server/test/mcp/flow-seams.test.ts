@@ -52,3 +52,39 @@ describe('SEAM probes (Part 5 T1)', () => {
     expect(plain?.rule).toBe('draft.link-form');
   });
 });
+
+describe('SEAM probes (Part 5 T2)', () => {
+  it('SEAM S10 (Graph Part 2): the folded ticketState carries outcome and passes after a decision', async () => {
+    const w = await buildDoorWorld(db, '3761');
+    const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
+    const next = await mk(w, w.owner, 'Pitch');
+    await rawEvents(w, w.owner, [{ entityId: decision, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: next, label: 'Yes' } }]);
+    const [decided] = await rawEvents(w, w.owner, [{ entityId: decision, type: 'ticket.decided', payload: { outcome: 'Yes' } }]);
+    expect(decided?.status, `Part 2 DC-4: ${decided?.reason}`).toBe('committed');
+    const res = await w.app.inject({ method: 'GET', url: `/v1/workspaces/${w.workspaceId}/tickets/${decision}`, headers: { authorization: `Bearer ${w.owner.sessionToken}` } });
+    const state = res.json<{ ticketState: { outcome?: string | null; passes?: unknown[] } }>().ticketState;
+    expect(state.outcome, 'S10: ticketState.outcome').toBe('Yes');
+    expect(state.passes?.length, 'S10: ticketState.passes').toBe(1);
+  });
+
+  it('SEAM S4 (Graph Part 3): the flow route answers every member get_flow reads, nodes in flow order', async () => {
+    const w = await buildDoorWorld(db, '3762');
+    const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
+    const next = await mk(w, w.owner, 'Pitch');
+    await rawEvents(w, w.owner, [{ entityId: decision, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: next, label: 'Yes' } }]);
+    const res = await w.app.inject({ method: 'GET', url: `/v1/workspaces/${w.workspaceId}/tickets/${decision}/flow`, headers: { authorization: `Bearer ${w.owner.sessionToken}` } });
+    expect(res.statusCode, 'S4: the flow route exists').toBe(200);
+    const flow = res.json<Record<string, unknown> & { nodes: Array<Record<string, unknown>>; edges: Array<Record<string, unknown>> }>();
+    for (const k of ['flowId', 'truncated', 'start', 'end', 'nodes', 'edges', 'autoMoves', 'draftCount']) expect(flow, `S4 flow.${k}`).toHaveProperty(k);
+    for (const k of ['id', 'key', 'draft', 'title', 'parentId', 'kind', 'state', 'assigneeId', 'waitForAll', 'estimate', 'reworkEstimate', 'round', 'outcome', 'passes', 'resolution', 'alternates', 'periods', 'planned', 'actual', 'tray', 'notes']) {
+      expect(flow.nodes[0], `S4 node.${k}`).toHaveProperty(k);
+    }
+    for (const k of ['kind', 'from', 'to', 'label', 'loop', 'taken']) expect(flow.edges[0], `S4 edge.${k}`).toHaveProperty(k);
+    expect(flow.nodes.map((n) => n['id']), 'S4: the Decision precedes what it leads to (flow order)').toEqual([decision, next]);
+    // a ticket in no flow: 200, and its only node is itself (the T5 cases and door rows call the route on unconnected tickets)
+    const alone = await mk(w, w.owner, 'Alone');
+    const lone = await w.app.inject({ method: 'GET', url: `/v1/workspaces/${w.workspaceId}/tickets/${alone}/flow`, headers: { authorization: `Bearer ${w.owner.sessionToken}` } });
+    expect(lone.statusCode, 'S4: an unconnected ticket has a flow of one').toBe(200);
+    expect(lone.json<{ nodes: Array<{ id: string }> }>().nodes.map((n) => n.id)).toEqual([alone]);
+  });
+});
