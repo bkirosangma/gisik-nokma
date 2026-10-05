@@ -57,7 +57,10 @@ const TABLE: Record<ConceptEventType, Row[]> = {
     { payload: { otherId: C, relation: 'related' }, sentence: `Linked the related concept ${C}` },
   ],
   'concept.unlinked': [{ payload: { otherId: C, relation: 'related' }, ctx: phones, sentence: 'Removed the link to Phones' }],
-  'concept.merged': [{ payload: { intoId: C }, ctx: phones, sentence: 'Merged into Phones' }],
+  'concept.merged': [
+    { payload: { intoId: C }, ctx: phones, sentence: 'Merged into Phones' },
+    { payload: { intoId: C }, sentence: `Merged into ${C}` },
+  ],
   'concept.deleted': [{ payload: {}, sentence: 'Deleted the concept' }],
 };
 
@@ -72,5 +75,9 @@ describe('27.456 concept History sentences', () => {
     // The fallbacks: a payload this file cannot read is headlined by its raw type.
     expect(describeEvent(event('concept.created', {}), phones)).toBe('concept.created');
     expect(describeEvent(event('concept.item_tagged', { itemKind: 'person', itemId: T }), label)).toBe('concept.item_tagged');
+    expect(describeEvent(event('concept.renamed', {}), phones)).toBe('concept.renamed');
+    expect(describeEvent(event('concept.linked', { relation: 'broader' }), phones)).toBe('concept.linked');
+    expect(describeEvent(event('concept.linked', { otherId: C, relation: 'narrower' }), phones)).toBe('concept.linked');
+    expect(describeEvent(event('concept.merged', {}), phones)).toBe('concept.merged');
   });
 });

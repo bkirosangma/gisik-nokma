@@ -38,6 +38,28 @@ describe('27.440–27.442 the concept vocabulary', () => {
     expect(conceptDescribedPayload.safeParse({ summary: 'x'.repeat(2000) }).success).toBe(true); // the bar itself: `max(1999)` reds here
     expect(conceptDescribedPayload.safeParse({ summary: '' }).success).toBe(true); // control: '' clears
     expect(conceptCreatedPayload.safeParse({ name: '   ' }).success).toBe(false); // displayName, not z.string().min(1)
+    // An id is never empty: '' is how a READ redacts an item (Task 4), never what an event may carry.
+    expect(conceptItemTaggedPayload.safeParse({ itemKind: 'ticket', itemId: '' }).success).toBe(false);
+    expect(conceptLinkedPayload.safeParse({ otherId: '', relation: 'related' }).success).toBe(false);
+    expect(conceptMergedPayload.safeParse({ intoId: '' }).success).toBe(false);
+    expect(conceptCreatedPayload.safeParse({ name: 'X', fromSuggestion: '' }).success).toBe(false);
+    // Every schema is strict: a valid sample per type parses, and the same with one extra member does not.
+    const samples: Record<string, Record<string, unknown>> = {
+      'concept.created': { name: 'X' },
+      'concept.renamed': { name: 'Y' },
+      'concept.described': { summary: 's' },
+      'concept.item_tagged': { itemKind: 'note', itemId: 'N' },
+      'concept.item_untagged': { itemKind: 'ticket', itemId: 'T' },
+      'concept.linked': { otherId: 'C', relation: 'related' },
+      'concept.unlinked': { otherId: 'C', relation: 'broader' },
+      'concept.merged': { intoId: 'C' },
+      'concept.deleted': {},
+    };
+    expect(Object.keys(samples).sort()).toEqual([...CONCEPT_EVENT_TYPES].sort());
+    for (const type of CONCEPT_EVENT_TYPES) {
+      expect(CONCEPT_PAYLOADS[type].safeParse(samples[type]).success, type).toBe(true);
+      expect(CONCEPT_PAYLOADS[type].safeParse({ ...samples[type], extra: 1 }).success, type).toBe(false);
+    }
   });
 
   it('27.442 the nine are registered at version 1 against concept, and nothing else is a concept.* type; control: each carries its own schema', () => {
