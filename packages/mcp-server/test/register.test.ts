@@ -84,7 +84,7 @@ describe('the tools, registered', () => {
     }
   });
 
-  it('14.555 the final registry is the 73 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
+  it('14.555 the final registry is the 74 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
     // The plan's header order, spelled out HERE and not read from the fixture: editing the fixture alone cannot make this green.
     const FINAL = [
       'search', 'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
@@ -100,9 +100,9 @@ describe('the tools, registered', () => {
       'define_workflow', 'define_ticket_type', 'migrate_ticket_type', 'set_visibility', 'update_workspace_settings',
       'list_deleted',
       'list_my_drafts', 'publish_draft', 'discard_draft',
-      'set_wait_for_all',
+      'set_wait_for_all', 'get_flow',
     ];
-    expect(FINAL).toHaveLength(73); // 63 until typed links T4 added `link_tickets` (27.060), 64 until MCP sweep 2 T4 added `restore_note_version`, 65 until MCP sweep 2 T5 added `close_tickets`, 66 until MCP sweep 2 T6 added the three preference and saved-filter tools (14.555), 69 until drafts T7 added `list_my_drafts`, `publish_draft`, `discard_draft` (28.141), 72 until Graph Part 5 T1 added `set_wait_for_all` (29.377)
+    expect(FINAL).toHaveLength(74); // 63 until typed links T4 added `link_tickets` (27.060), 64 until MCP sweep 2 T4 added `restore_note_version`, 65 until MCP sweep 2 T5 added `close_tickets`, 66 until MCP sweep 2 T6 added the three preference and saved-filter tools (14.555), 69 until drafts T7 added `list_my_drafts`, `publish_draft`, `discard_draft` (28.141), 72 until Graph Part 5 T1 added `set_wait_for_all` (29.377), 73 until Graph Part 5 T2 added `get_flow` (29.379)
     const tools = allTools(fakeSession());
     expect(tools.map((t) => t.name)).toEqual(FINAL);
     expect(TOOL_NAMES).toEqual(FINAL);

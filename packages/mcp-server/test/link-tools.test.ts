@@ -160,7 +160,7 @@ describe('29.376 link_tickets: remove and relabel file on the stored source', ()
 
   const refuse = { status: 'refused', eventId: 'e', rule: 'link.label-duplicate', reason: 'Another branch already has this label.' };
 
-  it('29.376 a refused add after a committed remove puts the old link back; if that is refused too, the error names the label to re-add', async () => {
+  it('29.376 a refused add after a committed remove puts the old link back; if that is refused too, the error says to re-add it, with its label when it had one', async () => {
     const putBack = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS }, { results: (i) => (i === 0 ? [COMMITTED, refuse] : undefined) });
     await expect(tool(putBack.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Approved' }))
       .rejects.toThrow(/^event 1 refused by link\.label-duplicate: Another branch already has this label\. The previous link was put back, so nothing changed\.$/);
@@ -171,6 +171,13 @@ describe('29.376 link_tickets: remove and relabel file on the stored source', ()
     const stuck = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS }, { results: (i) => (i === 0 ? [COMMITTED, refuse] : [refuse]) });
     await expect(tool(stuck.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Approved' }))
       .rejects.toThrow(/^event 1 refused by link\.label-duplicate: Another branch already has this label\. The previous link could NOT be put back: add it again with link_tickets \(action "add", label "Yes"\)\.$/);
+    // an UNLABELLED link (a plain ticket's arrow) is re-added without a label clause: `label ""` would be refused (wtg5-t2-relabel-msg);
+    // the labelled one above is the control
+    const bare = fakeFlow({ ...ENDS, [`${tw}/${A}/links`]: { links: [row('leads_to', 'out', B)] } }, { results: (i) => (i === 0 ? [COMMITTED, refuse] : [refuse]) });
+    await expect(tool(bare.session).handler({ ...relabel, ticketId: A, targetId: B, label: 'Go' }))
+      .rejects.toThrow(/^event 1 refused by link\.label-duplicate: Another branch already has this label\. The previous link could NOT be put back: add it again with link_tickets \(action "add"\)\.$/);
+    expect(bare.batches[1]![0], 'the put-back carried no label either').toMatchObject({ type: 'ticket.link_added', entity: { id: A }, payload: { kind: 'leads_to', targetId: B } });
+    expect('label' in payload(bare.batches[1]![0])).toBe(false);
     // a put-back whose answer cannot be trusted is not claimed as put back
     const unsure = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS }, { results: (i) => (i === 0 ? [COMMITTED, refuse] : []) });
     await expect(tool(unsure.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Approved' })).rejects.toThrow('could NOT be put back');

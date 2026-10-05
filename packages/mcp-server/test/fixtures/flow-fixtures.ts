@@ -1,5 +1,6 @@
 import { HttpError } from '../../src/http-client.js';
 import type { Session } from '../../src/session.js';
+import type { FlowWire } from '../../src/tools/flow-seams.js';
 import { NO_TRANSFER } from './fake-session.js';
 
 export const ulid = (tag: string): string => `01J0${tag}`.padEnd(26, '0');
@@ -57,4 +58,16 @@ export const detail = (over: { key?: string | null; draft?: boolean; typeId?: st
     stateId: over.stateId ?? 'todo', stateCategory: over.stateCategory ?? 'active', outcome: over.outcome ?? null, links: over.links ?? [],
   },
   rollup: null,
+});
+
+type Node = FlowWire['nodes'][number];
+/** One flow node with every member a flow answer has, defaulting to a plain Backlog task (Part 5 T2). */
+export const flowNode = (id: string, over: Partial<Node> = {}): Node => ({
+  id, key: `GN-${id.slice(-3)}`, draft: false, title: `Ticket ${id.slice(-3)}`, parentId: null, kind: 'ticket',
+  state: { id: 'backlog', name: 'Backlog', category: 'open' }, assigneeId: null, waitForAll: false, estimate: null, reworkEstimate: null, round: 1,
+  outcome: null, passes: [], resolution: null, alternates: [], periods: [], planned: [], actual: null, tray: null, notes: [], ...over,
+});
+/** A flow answer around `nodes`: starts at the first, ends at the last, no edges, `draftCount` counted. */
+export const flowWire = (nodes: Node[], over: Partial<FlowWire> = {}): FlowWire => ({
+  flowId: 'f1', truncated: false, start: [nodes[0]!.id], end: [nodes.at(-1)!.id], nodes, edges: [], autoMoves: [], draftCount: nodes.filter((n) => n.draft).length, ...over,
 });
