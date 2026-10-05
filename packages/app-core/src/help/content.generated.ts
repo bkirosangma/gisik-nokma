@@ -8399,7 +8399,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " closes one thing at a time: an open menu first, then the panel, then full screen. A reload keeps you in full screen until you exit it. On a phone the panel rises from the bottom instead. Two moves are listed at the bottom of "
+                    "text": " closes one thing at a time: an open menu or the publishing dialog first, then the panel, then full screen. Switching full screen on or off leaves a publish you have started open, with the destinations you picked. A reload keeps you in full screen until you exit it. On a phone the panel rises from the bottom instead. Two moves are listed at the bottom of "
                   },
                   {
                     "kind": "bold",
@@ -8856,7 +8856,15 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Confirm."
+                      "text": "Confirm, or press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (or Escape) to stop without publishing."
                     }
                   ]
                 ]

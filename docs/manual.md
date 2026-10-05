@@ -1478,7 +1478,8 @@ float in one row along the top: the name, **Add state**, **Add transition**, zoo
 narrower window zoom and Tidy are under **More**. The left-hand column is not shown. In its place a panel
 on the right opens when you click a box or an arrow, or press **Issues**; its tabs are **Selection**,
 **States & transitions**, **System rules** and **Issues**, and you can drag its left edge to make it wider
-or narrower. **Escape** closes one thing at a time: an open menu first, then the panel, then full screen.
+or narrower. **Escape** closes one thing at a time: an open menu or the publishing dialog first, then the panel, then full screen.
+Switching full screen on or off leaves a publish you have started open, with the destinations you picked.
 A reload keeps you in full screen until you exit it. On a phone the panel rises from the bottom instead.
 Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
 them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
@@ -1568,7 +1569,7 @@ you.
    missed: *"Every dropped state needs a destination."* If it cannot even count how many tickets are in a
    state it says "unavailable" next to the count and **still makes you decide** — it will not let you
    skip it.
-4. Confirm.
+4. Confirm, or press **Cancel** (or Escape) to stop without publishing.
 
 Publishing again makes version 2, and **tickets created under version 1 stay on version 1** unless they
 are moved across. Renaming a state without removing it publishes with none of this extra step.
