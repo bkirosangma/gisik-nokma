@@ -1,11 +1,16 @@
 import Sigma, { DEFAULT_STYLES } from 'sigma';
-import { extremityArrow, layerDashed, layerFill, pathLine, sdfCircle, sdfSquare } from 'sigma/rendering';
+import { DEFAULT_LABEL_MARGIN, extremityArrow, layerDashed, layerFill, sdfCircle, sdfSquare } from 'sigma/rendering';
 import { layerImage } from '@sigma/node-image';
 import type { MultiGraph } from 'graphology';
 import type { Attributes } from 'graphology-types';
 import type { GraphGroup } from '@gisik-nokma/domain';
-import type { EdgeAttributes, Level, NodeAttributes } from '../node-attributes.js';
+import type { EdgeAttributes, NodeAttributes } from '../node-attributes.js';
 import type { PaletteRole, ThemePalette } from '../palette.js';
+import type { LabelMetrics, SigmaLabels } from './card-box.js';
+import { CARD_VARIABLES, pathToCard } from './card-path.js';
+import {
+  backdropCornerRadius, backdropPadding, backdropShown, hasHead, LABEL_FONT, labelPosition, labelShown, labelSize, nodeShape, nodeSize, subShown, subSize,
+} from './card-style.js';
 
 /** The custom per-item state `customNodeState` / `customEdgeState` declare below. */
 export type NodeState = { isNb: boolean; isSel: boolean; isHl: boolean };
@@ -23,8 +28,6 @@ export const ICON_ATLAS_DEBOUNCE_MS = 20;
 
 export type ViewFlags = { nodeHovered: () => boolean; highlightOn: () => boolean };
 
-const big = (lv: Level | 'fog') => lv === 'card' || lv === 'cardS';
-const mid = (lv: Level | 'fog') => lv === 'chip' || lv === 'tap';
 /** Trap 2 (§4.2): a gap of 0 draws nothing, so a SOLID edge is dash 10000 / gap 0.2. */
 export const SOLID: readonly [number, number] = [10000, 0.2];
 export const DASH: Partial<Record<GraphGroup, readonly [number, number]>> = { relates: [7, 5], dup: [2, 5], ref: [1.5, 5] };
@@ -40,12 +43,21 @@ function subLabel(palette: () => ThemePalette) {
   return (ctx: { attributes: Record<string, unknown> }) => {
     const attributes = ctx.attributes as unknown as NodeAttributes;
     const text = attributes.sub ?? '';
-    const width = Math.ceil(text.length * 6.9) + 6;
+    const { width, height } = subSize(text);
     return {
       type: 'svg' as const,
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="17"><text x="1" y="13" font-family="-apple-system,BlinkMacSystemFont,Helvetica,sans-serif" font-size="12.5" fill="${palette().textMuted}">${escapeXml(text)}</text></svg>`,
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><text x="1" y="13" font-family="-apple-system,BlinkMacSystemFont,Helvetica,sans-serif" font-size="12.5" fill="${palette().textMuted}">${escapeXml(text)}</text></svg>`,
     };
   };
+}
+
+/**
+ * Sigma's own label facts for `cardShape`: its measurement, the widths its SDF atlas draws (sigma@4.0.0-beta.7 keeps
+ * `labelRenderer` private), and its label margin (no `primitives.nodes.label` is set here, so Sigma's default).
+ */
+export function labelsOf(sigma: KgSigma): SigmaLabels {
+  const labels = (sigma as unknown as { labelRenderer: { measureNodeLabel(d: { label: string; labelSize: number; labelFont: string }): LabelMetrics } }).labelRenderer;
+  return { measure: (label, labelSize, labelFont) => labels.measureNodeLabel({ label, labelSize, labelFont }), margin: DEFAULT_LABEL_MARGIN };
 }
 
 export function createSigma(
@@ -65,8 +77,8 @@ export function createSigma(
         labelAttachments: { subL: sub, subD: sub },
       },
       edges: {
-        variables: { dash: { type: 'number', default: 0 }, gap: { type: 'number', default: 0 } },
-        paths: [pathLine()],
+        variables: { dash: { type: 'number', default: 0 }, gap: { type: 'number', default: 0 }, ...CARD_VARIABLES },
+        paths: [pathToCard()],
         extremities: [extremityArrow()],
         layers: [layerDashed({ dashSize: { attribute: 'dash', mode: 'pixels' }, gapSize: { attribute: 'gap', mode: 'pixels' }, gapColor: 0, align: 0, solidExtremities: true })],
       },
@@ -78,11 +90,9 @@ export function createSigma(
         // sigma@4.0.0-beta.7 types DEFAULT_STYLES over bare `Attributes`, which beats the graph's node type in inference; `never` keeps the entry out of it
           DEFAULT_STYLES.nodes as never,
         {
-          shape: (a: NodeAttributes) => ((a.kind === 'note' || a.kind === 'workspace' || a.kind === 'project') && !a.fog && !a.image ? 'square' : 'circle'),
-          // trap 10: the centre card is size 1, label OVER it, so arrows into it stay visible
-          size: (a: NodeAttributes) =>
-            a.center && a.kind !== 'person' ? 1 : a.fog ? 3 : a.kind === 'person' ? (a.lv === 'dot' ? 5 : big(a.lv) || mid(a.lv) ? 16 : 12)
-            : a.lv === 'dot' ? 3.5 : a.image ? (big(a.lv) || mid(a.lv) ? 9.5 : 8) : a.kind === 'workspace' ? 7 : big(a.lv) ? 5.5 : 4.5,
+          // the card's shape and size values live in card-style.ts: the arrowheads' end (card-box.ts) reads the same ones
+          shape: nodeShape,
+          size: nodeSize,
           color: (a: NodeAttributes) =>
             a.fog ? P().fogDot : a.image ? (a.kind === 'note' ? P().surfaceRaised : P().surfaceSunken) : a.kind === 'person' ? P().edgePeople
             : a.kind === 'note' || a.kind === 'workspace' || a.kind === 'project' ? P().textSubtle : a.kind === 'concept' ? P().edgeConcept
@@ -91,19 +101,18 @@ export function createSigma(
           opacity: (a: NodeAttributes, s: { isHovered: boolean; isNb: boolean; isHl: boolean }) =>
             a.fog ? 0.9 : flags.highlightOn() ? (s.isHl ? 1 : 0.25) : flags.nodeHovered() && !s.isHovered && !s.isNb ? 0.32 : 1,
           label: (a: NodeAttributes) => a.lbl,
-          labelPosition: (a: NodeAttributes) => (a.kind === 'person' ? 'below' : a.center ? 'over' : 'right'),
-          labelVisibility: (a: NodeAttributes) => (a.lbl ? 'visible' : 'hidden'),
+          labelPosition,
+          labelVisibility: (a: NodeAttributes) => (labelShown(a) ? 'visible' : 'hidden'),
           labelColor: () => P().text,
-          labelSize: (a: NodeAttributes) => (a.center ? 15 : 12.5),
-          labelFont: '-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,sans-serif',
+          labelSize,
+          labelFont: LABEL_FONT,
           image: (a: NodeAttributes) => a.image || '',
-          labelAttachment: (a: NodeAttributes) => (a.sub ? (P().dark ? 'subD' : 'subL') : null),
+          labelAttachment: (a: NodeAttributes) => (subShown(a) ? (P().dark ? 'subD' : 'subL') : null),
           labelAttachmentPlacement: 'below',
-          backdropVisibility: (a: NodeAttributes, s: { isHovered: boolean; isSel: boolean }) => (!a.fog && a.lv !== 'dot' && (a.kind !== 'person' || s.isHovered || s.isSel) ? 'visible' : 'hidden'),
+          backdropVisibility: (a: NodeAttributes, s: { isHovered: boolean; isSel: boolean }) => (backdropShown(a, s) ? 'visible' : 'hidden'),
           backdropArea: 'both',
-          // 'tap' is 10, not the mockup's 7 (`:791`): 12.5 px text + 2 × 7 = 26.5 px, under spec §5's 32 px target; + 2 × 10 = 32.5
-          backdropPadding: (a: NodeAttributes) => (big(a.lv) || a.lv === 'tap' ? 10 : a.lv === 'compact' ? 4 : 7),
-          backdropCornerRadius: (a: NodeAttributes) => (a.kind === 'concept' ? 16 : big(a.lv) ? 12 : 9),
+          backdropPadding,
+          backdropCornerRadius,
           backdropColor: (a: NodeAttributes) => (a.kind === 'concept' ? (a.sug ? P().conceptSoft : P().conceptFill) : a.kind === 'workspace' || a.kind === 'project' ? P().surfaceSunken : P().surfaceRaised),
           backdropBorderColor: (a: NodeAttributes, s: { isSel: boolean; isHl: boolean }) =>
             s.isSel || (s.isHl && flags.highlightOn()) || a.center ? P().text : a.kind === 'concept' ? P().edgeConcept : P().graphCardLine,
@@ -124,7 +133,15 @@ export function createSigma(
             s.isHovered || s.isSel ? 3.4 : a.on ? 3 : a.fog ? 1.2 : a.grp === 'blocks' || a.grp === 'ref' ? 2.2 : a.grp === 'people' ? 1.3 : a.grp === 'projects' ? 1.1 : 1.7,
           opacity: (a: EdgeAttributes, s: { isHovered: boolean; isSel: boolean; isNb: boolean }) =>
             s.isHovered || s.isSel ? 1 : a.fog ? 0.22 : flags.highlightOn() ? 0.12 : flags.nodeHovered() ? (s.isNb ? 1 : 0.08) : a.grp === 'projects' ? 0.55 : a.on ? 1 : a.sug ? 0.6 : 0.45,
-          head: (a: EdgeAttributes) => (!a.fog && (a.grp === 'blocks' || a.grp === 'ref') ? 'arrow' : 'none'),
+          head: (a: EdgeAttributes) => (hasHead(a) ? 'arrow' : 'none'),
+          // owner ruling B: a head stops at its target's card border (card-path.ts); every other edge reads zeros and runs to the centre
+          kgNodeR: (a: EdgeAttributes) => a.card?.nodeR ?? 0,
+          kgNodeC: (a: EdgeAttributes) => a.card?.nodeC ?? 0,
+          kgBoxX: (a: EdgeAttributes) => a.card?.boxX ?? 0,
+          kgBoxY: (a: EdgeAttributes) => a.card?.boxY ?? 0,
+          kgBoxW: (a: EdgeAttributes) => a.card?.boxW ?? 0,
+          kgBoxH: (a: EdgeAttributes) => a.card?.boxH ?? 0,
+          kgBoxC: (a: EdgeAttributes) => a.card?.boxC ?? 0,
           label: '',
           labelVisibility: 'hidden', // trap 11: Sigma draws edge labels rotated, so the sentence is a DOM tooltip
           cursor: (a: EdgeAttributes) => (a.fog ? 'default' : 'pointer'),

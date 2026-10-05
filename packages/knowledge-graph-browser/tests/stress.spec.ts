@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 type Sweep = { frames: number; fps: number; worstMs: number; p99Ms: number; over167: number; overAt: number[] };
-type Stress = Sweep & { cards: number; fog: number; edges: number; renderer: string; firstMs: number; pass2: Sweep };
+type Stress = Sweep & { cards: number; fog: number; edges: number; searched: number; renderer: string; firstMs: number; pass2: Sweep };
 async function stress(page: import('@playwright/test').Page): Promise<Stress> {
   await page.goto('/stress.html?auto=1');
   await page.waitForFunction(() => (window as unknown as { __stress?: unknown }).__stress !== undefined, null, { timeout: 60_000 });
@@ -14,6 +14,7 @@ test('27.204 the stress scene draws 500 clear + 2,000 fog + 3,000 edges through 
   expect(r.cards).toBe(500);
   expect(r.fog).toBe(2000);
   expect(r.edges).toBe(3000);
+  expect(r.searched).toBeGreaterThan(0); // the blocks/ref edges into a card end at its border (owner ruling B)
   expect(r.fps).toBeGreaterThan(0); // a floor: SwiftShader is not a GPU number
 });
 

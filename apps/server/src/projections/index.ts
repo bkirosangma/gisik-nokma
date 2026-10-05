@@ -1,3 +1,4 @@
+import { projConcepts } from './proj-concepts.js';
 import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
 import { lifecycleProjection } from './lifecycle.js';
@@ -208,5 +209,10 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // readers, `read/linked-from.ts` and `read/graph-neighbours.ts`, are
   // request-path reads.
   registry.register(referencesProjection);
+  // Knowledge Graph spec D §3.1 (KG-D Task 3). APPENDED: `apply` reads no projection's table (only its own rows
+  // and `purged_entities`, which is not a projection and is never reset), and no projection reads the three
+  // concept tables inside an ingest transaction — their readers are the door (`check-concept.ts`) and request-path
+  // reads.
+  registry.register(projConcepts);
   return registry;
 }

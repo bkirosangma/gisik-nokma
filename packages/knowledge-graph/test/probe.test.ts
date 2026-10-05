@@ -6,7 +6,10 @@ import type { KgSigma } from '../src/render/sigma/program.js';
 
 // jsdom has no WebGL, so the REAL adapter mounts with Sigma's three collaborators stubbed; graphology is plain JS and runs.
 const { probeSentinel } = vi.hoisted(() => ({ probeSentinel: { sentinel: 'probe' } }));
-vi.mock('../src/render/sigma/program.js', () => ({ createSigma: () => ({ on: () => undefined, setCustomBBox: () => undefined, kill: () => undefined }) }));
+vi.mock('../src/render/sigma/program.js', () => ({
+  createSigma: () => ({ on: () => undefined, setCustomBBox: () => undefined, kill: () => undefined }),
+  labelsOf: () => ({ measure: () => ({ width: 0, height: 0, textHeight: 0 }), margin: 5 }),
+}));
 vi.mock('../src/render/sigma/attachment-cache.js', () => ({ keepAttachmentCache: () => () => undefined }));
 vi.mock('../src/render/sigma/camera-driver.js', () => ({ createCameraDriver: () => ({ goTo: () => undefined, zoomCentre: () => undefined, panBy: () => undefined, destroy: () => undefined }) }));
 vi.mock('../src/render/sigma/probe.js', () => ({ createProbe: () => probeSentinel }));

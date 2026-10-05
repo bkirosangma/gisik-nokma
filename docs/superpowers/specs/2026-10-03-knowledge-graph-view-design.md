@@ -187,7 +187,7 @@ If v4 fails a bar in §7, swapping the adapter (for example to Sigma 3) touches 
 7. **Wheel.** `preventSigmaDefault()`, `event.original.preventDefault()` AND a non-passive `wheel` listener on the container, or the page scrolls under the graph.
 8. **Camera.** Coordinates are read through `{cameraState}` overrides. The first fit runs in the first `afterRender`, because the viewport size is wrong before it.
 9. **Dimming.** Dim on item hover only, through our own flag, because `hasHovered` is also true for an edge hover.
-10. **Arrows** end at the target's dot. The centre card is drawn `labelPosition:'over'` at size 1, so arrows into it stay visible.
+10. **Arrows** are drawn under the cards (Sigma draws edges before nodes), so an edge that runs to its target's dot hides its head under the target's card. A directed edge (`blocks`, `ref`) therefore ends at its target's CARD border, and its head is drawn just outside it (1.5 px); a `parent` edge has no head. The node size stays small: the centre card is still drawn `labelPosition:'over'` at size 1, and a custom edge path searches the card's outline along the edge instead (owner ruling B, 2026-10-05).
 11. **Edge labels** are drawn rotated along the line, so the sentence is a DOM tooltip instead.
 
 ## 5. Phone
