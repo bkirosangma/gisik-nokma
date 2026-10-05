@@ -51,7 +51,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (16)
+  // invariant (17)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
@@ -69,6 +69,9 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/close.ts': 'invariant',
   // wtg2 T8: the flow parks a Not-taken ticket in the FIRST terminal state and never passes over a finished one (PS-8, PS-11).
   'packages/rule-engine/src/checks/flow-cause.ts': 'invariant',
+  // wtg2 T13: an edge is satisfied by the source's terminal CATEGORY (AP-1, never the closed flag), and the promotion rule
+  // excludes a Not-taken source itself (AP-3), so this is not on T17's done-meaning work list.
+  'packages/domain/src/flow/promotion.ts': 'invariant',
   'packages/rule-engine/src/checks/hierarchy.ts': 'invariant',
   'packages/rule-engine/src/transition.ts': 'invariant',
   // done-meaning (12): T17 changes these

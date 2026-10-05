@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { BACKLOG_STATE_ID, promotionsFor, type FlowEdge, type FlowNode } from '../src/index.js';
 
+/**
+ * wtg2 T13 (spec AP-1 to AP-3): `promotionsFor`, the pure rule that says which Backlog tickets a flow promotes and from
+ * which source. The plan's legs come first in each describe; the second `it` holds the legs the lane's mutation pass
+ * added (a clause or a second element the plan's legs cannot tell apart), each with its control beside it.
+ */
+
 const node = (id: string, over: Partial<FlowNode> = {}): FlowNode => ({
   id, typeId: 'task', stateId: 'todo', category: 'open', closed: false, trashed: false, draft: false, parentId: null,
   isDecision: false, outcome: null, passes: [], notTaken: null, waitForAll: false, started: false, rounds: 1, periods: [],
@@ -28,6 +34,18 @@ describe('29.210 the satisfied edge (any)', () => {
       });
     expect(decide('Yes')).toEqual([{ targetId: 'y', sourceTicketId: 'd', label: 'yes' }]); // case-folded
     expect(decide(null)).toEqual([]); // loop-reset Decision satisfies nothing
+  });
+  it('29.210 an unlabelled edge from a Decision with no outcome satisfies nothing; an ordinary source ignores the label', () => {
+    // a Decision edge with no label (one filed before the label rule, or before the type became a Decision): two absent
+    // labels agree in sameLabel, so only the outcome test keeps a pending Decision from satisfying it
+    const unlabelled = (outcome: string | null) =>
+      promotionsFor({ nodes: [done('d', undefined, { isDecision: true, outcome }), backlog('t')], edges: [edge('d', 't')], targetIds: ['t'] });
+    expect(unlabelled(null)).toEqual([]);
+    expect(unlabelled('Yes')).toEqual([]); // an outcome never matches a missing label
+    // control: a plain (non-Decision) source satisfies a labelled edge, and the promotion carries that label
+    expect(promotionsFor({ nodes: [done('s'), backlog('t')], edges: [edge('s', 't', 'Go')], targetIds: ['t'] })).toEqual([
+      { targetId: 't', sourceTicketId: 's', label: 'Go' },
+    ]);
   });
 });
 
@@ -66,6 +84,17 @@ describe('29.211 waitForAll and I*(T)', () => {
     // empty I*: the only source is not taken
     expect(promotionsFor({ nodes: [done('s', undefined, { notTaken: NOT_TAKEN }), tail()], edges: [edge('s', 't')], targetIds: ['t'] })).toEqual([]);
   });
+  it('29.211 waitForAll checks EVERY considered edge, whichever position the unsatisfied one holds', () => {
+    const tail = backlog('t', { waitForAll: true });
+    const run = (a: FlowNode, b: FlowNode) => promotionsFor({ nodes: [a, b, tail], edges: [edge('a', 't'), edge('b', 't')], targetIds: ['t'] });
+    expect(run(active('a'), done('b'))).toEqual([]); // the unsatisfied edge sorts FIRST
+    expect(run(done('a'), active('b'))).toEqual([]); // and LAST
+    expect(ids(run(done('a'), done('b')))).toEqual(['a>t']); // control: both satisfied
+    // without waitForAll one satisfied edge is enough, in either position
+    const any = (a: FlowNode, b: FlowNode) => promotionsFor({ nodes: [a, b, backlog('t')], edges: [edge('a', 't'), edge('b', 't')], targetIds: ['t'] });
+    expect(ids(any(active('a'), done('b')))).toEqual(['b>t']);
+    expect(ids(any(done('a'), active('b')))).toEqual(['a>t']);
+  });
 });
 
 describe('29.212 targets and sources that count', () => {
@@ -78,6 +107,16 @@ describe('29.212 targets and sources that count', () => {
     expect(ids(two({ ...active('b'), trashed: true }))).toEqual(['a>t']);
     expect(ids(two({ ...backlog('b'), draft: true }))).toEqual(['a>t']);
   });
+  it('29.212 only edges INTO the target count, and an unknown target or source id is ignored, not thrown on', () => {
+    // a satisfied edge into u must not promote t, whose own edge is from an open source
+    const both = promotionsFor({ nodes: [done('a'), active('b'), backlog('t'), backlog('u')], edges: [edge('a', 'u'), edge('b', 't')], targetIds: ['t', 'u'] });
+    expect(ids(both)).toEqual(['a>u']);
+    // a target id the read did not return (trashed, cut, or never there)
+    expect(promotionsFor({ nodes: [done('s')], edges: [edge('s', 't')], targetIds: ['t'] })).toEqual([]);
+    // an edge whose source is not a node (a hole) is not in I(T); the target's other edge still decides
+    expect(ids(promotionsFor({ nodes: [done('s'), backlog('t')], edges: [edge('gone', 't'), edge('s', 't')], targetIds: ['t'] }))).toEqual(['s>t']);
+    expect(promotionsFor({ nodes: [backlog('t')], edges: [edge('gone', 't')], targetIds: ['t'] })).toEqual([]);
+  });
 });
 
 describe('29.213 attribution and order', () => {
@@ -89,5 +128,18 @@ describe('29.213 attribution and order', () => {
     expect(pick(node('a', { stateId: 'done', category: 'terminal' }), done('b'))?.sourceTicketId).toBe('b'); // control: no period loses
     const many = promotionsFor({ nodes: [done('s'), backlog('z'), backlog('m')], edges: [edge('s', 'z'), edge('s', 'm')], targetIds: ['z', 'm', 'z'] });
     expect(many.map((p) => p.targetId)).toEqual(['m', 'z']);
+  });
+  it('29.213 the finish is the end of the LAST work period, not of the first', () => {
+    // a has run twice (a loop): its first pass ended before b finished, its second after
+    const twice = done('a', '2026-10-05T09:00:00.000Z', {
+      periods: [
+        { start: '2026-09-30T09:00:00.000Z', end: '2026-10-01T09:00:00.000Z', pass: 1 },
+        { start: '2026-10-04T09:00:00.000Z', end: '2026-10-05T09:00:00.000Z', pass: 2 },
+      ],
+    });
+    const pick = (a: FlowNode) =>
+      promotionsFor({ nodes: [a, done('b', '2026-10-03T09:00:00.000Z'), backlog('t')], edges: [edge('a', 't'), edge('b', 't')], targetIds: ['t'] })[0]?.sourceTicketId;
+    expect(pick(twice)).toBe('a');
+    expect(pick(done('a', '2026-10-01T09:00:00.000Z'))).toBe('b'); // control: one pass ending first loses
   });
 });
