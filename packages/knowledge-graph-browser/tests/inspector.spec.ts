@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { waitStill } from './helpers.js';
 
 /*
- * The inspectors on the real Sigma adapter (KG-C T8; cases 27.337, 27.338): `harness/main.tsx` renders `KnowledgeGraph` on
+ * The inspectors on the real Sigma adapter (KG-C T8; cases 27.337, 27.338, and 27.660 for the list under the canvas, whose
+ * rules `packages/ui/test/knowledge-graph-list-css.test.ts` reads): `harness/main.tsx` renders `KnowledgeGraph` on
  * the fixture, centred on GN-142, with the probe on. Every wait is for the camera to settle (`waitStill`), never a timer.
  */
 type Pt = { x: number; y: number };
