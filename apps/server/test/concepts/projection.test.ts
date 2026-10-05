@@ -7,7 +7,7 @@
  * that tags them, and 27.455 (reset, rolled back) runs last.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { projConcepts } from '../../src/projections/proj-concepts.js';
 import { purgeItem, type PurgeDeps } from '../../src/purge/purge-item.js';
@@ -175,7 +175,7 @@ describe('27.444 tag and untag', () => {
 
 describe('27.445 concept links', () => {
   it('27.445 related is stored a < b from either side, broader as written, unlinked from either side; control: unlink broader from the other concept keeps it', async () => {
-    const [C2, C1] = [newUlid(), newUlid()].sort() as [string, string];
+    const [C2, C1] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
     expect(C2 < C1).toBe(true);
     await applyCommitted(db.pool, [cev(C1, 'concept.created', { name: 'One' }), cev(C2, 'concept.created', { name: 'Two' })]);
 
