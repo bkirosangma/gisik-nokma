@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newSubmittedEvent, newUlid, parseEvent, withheldLinkPayload, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
 import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
 import { createReplica, type BootstrapResponse, type Replica, type TicketBootstrap } from '../src/replica/replica.js';
@@ -12,6 +12,8 @@ import {
   type ReconcileAnswer,
   type SyncTransport,
   TicketPullNotFound,
+  HttpStatusError,
+  WorkspaceAccessLost,
 } from '../src/engine/sync-engine.js';
 import { createHttpTransport, type WebSocketLike } from '../src/net/http-transport.js';
 
@@ -3020,5 +3022,260 @@ describe('27.088 a withheld link from the stream folds to nothing and does not s
     await engine.settled();
     expect((await replica.getTicket(T))?.confirmed?.links).toEqual([{ kind: 'relates', targetId: OTHER }]);
     expect(await replica.getCursor(WS)).toBe(13);
+  });
+});
+
+/**
+ * sync-start-retry: `start()` retries a transient workspace-bootstrap failure on
+ * its own, because nothing else calls it again — mobile calls it once
+ * (`apps/mobile/src/app.tsx`) and desktop only on the browser `online` event
+ * (`apps/desktop/src/app.tsx`), so a 502 or ruling D's 503 on a first launch
+ * used to leave the device at `connecting` until a relaunch.
+ *
+ * The workspace bootstrap goes through the SHIPPED `createHttpTransport` (its
+ * `fetchImpl` scripted) rather than a fake that throws typed errors: the engine
+ * retries anything that is not an answered status below 500, so a fake that
+ * threw `HttpStatusError(404)` would pass while the real transport still threw
+ * an untyped `Error` for a 404 — which the engine would retry for ever.
+ *
+ * Only `setTimeout`, `clearTimeout` and `Date` are faked; `drain()` turns the
+ * REAL `setImmediate` loop so `fetch`'s `Response` body reads complete without
+ * moving fake time.
+ */
+describe('29.406-29.412 the workspace bootstrap retries a transient failure', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  type Answer = number | 'network';
+
+  const drain = async (): Promise<void> => {
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve));
+  };
+  const advance = async (ms: number): Promise<void> => {
+    vi.advanceTimersByTime(ms);
+    await drain();
+  };
+
+  /** A fixture whose engine bootstraps through the real HTTP transport, answering `answers` in order (then 200). */
+  async function retryRig(answers: Answer[], random: () => number = () => 0.5) {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const base = await fixture();
+    const fetchedAt: number[] = [];
+    const queue = [...answers];
+    const fetchImpl = (async () => {
+      fetchedAt.push(Date.now());
+      const next = queue.shift() ?? 200;
+      if (next === 'network') throw new TypeError('fetch failed');
+      const body = next === 200 ? bootstrapOf() : next === 503 ? { error: 'snapshot_restate_pending' } : { error: 'no' };
+      return new Response(JSON.stringify(body), { status: next, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    const http = createHttpTransport({ baseUrl: 'https://api.example', token: 'tok', fetchImpl });
+    base.script.bootstrapImpl = () => http.bootstrap(WS);
+    const engine = createSyncEngine({
+      replica: base.replica,
+      outbox: base.outbox,
+      transport: fakeTransport(base.script),
+      reconnectDelayMs: 5,
+      random,
+    });
+    const statuses: SyncStatus[] = [];
+    engine.onStatus((s) => statuses.push(s));
+    return { ...base, engine, fetchedAt, statuses };
+  }
+
+  /** Start, and report whether the call has settled, without awaiting it. */
+  function begin(engine: SyncEngine) {
+    const state = { settled: false, error: undefined as unknown };
+    const done = engine.start(WS).then(
+      () => {
+        state.settled = true;
+      },
+      (err: unknown) => {
+        state.settled = true;
+        state.error = err;
+      },
+    );
+    return { state, done };
+  }
+
+  it('29.406 a 503 twice then a 200 bootstraps after 1 s + 2 s, connecting throughout; control: a first-try success arms no timer', async () => {
+    // CONTROL first: nothing failed, so nothing waits.
+    const ok = await retryRig([200]);
+    const first = begin(ok.engine);
+    await drain();
+    await first.done;
+    expect(first.state.error).toBeUndefined();
+    expect(ok.script.bootstraps).toBe(1);
+    expect(ok.script.subscribes).toEqual([{ afterSeq: 7 }]);
+    expect(vi.getTimerCount()).toBe(0);
+    ok.engine.stop();
+    vi.useRealTimers();
+
+    const { engine, script, replica, statuses } = await retryRig([503, 503, 200]);
+    const run = begin(engine);
+    await drain();
+    expect(script.bootstraps).toBe(1);
+    expect(vi.getTimerCount()).toBe(1);
+
+    // The first wait is 1 s: one millisecond short, nothing; at 1 s, attempt 2.
+    await advance(999);
+    expect(script.bootstraps).toBe(1);
+    await advance(1);
+    expect(script.bootstraps).toBe(2);
+
+    // The second is 2 s, not 1 s again: at 1 s + 1999 ms still two attempts.
+    await advance(1999);
+    expect(script.bootstraps).toBe(2);
+    expect(run.state.settled).toBe(false);
+    expect(await replica.getMe()).toBeNull();
+    expect(script.subscribes).toEqual([]);
+    expect(engine.status()).toBe('connecting');
+    // Two failures in, `connecting` is the only status ever published.
+    expect(statuses).toEqual(['connecting']);
+
+    await advance(1);
+    await run.done;
+    expect(run.state.error).toBeUndefined();
+    expect(script.bootstraps).toBe(3);
+    expect((await replica.getMe())?.userId).toBe(USER_A);
+    expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+    // `connecting` once, and the subscription's own `catching-up` only after it.
+    expect(statuses).toEqual(['connecting', 'catching-up']);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('29.407 a 403 is not retried: the error surfaces, and no timer is armed', async () => {
+    const { engine, script, statuses } = await retryRig([403]);
+    const run = begin(engine);
+    await drain();
+    await run.done;
+    expect(run.state.error).toBeInstanceOf(WorkspaceAccessLost);
+    expect(script.bootstraps).toBe(1);
+    expect(vi.getTimerCount()).toBe(0);
+    await advance(120_000);
+    expect(script.bootstraps).toBe(1);
+    expect(script.subscribes).toEqual([]);
+    expect(statuses).toEqual(['connecting']);
+  });
+
+  it('29.408 a 404 (and a 401) is not retried: the typed status surfaces, and no timer is armed', async () => {
+    for (const status of [404, 401]) {
+      const { engine, script } = await retryRig([status]);
+      const run = begin(engine);
+      await drain();
+      await run.done;
+      expect(run.state.error).toBeInstanceOf(HttpStatusError);
+      expect((run.state.error as HttpStatusError).status).toBe(status);
+      expect((run.state.error as Error).message).toBe(`bootstrap failed: ${status}`);
+      expect(vi.getTimerCount()).toBe(0);
+      await advance(120_000);
+      expect(script.bootstraps).toBe(1);
+      expect(script.subscribes).toEqual([]);
+      vi.useRealTimers();
+    }
+  });
+
+  it('29.409 a fetch that rejects (no answer) and a 500 are retried like the 503', async () => {
+    const { engine, script, fetchedAt } = await retryRig(['network', 500, 200]);
+    const t0 = Date.now();
+    const run = begin(engine);
+    await drain();
+    await advance(1000);
+    await advance(2000);
+    await run.done;
+    expect(run.state.error).toBeUndefined();
+    expect(fetchedAt.map((t) => t - t0)).toEqual([0, 1000, 3000]);
+    expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+  });
+
+  it('29.410 stop() mid-backoff cancels the retry: no timer, no further attempt, and start() resolves without subscribing', async () => {
+    const { engine, script, replica } = await retryRig([503, 200]);
+    const run = begin(engine);
+    await drain();
+    expect(vi.getTimerCount()).toBe(1);
+    engine.stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await drain();
+    expect(run.state.settled).toBe(true);
+    expect(run.state.error).toBeUndefined();
+    await advance(120_000);
+    expect(script.bootstraps).toBe(1);
+    expect(script.subscribes).toEqual([]);
+    expect(await replica.getMe()).toBeNull();
+    expect(engine.status()).toBe('offline');
+  });
+
+  it('29.410 stop() while an attempt is in flight: a 503 arms nothing, and a 200 is not loaded', async () => {
+    for (const outcome of ['fail', 'succeed'] as const) {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      const { script, replica, engine } = await fixture();
+      let answer!: () => void;
+      script.bootstrapImpl = () =>
+        new Promise<BootstrapResponse>((resolve, reject) => {
+          answer = () => (outcome === 'fail' ? reject(new HttpStatusError('bootstrap failed: 503', 503)) : resolve(bootstrapOf()));
+        });
+      const run = begin(engine);
+      await drain();
+      expect(script.bootstraps).toBe(1);
+      engine.stop();
+      answer();
+      await drain();
+      expect(run.state.settled).toBe(true);
+      expect(run.state.error).toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(await replica.getMe()).toBeNull();
+      expect(script.subscribes).toEqual([]);
+      vi.useRealTimers();
+    }
+  });
+
+  it('29.411 the backoff doubles to a 30 s cap, jittered by ±20%: 7 straight failures never wait above 36 s', async () => {
+    const failures: Answer[] = [503, 503, 503, 503, 503, 503, 503];
+    const schedules: Array<{ random: number; gaps: number[] }> = [
+      { random: 1, gaps: [1200, 2400, 4800, 9600, 19200, 36000, 36000] },
+      { random: 0, gaps: [800, 1600, 3200, 6400, 12800, 24000, 24000] },
+      { random: 0.5, gaps: [1000, 2000, 4000, 8000, 16000, 30000, 30000] },
+    ];
+    for (const { random, gaps } of schedules) {
+      const { engine, script, fetchedAt } = await retryRig([...failures], () => random);
+      const run = begin(engine);
+      await drain();
+      for (const [i, gap] of gaps.entries()) {
+        await advance(gap - 1);
+        expect(script.bootstraps, `random ${random}, gap ${i}: early`).toBe(i + 1);
+        await advance(1);
+        expect(script.bootstraps, `random ${random}, gap ${i}: due`).toBe(i + 2);
+      }
+      await run.done;
+      expect(run.state.error).toBeUndefined();
+      const observed = fetchedAt.slice(1).map((t, i) => t - fetchedAt[i]!);
+      expect(observed).toEqual(gaps);
+      expect(Math.max(...observed)).toBeLessThanOrEqual(30_000 * 1.2);
+      vi.useRealTimers();
+    }
+  });
+
+  it('29.412 a second start() supersedes a retrying one: one loop, one subscribe, with or without a stop() between', async () => {
+    for (const stopBetween of [true, false]) {
+      const { engine, script } = await retryRig([503, 200]);
+      const first = begin(engine);
+      await drain();
+      expect(vi.getTimerCount()).toBe(1);
+      // Desktop: `offline` stops, `online` starts again — or `online` fires twice.
+      if (stopBetween) engine.stop();
+      const second = begin(engine);
+      await drain();
+      await Promise.all([first.done, second.done]);
+      expect(first.state.error).toBeUndefined();
+      expect(second.state.error).toBeUndefined();
+      expect(script.bootstraps).toBe(2);
+      expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+      expect(vi.getTimerCount()).toBe(0);
+      await advance(120_000);
+      expect(script.bootstraps).toBe(2);
+      expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+      vi.useRealTimers();
+    }
   });
 });
