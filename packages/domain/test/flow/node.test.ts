@@ -119,6 +119,8 @@ describe('29.185 flowNodeOf', () => {
     );
     expect([node.explicitStart, node.explicitDue, node.estimate, node.reworkEstimate, node.waitForAll]).toEqual([null, null, null, null, false]);
     expect(flowNodeOf(ticket({ fields: { estimate: claim(1.5) } }), wf).estimate).toBeNull();
+    // a day that is not a string is no day, even when its text would match (an array stringifies to its member)
+    expect(flowNodeOf(ticket({ fields: { startDate: claim({ date: ['2026-10-05'] }) } }), wf).explicitStart).toBeNull();
     expect(flowNodeOf(ticket({ fields: { estimate: claim(365) } }), wf).estimate).toBe(365); // CONTROL: the edge of the range is accepted
   });
 });

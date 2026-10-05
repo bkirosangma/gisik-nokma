@@ -19,6 +19,8 @@ describe('29.180 Start and End nodes', () => {
     const two = analyzeFlow([fnode(C), fnode(B), fnode(A)], [edge(A, C), edge(B, C)]);
     expect(two.starts).toEqual([A, B]);
     expect(two.ends).toEqual([C]);
+    // both Starts seed the order, so every node is emitted
+    expect(two.order).toEqual([A, B, C]);
 
     // a pure two-ticket loop: no Start, no End. CONTROL: a feeder makes its target a non-Start but the feeder a Start.
     const loop = analyzeFlow([fnode(A), fnode(B)], [edge(A, B), edge(B, A)]);
