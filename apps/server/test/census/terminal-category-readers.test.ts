@@ -33,7 +33,9 @@ export function scanTerminalReaders(root: string, dirs: readonly string[]): Map<
 /** definition: authors or validates a workflow. invariant: "terminal" means finished, and a Not-taken ticket parked there IS finished (parent close, attention, sweeps, the board column). done-meaning: a count or sentence that means DONE; T17 makes each exclude a not-taken resolution. */
 type Reader = 'definition' | 'invariant' | 'done-meaning';
 export const TERMINAL_READERS: Record<string, Reader> = {
-  // definition (17)
+  // definition (18)
+  // wtg2 T13: AP-1 skips a promotion whose workflow's INITIAL state is terminal (the Start edge would finish it).
+  'apps/server/src/flow/promote.ts': 'definition',
   'apps/server/src/routes/builder-reads.ts': 'definition',
   'apps/server/src/tools/wtg-preflight.ts': 'definition',
   'packages/app-core/src/workflow-builder/anchor-issues.ts': 'definition',

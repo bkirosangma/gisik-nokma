@@ -116,6 +116,11 @@ export const REFUSALS = {
    */
   'cause.forged': 'Only the flow can record that a ticket was led here, reopened or passed over by a decision.',
   /**
+   * A flow promotion (`led-to`, wtg2 T13, spec AP-1) out of any state but the Backlog: a promotion is the universal Start
+   * edge and nothing else, so a late or duplicated one must not ride a declared edge back. `transition.ts` raises it.
+   */
+  'cause.led-to-not-backlog': 'A flow promotes a ticket only out of the Backlog. This one has already moved on, so nothing was changed.',
+  /**
    * A Decision's outcome rules (wtg2 T6, spec DC-4 and DC-5; `checks/decision.ts`). The other three `decision.*` reasons
    * are built (`unknownOutcomeRefusal`, `sameOutcomeRefusal`, `staleFromRefusal`) because they name labels.
    */

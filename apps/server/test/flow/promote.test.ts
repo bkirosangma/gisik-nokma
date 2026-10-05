@@ -380,7 +380,8 @@ describe('29.220 the server cap', () => {
     const t = await addTicket(db.pool);
     const sources = Array.from({ length: 301 }, () => newUlid());
     await stepMany(db.pool, sources.flatMap((id) => [
-      { ticketId: id, type: 'ticket.created', payload: { typeId: TASK, projectId: PROJECT, parentId: null, title: 'S', start: 'focus', stateId: 'done' } },
+      { ticketId: id, type: 'ticket.created', payload: { typeId: TASK, projectId: PROJECT, parentId: null, title: 'S', start: 'focus' } },
+      { ticketId: id, type: 'ticket.transitioned', payload: { to: 'done' } }, // no engine here: one move, no Doing period needed
       { ticketId: id, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: t } },
     ]));
     // control: at the UI's cap (300, FL-2) the same flow is truncated
