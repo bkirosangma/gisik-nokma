@@ -320,7 +320,7 @@ describe('27.479 the registry', () => {
   it('27.479 the five concept tools follow similar, the fixture agrees, and each description names its confirm rule where it has one', () => {
     const tools = allTools(fake().session);
     const names = tools.map((t) => t.name);
-    expect(names.slice(-7)).toEqual(['list_deleted', 'similar', 'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts']);
+    expect(names.slice(-6)).toEqual(['similar', 'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts']); // KG-D T6's graph tools sit between list_deleted and similar (27.514)
     expect(TOOL_NAMES).toEqual(names);
     const describe = (name: string) => tools.find((t) => t.name === name)?.description ?? '';
     expect(describe('manage_concept')).toContain('confirm_name');
