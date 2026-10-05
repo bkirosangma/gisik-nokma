@@ -319,15 +319,16 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: eight live reads means eight stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: ten live reads means ten stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. EIGHT reads ride this sheet — ticket, workflow,
+    // REFETCH on the query key. TEN reads ride this sheet — ticket, workflow,
     // members, history, the project's rows from which the SUBTASKS are derived
     // (door F, 2026-09-19), the ticket's TYPE LADDER (door G), the comment
-    // THREAD, and the ticket's NOTES section (notes series, Plan 6 of 7,
-    // `18.241`) — and each opens its own subscription.
+    // THREAD, the ticket's NOTES section (notes series, Plan 6 of 7,
+    // `18.241`), its LINKED FROM section (Knowledge Graph B, `27.149`), and its
+    // LINKS section (typed links, `27.074`) — and each opens its own subscription.
     //
-    // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add a ninth: it
+    // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add an eleventh: it
     // fetches the workspace's note list ONCE on mount (`useEffect`, case
     // 18.288 — a final review caught that a `useLiveQuery` version here
     // would refetch on every unrelated workspace stream frame for as long
@@ -335,16 +336,19 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     // the same one-time shape `note-document.tsx`'s own `queryNotes` uses.
     //
     // **The count was four until door F, five until door G, six until the
-    // comment thread, seven until the notes section, and each change is
-    // deliberate.** This assertion is a planted defect: it exists so that
+    // comment thread, seven until the notes section, eight until Knowledge
+    // Graph B's Linked from, nine until the typed-links Links section, and
+    // each change is deliberate.** This assertion is a planted defect: it exists so that
     // adding a read is a decision somebody makes rather than a side effect.
     // The eighth read is a real cost — a subscription per open sheet — and
     // it is paid because a note attached elsewhere must appear on this sheet
-    // without a reload (spec §10.4).
+    // without a reload (spec §10.4); the ninth, because a new reference to
+    // this ticket must appear the same way; the tenth, because a link filed
+    // from the other ticket must appear in this sheet's Links the same way.
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(8);
+    expect(source.subscriptions).toHaveLength(10);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
@@ -5987,5 +5991,111 @@ describe('16.130–16.132 Add subtask under a terminal parent offers the reopen'
     expect(parent.stateId).toBe('todo');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
     expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('');
+  });
+});
+
+/**
+ * Cases 27.074-27.076: the Links section on the sheet (typed links, spec A §3.1). The section's own cases,
+ * 27.065-27.073, are in `ticket-links-section.test.tsx`. 27.075's 44px row leg is a browser measurement
+ * (jsdom loads no `ui.css`), so it is 🧪 in the catalogue.
+ */
+describe('TicketSheet: the Links section', () => {
+  const OTHER = '01J9GTKB000000000000000000';
+  const link = (key: string, id: string) => ({
+    kind: 'blocks' as const,
+    direction: 'out' as const,
+    ticket: { id, projectId: 'p', key, title: `Title ${key}`, stateCategory: 'open' as const },
+  });
+  function phoneViewport(phone: boolean): void {
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(max-width: 40rem)' ? phone : false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  }
+  const editor = (() => null) as unknown as EditorSlotComponent;
+
+  it('27.074 sits between the fields and the subtasks, Subtasks + Notes + Comments stay adjacent, and without an editor slot offers no Add link or Remove; control: two links read "Links (2)", and with an editor slot both show', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getTicketLinks: async () => [link('GN-1', 'a'), link('GN-2', 'b')],
+    });
+    const { container, rerender } = render(
+      <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} />,
+    );
+    const links = await screen.findByTestId('ticket-links');
+    await screen.findByRole('heading', { name: 'Links (2)' });
+    const fields = container.querySelector('.gn-ticket-sheet__fields')!;
+    const subtasks = container.querySelector('.gn-ticket-sheet__subtasks')!;
+    expect(fields.compareDocumentPosition(links) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(links.compareDocumentPosition(subtasks) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(container.querySelector('.gn-ticket-sheet__subtasks + .gn-ticket-sheet__notes + .gn-comments')).not.toBeNull();
+    // the sheet's edit rights reach the section: no editor slot, no Add link and no Remove
+    await within(links).findByText('Title GN-1');
+    expect(within(links).queryByRole('button', { name: 'Add link' })).toBeNull();
+    expect(within(links).queryByRole('button', { name: /^Remove: / })).toBeNull();
+    rerender(
+      <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} onClose={vi.fn()} />,
+    );
+    const editable = within(screen.getByTestId('ticket-links'));
+    expect(await editable.findByRole('button', { name: 'Add link' })).toBeInTheDocument(); // control: an editor slot gives both
+    expect(editable.getByRole('button', { name: 'Remove: blocks GN-1' })).toBeInTheDocument();
+  });
+
+  it('27.075 on the phone sheet the section is present and Add link opens the bottom sheet; control: desktop is the Popover', async () => {
+    const read = ticketRead();
+    const user = userEvent.setup();
+    phoneViewport(true);
+    const { unmount } = render(
+      <TicketSheet dataSource={sheetSource(read)} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} onClose={vi.fn()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Add link' }));
+    expect(screen.getByRole('dialog', { name: 'Add link' })).toHaveClass('gn-dialog');
+    unmount();
+    phoneViewport(false);
+    render(
+      <TicketSheet dataSource={sheetSource(read)} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} onClose={vi.fn()} />,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Add link' }));
+    expect(screen.getByRole('dialog', { name: 'Add link' })).toHaveClass('gn-popover');
+    phoneViewport(false);
+  });
+
+  it('27.076 with a cache the precheck refuses a link to a ticket that already blocks this one, filing nothing; control: without a cache one event is filed', async () => {
+    const read = ticketRead();
+    const user = userEvent.setup();
+    const cache = createClientStateCache();
+    const titled = (title: string) => ({ title: { value: title, actorId: 'user_kiro', clientTime: '2026-08-18T08:00:00.000Z', serverTime: '2026-08-18T08:00:01.000Z' } });
+    cache.upsertTicket(ticketStateSeed({ fields: titled('Ice maker') }));
+    cache.upsertTicket(ticketStateSeed({ id: OTHER, fields: titled('Chiller'), links: [{ kind: 'blocks', targetId: TICKET }] }));
+    const queryTickets = async () => [{ ticketId: OTHER, projectId: 'p', key: 'GN-133', title: 'Chiller' }];
+    const pick = async () => {
+      await user.click(await screen.findByRole('button', { name: 'Add link' }));
+      await user.type(screen.getByLabelText('Find a ticket'), 'Ch');
+      await user.click(await screen.findByRole('button', { name: 'GN-133 Chiller' }));
+    };
+
+    const withCache = sheetSource(read);
+    const { unmount } = render(
+      <TicketSheet dataSource={withCache} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} cache={cache} queryTickets={queryTickets} onClose={vi.fn()} />,
+    );
+    await pick();
+    expect(await screen.findByText('"Chiller" already blocks "Ice maker".')).toBeInTheDocument();
+    expect(withCache.ingested).toEqual([]);
+    unmount();
+
+    const withoutCache = sheetSource(read);
+    render(
+      <TicketSheet dataSource={withoutCache} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} queryTickets={queryTickets} onClose={vi.fn()} />,
+    );
+    await pick();
+    await waitFor(() => expect(withoutCache.ingested.flat().map((e) => e.type)).toEqual(['ticket.link_added']));
   });
 });

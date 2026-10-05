@@ -20,10 +20,13 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   reconcile                       ledger vs report headings by membership + plan coverage
   lanes [--watch]                 one line per gisik: window
   seats [--json] [--flag]         one line per seat: busy/idle, shells+monitors, input box, Ctx, branch, last DONE/CHECKPOINT (read-only; --flag = only seats needing action)
+  check-base <branch> <stated-base>  WRONG-BASE (exit 1) when another origin/release/* or main reaches the branch's first-parent line nearer the tip than the base a REVIEW line states
   restart <window> <worktree> <brief> [--override FILE] [--model M] [--effort E]
   close <window>                  close an idle lane whose worktree is clean and pushed
   archive [--apply] [--list]      move stale lanes-dir working files to archive/<date>/ + roll the notes (dry-run by default; refuses while a landing is in flight)
   dispatch <window> <file>        two pastes + proof of delivery
+  autopilot once|run|start [--shadow]  the matchmaking loop: free reviewers pull queue items, free lanes take their pool's next task (FIX, tip-ready, stack <= 2) or review; --shadow logs WOULD only
+  prune-gate-locks [--apply] [--list]  remove gate-lock-* run dirs > 24 h and gate logs > 7 days from the log dir, never a live one (dry-run by default)
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
   run-tests [--label L] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary
@@ -32,6 +35,8 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   inbox [--seat S] [--all] [--watch]  my unacked messages; --watch = the ONE cursor watcher for the seat's Monitor
   ack <id> [--seat S] [--cancel]  receipt for a message (idempotent); stops redelivery
   postman run|once|status|audit|restarted <seat>  the delivery daemon (tmux window `postman`) and its admin
+  postman audit --parity|--since T|--window N  shadow parity + retirement condition A; dispatcher lines before 2026-10-03 name the task after the verb
+                                  and audit as no-ref: run condition A on windows from 10-03 on
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
     exit 0;;

@@ -122,6 +122,33 @@ export const primitives = {
   violet300: '#da8fff',
   magenta600: '#d30f45',
   magenta300: '#ff6482',
+  /** Knowledge Graph concept edge, light (knowledge-graph-sigma.html:6-28, spec C §3.7). */
+  teal700: '#0b7285',
+  /** Knowledge Graph concept edge, dark (knowledge-graph-sigma.html:6-28, spec C §3.7). */
+  teal300: '#5ccfe0',
+  /** Knowledge Graph concept pill fill, light (knowledge-graph-sigma.html:6-28, spec C §3.7). */
+  conceptFillLight: '#d6e7e5',
+  /** Knowledge Graph concept pill fill, dark (knowledge-graph-sigma.html:6-28, spec C §3.7). */
+  conceptFillDark: '#1e4350',
+  /** Knowledge Graph concept soft fill, light (knowledge-graph-sigma.html:6-28, spec C §3.7). */
+  conceptSoftLight: '#e8f0ee',
+  /** Knowledge Graph concept soft fill, dark (knowledge-graph-sigma.html:6-28, spec C §3.7). */
+  conceptSoftDark: '#1c3040',
+  /** Knowledge Graph fog dot, light (knowledge-graph-sigma.html:6-28, spec C §3.7). Pairless: see `fogDot`. */
+  fogDotLight: '#b9b2a6',
+  /** Knowledge Graph fog dot, dark (knowledge-graph-sigma.html:6-28, spec C §3.7). Pairless: see `fogDot`. */
+  fogDotDark: '#4a5578',
+  /**
+   * Knowledge Graph people edge, light (27.258). DERIVED, not the mockup's: the mockup's grey (`lineStrong`
+   * `#a8a49a`, knowledge-graph-sigma.html:6-28, spec C §3.7) measured 2.03 on `surface`, under the non-text 3:1. This is that hue darkened along the
+   * warm-grey line to the first value that clears 3:1 on the worst surface in any style. Measured (27.258) hig/minimal/neo on `surface` / `surfaceRaised`: 3.01 / 3.46 (hig, minimal) and 3.09 / 3.09 (neo); the floor is 3.01.
+   */
+  peopleEdgeLight: '#88857d',
+  /**
+   * Knowledge Graph people edge, dark (27.258). DERIVED: the mockup's `seamStrong` `#57544c` measured under 3:1;
+   * this is that hue lightened to the first value that clears it on the worst surface. Measured (27.258) hig/minimal/neo on `surface` / `surfaceRaised`: 3.65 / 3.00 (hig, minimal) and 3.26 / 3.26 (neo); the floor is 3.00.
+   */
+  peopleEdgeDark: '#777368',
   fogMuted: '#ebebf5',
   /** Untouched — see `line`. */
   seam: '#3a3833',
@@ -955,6 +982,30 @@ export const TOKEN_ROLES = [
   'level2',
   'level3',
   'level4',
+  /**
+   * The Knowledge Graph's colours (spec C §3.7; cases 27.255–27.259). The graph is drawn in WebGL, which reads
+   * values, so the view reads these at mount (`packages/knowledge-graph/src/render/palette.ts`). The eight `edge*`
+   * roles are non-text marks drawn on the canvas, `surface` on Home and `surfaceRaised` in a sheet, so each owes 3:1
+   * on both (`CONTRAST_PAIRS`). `conceptFill` and `conceptSoft` are a concept pill's fills and carry `text` (4.5).
+   * `edgePeople` is derived, not the mockup's grey (27.258; see `primitives.peopleEdgeLight`).
+   *
+   * **`fogDot` and `graphCardLine` are PAIRLESS by design (27.259).** Fog is never interactive (§3.1) and a dot is
+   * told from the canvas by shape, not by contrast alone, so `fogDot` is held to 1.5:1 by its test, not to 3:1; a
+   * card is told by its fill and text, so its hairline `graphCardLine` (the mockup's `--line`, not `border`, which
+   * is a much stronger grey) is decoration. Both measure under 3:1 and no `CONTRAST_PAIRS` row names them.
+   */
+  'edgeStructure',
+  'edgeBlocks',
+  'edgeRelates',
+  'edgeDuplicates',
+  'edgeAttached',
+  'edgeReference',
+  'edgePeople',
+  'edgeConcept',
+  'conceptFill',
+  'conceptSoft',
+  'fogDot',
+  'graphCardLine',
 ] as const;
 
 export type TokenRole = (typeof TOKEN_ROLES)[number];
@@ -1011,6 +1062,18 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     level2: 'violet600',
     level3: 'magenta600',
     level4: 'amber700',
+    edgeStructure: 'textSubtleLight',
+    edgeBlocks: 'red600',
+    edgeRelates: 'violet600',
+    edgeDuplicates: 'amber700',
+    edgeAttached: 'blue600',
+    edgeReference: 'magenta600',
+    edgePeople: 'peopleEdgeLight',
+    edgeConcept: 'teal700',
+    conceptFill: 'conceptFillLight',
+    conceptSoft: 'conceptSoftLight',
+    fogDot: 'fogDotLight',
+    graphCardLine: 'line',
   },
   dark: {
     surface: 'navyBase',
@@ -1057,6 +1120,18 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     level2: 'violet300',
     level3: 'magenta300',
     level4: 'amber300',
+    edgeStructure: 'textSubtleDark',
+    edgeBlocks: 'red300',
+    edgeRelates: 'violet300',
+    edgeDuplicates: 'amber300',
+    edgeAttached: 'blue300',
+    edgeReference: 'magenta300',
+    edgePeople: 'peopleEdgeDark',
+    edgeConcept: 'teal300',
+    conceptFill: 'conceptFillDark',
+    conceptSoft: 'conceptSoftDark',
+    fogDot: 'fogDotDark',
+    graphCardLine: 'seam',
   },
 };
 
@@ -1841,6 +1916,13 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'level2', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'level3', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'level4', bg: 'surfaceRaised', minimum: 3 },
+  /** Knowledge Graph (case 27.257): the edge colours are non-text marks on the canvas; a concept's label sits on its pill. `fogDot` and `graphCardLine` are deliberately absent (27.259). */
+  ...(['edgeStructure', 'edgeBlocks', 'edgeRelates', 'edgeDuplicates', 'edgeAttached', 'edgeReference', 'edgePeople', 'edgeConcept'] as const).flatMap((fg) => [
+    { fg, bg: 'surface' as const, minimum: 3 },
+    { fg, bg: 'surfaceRaised' as const, minimum: 3 },
+  ]),
+  { fg: 'text', bg: 'conceptFill', minimum: 4.5 },
+  { fg: 'text', bg: 'conceptSoft', minimum: 4.5 },
   /**
    * Added with the border sweep, and ONLY with it — `docs/hig-adoption-brief.md`
    * §7: *"Whichever wins, a `border`-on-`surface` pair should be ADDED to
@@ -1891,10 +1973,10 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'border', bg: 'surfaceWell', minimum: 3 },
   /**
    * UX fixes T1 (owner rulings U5 and U8, 2026-10-02; cases 23.001, 23.006, 23.007, 23.009). Eight rows, so the
-   * roster is 52.
+   * roster was 52 (now 74: the weekend tint's one, 29.104, WTG4 T2's three, 29.303, and the Knowledge Graph's 18, 27.257).
    *
    * - The neo field RING (`fieldRim`, a non-text boundary, 3:1) on the four grounds a field sits on. **RETIRED by HK-4
-   *   (2026-10-02, 24.121): the four rows are gone with the role, so the roster is 52.** Neo's field boundary is the shadow's
+   *   (2026-10-02, 24.121): the four rows are gone with the role, so the roster is 52 until the Knowledge Graph rows (27.257).** Neo's field boundary is the shadow's
    *   line layer, measured by 24.044; hig/minimal read `border`, which keeps its own rows.
    * - `textAccent` and `textSubtle` on `surfaceRaised` (4.5) were ALREADY rows (`textAccent`, Round 2d;
    *   `textSubtle`, 2026-09-15), so none is added here. U8's neo-dark raised step to `#232c50` re-clears both (5.40

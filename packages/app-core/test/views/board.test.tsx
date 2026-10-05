@@ -421,7 +421,9 @@ const ALLOWED_IMPORTS = /^(react(\/|$)|@gisik-nokma\/(ui|domain|rule-engine)(\/|
  * `require('axios')` invisible to a guard whose whole job is to name them.
  */
 const IMPORT_FORMS = [
-  /\bfrom\s*['"]([^'"]+)['"]/g,
+  // `(?<!-)`: a class name ENDING in `-from` (`className="gn-linked-from"`, Knowledge
+  // Graph B) is not a `from` clause, and `\b` alone matches between `-` and `f`.
+  /(?<!-)\bfrom\s*['"]([^'"]+)['"]/g,
   /\bimport\s+['"]([^'"]+)['"]/g,
 ];
 
@@ -491,6 +493,10 @@ describe('the view-import scan is proven against planted defects before it is tr
   it('reads import specifiers, and not the ones inside comments', () => {
     expect(importsOf("import { A } from '../online/http.js';")).toEqual(['../online/http.js']);
     expect(importsOf("// consumed from '../online/http.js' by nobody here")).toEqual([]);
+    // A class name ending in `-from` beside a quote is markup, not an import (27.143's section);
+    // the same text with a real `from` clause beside it still reads (control, same it).
+    expect(importsOf('<section className="gn-linked-from" data-testid="linked-from">')).toEqual([]);
+    expect(importsOf('<section className="gn-linked-from" />; export { X } from "./x.js";')).toEqual(['./x.js']);
   });
 
   it('PLANTED DEFECT: reads the three import spellings that carry no `from`', () => {

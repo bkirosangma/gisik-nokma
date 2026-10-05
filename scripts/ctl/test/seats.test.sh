@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1824 and 13.2032-13.2034 for `ctl seats`; run by `ctl selftest`.
+# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1824, 13.2032-13.2034 and 13.2105 for `ctl seats`; run by `ctl selftest`.
 # Two layers: seats.py is driven over a directory of captured panes (+ their git facts), and the whole verb is driven
 # against a fake `tmux` on PATH that serves those panes and logs every call (so "capture-pane only, never send-keys" is
 # a measured fact, not a promise). Real captures live in fixtures/seats/ (taken from the live gisik session 2026-10-03
@@ -283,6 +283,12 @@ check "13.2033 no effort segment (the DeepSeek backend sends none): effort is nu
 d=$(fixture); { printf 'gisik:2 exec2 lane | idle | sh 0 mon 0 | box empty | Ctx 11%% sonnet-5-5/max | task/x clean | last: none\n'; printf '⏺ the status line says | effort: max | Ctx 99%% in this sentence\n'; } > "$d/2.pane"; mkpane "$d/2.tmp" "⏺ working" "" 27 opus-5-5 "" low; cat "$d/2.tmp" >> "$d/2.pane"; meta "$d" 2 exec2 0
 check "13.2034 scrollback: a ctl-seats line (sonnet-5-5/max) and a sentence quoting \"| effort: max |\" above the real status line (effort low) — the effort comes from the REAL status line; CONTROL in the same check: the real pane alone reads the same" \
   '[ "$(effort_of "$d" 2)" = low ] && d2=$(fixture) && cp "$d/2.tmp" "$d2/2.pane" && meta "$d2" 2 exec2 0 && [ "$(effort_of "$d2" 2)" = low ] && [ "$(jv "$(run "$d" --json)" 2 "d[\"model\"]")" = opus-5-5 ]'
+
+# ============ 13.2105: the weekly usage % (ctl autopilot's budget guard: >= 85 no H++ launch, >= 95 no lane launch) ========
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ the budget was weekly 99%% yesterday\n⏺ ok')" "" 12 opus-5-5 ""; meta "$d" 2 exec2 0
+d2=$(fixture); sed 's/ | weekly 2% (resets mon 6:30am)//' "$d/2.pane" > "$d2/2.pane"; meta "$d2" 2 exec2 0
+check "13.2105 weekly: the status line's \"weekly 2%\" reads 2 in --json, and a transcript line saying \"weekly 99%\" above it does not count; CONTROL in the same check: the same pane with the weekly segment cut from the status line reads null (unknown, never a guess) while its Ctx still reads" \
+  '[ "$(jv "$(run "$d" --json)" 2 "d[\"weekly\"]")" = 2 ] && [ "$(jv "$(run "$d2" --json)" 2 "d[\"weekly\"]")" = None ] && [ "$(jv "$(run "$d2" --json)" 2 "d[\"ctx\"]")" = 12 ]'
 
 rm -rf "$T"
 [ "$fails" -eq 0 ] && echo "seats tests green" || { echo "$fails seats tests red"; exit 1; }
