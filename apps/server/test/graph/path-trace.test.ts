@@ -42,12 +42,14 @@ let app: FastifyInstance;
 let world: NotesFixture;
 const tokens = {} as Record<NotesUser, string>;
 const ids = {} as Record<NotesUser, string>;
-const [T2, T5, T6, T3] = [newUlid(), newUlid(), newUlid(), newUlid()].sort();
+/** Fresh ids in ascending order, as a tuple (`sort` returns `this`): the order legs rely on the minting. */
+const ascending = <T extends string[]>(...ids: T): T => ids.sort();
+const [T2, T5, T6, T3] = ascending(newUlid(), newUlid(), newUlid(), newUlid());
 const [T1, T4, T7, T8, CX] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
-const [M1, M2, M3, M4] = [newUlid(), newUlid(), newUlid(), newUlid()].sort();
+const [M1, M2, M3, M4] = ascending(newUlid(), newUlid(), newUlid(), newUlid());
 const [X, Y] = [newUlid(), newUlid()];
 const [D1, D2, D3] = [newUlid(), newUlid(), newUlid()];
-const [U2, U3] = [newUlid(), newUlid()].sort();
+const [U2, U3] = ascending(newUlid(), newUlid());
 const [U1, U4] = [newUlid(), newUlid()];
 const [G, S, SS, TA, TB] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
 const [NA, NB, TC, TD] = [newUlid(), newUlid(), newUlid(), newUlid()];
@@ -244,7 +246,7 @@ describe('27.509 graph/trace kind=blocks: breadth-first, stopping at a hidden it
     expect(back.sentences[0]).toBe(`${labelsOf(back).get(t(T3))!} blocks ${labelsOf(back).get(t(T4))!}`);
 
     expect(await get('owner', traceUrl({ from: t(T1), kind: 'blocks', direction: 'out', maxDepth: '11' }))).toEqual(INVALID);
-    for (const q of [{ maxDepth: '0' }, { kind: 'relates' }, { direction: 'up' }, { kind: '' }]) {
+    for (const q of [{ maxDepth: '0' }, { kind: 'relates' }, { direction: 'up' }, { kind: '' }] as Array<Record<string, string>>) {
       expect(await get('owner', traceUrl({ from: t(T1), kind: 'blocks', direction: 'out', ...q })), JSON.stringify(q)).toEqual(INVALID);
     }
     expect(await get('owner', traceUrl({ from: t(T1), kind: 'blocks' }))).toEqual(INVALID);

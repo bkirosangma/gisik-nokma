@@ -1,4 +1,5 @@
 import type { GraphEdgeView } from './graph.js';
+import { IST_TIME_ZONE } from './ist-day.js';
 
 /*
  * The Knowledge Graph's edge sentences (spec C §2.1), one copy for the view, the server and the MCP tools (spec D §5.1
@@ -45,7 +46,7 @@ export function howText(edge: GraphEdgeView): string {
   return HOW[edge.kind];
 }
 
-const DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+const DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: IST_TIME_ZONE });
 export function formatGraphDate(iso: string): string {
   return DATE.format(new Date(iso));
 }
