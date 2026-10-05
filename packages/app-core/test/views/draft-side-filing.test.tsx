@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeSubmittedFactory } from '../../src/submit.js';
@@ -144,6 +144,43 @@ describe('28.173 draft-side filing', () => {
     const pubChild = (await addSubtaskOn(false)).ingested.flat().at(-1)!;
     expect(pubChild.payload).toMatchObject({ parentId: TICKET, start: 'focus' });
     expect(pubChild.payload).not.toHaveProperty('draft');
+  });
+
+  it('28.173 a draft-side Undo still in flight keeps a re-Add of the same link from filing twice (its key names the other ticket, from `from`)', async () => {
+    let linked = true;
+    const held: Array<() => void> = [];
+    const source = createFakeDataSource(
+      {
+        getTicketLinks: async () =>
+          linked ? [{ kind: 'blocks', direction: 'in', ticket: { id: S, projectId: 'p', key: 'RP-9', title: 'Survey', stateCategory: 'open' } }] : [],
+      },
+      (events) => {
+        if (events[0]!.type === 'ticket.link_removed') {
+          linked = false;
+          return events.map(() => committed);
+        }
+        // Every add is held, so the Undo is still IN FLIGHT when the same link is added again.
+        return new Promise((resolve) => held.push(() => { linked = true; resolve(events.map(() => committed)); }));
+      },
+    );
+    const user = userEvent.setup();
+    render(
+      <Harness dataSource={source} workspaceId={WS} ticketId={D} canEdit make={make} isDraft
+        queryTickets={async () => [{ ticketId: S, projectId: 'p', key: 'RP-9', title: 'Survey' }]} />,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Remove: is blocked by RP-9' }));
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+    const adds = () => filed(source).filter(([, type]) => type === 'ticket.link_added');
+    await waitFor(() => expect(adds()).toHaveLength(1));
+    await user.click(screen.getByRole('button', { name: 'Add link' }));
+    await user.click(screen.getByRole('button', { name: /Link type/ }));
+    await user.click(await screen.findByRole('option', { name: 'Is blocked by' }));
+    await user.type(screen.getByLabelText('Find a ticket'), 'Su');
+    await user.click(await screen.findByRole('button', { name: 'RP-9 Survey' }));
+    // The re-Add met the Undo's in-flight key and filed nothing: one link_added for S, the Undo's own.
+    expect(adds()).toEqual([[D, 'ticket.link_added', { kind: 'blocks', targetId: D, from: S }]]);
+    await act(async () => { for (const release of held.splice(0)) release(); });
+    expect(adds()).toHaveLength(1);
   });
 
   it("28.173 a draft's OUTGOING link is already on its own stream (no from); the sheet hands the Links section its draft flag", async () => {

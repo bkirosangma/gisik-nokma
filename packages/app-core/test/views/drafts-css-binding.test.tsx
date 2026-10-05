@@ -24,6 +24,8 @@ describe('28.179 draft styling bindings', () => {
     expect(css).toMatch(/\.gn-ticket-sheet__subtask-card--pending\s*\{[^}]*border:\s*1px dashed/);
     // The ROW's own rule (a match on the buttons' rule beside it let the row's min-height go unnoticed).
     expect(css).toMatch(/@media \(max-width: 40rem\)\s*\{\s*\.gn-drafts__row\s*\{\s*min-height:\s*2\.75rem/);
+    // The phone row menu's items (FIX 1 F8): exactly 2.75rem, read off their own rule (a ×10 slip must not pass).
+    expect(css).toMatch(/^\.gn-drafts__menu-list button\s*\{\s*min-height:\s*2\.75rem;/m);
   });
   it('28.179 the block sits above LOADING PLACEHOLDERS, which must stay the last rules (25.019)', () => {
     const block = css.indexOf('.gn-draft-pill {');

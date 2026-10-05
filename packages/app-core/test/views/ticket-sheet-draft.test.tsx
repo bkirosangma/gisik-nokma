@@ -230,6 +230,25 @@ describe('28.174 Publish from the sheet', () => {
     await waitFor(() => expect(onDraftChanged).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByTestId('sheet-crumb-ticket')).toHaveTextContent('RP-7'));
   });
+  it('28.174 a second press of Publish while the first is in flight sends nothing (the banner is busy)', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const ds = source(
+      { getTicket: async () => draftRead(), getTickets: async (projectId) => ({ projectId, rows: [] }) as never },
+      async (events) => { await held; return events.map(() => committed); },
+    );
+    renderSheet(ds);
+    const user = userEvent.setup();
+    const publish = await screen.findByRole('button', { name: 'Publish' });
+    await user.click(publish);
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+    await user.click(publish);
+    // CONTROL (same `it`): the first press is the one in flight, so the banner's busy state is what stops the second.
+    expect(publish).toBeDisabled();
+    await act(async () => { release(); });
+    await waitFor(() => expect(publish).toBeEnabled());
+    expect(ds.ingested).toHaveLength(1);
+  });
   it('28.174 a refusal is shown verbatim and the pill stays; an unanswered publish says the plan sentence', async () => {
     renderSheet(source({ getTicket: async () => draftRead() }, (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'draft.parent-unpublished', reason: 'Publish the parent first' }))));
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Publish' }));
@@ -276,6 +295,24 @@ describe('28.175 Discard from the sheet', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(ds.ingested.map((batch) => batch.map((e) => [e.type, e.entity.id, e.payload]))).toEqual([[['ticket.discarded', TICKET, {}]]]);
     expect(onDraftChanged).toHaveBeenCalledTimes(1);
+  });
+  it('28.175 while a confirmed discard is in flight the banner Discard cannot ask again (one discard is filed)', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const getMyDrafts = vi.fn(async () => rows);
+    const ds = source({ getTicket: async () => draftRead(), getMyDrafts }, async (events) => { await held; return events.map(() => committed); });
+    renderSheet(ds);
+    const user = userEvent.setup();
+    const discard = await screen.findByRole('button', { name: 'Discard' });
+    await user.click(discard);
+    await user.click(within(await screen.findByRole('alertdialog', { name: 'Discard draft' })).getByRole('button', { name: 'Discard draft' }));
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+    await user.click(discard);
+    expect(discard).toBeDisabled();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(getMyDrafts).toHaveBeenCalledTimes(1);
+    await act(async () => { release(); });
+    expect(ds.ingested.map((batch) => batch.map((e) => e.type))).toEqual([['ticket.discarded']]);
   });
   it('28.175 a failed list read opens no dialog and says why', async () => {
     renderSheet(source({ getTicket: async () => draftRead(), getMyDrafts: async () => { throw new Error('down'); } }));
