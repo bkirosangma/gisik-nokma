@@ -37,7 +37,10 @@ log="$(ctl_log gate)"; console="$log.console"
 # (measured 2026-09-21 22:55 and 22:58: "line 216: timed: command not found", "line 238: code: unbound variable").
 # The copy is left in place after the run: it is the evidence of what ran.
 base="$(basename "$log" .log)"; work="$(dirname "$log")/gate-lock-${base#gate-}"
-if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_MODE=$mode GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
+# The Playwright ports of the gate (13.2280): a fixed pair away from the 3191 / 3192 defaults, which a lane's or a reviewer's own run holds. Only one gate runs at a time,
+# so the gate never clashes with itself; turbo hands them to the browser packages through each task's passThroughEnv (turbo.json), which leaves the task hash alone.
+export KG_PW_PORT=3291 FG_PW_PORT=3292
+if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_MODE=$mode KG_PW_PORT=$KG_PW_PORT FG_PW_PORT=$FG_PW_PORT GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
 mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
 # Priority over `ctl run-tests`: while this marker is live a new test slot is granted only while fewer than the gate cap (CTL_SEM_GATE_SLOTS, else the sem dir's gate-slots file, else 1; 0 = none) are held (running ones finish; sem.sh ctl_sem_acquire). Removed on every exit path.
 ctl_sem_gate_begin; trap ctl_sem_gate_end EXIT
