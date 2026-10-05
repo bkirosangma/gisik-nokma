@@ -263,3 +263,13 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part4-timeline-graph-home.md`; spec 
 <!-- WTG4 end -->
 
 <!-- wtg-part5-mcp -->
+
+## 29.5 Part 5: MCP (29.375–29.389)
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part5-mcp.md`. T1 29.375–29.378 · T2 29.379–29.381 · T3 29.382–29.383 · T4 29.384–29.386 · T5 29.387–29.389.
+
+<!-- wtg-part5-mcp T1 -->
+<!-- wtg-part5-mcp T2 -->
+<!-- wtg-part5-mcp T3 -->
+<!-- wtg-part5-mcp T4 -->
+<!-- wtg-part5-mcp T5 -->

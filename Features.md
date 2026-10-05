@@ -3915,3 +3915,11 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- WTG4 bullet T7 -->
 
 <!-- wtg-part5-mcp bullets -->
+
+### MCP (Part 5)
+
+<!-- wtg-part5-mcp T1 bullet -->
+<!-- wtg-part5-mcp T2 bullet -->
+<!-- wtg-part5-mcp T3 bullet -->
+<!-- wtg-part5-mcp T4 bullet -->
+<!-- wtg-part5-mcp T5 bullet -->
