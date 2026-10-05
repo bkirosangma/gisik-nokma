@@ -192,9 +192,10 @@ export class WorkspaceAccessLost extends Error {
  * "no answer at all" (a `fetch` that rejected — the only thing a saved copy may
  * stand in for).
  *
- * The workspace bootstrap throws it too (sync-start-retry), with the same
- * split read the other way round: `start()` retries "no answer" and a 5xx, and
- * surfaces any other status — see `isRetryableBootstrapFailure`.
+ * The workspace bootstrap throws it too (sync-start-retry), and `start()` reads
+ * the split the other way round: it retries a 5xx, a 429, and anything untyped —
+ * no answer at all, or an answer whose body would not parse — and surfaces any
+ * other status. See `isRetryableBootstrapFailure`.
  */
 export class HttpStatusError extends Error {
   readonly status: number;
@@ -240,11 +241,13 @@ export type ApplyFailure = {
 export type SyncEngine = {
   /**
    * Bootstrap if there is nothing to lose, then subscribe. A RETRYABLE bootstrap
-   * failure (no answer, or a 5xx such as ruling D's `snapshot_restate_pending`)
-   * is retried here, on a doubling backoff, for as long as this call is current
-   * — status stays `connecting` throughout — so the promise settles only when the
-   * engine subscribes, a non-retryable failure rejects it, or `stop()` / a newer
-   * `start()` supersedes it (it then resolves without subscribing).
+   * failure (no answer or one that would not parse, a 5xx such as ruling D's
+   * `snapshot_restate_pending`, or a 429) is retried here, on a doubling backoff,
+   * for as long as this call is current — status stays `connecting` throughout —
+   * so the promise settles only when the engine subscribes, a non-retryable
+   * failure rejects it, or `stop()` / a newer `start()` supersedes it (it then
+   * resolves without subscribing; a `loadBootstrap` already under way when that
+   * happened runs to its end first).
    */
   start(workspaceId: string): Promise<void>;
   stop(): void;
@@ -530,13 +533,20 @@ function bootstrapRetryDelayMs(attempt: number, random: () => number): number {
 /**
  * Whether a failed workspace bootstrap is worth asking again. A status the
  * server ANSWERED below 500 is its word — 401 signed out, 404, 400 — and asking
- * again gets the same word, so it surfaces as it always did; a 5xx (a deploy, a
- * 502 from the edge, ruling D's 503 while the boot restate pass runs) and no
- * answer at all (a `fetch` that rejected) are transient. The 403 never reaches
- * here: `start()` handles `WorkspaceAccessLost` first.
+ * again gets the same word, so it surfaces as it always did. The one exception
+ * is a 429, whose word is "later": the bootstrap draws on the same
+ * `events:<clientKey>` bucket as the outbox flush (`apps/server/src/app.ts:679-688`),
+ * so a device that has just flushed, or its NAT neighbours after a deploy, can be
+ * told to wait, and surfacing that would leave it at `connecting` (planner ruling
+ * 2026-10-05 18:56; the backoff spaces the retries, and `Retry-After` is not
+ * read). A 5xx (a deploy, a 502 from the edge, ruling D's 503 while the boot
+ * restate pass runs) is transient, and so is anything untyped: no answer at all
+ * (a `fetch` that rejected), or an answer whose body would not parse (a captive
+ * portal's HTML page makes `res.json()` throw). The 403 never reaches here:
+ * `start()` handles `WorkspaceAccessLost` first.
  */
 function isRetryableBootstrapFailure(err: unknown): boolean {
-  if (err instanceof HttpStatusError) return err.status >= 500;
+  if (err instanceof HttpStatusError) return err.status >= 500 || err.status === 429;
   return true;
 }
 
@@ -564,8 +574,11 @@ export function createSyncEngine(deps: {
   /**
    * Which `start()` call is current. A call whose number is no longer this one
    * — a later `start()` began, as desktop's `online` handler does after a
-   * `stop()` — must not bootstrap or subscribe: `stopped` alone cannot say so,
-   * because the later call set it back to false.
+   * `stop()` — must not ask again, load an answer that arrives after that, or
+   * subscribe: `stopped` alone cannot say so, because the later call set it back
+   * to false. A `loadBootstrap` already under way when the call was superseded
+   * runs to its end; the check before `subscribe` is what keeps that call from
+   * opening a second stream.
    */
   let startGeneration = 0;
   /**
@@ -1236,7 +1249,11 @@ export function createSyncEngine(deps: {
         if (!isCurrent()) return;
         await replica.loadBootstrap(body);
       }
-      subscribe(await replica.getCursor(ws));
+      const cursor = await replica.getCursor(ws);
+      // Superseded while it loaded the bootstrap or read the cursor (desktop's
+      // `offline`/`online` flap resets `stopped`): the newer call subscribes.
+      if (!isCurrent()) return;
+      subscribe(cursor);
     },
 
     stop() {

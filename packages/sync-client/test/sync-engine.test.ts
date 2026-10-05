@@ -3034,9 +3034,10 @@ describe('27.088 a withheld link from the stream folds to nothing and does not s
  *
  * The workspace bootstrap goes through the SHIPPED `createHttpTransport` (its
  * `fetchImpl` scripted) rather than a fake that throws typed errors: the engine
- * retries anything that is not an answered status below 500, so a fake that
- * threw `HttpStatusError(404)` would pass while the real transport still threw
- * an untyped `Error` for a 404 — which the engine would retry for ever.
+ * retries anything that is not an answered status below 500 (other than 429),
+ * so a fake that threw `HttpStatusError(404)` would pass while the real
+ * transport still threw an untyped `Error` for a 404 — which the engine would
+ * retry for ever.
  *
  * Only `setTimeout`, `clearTimeout` and `Date` are faked; `drain()` turns the
  * REAL `setImmediate` loop so `fetch`'s `Response` body reads complete without
@@ -3190,6 +3191,40 @@ describe('29.430-29.436 the workspace bootstrap retries a transient failure', ()
     expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
   });
 
+  it('29.433 a 429 (rate limited: the bootstrap shares the events: bucket) is retried on the same backoff, subscribed after exactly one 1 s wait; control: a 403, a 404 and the 428/430 either side of 429 surface with zero retries', async () => {
+    // CONTROL first: every other 4xx is still the server's word, and asking again gets the same one.
+    for (const status of [403, 404, 428, 430]) {
+      const { engine, script } = await retryRig([status]);
+      const run = begin(engine);
+      await drain();
+      expect(run.state.settled, `${status}`).toBe(true);
+      expect(run.state.error, `${status}`).toBeInstanceOf(status === 403 ? WorkspaceAccessLost : HttpStatusError);
+      expect(vi.getTimerCount(), `${status}`).toBe(0);
+      await advance(120_000);
+      expect(script.bootstraps, `${status}`).toBe(1);
+      expect(script.subscribes, `${status}`).toEqual([]);
+      vi.useRealTimers();
+    }
+
+    const { engine, script, fetchedAt, statuses } = await retryRig([429, 200]);
+    const t0 = Date.now();
+    const run = begin(engine);
+    await drain();
+    // Still pending with no fake time spent: a 429 that surfaced would have rejected here.
+    expect(run.state.settled).toBe(false);
+    expect(script.bootstraps).toBe(1);
+    expect(vi.getTimerCount()).toBe(1);
+    await advance(999);
+    expect(script.bootstraps).toBe(1);
+    await advance(1);
+    await run.done;
+    expect(run.state.error).toBeUndefined();
+    expect(fetchedAt.map((t) => t - t0)).toEqual([0, 1000]);
+    expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
+    expect(statuses).toEqual(['connecting', 'catching-up']);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('29.434 stop() mid-backoff cancels the retry: no timer, no further attempt, and start() resolves without subscribing', async () => {
     const { engine, script, replica } = await retryRig([503, 200]);
     const run = begin(engine);
@@ -3285,7 +3320,14 @@ describe('29.430-29.436 the workspace bootstrap retries a transient failure', ()
   it('29.436 a second start() while the first attempt is still in flight (desktop `online`, no stop()): the late answer arms nothing and loads nothing', async () => {
     for (const outcome of ['fail', 'succeed'] as const) {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
-      const { script, engine } = await fixture();
+      const { script, replica, engine } = await fixture();
+      // Counted, not read off a second subscribe: the guard before `subscribe` would hide a late load from that.
+      let loads = 0;
+      const load = replica.loadBootstrap.bind(replica);
+      replica.loadBootstrap = async (body) => {
+        loads += 1;
+        return load(body);
+      };
       let answerFirst!: () => void;
       script.bootstrapImpl = () =>
         script.bootstraps === 1
@@ -3307,11 +3349,83 @@ describe('29.430-29.436 the workspace bootstrap retries a transient failure', ()
       expect(first.state.settled).toBe(true);
       expect(first.state.error).toBeUndefined();
       expect(vi.getTimerCount()).toBe(0);
+      // The second call's load only: the first call's late 200 is not loaded.
+      expect(loads).toBe(1);
       expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
       await advance(120_000);
       expect(script.bootstraps).toBe(2);
       expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
       vi.useRealTimers();
+    }
+  });
+
+  it('29.436 a stop()/start() flap (or a second start()) once the first call has its answer — while it loads the bootstrap, or reads the cursor of a replica that needs none: the first call does not subscribe when it resumes', async () => {
+    /** A fixture whose first `loadBootstrap` — or, on a replica that needs no bootstrap, whose cursor read for `subscribe` — waits for `release`. */
+    async function gatedRig(where: 'load' | 'cursor') {
+      const base = await fixture();
+      const { replica } = base;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      if (where === 'load') {
+        const load = replica.loadBootstrap.bind(replica);
+        let loads = 0;
+        replica.loadBootstrap = async (body) => {
+          loads += 1;
+          if (loads === 1) await gate;
+          return load(body);
+        };
+      } else {
+        await replica.loadBootstrap(bootstrapOf());
+        const getCursor = replica.getCursor.bind(replica);
+        let reads = 0;
+        replica.getCursor = async (w) => {
+          reads += 1;
+          // Read 1 is `needsBootstrap`'s; read 2 is the cursor `subscribe` is handed.
+          if (reads === 2) await gate;
+          return getCursor(w);
+        };
+      }
+      return { ...base, release };
+    }
+
+    for (const where of ['load', 'cursor'] as const) {
+      // CONTROL first: the same gate with no second call holds the call, then subscribes once when it opens.
+      const ctl = await gatedRig(where);
+      const only = begin(ctl.engine);
+      await drain();
+      expect(only.state.settled, where).toBe(false);
+      expect(ctl.script.subscribes, where).toEqual([]);
+      ctl.release();
+      await drain();
+      await only.done;
+      expect(only.state.error, where).toBeUndefined();
+      expect(ctl.script.subscribes, where).toEqual([{ afterSeq: 7 }]);
+      ctl.engine.stop();
+
+      for (const stopBetween of [true, false]) {
+        const label = `${where}, stop between: ${stopBetween}`;
+        const { engine, script, release } = await gatedRig(where);
+        const first = begin(engine);
+        await drain();
+        expect(first.state.settled, label).toBe(false);
+        // Desktop: `offline` stops, `online` starts again — or `online` fires twice.
+        if (stopBetween) engine.stop();
+        const second = begin(engine);
+        await drain();
+        expect(second.state.settled, label).toBe(true);
+        expect(script.subscribes, label).toEqual([{ afterSeq: 7 }]);
+        release();
+        await drain();
+        expect(first.state.settled, label).toBe(true);
+        await Promise.all([first.done, second.done]);
+        expect(first.state.error, label).toBeUndefined();
+        expect(second.state.error, label).toBeUndefined();
+        expect(script.bootstraps, label).toBe(where === 'load' ? 2 : 0);
+        expect(script.subscribes, label).toEqual([{ afterSeq: 7 }]);
+        engine.stop();
+      }
     }
   });
 });
