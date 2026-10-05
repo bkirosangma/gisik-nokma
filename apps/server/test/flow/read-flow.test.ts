@@ -13,10 +13,13 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  *
  * ## The world
  *
- * `buildReadTestApp` is `routes/notes.test.ts`'s world: a workspace, a project, and four signed-in people, with
- * three tickets this file needs by their roles: `sharedTaskId` (audience: owner and member), `hiddenTaskId`
- * (audience: the owner only) and `taskInEpicId` (project-wide, so the member reads it). They are linked
- * SH -> HI -> TE, so the member can read both ends of a chain whose middle only the owner can read.
+ * `buildReadTestApp` is `routes/notes.test.ts`'s world: a workspace, a project, eight signed-in people (`ReadRole`)
+ * and a neighbour workspace that `neighbour` owns, with three tickets this file needs by their roles:
+ * `sharedTaskId` (audience: owner and member), `hiddenTaskId` (audience: the owner only) and `taskInEpicId`
+ * (project-wide, so the member reads it). They are linked SH -> HI -> TE, so the member can read both ends of a
+ * chain whose middle only the owner can read. `neighbour` is the cross-workspace asker of 29.187 and `stranger` (in
+ * no workspace) its non-member; `outsider` (off the project roster, a reader of project-mode work under rule A) is
+ * 29.188's second non-author.
  *
  * Events go in through `applyCommitted` (ledger plus every projection, no engine and no listener): this file is
  * about what the read returns for links that exist, not about whether the engine would have accepted them.
