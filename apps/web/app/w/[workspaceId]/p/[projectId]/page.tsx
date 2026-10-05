@@ -16,6 +16,7 @@ import {
   BulkCloseDialog,
   CalendarView,
   CreateTicketFlow,
+  DraftSavedToast,
   TicketList,
   EPIC_RANK,
   TicketSheet,
@@ -697,6 +698,8 @@ function ProjectBoard() {
    * `open`/`onOpenChange` props provide.
    */
   const [createOpen, setCreateOpen] = useState(false);
+  /** Drafts T8: the draft the dialog just saved, for its `Draft saved` toast (a draft is on no board, so nothing reloads). */
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   /**
    * A board column's own identity, when the New-ticket dialog was opened
    * FROM one (starting-status design, 2026-09-23) — `Board`'s
@@ -2346,6 +2349,7 @@ function ProjectBoard() {
           {...(createSelection === null ? {} : { initialSelection: createSelection })}
           onPending={pendingCreates.add}
           onRefused={pendingCreates.remove}
+          onDraftSaved={(ticketId) => setSavedDraftId(ticketId)}
           onCreated={(ticketId) => {
             // The server committed: the ghost stays until the read shows the id, so ask for the read now.
             pendingCreates.settle(ticketId);
@@ -3935,6 +3939,9 @@ function ProjectBoard() {
         }
         onDismiss={() => setDeleteNotice(null)}
       />
+      {savedDraftId === null ? null : (
+        <DraftSavedToast key={savedDraftId} ticketId={savedDraftId} onOpen={openTicket} onDismiss={() => setSavedDraftId(null)} />
+      )}
 
       {/*
         Rendered unconditionally on `expired` (matching `TicketSheet` just

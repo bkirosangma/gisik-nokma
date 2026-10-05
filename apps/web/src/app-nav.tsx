@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
+import { DraftsNavLink } from "./drafts-nav-link.js";
 import { useTabletBar } from "./use-tablet-bar.js";
 import { NavBrand } from "./nav-brand.js";
 import { NotesNavLink } from "./notes-nav-link.js";
@@ -364,6 +365,10 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           >
             <NavPending>My work</NavPending>
           </Link>
+        ) : null}
+        {/* Drafts T8 (spec §12.2): the viewer's own drafts, beside My work, with their count. */}
+        {!noWorkspace && effectiveWorkspaceId !== undefined ? (
+          <DraftsNavLink workspaceId={effectiveWorkspaceId} current={currentSection(`/w/${effectiveWorkspaceId}/drafts`)} />
         ) : null}
         {!noWorkspace ? (
           <Link

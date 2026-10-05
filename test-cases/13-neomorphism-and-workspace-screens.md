@@ -991,7 +991,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   (`app-nav.test.tsx`)
 - **13.392** ✅ Every literal nav target is checked against the app directory itself, not only against
   what the component renders: a table of `[href, page.tsx path]` pairs (nine, after Round 19c swapped
-  `/w/<id>/settings/ticket-types` for `/settings?workspaceId=<id>` and kept `/w/<id>/members`), each
+  `/w/<id>/settings/ticket-types` for `/settings?workspaceId=<id>` and kept `/w/<id>/members`; drafts T8 added `/w/<id>/drafts` → `app/w/[workspaceId]/drafts/page.tsx`), each
   existence-checked with `node:fs`, and the nav's own rendered href set checked both for coverage (every
   table entry appears) and for closure (every rendered href is in the table) — so a href this table
   forgot would fail loudly rather than silently passing because nobody asked. —
