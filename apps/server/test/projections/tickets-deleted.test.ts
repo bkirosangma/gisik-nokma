@@ -205,6 +205,12 @@ describe('proj_tickets carries deleted_at / deleted_by, and restore clears them'
       pending_children: [], // drafts T6 (owner ruling O1): a non-draft holds none
       outcome: null, // wtg2 T5: never decided
       passes: [],
+      // wtg2 T9: never started, never reset, no flow close
+      started_at: null,
+      ended_at: null,
+      periods: [],
+      rounds: 1,
+      closed_cause: null,
     };
     expect(rowToTicketState(shaped).deleted).toBeNull();
     // The positive control through the same call: set the second column and the

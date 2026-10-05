@@ -1,5 +1,7 @@
 import {
   REFUSAL_RULES,
+  branchesOf,
+  decisionOutcomeRequired,
   evaluateEvent,
   flowCauseForgery,
   workflowStateNotCreatableRefusal,
@@ -7,11 +9,13 @@ import {
 } from '@gisik-nokma/rule-engine';
 import {
   BACKLOG_STATE_ID,
+  DECISION_TYPE_ID,
   isCreatableState,
   label,
   statesWithBacklog,
   ticketClosedPayload,
   ticketCreatedPayload,
+  ticketDecidedPayload,
   ticketLinkAddedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
@@ -122,12 +126,12 @@ function notEvaluated(): PrecheckResult {
  * The caller defers, which is what it should do.
  *
  * The line the whole module is built to hold is between the last two: a
- * pre-check may never manufacture a `passed` out of ABSENCE. Five gates keep
+ * pre-check may never manufacture a `passed` out of ABSENCE. Six gates keep
  * it for `ticket.transitioned`'s accept path, and each names the absence it
  * closes — the `closed-ticket` refusal ahead of them (fired on a
  * `ticket.transitioned` whose ticket is closed, backlog/closed spec §2,
  * 2026-09-17) is a REFUSAL, decided from the flag alone, and is not one of
- * the four for that reason: it never manufactures the `passed` the gates
+ * the gates for that reason: it never manufactures the `passed` the gates
  * exist to guard:
  *
  *  1. the moving ticket and its workflow definition must be cached at all;
@@ -160,7 +164,14 @@ function notEvaluated(): PrecheckResult {
  *     (`transition.ts`, E3-19) reads the parent's category and refuses nothing
  *     when the parent cannot be resolved, so an uncached parent reads as no
  *     parent, and that is the same accept-from-absence gate 3 closes on the
- *     other side of the relation.
+ *     other side of the relation;
+ *  6. an ACCEPT into a terminal state of an outcome-less Decision must not rest
+ *     on its branch list (DC-5, wtg2 T6, `acceptRestsOnUnseenBranches`): the
+ *     cache holds the `leads_to` links THIS viewer was served, so "no visible
+ *     branch" is not "no branch". One visible branch and no outcome is a
+ *     refusal the engine decides from cached facts. `ticket.closed` defers on
+ *     the same absence (`precheckTicketClosed`), and `ticket.decided` defers on
+ *     an outcome that matches no visible label (`precheckTicketDecided`).
  *
  * One refusal is downgraded rather than shown: a roles-bearing `restrict-to`
  * resolves against memberships only the server holds, and refusing there would
@@ -190,6 +201,7 @@ export async function precheckEvent(
   if (submitted.type === 'ticket.closed') return precheckTicketClosed(submitted, cache);
   if (submitted.type === 'ticket.reopened') return precheckTicketReopened(submitted, cache);
   if (submitted.type === 'ticket.ranked') return precheckTicketRanked(submitted, cache);
+  if (submitted.type === 'ticket.decided') return precheckTicketDecided(submitted, cache, deps);
   if (submitted.type === 'ticket.link_added' || submitted.type === 'ticket.link_removed') {
     return precheckTicketLink(submitted, cache, deps);
   }
@@ -201,7 +213,7 @@ export async function precheckEvent(
 
   // The engine's own door for this payload. It is parsed first because the
   // engine's first question is a payload-and-actor one (wtg2 T8: a forged flow
-  // cause, `transition.ts:63`, asked before it reads the ticket); later it
+  // cause, `transition.ts:64`, asked before it reads the ticket); later it
   // answers the two questions the verdict alone cannot: which state is being
   // entered, and which edge carries the rule that refused.
   const payload = ticketTransitionedPayloadSchema.safeParse(submitted.payload);
@@ -212,8 +224,8 @@ export async function precheckEvent(
   if (ticket === undefined) return notEvaluated();
 
   // The explicit reopen (backlog/closed spec §2), mirrored from the engine's
-  // OWN order: `transition.ts:78` decides this before it even fetches the
-  // workflow def at `:82`, because a closed ticket has no legal move at all
+  // OWN order: `transition.ts:79` decides this before it even fetches the
+  // workflow def at `:83`, because a closed ticket has no legal move at all
   // and the flag is a fact this cache already holds — no def, no version
   // chain, nothing further is needed to answer confidently. Deciding it here,
   // ahead of the gates below, is what makes this branch predict the engine on
@@ -237,6 +249,7 @@ export async function precheckEvent(
     if (!payload.success) return notEvaluated();
     if (acceptRestsOnUnseenChildren(ticket, def, payload.data, cache)) return notEvaluated();
     if (acceptRestsOnUnseenParent(ticket, def, payload.data, cache)) return notEvaluated();
+    if (acceptRestsOnUnseenBranches(ticket, def, payload.data)) return notEvaluated();
     return { kind: 'passed' };
   }
 
@@ -499,12 +512,14 @@ function forgedCause(submitted: SubmittedEvent, cause: unknown): PrecheckResult 
  * ticket-type definition this cache has no store for; `checkTicketClosed` and
  * `checkTicketReopened` read neither. Each first asks the forged-cause question
  * (`forgedCause` below), which reads only the payload and the actor; past it,
- * `checkTicketClosed` reads `ticket.closed`, `ticket.stateCategory` and the
- * vouched children's categories, all cached facts, and consults a workflow def
+ * `checkTicketClosed` reads `ticket.closed`, `ticket.stateCategory`, the
+ * vouched children's categories and (DC-5) the ticket's type, outcome and
+ * branches, all cached facts, and consults a workflow def
  * ONLY to spell the state's NAME inside a refusal reason it has already decided
  * to give. So once every fact a verdict rests on is genuinely held, a `passed`
  * here is not an accept manufactured from absence — it is the one this
- * module's own invariant permits.
+ * module's own invariant permits. The one absence left, an outcome-less
+ * Decision whose branches this viewer may not see, defers (gate 6).
  */
 function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
   const parsed = ticketClosedPayload.safeParse(submitted.payload);
@@ -547,7 +562,44 @@ function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache
       reason: `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`,
     };
   }
+  // DC-5 (wtg2 T6), the engine's own function after the open-child count, as in `checks/close.ts`. A refusal needs one
+  // visible branch; an outcome-less Decision showing none may still have branches this viewer cannot see, so it defers.
+  // A client never files `branch-not-taken` (`forgedCause` above refuses it), so the exemption stays at its default.
+  const needsOutcome = decisionOutcomeRequired(ticket);
+  if (needsOutcome !== null) return { kind: 'refused', rule: needsOutcome.rule, reason: needsOutcome.reason };
+  if (decisionBranchesUnseen(ticket)) return notEvaluated();
   return { kind: 'passed' };
+}
+
+/**
+ * An outcome-less Decision that shows this viewer no branch: "no branches" and "branches I cannot see" look the same in
+ * a viewer-filtered cache (a hidden target is a hole, spec FL-1), so DC-5's accept cannot be decided here.
+ */
+function decisionBranchesUnseen(ticket: TicketState): boolean {
+  return ticket.typeId === DECISION_TYPE_ID && (ticket.outcome ?? null) === null && branchesOf(ticket).length === 0;
+}
+
+/**
+ * GATE 6. DC-5's accept needs every branch; the cache holds the visible ones only. A refusal needs just one visible
+ * branch and rides the engine verdict, so only the terminal accept of a branch-less-looking Decision defers.
+ */
+function acceptRestsOnUnseenBranches(ticket: TicketState, def: WorkflowDef, payload: TicketTransitionedPayload): boolean {
+  return decisionBranchesUnseen(ticket) && statesWithBacklog(def).find((state) => state.id === payload.to)?.category === 'terminal';
+}
+
+/**
+ * `ticket.decided` (wtg2 T6), through the shared engine (`checks/decision.ts` reads only the ticket's own state, never a
+ * type definition, so `contextFromCache` can answer it). An outcome that matched a VISIBLE label is a fact the cache
+ * holds; a label matching no visible branch may still name one the viewer cannot see, so `decision.unknown-outcome`
+ * defers and never refuses (the module's invariant).
+ */
+async function precheckTicketDecided(submitted: SubmittedEvent, cache: ClientStateCache, deps: PrecheckDeps): Promise<PrecheckResult> {
+  if (!ticketDecidedPayload.safeParse(submitted.payload).success) return notEvaluated();
+  if (cache.getTicket(submitted.entity.id) === undefined) return notEvaluated();
+  const verdict = await (deps.evaluate ?? evaluateEvent)(completeForPrecheck(submitted, deps.now), contextFromCache(cache));
+  if (!verdict.refused) return { kind: 'passed' };
+  if (verdict.rule === 'decision.unknown-outcome') return notEvaluated();
+  return { kind: 'refused', rule: verdict.rule, reason: verdict.reason };
 }
 
 /**

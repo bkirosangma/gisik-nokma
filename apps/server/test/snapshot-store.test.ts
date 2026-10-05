@@ -55,6 +55,8 @@ describe('snapshot store', () => {
       seq: 3,
       state: { name: 'CC HQ' },
       provenance: null,
+      // wtg2 T9: both writes stamp the current fold version (2 = work periods and rounds).
+      foldVersion: 2,
     });
   });
 });

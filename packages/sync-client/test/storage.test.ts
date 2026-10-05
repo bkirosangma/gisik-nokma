@@ -17,8 +17,9 @@ describe('migrateLocal', () => {
       // `snapshot_provenance` joined the list with ruling P36. It is a SIBLING
       // TABLE rather than a column on `snapshots` because `migrateLocal` runs
       // `CREATE TABLE IF NOT EXISTS` and nothing else — there is no `ALTER`
-      // path, and `LOCAL_SCHEMA_VERSION` is written into `meta` and never read
-      // back — so a new column would work on a fresh device and throw
+      // path, and `LOCAL_SCHEMA_VERSION` was written into `meta` and never read
+      // back (its one reader since version 5, `createReplica`, re-pulls
+      // state, not columns) — so a new column would work on a fresh device and throw
       // `no such column` on every existing one. An exact `toEqual` here is what
       // made that decision visible instead of silent.
       // `notes` and `note_comments` joined with Plan 2 of the notes series and
@@ -36,8 +37,9 @@ describe('migrateLocal', () => {
     // against itself is a round-trip check that survives any value change, so a
     // silent version bump would pass. A schema version is exactly the thing that
     // should require a conscious edit here when it moves.
-    expect(LOCAL_SCHEMA_VERSION).toBe(4);
-    expect(version[0]?.value).toBe('4');
+    // 5: Workflow and Timeline graphs T9 (no DDL; `createReplica` re-pulls held tickets).
+    expect(LOCAL_SCHEMA_VERSION).toBe(5);
+    expect(version[0]?.value).toBe('5');
     await storage.close();
   });
 });

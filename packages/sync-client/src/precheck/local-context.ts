@@ -1,6 +1,7 @@
 import {
   TICKET_EVENT_TYPES,
   foldTicketEvent,
+  keepConfirmedPeriods,
   membershipId,
   type EventEnvelope,
   type PublishedWorkflowDef,
@@ -148,10 +149,13 @@ export async function buildPendingOverlay(deps: LocalContextDeps): Promise<Pendi
     // both clocks, so the provenance stays readable as "this device said so".
     const env: EventEnvelope = { ...submitted, serverTime: submitted.clientTime, seq };
     try {
-      const next = foldTicketEvent(states.get(ticketId), env, localDeps);
+      const before = states.get(ticketId);
+      const next = foldTicketEvent(before, env, localDeps);
       // A purged ticket's redacted creation folds to nothing (trash Plan 2 D7):
-      // no state, and — unlike a throw — not "unfoldable" either.
-      if (next !== undefined) states.set(ticketId, next);
+      // no state, and — unlike a throw — not "unfoldable" either. The periods
+      // stay the confirmed ones (wtg2 T9, ES-4): the device clock above would
+      // otherwise open or close a work period no server stamped.
+      if (next !== undefined) states.set(ticketId, keepConfirmedPeriods(before, next));
     } catch {
       unfoldable.add(ticketId);
     }
