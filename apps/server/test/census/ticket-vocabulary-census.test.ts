@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { domainRegistry, linkReading, TICKET_EVENT_TYPES, TICKET_LINK_KINDS, type EventTypeRegistration } from '@gisik-nokma/domain';
+import { REFUSALS } from '@gisik-nokma/rule-engine';
 import { payloadIds } from '../../src/purge/check-purged.js';
 import { BOOTSTRAP_BACKFILL_TYPES } from '../../src/sync/sync-routes.js';
 
@@ -78,5 +81,40 @@ describe('29.137 the decision census', () => {
     const [a, b] = ['01J9GTKB000000000000000000', '01J9GTKC000000000000000000'];
     expect(payloadIds('ticket.decided', { outcome: 'Yes', closeStarted: [a, b] })).toEqual([['ticket', a], ['ticket', b]]);
     expect(payloadIds('ticket.decided', { outcome: 'Yes' })).toEqual([]); // control: no request, no ids
+  });
+});
+
+describe('29.209 the flow-cause census', () => {
+  it('29.209 cause.forged is a refusal; each flow cause rides exactly its event types in the registry; payloadIds names the cause ids; the mobile bundle carries the new payloads', () => {
+    expect(REFUSALS['cause.forged']).toBe('Only the flow can record that a ticket was led here, reopened or passed over by a decision.');
+    const [D, S, U, E] = ['01J9GDEC000000000000000000', '01J9GSRC000000000000000000', '01J9GACT000000000000000001', '01J9GEVT000000000000000001'];
+    const causes = {
+      'led-to': { kind: 'led-to', sourceTicketId: S, triggeredBy: U },
+      'reopened-by-flow': { kind: 'reopened-by-flow', decisionTicketId: D, outcome: 'No', pass: 1, decidedBy: U, decisionEventId: E },
+      'branch-not-taken': { kind: 'branch-not-taken', decisionTicketId: D, outcome: 'No', pass: 1, decidedBy: U, decisionEventId: E },
+    } as const;
+    // Read through the REGISTRY's own payload schemas, never a retyped list: which kinds each type accepts.
+    const schemaOf = (type: string) => {
+      const registration = domainRegistry.registrations().find((r) => r.type === type);
+      if (registration === undefined) throw new Error(`${type} is not registered`);
+      return registration.payloadSchema;
+    };
+    const accepted = (type: string, extra: Record<string, unknown>) =>
+      Object.entries(causes).filter(([, cause]) => schemaOf(type).safeParse({ ...extra, cause }).success).map(([kind]) => kind);
+    expect(accepted('ticket.transitioned', { to: 'todo' })).toEqual(['led-to', 'reopened-by-flow', 'branch-not-taken']);
+    expect(accepted('ticket.closed', {})).toEqual(['branch-not-taken']);
+    expect(accepted('ticket.reopened', {})).toEqual(['reopened-by-flow']);
+    // The purge door names the cause's ticket, on each type that may carry one, and never the person.
+    expect(payloadIds('ticket.transitioned', { to: 'todo', cause: causes['led-to'] })).toEqual([['ticket', S]]);
+    expect(payloadIds('ticket.closed', { cause: causes['branch-not-taken'] })).toEqual([['ticket', D]]);
+    expect(payloadIds('ticket.reopened', { cause: causes['reopened-by-flow'] })).toEqual([['ticket', D]]);
+    expect(payloadIds('ticket.transitioned', { to: 'todo' })).toEqual([]); // control: an uncaused move names nothing
+    // The mobile editor bundle embeds the domain registry, so it is rebuilt with the new payloads (read here, not by
+    // `generate:editor-html --check`, which warns and passes when the webview is unbuilt).
+    const bundle = readFileSync(resolve(import.meta.dirname, '../../../mobile/src/editor/editor-html.generated.ts'), 'utf8');
+    expect(bundle).toContain('branch-not-taken');
+    // control: the 27.004 census still fires on a planted registration
+    const planted = { type: 'ticket.planted_for_census', version: 1, entityKind: 'ticket', payloadSchema: undefined as never } as EventTypeRegistration;
+    expect(unaccounted([...domainRegistry.registrations(), planted])).toEqual(['ticket.planted_for_census']);
   });
 });
