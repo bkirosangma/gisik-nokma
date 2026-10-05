@@ -6232,7 +6232,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text);
   font-size: 0.85rem;
 }
-.gn-timeline__nothing .gn-timeline__nav:disabled { opacity: 0.45; cursor: default; }
+.gn-timeline__nothing .gn-timeline__nav:disabled { opacity: var(--gn-disabled-opacity); cursor: default; }
 
 /* PORTRAIT (PK-7, TV-6): a container narrower than 40rem lays the same packing out with time running DOWN. A lane is a column
    group (`--lane-extent` = its rows x 112 px, placed by `--lane-offset`), the day labels ride a sticky 80 px gutter at the left, and

@@ -135,7 +135,8 @@ describe('29.109 portrait runs time down a sticky gutter, and the Nothing-in-vie
     expect(valueOf(ruleExactly(ui, '.gn-timeline__stage'), 'position')).toBe('relative');
     const disabled = ruleExactly(ui, '.gn-timeline__nothing .gn-timeline__nav:disabled');
     expect(valueOf(disabled, 'cursor')).toBe('default');
-    expect(valueOf(disabled, 'opacity')).toBe('0.45');
+    // The ONE disabled token (23.094 polices every :disabled opacity in the sheets), never a literal of its own.
+    expect(valueOf(disabled, 'opacity')).toBe('var(--gn-disabled-opacity)');
     // GUARD (T9's canvas, not a control of this task's rules): the canvas is itself a positioning parent that scrolls, so a pill inside
     // it would be carried away; the pill's place OUTSIDE it is pinned in the DOM by 29.108 (`pill.closest('.gn-timeline__canvas')`).
     expect(valueOf(ruleExactly(ui, '.gn-timeline__canvas'), 'position')).toBe('relative');
