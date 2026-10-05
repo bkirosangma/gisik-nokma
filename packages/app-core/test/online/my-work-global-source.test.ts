@@ -141,6 +141,12 @@ describe('the My work preferences document', () => {
   });
 
   it('30.028 refuses a document it does not understand, and a missing route is an error rather than the defaults', async () => {
+    // CONTROL, same `it`: every value the route accepts maps, the LAST one included, so the
+    // refusals below are of the bad values and not of a short list of good ones.
+    const allFour = { show: ['created', 'assigned', 'ws-admin', 'project-admin'], grouping: 'workspace-project' };
+    const { fetchImpl: allFourFetch } = recordingFetch({ 'GET /v1/me/my-work-preferences': allFour });
+    expect(await createOnlineDataSource({ baseUrl: '', fetchImpl: allFourFetch }).query.getMyWorkPreferences()).toEqual(allFour);
+
     for (const body of [
       { show: ['bogus'], grouping: 'flat' },
       { show: 'created', grouping: 'flat' },
