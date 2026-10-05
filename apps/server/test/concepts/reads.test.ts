@@ -24,6 +24,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { newUlid, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { readConceptView, visibleConceptIds } from '../../src/read/concepts.js';
 import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
 import { buildTestApp } from '../helpers/app.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -45,6 +46,7 @@ const C0 = newUlid();
 const CM = newUlid();
 const CD = newUlid();
 const CF = newUlid();
+const S0 = newUlid(); // the suggestion C0 was created from
 const FW = newUlid(); // another workspace, holding CF and the foreign ticket FT and note FN
 const FT = newUlid();
 const FN = newUlid();
@@ -93,7 +95,7 @@ beforeAll(async () => {
     cev(CW, 'concept.item_tagged', { itemKind: 'note', itemId: world.NOTES.nWorkspace }),
     cev(CE, 'concept.created', { name: 'Invoices' }),
     cev(CE, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE }),
-    cev(C0, 'concept.created', { name: 'Empty' }),
+    cev(C0, 'concept.created', { name: 'Empty', fromSuggestion: S0 }),
     cev(CM, 'concept.created', { name: 'Mixed' }),
     cev(CM, 'concept.item_tagged', { itemKind: 'note', itemId: world.NOTES.nWorkspace }),
     cev(CM, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE }),
@@ -161,6 +163,12 @@ describe('27.466 an empty concept is for members and above', () => {
     expect(await listIds('memberOut')).toContain(C66);
     expect(await listIds('guestListed')).not.toContain(C66);
     expect(await listIds('guestUnlisted')).not.toContain(C66);
+    // Asked directly with a NON-member's role (every route refuses one first), the empty rule still says no.
+    const strangerEff = await resolveEffectiveRole(db.pool, ids.outsider, world.WS);
+    expect(strangerEff.workspaceRole).toBeNull();
+    expect([...(await visibleConceptIds(db.pool, strangerEff, ids.outsider, world.WS, [C66]))]).toEqual([]);
+    const memberOutEff = await resolveEffectiveRole(db.pool, ids.memberOut, world.WS);
+    expect([...(await visibleConceptIds(db.pool, memberOutEff, ids.memberOut, world.WS, [C66]))]).toEqual([C66]);
     // Control: TE (explicit [guestListed]) tagged in, the concept now has TE's audience, not the empty rule's.
     await applyCommitted(db.pool, [cev(C66, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE })]);
     expect(await listIds('guestListed')).toContain(C66);
@@ -186,9 +194,10 @@ describe('27.467 one concept', () => {
     const owner = (await get('owner', `/v1/concepts/${CP}`)).json() as { links: Array<{ otherId: string }> };
     expect(owner.links.map((l) => l.otherId).sort()).toEqual(sorted(C0, CW, CE));
     // From the broader end, CP is narrower.
-    const c0 = (await get('memberIn', `/v1/concepts/${C0}`)).json() as { links: unknown[]; items: unknown[] };
+    const c0 = (await get('memberIn', `/v1/concepts/${C0}`)).json() as { links: unknown[]; items: unknown[]; fromSuggestion: unknown };
     expect(c0.links).toEqual([{ otherId: CP, otherName: 'Licences', relation: 'broader', direction: 'narrower' }]);
     expect(c0.items).toEqual([]);
+    expect(c0.fromSuggestion).toBe(S0); // CP's is null (above)
     // Hidden = unknown, byte for byte: guestUnlisted, a random id, and a non-member.
     const random = await answer('memberIn', `/v1/concepts/${newUlid()}`);
     expect(random).toEqual({ status: 404, body: NOT_FOUND });
@@ -197,6 +206,10 @@ describe('27.467 one concept', () => {
     expect(await answer('outsider', `/v1/concepts/${C0}`)).toEqual(random); // empty, so only the membership gate stands
     expect(await answer('owner', `/v1/concepts/${CD}`)).toEqual(random); // deleted
     expect(await answer('owner', `/v1/concepts/${CF}`)).toEqual(random); // another workspace
+    // The read itself answers null for an id with no row (the route asks for the workspace first; a purge between the
+    // two would land here).
+    const ownerEff = await resolveEffectiveRole(db.pool, ids.owner, world.WS);
+    expect(await readConceptView(db.pool, ownerEff, ids.owner, newUlid())).toBeNull();
     // Control, same it: memberOut reads TP on the ref (Rule A), so reads CP.
     expect((await get('memberOut', `/v1/concepts/${CP}`)).statusCode).toBe(200);
   });
@@ -319,8 +332,9 @@ describe('27.483 trash (Review Focus 3, at read time)', () => {
       tev(TT, 'visibility.set', { ticketId: TT, mode: 'explicit', userIds: [world.ids.guestListed] }),
       makeCommitted({ workspaceId: world.WS, actorId: world.ids.author, entity: { kind: 'note', id: nT }, type: 'note.created', payload: { title: 'Crate count', homeProjectId: world.P, scope: { mode: 'explicit', userIds: [world.ids.guestListed] } } }),
       cev(C83, 'concept.created', { name: 'Crates' }),
-      cev(C83, 'concept.item_tagged', { itemKind: 'ticket', itemId: TT }),
-      cev(C83, 'concept.item_tagged', { itemKind: 'note', itemId: nT }),
+      // Tagged at the same instant, ticket first: the kind, then the id, orders them (note before ticket).
+      { ...cev(C83, 'concept.item_tagged', { itemKind: 'ticket', itemId: TT }), serverTime: '2026-10-05T12:00:00.000Z' },
+      { ...cev(C83, 'concept.item_tagged', { itemKind: 'note', itemId: nT }), serverTime: '2026-10-05T12:00:00.000Z' },
     ]);
     const owned = async () => {
       const list = (await get('owner', `/v1/workspaces/${world.WS}/concepts`)).json() as { concepts: Array<{ id: string; itemCount: number }> };
@@ -328,7 +342,7 @@ describe('27.483 trash (Review Focus 3, at read time)', () => {
       return { listed: list.concepts.find((c) => c.id === C83)?.itemCount, count: view.itemCount, items: view.items.map((i) => i.id) };
     };
     // Both live: the concept has their audience (guestListed in, memberOut out).
-    expect(await owned()).toEqual({ listed: 2, count: 2, items: [TT, nT] });
+    expect(await owned()).toEqual({ listed: 2, count: 2, items: [nT, TT] });
     expect(await listIds('guestListed')).toContain(C83);
     expect(await listIds('memberOut')).not.toContain(C83);
     await applyCommitted(db.pool, [
@@ -378,44 +392,38 @@ describe('27.469 the assignee arm (Review Focus 2)', () => {
 });
 
 describe('27.468 an audience that narrows after the tag (Review Focus 1)', () => {
-  it('27.468 memberIn reads the concept, a visibility.set makes its ticket explicit [owner], and memberIn loses it at once in the list, the get and the door; control: the owner keeps it', async () => {
+  it('27.468 memberIn tags the ticket through the door and reads the concept, a visibility.set makes the ticket explicit [owner], and memberIn loses it at once in the list, the get and the door; control: the owner keeps it', async () => {
     const T68 = newUlid();
     const C68 = newUlid();
-    await applyCommitted(db.pool, [
-      ticketCreated(T68, 'Pay the electricity bill'),
-      cev(C68, 'concept.created', { name: 'Bills' }),
-      cev(C68, 'concept.item_tagged', { itemKind: 'ticket', itemId: T68 }),
-    ]);
+    await applyCommitted(db.pool, [ticketCreated(T68, 'Pay the electricity bill'), cev(C68, 'concept.created', { name: 'Bills' })]);
+    // From here every write goes through the door (a door write takes the ledger's next seqs, so `applyCommitted`
+    // may not follow it; this describe runs last for that reason).
+    const post = async (who: Who, entity: { kind: string; id: string }, type: string, payload: Record<string, unknown>) => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/events',
+        headers: { authorization: `Bearer ${tokens[who]}` },
+        payload: {
+          events: [
+            { id: newUlid(), version: 1, origin: 'web', clientTime: new Date().toISOString(), workspaceId: world.WS, entity, type, payload, actorId: ids[who] },
+          ],
+        },
+      });
+      return (res.json() as { results: Array<Record<string, unknown>> }).results[0];
+    };
+    // memberIn tags it: the door asks whether memberIn sees C68 and the ticket, and both are yes.
+    expect(await post('memberIn', { kind: 'concept', id: C68 }, 'concept.item_tagged', { itemKind: 'ticket', itemId: T68 })).toMatchObject({ status: 'committed' });
     // The precondition: a 404 after proves nothing if it was a 404 before.
     expect((await get('memberIn', `/v1/concepts/${C68}`)).statusCode).toBe(200);
     expect(await listIds('memberIn')).toContain(C68);
-    await applyCommitted(db.pool, [tev(T68, 'visibility.set', { ticketId: T68, mode: 'explicit', userIds: [world.ids.owner] })]);
-    // No other write in between: nothing may answer from a cache.
+    expect(await post('owner', { kind: 'ticket', id: T68 }, 'visibility.set', { ticketId: T68, mode: 'explicit', userIds: [world.ids.owner] })).toMatchObject({
+      status: 'committed',
+    });
+    // No other write in between: nothing may answer from a cache, the door's included (it said yes at tag time).
     expect(await answer('memberIn', `/v1/concepts/${C68}`)).toEqual({ status: 404, body: NOT_FOUND });
     expect(await listIds('memberIn')).not.toContain(C68);
     expect((await get('owner', `/v1/concepts/${C68}`)).statusCode).toBe(200);
-    // The door agrees (last: a door write would move the ledger's seqs past `applyCommitted`'s).
-    const rename = await app.inject({
-      method: 'POST',
-      url: '/v1/events',
-      headers: { authorization: `Bearer ${tokens.memberIn}` },
-      payload: {
-        events: [
-          {
-            id: newUlid(),
-            version: 1,
-            origin: 'web',
-            clientTime: new Date().toISOString(),
-            workspaceId: world.WS,
-            entity: { kind: 'concept', id: C68 },
-            type: 'concept.renamed',
-            payload: { name: 'Mine now' },
-            actorId: world.ids.memberIn,
-          },
-        ],
-      },
-    });
-    expect((rename.json() as { results: Array<Record<string, unknown>> }).results[0]).toMatchObject({
+    expect(await post('memberIn', { kind: 'concept', id: C68 }, 'concept.renamed', { name: 'Mine now' })).toMatchObject({
       status: 'refused',
       rule: 'concept.unknown',
       reason: 'That concept does not exist or you cannot see it.',
