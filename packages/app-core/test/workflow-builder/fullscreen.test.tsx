@@ -564,6 +564,9 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
     // the mapping is open in the toolbar beside the panel, and focus stayed on Publish (the dialog takes none)
     expect(toolbar().contains(mappingDialog())).toBe(true);
     expect(publish()).toHaveFocus();
+    // only Escape is its Cancel: another key leaves the mapping open
+    await user.keyboard('x');
+    expect(mappingDialog()).not.toBeNull();
     // A DOCUMENT bubble spy hears the key after React's handlers and before the ladder's WINDOW listener, so it records the
     // dialog's own mark: a window spy would also see the ladder's preventDefault, and pass with the dialog marking nothing.
     const seen: boolean[] = [];

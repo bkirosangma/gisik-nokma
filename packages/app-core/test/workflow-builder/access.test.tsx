@@ -97,9 +97,17 @@ function renderBuilder(session: BuilderSession, gateway = createFakeGateway()) {
  * by them, and a hand-maintained name list would silently stop covering it.
  */
 /**
- * G-9 T5 FIX 1 (F4): the floating panel's tabs only switch what the panel shows, so the member sweep lets them through, but only
- * THEM: a segmented item counts as a tab when it sits inside `.gn-wf-panel__tabs`, so a future authoring segmented control elsewhere
- * in the builder still fails the sweep.
+ * G-9 T5 FIX 1 (F4): what the "only jumps" sweeps look at: every button AND every tab. A segmented control's items are
+ * `role="tab"` buttons, so a button-only query never saw them, and the page-wide `gn-segmented__item` allowance the sweeps carried
+ * admitted nothing at all.
+ */
+function sweptControls(): HTMLElement[] {
+  return [...screen.queryAllByRole('button'), ...screen.queryAllByRole('tab')];
+}
+
+/**
+ * The floating panel's tabs only switch what the panel shows, so the member sweep lets them through, but only THEM: a segmented
+ * item counts as a panel tab when it sits inside `.gn-wf-panel__tabs`, so an authoring segmented control elsewhere fails the sweep.
  */
 function isPanelTab(button: HTMLElement): boolean {
   return button.className.includes('gn-segmented__item') && button.closest('.gn-wf-panel__tabs') !== null;
@@ -184,7 +192,9 @@ describe('read-only workflow views for non-admins', () => {
     expect(
       screen.queryByText('Could not load workspace people and types. Reload to try again.'),
     ).not.toBeInTheDocument();
-    for (const button of screen.queryAllByRole('button')) {
+    // AMENDED 2026-10-05 (G-9 T5 FIX 1, F4): tabs too. A segmented control's items are `role="tab"` buttons, which
+    // `queryAllByRole('button')` never returns, so an authoring segmented control would have passed this sweep unseen.
+    for (const button of sweptControls()) {
       // The canvas Category pickers (Select, Phase 2 Wave B Task 1) are real
       // <button> elements too, but they're a value-bearing control, not a
       // navigation jump or an authoring action. This test never calls
@@ -199,8 +209,8 @@ describe('read-only workflow views for non-admins', () => {
       // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
       // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
       // AMENDED 2026-10-05 (G-9 T5): the full-screen controls only change what is shown (see the member sweep below).
-      // AMENDED 2026-10-05 (G-9 T5 FIX 1): no segmented item here: this sweep never opens the floating panel, the only place one may
-      // stand (see `isPanelTab`), so any segmented control reaching a guest's screen fails.
+      // AMENDED 2026-10-05 (G-9 T5 FIX 1): no segmented item (no tab) here: this sweep never opens the floating panel, the only place
+      // one may stand (see `isPanelTab`), so any segmented control reaching a guest's screen fails.
       expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close/);
     }
     expect(gateway.submitted).toEqual([]);
@@ -392,7 +402,8 @@ describe('no authoring action is reachable by any path the builder screen offers
     await screen.findByTestId('state-node-later');
 
     function everyButtonIsAJump(): void {
-      for (const button of screen.queryAllByRole('button')) {
+      // AMENDED 2026-10-05 (G-9 T5 FIX 1, F4): tabs too (see the guest sweep), so the panel's tabs are swept, as tabs.
+      for (const button of sweptControls()) {
         // Same as the guest test above: a Select trigger (Category, one per
         // canvas node) is a value-bearing control, not a jump or an
         // authoring action — assert disabled rather than only skip, so an
