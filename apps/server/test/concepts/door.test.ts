@@ -150,11 +150,14 @@ describe('27.449 hidden, absent and deleted concepts get one refusal', () => {
     expect(await permits('concept.renamed', rename, CE, 'owner')).toBeNull();
     expect(await permits('concept.renamed', rename, CP, 'memberIn')).toBeNull();
 
-    // The OTHER concept of a link or a merge is asked too.
-    expect(await permits('concept.linked', { otherId: CE, relation: 'related' }, CW, 'memberOut')).toEqual(UNKNOWN);
-    expect(await permits('concept.linked', { otherId: CE, relation: 'related' }, CW, 'owner')).toBeNull();
-    expect(await permits('concept.merged', { intoId: CE }, CW, 'memberOut')).toEqual(UNKNOWN);
-    expect(await permits('concept.merged', { intoId: CE }, CW, 'owner')).toBeNull();
+    // The OTHER concept of a link or a merge is asked too (`broader`, and the empty CQ merged: neither depends on how
+    // CE's id sorts nor on what CE holds).
+    expect(await permits('concept.linked', { otherId: CE, relation: 'broader' }, CW, 'memberOut')).toEqual(UNKNOWN);
+    expect(await permits('concept.linked', { otherId: CE, relation: 'broader' }, CW, 'owner')).toBeNull();
+    expect(await permits('concept.merged', { intoId: CE }, CQ, 'memberOut')).toEqual(UNKNOWN);
+    expect(await permits('concept.merged', { intoId: CE }, CQ, 'owner')).toBeNull();
+    // Before the related-stream rule (27.459): a related link to an unknown LOWER id is unknown, not "post it there".
+    expect(await permits('concept.linked', { otherId: '00000000000000000000000000', relation: 'related' }, CW, 'memberIn')).toEqual(UNKNOWN);
   });
 });
 
@@ -184,16 +187,25 @@ describe('27.450 the state rules', () => {
       rule: 'concept.self',
       reason: 'A concept cannot be merged into itself.',
     });
-    expect(await permits('concept.merged', { intoId: CW }, CP, 'memberIn')).toBeNull();
+    // CP holds TP, which CW lacks: the merge waits for CW's tag (27.463). CQ holds nothing, so it may merge.
+    expect(await permits('concept.merged', { intoId: CW }, CP, 'memberIn')).toEqual({
+      refused: true,
+      rule: 'concept.merge-incomplete',
+      reason: 'One item in this concept is not yet in the concept it merges into. Add it there first.',
+    });
+    expect(await permits('concept.merged', { intoId: CW }, CQ, 'memberIn')).toBeNull();
 
     // related CP–CW, written from CP (the lower id), stored (CP, CW).
     await applyCommitted(db.pool, [cev(CP, 'concept.linked', { otherId: CW, relation: 'related' })]);
-    // From CW, the HIGHER id: the raw key (CW, CP) is not the stored one, so this needs the door's swap.
-    expect(await permits('concept.linked', { otherId: CP, relation: 'related' }, CW, 'memberIn')).toEqual({
+    expect(await permits('concept.linked', { otherId: CW, relation: 'related' }, CP, 'memberIn')).toEqual({
       refused: true,
       rule: 'concept.link-exists',
       reason: 'These concepts are already linked that way.',
     });
+    // R1: a related link is posted and removed on the LOWER id only, whether or not it exists (27.459).
+    const relatedStream = { refused: true, rule: 'concept.related-stream', reason: 'A related link is posted on the concept with the lower id.' };
+    expect(await permits('concept.linked', { otherId: CP, relation: 'related' }, CW, 'memberIn')).toEqual(relatedStream);
+    expect(await permits('concept.unlinked', { otherId: CP, relation: 'related' }, CW, 'memberIn')).toEqual(relatedStream);
     expect(await permits('concept.linked', { otherId: CP, relation: 'broader' }, CW, 'memberIn')).toBeNull();
     // The same relation sharing ONE end with the stored row is still a new link (CP < CQ < CW).
     expect(await permits('concept.linked', { otherId: CW, relation: 'related' }, CQ, 'memberIn')).toBeNull();
@@ -205,7 +217,6 @@ describe('27.450 the state rules', () => {
       reason: 'These concepts are not linked that way.',
     });
     expect(await permits('concept.unlinked', { otherId: CW, relation: 'related' }, CP, 'memberIn')).toBeNull();
-    expect(await permits('concept.unlinked', { otherId: CP, relation: 'related' }, CW, 'memberIn')).toBeNull();
   });
 });
 

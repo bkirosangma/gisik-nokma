@@ -5,7 +5,7 @@
  * compile-time switch (TS2366) plus 27.454.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CONCEPT_EVENT_TYPES, domainRegistry, makeEnvelope, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { CONCEPT_EVENT_TYPES, domainRegistry, makeEnvelope, newUlid, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
 import { checkConceptPermission } from '../../src/permissions/check-concept.js';
 import { checkPermission } from '../../src/permissions/check-permission.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
@@ -144,7 +144,7 @@ describe('27.457 the concept registry census', () => {
     expect(await checkConceptPermission(comment, { db: db.pool, sessionUserId: guest, eff, workspaceExists: true })).toBeNull();
 
     // 4. The projection is total over the nine AND each arm does something: every step changes the tables.
-    const [C1, C2] = [newUlid(), newUlid()];
+    const [C1, C2] = [newUlid(), newUlid()].sort() as [Ulid, Ulid]; // C1 < C2: a related link is written by the lower id (R1)
     const steps: Array<[string, string, Record<string, unknown>]> = [
       [C1, 'concept.created', { name: 'One' }],
       [C2, 'concept.created', { name: 'Two' }],

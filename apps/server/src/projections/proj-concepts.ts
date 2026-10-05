@@ -11,14 +11,17 @@ import {
 } from '@gisik-nokma/domain';
 import type { Projection } from './registry.js';
 
-/** `related` is symmetric and stored once, a < b (the table's CHECK); `broader` is stored as written. */
-function linkKey(self: string, other: string, relation: 'broader' | 'related'): [string, string] {
-  return relation === 'related' && other < self ? [other, self] : [self, other];
-}
-
 /**
- * Knowledge Graph spec D §3.1. A tag naming a PURGED item is skipped (the `purged_entities` read, as
- * `notes.ts:233-235` reads it), so a rebuild after a purge equals the live table, which the purge erased.
+ * Knowledge Graph spec D §3.1, under the planner's R1 ruling (2026-10-05): every row key here is written AND removed
+ * by ONE concept's stream, because a rebuild replays one concept's whole stream at a time (`readLedger`) and live
+ * does not. A link row is (a, b) = (the concept whose stream wrote it, the other one): `broader` as written, and
+ * `related` only ever from the lower id (the door refuses the other side), so the table's `a < b` CHECK holds. A merge
+ * copies nothing: the client tags the merged concept's items on the target first (`concepts/merge.ts`).
+ *
+ * The one cross-stream removal left, a delete or merge dropping the links OTHER concepts wrote to it, converges
+ * because the `linked` arm never writes a link to a deleted end. A tag naming a PURGED item is skipped (the
+ * `purged_entities` read, as `notes.ts:233-235` reads it), so a rebuild after a purge equals the live table, which the
+ * purge erased.
  */
 export const projConcepts: Projection = {
   name: 'proj_concepts',
@@ -68,34 +71,28 @@ export const projConcepts: Projection = {
       }
       case 'concept.linked': {
         const p = conceptLinkedPayload.parse(event.payload);
-        const [a, b] = linkKey(concept, p.otherId, p.relation);
-        // A link naming a deleted (or merged) end is never written. Both are terminal, and the door refuses a link to
-        // a deleted concept, so a deleted end was deleted AFTER this event — but replay runs one concept's whole
-        // stream at a time (`readLedger`'s order), so it can meet this event after the other end's delete. Skipped
-        // here or deleted there, live and a rebuild both end with no row.
+        // A link to a deleted (or merged) concept is never written. Both are terminal, and the door refuses a link to
+        // a deleted concept, so the other end was deleted AFTER this event — but replay can meet this event after the
+        // other end's whole stream. Skipped here or deleted there, live and a rebuild both end with no row. This end
+        // is the stream's own concept, which only its own stream deletes, later.
         await tx.query(
           `INSERT INTO proj_concept_links (workspace_id, a, b, relation, linked_by, linked_at, origin)
            SELECT $1, $2, $3, $4, $5, $6, $7
-            WHERE NOT EXISTS (SELECT 1 FROM proj_concepts WHERE concept_id IN ($2, $3) AND deleted = TRUE)
+            WHERE NOT EXISTS (SELECT 1 FROM proj_concepts WHERE concept_id = $3 AND deleted = TRUE)
            ON CONFLICT DO NOTHING`,
-          [event.workspaceId, a, b, p.relation, event.actorId, event.serverTime, event.origin],
+          [event.workspaceId, concept, p.otherId, p.relation, event.actorId, event.serverTime, event.origin],
         );
         return;
       }
       case 'concept.unlinked': {
         const p = conceptUnlinkedPayload.parse(event.payload);
-        const [a, b] = linkKey(concept, p.otherId, p.relation);
-        await tx.query('DELETE FROM proj_concept_links WHERE a = $1 AND b = $2 AND relation = $3', [a, b, p.relation]);
+        await tx.query('DELETE FROM proj_concept_links WHERE a = $1 AND b = $2 AND relation = $3', [concept, p.otherId, p.relation]);
         return;
       }
       case 'concept.merged': {
         const p = conceptMergedPayload.parse(event.payload);
-        await tx.query(
-          `INSERT INTO proj_concept_items (concept_id, workspace_id, item_kind, item_id, tagged_by, tagged_at, origin)
-           SELECT $2, workspace_id, item_kind, item_id, tagged_by, tagged_at, origin FROM proj_concept_items WHERE concept_id = $1
-           ON CONFLICT DO NOTHING`,
-          [concept, p.intoId],
-        );
+        // Its items reached the target as the target's own `concept.item_tagged` events, before this one (the door's
+        // `concept.merge-incomplete`). An item that was not live then (in the trash) is not carried.
         await tx.query('DELETE FROM proj_concept_items WHERE concept_id = $1', [concept]);
         await tx.query('DELETE FROM proj_concept_links WHERE a = $1 OR b = $1', [concept]);
         await tx.query('UPDATE proj_concepts SET deleted = TRUE, merged_into = $2 WHERE concept_id = $1', [concept, p.intoId]);

@@ -6,6 +6,7 @@ import {
   type EventEnvelope,
 } from '@gisik-nokma/domain';
 import type { Refusal } from '@gisik-nokma/rule-engine'; // as check-permission.ts:20 and check-purged.ts:2
+import { itemsMissingFromTarget } from '../concepts/merge.js';
 import type { Queryable } from '../db/queryable.js';
 import { hiddenItems, type ItemRef } from '../read/item-visibility.js';
 import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
@@ -20,10 +21,20 @@ export const CONCEPT_RULES = {
   linkExists: 'concept.link-exists',
   linkUnknown: 'concept.link-unknown',
   self: 'concept.self',
+  relatedStream: 'concept.related-stream',
+  mergeIncomplete: 'concept.merge-incomplete',
 } as const;
 export const CONCEPT_GUEST_REASON = 'Guests can read concepts but cannot change them.';
 export const CONCEPT_UNKNOWN_REASON = 'That concept does not exist or you cannot see it.';
 export const CONCEPT_ITEM_UNKNOWN_REASON = 'That ticket or note does not exist or you cannot see it.';
+export const CONCEPT_RELATED_STREAM_REASON = 'A related link is posted on the concept with the lower id.';
+
+/** The merge waits for D's tags (`concepts/merge.ts`); the refusal counts what is still missing. */
+export function conceptMergeIncompleteReason(missing: number): string {
+  return missing === 1
+    ? 'One item in this concept is not yet in the concept it merges into. Add it there first.'
+    : `${missing} items in this concept are not yet in the concept it merges into. Add them there first.`;
+}
 
 const refuse = (rule: string, reason: string): Refusal => ({ refused: true, rule, reason });
 
@@ -65,7 +76,10 @@ async function seesItem(db: Queryable, ctx: VisibilityContext, workspaceId: stri
  * - guests: read only;
  * - every write: the actor sees the concept (D4), plus every item or concept the event adds;
  * - the state rules (already tagged, self-link, …) after the audience questions, so a refusal never describes a
- *   concept the actor may not see.
+ *   concept the actor may not see;
+ * - and the two that keep every concept row key on ONE stream (the planner's R1 ruling, 2026-10-05; why in
+ *   `concepts/merge.ts`): a related link is posted and removed by the lower id, and a merge waits until the target
+ *   holds every live item the merged concept holds.
  */
 export async function checkConceptPermission(env: EventEnvelope, ctx: VisibilityContext): Promise<Refusal | null> {
   if (env.entity.kind !== 'concept') return null;
@@ -99,10 +113,11 @@ export async function checkConceptPermission(env: EventEnvelope, ctx: Visibility
     const p = conceptLinkedPayload.parse(env.payload);
     if (p.otherId === self) return refuse(CONCEPT_RULES.self, 'A concept cannot be linked to itself.');
     if (!(await seesConcept(ctx.db, ctx, ws, p.otherId))) return refuse(CONCEPT_RULES.unknown, CONCEPT_UNKNOWN_REASON);
-    const [a, b] = p.relation === 'related' && p.otherId < self ? [p.otherId, self] : [self, p.otherId];
+    if (p.relation === 'related' && p.otherId < self) return refuse(CONCEPT_RULES.relatedStream, CONCEPT_RELATED_STREAM_REASON);
+    // Stored as written, (this concept, the other): `broader` is directed, and `related` only ever comes from the lower id.
     const exists =
-      (await ctx.db.query('SELECT 1 FROM proj_concept_links WHERE a = $1 AND b = $2 AND relation = $3', [a, b, p.relation])).rows
-        .length > 0;
+      (await ctx.db.query('SELECT 1 FROM proj_concept_links WHERE a = $1 AND b = $2 AND relation = $3', [self, p.otherId, p.relation]))
+        .rows.length > 0;
     if (type === 'concept.linked' && exists) return refuse(CONCEPT_RULES.linkExists, 'These concepts are already linked that way.');
     if (type === 'concept.unlinked' && !exists) return refuse(CONCEPT_RULES.linkUnknown, 'These concepts are not linked that way.');
     return null;
@@ -112,6 +127,8 @@ export async function checkConceptPermission(env: EventEnvelope, ctx: Visibility
     const p = conceptMergedPayload.parse(env.payload);
     if (p.intoId === self) return refuse(CONCEPT_RULES.self, 'A concept cannot be merged into itself.');
     if (!(await seesConcept(ctx.db, ctx, ws, p.intoId))) return refuse(CONCEPT_RULES.unknown, CONCEPT_UNKNOWN_REASON);
+    const missing = await itemsMissingFromTarget(ctx.db, ws, self, p.intoId);
+    if (missing.length > 0) return refuse(CONCEPT_RULES.mergeIncomplete, conceptMergeIncompleteReason(missing.length));
     return null;
   }
   return null; // renamed, described, deleted: seeing the concept is the whole rule (D2: any member who sees it)

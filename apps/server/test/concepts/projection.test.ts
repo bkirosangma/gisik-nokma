@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
+import { conceptMergeSteps } from '../../src/concepts/merge.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { projConcepts } from '../../src/projections/proj-concepts.js';
 import { purgeItem, type PurgeDeps } from '../../src/purge/purge-item.js';
@@ -130,19 +131,16 @@ describe('27.443 proj_concepts folds created, renamed, described and deleted', (
     expect(await conceptRow(C)).toMatchObject({ name: 'Scroll jumps', summary: '' });
 
     // A delete drops every link naming the concept, at EITHER end, and keeps the other concepts' rows.
-    // The two written on ANOTHER concept's stream hold C at b and at a; 27.452's rebuild meets each after C's delete.
-    const [O1, O2, O3] = [newUlid(), newUlid(), newUlid()];
-    expect(C < O3).toBe(true); // so the related row is (C, O3)
+    // The one written on ANOTHER concept's stream holds C at b; 27.452's rebuild meets it after C's delete.
+    const [O1, O2] = [newUlid(), newUlid()];
     await applyCommitted(db.pool, [
       cev(O1, 'concept.created', { name: 'Narrow' }),
       cev(O2, 'concept.created', { name: 'Wide' }),
-      cev(O3, 'concept.created', { name: 'Near' }),
       cev(C, 'concept.linked', { otherId: O1, relation: 'broader' }), // stored (C, O1)
       cev(O2, 'concept.linked', { otherId: C, relation: 'broader' }), // stored (O2, C)
-      cev(O3, 'concept.linked', { otherId: C, relation: 'related' }), // stored (C, O3)
       cev(O1, 'concept.linked', { otherId: O2, relation: 'broader' }), // names no C: the control
     ]);
-    expect(await linkRows(C)).toHaveLength(3);
+    expect(await linkRows(C)).toHaveLength(2);
     await applyCommitted(db.pool, [cev(C, 'concept.deleted', {})]);
     expect(await conceptRow(C)).toMatchObject({ name: 'Scroll jumps', deleted: true, merged_into: null });
     expect(await linkRows(C)).toEqual([]);
@@ -193,16 +191,16 @@ describe('27.444 tag and untag', () => {
 });
 
 describe('27.445 concept links', () => {
-  it('27.445 related is stored a < b from either side, broader as written, unlinked from either side; control: unlink broader from the other concept keeps it', async () => {
+  it('27.445 a link is stored as written, related only from the lower id; unlinked removes exactly that row; control: unlinking broader from the other concept keeps it', async () => {
     const [C2, C1] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
     expect(C2 < C1).toBe(true);
     await applyCommitted(db.pool, [cev(C1, 'concept.created', { name: 'One' }), cev(C2, 'concept.created', { name: 'Two' })]);
 
-    // From the HIGHER id: the related row is stored (C2, C1).
-    await applyCommitted(db.pool, [cev(C1, 'concept.linked', { otherId: C2, relation: 'related' })]);
+    // related from C2, the lower id (R1: the door refuses it from C1, 27.450 and 27.459): stored (C2, C1).
+    await applyCommitted(db.pool, [cev(C2, 'concept.linked', { otherId: C1, relation: 'related' })]);
     expect(await linkRows(C1, C2)).toEqual([{ a: C2, b: C1, relation: 'related' }]);
 
-    // The same link again (from the other side) keeps one row.
+    // The same link again (a replayed ledger) keeps one row.
     await applyCommitted(db.pool, [cev(C2, 'concept.linked', { otherId: C1, relation: 'related' })]);
     expect(await linkRows(C1, C2)).toEqual([{ a: C2, b: C1, relation: 'related' }]);
 
@@ -225,23 +223,14 @@ describe('27.445 concept links', () => {
       { a: C2, b: C1, relation: 'related' },
     ]);
 
-    // Unlinked from C1, the HIGHER id: the raw key (C1, C2) is not the stored (C2, C1), so this needs linkKey.
-    await applyCommitted(db.pool, [cev(C1, 'concept.unlinked', { otherId: C2, relation: 'related' })]);
-    expect(await linkRows(C1, C2)).toEqual([{ a: C1, b: C2, relation: 'broader' }]);
-
-    // The other side: linked from C2 (no swap needed), unlinked from C2.
-    await applyCommitted(db.pool, [cev(C2, 'concept.linked', { otherId: C1, relation: 'related' })]);
-    expect(await linkRows(C1, C2)).toEqual([
-      { a: C1, b: C2, relation: 'broader' },
-      { a: C2, b: C1, relation: 'related' },
-    ]);
+    // Unlinked from C2, exactly the related row goes.
     await applyCommitted(db.pool, [cev(C2, 'concept.unlinked', { otherId: C1, relation: 'related' })]);
     expect(await linkRows(C1, C2)).toEqual([{ a: C1, b: C2, relation: 'broader' }]);
   });
 });
 
 describe('27.446 merge', () => {
-  it('27.446 C1 into C2: tags move without duplicates, C1’s links go, C1 is deleted and merged_into C2; C3 is untouched', async () => {
+  it('27.446 C1 into C2 by its sequence: C2 keeps its own tagger, the item C1 alone held is tagged by the merging actor, C1’s rows and links go, C1 is deleted and merged_into C2; C3 is untouched', async () => {
     const [C1, C2, C3] = [newUlid(), newUlid(), newUlid()];
     await applyCommitted(db.pool, [
       cev(C1, 'concept.created', { name: 'Merged' }),
@@ -249,7 +238,7 @@ describe('27.446 merge', () => {
       cev(C3, 'concept.created', { name: 'Third' }),
       cev(C1, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }),
       cev(C1, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE }, 'author', 'mcp'),
-      cev(C2, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }),
+      cev(C2, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'memberIn', 'mcp'),
       cev(C1, 'concept.linked', { otherId: C3, relation: 'broader' }), // stored (C1, C3): C1 as a
       cev(C3, 'concept.linked', { otherId: C1, relation: 'broader' }), // stored (C3, C1): C1 as b
       cev(C3, 'concept.linked', { otherId: C2, relation: 'broader' }), // names no C1: the control
@@ -257,11 +246,20 @@ describe('27.446 merge', () => {
     // Something for "no links" to remove, at both ends.
     expect(await linkRows(C1)).toHaveLength(2);
 
-    await applyCommitted(db.pool, [cev(C1, 'concept.merged', { intoId: C2 })]);
+    // The sequence (`concepts/merge.ts`), posted by the admin over the web: C2 lacks only TE.
+    const steps = await conceptMergeSteps(db.pool, world.WS, C1, C2);
+    expect(steps.map((s) => [s.entity.id, s.type, s.payload])).toEqual([
+      [C2, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE }],
+      [C1, 'concept.merged', { intoId: C2 }],
+    ]);
+    await applyCommitted(
+      db.pool,
+      steps.map((s) => makeCommitted({ workspaceId: world.WS, actorId: world.ids.admin, entity: s.entity, type: s.type, payload: s.payload })),
+    );
 
     const expected = [
-      { workspace_id: world.WS, item_kind: 'ticket', item_id: world.TE, tagged_by: world.ids.author, origin: 'mcp' },
-      { workspace_id: world.WS, item_kind: 'ticket', item_id: world.TP, tagged_by: world.ids.owner, origin: 'web' },
+      { workspace_id: world.WS, item_kind: 'ticket', item_id: world.TE, tagged_by: world.ids.admin, origin: 'web' },
+      { workspace_id: world.WS, item_kind: 'ticket', item_id: world.TP, tagged_by: world.ids.memberIn, origin: 'mcp' },
     ].sort((x, y) => x.item_id.localeCompare(y.item_id));
     expect(await itemRows(C2)).toEqual(expected);
     expect(await itemRows(C1)).toEqual([]);
