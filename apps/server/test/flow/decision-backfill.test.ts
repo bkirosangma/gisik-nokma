@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import {
@@ -119,4 +124,61 @@ describe('29.143 the Decision backfill', () => {
     expect([quick(), quick()]).toEqual([300, 300]); // never later than the interval
     expect(() => firstThenEvery(0, 30_000)()).toThrow('DECISION_BACKFILL_INTERVAL_MS');
   });
+
+  it('29.143 the spawned CLI: --dry-run lists the candidates and writes nothing, a run defines and exits 0, a refusal exits 1 naming the workspace, no DATABASE_URL exits 2, and importing the module runs nothing', async () => {
+    // A process, not an import of main: the entry guard, the DATABASE_URL read and the exit code only exist when it runs as a CLI.
+    const serverDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
+    const spawnTsx = (args: string[], env: NodeJS.ProcessEnv) => spawnSync('pnpm', ['exec', 'tsx', ...args], { cwd: serverDir, encoding: 'utf8', env, timeout: 90_000 });
+    const cli = (...flags: string[]) => spawnTsx(['src/tools/backfill-decision-type.ts', ...flags], { ...process.env, DATABASE_URL: db.url });
+    const line = (stdout: string, msg: string): Record<string, unknown> | undefined => stdout.split('\n').flatMap((l) => {
+      try { return [JSON.parse(l) as Record<string, unknown>]; } catch { return []; }
+    }).find((entry) => entry['msg'] === msg);
+    const ws = newUlid();
+    await seedLegacy(ws);
+
+    const dry = cli('--dry-run');
+    expect(dry.status, dry.stderr).toBe(0);
+    expect(line(dry.stdout, 'decision backfill dry run')).toEqual({ msg: 'decision backfill dry run', candidates: [{ workspaceId: ws, workflowId: `wf-main-${ws}` }] });
+    expect(line(dry.stdout, 'decision backfill complete')).toBeUndefined();
+    expect(await decisionEvents(ws)).toEqual([]); // the dry run wrote nothing
+
+    // Import safety: loading the module must not run main(). `tsx -e` has no `argv[1]`, and a script FILE has one that is not the
+    // CLI's, so the entry guard is read in both its halves; DATABASE_URL is set, so a main() that ran would write the definition.
+    const imported = spawnTsx(['-e', "import('./src/tools/backfill-decision-type.ts').then(() => console.log('imported-only'))"], { ...process.env, DATABASE_URL: db.url });
+    expect(imported.status, imported.stderr).toBe(0);
+    expect(imported.stdout.trim()).toBe('imported-only');
+    const scratch = mkdtempSync(join(tmpdir(), 'decision-backfill-import-'));
+    try {
+      const entry = join(scratch, 'import-only.mts');
+      writeFileSync(entry, `await import(${JSON.stringify(pathToFileURL(join(serverDir, 'src/tools/backfill-decision-type.ts')).href)});\nconsole.log('imported-only');\n`);
+      const viaFile = spawnTsx([entry], { ...process.env, DATABASE_URL: db.url });
+      expect(viaFile.status, viaFile.stderr).toBe(0);
+      expect(viaFile.stdout.trim()).toBe('imported-only');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+    expect(await decisionEvents(ws)).toEqual([]); // control for both imports: the run below, same database, does write
+
+    const run = cli();
+    expect(run.status, run.stderr).toBe(0);
+    expect(line(run.stdout, 'decision backfill complete')).toEqual({ msg: 'decision backfill complete', candidates: 1, defined: 1, refused: 0, alreadyHad: 0 });
+    expect(await decisionRows(ws)).toEqual([expect.objectContaining({ workflow_id: `wf-main-${ws}`, defined_by: SYSTEM_ACTOR_FLOW })]);
+
+    // A real refusal from the real door: a workspace the purge has erased (`purged_entities`) is refused `purged` by
+    // `checkPurged`, while no lifecycle row excludes it from the candidates.
+    const gone = newUlid();
+    await seedLegacy(gone);
+    await db.pool.query(`INSERT INTO purged_entities (entity_kind, entity_id, workspace_id, purged_at) VALUES ('workspace', $1, $1, now())`, [gone]);
+    const refused = cli();
+    expect(refused.status).toBe(1);
+    expect(line(refused.stdout, 'decision backfill complete')).toEqual({ msg: 'decision backfill complete', candidates: 1, defined: 0, refused: 1, alreadyHad: 1 });
+    expect(refused.stderr).toContain(`decision backfill refused for workspace ${gone}`);
+    expect(await decisionRows(gone)).toEqual([]);
+
+    const env = { ...process.env };
+    delete env['DATABASE_URL'];
+    const unset = spawnTsx(['src/tools/backfill-decision-type.ts'], env);
+    expect(unset.status).toBe(2);
+    expect(unset.stderr).toContain('DATABASE_URL is required');
+  }, 120_000);
 });

@@ -8,6 +8,12 @@ import { createObjectStoreFromEnv } from '../attachments/store-config.js';
 import { runAutoCloseSweep } from '../auto-close/sweep.js';
 import { ConfigError } from '../config.js';
 import { createPool } from '../db.js';
+import {
+  backfillDecisionType,
+  decisionBackfillIntervalMs,
+  DECISION_BACKFILL_BOOT_DELAY_MS,
+  firstThenEvery,
+} from '../flow/decision-backfill.js';
 import { createIngestService } from '../ingest/ingest-service.js';
 import { runNotificationSweep } from '../notifications/sweep.js';
 import { requireExplicitObjectStore, runPurgeSweep } from '../purge/sweep.js';
@@ -193,6 +199,10 @@ async function main(): Promise<void> {
   // and empty-means-unset handling as the sweeps above, default one day.
   const sessionSweepIntervalMs = readSessionSweepIntervalMs(process.env);
 
+  // The Decision-type backfill (wtg-part2-model T7, spec DC-3): the same read-once, validate-on-every-call shape
+  // and empty-means-unset handling as the sweeps above, default one day.
+  const decisionBackfillEveryMs = decisionBackfillIntervalMs(process.env);
+
   // The auto-close sweep closes tickets, so it needs a door to close them
   // THROUGH — the same composition `seed/cli-seed-dev-workspace.ts` uses, built
   // here rather than there because this is the process that runs it on a timer.
@@ -307,6 +317,18 @@ async function main(): Promise<void> {
         await runExpiredSessionSweep(pool, new Date(), (entry) => console.log(JSON.stringify(entry)));
       },
       delayMs: () => requirePositiveIntervalMs(sessionSweepIntervalMs, 'SESSION_SWEEP_INTERVAL_MS'),
+    },
+    {
+      // Spec DC-3: the Decision type for workspaces founded before the seed existed. Boot + daily, idempotent.
+      name: 'decision-backfill',
+      run: async (): Promise<void> => {
+        const report = await backfillDecisionType({ pool, ingest });
+        console.log(JSON.stringify({ msg: 'decision backfill complete', ...report }));
+      },
+      // ONE closure, created here: its `first` flag must survive `startScheduler`'s up-front `delayMs()` call and every
+      // re-arm, so only the first run lands at the boot delay. Building the closure inside an arrow called per delay would
+      // mint a fresh flag on every call and re-run the job every 30 s forever (29.143 pins this shape).
+      delayMs: firstThenEvery(decisionBackfillEveryMs, DECISION_BACKFILL_BOOT_DELAY_MS),
     },
   ];
 
