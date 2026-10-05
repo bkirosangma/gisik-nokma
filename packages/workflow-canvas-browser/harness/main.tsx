@@ -20,9 +20,18 @@ const themeTag = document.createElement('style');
 themeTag.textContent = themeStylesheet();
 document.head.appendChild(themeTag);
 
-const initialDraft = draftFromTemplate(template);
-const WORKSPACE_ID = 'ws1';
-const session: BuilderSession = { userId: 'u1', role: (params.get('role') || 'owner') as BuilderSession['role'] };
+/**
+ * G-9 T5 (planner ruling 2026-10-04 Q3): `?stableDraft=1` gives the draft this FIXED id, so a reload reads the same storage key (25.556).
+ * Opt-in: by default every load mints a fresh id, so a second `openHarness` in one test never restores the first one's stored draft
+ * (E5-41), which 25.526 and 25.541 rely on.
+ */
+const HARNESS_DRAFT_ID = 'harness-draft';
+const fresh = draftFromTemplate(template);
+const initialDraft = params.get('stableDraft') === '1' ? { ...fresh, def: { ...fresh.def, id: HARNESS_DRAFT_ID } } : fresh;
+// Fixed ULIDs (G-9 T5): Publish runs the event through the shipped envelope schema (the fake gateway's `submit`), which refuses a
+// workspace or actor id that is not a ULID; fixed, so a reload reads the same storage key.
+const WORKSPACE_ID = '01JA0000000000000000000000';
+const session: BuilderSession = { userId: '01JA0000000000000000000001', role: (params.get('role') || 'owner') as BuilderSession['role'] };
 
 // The draft the screen persists on every change: a test reads positions from here, which is the store's own state.
 (window as unknown as { __draftPositions: () => unknown }).__draftPositions = () =>

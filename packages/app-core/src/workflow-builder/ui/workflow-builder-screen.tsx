@@ -87,6 +87,9 @@ function useMediaQuery(query: string): boolean {
   );
 }
 
+/** The gap between the floating toolbar's bottom and the floating panel's top, in px (the toolbar's own 0.75rem inset). */
+const PANEL_CLEARANCE = 12;
+
 function readSession(key: string): string | null {
   try {
     return window.sessionStorage.getItem(key);
@@ -327,6 +330,26 @@ export function WorkflowBuilderScreen(props: {
     { open: fullscreen, close: exitFullScreen },
   ]);
 
+  // The floating panel starts below the floating toolbar, which wraps at narrower widths: its bottom, measured, is the panel's top.
+  const layoutRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    const layout = layoutRef.current;
+    if (!fullscreen || toolbar === null || layout === null || typeof ResizeObserver === 'undefined') return;
+    const place = () => {
+      const below = toolbar.getBoundingClientRect().bottom - layout.getBoundingClientRect().top;
+      layout.style.setProperty('--gn-wf-panel-top', `${Math.max(0, Math.round(below)) + PANEL_CLEARANCE}px`);
+    };
+    const observer = new ResizeObserver(place);
+    observer.observe(toolbar);
+    observer.observe(layout);
+    place();
+    return () => {
+      observer.disconnect();
+      layout.style.removeProperty('--gn-wf-panel-top');
+    };
+  }, [fullscreen, data]);
+
   useEffect(() => {
     const target = focusAfterToggle.current;
     focusAfterToggle.current = null;
@@ -498,7 +521,7 @@ export function WorkflowBuilderScreen(props: {
             </div>
           )}
         </header>
-        <div className="workflow-builder-screen__layout">
+        <div className="workflow-builder-screen__layout" ref={layoutRef}>
           {panelsOpen ? <div className="workflow-builder-screen__scrim" aria-hidden="true" onClick={closePanels} /> : null}
           <aside
             id="workflow-builder-panels"

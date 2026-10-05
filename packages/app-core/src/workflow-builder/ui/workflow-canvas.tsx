@@ -253,7 +253,7 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void; fullScr
         <Background />
         <CanvasOverlays guides={guides} outline={outline} />
         <Panel position="bottom-left">
-          {/* G-9 T4: Tidy sits beside Fit to screen; it renders nothing for a viewer. T5: Full screen too, for every role. */}
+          {/* G-9 T4: Tidy sits beside Fit to screen; it renders nothing for a viewer. */}
           <div className="gn-workflow-canvas__corner">
             <button
               type="button"
@@ -263,13 +263,17 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void; fullScr
               Fit to screen
             </button>
             <TidyControl sizes={() => measuredSizes(getNodes())} />
-            {props.fullScreen ? (
-              <button type="button" ref={props.fullScreen.buttonRef} className="gn-workflow-canvas__fit" onClick={props.fullScreen.onEnter}>
-                Full screen
-              </button>
-            ) : null}
           </div>
         </Panel>
+        {/* G-9 T5: the canvas's own way into full screen, for every role, in the opposite corner from the board's bottom-left controls
+            (a wider bottom-left strip covered states dragged down beside it). Absent in full screen, where the toolbar has Exit. */}
+        {props.fullScreen ? (
+          <Panel position="top-right">
+            <button type="button" ref={props.fullScreen.buttonRef} className="gn-workflow-canvas__fit" onClick={props.fullScreen.onEnter}>
+              Full screen
+            </button>
+          </Panel>
+        ) : null}
       </ReactFlow>
       <div className="gn-visually-hidden" aria-live="polite">
         {blocked}

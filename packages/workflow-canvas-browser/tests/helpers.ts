@@ -1,7 +1,8 @@
 import type { Page } from '@playwright/test';
 
-export async function openHarness(page: Page, opts: { phone?: boolean; role?: string; seed?: string } = {}) {
+export async function openHarness(page: Page, opts: { phone?: boolean; role?: string; seed?: string; stableDraft?: boolean } = {}) {
   const q = new URLSearchParams({ phone: opts.phone ? '1' : '0', role: opts.role ?? 'owner', seed: opts.seed ?? '' });
+  if (opts.stableDraft) q.set('stableDraft', '1');
   if (opts.phone) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/?${q}`);
   await page.locator('.react-flow__node').first().waitFor();

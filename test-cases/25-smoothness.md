@@ -365,12 +365,12 @@ Full-screen editing, the floating toolbar and panel, the Escape ladder, the phon
 - ✅ **25.548 — the Escape ladder closes the innermost layer first: an open rule menu, then the panel, then full screen; a prevented Escape is left alone, a popover closes alone, and with nothing open one Escape exits.**
 - ✅ **25.549 — in full screen a selection opens the floating panel on the Selection tab at every width, the Issues badge opens the Issues tab, and × closes it; control: outside full screen no panel opens.**
 - ✅ **25.550 — the panel is an `aside` region labelled "Workflow panel", not a dialog, and nothing over the canvas is `inert` or `aria-hidden`.**
-- ❌ **25.551 — in Chromium full screen covers the window, keeps the viewport transform, and every toolbar control works; Exit restores the normal box.**
-- ❌ **25.552 — a member can enter full screen and is offered no Add state, Add transition or Tidy anywhere; control first: the owner is.**
-- ❌ **25.553 — a drag inside full screen moves the state live with its arrow.**
-- ❌ **25.554 — on a 390×844 touch phone the toolbar row is name, Add state, Add transition, Publish, More and Exit; a tap on a state opens a bottom sheet; a touch drag moves a state live.**
-- ❌ **25.555 — in Chromium at 700 px wide, Escape closes the More menu, then the panel, then full screen.**
-- ❌ **25.556 — a reload in the same tab keeps full screen on (`?stableDraft=1`); control: after Exit a reload keeps it off.**
+- ✅ **25.551 — in Chromium full screen covers the window, keeps the viewport transform, and every toolbar control works; Exit restores the normal box.**
+- ✅ **25.552 — a member can enter full screen and is offered no Add state, Add transition or Tidy anywhere; control first: the owner is.**
+- ✅ **25.553 — a drag inside full screen moves the state live with its arrow.**
+- ✅ **25.554 — on a 390×844 touch phone the toolbar row is name, Add state, Add transition, Publish, More and Exit; a tap on a state opens a bottom sheet; a touch drag moves a state live.**
+- ✅ **25.555 — in Chromium at 700 px wide, Escape closes the More menu, then the panel, then full screen.**
+- ✅ **25.556 — a reload in the same tab keeps full screen on (`?stableDraft=1`); control: after Exit a reload keeps it off.**
 
 ## 25.42 The phone ticket-sheet header compacts with the scroll, with no jitter (G-8)
 

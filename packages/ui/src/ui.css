@@ -4288,7 +4288,7 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   box-shadow: var(--gn-shadow-near-lg);
 }
 .gn-wf-toolbar .workflow-builder-screen__name { width: 12rem; min-height: 2.75rem; font-size: 1rem; font-weight: 600; line-height: 1.25; }
-.gn-wf-toolbar .gn-button { min-height: 2.75rem; }
+.gn-wf-toolbar .gn-button { min-height: 2.75rem; white-space: nowrap; }
 .gn-wf-toolbar__zoom { display: inline-flex; gap: 0.125rem; }
 .gn-wf-toolbar__zoom .gn-button { min-width: 2.75rem; justify-content: center; }
 /* The Issues badge: the validator's count in a pill, tinted danger while it blocks Publish. */
@@ -4333,10 +4333,11 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-wf-more__item:hover,
 .gn-wf-more .gn-tidy .gn-button:hover { background: var(--gn-fill-tertiary); }
 .gn-wf-more__item:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
-/* The floating panel (spec §4.3): a raised card over the right of the canvas, under the toolbar's row; its width is inline (280–480). */
+/* The floating panel (spec §4.3): a raised card over the right of the canvas, its width inline (280–480). Its top clears the toolbar,
+   which wraps to two rows below ~1100px: the screen measures the toolbar's bottom into `--gn-wf-panel-top` on the layout. */
 .gn-wf-panel {
   position: absolute;
-  top: 4.5rem;
+  top: var(--gn-wf-panel-top, 4.5rem);
   right: 0.75rem;
   bottom: 0.75rem;
   z-index: 4;
@@ -4365,7 +4366,7 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-wf-panel__resize:focus-visible::after { background: var(--gn-accent); }
 .gn-wf-panel__resize:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
 .gn-wf-panel__head { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 0.75rem 0.5rem; }
-.gn-wf-panel__tabs { flex: 1 1 auto; min-width: 0; }
+.gn-wf-panel__tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
 .gn-wf-panel__close {
   flex: none;
   min-width: 2.75rem;
@@ -4404,9 +4405,10 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   padding-bottom: env(safe-area-inset-bottom);
   border-radius: var(--gn-radius-track) var(--gn-radius-track) 0 0;
 }
+/* On a phone the toolbar's rows would cover a third of the canvas, so it sits in flow above it, full width. */
 @media (max-width: 40rem) {
   .workflow-builder-screen__actions > .workflow-builder-screen__fullscreen { flex: 1 1 0; min-height: 2.75rem; }
-  .gn-wf-toolbar { right: 0.5rem; left: 0.5rem; width: auto; max-width: none; transform: none; }
+  .gn-wf-toolbar { position: static; width: auto; max-width: none; margin: 0.5rem; transform: none; }
   .gn-wf-toolbar .workflow-builder-screen__name { flex: 1 1 100%; width: auto; }
 }
 
