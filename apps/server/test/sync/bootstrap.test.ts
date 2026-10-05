@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import {
   applyTicketEvent,
   newSubmittedEvent,
@@ -842,7 +842,9 @@ describe('GET /v1/sync/bootstrap', () => {
  * current one derives (work periods since T9). Until this process's boot restate pass has settled
  * (`bootRestate.complete`), `bootstrapTicket` refuses it (`SnapshotRestatePending`) and both routes answer 503, which
  * the client's pull drain keeps owed; after the pass such a row is a restate that failed, served as stored and named in
- * a warning. 29.404 (the flag and the writer) is in `snapshot-fold-version.test.ts`.
+ * a warning, unless it was created after the pass read its due set (`bootRestate.dueAt`, 29.406-29.409 below). These
+ * cases leave `dueAt` null, the value a pass that failed before its clock read publishes. 29.404 (the flag and the
+ * writer) is in `snapshot-fold-version.test.ts`.
  *
  * Each case seeds its own workspace (`fvWorkspace`) through the real ingest door, as WS3 is seeded, so the routes'
  * gates and the device's reconcile meet a ticket the member may open, and 29.403 controls every ticket in the
@@ -929,6 +931,15 @@ async function fvTicket(
     expect(result).toMatchObject({ status: 'committed' });
   }
   if (foldVersion === null) return { ticketId, rowState: null };
+  return { ticketId, rowState: await fvPlant(world, ticketId, foldVersion) };
+}
+
+/**
+ * Plants `ticketId`'s snapshot row at `FV_CUT`, stamped `foldVersion`, and returns its state. `createdAt` binds
+ * `snapshots.created_at` (the column default, the insert's own clock, when omitted): 29.406-29.409 plant a row as an
+ * old instance would write it during a rolling deploy, on either side of the boot pass's instant.
+ */
+async function fvPlant(world: FvWorkspace, ticketId: string, foldVersion: number, createdAt?: Date): Promise<Record<string, unknown>> {
   const folded = await fvFold(world, ticketId, FV_CUT);
   if (folded.periods?.length !== 1) throw new Error('fixture: the fold up to the cut holds one period');
   // A row from an older fold has that fold's shape: no work periods and no rounds (T9's members).
@@ -938,10 +949,11 @@ async function fvTicket(
     delete row['rounds'];
   }
   await db.pool.query(
-    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version) VALUES ('ticket', $1, $2, $3, NULL, $4)`,
-    [ticketId, FV_CUT, JSON.stringify(row), foldVersion],
+    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version, created_at)
+       VALUES ('ticket', $1, $2, $3, NULL, $4, COALESCE($5::timestamptz, now()))`,
+    [ticketId, FV_CUT, JSON.stringify(row), foldVersion, createdAt ?? null],
   );
-  return { ticketId, rowState: row };
+  return row;
 }
 
 async function withClient<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -1063,6 +1075,7 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
   beforeEach(() => {
     warnings = [];
     bootRestate.complete = false;
+    bootRestate.dueAt = null;
     bootRestate.warn = (msg) => {
       warnings.push(msg);
     };
@@ -1094,7 +1107,7 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
     expect(warnings).toEqual([]);
   });
 
-  it('29.401 once the boot pass has settled, a stale row is a restate that failed: served as stored, with one warning naming the ticket; controls: a current row and a later fold are served with none', async () => {
+  it('29.401 once the boot pass has settled, a stale row (no dueAt published) is a restate that failed: served as stored, with one warning naming the ticket; controls: a current row and a later fold are served with none', async () => {
     const world = await fvWorkspace();
     const current = await fvTicket(world, TICKET_FOLD_VERSION);
     const later = await fvTicket(world, TICKET_FOLD_VERSION + 1);
@@ -1224,6 +1237,246 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
       expect(res.statusCode).toBe(500);
       expect(res.body).not.toContain(SNAPSHOT_RESTATE_PENDING);
     }
+    expect(warnings).toEqual([]);
+  });
+});
+
+/**
+ * Cases 29.406-29.409 (wtg2 fold-version overlap, planner ruling E 2026-10-05, its instant re-pinned at 17:52 on the
+ * lane's question). A rolling deploy runs the OLD instance's interval writer beside the new one, and it writes rows
+ * stamped with the old fold (the column default, 1). Such a row written after the new instance's boot pass read its due
+ * set was never seen by that pass, so it is not a restate that failed: served as stored, a schema-5 device would clear
+ * its owed pull on it and never pull again. The boot pass therefore publishes `bootRestate.dueAt`, the database clock
+ * read just before its due query; after the pass a stale row whose `created_at` is LATER than `dueAt` is refused as
+ * before the pass, and the next interval pass restates it. One at or before `dueAt` is a failed restate, served as
+ * stored with the warning (ruling D).
+ *
+ * 29.406 and 29.407 set the flag by hand, as 29.401 does; 29.406's second leg, 29.408 and 29.409 run the real writer.
+ */
+describe('29.406-29.409 a stale row written after the boot pass read its due set is an old instance\'s, not a failed restate', () => {
+  let warnings: string[] = [];
+  const collectWarnings = (): void => {
+    bootRestate.warn = (msg) => {
+      warnings.push(msg);
+    };
+  };
+  beforeEach(() => {
+    warnings = [];
+    bootRestate.complete = false;
+    bootRestate.dueAt = null;
+    collectWarnings();
+  });
+  afterAll(() => {
+    for (const engine of fvEngines.splice(0)) engine.stop();
+  });
+
+  /** The boot pass as `index.ts` starts it, on `pool`, run to settled; returns the `dueAt` it published. */
+  async function fvBootPass(pool: Pool = db.pool): Promise<Date> {
+    const log: string[] = [];
+    const stop = startSnapshotWriter(pool, { intervalMs: 3_600_000, minEvents: STALE_ONLY, immediate: true, log: (msg) => log.push(msg) });
+    try {
+      await vi.waitFor(() => {
+        expect(bootRestate.complete).toBe(true);
+      }, { timeout: 20_000 });
+    } finally {
+      stop();
+    }
+    expect(log).toEqual([]);
+    // The writer points `warn` at its own log; these cases collect it here instead.
+    collectWarnings();
+    const at = bootRestate.dueAt;
+    if (!(at instanceof Date)) throw new Error('fixture: the settled boot pass published its dueAt');
+    return at;
+  }
+
+  const shift = (at: Date, ms: number): Date => new Date(at.getTime() + ms);
+  const setCreatedAt = (ticketId: string, at: Date) =>
+    db.pool.query(`UPDATE snapshots SET created_at = $2 WHERE entity_kind = 'ticket' AND entity_id = $1`, [ticketId, at]);
+  const refusalOf = (ticketId: string) =>
+    withClient(async (client) => bootstrapTicket(client, ticketId, targetSight(client, memberId)).catch((err: unknown) => err));
+
+  it('29.406 after the boot pass, a stale row created after its dueAt is refused (SnapshotRestatePending, both bootstrap routes 503); control: the same row created before dueAt is served as stored with one warning; a row an old instance writes during a real pass, after its due query, is refused; and interval passes settling after the boot pass leave its dueAt standing', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    const dueAt = new Date((await db.pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t.getTime() - 60_000);
+    bootRestate.dueAt = dueAt;
+    bootRestate.complete = true;
+    const rowState = await fvPlant(world, ticketId, TICKET_FOLD_VERSION - 1, shift(dueAt, 1_000));
+    // The premise: the row is stale and later than dueAt.
+    expect(await readLatestSnapshot(db.pool, 'ticket', ticketId)).toMatchObject({ seq: FV_CUT, foldVersion: TICKET_FOLD_VERSION - 1, createdAt: shift(dueAt, 1_000) });
+
+    const refusal = await refusalOf(ticketId);
+    expect(refusal).toBeInstanceOf(SnapshotRestatePending);
+    expect((refusal as SnapshotRestatePending).ticketId).toBe(ticketId);
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/sync/bootstrap/ticket?workspaceId=${world.workspaceId}&ticketId=${ticketId}`,
+      headers: memberHeaders,
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: SNAPSHOT_RESTATE_PENDING });
+    // The workspace door holds the same ticket, so it refuses the whole request.
+    const whole = await app.inject({ method: 'GET', url: `/v1/sync/bootstrap?workspaceId=${world.workspaceId}`, headers: memberHeaders });
+    expect(whole.statusCode).toBe(503);
+    expect(whole.json()).toEqual({ error: SNAPSHOT_RESTATE_PENDING });
+    expect(warnings).toEqual([]);
+    expect(await snapshotRows(ticketId)).toBe(1);
+
+    // Control: the same row, created a second BEFORE dueAt, is a restate that failed.
+    await setCreatedAt(ticketId, shift(dueAt, -1_000));
+    await withClient(async (client) => {
+      const served = await bootstrapTicket(client, ticketId, targetSight(client, memberId));
+      expect(served.snapshot?.seq).toBe(FV_CUT);
+      expect(served.snapshot?.state).toEqual(rowState);
+    });
+    expect(warnings).toEqual([staleServedWarning(ticketId)]);
+
+    // The real pass: an old instance writes a stale row (the column's own clock) the moment the boot pass's due query
+    // returns, so the pass never sees it. The seam is a pool whose due query plants the row before it answers.
+    const late = await fvTicket(world, null);
+    let planted = 0;
+    const oldInstance = new Proxy(db.pool, {
+      get(pool, prop) {
+        if (prop === 'query') {
+          return async (...args: unknown[]): Promise<unknown> => {
+            const result = await (pool.query as (...a: unknown[]) => Promise<unknown>).apply(pool, args);
+            if (typeof args[0] === 'string' && args[0].includes('FROM events e') && planted === 0) {
+              planted += 1;
+              // A margin past the clock read: without it the row lands 1-2 ms after dueAt (measured), and a gap under
+              // a millisecond truncates to equal and is served. The order, not the margin, is what this leg pins.
+              await pool.query('SELECT pg_sleep(0.02)');
+              await fvPlant(world, late.ticketId, TICKET_FOLD_VERSION - 1);
+            }
+            return result;
+          };
+        }
+        const value = Reflect.get(pool, prop) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(pool) : value;
+      },
+    });
+    bootRestate.complete = false;
+    bootRestate.dueAt = null;
+    warnings = [];
+    const realDueAt = await fvBootPass(oldInstance);
+    expect(planted).toBe(1);
+    expect(await refusalOf(late.ticketId)).toBeInstanceOf(SnapshotRestatePending);
+    expect(warnings).toEqual([]);
+    // Why: the pass left the row stale, and it was created after the pass read its clock.
+    const row = await readLatestSnapshot(db.pool, 'ticket', late.ticketId);
+    expect(row?.foldVersion).toBe(TICKET_FOLD_VERSION - 1);
+    expect(row!.createdAt.getTime()).toBeGreaterThan(realDueAt.getTime());
+
+    // The instant is the BOOT pass's: interval passes that settle after it read no clock and publish nothing, so once
+    // they have run a row created after it is still refused.
+    bootRestate.complete = false;
+    bootRestate.dueAt = null;
+    let dueQueries = 0;
+    const ticking = new Proxy(db.pool, {
+      get(pool, prop) {
+        if (prop === 'query') {
+          return async (...args: unknown[]): Promise<unknown> => {
+            if (typeof args[0] === 'string' && args[0].includes('FROM events e')) dueQueries += 1;
+            return (pool.query as (...a: unknown[]) => Promise<unknown>).apply(pool, args);
+          };
+        }
+        const value = Reflect.get(pool, prop) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(pool) : value;
+      },
+    });
+    const tickLog: string[] = [];
+    const stopTicking = startSnapshotWriter(ticking, { intervalMs: 20, minEvents: STALE_ONLY, immediate: true, log: (msg) => tickLog.push(msg) });
+    let bootDueAt: Date | null = null;
+    try {
+      await vi.waitFor(() => {
+        expect(bootRestate.complete).toBe(true);
+      }, { timeout: 20_000 });
+      bootDueAt = bootRestate.dueAt;
+      const atSettle = dueQueries;
+      // Two more passes started after the boot pass settled.
+      await vi.waitFor(() => {
+        expect(dueQueries).toBeGreaterThanOrEqual(atSettle + 2);
+      }, { timeout: 10_000, interval: 20 });
+    } finally {
+      stopTicking();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300)); // the later passes in flight settle
+    collectWarnings();
+    expect(tickLog).toEqual([]);
+    expect(bootDueAt).toBeInstanceOf(Date);
+    expect(bootRestate.dueAt).toBe(bootDueAt);
+    const afterBoot = await fvTicket(world, null);
+    await fvPlant(world, afterBoot.ticketId, TICKET_FOLD_VERSION - 1, shift(bootDueAt!, 1_000));
+    expect(await refusalOf(afterBoot.ticketId)).toBeInstanceOf(SnapshotRestatePending);
+    expect(warnings).toEqual([]);
+  });
+
+  it('29.407 a stale row created exactly at dueAt is served as stored (the refusal is strictly later: a millisecond after it is refused)', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    const dueAt = new Date((await db.pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t.getTime() - 60_000);
+    bootRestate.dueAt = dueAt;
+    bootRestate.complete = true;
+    await fvPlant(world, ticketId, TICKET_FOLD_VERSION - 1, dueAt);
+    // The premise: dueAt survives the round trip through timestamptz unchanged, so this IS the equal case.
+    expect((await readLatestSnapshot(db.pool, 'ticket', ticketId))?.createdAt.getTime()).toBe(dueAt.getTime());
+    await withClient(async (client) => {
+      expect((await bootstrapTicket(client, ticketId, targetSight(client, memberId))).snapshot?.seq).toBe(FV_CUT);
+    });
+    expect(warnings).toEqual([staleServedWarning(ticketId)]);
+
+    // A millisecond later is refused: the refusal starts at the first instant after dueAt, not at some tolerance past it.
+    await setCreatedAt(ticketId, shift(dueAt, 1));
+    expect((await readLatestSnapshot(db.pool, 'ticket', ticketId))?.createdAt.getTime()).toBe(dueAt.getTime() + 1);
+    expect(await refusalOf(ticketId)).toBeInstanceOf(SnapshotRestatePending);
+    expect(warnings).toEqual([staleServedWarning(ticketId)]);
+  });
+
+  it('29.408 dueAt is read on the database clock: with the app clock an hour ahead during the pass, a row created a second after it is still refused', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    // Only `Date` is faked: real timers keep `vi.waitFor`, the writer's interval and pg moving.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    let dueAt: Date;
+    try {
+      vi.setSystemTime(new Date(Date.now() + 3_600_000));
+      dueAt = await fvBootPass();
+    } finally {
+      vi.useRealTimers();
+    }
+    // The premise: dueAt sits on the database's clock, not an hour ahead of it.
+    const { rows } = await db.pool.query<{ t: Date }>('SELECT now() AS t');
+    expect(Math.abs(rows[0]!.t.getTime() - dueAt.getTime())).toBeLessThan(60_000);
+
+    await fvPlant(world, ticketId, TICKET_FOLD_VERSION - 1, shift(dueAt, 1_000));
+    expect(await refusalOf(ticketId)).toBeInstanceOf(SnapshotRestatePending);
+    expect(warnings).toEqual([]);
+  });
+
+  it('29.409 end to end: a schema-5 device pulling a row an old instance wrote after the boot pass is refused and stays owed; the next interval pass restates the row and the retry confirms the full fold\'s periods', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    const want = (await fvFold(world, ticketId)).periods;
+    expect(want).toHaveLength(2);
+    const dueAt = await fvBootPass();
+    await fvPlant(world, ticketId, TICKET_FOLD_VERSION - 1, shift(dueAt, 1_000));
+    const device = await preDeployDevice(world, ticketId);
+    expect(await periodsOn(device, ticketId)).toHaveLength(1);
+    expect(await owed(device, world)).toEqual([ticketId]);
+
+    const { catchUp } = await engineOnRoutes(world, device);
+    await catchUp();
+    expect(await owed(device, world)).toEqual([ticketId]);
+    expect(await periodsOn(device, ticketId)).toHaveLength(1);
+    expect(warnings).toEqual([]);
+
+    // The next interval pass: the row is due (its fold is old), and the ticket is restated from its full history at its head.
+    const head = (await readEntityEvents(db.pool, 'ticket', ticketId)).at(-1)?.seq;
+    expect((await runSnapshotPass(db.pool, { minEvents: STALE_ONLY })).written).toContainEqual({ entityId: ticketId, seq: head });
+    expect(await readLatestSnapshot(db.pool, 'ticket', ticketId)).toMatchObject({ seq: head, foldVersion: TICKET_FOLD_VERSION });
+
+    await catchUp();
+    expect(await owed(device, world)).toEqual([]);
+    expect(await periodsOn(device, ticketId)).toEqual(want);
     expect(warnings).toEqual([]);
   });
 });

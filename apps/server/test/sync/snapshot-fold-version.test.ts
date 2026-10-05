@@ -349,7 +349,8 @@ describe('29.355 snapshot fold versions', () => {
  * `bootRestate.complete` when it SETTLES, however it ends. A ticket whose restate throws is logged by id and does not
  * stop the pass, because once the flag is set a stale row left behind is served as stored, without its periods: a
  * stale ticket sorting AFTER the throwing one must still be restated. A pass that fails outright (before any ticket)
- * sets the flag too, after its failure is logged. Last in the file: the poisoned ticket stays stale, and a plain
+ * sets the flag too, after its failure is logged. With the flag it publishes `bootRestate.dueAt` (wtg2 fold-version
+ * overlap): the database clock it read before its due query, or null when the pass failed before that read. Last in the file: the poisoned ticket stays stale, and a plain
  * `runSnapshotPass` after this case would throw on it.
  */
 describe('29.404 the boot restate flag', () => {
@@ -368,6 +369,7 @@ describe('29.404 the boot restate flag', () => {
     await plant(AFTER_POISON, 3, await foldPrefix(AFTER_POISON, 3, newest), true);
 
     bootRestate.complete = false;
+    bootRestate.dueAt = null;
     const logged: string[] = [];
     const stop = startSnapshotWriter(db.pool, { intervalMs: 3_600_000, minEvents: 1_000_000, immediate: true, log: (msg) => logged.push(msg) });
     expect(bootRestate.complete).toBe(false); // control: started is not settled
@@ -378,6 +380,8 @@ describe('29.404 the boot restate flag', () => {
     } finally {
       stop();
     }
+    // The boot pass published the database clock it read before its due query (wtg2 fold-version overlap).
+    expect(bootRestate.dueAt).toBeInstanceOf(Date);
     expect(logged).toEqual([`snapshot pass: ticket ${POISON} failed: Error: applyTicketEvent: workflow "wf-snap" has no state "nowhere"`]);
     expect([(await readLatestSnapshot(db.pool, 'ticket', POISON))?.foldVersion, (await readLatestSnapshot(db.pool, 'ticket', AFTER_POISON))?.foldVersion]).toEqual([
       TICKET_FOLD_VERSION - 1,
@@ -399,6 +403,8 @@ describe('29.404 the boot restate flag', () => {
 
     // The pass rejects before any ticket (its due query fails): the flag is still set, after the failure is logged.
     bootRestate.complete = false;
+    // A stand-in for an earlier pass's value: the settle must clear it, not leave it standing.
+    bootRestate.dueAt = new Date(0);
     const down: string[] = [];
     const broken = new Proxy(db.pool, {
       get(pool, prop) {
@@ -416,10 +422,13 @@ describe('29.404 the boot restate flag', () => {
       stopBroken();
     }
     expect(down).toEqual(['snapshot pass failed: Error: due query down']);
+    // Its clock read failed with it (wtg2 fold-version overlap): no dueAt, so a stale row is served as ruling D says.
+    expect(bootRestate.dueAt).toBeNull();
 
     // The flag is the BOOT pass's: later passes (the wrapper is not re-entrant) that settle while the first is still
     // held do not set it. The first pass's due query is held until released; every later call goes through.
     bootRestate.complete = false;
+    bootRestate.dueAt = null;
     let release: () => void = () => undefined;
     const held = new Promise<void>((resolve) => {
       release = resolve;

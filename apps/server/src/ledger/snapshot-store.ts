@@ -44,10 +44,17 @@ export type Snapshot = {
    * version, because a row is always written by the current fold.
    */
   foldVersion: number;
+  /**
+   * `snapshots.created_at`: when the row was first inserted, on the DATABASE clock. An `overwriteSnapshot` landing on
+   * the row's seq leaves it as it was. Read by `bootstrapTicket` (wtg2 fold-version overlap, planner ruling E): a stale
+   * row created after `bootRestate.dueAt` (the database clock the boot restate pass read before its due query) was
+   * written by an old instance during a rolling deploy, not left behind by a restate that failed. Never passed by a writer: the column's default stamps it.
+   */
+  createdAt: Date;
 };
 
-/** What a writer hands over: a snapshot without its fold version, which the write stamps (`TICKET_FOLD_VERSION`). */
-export type SnapshotInput = Omit<Snapshot, 'foldVersion'>;
+/** What a writer hands over: a snapshot without its fold version, which the write stamps (`TICKET_FOLD_VERSION`), or its creation time. */
+export type SnapshotInput = Omit<Snapshot, 'foldVersion' | 'createdAt'>;
 
 export async function writeSnapshot(client: PoolClient, snapshot: SnapshotInput): Promise<void> {
   await client.query(
@@ -112,8 +119,9 @@ export async function readLatestSnapshot(
     state: Record<string, unknown>;
     provenance: SnapshotProvenance | null;
     fold_version: number;
+    created_at: Date;
   }>(
-    `SELECT seq, state, provenance, fold_version FROM snapshots
+    `SELECT seq, state, provenance, fold_version, created_at FROM snapshots
      WHERE entity_kind = $1 AND entity_id = $2
      ORDER BY seq DESC LIMIT 1`,
     [kind, id],
@@ -134,5 +142,6 @@ export async function readLatestSnapshot(
     state: row.state,
     provenance: row.provenance ?? null,
     foldVersion: row.fold_version,
+    createdAt: row.created_at,
   };
 }
