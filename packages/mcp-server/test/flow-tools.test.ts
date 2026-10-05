@@ -35,9 +35,9 @@ describe('29.377 set_wait_for_all', () => {
     expect(f.batches[2]![0]).toMatchObject({ payload: { fieldId: 'region', value: 'south' } });
   });
 
-  it('29.377 the module is the one tool, its input keys and its description word for word', () => {
+  it('29.377 set_wait_for_all opens the module, its input keys and its description word for word', () => {
     const tools = flowTools(fakeFlow().session);
-    expect(tools.map((t) => t.name)).toEqual(['set_wait_for_all']);
+    expect(tools.map((t) => t.name)).toEqual(['set_wait_for_all', 'get_flow']); // the tool order of the plan: get_flow since Part 5 T2 (29.379)
     expect(Object.keys(tools[0]!.inputSchema).sort()).toEqual(['ticketId', 'value', 'workspaceId']);
     expect(tools[0]!.description).toBe(
       'Turn "wait for all incoming" on or off for a ticket in a flow. Off (the default): the ticket moves from Backlog to its first status as soon as ANY ticket that leads to it ' +

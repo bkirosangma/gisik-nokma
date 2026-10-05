@@ -146,5 +146,6 @@ export const SWEEP: Record<string, SweepEntry> = {
   // draft end
   // flow begin (wtg-part5 T1 to T5)
   set_wait_for_all: { args: { workspaceId: 'w', ticketId: 't', value: true } },
+  get_flow: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async () => ({ flowId: 'f', truncated: false, start: [], end: [], nodes: [], edges: [], autoMoves: [], draftCount: 0 }) } },
   // flow end
 };
