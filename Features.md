@@ -2277,7 +2277,8 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
 - ✅ **`GET /v1/sync/bootstrap`** — first-run replica build without replaying full history: for every
-  ticket `listVisibleTickets` returns for the caller, the latest reducer-folded snapshot (if one exists) plus a per-entity tail
+  ticket `listVisibleTickets` returns for the caller, the latest reducer-folded snapshot (if one exists; one written by an
+  older fold answers the whole request 503 until the boot restate pass has settled, 29.403) plus a per-entity tail
   — everything after the snapshot's seq, PLUS every `comment.added` / `attachment.added` /
   `visibility.set` / `claim.contested` / `claim.contested_resolved` regardless of position. That list is
   not a taste judgement and it is not hand-kept: it is **every one of the thirteen types the registry
@@ -2619,6 +2620,8 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   presence-versus-absence an oracle, the disclosure the reconcile door already refuses. The response
   carries no stream cursor, and the omission is load-bearing — a per-ticket pull that moved the workspace
   cursor would skip every intervening event for every other ticket and look exactly like convergence.
+  A snapshot written by an older fold is refused with a 503 until the boot restate pass has settled, which the
+  client's drain keeps owed instead of dropping it like the 404 (wtg2 fold-version bootstrap, 29.400-29.405).
   Cases 12.299-12.303. `apps/server/src/sync/sync-routes.ts`
 - ✅ **A pull that fails is remembered, not fatal and not forgotten** *(closure 5b(d))* — the ids a
   notice named are recorded in durable client storage, so a pull that fails or times out leaves the
@@ -3887,6 +3890,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 - ✅ **Actual start and end dates** (wtg2 T9; `packages/domain/src/flow/derive.ts`, `packages/domain/src/ticket-state.ts`) — a ticket's actual start and end dates, derived from its work periods, past and reopened: the first period's start and the last period's end (none while the last period is open); `hasStarted` reads an open last period, `ticketRound` the round, `resolutionOf` a not-taken close. Cases 29.167-29.168.
 - ⚙️ **Work periods and rounds** (wtg2 T9; `packages/domain/src/flow/periods.ts`, `apps/server/src/projections/tickets.ts`, `apps/server/migrations/1792100200000_proj-tickets-periods.sql`) — folded by the shared reducer (a period opens on the first move into an active or terminal state and closes on terminal or Backlog; a not-taken move opens none; `rounds` counts the flow's loop resets) and projected to `proj_tickets` (`started_at`, `ended_at`, `periods`, `rounds`, `closed_cause`). Cases 29.169-29.170, 29.350-29.353, 29.359.
 - ⚙️ **Snapshot fold versions and the replica's re-pull on schema 5** (wtg2 T9; `apps/server/src/ledger/snapshot-store.ts`, `apps/server/src/sync/snapshot-writer.ts`, `apps/server/src/sync/ledger-deps.ts`, `packages/sync-client/src/replica/replica.ts`, `packages/sync-client/src/precheck/local-context.ts`) — a snapshot written before work periods (`fold_version` 1) is restated from its full history by the snapshot pass, folding each event with the definitions in force at it, read from the ledger (`memoizedDepsAsOfEvent`: one load per definition change per pass), and in place when it sits at the head; the server starts the writer with an immediate first pass, so a deploy restates without waiting an interval; a replica opening at local schema 5 owes a pull for every ticket it holds; a pending event leaves the confirmed periods alone. Cases 29.354-29.355, 29.360.
+- ⚙️ **A snapshot from an older fold waits for the boot restate pass** (wtg2 fold-version bootstrap, planner ruling D; `apps/server/src/sync/sync-routes.ts`, `apps/server/src/sync/snapshot-writer.ts`) — until the writer's first pass has settled (`bootRestate.complete`, in process), both bootstrap doors refuse a ticket whose stored snapshot predates the current fold with a 503 `snapshot_restate_pending`, which the client's pull drain keeps owed (a device holding a pre-periods baseline would keep it, and a null snapshot would not replace it); after the pass such a row is a restate that failed and is served as stored with a warning naming the ticket; a ticket whose restate throws is logged by id and the pass goes on. Cases 29.400-29.405.
 <!-- wtg-part2-model T10 bullet -->
 - ⚙️ **Flow analysis** (wtg2 T10; `packages/domain/src/flow/{types,analysis,graph,node}.ts`) — pure, clock-free functions over a ticket's "leads to" links: Start and End tickets, loop-closing edges, flow order, the effective graph after a Decision's choice, the live set, loop bodies and branches, and the single `FlowNode` shape every flow feature reads. Cases 29.180-29.186.
 <!-- wtg-part2-model T11 bullet -->

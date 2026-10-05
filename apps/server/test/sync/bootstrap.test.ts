@@ -1,19 +1,44 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { newSubmittedEvent, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import type { PoolClient } from 'pg';
+import {
+  applyTicketEvent,
+  newSubmittedEvent,
+  newUlid,
+  TICKET_EVENT_TYPES,
+  TICKET_FOLD_VERSION,
+  type LedgerEvent,
+  type SubmittedEvent,
+  type TicketState,
+} from '@gisik-nokma/domain';
+import {
+  createHttpTransport,
+  createOutbox,
+  createReplica,
+  createSyncEngine,
+  TicketPullNotFound,
+  type SyncEngine,
+  type WebSocketLike,
+} from '@gisik-nokma/sync-client';
+import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
 import type { IngestService } from '../../src/ingest/ingest-service.js';
+import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
+import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
 import { buildContestedClaim } from '../../src/sync/contest-coherence.js';
+import { BOOTSTRAP_BACKFILL_TYPES, bootstrapTicket, SnapshotRestatePending } from '../../src/sync/sync-routes.js';
+import { targetSight } from '../../src/visibility/withhold-link-targets.js';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { applyAll, seedGuest, seedMember, setVisibilityEnv } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
-import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
+import { bootRestate, runSnapshotPass, startSnapshotWriter } from '../../src/sync/snapshot-writer.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
 import { buildLedgerDeps } from '../../src/sync/ledger-deps.js';
 
 /**
  * `GET /v1/sync/bootstrap` — 12.94-12.99 and 12.115-12.118
- * (`test-cases/12-offline-sync-apps.md`). *This line said `12.94-12.97` from the
+ * (`test-cases/12-offline-sync-apps.md`), and at the end of the file 29.400-29.403
+ * and 29.405, a snapshot from an older fold (`test-cases/29-workflow-timeline-graphs.md`). *This line said `12.94-12.97` from the
  * round that added 12.98-12.99 until the round that added 12.115-12.118 —
  * exactly the stale-enumeration bug that round was fixing in two other places.
  * A range in prose is a fact about a moment; recount it from the `it(` blocks.*
@@ -94,6 +119,8 @@ const WS3_TYPE_LOSER_ENTITY = typeEntityA < typeEntityB ? typeEntityB : typeEnti
 let memberId = '';
 let guestId = '';
 let memberHeaders: Record<string, string> = {};
+/** The member's bearer token, for the shipped HTTP transport in 29.402 and 29.405. */
+let memberToken = '';
 let guestHeaders: Record<string, string> = {};
 
 beforeAll(async () => {
@@ -108,6 +135,7 @@ beforeAll(async () => {
   memberId = member.userId;
   guestId = guest.userId;
   memberHeaders = { authorization: `Bearer ${member.token}` };
+  memberToken = member.token;
   guestHeaders = { authorization: `Bearer ${guest.token}` };
 
   const submit = (entity: { kind: 'workflow' | 'ticket-type' | 'ticket'; id: string }, type: string, payload: unknown) =>
@@ -804,5 +832,378 @@ describe('GET /v1/sync/bootstrap', () => {
     expect(cursorIndex).toBeGreaterThanOrEqual(0);
     expect(tailIndex).toBeGreaterThanOrEqual(0);
     expect(cursorIndex).toBeLessThan(tailIndex);
+  });
+});
+
+/**
+ * Cases 29.400-29.403 and 29.405 (wtg2 fold-version bootstrap, planner ruling D 2026-10-05, which replaced 11:31's
+ * "served as null": a device holding a local baseline does not replay on a null snapshot, it resumes from its own row).
+ * A stored snapshot whose `fold_version` is below `TICKET_FOLD_VERSION` was written by a fold that lacks members the
+ * current one derives (work periods since T9). Until this process's boot restate pass has settled
+ * (`bootRestate.complete`), `bootstrapTicket` refuses it (`SnapshotRestatePending`) and both routes answer 503, which
+ * the client's pull drain keeps owed; after the pass such a row is a restate that failed, served as stored and named in
+ * a warning. 29.404 (the flag and the writer) is in `snapshot-fold-version.test.ts`.
+ *
+ * Each case seeds its own workspace (`fvWorkspace`) through the real ingest door, as WS3 is seeded, so the routes'
+ * gates and the device's reconcile meet a ticket the member may open, and 29.403 controls every ticket in the
+ * workspace it bootstraps. Every ticket carries the same seven events, its snapshot row cut at seq 5 (`FV_CUT`):
+ * created, a `visibility.set` (workspace), into `doing` (period 1 opens), a comment, into `done` (period 1 closes) |
+ * into `doing` again (period 2 opens), a title edit. Below the cut sit backfill events and events no tail carries;
+ * above it a period opens, so a device that resumed from a pre-periods baseline shows one period where the full fold
+ * has two. The rows are planted by a direct INSERT, never `writeSnapshot`, which stamps the current version whatever
+ * it is handed. No pass meets them unless a case runs one: this file's `runSnapshotPass` is in `beforeAll`, before
+ * they exist, and `buildTestApp` starts no writer.
+ */
+const FV_CUT = 5;
+const FOLDED_TYPES: readonly string[] = TICKET_EVENT_TYPES;
+const BACKFILL: readonly string[] = BOOTSTRAP_BACKFILL_TYPES;
+/** Past every head in this file, so a pass run with it writes only the restates of stale rows. */
+const STALE_ONLY = 1_000_000;
+
+type FvWorkspace = { workspaceId: string; projectId: string; typeId: string };
+
+async function fvWorkspace(): Promise<FvWorkspace> {
+  const workspaceId = newUlid();
+  const projectId = newUlid();
+  const workflowId = newUlid();
+  const typeId = newUlid();
+  const submit = (entity: { kind: 'workflow' | 'ticket-type'; id: string }, type: string, payload: unknown) =>
+    newSubmittedEvent({ workspaceId, entity, type, payload, actorId: memberId, origin: 'server' });
+  const results = await ingest.ingestBatch([
+    submit({ kind: 'workflow', id: workflowId }, 'workflow.defined', {
+      id: workflowId,
+      version: 1,
+      name: 'Basic',
+      initialStateId: 'todo',
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'doing', name: 'Doing', category: 'active' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: ['todo', 'doing', 'done'].map((to) => ({ from: '*', to, rules: [] })),
+    }),
+    submit({ kind: 'ticket-type', id: typeId }, 'ticket-type.defined', {
+      id: typeId,
+      name: 'Task',
+      icon: 'check',
+      rank: 3,
+      workflowId,
+      fields: [],
+    }),
+  ]);
+  for (const result of results) expect(result.status).toBe('committed');
+  await seedMember(db.pool, workspaceId, memberId, 'member', [{ projectId }]);
+  return { workspaceId, projectId, typeId };
+}
+
+/** The reducer's fold of the ticket's stream up to `uptoSeq`, with the workspace's ledger definitions. */
+async function fvFold(world: FvWorkspace, ticketId: string, uptoSeq = Infinity): Promise<TicketState> {
+  const deps = await buildLedgerDeps(db.pool, world.workspaceId);
+  let state: TicketState | undefined;
+  for (const env of await readEntityEvents(db.pool, 'ticket', ticketId)) {
+    if (env.seq <= uptoSeq && FOLDED_TYPES.includes(env.type)) state = applyTicketEvent(state, env, deps);
+  }
+  if (state === undefined) throw new Error('fixture: nothing folded');
+  return state;
+}
+
+/** A ticket with the seven events, and its snapshot row at `FV_CUT` stamped `foldVersion` (no row when null). */
+async function fvTicket(
+  world: FvWorkspace,
+  foldVersion: number | null,
+): Promise<{ ticketId: string; rowState: Record<string, unknown> | null }> {
+  const ticketId = newUlid();
+  const submit = (type: string, payload: unknown): SubmittedEvent =>
+    newSubmittedEvent({ workspaceId: world.workspaceId, entity: { kind: 'ticket', id: ticketId }, type, payload, actorId: memberId, origin: 'server' });
+  // One batch per event, so each is stamped by its own commit (the periods' clocks).
+  for (const event of [
+    submit('ticket.created', { typeId: world.typeId, projectId: world.projectId, parentId: null, title: 'Fold me' }),
+    submit('visibility.set', { ticketId, mode: 'workspace' }),
+    submit('ticket.transitioned', { to: 'doing' }),
+    submit('comment.added', { body: { type: 'doc', content: [] } }),
+    submit('ticket.transitioned', { to: 'done' }),
+    submit('ticket.transitioned', { to: 'doing' }),
+    submit('ticket.field_set', { fieldId: 'title', value: 'Fold me again' }),
+  ]) {
+    const [result] = await ingest.ingestBatch([event]);
+    expect(result).toMatchObject({ status: 'committed' });
+  }
+  if (foldVersion === null) return { ticketId, rowState: null };
+  const folded = await fvFold(world, ticketId, FV_CUT);
+  if (folded.periods?.length !== 1) throw new Error('fixture: the fold up to the cut holds one period');
+  // A row from an older fold has that fold's shape: no work periods and no rounds (T9's members).
+  const row = JSON.parse(JSON.stringify(folded)) as Record<string, unknown>;
+  if (foldVersion < TICKET_FOLD_VERSION) {
+    delete row['periods'];
+    delete row['rounds'];
+  }
+  await db.pool.query(
+    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version) VALUES ('ticket', $1, $2, $3, NULL, $4)`,
+    [ticketId, FV_CUT, JSON.stringify(row), foldVersion],
+  );
+  return { ticketId, rowState: row };
+}
+
+async function withClient<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await db.pool.connect();
+  try {
+    return await run(client);
+  } finally {
+    client.release();
+  }
+}
+
+async function snapshotRows(ticketId: string): Promise<number> {
+  const { rows } = await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM snapshots WHERE entity_id = $1`, [ticketId]);
+  return rows[0]?.n ?? -1;
+}
+
+const seqIds = (events: readonly LedgerEvent[]): Array<[number, string]> => events.map((e) => [e.seq, e.id]);
+
+/** The one warning a stale row served after the boot pass leaves, exactly. */
+const staleServedWarning = (ticketId: string): string =>
+  `bootstrap: ticket ${ticketId} is served a snapshot from fold ${TICKET_FOLD_VERSION - 1} (current ${TICKET_FOLD_VERSION}): its restate failed`;
+
+/**
+ * A device as it stood before the deploy: it bootstrapped the ticket from the STALE row (the row as stored plus the
+ * tail the old door sent), and the new bundle has opened it at local schema 5, so it owes a pull for the ticket
+ * (`createReplica`'s schema-5 arm). Built from the server's own envelopes, because the replica dedupes by event id.
+ */
+async function preDeployDevice(world: FvWorkspace, ticketId: string) {
+  const storage = createBetterSqliteStorage(':memory:');
+  const row = await readLatestSnapshot(db.pool, 'ticket', ticketId);
+  if (row === null || row.foldVersion >= TICKET_FOLD_VERSION) throw new Error('fixture: a pre-deploy device holds a stale row');
+  const all = await readEntityEvents(db.pool, 'ticket', ticketId);
+  const { rows: defRows } = await db.pool.query<EventRow>(
+    `SELECT * FROM events WHERE workspace_id = $1 AND entity_kind IN ('workflow', 'ticket-type') ORDER BY workspace_seq`,
+    [world.workspaceId],
+  );
+  await (await createReplica({ storage })).loadBootstrap({
+    workspaceId: world.workspaceId,
+    me: { userId: memberId, workspaceRole: 'member', projectIds: [world.projectId] },
+    streamSeq: await readStreamSeq(db.pool, world.workspaceId),
+    definitions: defRows.map(rowToEnvelope),
+    tickets: [
+      {
+        ticketId,
+        snapshot: { seq: row.seq, state: row.state as unknown as TicketState, provenance: null },
+        events: all.filter((e) => e.seq > row.seq || BACKFILL.includes(e.type)),
+      },
+    ],
+  });
+  await storage.run("UPDATE meta SET value = '4' WHERE key = 'schema_version'", []);
+  return { storage, replica: await createReplica({ storage }) };
+}
+
+type DrivableSocket = WebSocketLike & { deliver: (frame: unknown) => void };
+
+/** `notes-client-seam.test.ts`'s socket: the test delivers the frames the hub would send. */
+function drivableSocket(): DrivableSocket {
+  const socket: DrivableSocket = {
+    onopen: null,
+    onmessage: null,
+    onclose: null,
+    onerror: null,
+    deliver(frame) {
+      socket.onmessage?.({ data: JSON.stringify(frame) });
+    },
+    send() {
+      // The subscribe message is not what these cases measure.
+    },
+    close() {
+      // Nor is the close path.
+    },
+  };
+  return socket;
+}
+
+const fvEngines: SyncEngine[] = [];
+
+/**
+ * The SHIPPED engine on the SHIPPED transport against this app's routes (`notes-client-seam.test.ts`'s bridge:
+ * `fetchImpl` over `app.inject`), so the 503 travels through the real status mapping and the real drain.
+ * `catchUp` delivers a `caught-up` frame at the workspace's head: the drain runs inside that link.
+ */
+async function engineOnRoutes(world: FvWorkspace, device: Awaited<ReturnType<typeof preDeployDevice>>) {
+  const socket = drivableSocket();
+  const transport = createHttpTransport({
+    baseUrl: 'http://test.invalid',
+    token: memberToken,
+    fetchImpl: async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : String(input));
+      const res = await app.inject({
+        method: (init?.method ?? 'GET') as 'GET' | 'POST',
+        url: `${url.pathname}${url.search}`,
+        headers: (init?.headers ?? {}) as Record<string, string>,
+        ...(init?.body === undefined ? {} : { payload: JSON.parse(String(init.body)) }),
+      });
+      return new Response(res.body, { status: res.statusCode, headers: { 'content-type': 'application/json' } });
+    },
+    webSocketFactory: () => socket,
+  });
+  const engine = createSyncEngine({ replica: device.replica, outbox: createOutbox({ storage: device.storage, replica: device.replica }), transport });
+  fvEngines.push(engine);
+  await engine.start(world.workspaceId);
+  await engine.settled();
+  const catchUp = async (): Promise<void> => {
+    // The frame names its workspace: the transport drops a `caught-up` for any other as a crossed stream.
+    socket.deliver({ type: 'caught-up', workspaceId: world.workspaceId, seq: Number(await readStreamSeq(db.pool, world.workspaceId)) });
+    await engine.settled();
+  };
+  return { transport, catchUp };
+}
+
+const owed = async (device: Awaited<ReturnType<typeof preDeployDevice>>, world: FvWorkspace): Promise<string[]> =>
+  (await device.replica.listPendingPulls(world.workspaceId)).map((t) => t.id);
+const periodsOn = async (device: Awaited<ReturnType<typeof preDeployDevice>>, ticketId: string) =>
+  (await device.replica.getTicket(ticketId))?.confirmed?.periods;
+
+describe('29.400-29.405 a snapshot from an older fold waits for the boot restate pass', () => {
+  let warnings: string[] = [];
+  beforeEach(() => {
+    warnings = [];
+    bootRestate.complete = false;
+    bootRestate.warn = (msg) => {
+      warnings.push(msg);
+    };
+  });
+  afterAll(() => {
+    for (const engine of fvEngines.splice(0)) engine.stop();
+  });
+
+  it('29.400 before the boot pass settles, a row stamped below TICKET_FOLD_VERSION is refused and nothing is written; controls: a current row and a ticket with no row are served', async () => {
+    const world = await fvWorkspace();
+    const stale = await fvTicket(world, TICKET_FOLD_VERSION - 1);
+    const current = await fvTicket(world, TICKET_FOLD_VERSION);
+    const bare = await fvTicket(world, null);
+    await withClient(async (client) => {
+      // The premise: the row EXISTS and is stale, so the refusal is the rule's.
+      expect(await readLatestSnapshot(client, 'ticket', stale.ticketId)).toMatchObject({ seq: FV_CUT, foldVersion: TICKET_FOLD_VERSION - 1 });
+      const refusal = await bootstrapTicket(client, stale.ticketId, targetSight(client, memberId)).catch((err: unknown) => err);
+      expect(refusal).toBeInstanceOf(SnapshotRestatePending);
+      expect((refusal as SnapshotRestatePending).ticketId).toBe(stale.ticketId);
+      // A read path never writes: the stale row is still the only row.
+      expect(await snapshotRows(stale.ticketId)).toBe(1);
+      expect(await readLatestSnapshot(client, 'ticket', stale.ticketId)).toMatchObject({ seq: FV_CUT, foldVersion: TICKET_FOLD_VERSION - 1 });
+
+      expect((await bootstrapTicket(client, current.ticketId, targetSight(client, memberId))).snapshot?.seq).toBe(FV_CUT);
+      const none = await bootstrapTicket(client, bare.ticketId, targetSight(client, memberId));
+      expect(none.snapshot).toBeNull();
+      expect(seqIds(none.events)).toEqual(seqIds(await readEntityEvents(client, 'ticket', bare.ticketId)));
+    });
+    expect(warnings).toEqual([]);
+  });
+
+  it('29.401 once the boot pass has settled, a stale row is a restate that failed: served as stored, with one warning naming the ticket; controls: a current row and a later fold are served with none', async () => {
+    const world = await fvWorkspace();
+    const current = await fvTicket(world, TICKET_FOLD_VERSION);
+    const later = await fvTicket(world, TICKET_FOLD_VERSION + 1);
+    const stale = await fvTicket(world, TICKET_FOLD_VERSION - 1);
+    // The flag is set by hand here, as the real writer leaves it after a restate that threw (29.404 runs that writer).
+    bootRestate.complete = true;
+    await withClient(async (client) => {
+      expect((await bootstrapTicket(client, current.ticketId, targetSight(client, memberId))).snapshot?.seq).toBe(FV_CUT);
+      // The rule is "older than the current fold", not "any other fold".
+      expect((await bootstrapTicket(client, later.ticketId, targetSight(client, memberId))).snapshot?.seq).toBe(FV_CUT);
+      expect(warnings).toEqual([]);
+
+      const served = await bootstrapTicket(client, stale.ticketId, targetSight(client, memberId));
+      expect(served.snapshot?.seq).toBe(FV_CUT);
+      expect(served.snapshot?.state).toEqual(stale.rowState);
+      // As stored means the stored seq bounds the tail: the tail plus the backfill types, not the whole history.
+      const all = await readEntityEvents(client, 'ticket', stale.ticketId);
+      const tail = all.filter((e) => e.seq > FV_CUT || BACKFILL.includes(e.type));
+      expect(tail.length).toBeLessThan(all.length);
+      expect(tail.some((e) => e.seq <= FV_CUT)).toBe(true);
+      expect(seqIds(served.events)).toEqual(seqIds(tail));
+      expect(warnings).toEqual([staleServedWarning(stale.ticketId)]);
+    });
+  });
+
+  it('29.402 a device holding a stale local baseline: its pull is refused during the boot pass and stays owed, and the first catch-up after the pass gives the full fold periods; control: the same rig started after the pass converges in one catch-up', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, TICKET_FOLD_VERSION - 1);
+    const want = (await fvFold(world, ticketId)).periods;
+    // Counted, not compared by clock: commits may share a millisecond, and the stale baseline loses a whole period.
+    expect(want).toHaveLength(2);
+    const early = await preDeployDevice(world, ticketId);
+    const late = await preDeployDevice(world, ticketId);
+    expect(await periodsOn(early, ticketId)).toHaveLength(1);
+    expect(await owed(early, world)).toEqual([ticketId]);
+
+    const { catchUp } = await engineOnRoutes(world, early);
+    await catchUp();
+    expect(await owed(early, world)).toEqual([ticketId]);
+    expect(await periodsOn(early, ticketId)).toHaveLength(1);
+
+    // The boot pass as `index.ts` starts it: immediate, and it sets the flag when it settles.
+    const log: string[] = [];
+    const stop = startSnapshotWriter(db.pool, { intervalMs: 3_600_000, minEvents: STALE_ONLY, immediate: true, log: (msg) => log.push(msg) });
+    try {
+      await vi.waitFor(() => {
+        expect(bootRestate.complete).toBe(true);
+      }, { timeout: 20_000 });
+    } finally {
+      stop();
+    }
+    expect(log).toEqual([]);
+    expect(await readLatestSnapshot(db.pool, 'ticket', ticketId)).toMatchObject({ foldVersion: TICKET_FOLD_VERSION });
+
+    await catchUp();
+    expect(await owed(early, world)).toEqual([]);
+    expect(await periodsOn(early, ticketId)).toEqual(want);
+
+    // Control: the same rig, its engine started only now, converges in ONE catch-up.
+    expect(await owed(late, world)).toEqual([ticketId]);
+    await (await engineOnRoutes(world, late)).catchUp();
+    expect(await owed(late, world)).toEqual([]);
+    expect(await periodsOn(late, ticketId)).toEqual(want);
+  });
+
+  it('29.403 the workspace bootstrap answers 503 while a ticket row in it is stale and the boot pass has not settled; control: all rows current is served; after the pass the stale row is served as stored', async () => {
+    const world = await fvWorkspace();
+    const url = `/v1/sync/bootstrap?workspaceId=${world.workspaceId}`;
+    const current = await fvTicket(world, TICKET_FOLD_VERSION);
+    const allCurrent = await app.inject({ method: 'GET', url, headers: memberHeaders });
+    expect(allCurrent.statusCode).toBe(200);
+
+    const stale = await fvTicket(world, TICKET_FOLD_VERSION - 1);
+    const refused = await app.inject({ method: 'GET', url, headers: memberHeaders });
+    expect(refused.statusCode).toBe(503);
+    expect(refused.json()).toEqual({ error: 'snapshot_restate_pending' });
+
+    bootRestate.complete = true;
+    const served = await app.inject({ method: 'GET', url, headers: memberHeaders });
+    expect(served.statusCode).toBe(200);
+    const body = served.json<{ tickets: Array<{ ticketId: string; snapshot: { seq: number } | null }> }>();
+    expect(body.tickets.map((t) => `${t.ticketId}@${String(t.snapshot?.seq)}`).sort()).toEqual(
+      [`${current.ticketId}@${FV_CUT}`, `${stale.ticketId}@${FV_CUT}`].sort(),
+    );
+    expect(warnings).toEqual([staleServedWarning(stale.ticketId)]);
+  });
+
+  it('29.405 the refusal is a 503 the shipped transport does NOT map to TicketPullNotFound, so the drain keeps the id owed, while a 404 still drops an owed id (ruling P37.3)', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, TICKET_FOLD_VERSION - 1);
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/sync/bootstrap/ticket?workspaceId=${world.workspaceId}&ticketId=${ticketId}`,
+      headers: memberHeaders,
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: 'snapshot_restate_pending' });
+
+    const device = await preDeployDevice(world, ticketId);
+    // An id no one can open: the route's 404, which the transport types as TicketPullNotFound.
+    const phantom = newUlid();
+    await device.replica.addPendingPulls(world.workspaceId, [{ id: phantom, headSeq: 0 }]);
+    const { transport, catchUp } = await engineOnRoutes(world, device);
+    const refusal = await transport.bootstrapTicket(world.workspaceId, ticketId).catch((err: unknown) => err);
+    expect(refusal).toBeInstanceOf(Error);
+    expect(refusal).not.toBeInstanceOf(TicketPullNotFound);
+    expect(await transport.bootstrapTicket(world.workspaceId, phantom).catch((err: unknown) => err)).toBeInstanceOf(TicketPullNotFound);
+    expect((await owed(device, world)).sort()).toEqual([ticketId, phantom].sort());
+    await catchUp();
+    expect(await owed(device, world)).toEqual([ticketId]);
   });
 });

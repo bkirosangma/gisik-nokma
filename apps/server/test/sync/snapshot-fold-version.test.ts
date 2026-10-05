@@ -4,6 +4,7 @@ import {
   applyTicketEvent,
   newUlid,
   TICKET_EVENT_TYPES,
+  TICKET_FOLD_VERSION,
   type LedgerEvent,
   type TicketState,
   type TicketStateDeps,
@@ -11,7 +12,7 @@ import {
 import { insertEvent, readEntityEvents } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot, writeSnapshot } from '../../src/ledger/snapshot-store.js';
 import { buildLedgerDeps } from '../../src/sync/ledger-deps.js';
-import { foldTicketHead, runSnapshotPass, startSnapshotWriter } from '../../src/sync/snapshot-writer.js';
+import { bootRestate, foldTicketHead, runSnapshotPass, startSnapshotWriter } from '../../src/sync/snapshot-writer.js';
 import { makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
@@ -338,5 +339,67 @@ describe('29.355 snapshot fold versions', () => {
     const overwrites = (ticketId: string): boolean[] =>
       calls.filter((call) => call.text.includes('INSERT INTO snapshots') && call.values[1] === ticketId).map((call) => call.text.includes('ON CONFLICT'));
     expect([overwrites(TICKET_7), overwrites(TICKET_6)]).toEqual([[true], [false]]);
+  });
+});
+
+/**
+ * Case 29.404 (wtg2 fold-version bootstrap, planner ruling D 2026-10-05): the writer's boot pass sets
+ * `bootRestate.complete` when it SETTLES, however it ends. A ticket whose restate throws is logged by id and does not
+ * stop the pass, because once the flag is set a stale row left behind is served as stored, without its periods: a
+ * stale ticket sorting AFTER the throwing one must still be restated. A pass that fails outright (before any ticket)
+ * sets the flag too, after its failure is logged. Last in the file: the poisoned ticket stays stale, and a plain
+ * `runSnapshotPass` after this case would throw on it.
+ */
+describe('29.404 the boot restate flag', () => {
+  it('29.404 a restate that throws is logged by ticket and the pass goes on, and the flag is set when the pass settles; a pass that fails outright sets it too', async () => {
+    // POISON moves into a state no definition ever had, so its restate throws. SORTED: the pass folds in id order, so
+    // a pass that stopped at the throw would leave AFTER_POISON stale.
+    const sorted = [newUlid(), newUlid()].sort();
+    const POISON = sorted[0]!;
+    const AFTER_POISON = sorted[1]!;
+    await seed([
+      created(POISON, 'snap-task', S1), to(POISON, 'nowhere', S2),
+      created(AFTER_POISON, 'snap-task', S1), to(AFTER_POISON, 'doing', S2), to(AFTER_POISON, 'done', S3),
+    ]);
+    const newest = await buildLedgerDeps(db.pool, WS);
+    await plant(POISON, 1, await foldPrefix(POISON, 1, newest), true);
+    await plant(AFTER_POISON, 3, await foldPrefix(AFTER_POISON, 3, newest), true);
+
+    bootRestate.complete = false;
+    const logged: string[] = [];
+    const stop = startSnapshotWriter(db.pool, { intervalMs: 3_600_000, minEvents: 1_000_000, immediate: true, log: (msg) => logged.push(msg) });
+    expect(bootRestate.complete).toBe(false); // control: started is not settled
+    try {
+      await vi.waitFor(() => {
+        expect(bootRestate.complete).toBe(true);
+      }, { timeout: 10_000, interval: 50 });
+    } finally {
+      stop();
+    }
+    expect(logged).toEqual([`snapshot pass: ticket ${POISON} failed: Error: applyTicketEvent: workflow "wf-snap" has no state "nowhere"`]);
+    expect([(await readLatestSnapshot(db.pool, 'ticket', POISON))?.foldVersion, (await readLatestSnapshot(db.pool, 'ticket', AFTER_POISON))?.foldVersion]).toEqual([
+      TICKET_FOLD_VERSION - 1,
+      TICKET_FOLD_VERSION,
+    ]);
+
+    // The pass rejects before any ticket (its due query fails): the flag is still set, after the failure is logged.
+    bootRestate.complete = false;
+    const down: string[] = [];
+    const broken = new Proxy(db.pool, {
+      get(pool, prop) {
+        if (prop === 'query') return () => Promise.reject(new Error('due query down'));
+        const value = Reflect.get(pool, prop) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(pool) : value;
+      },
+    });
+    const stopBroken = startSnapshotWriter(broken, { intervalMs: 3_600_000, minEvents: 1_000_000, immediate: true, log: (msg) => down.push(msg) });
+    try {
+      await vi.waitFor(() => {
+        expect(bootRestate.complete).toBe(true);
+      }, { timeout: 10_000, interval: 50 });
+    } finally {
+      stopBroken();
+    }
+    expect(down).toEqual(['snapshot pass failed: Error: due query down']);
   });
 });

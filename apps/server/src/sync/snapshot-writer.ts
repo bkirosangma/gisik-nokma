@@ -13,6 +13,20 @@ import { buildLedgerDeps, memoizedDepsAsOfEvent, type DepsAsOfEvent } from './le
 const DEFAULT_MIN_EVENTS = 20;
 
 /**
+ * The BOOT RESTATE flag (wtg2 fold-version bootstrap, planner ruling D, 2026-10-05). `complete` turns true once the
+ * first pass this process's `startSnapshotWriter` started has SETTLED, cleanly or not: T9's boot pass, which restates
+ * every snapshot written by an older fold. Until then `bootstrapTicket` refuses a row with `fold_version <
+ * TICKET_FOLD_VERSION` (`SnapshotRestatePending`, answered 503, which the client's pull drain keeps owed and retries);
+ * after it, such a row can only be a restate that failed, so it is served as stored and named on `warn`, which the
+ * writer points at its own log. In-process and per instance: each server process runs its own boot pass, and
+ * `deploy/do/app.yaml` runs one server instance.
+ */
+export const bootRestate: { complete: boolean; warn: (msg: string) => void } = {
+  complete: false,
+  warn: (): undefined => undefined,
+};
+
+/**
  * The result of one resume-and-replay: where the ticket's stream head is, what
  * the reducer folds it to, and where the snapshot it resumed from sat.
  *
@@ -227,7 +241,9 @@ type Due = { workspaceId: string; entityId: string };
  *   candidate whose fold returns `null` lands in neither `rewritten` nor
  *   `skipped`, so that outcome does not partition its own candidates either.
  *   `skipped` is a LOWER BOUND on what can still throw here, never the set. The
- *   interval wrapper logs and swallows it whichever population it came from.
+ *   interval wrapper logs it by ticket and goes on to the next due ticket
+ *   (`onTicketError`, wtg2 fold-version bootstrap), whichever population it came
+ *   from; a call without that hook still ends at the throw.
  * - **The whole due set is folded in one call, serially.** Bounded by the
  *   number of tickets that crossed the threshold since the last pass, not by
  *   ledger size, but nothing here yields between entities. The exception is
@@ -254,7 +270,15 @@ type Due = { workspaceId: string; entityId: string };
  */
 export async function runSnapshotPass(
   pool: Pool,
-  opts: { minEvents?: number } = {},
+  opts: {
+    minEvents?: number;
+    /**
+     * When given, a ticket whose fold or write throws is reported here and the pass goes on to the next due ticket;
+     * without it the throw ends the pass, as before (wtg2 fold-version bootstrap: `startSnapshotWriter` passes it, so one
+     * unfoldable ticket cannot leave every stale ticket after it unrestated once `bootRestate` is complete).
+     */
+    onTicketError?: (ticketId: string, err: unknown) => void;
+  } = {},
 ): Promise<{ written: Array<{ entityId: string; seq: number }> }> {
   const minEvents = opts.minEvents ?? DEFAULT_MIN_EVENTS;
   // Due: the head ran `minEvents` past the LATEST snapshot, or that latest row was written by an older fold (wtg2 T9).
@@ -316,6 +340,9 @@ export async function runSnapshotPass(
         provenance: head.provenance,
       });
       written.push({ entityId: item.entityId, seq: head.seq });
+    } catch (err) {
+      if (opts.onTicketError === undefined) throw err;
+      opts.onTicketError(item.entityId, err);
     } finally {
       client.release();
     }
@@ -327,8 +354,13 @@ export async function runSnapshotPass(
  * Interval wrapper for the server entrypoint. A failing pass is logged and
  * swallowed: the ledger is untouched either way, and a background maintenance
  * task that can take the process down is a worse failure than a snapshot that
- * is one interval late. The timer is `unref`'d so it never holds the process
+ * is one interval late. A ticket that throws is logged by id and the pass goes
+ * on (`onTicketError`). The timer is `unref`'d so it never holds the process
  * open on its own.
+ *
+ * The FIRST pass it starts is the boot pass (wtg2 fold-version bootstrap): when
+ * that pass settles, however it ended, it sets `bootRestate.complete`, and from
+ * then on a stale row is served as stored and reported on `log`.
  *
  * The returned stop function is the whole shutdown story this module owns —
  * `apps/server/src/index.ts` has no SIGTERM handler and no `pool.close()`, so
@@ -340,10 +372,26 @@ export function startSnapshotWriter(
   opts: { intervalMs: number; minEvents: number; log?: (msg: string) => void; immediate?: boolean },
 ): () => void {
   const log = opts.log ?? ((): undefined => undefined);
+  // A stale row served after the boot pass is reported on this same log (`bootRestate.warn`).
+  bootRestate.warn = log;
+  let first = true;
   const pass = (): void => {
-    void runSnapshotPass(pool, { minEvents: opts.minEvents }).catch((err: unknown) => {
-      log(`snapshot pass failed: ${String(err)}`);
-    });
+    // The FIRST pass started is the boot pass, and only it sets the flag: an overlapping later pass (this wrapper is not
+    // re-entrant) settling first must not declare the boot restate done.
+    const boot = first;
+    first = false;
+    void runSnapshotPass(pool, {
+      minEvents: opts.minEvents,
+      onTicketError: (ticketId, err) => {
+        log(`snapshot pass: ticket ${ticketId} failed: ${String(err)}`);
+      },
+    })
+      .catch((err: unknown) => {
+        log(`snapshot pass failed: ${String(err)}`);
+      })
+      .finally(() => {
+        if (boot) bootRestate.complete = true;
+      });
   };
   // `immediate` (wtg2 T9): one pass now, before the first tick, so a deploy that bumps `TICKET_FOLD_VERSION` restates
   // the stale snapshots within seconds rather than one interval later.
