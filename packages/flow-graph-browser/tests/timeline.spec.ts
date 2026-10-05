@@ -4,14 +4,14 @@ type Box = { id: string; key: string | null; row: string; left: number; right: n
 type KeyBox = { owner: string; left: number; right: number; top: number; bottom: number };
 
 /**
- * 29.089 — ERRATA E11 in a real browser: the product's Timeline view at the Month preset (8 px per day) over `timeline.html`'s
+ * 29.089 — ERRATA E11 in a real browser: the product's Timeline view at the Month preset (8 px per day) over `timeline-geometry.html`'s
  * seed. A one-day bar is drawn 12 px (its two 6 px paddings), so the packer must not seat the next day's bar beside it, and an
  * outside key starts KEY_GAP_PX (4 px) after the DRAWN end. Measured from real rects after the zoom settles, with reduced
  * motion so the re-pack does not glide. LOCAL, headless Chromium (layout, not a frame-time number).
  */
 test('29.089 at Month: zero overlaps among the bars (the keyless one-day draft row included) and every outside key sits at least 4 px clear of its bar and over no bar', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/timeline.html');
+  await page.goto('/timeline-geometry.html');
   await page.getByRole('radio', { name: 'Month' }).click();
   await expect(page.getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('.gn-timeline')).not.toHaveAttribute('data-zooming', 'true');
