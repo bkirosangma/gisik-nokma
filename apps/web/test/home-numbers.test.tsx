@@ -39,6 +39,8 @@ describe('27.634 the six numbers, in the spec order, with their labels', () => {
     const { rerender } = render(<HomeNumbers {...props()} />);
     // ONE ordered list: the buttons in DOM order are exactly the six named ones, in this order.
     expect(screen.getAllByRole('button')).toEqual(NAMES.map((name) => screen.getByRole('button', { name })));
+    // The text too, not only the computed name: jsdom's name computation separates the two spans by itself.
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(NAMES);
     expect(dueSoonLabel(0)).toBe('Due today');
     expect(dueSoonLabel(1)).toBe('Due in 1 day');
     expect(dueSoonLabel(7)).toBe('Due in 7 days');

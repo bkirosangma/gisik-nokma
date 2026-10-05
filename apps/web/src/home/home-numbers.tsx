@@ -49,7 +49,7 @@ export function HomeNumbers({ home, failed, onRetry, pressed, onToggle, dueSoonD
               disabled={disabled}
               onClick={() => onToggle(n.key)}
             >
-              {/* The space makes the accessible name "12 Tickets", not "12Tickets"; the grid draws no box for it. */}
+              {/* The space makes the tile's text "12 Tickets", not "12Tickets" (27.634); the grid draws no box for it. */}
               <span className="gn-home__number-value">{value}</span>{' '}
               <span className="gn-home__number-label">{n.label(dueSoonDays)}</span>
             </button>
