@@ -1207,7 +1207,7 @@ function ProjectBoard() {
    *
    * ⚠ **AND THE PREDICATE HAS A REPLICA EDGE THIS FOLD CANNOT SEE.** A row's
    * `typeRank` comes from the roster the read resolved against, and
-   * `replica-data-source.ts:763` fills an UNKNOWN type with `?? 0` — so an epic
+   * `replica-data-source.ts:1210` fills an UNKNOWN type with `?? 0` — so an epic
    * the replica's own type table does not hold arrives as rank 0 and is drawn on
    * this tab. That is the conservative direction (it draws MORE, never less, and
    * a row whose type nothing can name is one nothing can honestly exclude) and

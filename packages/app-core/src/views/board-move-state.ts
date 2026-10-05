@@ -58,7 +58,7 @@ export const PENDING_TTL_MS = 20_000;
  * `ticket_id`, text order — the server read (`apps/server/src/routes/board.ts:120`,
  * `ORDER BY t.ticket_id`), the offline replica's enumeration
  * (`packages/sync-client/src/replica/replica.ts:1883`, `ORDER BY ticket_id`,
- * pushed into columns in that order at `replica-data-source.ts:1530`) and the
+ * pushed into columns in that order at `replica-data-source.ts:1659`) and the
  * client mapper (`online/mappers.ts:718`, `.map` — order kept) all agree, and the
  * board renders `column.cards` as given, so a live-query repaint after the move
  * puts the card exactly here. The optimistic overlay (`applyPendingMoves`) uses THIS
