@@ -373,6 +373,17 @@ describe('the phone sheet', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
+
+    // Only an Escape that closes the overlay retires the listener (mutant: retire on any key): after a Tab the overlay's Escape still
+    // collapses it, and the sheet stays open.
+    onClose.mockClear();
+    open();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(overlay()).toHaveAttribute('data-state', 'open');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(overlay()).toHaveAttribute('data-state', 'closing');
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
   });
 
   it('25.444 an overlay reopened while it animates out takes its Escape again: it collapses and the sheet stays open', async () => {
@@ -440,7 +451,7 @@ describe('the phone sheet', () => {
 
   it('25.435 a press on Move while the title overlay is open is not an outside tap: Move stays live and its click opens the dialog (G-8 FIX 1 F1; G14)', async () => {
     stubMedia({ phone: true });
-    renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
+    const onClose = renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
     await settled();
     await scrollTo(500);
     const titleGroup = (): HTMLElement | null => screen.queryByRole('group', { name: 'Full title' });
@@ -464,6 +475,13 @@ describe('the phone sheet', () => {
     expect(titleGroup()).not.toBeNull();
     expect(moveButton()).not.toHaveAttribute('inert');
     expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
+    // The Move dialog's Escape was the dialog's own, so it did not retire the overlay's listener (sheet-peek-escape-race; mutant: an
+    // Escape inside another dialog retires it): the next Escape collapses the overlay, and the sheet stays open.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(panel()).toHaveAttribute('data-peek-state', 'closing');
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(titleGroup()).toBeNull(), CLOSED);
+    expect(onClose).not.toHaveBeenCalled();
     cleanup();
 
     // The control, in the same it(): a press on the sheet body is an outside tap, and Move goes inert.
