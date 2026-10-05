@@ -77,7 +77,7 @@ describe('29.244 GET /v1/workspaces/:ws/tickets/:id/flow', () => {
     }
   });
 
-  it('29.244 an own draft of ANOTHER workspace seeds nothing through this workspace\'s path; control: its own workspace\'s path reads it', async () => {
+  it('29.244 an own draft, or a ticket the viewer sees, of ANOTHER workspace seeds nothing through this workspace\'s path; control: its own workspace\'s path reads each', async () => {
     // The neighbour's owner joins this workspace as a member, and authors a draft at home. `ticketAccess` answers
     // `own-draft` for it (it reads the ticket's OWN workspace), so the path's workspace is the liveness check's to hold.
     const nb = read.neighbour;
@@ -103,5 +103,11 @@ describe('29.244 GET /v1/workspaces/:ws/tickets/:id/flow', () => {
     expect((await get('neighbour', workspaceId, shown)).statusCode).toBe(200);
     const across = await get('neighbour', workspaceId, draftId);
     expect([across.statusCode, across.json()]).toEqual([404, { error: 'not_found' }]);
+    // the VISIBLE arm too: a published ticket the neighbour sees at home (`ticketAccess` answers `visible`) seeds nothing
+    // through this path; without the path's workspace clause the walk would answer 200 with no node, an oracle across
+    // workspaces. Control: its own workspace's path reads it.
+    expect((await get('neighbour', nb.workspaceId, nb.ticketId)).statusCode).toBe(200);
+    const foreign = await get('neighbour', workspaceId, nb.ticketId);
+    expect([foreign.statusCode, foreign.json()]).toEqual([404, { error: 'not_found' }]);
   });
 });

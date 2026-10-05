@@ -942,6 +942,8 @@ export function buildApp(
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.
   registerTicketRoutes(app, { pool: deps.pool }, requireSession);
+  // One ticket's flow as the Workflow graph's `FlowRead` (wtg Part 3 T3, over Part 2's FL-1 walk), for the signed-in viewer.
+  // Same preHandler by parameter, same reason as its neighbours: the handler reads `request.currentUserId`.
   registerFlowRoutes(app, { pool: deps.pool }, requireSession);
   // The viewer's own drafts (drafts spec G8): the Drafts page and MCP's list_my_drafts. Session-subject only.
   registerDraftRoutes(app, { pool: deps.pool }, requireSession);
@@ -964,8 +966,6 @@ export function buildApp(
   // preHandler by parameter, same reason as its three neighbours: the handler
   // reads `request.currentUserId`.
   registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);
-  // One ticket's flow (wtg Part 2, FL-1): the weakly connected component over "leads to", for the signed-in viewer.
-  // Same preHandler by parameter, same reason as its neighbours: the handler reads `request.currentUserId`.
   // One ticket's typed links, both directions, visible ends only (typed-links
   // plan T4; spec A §2.4). Same preHandler by parameter, same reason.
   registerTicketLinkRoutes(app, { pool: deps.pool }, requireSession);
