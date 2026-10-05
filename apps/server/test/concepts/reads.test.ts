@@ -1,16 +1,16 @@
 /**
  * Knowledge Graph spec D §3.2 (D4) at READ time, KG-D Task 4: the concept routes (`routes/concepts.ts`) over
- * `read/concepts.ts`. Cases 27.465–27.472 and 27.482 (`test-cases/27-knowledge-graph.md` §27.D).
+ * `read/concepts.ts`. Cases 27.465–27.472, 27.482 and 27.483 (`test-cases/27-knowledge-graph.md` §27.D).
  *
  * The world is `seedNotesFixture` around seven people who signed in over the wire first (its `userIds`), so each
  * can call the API with a bearer; `outsider` signed in and belongs to no workspace. Concepts are seeded with
- * `applyCommitted` (the door is SL3's and is tested there):
+ * `applyCommitted` (the door is SL3's and is tested there; only 27.468, the last describe, writes through it):
  * - CP tags TP (created by the owner over MCP, tagged by `author` from the desktop app), linked `related` to CW and CE and
  *   `broader` to C0 (C0 is broader than CP);
  * - CW tags nWorkspace; CE tags TE (explicit `[guestListed]`); C0 tags nothing; CM tags nWorkspace AND TE (a MIXED
  *   concept: `memberIn` sees only nWorkspace, `guestListed` only TE, so `every` and `some` answer differently).
  * - CP < CW and CP < CE, minted as a sorted triple: a `related` row is written by the lower id (R1, the table's CHECK).
- * - CD is deleted, and CF lives in another workspace: neither may reach anyone here.
+ * - CD is deleted, and CF lives in another workspace (FW, with the ticket FT and the note FN): none may reach anyone here.
  *
  * Who reads what (Rule A, planner ruling 2026-10-04, report Q1): every member and admin reads every founded project,
  * so `memberOut` READS TP; the owner reads everything; guests read explicit lists only (`guestListed`: TE). Every
