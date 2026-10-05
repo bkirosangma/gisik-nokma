@@ -3268,7 +3268,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in the top bar, where each one can be opened, published or discarded. A draft's own page shows a "
+                    "text": " in the top bar (on a phone, under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the bottom bar), where each one can be opened, published or discarded. A draft's own page shows a "
                   },
                   {
                     "kind": "bold",

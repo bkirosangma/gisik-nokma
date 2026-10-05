@@ -532,7 +532,7 @@ settings are kept for about a month in case they come back.
 
 **Saving a draft.** **Save as draft** keeps the ticket private: only you can see it, it has no number yet, and
 it starts in the backlog. A **Draft saved** message offers **Open**. Your drafts are listed on **Drafts** in the
-top bar, where each one can be opened, published or discarded. A draft's own page shows a **Draft** label where
+top bar (on a phone, under **More** in the bottom bar), where each one can be opened, published or discarded. A draft's own page shows a **Draft** label where
 the number goes and a banner that says *"Only you can see this draft."*, with **Publish** and **Discard**.
 History and comments are not offered yet, and **Move** and **Delete** say *"Available after you publish"*.
 **Publish** makes it an ordinary ticket with a number, last in the backlog. **Discard** first says what will be

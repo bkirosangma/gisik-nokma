@@ -209,7 +209,7 @@ describe('21.025 Edit bottom bar', () => {
     await waitFor(() => expect(items()).toEqual(['Board', 'My work', 'Notes', 'Inbox', 'More']));
   });
 
-  it('21.025 the last slot can be removed (an empty bar is just More) and every nine destinations are offered between the two lists', async () => {
+  it('21.025 the last slot can be removed (an empty bar is just More) and all ten destinations are offered between the two lists', async () => {
     const user = userEvent.setup();
     rememberBottomBar(U, ['notes']);
     render(bar());
@@ -225,7 +225,8 @@ describe('21.025 Edit bottom bar', () => {
     await user.click(within(await screen.findByRole('dialog', { name: 'More' })).getByRole('button', { name: 'Edit bottom bar' }));
     const reopened = await screen.findByRole('dialog', { name: 'Edit bottom bar' });
     const offered = within(reopened).getAllByRole('button', { name: /^Add / });
-    expect(offered).toHaveLength(9);
+    // Ten since Drafts joined the catalogue (drafts T8 FIX 1, 28.198).
+    expect(offered).toHaveLength(10);
   });
 });
 
@@ -236,7 +237,7 @@ describe('21.026 More lists what the bar does not carry', () => {
     await user.click(within(phoneNav()).getByRole('button', { name: 'More' }));
     const more = await screen.findByRole('dialog', { name: 'More' });
     const links = within(more).getAllByRole('link').map((a) => a.textContent);
-    expect(links).toEqual(['List', 'Calendar', 'Timeline', 'Backlog', 'Members', 'Settings', 'Account', 'Help']);
+    expect(links).toEqual(['List', 'Calendar', 'Timeline', 'Backlog', 'Drafts', 'Members', 'Settings', 'Account', 'Help']);
     expect(within(more).getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe(`/settings?workspaceId=${WS}`);
     expect(within(more).getByRole('link', { name: 'Account' }).getAttribute('href')).toBe('/account');
     expect(within(more).getByRole('button', { name: 'Edit bottom bar' })).toBeTruthy();
@@ -442,7 +443,7 @@ describe('21.033 the script and the stylesheet name the same phone width', () =>
 });
 
 // Keep the destinations type exercised so a renamed id fails typecheck here, not only in the store.
-const _all: readonly BarDestination[] = ['board', 'my-work', 'notes', 'inbox', 'list', 'calendar', 'timeline', 'backlog', 'members'];
+const _all: readonly BarDestination[] = ['board', 'my-work', 'notes', 'inbox', 'list', 'calendar', 'timeline', 'backlog', 'drafts', 'members'];
 void _all;
 void fireEvent;
 
@@ -590,5 +591,41 @@ describe('23.286 the bar with no user id (the session never loaded) remembers no
     );
     await user.click(within(phoneNav()).getByRole('link', { name: 'Board' }));
     expect(window.localStorage.length).toBeGreaterThan(0);
+  });
+});
+
+describe('28.198 below 1025 px Drafts is reached from More (drafts T8 FIX 1; planner ruled B 09:11)', () => {
+  it('28.198 More lists Drafts, linking to /w/<ws>/drafts, and tapping it closes More; CONTROL: the default slots are unchanged', async () => {
+    const user = userEvent.setup();
+    render(bar());
+    // CONTROL — the default bar is byte-identical: Drafts is offered by More, never slotted by default.
+    await waitFor(() => expect(items()).toEqual(['Board', 'My work', 'Notes', 'Inbox', 'More']));
+    await user.click(within(phoneNav()).getByRole('button', { name: 'More' }));
+    const more = await screen.findByRole('dialog', { name: 'More' });
+    const drafts = within(more).getByRole('link', { name: 'Drafts' });
+    expect(drafts.getAttribute('href')).toBe(`/w/${WS}/drafts`);
+    await user.click(drafts);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull());
+  });
+
+  it('28.198 a bar that pins Drafts draws it as a slot, current on /w/<ws>/drafts', async () => {
+    rememberBottomBar(U, ['drafts', 'notes']);
+    render(bar({ pathname: `/w/${WS}/drafts` }));
+    await waitFor(() => expect(items()).toEqual(['Drafts', 'Notes', 'More']));
+    const slot = within(phoneNav()).getByRole('link', { name: 'Drafts' });
+    expect(slot.getAttribute('href')).toBe(`/w/${WS}/drafts`);
+    expect(slot.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('28.198 at desktop width there is no bar and the top bar still carries the Drafts link', async () => {
+    stubPhoneViewport(false);
+    render(
+      <Providers services={stubServices({ getMyWorkspaces: async () => [] }, { notifications: { unreadCount: async () => 0 } })}>
+        <AppNav workspaceId={WS} />
+      </Providers>,
+    );
+    const link = await screen.findByRole('link', { name: 'Drafts' });
+    expect(link.getAttribute('href')).toBe(`/w/${WS}/drafts`);
+    expect(screen.queryByRole('navigation', { name: 'Phone' })).toBeNull();
   });
 });
