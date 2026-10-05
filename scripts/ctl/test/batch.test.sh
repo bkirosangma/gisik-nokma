@@ -116,6 +116,13 @@ if a[0] == 'land':
         git('merge', '-q', '--no-ff', '--no-edit', d['headRefOid'], cwd=L)
         git('push', '-q', 'origin', base, cwd=L)
     mc = git('rev-parse', 'HEAD', cwd=L).stdout.strip()
+    mv = os.path.join(S, 'move-on-land')   # "<n> <sha>": PR #n's head moves right after the landing
+    if os.path.exists(mv):
+        m, new = open(mv).read().split()
+        q = os.path.join(S, f'pr-{m}.json')
+        e = json.load(open(q))
+        e['headRefOid'] = new
+        json.dump(e, open(q, 'w'))
     d['state'], d['mergeCommit'] = 'MERGED', {'oid': mc}
     json.dump(d, open(p, 'w'))
     say(f'OK land #{n} merge {mc[:12]} {base} {mc[:12]} primary untouched', 0)
@@ -147,7 +154,7 @@ mk() {
     mkdir -p apps/server/migrations packages/domain/test apps/mobile/src/editor
     echo 'create table a();' > apps/server/migrations/1000_a.sql
     for i in $(seq 1 20); do echo "line $i"; done > shared.txt
-    printf '%s\n' "describe('x', () => {" "    expect(TICKET_EVENT_TYPES).toHaveLength(17);" "    expect(other).toBe(1);" "});" > packages/domain/test/ticket-state.test.ts
+    printf '%s\n' "describe('x', () => {" "    expect(TICKET_EVENT_TYPES).toHaveLength(17);" "  // 1" "  // 2" "  // 3" "  // 4" "  // 5" "    expect(other).toBe(1);" "  // 6" "});" > packages/domain/test/ticket-state.test.ts
     echo 'export const html = "v1";' > apps/mobile/src/editor/editor-html.generated.ts
     echo 'lock: 1' > pnpm-lock.yaml
     $G add -A && $G commit -q -m base && $G push -q origin main 2>/dev/null
@@ -185,14 +192,17 @@ PY
 shared_edit() { mem "$1" "sed -i.bak 2s/.*/$1/ shared.txt && rm -f shared.txt.bak"; pr "$2" "task/$1"; ready "task/$1" READY; }   # line 2 of shared.txt: two of these conflict
 mig() { mem "$1" "$3"; pr "$2" "task/$1"; ready "task/$1" READY; }
 TS=packages/domain/test/ticket-state.test.ts
+rewrite() { mem "$1" "sed -i.bak 's/expect(TICKET_EVENT_TYPES).toHaveLength(17)/expect(TICKET_EVENT_TYPES.length).toBe(18)/' $TS && rm -f $TS.bak"; pr "$2" "task/$1"; ready "task/$1" READY; }   # the pin line rewritten: only its OLD form matches
 bump() { mem "$1" "sed -i.bak 's/toHaveLength(17)/toHaveLength(18)/' $TS && rm -f $TS.bak"; pr "$2" "task/$1"; ready "task/$1" READY; }
 other_line() { mem "$1" "sed -i.bak 's/toBe(1)/toBe(2)/' $TS && rm -f $TS.bak"; pr "$2" "task/$1"; ready "task/$1" READY; }
 tail_line() { mem "$1" "echo '// tail' >> $TS"; pr "$2" "task/$1"; ready "task/$1" READY; }
 bundle() { mem "$1" "echo 'export const html = \"$1\";' > apps/mobile/src/editor/editor-html.generated.ts"; pr "$2" "task/$1"; ready "task/$1" READY; }
-# tipmerge_a [hand] — task/a merges origin's release tip (the tip moved since a was cut) and is pushed; PR #11 moves to that merge. `hand`
-# amends the merge with an edit of its own: two parents still, but its tree is no longer the auto-merge.
+# tipmerge_a [hand|side] — task/a merges origin's release tip (the tip moved since a was cut) and is pushed; PR #11 moves to that merge. `hand`
+# amends the merge with an edit of its own: two parents still, but its tree is no longer the auto-merge. `side` merges task/c (not on the
+# base) instead: a clean auto-merge, but of unreviewed work.
 tipmerge_a() {
-  ( cd "$w" && $G fetch -q origin && $G checkout -q -B task/a origin/task/a && $G merge -q --no-edit "origin/$BASE" \
+  local with="origin/$BASE"; [ "${1:-}" != side ] || with=origin/task/c
+  ( cd "$w" && $G fetch -q origin && $G checkout -q -B task/a origin/task/a && $G merge -q --no-edit "$with" \
     && { [ "${1:-}" != hand ] || { echo hand >> packages/a/a.txt && $G commit -q -a --amend --no-edit; }; } && $G push -q origin task/a 2>/dev/null ) && pr 11 task/a
 }
 noise_lines() { local h; h=$(sha "$1"); printf '%s\n' "13:51 DONE 12:00 RIDER $h $1 ${h:0:8} (reviewer C)" "13:52 DONE 12:00 $1 ${h:0:8} (reviewer A, VOID)" \
@@ -232,9 +242,10 @@ check "13.2297 a FIX after the READY line refuses the PR (rule ready, the FIX li
 check "13.2297 RIDER, VOID, REVIEW and TOOK lines naming the head are no READY; a READY naming an OLDER sha of the branch is none either" \
   'mk && : > "$Q" && noise_lines task/a && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY" \
    && : > "$Q" && ready task/a READY "$($G -C "$bare" rev-parse task/a^)" && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY"'
-check "13.2297 a needs-tip line admits the CLEAN tip merge of the sha it names; a hand-edited merge (its tree is not the auto-merge) and a READY (not needs-tip) naming the pre-merge sha are refused" \
+check "13.2297 a needs-tip line admits the CLEAN tip merge of the sha it names; a hand-edited merge (its tree is not the auto-merge), a clean merge of a branch NOT on the base, and a READY (not needs-tip) naming the pre-merge sha are refused" \
   'mk && : > "$Q" && ready task/a needs-tip && ready task/b READY && tipmerge_a && b 11 12 --dry-run && [ $rc -eq 0 ] \
    && mk && : > "$Q" && ready task/a needs-tip && ready task/b READY && tipmerge_a hand && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY" \
+   && mk && : > "$Q" && ready task/a needs-tip && ready task/b READY && tipmerge_a side && [ "$($G -C "$bare" rev-list --parents -n 1 task/a | wc -w)" -eq 3 ] && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY" \
    && mk && : > "$Q" && ready task/a READY && ready task/b READY && tipmerge_a && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY"'
 check "13.2297 a head already on origin/<base>, a PR that is not OPEN and a PR against another base are refused, each naming the PR" \
   'mk && pr 11 "$BASE" && ready "$BASE" READY && pr 12 task/b CLOSED && pr 13 task/c OPEN release/other && b 11 12 13 --dry-run && [ $rc -eq 1 ] \
@@ -258,13 +269,20 @@ check "13.2299 always alone (rule c): pnpm-lock.yaml, a Dockerfile*, scripts/ctl
    && alone_leg "mkdir -p docs/lanes/gate-lock && echo x > docs/lanes/gate-lock/locked-test.sh" "touches docs/lanes/gate-lock/locked-test.sh (the gate itself" \
    && alone_leg "mkdir -p packages/zeta && echo {} > packages/zeta/package.json" "creates a package (packages/zeta/package.json)"'
 check "13.2299 CONTROL — changing an EXISTING package.json, and adding one outside apps/* and packages/* (a test fixture), create no package" \
-  'mk && mem e "echo \" \" >> packages/a/package.json && mkdir -p scripts/fx/pk && echo {} > scripts/fx/pk/package.json" && pr 15 task/e && ready task/e READY && b 15 12 --dry-run && [ $rc -eq 0 ]'
+  'mk && mem e "echo \" \" >> packages/a/package.json && mkdir -p scripts/fx/packages/pk && echo {} > scripts/fx/packages/pk/package.json" && pr 15 task/e && ready task/e READY && b 15 12 --dry-run && [ $rc -eq 0 ]'
 
 # --- 13.2300: rule (d), shared count pins --------------------------------------------------------------------------------------------------
 check "13.2300 two PRs bumping one shared count pin refuse the later in READY order (rule d), naming the pin and the earlier PR — they merge cleanly and then fail" \
   'mk && bump e 15 && bump f 16 && b 16 15 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #16 (d) shared count pin \"the ticket-state event-type count (17/18/19)\" ($TS) is also bumped by #15" && ! says "^REFUSE #15"'
 check "13.2300 CONTROL — two PRs changing OTHER lines of a pin's file pass (the pin is its line); a whole-file pin (the generated editor bundle) changed by two refuses" \
   'mk && other_line e 15 && tail_line f 16 && b 15 16 --dry-run && [ $rc -eq 0 ] && mk && bundle e 15 && bundle f 16 && b 15 16 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #16 (d) shared count pin \"the generated mobile editor bundle\""'
+check "13.2300 a pin line REWRITTEN by the second PR still counts through its old form (the removed line matches)" \
+  'mk && bump e 15 && rewrite f 16 && b 15 16 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #16 (d) shared count pin \"the ticket-state event-type count"'
+# tip_moves — after every member was cut, the tip bumps the ticket-state count and changes pnpm-lock.yaml: changes no member made.
+tip_moves() { ( cd "$w" && $G fetch -q origin && $G checkout -q -B "$BASE" "origin/$BASE" && sed -i.bak 's/toHaveLength(17)/toHaveLength(18)/' $TS && rm -f $TS.bak && echo 'lock: 9' > pnpm-lock.yaml \
+  && $G commit -q -am "tip moves" && $G push -q origin "$BASE" 2>/dev/null ); }
+check "13.2300 the rules read each member's OWN diff (three dots, from its merge base): a pin bump and a pnpm-lock.yaml change the tip made after the members were cut are charged to no member" \
+  'mk && other_line e 15 && tail_line f 16 && tip_moves && b 15 16 11 --dry-run && [ $rc -eq 0 ] && ! says "^REFUSE"'
 # pins_live PY [EXTRA] — every SHARED_PINS file exists in the checkout running this suite and each pattern matches a line of it (EXTRA: one
 # more pin as a JSON triple, for the control).
 pins_live() { python3 - "$1" "$($G -C "$HERE" rev-parse --show-toplevel)" "${2:-}" <<'PY'
@@ -312,6 +330,8 @@ check "13.2302 a member GitHub did not mark merged is closed with a comment nami
 check "13.2302 a member whose head is NOT in origin/<base> after the landing is never closed: left open, the call FAILS naming it" \
   'mk && rm "$S/automark" && touch "$S/land-hollow" && b 11 12 && [ $rc -eq 1 ] && [ "$(prf 11 state)" = OPEN ] && [ "$(prf 12 state)" = OPEN ] && ! grep -q "pr close" "$S/mut.log" \
    && says "^MEMBER #11 task/a .* NOT in origin/$BASE" && summary "need a hand: #11 #12"'
+check "13.2302 a member whose PR head moved right after the landing is never closed (live work): left open, the call FAILS naming it" \
+  'mk && rm "$S/automark" && echo "12 $(sha task/c)" > "$S/move-on-land" && b 11 12 && [ $rc -eq 1 ] && [ "$(prf 12 state)" = OPEN ] && closed_by_batch 11 && says "^MEMBER #12 task/b .* left OPEN: its head is" && summary "need a hand: #12 (log"'
 check "13.2302 a member whose PR head moved after the union was built is not landed: no pr open, no land, the FAIL names it" \
   'mk && echo "12 $(sha task/c)" > "$S/move-on-gate" && b 11 12 && [ $rc -eq 1 ] && [ "$(ncalls gate)" = 1 ] && [ "$(ncalls "pr open")" = 0 ] && [ "$(ncalls land)" = 0 ] && summary "#12 moved since the union was built"'
 
@@ -328,7 +348,7 @@ check "13.2304 red touching SEVERAL members: bisect — the first half in READY 
    && says "^MEMBER #14 task/d .* held: bisect" && says "^MEMBER #12 task/b .* merged"'
 check "13.2304 red touching NO member with 2 in the union: halves of one are no batch — gate singly, exit 3, no second gate, nothing landed" \
   'mk && printf "red @t/nope#test\n" > "$S/gates" && b 11 12 && [ $rc -eq 3 ] && [ "$(ngated)" = 1 ] && says "^BISECT after gate 1: 0 members" && [ "$(ncalls land)" = 0 ] && [ "$(ncalls "pr open")" = 0 ] \
-   && says "^MEMBER #11 task/a .* gate singly"'
+   && says "^MEMBER #11 task/a .* gate singly" && says "^MEMBER #12 task/b .* gate singly"'
 check "13.2304 a gate that refused to run is no gate and no member's: stop, exit 1, nothing ejected or bisected, no PR; a red with timeouts>0, or with no failing task, stops the same way" \
   'mk && printf "refuse\n" > "$S/gates" && b 11 12 && [ $rc -eq 1 ] && [ "$(ncalls gate)" = 1 ] && [ "$(ngated)" = 0 ] && summary "the gate did not run" && ! says "FIX candidate" && ! says "^BISECT" && [ "$(ncalls "pr open")" = 0 ] \
    && mk && printf "red @t/b#test timeouts=2\n" > "$S/gates" && b 11 12 13 && [ $rc -eq 1 ] && [ "$(ngated)" = 1 ] && summary "not a member.s (timeouts=2)" && ! says "FIX candidate" \

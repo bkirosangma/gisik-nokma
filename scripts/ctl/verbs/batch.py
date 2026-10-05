@@ -484,8 +484,8 @@ def land(members, kept, union, stamp, gates):
     r = run([CTL, 'pr', 'open', branch, '--title', title, '--body', body, '--base', BASE, '--repo', TREE])
     last = last_line(r)
     say(f'  {last}')
-    pm = re.match(r'OK pr-open #(\d+) head ([0-9a-f]{7,40})', last)
-    if r.returncode != 0 or not pm or not union.startswith(pm.group(2)):
+    pm = re.match(r'OK pr-open #(\d+) ', last)
+    if r.returncode != 0 or not pm:
         report(members)
         fail(f'ctl pr open {branch}: {last} — not landed')
     pr = pm.group(1)
