@@ -308,7 +308,6 @@ export function WorkflowBuilderScreen(props: {
   const enterFullScreen = (from: 'header' | 'corner') => {
     enteredFrom.current = from;
     focusAfterToggle.current = 'toolbar';
-    setPanelsOpen(false);
     setFullscreen(true);
     writeSession(fullScreenKey, 'true');
   };

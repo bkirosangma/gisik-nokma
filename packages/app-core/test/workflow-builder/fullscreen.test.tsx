@@ -145,6 +145,7 @@ describe('25.546 full screen and the panel width are remembered for the session,
     expect(await widthAfterMount('280')).toBe('280px');
     expect(await widthAfterMount('junk')).toBe('360px');
     expect(await widthAfterMount('')).toBe('360px'); // not Number('') = 0, which would clamp to 280
+    expect(await widthAfterMount('300.6')).toBe('301px'); // whole px
 
     window.sessionStorage.setItem(`${key}:panelWidth`, '300');
     await renderBuilder({ workspaceId, initialDraft });
@@ -294,6 +295,8 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
       await user.keyboard('{Escape}');
       expect(panel()).toBeNull();
       expect(root).toHaveAttribute('data-fullscreen', 'true');
+      // focus was inside the panel: it stays in the full-screen region rather than falling to the body
+      expect(root).toHaveFocus();
 
       await user.keyboard('{Escape}');
       expect(root).toHaveAttribute('data-fullscreen', 'false');
@@ -333,11 +336,13 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
     expect(root).toHaveAttribute('data-fullscreen', 'true');
   });
 
-  it('25.548 control: with nothing open, one Escape exits full screen', async () => {
+  it('25.548 control: with nothing open, one Escape exits full screen; any other key leaves it on', async () => {
     const user = userEvent.setup();
     const { root, header } = await renderBuilder();
     await enterFullScreen(user, header);
     expect(panel()).toBeNull();
+    await user.keyboard('{Enter}');
+    expect(root).toHaveAttribute('data-fullscreen', 'true');
     await user.keyboard('{Escape}');
     expect(root).toHaveAttribute('data-fullscreen', 'false');
   });
