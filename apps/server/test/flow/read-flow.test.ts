@@ -1,9 +1,10 @@
 import type { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type FlowRead } from '@gisik-nokma/domain';
 import { FLOW_DEFAULT_CAP, FLOW_MAX_RINGS, readFlow, walkFlow } from '../../src/flow/read-flow.js';
+import { readFlowView } from '../../src/flow/flow-view.js';
 import { listMyDrafts } from '../../src/read/drafts.js';
-import { flowWire, type FlowReadWire } from '../../src/routes/flow.js';
+import { requireMember } from '../../src/read/membership.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
@@ -152,9 +153,9 @@ describe('29.187 a hidden ticket is a hole', () => {
     expect(hidden.json()).toEqual({ error: 'not_found' }); // the one NOT_FOUND_BODY, not merely two equal bodies
     const member = await get('member', SH);
     expect(member.statusCode).toBe(200);
-    const body = member.json() as FlowReadWire;
-    expect(body.tickets.map((t) => t.id)).toEqual([SH]);
-    expect(body.links).toEqual([]);
+    const body = member.json() as FlowRead;
+    expect(body.nodes.map((n) => n.id)).toEqual([SH]);
+    expect(body.edges).toEqual([]);
     expect(JSON.stringify(body)).not.toContain('Salary review'); // the hidden ticket's title
     // CONTROL: the owner opens the same hidden ticket as a seed
     expect((await get('owner', HI)).statusCode).toBe(200);
@@ -305,22 +306,22 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
     const room = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 301 });
     expect([room.nodes.length, room.truncated, room.reached]).toEqual([301, false, 301]);
     // the route reads with the default, and its wire carries the same cut, truncated and reached
-    const wire = (await get('owner', hub)).json() as FlowReadWire;
-    expect([wire.tickets.length, wire.links.length, wire.truncated, wire.reached]).toEqual([300, 299, true, 301]);
+    const wire = (await get('owner', hub)).json() as FlowRead;
+    expect([wire.nodes.length, wire.edges.length, wire.truncated, wire.reached]).toEqual([300, 299, true, 301]);
   });
 
-  it('29.189 the wire: titles, keys, state names, the node, leads_to with its label and blocks drawn between members; a draft has no key', async () => {
+  it('29.189 the wire: titles, keys, state names, leads_to with its label and blocks drawn between members; a draft has no key', async () => {
+    // The route answers Part 3's FlowRead (wtg3 T3 replaced this task's small wire on the same path); the claims are the same.
     const owner = await get('owner', SH);
     expect(owner.statusCode).toBe(200);
-    const body = owner.json() as FlowReadWire;
+    const body = owner.json() as FlowRead;
     expect(body.rootId).toBe(SH);
-    expect(body.tickets.map((t) => t.id).sort()).toEqual([HI, SH, TE].sort());
-    const shared = body.tickets.find((t) => t.id === SH);
-    expect(shared).toMatchObject({ title: 'Renew the trade licence', stateName: 'Waiting on counterparty', projectId: PROJECT, assigneeId: null });
+    expect(body.nodes.map((n) => n.id).sort()).toEqual([HI, SH, TE].sort());
+    const shared = body.nodes.find((n) => n.id === SH);
+    expect(shared).toMatchObject({ title: 'Renew the trade licence', state: { id: 'waiting', name: 'Waiting on counterparty', category: 'active' }, projectId: PROJECT, assigneeId: null, draft: false });
     // TE is the member's assigned task: the assignee rides the wire (SH above is the unassigned control)
-    expect(body.tickets.find((t) => t.id === TE)).toMatchObject({ title: 'File the GST return', projectId: PROJECT, assigneeId: MEMBER });
-    expect(shared?.node).toMatchObject({ id: SH, stateId: 'waiting', category: 'active', draft: false });
-    const links = body.links.map((l) => `${l.kind}:${l.sourceId}>${l.targetId}:${l.label}`).sort();
+    expect(body.nodes.find((n) => n.id === TE)).toMatchObject({ title: 'File the GST return', projectId: PROJECT, assigneeId: MEMBER });
+    const links = body.edges.map((l) => `${l.kind}:${l.from}>${l.to}:${l.label}`).sort();
     expect(links).toEqual([`blocks:${SH}>${TE}:null`, `leads_to:${HI}>${TE}:Yes`, `leads_to:${SH}>${HI}:null`].sort());
     expect([body.truncated, body.reached]).toEqual([false, 3]);
     // Keys: every ticket here is published, so each wire key is non-null and is the key the single-ticket route
@@ -328,14 +329,14 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
     for (const id of [SH, HI, TE]) {
       const viaTicket = (await rw.app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${id}`, headers: rw.authOf('owner') })).json().key;
       expect(viaTicket).toMatch(/^[A-Z0-9]+-\d+$/);
-      expect(body.tickets.find((t) => t.id === id)?.key).toBe(viaTicket);
+      expect(body.nodes.find((n) => n.id === id)?.key).toBe(viaTicket);
     }
 
-    const author = (await get('member', FA)).json() as FlowReadWire;
-    const draft = author.tickets.find((t) => t.id === FD);
+    const author = (await get('member', FA)).json() as FlowRead;
+    const draft = author.nodes.find((n) => n.id === FD);
     expect(draft?.key).toBeNull();
-    expect(draft?.node.draft).toBe(true);
-    expect(author.tickets.find((t) => t.id === FA)?.node.draft).toBe(false); // CONTROL: a published ticket is not flagged
+    expect(draft?.draft).toBe(true);
+    expect(author.nodes.find((n) => n.id === FA)?.draft).toBe(false); // CONTROL: a published ticket is not flagged
   });
 
   it('29.189 a row the projection cannot name is never drawn: a missing definition, an undeclared state or a missing title throws, naming the ticket', async () => {
@@ -355,22 +356,19 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
       `walkFlow: ticket ${x2} is in state nowhere, which ${wf}@${v} does not declare`,
     );
     // no title claim at all (x3), and a title claim whose value is not a string (x4): the walk does not read the
-    // title, so it still returns the node; the wire refuses to print one
+    // title, so it still returns the node; the flow view refuses to print one (`titleOf`, the card read's own guard)
+    const eff = (await requireMember(db.pool, OWNER, WS))!;
     await db.pool.query("UPDATE proj_tickets SET fields = fields - 'title' WHERE ticket_id = $1", [x3]);
     await db.pool.query("UPDATE proj_tickets SET fields = jsonb_set(fields, '{title,value}', '7') WHERE ticket_id = $1", [x4]);
     for (const id of [x3, x4]) {
       const walk = await walkFlow(db.pool, { workspaceId: WS, seedId: id, viewerId: OWNER });
       expect(walk.read.nodes.map((n) => n.id)).toEqual([id]);
-      await expect(flowWire(db.pool, WS, id, walk)).rejects.toThrow(
-        `flow read: ticket ${id} has no string title claim; ticket.created writes one, so proj_tickets and the ledger disagree`,
-      );
     }
-    // the wire's own two guards: a node whose state, or state name, the walk did not hand over
-    const whole = await walkFlow(db.pool, { workspaceId: WS, seedId: SH, viewerId: OWNER });
-    expect((await flowWire(db.pool, WS, SH, whole)).tickets).toHaveLength(3); // CONTROL: the intact walk wires
-    const noName = { ...whole, stateNames: new Map([...whole.stateNames].filter(([id]) => id !== TE)) };
-    await expect(flowWire(db.pool, WS, SH, noName)).rejects.toThrow(`flow read: no state name for node ${TE}`);
-    const noState = { ...whole, states: new Map([...whole.states].filter(([id]) => id !== TE)) };
-    await expect(flowWire(db.pool, WS, SH, noState)).rejects.toThrow(`flow read: no state for node ${TE}`);
+    await expect(readFlowView(db.pool, { workspaceId: WS, seedId: x3, viewerId: OWNER, eff })).rejects.toThrow(
+      `titleOf: no title claim on ticket ${x3} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
+    );
+    await expect(readFlowView(db.pool, { workspaceId: WS, seedId: x4, viewerId: OWNER, eff })).rejects.toThrow(
+      `titleOf: the title claim on ticket ${x4} is not a string — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
+    );
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
@@ -23,7 +24,7 @@ import {
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
 import type { IngestService } from '../../src/ingest/ingest-service.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
-import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
+import { overwriteSnapshot, readLatestSnapshot, writeSnapshot } from '../../src/ledger/snapshot-store.js';
 import { buildContestedClaim } from '../../src/sync/contest-coherence.js';
 import { BOOTSTRAP_BACKFILL_TYPES, bootstrapTicket, SNAPSHOT_RESTATE_PENDING, SnapshotRestatePending } from '../../src/sync/sync-routes.js';
 import { targetSight } from '../../src/visibility/withhold-link-targets.js';
@@ -38,7 +39,9 @@ import { buildLedgerDeps } from '../../src/sync/ledger-deps.js';
 /**
  * `GET /v1/sync/bootstrap` — 12.94-12.99 and 12.115-12.118
  * (`test-cases/12-offline-sync-apps.md`), and at the end of the file 29.400-29.403
- * and 29.405, a snapshot from an older fold (`test-cases/29-workflow-timeline-graphs.md`). *This line said `12.94-12.97` from the
+ * and 29.405-29.409, a snapshot from an older fold, then 29.420-29.427 but 29.425, the snapshot write token
+ * (`test-cases/29-workflow-timeline-graphs.md`; 29.404 is in `snapshot-fold-version.test.ts`, 29.425 in
+ * `test/migrations.test.ts`). *This line said `12.94-12.97` from the
  * round that added 12.98-12.99 until the round that added 12.115-12.118 —
  * exactly the stale-enumeration bug that round was fixing in two other places.
  * A range in prose is a fact about a moment; recount it from the `it(` blocks.*
@@ -1230,8 +1233,12 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
     // Control: a current row is served by both doors.
     expect((await app.inject({ method: 'GET', url: ticketUrl, headers: memberHeaders })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: workspaceUrl, headers: memberHeaders })).statusCode).toBe(200);
-    // A corrupt CURRENT-fold row: `state.links` is not iterable, so `withholdLinks` throws a TypeError in the try.
-    await db.pool.query(`UPDATE snapshots SET state = jsonb_set(state, '{links}', '5') WHERE entity_kind = 'ticket' AND entity_id = $1`, [ticketId]);
+    // A corrupt CURRENT-fold row: `state.links` is not iterable, so `withholdLinks` throws a TypeError in the try. The
+    // fresh `write_token` keeps it current: a ticket-row UPDATE that leaves the token as it was is demoted (29.420).
+    await db.pool.query(
+      `UPDATE snapshots SET state = jsonb_set(state, '{links}', '5'), write_token = gen_random_uuid() WHERE entity_kind = 'ticket' AND entity_id = $1`,
+      [ticketId],
+    );
     for (const url of [ticketUrl, workspaceUrl]) {
       const res = await app.inject({ method: 'GET', url, headers: memberHeaders });
       expect(res.statusCode).toBe(500);
@@ -1240,6 +1247,27 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
     expect(warnings).toEqual([]);
   });
 });
+
+/**
+ * The boot pass as `index.ts` starts it, on `pool`, run to settled; returns the `dueAt` it published. The writer points
+ * `bootRestate.warn` at its own log, so `rearm` points it back at the calling case's collector.
+ */
+async function fvBootPassOn(pool: Pool, rearm: () => void): Promise<Date> {
+  const log: string[] = [];
+  const stop = startSnapshotWriter(pool, { intervalMs: 3_600_000, minEvents: STALE_ONLY, immediate: true, log: (msg) => log.push(msg) });
+  try {
+    await vi.waitFor(() => {
+      expect(bootRestate.complete).toBe(true);
+    }, { timeout: 20_000 });
+  } finally {
+    stop();
+  }
+  expect(log).toEqual([]);
+  rearm();
+  const at = bootRestate.dueAt;
+  if (!(at instanceof Date)) throw new Error('fixture: the settled boot pass published its dueAt');
+  return at;
+}
 
 /**
  * Cases 29.406-29.409 (wtg2 fold-version overlap, planner ruling E 2026-10-05, its instant re-pinned at 17:52 on the
@@ -1271,27 +1299,13 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
   });
 
   /** The boot pass as `index.ts` starts it, on `pool`, run to settled; returns the `dueAt` it published. */
-  async function fvBootPass(pool: Pool = db.pool): Promise<Date> {
-    const log: string[] = [];
-    const stop = startSnapshotWriter(pool, { intervalMs: 3_600_000, minEvents: STALE_ONLY, immediate: true, log: (msg) => log.push(msg) });
-    try {
-      await vi.waitFor(() => {
-        expect(bootRestate.complete).toBe(true);
-      }, { timeout: 20_000 });
-    } finally {
-      stop();
-    }
-    expect(log).toEqual([]);
-    // The writer points `warn` at its own log; these cases collect it here instead.
-    collectWarnings();
-    const at = bootRestate.dueAt;
-    if (!(at instanceof Date)) throw new Error('fixture: the settled boot pass published its dueAt');
-    return at;
-  }
+  const fvBootPass = (pool: Pool = db.pool): Promise<Date> => fvBootPassOn(pool, collectWarnings);
 
   const shift = (at: Date, ms: number): Date => new Date(at.getTime() + ms);
+  // The fresh `write_token` keeps the hand-set clock: a ticket-row UPDATE that leaves the token as it was is demoted,
+  // and the demotion re-stamps `created_at` (29.420).
   const setCreatedAt = (ticketId: string, at: Date) =>
-    db.pool.query(`UPDATE snapshots SET created_at = $2 WHERE entity_kind = 'ticket' AND entity_id = $1`, [ticketId, at]);
+    db.pool.query(`UPDATE snapshots SET created_at = $2, write_token = gen_random_uuid() WHERE entity_kind = 'ticket' AND entity_id = $1`, [ticketId, at]);
   const refusalOf = (ticketId: string) =>
     withClient(async (client) => bootstrapTicket(client, ticketId, targetSight(client, memberId)).catch((err: unknown) => err));
 
@@ -1477,6 +1491,278 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
     await catchUp();
     expect(await owed(device, world)).toEqual([]);
     expect(await periodsOn(device, ticketId)).toEqual(want);
+    expect(warnings).toEqual([]);
+  });
+});
+
+/**
+ * Cases 29.420-29.427 but 29.425 (wtg2 fold-version writer token, planner ruling F 2026-10-05, its clocks ruled at
+ * 18:31). A rolling deploy runs the OLD instance's `overwriteSnapshot` beside the new code, and its DO UPDATE sets
+ * neither `fold_version` nor `write_token`. On a ticket row the new instance has already restated it writes old-shape
+ * state (no work periods), and the row would keep the current fold and its old `created_at`, which neither the due
+ * query nor ruling E sees. Migration `1792100300000_snapshots-write-token.sql` handles that write in the database:
+ * every new writer sets a fresh `write_token`, and a BEFORE UPDATE trigger demotes a ticket-row update that leaves the
+ * token as it was (`fold_version` 1, `created_at` the write's own clock), so ruling E refuses the row and the next pass
+ * restates it. The same migration makes `created_at`'s default the insert's own clock, for an old instance's INSERT.
+ * 29.425, the migration down and up, is in `test/migrations.test.ts`.
+ */
+describe('29.420-29.427 an old instance\'s write to a ticket snapshot is demoted by the write-token trigger', () => {
+  /**
+   * The OLD instance's write, verbatim: main's `overwriteSnapshot` statement (origin/main 66c46fdd,
+   * `apps/server/src/ledger/snapshot-store.ts:73-76`; release/knowledge-graph, which reaches main before WG, carries the
+   * same text). Its DO UPDATE sets neither `fold_version` nor `write_token`. At a seq with no row it is a plain INSERT,
+   * so both columns take their defaults.
+   */
+  const OLD_OVERWRITE_SQL = `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance)
+       VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (entity_kind, entity_id, seq)
+       DO UPDATE SET state = excluded.state, provenance = excluded.provenance`;
+  /**
+   * New code that forgets the token: this file's `overwriteSnapshot` as it stood before the token (ba9bd446
+   * `snapshot-store.ts:91-94`). It stamps the current fold, and is demoted all the same (29.424).
+   */
+  const TOKENLESS_NEW_OVERWRITE_SQL = `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version)
+       VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (entity_kind, entity_id, seq)
+       DO UPDATE SET state = excluded.state, provenance = excluded.provenance, fold_version = excluded.fold_version`;
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  /** A current-fold state and an old-fold one. The trigger reads neither, so 29.420 and 29.422-29.424 need no fold. */
+  const RESTATED = { title: 'Restated', periods: [{ start: '2026-10-05T04:30:00.000Z', end: null, pass: 1 }], rounds: 1 };
+  const OLD_SHAPE = { title: 'Old shape' };
+
+  type RawRow = {
+    state: Record<string, unknown>;
+    provenance: unknown;
+    fold_version: number;
+    created_at: Date;
+    write_token: string | null;
+  };
+
+  let warnings: string[] = [];
+  const collectWarnings = (): void => {
+    bootRestate.warn = (msg) => {
+      warnings.push(msg);
+    };
+  };
+  beforeEach(() => {
+    warnings = [];
+    bootRestate.complete = false;
+    bootRestate.dueAt = null;
+    collectWarnings();
+  });
+
+  const bootPass = (): Promise<Date> => fvBootPassOn(db.pool, collectWarnings);
+  /** An hour before the database clock: a `created_at` every later write's clock is clearly past, at any precision. */
+  const hourAgo = async (): Promise<Date> =>
+    new Date((await db.pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t.getTime() - 3_600_000);
+
+  async function raw(kind: string, entityId: string, seq: number): Promise<RawRow> {
+    const { rows } = await db.pool.query<RawRow>(
+      'SELECT state, provenance, fold_version, created_at, write_token FROM snapshots WHERE entity_kind = $1 AND entity_id = $2 AND seq = $3',
+      [kind, entityId, seq],
+    );
+    if (rows.length !== 1) throw new Error(`fixture: one ${kind} row at seq ${seq}, found ${rows.length}`);
+    return rows[0]!;
+  }
+
+  /** A row as some writer left it, with every column the trigger reads or writes bound; `token` null is a row from before the migration. */
+  async function plantRow(kind: string, entityId: string, seq: number, state: object, foldVersion: number, token: string | null, createdAt: Date): Promise<void> {
+    await db.pool.query(
+      `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance, fold_version, write_token, created_at)
+         VALUES ($1, $2, $3, $4, NULL, $5, $6, $7)`,
+      [kind, entityId, seq, JSON.stringify(state), foldVersion, token, createdAt],
+    );
+  }
+
+  /**
+   * A stale row (fold 1, old shape: the full fold without periods or rounds) AT the ticket's head, created at
+   * `createdAt`, so the boot pass restates it IN PLACE and the restated row keeps that `created_at` (29.421 needs it at
+   * or before `dueAt`). Returns the head and the old-shape state an old instance would write there.
+   */
+  async function plantStaleAtHead(world: FvWorkspace, ticketId: string, createdAt: Date): Promise<{ head: number; oldShape: Record<string, unknown> }> {
+    const head = (await readEntityEvents(db.pool, 'ticket', ticketId)).at(-1)!.seq;
+    const oldShape = JSON.parse(JSON.stringify(await fvFold(world, ticketId))) as Record<string, unknown>;
+    delete oldShape['periods'];
+    delete oldShape['rounds'];
+    await plantRow('ticket', ticketId, head, oldShape, 1, null, createdAt);
+    return { head, oldShape };
+  }
+
+  const refusalOf = (ticketId: string) =>
+    withClient(async (client) => bootstrapTicket(client, ticketId, targetSight(client, memberId)).catch((err: unknown) => err));
+
+  it('29.420 the old instance\'s overwrite of a restated ticket row is demoted: fold_version 1 and created_at re-stamped later, its old-shape state kept, and a row with no token (as the migration found every row) too; control: the new overwriteSnapshot on the row keeps the fold and created_at and changes the token', async () => {
+    const ticketId = newUlid();
+    const token = randomUUID();
+    const past = await hourAgo();
+    await plantRow('ticket', ticketId, 3, RESTATED, TICKET_FOLD_VERSION, token, past);
+
+    // CONTROL: the new writer on the restated row sets a fresh token, so the trigger leaves the row's fold and clock.
+    const again = { ...RESTATED, title: 'Restated again' };
+    await withClient((client) => overwriteSnapshot(client, { entityKind: 'ticket', entityId: ticketId, seq: 3, state: again, provenance: null }));
+    const kept = await raw('ticket', ticketId, 3);
+    expect(kept).toMatchObject({ state: again, fold_version: TICKET_FOLD_VERSION, created_at: past });
+    expect(kept.write_token).toEqual(expect.stringMatching(UUID));
+    expect(kept.write_token).not.toBe(token);
+
+    // The old instance's write on the same row: its state lands, and the row is stale again, created now.
+    await db.pool.query(OLD_OVERWRITE_SQL, ['ticket', ticketId, 3, JSON.stringify(OLD_SHAPE), null]);
+    const demoted = await raw('ticket', ticketId, 3);
+    expect(demoted.state).toEqual(OLD_SHAPE);
+    expect(demoted.fold_version).toBe(1);
+    expect(demoted.created_at.getTime()).toBeGreaterThan(past.getTime());
+    expect(demoted.write_token).toBe(kept.write_token);
+
+    // A row with no token: the old write leaves it null, and null is not distinct from null.
+    const bare = newUlid();
+    await plantRow('ticket', bare, 3, RESTATED, TICKET_FOLD_VERSION, null, past);
+    await db.pool.query(OLD_OVERWRITE_SQL, ['ticket', bare, 3, JSON.stringify(OLD_SHAPE), null]);
+    const bareRow = await raw('ticket', bare, 3);
+    expect(bareRow).toMatchObject({ state: OLD_SHAPE, fold_version: 1, write_token: null });
+    expect(bareRow.created_at.getTime()).toBeGreaterThan(past.getTime());
+  });
+
+  it('29.421 end to end: after the boot pass restated a ticket in place, the old instance\'s overwrite of that row is refused (SnapshotRestatePending, 503); the next interval pass restates it, and the bootstrap serves the full fold\'s periods', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    const want = (await fvFold(world, ticketId)).periods;
+    expect(want).toHaveLength(2);
+    const { head, oldShape } = await plantStaleAtHead(world, ticketId, await hourAgo());
+    const dueAt = await bootPass();
+    // The premise: the pass restated the row IN PLACE, so its created_at is still at or before dueAt.
+    const restated = await raw('ticket', ticketId, head);
+    expect(restated.fold_version).toBe(TICKET_FOLD_VERSION);
+    expect(restated.write_token).toEqual(expect.stringMatching(UUID));
+    expect(restated.created_at.getTime()).toBeLessThanOrEqual(dueAt.getTime());
+    expect(await snapshotRows(ticketId)).toBe(1);
+
+    await db.pool.query(OLD_OVERWRITE_SQL, ['ticket', ticketId, head, JSON.stringify(oldShape), JSON.stringify(restated.provenance)]);
+    const refusal = await refusalOf(ticketId);
+    expect(refusal).toBeInstanceOf(SnapshotRestatePending);
+    expect((refusal as SnapshotRestatePending).ticketId).toBe(ticketId);
+    const url = `/v1/sync/bootstrap/ticket?workspaceId=${world.workspaceId}&ticketId=${ticketId}`;
+    const res = await app.inject({ method: 'GET', url, headers: memberHeaders });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: SNAPSHOT_RESTATE_PENDING });
+    expect(warnings).toEqual([]);
+    // Why: the row is stale again, and created after dueAt.
+    const demoted = await raw('ticket', ticketId, head);
+    expect(demoted.fold_version).toBe(1);
+    expect(demoted.created_at.getTime()).toBeGreaterThan(dueAt.getTime());
+
+    // The next interval pass restates it, and the bootstrap serves it with the full fold's periods.
+    expect((await runSnapshotPass(db.pool, { minEvents: STALE_ONLY })).written).toContainEqual({ entityId: ticketId, seq: head });
+    await withClient(async (client) => {
+      const served = await bootstrapTicket(client, ticketId, targetSight(client, memberId));
+      expect(served.snapshot?.seq).toBe(head);
+      expect(served.snapshot?.state['periods']).toEqual(want);
+    });
+    expect((await app.inject({ method: 'GET', url, headers: memberHeaders })).statusCode).toBe(200);
+    expect(warnings).toEqual([]);
+  });
+
+  it('29.422 the trigger leaves a non-ticket row alone: the old SQL on a workspace-kind row keeps its fold_version and created_at; control: the same write on a ticket row is demoted', async () => {
+    const past = await hourAgo();
+    const ticketId = newUlid();
+    const workspaceId = newUlid();
+    await plantRow('ticket', ticketId, 2, RESTATED, TICKET_FOLD_VERSION, randomUUID(), past);
+    await plantRow('workspace', workspaceId, 2, { name: 'Corner' }, TICKET_FOLD_VERSION, randomUUID(), past);
+
+    // CONTROL: the write the trigger demotes.
+    await db.pool.query(OLD_OVERWRITE_SQL, ['ticket', ticketId, 2, JSON.stringify(OLD_SHAPE), null]);
+    const ticketRow = await raw('ticket', ticketId, 2);
+    expect(ticketRow.fold_version).toBe(1);
+    expect(ticketRow.created_at.getTime()).toBeGreaterThan(past.getTime());
+
+    await db.pool.query(OLD_OVERWRITE_SQL, ['workspace', workspaceId, 2, JSON.stringify({ name: 'Corner renamed' }), null]);
+    expect(await raw('workspace', workspaceId, 2)).toMatchObject({ state: { name: 'Corner renamed' }, fold_version: TICKET_FOLD_VERSION, created_at: past });
+  });
+
+  it('29.423 an INSERT is never demoted: the new writeSnapshot and overwriteSnapshot (no row at the seq) write the current fold and fresh tokens, and a token-less INSERT stamping the current fold and a past created_at keeps both', async () => {
+    const ticketId = newUlid();
+    await withClient(async (client) => {
+      await writeSnapshot(client, { entityKind: 'ticket', entityId: ticketId, seq: 1, state: RESTATED, provenance: null });
+      await overwriteSnapshot(client, { entityKind: 'ticket', entityId: ticketId, seq: 2, state: RESTATED, provenance: null });
+    });
+    const inserted = await raw('ticket', ticketId, 1);
+    const upserted = await raw('ticket', ticketId, 2);
+    for (const row of [inserted, upserted]) {
+      expect(row.fold_version).toBe(TICKET_FOLD_VERSION);
+      expect(row.write_token).toEqual(expect.stringMatching(UUID));
+    }
+    expect(inserted.write_token).not.toBe(upserted.write_token);
+
+    // No token and a hand-set clock: an UPDATE like it is demoted (29.424), the INSERT is left exactly as written.
+    const past = await hourAgo();
+    await plantRow('ticket', ticketId, 3, RESTATED, TICKET_FOLD_VERSION, null, past);
+    expect(await raw('ticket', ticketId, 3)).toMatchObject({ fold_version: TICKET_FOLD_VERSION, created_at: past, write_token: null });
+  });
+
+  it('29.424 a new-code UPDATE that forgets the token is demoted even when it stamps the current fold: the pre-token overwriteSnapshot statement and a bare UPDATE (the fail-safe direction: one restate, never a stale serve)', async () => {
+    const past = await hourAgo();
+    // A stale row the token-less path restates: it stamps the current fold over fold 1, and the row stays stale.
+    const viaOverwrite = newUlid();
+    await plantRow('ticket', viaOverwrite, 4, OLD_SHAPE, 1, randomUUID(), past);
+    await db.pool.query(TOKENLESS_NEW_OVERWRITE_SQL, ['ticket', viaOverwrite, 4, JSON.stringify(RESTATED), null, TICKET_FOLD_VERSION]);
+    const overwritten = await raw('ticket', viaOverwrite, 4);
+    expect(overwritten).toMatchObject({ state: RESTATED, fold_version: 1 });
+    expect(overwritten.created_at.getTime()).toBeGreaterThan(past.getTime());
+
+    const viaUpdate = newUlid();
+    await plantRow('ticket', viaUpdate, 4, RESTATED, TICKET_FOLD_VERSION, randomUUID(), past);
+    await db.pool.query(`UPDATE snapshots SET state = $2 WHERE entity_kind = 'ticket' AND entity_id = $1`, [viaUpdate, JSON.stringify(OLD_SHAPE)]);
+    const updated = await raw('ticket', viaUpdate, 4);
+    expect(updated).toMatchObject({ state: OLD_SHAPE, fold_version: 1 });
+    expect(updated.created_at.getTime()).toBeGreaterThan(past.getTime());
+  });
+
+  it('29.426 the demotion stamps the write\'s own clock, not its transaction\'s start: an old-instance transaction that BEGINs before the boot pass reads dueAt and overwrites the restated row after it is refused', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    const { head, oldShape } = await plantStaleAtHead(world, ticketId, await hourAgo());
+    // The old instance's publish: its refresh runs inside the ingest transaction (main 66c46fdd ingest-service.ts:170-378).
+    const old = await db.pool.connect();
+    try {
+      await old.query('BEGIN');
+      const txStart = (await old.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t;
+      const dueAt = await bootPass();
+      // The premise: a clock read at the transaction's start would not be later than dueAt, and the row was restated first.
+      expect(txStart.getTime()).toBeLessThanOrEqual(dueAt.getTime());
+      expect((await raw('ticket', ticketId, head)).fold_version).toBe(TICKET_FOLD_VERSION);
+      await old.query(OLD_OVERWRITE_SQL, ['ticket', ticketId, head, JSON.stringify(oldShape), null]);
+      await old.query('COMMIT');
+      const row = await raw('ticket', ticketId, head);
+      expect(row.fold_version).toBe(1);
+      expect(row.created_at.getTime()).toBeGreaterThan(dueAt.getTime());
+    } finally {
+      // Destroyed, not returned: a failed assert above would hand the pool a client inside an open transaction.
+      old.release(true);
+    }
+    expect(await refusalOf(ticketId)).toBeInstanceOf(SnapshotRestatePending);
+    expect(warnings).toEqual([]);
+  });
+
+  it('29.427 a row an old instance INSERTs inside a transaction that BEGAN before the boot pass read dueAt takes the insert\'s own clock (the created_at default): it is refused after the pass', async () => {
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, null);
+    const old = await db.pool.connect();
+    try {
+      await old.query('BEGIN');
+      const txStart = (await old.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t;
+      const dueAt = await bootPass();
+      expect(txStart.getTime()).toBeLessThanOrEqual(dueAt.getTime());
+      // The premise: the ticket has no row yet, so the old statement is a plain INSERT (both columns their defaults).
+      expect(await snapshotRows(ticketId)).toBe(0);
+      await old.query(OLD_OVERWRITE_SQL, ['ticket', ticketId, FV_CUT, JSON.stringify(OLD_SHAPE), null]);
+      await old.query('COMMIT');
+      const row = await raw('ticket', ticketId, FV_CUT);
+      expect(row).toMatchObject({ fold_version: 1, write_token: null });
+      expect(row.created_at.getTime()).toBeGreaterThan(dueAt.getTime());
+    } finally {
+      // Destroyed, not returned: a failed assert above would hand the pool a client inside an open transaction.
+      old.release(true);
+    }
+    expect(await refusalOf(ticketId)).toBeInstanceOf(SnapshotRestatePending);
     expect(warnings).toEqual([]);
   });
 });

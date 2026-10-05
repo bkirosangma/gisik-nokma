@@ -286,6 +286,45 @@ export async function listNotesForTicket(
 }
 
 /**
+ * The notes attached to ANY of `ticketIds` that this viewer may read, newest first, grouped by ticket (the Workflow graph's
+ * note blocks). The same predicates as `listNotesForTicket` (workspace, not deleted, `visibleNotesWhere`,
+ * `NOTE_PROJECT_LIVE_WHERE`) without `summariesOf`, which reads each note's attached tickets and this read does not need.
+ * A note the viewer cannot read is absent (D5): no placeholder, no count. One query for the whole flow.
+ */
+export async function listNotesForTickets(
+  db: Queryable,
+  eff: EffectiveRole,
+  userId: string,
+  workspaceId: string,
+  ticketIds: readonly string[],
+): Promise<Map<string, Array<{ noteId: string; title: string }>>> {
+  const out = new Map<string, Array<{ noteId: string; title: string }>>();
+  if (ticketIds.length === 0) return out;
+  const params = new SqlParams();
+  const clauses = [
+    `n.workspace_id = ${params.add(workspaceId)}`,
+    `na.ticket_id = ANY(${params.add([...ticketIds])}::text[])`,
+    'n.deleted = FALSE',
+    visibleNotesWhere(eff, userId, params),
+    NOTE_PROJECT_LIVE_WHERE,
+  ];
+  const { rows } = await db.query<{ note_id: string; title: string; ticket_id: string }>(
+    `SELECT n.note_id, n.title, na.ticket_id
+       FROM proj_notes n
+       JOIN proj_note_attachments na ON na.note_id = n.note_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY n.updated_at DESC, n.note_id`,
+    params.toArray(),
+  );
+  for (const row of rows) {
+    const list = out.get(row.ticket_id) ?? [];
+    list.push({ noteId: row.note_id, title: row.title });
+    out.set(row.ticket_id, list);
+  }
+  return out;
+}
+
+/**
  * A note's comment thread, oldest first.
  *
  * ORDER BY `workspace_seq`, matching `listTicketComments`: a comment thread

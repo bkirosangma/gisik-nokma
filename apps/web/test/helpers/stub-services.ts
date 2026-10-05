@@ -209,6 +209,7 @@ export function stubServices(
     // an invented blank and pass.
     getMyWork: unstubbed('getMyWork'),
     getAttention: unstubbed('getAttention'),
+    getFlow: unstubbed('getFlow'),
     // UNSTUBBED, same rule again (second wave Task 6). The settings screen's
     // whole job is to show what this workspace CHOSE, so a default here would
     // be this helper inventing a choice — `staleDays: 7` with

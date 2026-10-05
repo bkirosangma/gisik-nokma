@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { runner } from 'node-pg-migrate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 import { createPool } from '../src/db.js';
@@ -218,4 +220,66 @@ describe('createPool session timezone (falsifiable)', () => {
       await cleaner.end();
     }
   });
+});
+
+/**
+ * 29.425 (wtg2 fold-version writer token, planner ruling F 2026-10-05; `test-cases/29-workflow-timeline-graphs.md`):
+ * `1792100300000_snapshots-write-token.sql` goes down and up. Down drops the demoting trigger, its function and
+ * `write_token`, and puts `created_at`'s default back to `now()`, while the migration before it (`fold_version`, T9)
+ * stays; up brings all of it back, and a token-less update of a ticket row is demoted again. The behaviour itself is
+ * 29.420-29.427 in `test/sync/bootstrap.test.ts`.
+ */
+describe('29.425 the snapshots write-token migration', () => {
+  const MIGRATIONS_DIR = fileURLToPath(new URL('../migrations', import.meta.url));
+  const WRITE_TOKEN_MIGRATION = '1792100300000_snapshots-write-token';
+
+  async function shape(pool: pg.Pool): Promise<{ defaults: Record<string, string | null>; triggers: string[]; functions: string[] }> {
+    const columns = await pool.query<{ column_name: string; column_default: string | null }>(
+      `SELECT column_name, column_default FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'snapshots' AND column_name IN ('created_at', 'fold_version', 'write_token')`,
+    );
+    const triggers = await pool.query<{ tgname: string }>(
+      `SELECT tgname FROM pg_trigger WHERE tgrelid = 'snapshots'::regclass AND NOT tgisinternal ORDER BY tgname`,
+    );
+    const functions = await pool.query<{ proname: string }>(
+      `SELECT proname FROM pg_proc WHERE proname = 'snapshots_demote_tokenless_update'`,
+    );
+    return {
+      defaults: Object.fromEntries(columns.rows.map((row) => [row.column_name, row.column_default])),
+      triggers: triggers.rows.map((row) => row.tgname),
+      functions: functions.rows.map((row) => row.proname),
+    };
+  }
+
+  const UP = {
+    defaults: { created_at: 'clock_timestamp()', fold_version: '1', write_token: null },
+    triggers: ['snapshots_demote_tokenless_update'],
+    functions: ['snapshots_demote_tokenless_update'],
+  };
+
+  it('29.425 down drops the trigger, its function and write_token and restores the now() default (fold_version stays); up brings them back and the demotion works again', async () => {
+    const fresh = await createTestDatabase();
+    try {
+      expect(await shape(fresh.pool)).toEqual(UP);
+      const { rows } = await fresh.pool.query<{ name: string }>('SELECT name FROM pgmigrations WHERE name = $1', [WRITE_TOKEN_MIGRATION]);
+      // The positive control: the migration ran, so "gone" below is its down and not a table that never had it.
+      expect(rows).toHaveLength(1);
+
+      await runner({ databaseUrl: fresh.url, dir: MIGRATIONS_DIR, direction: 'down', file: WRITE_TOKEN_MIGRATION, migrationsTable: 'pgmigrations', log: () => {} });
+      expect(await shape(fresh.pool)).toEqual({ defaults: { created_at: 'now()', fold_version: '1' }, triggers: [], functions: [] });
+
+      await runner({ databaseUrl: fresh.url, dir: MIGRATIONS_DIR, direction: 'up', migrationsTable: 'pgmigrations', log: () => {} });
+      expect(await shape(fresh.pool)).toEqual(UP);
+      const ticketId = randomUUID();
+      await fresh.pool.query(
+        `INSERT INTO snapshots (entity_kind, entity_id, seq, state, fold_version, write_token) VALUES ('ticket', $1, 1, '{}', 2, gen_random_uuid())`,
+        [ticketId],
+      );
+      await fresh.pool.query(`UPDATE snapshots SET state = '{"title": "old"}' WHERE entity_kind = 'ticket' AND entity_id = $1`, [ticketId]);
+      const after = await fresh.pool.query<{ fold_version: number }>('SELECT fold_version FROM snapshots WHERE entity_id = $1', [ticketId]);
+      expect(after.rows[0]?.fold_version).toBe(1);
+    } finally {
+      await fresh.drop();
+    }
+  }, 60_000);
 });

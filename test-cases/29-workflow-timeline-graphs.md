@@ -20,6 +20,7 @@
 | 29.375–29.389 | Part 5: MCP (MC) | `2026-10-03-wtg-part5-mcp.md` |
 | 29.390–29.399 | Part 2: notifications (NT) | `2026-10-03-wtg-part2-model.md` |
 | 29.400–29.409 | Part 2 follow-up: a snapshot from an older fold waits for the boot restate pass (FV; 29.406–29.409 the rolling-deploy overlap) | planner rulings 2026-10-05 11:31, 15:10 (D) and 16:20 (E, its instant re-pinned 17:52) |
+| 29.420–29.427 | Part 2 follow-up: the snapshot write token (FV; an old instance's write during a rolling deploy is demoted) | planner rulings 2026-10-05 18:20 (F) and 18:31 (its clocks) |
 | 29.430–29.436 | follow-up: the workspace bootstrap retries a transient failure (SR) | `task/sync-start-retry` (lane 2's 15:46 note) |
 
 Unused ids in a block stay free for that Part's follow-ups. Parts 2–5 each add their own `## 29.N` sub-section below their Part anchor; merges are unions (each plan writes under its own anchors).
@@ -222,6 +223,15 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpow
 - ✅ **29.407 — a stale row created exactly at dueAt is served as stored with one warning (the refusal is strictly later);** the premise asserts the created_at read back equals dueAt to the millisecond; a row a millisecond after dueAt is refused. Mutation: `>` → `>=` → reddens; a 1 ms tolerance (`createdAt > dueAt + 1 ms`) → the millisecond-after leg reddens.
 - ✅ **29.408 — dueAt is the database clock: with the app clock an hour ahead during the boot pass, dueAt lies within a minute of the database's now() and a row created a second after it is still refused.** Mutation: dueAt from `new Date()` → reddens.
 - ✅ **29.409 — end to end on the shipped engine, transport and routes: a schema-5 device owing a pull for a ticket whose stale row an old instance wrote after the boot pass is refused and keeps the id owed with one period; the next interval pass restates the ticket from its full history at its head, and the retry clears the id with the periods of a fresh full fold.** Mutation: drop the created_at clause → the first catch-up clears the id with one period.
+<!-- wtg2-fold-version-writer-token (planner ruling F, 2026-10-05; its clocks ruled 18:31). 29.425 is in apps/server/test/migrations.test.ts, the rest in apps/server/test/sync/bootstrap.test.ts. -->
+- ✅ **29.420 — the old instance's write (main's overwriteSnapshot statement, copied verbatim) on a restated ticket row (current fold, write_token T) is demoted: its old-shape state lands, fold_version becomes 1 and created_at is re-stamped later; a row with no token (as the migration found every row) is demoted the same way;** control (same case, first): the new overwriteSnapshot on the row keeps the current fold and created_at and sets a new token. Mutation: the trigger never demotes → reddens; `IS NOT DISTINCT FROM` → `IS DISTINCT FROM` → both arms redden; overwriteSnapshot without `write_token = excluded.write_token` → the control reddens; `IS NOT DISTINCT FROM` → `=` → the no-token arm reddens.
+- ✅ **29.421 — end to end: the boot pass restates a ticket in place (its row keeps a created_at at or before dueAt), then the old instance's write lands on that row: bootstrapTicket throws SnapshotRestatePending and the ticket route answers 503 snapshot_restate_pending, with no warning; the next interval pass restates it and the bootstrap serves the full fold's periods (200).** Mutation: the trigger never demotes, or demotes fold_version but leaves created_at → reddens (ruling E would serve the row as a restate that failed).
+- ✅ **29.422 — the trigger leaves a non-ticket row alone: the old write on a workspace-kind row keeps its fold_version and created_at (its state lands);** control (same case, first): the same write on a ticket row is demoted. Mutation: drop the `entity_kind = 'ticket'` filter → reddens.
+- ✅ **29.423 — an INSERT is never demoted: the new writeSnapshot and overwriteSnapshot (no row at the seq) write the current fold and two different fresh tokens, and a token-less INSERT stamping the current fold and a past created_at keeps both.** Mutation: the trigger fires BEFORE INSERT OR UPDATE → reddens; writeSnapshot without its token → reddens.
+- ✅ **29.424 — a new-code UPDATE that forgets the token is demoted even when it stamps the current fold (the pre-token overwriteSnapshot statement restating a fold-1 row, and a bare UPDATE of a current row): the fail-safe direction, one restate and never a stale serve.** Mutation: demote only when the update leaves fold_version unchanged → reddens.
+- ✅ **29.425 — the migration goes down and up: down drops the trigger, its function and write_token and puts created_at's default back to now(), while fold_version (the migration before it) stays; up brings all of it back (default clock_timestamp()) and a token-less update of a ticket row is demoted again.** `pnpm check:migrations` is green.
+- ✅ **29.426 — the demotion stamps the write's own clock, not its transaction's start: an old-instance transaction that BEGINs before the boot pass reads dueAt and overwrites the restated row after the pass is refused (created_at later than dueAt).** Mutation: `clock_timestamp()` → `now()` in the trigger → reddens.
+- ✅ **29.427 — a row an old instance INSERTs inside a transaction that began before the boot pass read dueAt takes the insert's own clock (the created_at default, clock_timestamp()): fold 1, no token, created_at later than dueAt, refused.** Mutation: the default back to `now()` → reddens.
 <!-- sync-start-retry (lane 2's 15:46 note) -->
 - ✅ **29.430 — `engine.start` retries a workspace bootstrap answered 503 (ruling D's `snapshot_restate_pending`) through the shipped HTTP transport: two 503s then a 200 bootstrap and subscribe after 1 s + 2 s of fake time, with `connecting` the only status published until then;** control: a first-try success arms no timer. Mutation: a constant 1 s backoff → a third attempt at 2 s; publish `offline` between retries → the status list grows.
 - ✅ **29.431 — a 403 (`WorkspaceAccessLost`) is not retried: `start()` rejects at once, one attempt, no timer, nothing subscribed after two minutes of fake time.** Mutation: let the 403 fall through to the retry → still waiting.
@@ -262,6 +272,41 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpow
 <!-- wtg-part2-model T19 -->
 
 <!-- wtg-part3-workflow-graph -->
+## 29.3 Part 3 — The Workflow graph (29.230–29.289)
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part3-workflow-graph.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md` §9–10. Ids tile 29.230–29.289: T1 230–233 · T2 234–239 · T3 240–245 · T4 246–250 · T5 251–254 · T6 255–259 · T7 260–262 · T8 263–266 · T9 267–269 · T10 270–275 · T11 276–279 · T12 280–289.
+
+<!-- wtg-part3-workflow-graph T1 -->
+
+<!-- wtg-part3-workflow-graph T2 -->
+
+<!-- wtg-part3-workflow-graph T3 -->
+- ✅ **29.240 — A Decision's other branches are named, and a flow's shape is stable:** a ticket on exactly one branch of a Decision names the other branches (outcome and first ticket); the Decision, the ticket before it, a loop target reached over a back edge only and the shared tail of a diamond get none; nodes arrive in flow order with starts, ends, a stable `flowId` (the smallest ticket id), `blocks` edges only between members, and a draft has no key; an unlabelled edge out of a Decision is no branch (never named as an alternate, and beside one label it makes no pair); control: a Decision with one forward label has no alternates, and a ticket with no card facts is a loud error, never a blank. Mutation: count a ticket on two branches as on one → reds.
+- ✅ **29.241 — A Decision's edges say which way it went:** a loop edge counts the passes whose FINAL outcome is its label (a revision replaces it), the chosen edge is full weight and the others are not, a source that is not a settled Decision has `chosen: null`; control: a pending Decision chooses none but keeps its history. Mutation: count the first outcome of a revised pass → reds.
+- ✅ **29.242 — The read carries the dates and the reasons:** periods and the actual span are IST days with an open period ending null and the 18:29:59Z / 18:30:00Z pair falling on different days; planned intervals keep pass, basis and `pruned`; the tray carries its reason; a Not-taken ticket keeps its resolution, and names its Decision only when the read holds that Decision (`decisionTicketId: null` for a hole, the outcome and pass kept: FL-1); notes and the pin counts pass through; control: a ticket the plan does not know has none of these. Mutation: slice the instant's date instead of `istDayOf` → reds.
+- ✅ **29.243 — A hidden ticket is a hole:** for a member who cannot see one ticket in the middle of a flow, the read has no node, no edge, no key and no count for it, and nothing behind it that is only reachable through it; the owner's read of the same seed has all of them; titles, keys, state names, assignee names, visible notes and pin counts match the rows; a note the viewer cannot read, a deleted note and a note homed in a deleted project are absent and uncounted (each listed while live, as the control); a block link with one hidden end is absent; the automatic moves are the flow actor's transitions with a flow cause, one per move (a reset's paired reopen is not a second), only for tickets in the read, newest first and at most 50, while a person's move, even one carrying a flow cause, is not one; the facts loader refuses a ticket whose workflow version or state is not published, by name; the facts, automatic-moves and notes loaders each keep to the path's workspace (another workspace's ticket passed in by id gets nothing, while its own workspace reads all three) and to the ids they are given (a ticket with no notes, asked alone, gets none); control: the number of queries is the same for a 6-ticket flow and a flow 34 tickets wider (one query per ring, FL-2; planner ruling 2026-10-04). Mutation: read nodes with `viewerId: null` → reds.
+- ✅ **29.244 — The route:** `GET /v1/workspaces/:ws/tickets/:id/flow` answers 401 with no session, a byte-identical 404 for a stranger, a neighbour workspace's owner, an unknown id, a deleted ticket and a ticket the viewer cannot see, and 200 `FlowRead` for a member; the author's own draft seeds a 200 read that holds it (`draft: true`, no key) while anyone else, the owner included, gets the same 404 for it (FL-1, planner ruling 2026-10-04); an own draft of ANOTHER workspace, and a published ticket the viewer sees there, each seed nothing through this workspace's path (the path's workspace is the liveness check's to hold, on both arms); control: the owner's 200 on the same URL, and the other workspace's path reading that draft and that ticket. Mutation: skip the `ticketAccess` refusal → reds.
+- ✅ **29.245 — `getFlow` is online only:** the online source returns the route's body through `mapFlow` (a body missing `nodes`, `edges`, `order` or `flowId` throws); a 404 comes back as `HttpError` 404, never as a mapping failure; the real route's body passes the real `mapFlow` unchanged (`client-contract.test.ts`); the soft-delete census lists `getFlow` as refusing a deleted seed; the replica rejects with `ReplicaGapError('getFlow', …)` and `getFlow` is a key of `REPLICA_GAPS`; control: a replica method that answers still resolves. Mutation: remove the key from `REPLICA_GAPS` → 12.185 reds.
+
+<!-- wtg-part3-workflow-graph T4 -->
+
+<!-- wtg-part3-workflow-graph T5 -->
+
+<!-- wtg-part3-workflow-graph T6 -->
+
+<!-- wtg-part3-workflow-graph T7 -->
+
+<!-- wtg-part3-workflow-graph T8 -->
+
+<!-- wtg-part3-workflow-graph T9 -->
+
+<!-- wtg-part3-workflow-graph T10 -->
+
+<!-- wtg-part3-workflow-graph T11 -->
+
+<!-- wtg-part3-workflow-graph T12 -->
+
+<!-- wtg-part3-workflow-graph end -->
 
 <!-- WTG4 -->
 

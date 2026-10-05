@@ -7,6 +7,7 @@ const SRC = fileURLToPath(new URL('../../src', import.meta.url));
 
 /** Every file under `apps/server/src` that names the link table, and why it may. A reader of the table must answer for drafts (R41, R42). */
 const READERS: Record<string, string> = {
+  'flow/flow-view.ts': "the Workflow graph's blocks read (wtg3 T3, 29.243): both ends must be among the ids Part 2's walk already admitted for this viewer (LIVE_TICKET_WHERE and visibleTicketsWhere, or their own drafts), so no blocks link to a hole or to someone else's draft is read",
   'flow/read-flow.ts': "the flow read (wtg2 T12): the ring statement walks leads_to only, and an end is admitted through LIVE_TICKET_WHERE and visibleTicketsWhere or as the viewer's own draft (listMyDrafts); the closing statement keeps a link only when both ends were admitted, so no edge to someone else's draft (29.188)",
   'projections/ticket-links.ts': 'writes the table, keyed by from ?? entity (drafts R42)',
   'projections/tickets.ts': "a docblock naming the table as the queryable copy of TicketState.links; it reads nothing from it",
