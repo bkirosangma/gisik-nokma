@@ -612,9 +612,11 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
   - The batch tree may not be the primary, a tree standing on a branch (a lane's `task/*`; the remedy names `checkout --detach`), a dirty tree, no worktree, or the checkout holding the running ctl. CONTROL: a tree on `batch/*` is accepted.
   - One batch per tree: a lock held by a live pid refuses; a dead holder's lock is taken over and released at the end.
 - 13.2297 🧪 READY.
-  - A PR whose head no `READY` / `needs-tip` line of `roles/QUEUE-review.md` names is refused (`REFUSE #<pr> (ready) …`), and the WHOLE call refuses: nothing merged, gated or pushed.
+  - A PR whose head no `READY` / `needs-tip` line of `roles/QUEUE-review.md` names is refused (`REFUSE #<pr> (ready) …`), and the WHOLE call refuses: nothing merged, gated or pushed. The refusal prints the one spelling read: `HH:MM DONE <time> READY|needs-tip <branch> <sha>`.
   - A needs-tip line counts as READY.
   - A FIX of the same branch AFTER the READY line refuses. CONTROL: a FIX before it, or a later FIX of another branch, does not.
+  - A FIX line after the READY line refuses the PR it names in every spelling the live queue holds, one leg each: `FIX <n> task/<x> <sha>`; `FIX (task/<x> <sha> → BRIEF…)`; the ORCH's gate-red `FIX (<slug> <sha>)` and `FIX (<slug> gate fail → lane 4)` (no sha: the bare slug names it); `FIX-<n> task/<x> <sha>`; `FIX (<sha>; …)` naming only 7 hex of the head; and a FIX naming only the needs-tip sha under a clean tip merge.
+  - CONTROL in each leg: the same spelling naming another branch (`task/ab`), slug (`ab`, `a-b`: a slug is a WHOLE token) or sha refuses nothing. So do 6 hex of the head (too short for a sha) and `FIX (BRIEF-a-fix-1.md)` (it names neither, so it cannot be attributed).
   - RIDER, VOID, REVIEW and TOOK lines, and a READY naming an older sha, are no READY.
   - A needs-tip line admits the CLEAN tip merge of the sha it names (tree = `git merge-tree` of its parents, second parent on the base). A hand-edited merge, a clean merge of a branch NOT on the base (unreviewed work), and a READY naming the pre-merge sha are refused.
   - These are refused too: a head already on the base, a PR that is not OPEN, a PR against another base.
@@ -640,6 +642,7 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
   - A member GitHub did not mark is closed with a comment naming the batch PR and the landed sha.
   - A member whose head is not in the base after the landing, or whose PR head moved right after it, is never closed: it is left open and the FAIL names it.
   - A member whose head moved after the union was built is not landed: no PR, no land.
+  - A member whose PR was CLOSED while the gate ran, its head unchanged, is not landed: no PR, no land, and the FAIL names it. CONTROL: the same world without the close lands.
   - Every ctl call's verdict is its stdout `OK|FAIL` line: the stub writes stderr after each one (as the real `pr open`'s push does), and every green leg still lands. A RELATIVE `CTL_LOG_DIR` still hands `ctl pr open` an absolute body path.
 - 13.2303 🧪 Red in one member's package.
   - The output prints `FIX candidate: #<pr>`, and the union is rebuilt WITHOUT that member: the second gate's tree differs and does not contain it.
@@ -648,7 +651,7 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.2304 🧪 Red that is not one member's.
   - Red touching several members: bisect. The first half in READY order re-gates; the rest is `HELD` and left open.
   - Red touching no member, with two in the union: `gate singly` for both, exit 3, no second gate.
-  - A gate that refused to run is no gate: stop, nothing ejected or bisected, no PR. A red with `timeouts>0`, or with no failing task, stops the same way.
+  - A gate FAIL with no log is no gate: stop, nothing ejected or bisected, no PR. The leg plays a refusal before the run, and the FAIL says "a FAIL with no log, refused before the run (dirty tree, base moved) or orphans after it" (gate.sh's orphan FAIL comes after a run and names no log either). A red with `timeouts>0`, or with no failing task, stops the same way.
 - 13.2305 🧪 The cap, `--dry-run`, wiring.
   - The third red stops the call with the state printed: exactly 3 gates, the third red unattributed, nothing landed.
   - `--dry-run` makes no mutating call (no ctl call; `gh` only `pr view`), leaves origin and the batch tree as they were, and prints the order, the predicted union tree and the commands.

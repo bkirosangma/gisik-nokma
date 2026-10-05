@@ -6,8 +6,11 @@ its own gate — 6 gates in the hour, 105 of 118 slot-wait min/h inside a gate w
 the lever left is the NUMBER of gates. The batch rules are the lanes dir's BATCHING-workflow-graph.md (READY, rules (a)-(d)).
 
 1. The WHOLE call is refused (nothing merged, gated or pushed) unless every PR is open against <base>, READY in roles/QUEUE-review.md at
-   its head sha with no later FIX, and breaks none of rules (b) migrations, (c) always alone, (d) shared count pins. Every refusal is
-   printed (`REFUSE #<pr> (<rule>) …`); the summary names the PRs that passed.
+   its head sha with no later FIX naming it, and breaks none of rules (b) migrations, (c) always alone, (d) shared count pins. A FIX is
+   any `HH:MM DONE <time> FIX…` line, in every spelling the queue holds (`FIX`, `FIX <n>`, `FIX-<n>`, parenthesised or not). It names
+   a member by its slug as a WHOLE token (`task/<x>`, `(<x>`; not `<x>b`, `<x>-b`), or by a hex run (>= 7) that its head or a
+   needs-tip sha under it begins with. A FIX naming neither (`FIX (BRIEF-<x>-fix-1.md)`) cannot be attributed and refuses nothing.
+   Every refusal is printed (`REFUSE #<pr> (<rule>) …`); the summary names the PRs that passed.
 2. The union is built in the batch tree — never the primary, never the checkout running this ctl, never a tree standing on a branch
    (a lane or reviewer tree stands on its task branch; a batch tree is detached or on batch/*): detached at a fresh origin/<base>, each
    head merged --no-ff in READY order (the queue's order, not the argument order). A conflict aborts that one merge and ejects that PR;
@@ -18,8 +21,9 @@ the lever left is the NUMBER of gates. The batch rules are the lanes dir's BATCH
    and the landed sha — only while its head is still the batched sha AND reachable from origin/<base>. Every member's state is printed.
 5. RED: the failing turbo task's package -> the members whose diff touches it. Exactly one -> ejected ('FIX candidate'), the rest re-gate
    (from cache); none or several -> bisect in halves (the first half re-gates, the rest is held). At most MAX_GATES gates per call: the
-   last red stops the call with the state printed. A gate that did not run (dirty tree, base moved) is no gate, and a red with no failing
-   task or with hook timeouts / engine warnings is not a member's: both stop, nothing ejected.
+   last red stops the call with the state printed. A FAIL with no log (refused before the run: dirty tree, base moved; or orphans
+   after it) is no gate, and a red with no failing task or with hook timeouts / engine warnings is not a member's: both stop, nothing
+   ejected.
 --dry-run fetches and reads only: the refusals, the merge order, the predicted union tree (merge-tree + dangling commit-tree objects, no
 ref), the commands. Exit 0 = landed (or a clean dry-run), 1 = refused or failed, 3 = no batch (gate singly).
 """
@@ -42,9 +46,14 @@ LANES = os.environ.get('CTL_LANES_DIR') or '/Users/kiro/my_projects/gisik-nokma-
 PRIMARY = os.environ.get('GISIK_PRIMARY') or '/Users/kiro/my_projects/gisik-nokma'
 MAX_GATES = 3
 POOLS = {'release/knowledge-graph': 'kg', 'release/workflow-graph': 'wg'}
-# A reviewer verdict: `HH:MM DONE <REVIEW time> <READY|needs-tip|FIX> <branch> <sha>` — the verdict is the word right after the cited time
+# An admitting verdict: `HH:MM DONE <REVIEW time> READY|needs-tip <branch> <sha>` — the verdict is the word right after the cited time
 # (autopilot's grammar), so RIDER, VOID and `DONE <t> READY … (FIX 1 delta)` read right; REVIEW, TOOK and NOTE lines are no verdicts.
-VERDICT = re.compile(r'^(\d\d:\d\d) DONE (\d\d:\d\d) (READY|needs-tip|FIX) (\S+) ([0-9a-f]{7,40})(?=\s|$)')
+# Only this spelling admits: a READY in any other spelling admits nothing (fails closed), and the refusal prints the spelling read.
+VERDICT = re.compile(r'^(\d\d:\d\d) DONE (\d\d:\d\d) (READY|needs-tip) (\S+) ([0-9a-f]{7,40})(?=\s|$)')
+# A FIX verdict in ANY spelling: the word after the cited time starts with FIX (`FIX`, `FIX <n>`, `FIX-<n>`, …), then branches, slugs,
+# shas or a parenthesis in any order. On 10-05, 33 of the queue's 180 FIX lines were not `FIX <branch> <sha>`, and the ORCH's gate-red
+# FIXes are `FIX (<slug> …)`. A FIX line refuses every member it names (fix_names), so a new spelling fails closed instead of open.
+FIX_LINE = re.compile(r'^\d\d:\d\d DONE \d\d:\d\d FIX')
 MIGRATION = re.compile(r'^apps/server/migrations/(\d+)_[^/]*$')
 PACKAGE_ROOT = re.compile(r'^(apps|packages)/[^/]+/package\.json$')
 # BATCHING-workflow-graph.md (d): "No two tasks may bump the same count pin … These merge cleanly and then FAIL." A pin is (name, file, line
@@ -239,12 +248,15 @@ def read_queue():
             lines = f.read().splitlines()
     except OSError as e:
         fail(f'cannot read {path} ({e.strerror}) — the READY check fails closed; nothing touched')
-    verdicts = []
+    verdicts, fixes = [], []
     for i, line in enumerate(lines):
         m = VERDICT.match(line)
         if m:
             verdicts.append((i, m.group(1), m.group(3), m.group(4), m.group(5), line))
-    return verdicts
+        f = FIX_LINE.match(line)
+        if f:
+            fixes.append((i, line[f.end():], line))
+    return verdicts, fixes
 
 
 def tip_merge_chain(sha):
@@ -264,9 +276,20 @@ def tip_merge_chain(sha):
     return chain
 
 
-def ready_problem(m, verdicts):
+def fix_names(text, m, chain):
+    """Whether a FIX line's text (what follows its FIX word) names member m. By its slug (`<x>` of `task/<x>`) as a WHOLE token: no
+    word character or `-` on either side, so `task/<x>`, `(<x>` and `<x>,` name it, while `task/<x>b`, `<x>-b` and `BRIEF-<x>-fix-1.md`
+    do not. Or by a hex run (>= 7) that a sha of its chain begins with: its head, or a needs-tip sha a clean tip merge put it on
+    (`REVIEW-<x>-<sha8>.md` names it too). A FIX that names neither cannot be attributed to any member."""
+    slug = re.escape(m.ref.split('/', 1)[-1])
+    if re.search(rf'(?<![\w-]){slug}(?![\w-])', text):
+        return True
+    return any(c.startswith(h) for h in re.findall(r'[0-9a-f]{7,}', text) for c in chain)
+
+
+def ready_problem(m, verdicts, fixes):
     """None when the queue holds a READY line naming the head (or a needs-tip line naming it or what a clean tip merge put it on) with no
-    LATER FIX of that line's branch; else why not. "Later" is the file's line order: the queue has HH:MM and no dates."""
+    LATER FIX line naming the member (fix_names); else why not. "Later" is the file's line order: the queue has HH:MM and no dates."""
     chain = tip_merge_chain(m.sha)
     hit = None
     for v in verdicts:
@@ -274,11 +297,12 @@ def ready_problem(m, verdicts):
         if (verdict == 'READY' and m.sha.startswith(sha)) or (verdict == 'needs-tip' and any(c.startswith(sha) for c in chain)):
             hit = v
     if hit is None:
-        return f'no READY or needs-tip line in roles/QUEUE-review.md names {m.sha[:8]} (nor a clean tip merge of a needs-tip sha)'
+        return (f'no READY or needs-tip line in roles/QUEUE-review.md names {m.sha[:8]} (nor a clean tip merge of a needs-tip sha); the one '
+                f'spelling read: HH:MM DONE <time> READY|needs-tip <branch> <sha>')
     m.idx, m.when, m.verdict = hit[0], hit[1], hit[2]
-    later = [v for v in verdicts if v[0] > hit[0] and v[2] == 'FIX' and v[3] == hit[3]]
+    later = [f for f in fixes if f[0] > hit[0] and fix_names(f[1], m, chain)]
     if later:
-        return f'FIX after READY: queue line {later[-1][0] + 1} "{later[-1][5][:120]}"'
+        return f'FIX after READY: queue line {later[-1][0] + 1} "{later[-1][2][:120]}"'
     return None
 
 
@@ -415,7 +439,7 @@ def install_argv():
 
 def gate(sha):
     """('green' | 'red' | 'refused', the gate's verdict line, the failing turbo tasks). A FAIL line with no `(log <file>)` is a refusal before
-    the run (HEAD, dirty tree, base moved, orphans): no gate ran."""
+    the run (HEAD, dirty tree, base moved) or orphans after it (gate.sh's orphan FAIL names no log): no gate counted."""
     r = run([CTL, 'gate', sha, '--base', BASE, '--repo', TREE])
     last = verdict_line(r)
     say(f'  {last}')
@@ -552,7 +576,8 @@ def batch(members, stamp):
         verdict, last, tasks = gate(union)
         if verdict == 'refused':
             report(members)
-            fail(f'the gate did not run: {last} — no gate counted, nothing pushed; fix the cause and re-run')
+            fail(f'a FAIL with no log, refused before the run (dirty tree, base moved) or orphans after it: {last} — no gate counted, '
+                 f'nothing pushed; fix the cause and re-run')
         if verdict == 'green':
             break
         say(f'RED gate {gates}/{MAX_GATES} {union[:12]}: ' + (', '.join(tasks) or 'no failing turbo task in its log'))
@@ -638,7 +663,7 @@ def main(argv):
     if git('fetch', '-q', 'origin').returncode != 0:
         fail('cannot fetch origin (offline?) — nothing touched')
     BASE_SHA = out('rev-parse', '--verify', '-q', f'origin/{BASE}^{{commit}}') or fail(f'no origin/{BASE} after the fetch')
-    verdicts = read_queue()
+    verdicts, fixes = read_queue()
     checked = []
     for m in members:
         if not m.sha:
@@ -649,7 +674,7 @@ def main(argv):
         if is_anc(m.sha, BASE_SHA):
             refusals.append((m, 'ready', f'head {m.sha[:8]} is already on origin/{BASE}'))
             continue
-        p = ready_problem(m, verdicts)
+        p = ready_problem(m, verdicts, fixes)
         if p:
             refusals.append((m, 'ready', p))
         m.files = member_files(m)

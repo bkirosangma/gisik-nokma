@@ -87,6 +87,12 @@ if a[0] == 'gate':
             d = json.load(open(p))
             d['headRefOid'] = new
             json.dump(d, open(p, 'w'))
+        cl = os.path.join(S, 'close-on-gate')   # "<n>": PR #n is CLOSED while the gate runs, its head unchanged
+        if os.path.exists(cl):
+            p = os.path.join(S, f'pr-{open(cl).read().strip()}.json')
+            d = json.load(open(p))
+            d['state'] = 'CLOSED'
+            json.dump(d, open(p, 'w'))
         say(f'OK gate {sha} EXIT=0 · mode=cached · Tasks: 46 successful, 46 total', 0)
     log = os.path.join(S, f'gate-{k + 1}.log')
     with open(log, 'w') as f:
@@ -210,6 +216,11 @@ tipmerge_a() {
 }
 noise_lines() { local h; h=$(sha "$1"); printf '%s\n' "13:51 DONE 12:00 RIDER $h $1 ${h:0:8} (reviewer C)" "13:52 DONE 12:00 $1 ${h:0:8} (reviewer A, VOID)" \
   "13:53 REVIEW $1 $h base=origin/$BASE" "13:54 TOOK 13:53 $1 ${h:0:8} (reviewer B, pull, FULL)" >> "$Q"; }
+s8() { sha "$1" | cut -c1-"${2:-8}"; }   # s8 BRANCH [N] — the first N (8) hex of BRANCH's origin tip
+# fixq TEXT… — the queue: READY task/a, READY task/b, then one FIX line per TEXT, verbatim after `13:59 DONE 12:00 ` (a live spelling);
+# a dry-run of #11 #12. Only #11 (task/a) may be named by the legs; a CONTROL names neither a nor b.
+fixq() { local t; : > "$Q"; ready task/a READY; ready task/b READY; for t in "$@"; do printf '13:59 DONE 12:00 %s\n' "$t" >> "$Q"; done; b 11 12 --dry-run; }
+refused11() { [ $rc -eq 1 ] && says "^REFUSE #11 (ready) FIX after READY: queue line $1 \"13:59 DONE 12:00 FIX" && ! says "^REFUSE #12"; }   # the WHOLE line quoted
 
 # --- 13.2296: arguments, main, the batch tree --------------------------------------------------------------------------------------------
 check "13.2296 main is refused before any call: exit 1, the FAIL names main, no gh call, no ctl call, the batch tree untouched" \
@@ -234,14 +245,36 @@ check "13.2296 one batch per tree: a lock held by a live pid refuses (nothing ga
    && echo 999999 > "$d/pid" && b 11 12 && [ $rc -eq 0 ] && [ ! -e "$d" ]'
 
 # --- 13.2297: READY ------------------------------------------------------------------------------------------------------------------------
-check "13.2297 a PR with no READY / needs-tip line naming its head is refused (the PR and the rule named); the WHOLE call refuses, nothing merged, gated or pushed" \
+check "13.2297 a PR with no READY / needs-tip line naming its head is refused (the PR, the rule and the one spelling read named); the WHOLE call refuses, nothing merged, gated or pushed" \
   'mk && : > "$Q" && ready task/a READY && o0=$(originrefs) && s0=$(treestate) && b 11 12 && [ $rc -eq 1 ] && says "^REFUSE #12 (ready) no READY or needs-tip line" && ! says "^REFUSE #11" \
+   && says "^REFUSE #12 .*; the one spelling read: HH:MM DONE <time> READY|needs-tip <branch> <sha>$" \
    && summary "^FAIL batch refused: 1 refusal(s) on #12" && [ "$(originrefs)" = "$o0" ] && [ "$(treestate)" = "$s0" ] && [ ! -e "$S/ctl.log" ] && [ ! -e "$S/mut.log" ]'
 check "13.2297 a needs-tip line names a head as a READY line does (CONTROL for the refusals around it)" \
   'mk && : > "$Q" && ready task/a needs-tip && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 0 ]'
 check "13.2297 a FIX after the READY line refuses the PR (rule ready, the FIX line quoted); CONTROL — a FIX BEFORE the READY line, or a later FIX of ANOTHER branch, does not" \
-  'mk && : > "$Q" && ready task/a READY && ready task/b READY && ready task/a FIX && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) FIX after READY: queue line 3" \
+  'mk && : > "$Q" && ready task/a READY && ready task/b READY && ready task/a FIX && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) FIX after READY: queue line 3 \"13:[0-5][0-9] DONE 12:00 FIX task/a " \
    && : > "$Q" && ready task/a FIX && ready task/a READY && ready task/b READY && ready task/c FIX && b 11 12 --dry-run && [ $rc -eq 0 ]'
+# FIX spellings of the live queue (QUEUE-review.md on 10-05: 33 of 180 FIX lines are not `FIX <branch> <sha>`): each refuses #11 when it
+# names task/a, and its CONTROL (first, same world) names ANOTHER branch, slug or sha and refuses nothing.
+check "13.2297 FIX spelling FIX <n> task/<x> <sha> (queue lines 1466, 1482) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "FIX 1 task/ab $(s8 task/c) (BRIEF-ab-fix-1.md; REVIEW-ab-$(s8 task/c).md; reviewer B)" && [ $rc -eq 0 ] \
+   && fixq "FIX 1 task/a $(s8 task/a) → BRIEF-a-fix-1.md (reviewer B)" && refused11 3'
+check "13.2297 FIX spelling FIX (task/<x> <sha> → BRIEF…) (queue line 1442) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "FIX (task/ab $(s8 task/c) → BRIEF-ab-fix-1.md; MERGETIP posted) (reviewer B)" && [ $rc -eq 0 ] \
+   && fixq "FIX (task/a $(s8 task/a) → BRIEF-a-fix-1.md; MERGETIP posted) (reviewer B)" && refused11 3'
+check "13.2297 FIX spelling — the ORCH gate-red FIX (<slug> <sha>) (queue lines 738-790) and FIX (<slug> gate fail → lane 4) with no sha (754) refuse #11 by the bare slug; CONTROL — ab and a-b (a slug is a WHOLE token: no word character or - on either side) and FIX (BRIEF-a-fix-1.md) (names neither, cannot be attributed) do not" \
+  'mk && fixq "FIX (ab $(s8 task/c))" "FIX (a-b gate fail → lane 4)" "FIX (BRIEF-a-fix-1.md)" && [ $rc -eq 0 ] \
+   && fixq "FIX (a $(s8 task/a))" && refused11 3 && fixq "FIX (a gate fail → lane 4)" && refused11 3'
+check "13.2297 FIX spelling FIX-<n> task/<x> <sha> (9 queue lines, 162-314) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "FIX-1 task/ab $(s8 task/c) (19/20 mutations; review=REVIEW-ab-$(s8 task/c).md)" && [ $rc -eq 0 ] \
+   && fixq "FIX-2 task/a $(s8 task/a) (19/20 mutations; review=REVIEW-a-$(s8 task/a).md)" && refused11 3'
+check "13.2297 FIX spelling FIX (<sha>; …) naming no branch (queue line 303): 7 hex of the head refuse #11; CONTROL — 6 hex of it (too short for a sha) and other shas do not" \
+  'mk && fixq "FIX ($(s8 task/c); merge tip $(s8 task/d) verified, FIX 1 to lane 1)" "FIX ($(s8 task/a 6) delta; content FIX 1)" && [ $rc -eq 0 ] \
+   && fixq "FIX ($(s8 task/a 7); merge tip $(s8 task/c) verified, FIX 1 to lane 1)" && refused11 3'
+check "13.2297 FIX spelling — a FIX naming only the needs-tip sha under a clean tip merge (queue line 304: FIX (<merge> = merge of <sha>, …)) refuses #11; CONTROL — other shas do not" \
+  'mk && x=$(s8 task/a) && : > "$Q" && ready task/a needs-tip && ready task/b READY && tipmerge_a \
+   && printf "%s\n" "13:59 DONE 12:00 FIX ($(s8 task/c) = merge of $(s8 task/d), delta verified; content FIX 1)" >> "$Q" && b 11 12 --dry-run && [ $rc -eq 0 ] \
+   && printf "%s\n" "13:59 DONE 12:00 FIX (merge of $x, delta verified; content FIX 1)" >> "$Q" && b 11 12 --dry-run && refused11 4'
 check "13.2297 RIDER, VOID, REVIEW and TOOK lines naming the head are no READY; a READY naming an OLDER sha of the branch is none either" \
   'mk && : > "$Q" && noise_lines task/a && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY" \
    && : > "$Q" && ready task/a READY "$($G -C "$bare" rev-parse task/a^)" && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY"'
@@ -339,6 +372,10 @@ check "13.2302 a member whose PR head moved right after the landing is never clo
   'mk && rm "$S/automark" && echo "12 $(sha task/c)" > "$S/move-on-land" && b 11 12 && [ $rc -eq 1 ] && [ "$(prf 12 state)" = OPEN ] && closed_by_batch 11 && says "^MEMBER #12 task/b .* left OPEN: its head is" && summary "need a hand: #12 (log"'
 check "13.2302 a member whose PR head moved after the union was built is not landed: no pr open, no land, the FAIL names it" \
   'mk && echo "12 $(sha task/c)" > "$S/move-on-gate" && b 11 12 && [ $rc -eq 1 ] && [ "$(ncalls gate)" = 1 ] && [ "$(ncalls "pr open")" = 0 ] && [ "$(ncalls land)" = 0 ] && summary "#12 moved since the union was built"'
+check "13.2302 a member whose PR was CLOSED while the gate ran (its head unchanged) is not landed: no pr open, no land, the FAIL names it; CONTROL — the same world without the close lands" \
+  'mk && b 11 12 && [ $rc -eq 0 ] && [ "$(ncalls land)" = 1 ] \
+   && mk && echo 12 > "$S/close-on-gate" && b 11 12 && [ $rc -eq 1 ] && [ "$(ncalls gate)" = 1 ] && [ "$(ncalls "pr open")" = 0 ] && [ "$(ncalls land)" = 0 ] \
+   && summary "#12 moved since the union was built (state CLOSED, head $(s8 task/b), batched $(s8 task/b))"'
 
 # --- 13.2303: red, one member --------------------------------------------------------------------------------------------------------------
 check "13.2303 red in ONE member's package: FIX candidate names it, the union is rebuilt WITHOUT it and gated again (two gates, one install), then lands; the candidate stays open and out of the base" \
@@ -355,7 +392,7 @@ check "13.2304 red touching NO member with 2 in the union: halves of one are no 
   'mk && printf "red @t/nope#test\n" > "$S/gates" && b 11 12 && [ $rc -eq 3 ] && [ "$(ngated)" = 1 ] && says "^BISECT after gate 1: 0 members" && [ "$(ncalls land)" = 0 ] && [ "$(ncalls "pr open")" = 0 ] \
    && says "^MEMBER #11 task/a .* gate singly" && says "^MEMBER #12 task/b .* gate singly"'
 check "13.2304 a gate that refused to run is no gate and no member's: stop, exit 1, nothing ejected or bisected, no PR; a red with timeouts>0, or with no failing task, stops the same way" \
-  'mk && printf "refuse\n" > "$S/gates" && b 11 12 && [ $rc -eq 1 ] && [ "$(ncalls gate)" = 1 ] && [ "$(ngated)" = 0 ] && summary "the gate did not run" && ! says "FIX candidate" && ! says "^BISECT" && [ "$(ncalls "pr open")" = 0 ] \
+  'mk && printf "refuse\n" > "$S/gates" && b 11 12 && [ $rc -eq 1 ] && [ "$(ncalls gate)" = 1 ] && [ "$(ngated)" = 0 ] && summary "a FAIL with no log, refused before the run (dirty tree, base moved) or orphans after it: FAIL gate " && ! says "FIX candidate" && ! says "^BISECT" && [ "$(ncalls "pr open")" = 0 ] \
    && mk && printf "red @t/b#test timeouts=2\n" > "$S/gates" && b 11 12 13 && [ $rc -eq 1 ] && [ "$(ngated)" = 1 ] && summary "not a member.s (timeouts=2)" && ! says "FIX candidate" \
    && mk && printf "red\n" > "$S/gates" && b 11 12 13 && [ $rc -eq 1 ] && summary "no failing turbo task" && ! says "^BISECT"'
 
