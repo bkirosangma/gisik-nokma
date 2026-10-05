@@ -78,6 +78,7 @@ export function loopBody(
   analysis: FlowAnalysis,
 ): Set<string> {
   const known = new Set(analysis.order);
+  // each clause alone is equivalent (planner 2026-10-06 03:50): only a hole self-link reaches here, and either end catches it
   if (!known.has(backEdge.sourceId) || !known.has(backEdge.targetId)) return new Set();
   const forward = forwardEdges(edges, analysis);
   const fromTarget = reach([backEdge.targetId], adjacency(forward, known));

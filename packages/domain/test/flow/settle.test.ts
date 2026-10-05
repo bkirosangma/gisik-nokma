@@ -146,6 +146,30 @@ describe('29.364 a non-loop outcome closes what only the other branches lead to'
     ]);
   });
 
+  it('29.364 the depth walk is bounded: a corrupt parent cycle stops after exactly nodes + 1 hops; a real chain of n takes n - 1', () => {
+    // d: Yes -> p, No -> x -> y. x and y close; their one sort comparison asks depth(x) once. x hangs under c1, whose
+    // counted parentId getters see each hop. The same flow with x under nothing is the baseline (it subtracts every
+    // other read of those getters, which does not depend on x).
+    const edges = [edge(DEC, P, 'Yes'), edge(DEC, X, 'No'), edge(X, Y)];
+    const [c1, c2, c3] = [50, 51, 52].map(uid) as [string, string, string];
+    let reads = 0;
+    const counted = (id: string, parentId: string | null): FlowNode =>
+      Object.defineProperty(fnode(id), 'parentId', { get: () => ((reads += 1), parentId), enumerable: true });
+    const walk = (xParent: string | null, above: () => FlowNode[]): number => {
+      reads = 0;
+      planSettle({ nodes: [decision(DEC, decided('Yes')), fnode(P), fnode(X, { parentId: xParent }), fnode(Y), ...above()], edges, decisionId: DEC });
+      return reads;
+    };
+    // A hop reads its ticket's parentId twice (the null test, then the lookup); a null parent ends the walk after one read.
+    // The corrupt cycle c1 <-> c2 in a flow of SIX nodes: the cap is the node count, 6, so hops 0..6 pass and the walk
+    // stops after 7 hops (the literal is the cap's own pin: x10 walks 61 hops, '<' walks 6)
+    const cycle = () => [counted(c1, c2), counted(c2, c1)];
+    expect(walk(c1, cycle) - walk(null, cycle)).toBe(2 * 7);
+    // CONTROL: a real chain x -> c1 -> c2 -> c3 (four tickets) takes 3 hops, n - 1: two reads each, the last one null
+    const chain = () => [counted(c1, c2), counted(c2, c3), counted(c3, null)];
+    expect(walk(c1, chain) - walk(null, chain)).toBe(2 + 2 + 1);
+  });
+
   it('29.364 drafts and trashed tickets are never moved', () => {
     const nodes = m.nodes({ '144': decided('Yes'), '145': { draft: true } });
     expect(planSettle({ nodes, edges: m.edges(), decisionId: K['144'] }).steps).toEqual([]);
