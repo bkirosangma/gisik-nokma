@@ -301,6 +301,11 @@ check "13.2297 a FIX token is WHOLE and upper case: CONTROL — task/<x> <sha> P
 check "13.2297 an admitting READY is no FIX line, even with a FIX token before its parenthesis: CONTROL — READY task/c <sha> FIX-1 delta re-check (needs task/a …) refuses nothing; the same line with no admitting verdict (task/c <sha> FIX-1 …) is a FIX, and it refuses #11, the PR it names" \
   'mk && fixq "READY task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)" && [ $rc -eq 0 ] \
    && fixq "task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)" && refused11 3 "task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)\""'
+check "13.2297 only DONE lines are read: CONTROL — a NOTE and a CORRECTION line naming task/<x> <sha> with a FIX token before any parenthesis (queue lines 1830, 2080) after the READY refuse nothing; the same words on a DONE line refuse #11" \
+  'mk && : > "$Q" && ready task/a READY && ready task/b READY \
+   && printf "%s\n" "13:59 NOTE ORCH: task/a $(s8 task/a) FIX 3 re-check is UNTAKEN again: first free reviewer takes it" "13:59 CORRECTION task/a $(s8 task/a): lane 2 take is void; reviewer B keeps the FIX 1 re-check" >> "$Q" \
+   && b 11 12 --dry-run && [ $rc -eq 0 ] \
+   && fixq "task/a $(s8 task/a) FIX 3 re-check is UNTAKEN again: first free reviewer takes it" && refused11 3 "task/a $(s8 task/a) FIX 3 re-check is UNTAKEN again: first free reviewer takes it\""'
 check "13.2297 the verdict word right after the cited time is a FIX when it starts with FIX, whole token or not (FIX 1's prefix, kept): FIX2 task/<x> <sha> refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
   'mk && fixq "FIX2 task/ab $(s8 task/c) (BRIEF-ab-fix-2.md)" && [ $rc -eq 0 ] \
    && fixq "FIX2 task/a $(s8 task/a) (BRIEF-a-fix-2.md)" && refused11 3 "FIX2 task/a $(s8 task/a) (BRIEF-a-fix-2.md)\""'
