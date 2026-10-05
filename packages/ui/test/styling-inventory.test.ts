@@ -9,9 +9,9 @@ import {
 
 /** Styling refresh Plan B, Task B1 — cases 20.201–20.204 (§20.21). */
 describe('20.201 every route has a styling owner', () => {
-  it('20.201 the live tree has 26 routes, all owned, none stale', () => {
+  it('20.201 the live tree has 27 routes, all owned, none stale', () => {
     const routes = listPageRoutes();
-    expect(routes).toHaveLength(26);
+    expect(routes).toHaveLength(27); // 27 since drafts T8 (`w/[workspaceId]/drafts`)
     expect(unownedRoutes(routes, SCREEN_OWNERS)).toEqual({ unowned: [], stale: [] });
     // CONTROL — a planted route and a planted owner are both reported.
     const planted = unownedRoutes([...routes, 'apps/web/app/zz/page.tsx'], { ...SCREEN_OWNERS, 'apps/web/app/gone/page.tsx': 'B0' });

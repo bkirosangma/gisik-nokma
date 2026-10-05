@@ -23,7 +23,10 @@
  * a destination with no route, into the bar.
  */
 
-/** Everything a slot can hold. The scoped ones (all but `notes` and `inbox`) need a workspace to resolve. */
+/**
+ * Everything a slot can hold. The scoped ones (all but `notes` and `inbox`) need a workspace to resolve. `drafts` (drafts
+ * T8 FIX 1, planner ruling B, case 28.198) is offered and never in the default: below 1025px More is how Drafts is reached.
+ */
 export type BarDestination =
   | 'board'
   | 'my-work'
@@ -33,6 +36,7 @@ export type BarDestination =
   | 'calendar'
   | 'timeline'
   | 'backlog'
+  | 'drafts'
   | 'members';
 
 /** Declared once: the type above, the editor's "Available" list and the read-side door all derive from this. */
@@ -45,6 +49,7 @@ export const BAR_DESTINATIONS: readonly BarDestination[] = [
   'calendar',
   'timeline',
   'backlog',
+  'drafts',
   'members',
 ];
 

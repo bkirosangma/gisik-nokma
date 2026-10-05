@@ -716,6 +716,16 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
+                  "text": "Drafts"
+                },
+                {
+                  "kind": "text",
+                  "text": " — the tickets you saved as drafts in this workspace, with how many there are. Only you can see them (§5)."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
                   "text": "Members"
                 },
                 {
@@ -814,7 +824,7 @@ export const HELP_CONTENT: HelpContent = [
             "spans": [
               {
                 "kind": "bold",
-                "text": "My work, Members and Settings appear only once a workspace is open"
+                "text": "My work, Drafts, Members and Settings appear only once a workspace is open"
               },
               {
                 "kind": "text",
@@ -3204,9 +3214,142 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the ticket needs a title)."
+                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the ticket needs a title). Or press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save as draft"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " beside it, to keep the ticket to yourself until it is ready (below)."
                     }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Saving a draft."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save as draft"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " keeps the ticket private: only you can see it, it has no number yet, and it starts in the backlog. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Draft saved"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Your drafts are listed on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Drafts"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the top bar (on a phone, under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the bottom bar), where each one can be opened, published or discarded. A draft's own page shows a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Draft"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " label where the number goes and a banner that says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Only you can see this draft.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Publish"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". History and comments are not offered yet, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " say "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Available after you publish\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Publish"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " makes it an ordinary ticket with a number, last in the backlog. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " first says what will be erased with it (its sub-drafts and uploaded files; linked notes are kept), and then erases it."
+                  }
                 ]
               },
               {

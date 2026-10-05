@@ -16,6 +16,7 @@ import { ASSIGN_OUTSIDER_OPTION, OUTSIDER_JOINS_AS_GUEST } from '../people/copy.
 import type { LookedUpPerson, LookupPerson } from '../people/types.js';
 import type { EditorSlotComponent } from './editor-slot.js';
 import { OutsiderFinder } from './outsider-finder.js';
+import { DRAFT_SAVE_LABEL } from './drafts-copy.js';
 
 /**
  * The Assignee picker's row for nobody, spelled as an OPTION VALUE rather than
@@ -215,6 +216,8 @@ export type NewTicketDraft = {
   dueDate?: string;
   /** The birth estimate in whole days (wtg2 T4, spec ES-1). Absent means no claim: an empty input is omitted, like the dates. */
   estimate?: number;
+  /** Drafts T8: "Save as draft" was pressed. The flow, which builds the event, forces `start: 'backlog'` and drops `stateId`. */
+  draft?: true;
 };
 
 export type NewTicketDialogProps = {
@@ -861,11 +864,15 @@ export function NewTicketDialog({
    */
   const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
+  // Drafts T8: while a draft saves, the switch reads ON and is disabled (a draft is born in the backlog); its own
+  // state is untouched, so it is as the person left it once the save settles.
+  const [savingDraft, setSavingDraft] = useState(false);
 
-  const create = (): void => {
+  const submit = (asDraft: boolean): void => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    setSavingDraft(asDraft);
     // The guard LIFTS on settle either way: a refusal leaves the dialog open
     // with nothing in flight, and the person must be able to press again. The
     // rejection is NOT swallowed — `.finally` passes it through exactly as the
@@ -894,12 +901,14 @@ export function NewTicketDialog({
         // its absence is the ruling rather than an oversight: the parent list
         // has no bearing on where a ticket is born any more, so a withheld
         // picker withholds the PARENT and nothing else.
-        start: startInBacklog ? 'backlog' : 'focus',
+        // Drafts T8: a draft is born in the backlog whatever the switch says (the flow forces it again, decision 6).
+        start: asDraft || startInBacklog ? 'backlog' : 'focus',
         // Spec 2026-09-22. ALWAYS sent, like `start` and for the same reason:
         // the wire's absence-means-P2 rule is for events older than the field,
         // not for this client. The control is preselected, so this is always a
         // level the person could see.
         priority,
+        ...(asDraft ? { draft: true as const } : {}),
         // The description, OMITTED when it renders to nothing (owner request
         // 2026-09-23). `docToPlainText` is the decision, and it is the domain's
         // one projection — total, so `undefined`, a clearing `null` and an empty
@@ -930,7 +939,8 @@ export function NewTicketDialog({
         // `currentStates` can be `null` here only if `workflowStates` never
         // resolved this workflow at all, in which case there is nothing to
         // compare against and the value is left out rather than guessed.
-        ...(startInBacklog ||
+        ...(asDraft ||
+        startInBacklog ||
         currentStates === null ||
         stateId === '' ||
         stateId === currentStates.initialStateId
@@ -948,10 +958,14 @@ export function NewTicketDialog({
     ).finally(() => {
       submittingRef.current = false;
       setSubmitting(false);
+      setSavingDraft(false);
     });
   };
+  const create = (): void => submit(false);
+  const saveAsDraft = (): void => submit(true);
 
-  // Why Create is disabled, said in the footer (23.124) — the first reason that holds. `submitting` is not one: a
+  // Why Create (and Save as draft, drafts T8: the same submit, so the same hint) is disabled, said in the footer
+  // (23.124) — the first reason that holds. `submitting` is not one: a
   // request already on the wire needs no hint, only the disabled look.
   const hintId = useId();
   const disabledHint =
@@ -980,6 +994,15 @@ export function NewTicketDialog({
             </p>
           )}
           <Button onClick={onClose}>Cancel</Button>
+          {/* Drafts T8: the secondary submit. It shares `submit`'s guard and the hint above, so one press of either
+              files one ticket; the flow turns `draft: true` into a private ticket born in the backlog. */}
+          <Button
+            disabled={disabledHint !== null || submitting}
+            aria-describedby={disabledHint === null ? undefined : hintId}
+            onClick={saveAsDraft}
+          >
+            {DRAFT_SAVE_LABEL}
+          </Button>
           <Button
             variant="primary"
             // `submitting` is the render half of the duplicate-submit guard (the ref is what actually stops one):
@@ -1047,7 +1070,8 @@ export function NewTicketDialog({
         is carried over to imply a rule that was never there.
       */}
       <Switch
-        checked={startInBacklog}
+        checked={startInBacklog || savingDraft}
+        disabled={savingDraft}
         onChange={(next) => {
           setStartInBacklog(next);
           // Written at the moment of the CHOICE, not at creation (owner ruling
