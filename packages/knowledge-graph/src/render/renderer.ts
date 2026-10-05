@@ -46,6 +46,8 @@ export type RendererProbe = {
   inkLog(): number[];
   clearInk(): void;
   alphaAt(points: readonly { x: number; y: number }[]): number[];
+  /** What Sigma's picking buffer holds at each stage point, as `kind:key` (null: the stage). 27.353's hit-area control. */
+  hitAt(points: readonly { x: number; y: number }[]): (string | null)[];
   invalidated(): string[];
   positions(): Record<string, { x: number; y: number }>;
 };

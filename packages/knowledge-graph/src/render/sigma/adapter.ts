@@ -3,14 +3,16 @@ import type { CameraState } from '../../engine/camera.js';
 import { solveFit } from '../../engine/fit.js';
 import { glideFrame } from '../../engine/glide.js';
 import { radius } from '../../engine/layout.js';
-import type { EdgeAttributes, NodeAttributes } from '../node-attributes.js';
+import type { CardShape, EdgeAttributes, NodeAttributes } from '../node-attributes.js';
 import type { ThemePalette } from '../palette.js';
 import type { CreateRenderer, DrawNode, DrawStates, DrawView, GraphRenderer, HoverEvent, MountOptions, PickEvent } from '../renderer.js';
 import { keepAttachmentCache } from './attachment-cache.js';
+import { cardShape, type SigmaLabels } from './card-box.js';
+import { hasHead } from './card-style.js';
 import { createCameraDriver } from './camera-driver.js';
 import { iconUri } from './icons.js';
 import { createProbe } from './probe.js';
-import { createSigma, type KgSigma } from './program.js';
+import { createSigma, labelsOf, type KgSigma } from './program.js';
 import { drawRings } from './rings.js';
 
 /**
@@ -28,6 +30,7 @@ export const createSigmaRenderer: CreateRenderer = () => {
   let ringsSvg: SVGSVGElement;
   let driver: ReturnType<typeof createCameraDriver> | undefined;
   let dropSub: (ref: string) => void = () => undefined;
+  let labels: SigmaLabels;
   const invalidated: string[] = [];
   let nodeHovered = false, highlight: ReadonlySet<string> | null = null;
   let fitState: CameraState | null = null, fitPending = true, firstGraph = true, lastView: DrawView | null = null;
@@ -74,6 +77,7 @@ export const createSigmaRenderer: CreateRenderer = () => {
       const far = radius(o.config.R, 6);
       sigma.setCustomBBox({ x: [-far[0] * 1.25, far[0] * 1.25], y: [-far[1] * 1.25, far[1] * 1.25] }); // glide keeps the frame fixed (`:756`, `:809`)
       dropSub = keepAttachmentCache(sigma, invalidated);
+      labels = labelsOf(sigma);
       driver = createCameraDriver(sigma, stage, () => fitState?.ratio ?? 1, o.reduceMotion, (s) => cams.forEach((cb) => cb(s)));
       sigma.on('afterRender', () => {
         if (lastView === null) return;
@@ -161,7 +165,16 @@ export const createSigmaRenderer: CreateRenderer = () => {
           from.set(n.ref, { ...start });
         }
       }
-      for (const e of edges) if (g.hasNode(e.from) && g.hasNode(e.to)) g.addEdgeWithKey(e.id, e.from, e.to, { id: e.id, grp: e.grp, fog: e.fog, sug: e.sug, on: e.on });
+      // owner ruling B: a directed edge carries its target's card, so its head stops at that card's border (card-path.ts)
+      const cards = new Map<string, CardShape | null>();
+      const cardOf = (ref: string): CardShape | null => {
+        if (!cards.has(ref)) cards.set(ref, cardShape(g.getNodeAttributes(ref), labels));
+        return cards.get(ref)!;
+      };
+      for (const e of edges) {
+        if (!g.hasNode(e.from) || !g.hasNode(e.to)) continue;
+        g.addEdgeWithKey(e.id, e.from, e.to, { id: e.id, grp: e.grp, fog: e.fog, sug: e.sug, on: e.on, card: hasHead(e) ? cardOf(e.to) : null });
+      }
       applyStates(states);
       // glide (`:890-895`): positions tween while the frame stays fixed
       cancelAnimationFrame(glideRaf);
