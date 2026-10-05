@@ -676,6 +676,18 @@ describe('KnowledgeGraph: the empty state and the scope note name their cause (K
     await user.click(screen.getByRole('button', { name: 'Add link' }));
     expect(onAddLink).toHaveBeenCalledWith(expect.objectContaining({ ref: T('t9') }));
     cleanup();
+    // an edge whose far end the server withheld is no link the member has: still nothing linked, and Add link
+    const centre9 = item('t9', { label: 'GN-9', ws: 'gn', project: 'j_mw' });
+    const withheld: GraphSource = {
+      ring: async (q): Promise<GraphRingResponse> => ({
+        hop: q.hops, center: { ...centre9, hop: 0 }, items: [], frontier: [], truncated: false, cursor: null,
+        edges: q.hops === 1 ? [{ id: `relates|${T('t9')}|${T('t404')}`, kind: 'relates', from: T('t9'), to: T('t404'), snippet: null, addedBy: null, addedAt: null, origin: null, suggested: false }] : [],
+      }),
+    };
+    setup({ centre: T('t9'), onAddLink }, { source: withheld });
+    expect(await screen.findByText('Nothing is linked to GN-9 yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add link' })).toBeInTheDocument();
+    cleanup();
     // control: the centre with links, every chip off
     const { fake } = setup({ onAddLink });
     await drawn(fake, T('t126'));
