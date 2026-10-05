@@ -153,7 +153,8 @@ settings screens for states and ticket types are behind **Settings**. See
 
 On a phone, a tablet or any window up to about 1024 pixels wide the links are in a **bar along the
 bottom** instead, with **More** at its right-hand end holding the rest, plus **Settings**, **Account** and
-**Help**. **Edit bottom bar**, the last row of **More**, lets you choose what the bar carries.
+**Help**. **Edit bottom bar**, the last row of **More**, lets you choose what the bar carries. Unlike the
+top bar, it offers **My work** even with no workspace open, because My work covers every workspace you are in.
 
 ---
 

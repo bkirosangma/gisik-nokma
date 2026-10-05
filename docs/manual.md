@@ -133,7 +133,7 @@ choose **Delete** beside it.
 There is a small bar across the top of nearly every screen. Inside a workspace it carries:
 
 - **Workspaces** — the list of every workspace you are in.
-- **My work** — the tickets assigned to you.
+- **My work** — your tickets from every workspace you are in, on one page.
 - **Members** — the people in this workspace, and what they are.
 - **Settings** — this workspace's own screens: its ticket types, its workflows, its project groups,
   and the workspace itself (§11 and §12).
@@ -158,7 +158,7 @@ avatar**, so **Help** and **Account** stay in the bar as plain links rather than
 On a phone, and on a tablet or any window up to about 1024 pixels wide, the links leave the top of the
 screen and become a **bar along the bottom**: the places you use most, then **More**. **More** opens a
 sheet with everything the bar does not carry — including the workspace's last project, set apart with its
-**Last project:** label — and **Settings**, **Account** and **Help**.
+**Last project:** label — and **Settings**, **Account** and **Help**. Unlike the top bar, the bottom bar offers **My work** even with no workspace open, since My work covers every workspace you are in.
 
 The bar is yours to arrange. Press **Edit bottom bar**, the last row of **More**, to choose which places
 the bar carries and in what order; **Reset to default** puts it back. The product remembers your choice.

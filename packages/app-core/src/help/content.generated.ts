@@ -692,7 +692,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " — the tickets assigned to you."
+                  "text": " — your tickets from every workspace you are in, on one page."
                 }
               ],
               [
@@ -903,7 +903,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": "."
+                    "text": ". Unlike the top bar, the bottom bar offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "My work"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " even with no workspace open, since My work covers every workspace you are in."
                   }
                 ]
               },
@@ -12757,7 +12765,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", lets you choose what the bar carries."
+                    "text": ", lets you choose what the bar carries. Unlike the top bar, it offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "My work"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " even with no workspace open, because My work covers every workspace you are in."
                   }
                 ]
               }
