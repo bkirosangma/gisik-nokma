@@ -30,6 +30,8 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
   run-tests [--label L] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary
+  mutate [--base REF] [--json]    Stryker + numeric ×10/÷10, ceil/floor/round, casts stripped, on the branch's changed lines; one slot-run per file
+                                  (exit 0 no survivor, 1 survivors to triage, 2 tool failure; report ~/.cache/gisik-ctl/mutate-<branch>-<sha8>.md)
   post <to> --kind K (--body FILE | --text STR) [--from SEAT] [--reply-to ID]
                                   append a message to roles/LEDGER.jsonl (the postman delivers it)
   inbox [--seat S] [--all] [--watch]  my unacked messages; --watch = the ONE cursor watcher for the seat's Monitor

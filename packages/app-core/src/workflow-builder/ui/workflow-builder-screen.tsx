@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type RefObject } from 'react';
 import { PHONE_BOARD_QUERY } from '../../views/use-phone-board.js';
-import { Button, Skeleton, SkeletonRegion, useScrollEdges } from '@gisik-nokma/ui';
-import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
+import { Button, Popover, Skeleton, SkeletonRegion, useScrollEdges } from '@gisik-nokma/ui';
+import { validateWorkflowDef, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
 import { AuthoringReadRefused, type WorkflowAuthoringGateway, type WorkspaceMember } from '../gateway.js';
 import {
@@ -14,13 +14,15 @@ import {
   type BuilderSession,
 } from './builder-context.js';
 import { AddTransitionForm } from './add-transition-form.js';
-import { BuilderPanels } from './builder-panels.js';
+import { BuilderPanels, STACKED_QUERY } from './builder-panels.js';
+import { FloatingPanel, type PanelTab } from './floating-panel.js';
 import { IssuesPanel } from './issues-panel.js';
-import { PublishControls } from './publish-controls.js';
+import { PublishControls, usePublishFlow, type PublishFlow } from './publish-controls.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
 import type { CanvasApi } from './use-canvas-api.js';
 import { TidyControl } from './tidy-control.js';
+import { useEscapeLadder } from './use-escape-ladder.js';
 import { WorkflowCanvas } from './workflow-canvas.js';
 
 /**
@@ -71,6 +73,175 @@ function AddStateButton(props: { canvas: RefObject<CanvasApi | null> }) {
   );
 }
 
+/** Does `query` match the window now? `false` where `matchMedia` is missing (the server, jsdom unstubbed), like `usePhoneBoard`. */
+function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+      const list = window.matchMedia(query);
+      list.addEventListener('change', onChange);
+      return () => list.removeEventListener('change', onChange);
+    },
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** The gap between the floating toolbar's bottom and the floating panel's top, in px (the toolbar's own 0.75rem inset). */
+const PANEL_CLEARANCE = 12;
+
+function readSession(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeSession(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // storage unavailable: the choice still holds until the screen unmounts
+  }
+}
+
+/** The error count `validateWorkflowDef` gives (what blocks Publish), never the advisories. */
+function useIssueCount(): number {
+  return validateWorkflowDef(useDraft().def).length;
+}
+
+function IssuesBadge(props: { onOpen: () => void }) {
+  const count = useIssueCount();
+  return (
+    <Button className="gn-wf-toolbar__issues" data-count={count > 0 ? 'some' : 'none'} onClick={props.onOpen}>
+      Issues <span className="gn-wf-toolbar__count">{count}</span>
+    </Button>
+  );
+}
+
+/**
+ * The toolbar's overflow at narrow widths (spec §4.2, planner ruling 2026-10-04 Q6): there is no shared `Menu`, so this is the shared
+ * `Popover` holding a `role="menu"` of `role="menuitem"` buttons, keyed like `AddRuleMenu` (ArrowDown / ArrowUp wrap, Home / End). The
+ * Popover consumes its own Escape, so the ladder never closes a layer under it. Zoom and Tidy leave it open (zoom is pressed again,
+ * and "Undo tidy" appears beside Tidy, inside the menu: closing it would take the offer with it); Issues closes it, opening the panel.
+ */
+function MoreMenu(props: { canvas: RefObject<CanvasApi | null>; withIssues: boolean; onIssues: () => void }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const issues = useIssueCount();
+  const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
+    const items = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const target =
+      event.key === 'ArrowDown' ? items[(at + 1) % items.length]
+      : event.key === 'ArrowUp' ? items[(at - 1 + items.length) % items.length]
+      : event.key === 'Home' ? items[0]
+      : event.key === 'End' ? items[items.length - 1]
+      : undefined;
+    if (target === undefined) return;
+    event.preventDefault();
+    target.focus();
+  };
+  return (
+    <>
+      <Button
+        ref={triggerRef}
+        className="gn-wf-toolbar__more"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        More
+      </Button>
+      <Popover triggerRef={triggerRef} open={open} onClose={() => setOpen(false)} aria-label="More">
+        <ul ref={listRef} className="gn-wf-more" role="menu" aria-label="More" onKeyDown={onKeyDown}>
+          <li role="none">
+            <button type="button" role="menuitem" className="gn-wf-more__item" onClick={() => props.canvas.current?.zoomOut()}>
+              Zoom out
+            </button>
+          </li>
+          <li role="none">
+            <button type="button" role="menuitem" className="gn-wf-more__item" onClick={() => props.canvas.current?.zoomIn()}>
+              Zoom in
+            </button>
+          </li>
+          <li role="none">
+            <button type="button" role="menuitem" className="gn-wf-more__item" onClick={() => props.canvas.current?.fit()}>
+              Fit to screen
+            </button>
+          </li>
+          <li role="none">
+            <TidyControl role="menuitem" sizes={() => props.canvas.current?.sizes() ?? {}} />
+          </li>
+          {props.withIssues ? (
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="gn-wf-more__item"
+                onClick={() => {
+                  setOpen(false);
+                  props.onIssues();
+                }}
+              >
+                Issues <span className="gn-wf-toolbar__count">{issues}</span>
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      </Popover>
+    </>
+  );
+}
+
+/**
+ * Full screen's one row of controls (spec §4.2), top centre over the canvas, in place of the header's title row. The existing controls,
+ * each with its own `canAuthor` guard, so a viewer gets the name (read-only), zoom, Issues and Exit. Narrower than `STACKED_QUERY` the
+ * zoom group and Tidy fold into More; the Issues badge folds too only on a phone (spec §4.5, planner ruling 2026-10-04 Q2).
+ */
+function FullScreenToolbar(props: {
+  toolbarRef: RefObject<HTMLDivElement | null>;
+  canvas: RefObject<CanvasApi | null>;
+  narrow: boolean;
+  phone: boolean;
+  onIssues: () => void;
+  onExit: () => void;
+  onPublished: (payload: PublishedWorkflowDef) => void;
+  publishFlow: PublishFlow;
+}) {
+  const sizes = () => props.canvas.current?.sizes() ?? {};
+  return (
+    <div className="gn-wf-toolbar" ref={props.toolbarRef}>
+      <WorkflowNameField />
+      <AddStateButton canvas={props.canvas} />
+      <AddTransitionForm />
+      {props.narrow ? null : (
+        <>
+          <div role="group" aria-label="Zoom" className="gn-wf-toolbar__zoom">
+            <Button className="gn-wf-toolbar__zoom-step" aria-label="Zoom out" onClick={() => props.canvas.current?.zoomOut()}>
+              −
+            </Button>
+            <Button className="gn-wf-toolbar__zoom-step" aria-label="Zoom in" onClick={() => props.canvas.current?.zoomIn()}>
+              +
+            </Button>
+            <Button className="gn-wf-toolbar__zoom-step" aria-label="Fit to screen" onClick={() => props.canvas.current?.fit()}>
+              Fit
+            </Button>
+          </div>
+          <TidyControl sizes={sizes} />
+        </>
+      )}
+      {props.phone ? null : <IssuesBadge onOpen={props.onIssues} />}
+      <PublishControls onPublished={props.onPublished} flow={props.publishFlow} />
+      {props.narrow ? <MoreMenu canvas={props.canvas} withIssues={props.phone} onIssues={props.onIssues} /> : null}
+      <Button className="gn-wf-toolbar__exit" onClick={props.onExit}>
+        Exit full screen
+      </Button>
+    </div>
+  );
+}
+
 export function WorkflowBuilderScreen(props: {
   workspaceId: string;
   session: BuilderSession;
@@ -103,8 +274,28 @@ export function WorkflowBuilderScreen(props: {
   const [loadFailed, setLoadFailed] = useState(false);
   // Phone only (Plan Task 11, 21.170): the States / Transitions / System rules / Issues column is a bottom sheet
   // opened from the "Panels" button. Above 40rem the button, the scrim and the Done button are `display: none` and
-  // this state paints nothing, so the side-by-side layout is untouched.
+  // this state paints nothing, so the side-by-side layout is untouched. In full screen (G-9 T5) the column is not
+  // shown at any width: the floating panel below replaces it, and this state stays false.
   const [panelsOpen, setPanelsOpen] = useState(false);
+  // G-9 T5 (spec §4.1): full screen is this same screen, fixed over the window, remembered for the session per draft.
+  const fullScreenKey = `${storageKey}:fullscreen`;
+  const [fullscreen, setFullscreen] = useState(() => readSession(fullScreenKey) === 'true');
+  const fullscreenNow = useRef(fullscreen);
+  fullscreenNow.current = fullscreen;
+  const [panel, setPanel] = useState<{ open: boolean; tab: PanelTab }>({ open: false, tab: 'selection' });
+  // G-9 T5 FIX 1 (planner ruling 2026-10-05 09:42): the toggle remounts PublishControls (toolbar or title row), so the publish
+  // attempt (its phase, the mapping's picks, the refusal or outcome on it) is held here, above the toggle, and handed to both.
+  const publishFlow = usePublishFlow();
+  const narrow = useMediaQuery(STACKED_QUERY);
+  const phone = useMediaQuery(PHONE_BOARD_QUERY);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const headerFullScreenRef = useRef<HTMLButtonElement>(null);
+  const cornerFullScreenRef = useRef<HTMLButtonElement>(null);
+  // Which button entered (focus goes back to it on exit), and where focus goes after the next full-screen change: only a
+  // press moves focus, so a mount that restores full screen from the session leaves it where it is.
+  const enteredFrom = useRef<'header' | 'corner'>('header');
+  const focusAfterToggle = useRef<'toolbar' | 'header' | 'corner' | null>(null);
   // The left panel scrolls down on the desktop split: `.gn-scroll-fade--y` shows a state list that runs past the fold.
   const leftEdgesRef = useScrollEdges<HTMLElement>('y');
   const canvasApi = useRef<CanvasApi | null>(null);
@@ -118,15 +309,72 @@ export function WorkflowBuilderScreen(props: {
     panelsButtonRef.current?.focus();
   };
 
+  const enterFullScreen = (from: 'header' | 'corner') => {
+    enteredFrom.current = from;
+    focusAfterToggle.current = 'toolbar';
+    setFullscreen(true);
+    writeSession(fullScreenKey, 'true');
+  };
+  const exitFullScreen = () => {
+    focusAfterToggle.current = enteredFrom.current;
+    setPanel((was) => ({ ...was, open: false }));
+    setFullscreen(false);
+    writeSession(fullScreenKey, 'false');
+  };
+  const openPanel = (tab: PanelTab) => setPanel({ open: true, tab });
+  const closePanel = () => {
+    // Focus inside the panel would fall to the body with it: keep it in the full-screen region instead.
+    if (rootRef.current?.querySelector('.gn-wf-panel')?.contains(document.activeElement)) rootRef.current.focus();
+    setPanel((was) => ({ ...was, open: false }));
+  };
+  // One Escape owner for full screen, innermost first (planner ruling 2026-10-04 Q1).
+  useEscapeLadder([
+    { open: fullscreen && panel.open, close: closePanel },
+    { open: fullscreen, close: exitFullScreen },
+  ]);
+
+  // The floating panel starts below the floating toolbar, which wraps at narrower widths: its bottom, measured, is the panel's top.
+  const layoutRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    // A tap on a canvas node or arrow writes the draft's one `selection`, and the row it opens lives in the panels
-    // column — on a phone that column is hidden until asked for, so a NEW selection opens the sheet (once per change,
-    // never for the draft's own starting selection). Phone only (T13, 21.176): above 40rem the column is always
-    // on screen, and flipping `panelsOpen` there would leave a stale open sheet for the next resize to the phone.
+    const toolbar = toolbarRef.current;
+    const layout = layoutRef.current;
+    if (!fullscreen || toolbar === null || layout === null || typeof ResizeObserver === 'undefined') return;
+    const place = () => {
+      const below = toolbar.getBoundingClientRect().bottom - layout.getBoundingClientRect().top;
+      layout.style.setProperty('--gn-wf-panel-top', `${Math.max(0, Math.round(below)) + PANEL_CLEARANCE}px`);
+    };
+    const observer = new ResizeObserver(place);
+    observer.observe(toolbar);
+    observer.observe(layout);
+    place();
+    return () => {
+      observer.disconnect();
+      layout.style.removeProperty('--gn-wf-panel-top');
+    };
+  }, [fullscreen, data]);
+
+  useEffect(() => {
+    const target = focusAfterToggle.current;
+    focusAfterToggle.current = null;
+    if (target === 'toolbar') toolbarRef.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)')?.focus();
+    else if (target === 'header') headerFullScreenRef.current?.focus();
+    else if (target === 'corner') cornerFullScreenRef.current?.focus();
+  }, [fullscreen]);
+
+  useEffect(() => {
+    // A tap on a canvas node or arrow writes the draft's one `selection`, and what it opens is out of sight until asked
+    // for, so a NEW selection opens it (once per change, never for the draft's own starting selection). In full screen
+    // (G-9 T5, spec §4.3, planner ruling 2026-10-04 Q5) that is the floating panel, at EVERY width: on the Selection
+    // tab, unless the change came from the panel's own lists, which expand the row in place. Outside full screen it is
+    // the phone's sheet, and phone only (T13, 21.176): above 40rem the column is always on screen, and flipping
+    // `panelsOpen` there would leave a stale open sheet for the next resize to the phone.
     let last = store.getState().selection;
     return store.subscribe(() => {
       const next = store.getState().selection;
-      if (next !== last && next.kind !== 'none' && window.matchMedia?.(PHONE_BOARD_QUERY).matches) setPanelsOpen(true);
+      if (next !== last && next.kind !== 'none') {
+        if (fullscreenNow.current) setPanel((was) => ({ open: true, tab: was.open && was.tab === 'lists' ? 'lists' : 'selection' }));
+        else if (window.matchMedia?.(PHONE_BOARD_QUERY).matches) setPanelsOpen(true);
+      }
       last = next;
     });
   }, [store]);
@@ -208,51 +456,76 @@ export function WorkflowBuilderScreen(props: {
     canAuthor: canAuthorRole(props.session.role),
   };
 
+  const onPublished = (payload: PublishedWorkflowDef) => {
+    // The recovered draft is now the server's own truth — clearing
+    // it here (rather than leaving it to expire on its own) is what
+    // stops a stale pre-publish version from resurfacing if this
+    // same id is ever opened again in this tab.
+    try {
+      window.sessionStorage.removeItem(storageKey);
+    } catch {
+      // already inaccessible; nothing more to clear
+    }
+    props.onPublished?.(payload);
+  };
+
   return (
     <BuilderProvider store={store} env={env}>
-      <div className="workflow-builder-screen">
+      {/* G-9 T5: one tree in both layouts, so the canvas (and React Flow's zoom and pan) stays mounted across the switch. */}
+      <div
+        ref={rootRef}
+        className="workflow-builder-screen"
+        data-fullscreen={fullscreen ? 'true' : 'false'}
+        role={fullscreen ? 'region' : undefined}
+        aria-label={fullscreen ? 'Workflow editor, full screen' : undefined}
+        tabIndex={fullscreen ? -1 : undefined}
+      >
         <header className="workflow-builder-screen__header">
           {env.canAuthor ? null : <ReadOnlyBanner />}
           {/* The prototype's header is one row carrying the title on the left
               and the actions on the right (`:1015-1022`); the banner sits above
               it rather than inside it, which is why this is a wrapper and not
-              four more children of `__header`. The prototype's third piece —
+              four more children of `__header`. In full screen (G-9 T5) the
+              floating toolbar takes the title row's place. The prototype's third piece —
               a `wfStatus` line ("Draft · last saved 11:58") — is NOT here:
               `last saved`/`lastSaved`/`wfStatus` are 0 hits repo-wide, so there
               is no state to render. Named as an absence, not built. */}
-          <div className="workflow-builder-screen__title-row">
-            <WorkflowNameField />
-            <div className="workflow-builder-screen__actions">
-              <AddStateButton canvas={canvasApi} />
-              <AddTransitionForm />
-              <TidyControl sizes={() => canvasApi.current?.sizes() ?? {}} />
-              <Button
-                ref={panelsButtonRef}
-                className="workflow-builder-screen__panels"
-                aria-expanded={panelsOpen}
-                aria-controls="workflow-builder-panels"
-                onClick={() => setPanelsOpen(true)}
-              >
-                Panels
-              </Button>
-              <PublishControls
-                onPublished={(payload) => {
-                  // The recovered draft is now the server's own truth — clearing
-                  // it here (rather than leaving it to expire on its own) is what
-                  // stops a stale pre-publish version from resurfacing if this
-                  // same id is ever opened again in this tab.
-                  try {
-                    window.sessionStorage.removeItem(storageKey);
-                  } catch {
-                    // already inaccessible; nothing more to clear
-                  }
-                  props.onPublished?.(payload);
-                }}
-              />
+          {fullscreen ? (
+            <FullScreenToolbar
+              toolbarRef={toolbarRef}
+              canvas={canvasApi}
+              narrow={narrow}
+              phone={phone}
+              onIssues={() => openPanel('issues')}
+              onExit={exitFullScreen}
+              onPublished={onPublished}
+              publishFlow={publishFlow}
+            />
+          ) : (
+            <div className="workflow-builder-screen__title-row">
+              <WorkflowNameField />
+              <div className="workflow-builder-screen__actions">
+                <AddStateButton canvas={canvasApi} />
+                <AddTransitionForm />
+                <TidyControl sizes={() => canvasApi.current?.sizes() ?? {}} />
+                <Button
+                  ref={panelsButtonRef}
+                  className="workflow-builder-screen__panels"
+                  aria-expanded={panelsOpen}
+                  aria-controls="workflow-builder-panels"
+                  onClick={() => setPanelsOpen(true)}
+                >
+                  Panels
+                </Button>
+                <PublishControls onPublished={onPublished} flow={publishFlow} />
+                <Button ref={headerFullScreenRef} className="workflow-builder-screen__fullscreen" onClick={() => enterFullScreen('header')}>
+                  Full screen
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </header>
-        <div className="workflow-builder-screen__layout">
+        <div className="workflow-builder-screen__layout" ref={layoutRef}>
           {panelsOpen ? <div className="workflow-builder-screen__scrim" aria-hidden="true" onClick={closePanels} /> : null}
           <aside
             id="workflow-builder-panels"
@@ -279,8 +552,20 @@ export function WorkflowBuilderScreen(props: {
               the canvas is a named region inside it, and `aria-label` is what
               keeps it addressable now that it is not a landmark of its own. */}
           <section className="workflow-builder-screen__canvas" aria-label="Canvas">
-            <WorkflowCanvas onReady={onCanvasReady} />
+            <WorkflowCanvas
+              onReady={onCanvasReady}
+              fullScreen={fullscreen ? null : { buttonRef: cornerFullScreenRef, onEnter: () => enterFullScreen('corner') }}
+            />
           </section>
+          {/* Opened only in full screen (the subscription's full-screen arm, the toolbar's badge), and closed by Exit. */}
+          <FloatingPanel
+            open={panel.open}
+            tab={panel.tab}
+            onTab={(tab) => setPanel({ open: true, tab })}
+            onClose={closePanel}
+            phone={phone}
+            widthKey={`${storageKey}:panelWidth`}
+          />
         </div>
       </div>
     </BuilderProvider>

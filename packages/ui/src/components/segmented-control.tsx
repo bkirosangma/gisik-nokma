@@ -65,7 +65,9 @@ export type SegmentedControlProps<T extends string> = {
  *
  * **`aria-controls`/`tabpanel` is NOT added, and the limit is on purpose.**
  * `SegmentedControl` is generic — it renders a choice, not a panel — and it has
- * seven render sites of two genuinely different kinds: the ticket sheet's
+ * seven render sites when this was written (thirteen on 2026-10-05, the
+ * full-screen workflow panel's tabs, G-9 T5, among the panel-switching kind)
+ * of two genuinely different kinds: the ticket sheet's
  * *Details* / *History* and the help browser's sections really do switch a panel
  * in place, while the theme and style toggles, `/inbox` and `/sign-in` switch a
  * setting or a route. The finding's first alternative (`aria-pressed` on a group

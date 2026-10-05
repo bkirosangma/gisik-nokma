@@ -23,7 +23,7 @@ TURBO="$repo/node_modules/.bin/turbo"
 [ -x "$TURBO" ] || { echo "FAIL gate-cache: $TURBO missing — pnpm install first"; exit 1; }
 UI=@gisik-nokma/ui; MOBILE=@gisik-nokma/mobile; APPCORE=@gisik-nokma/app-core; SERVER=@gisik-nokma/server; EDITOR=@gisik-nokma/editor
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 
 # A copy of the tree as it is NOW (tracked files, uncommitted edits included), committed, so turbo hashes it as a repo.
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -107,4 +107,5 @@ else
     check "$id $pkg#test --real: changing $file is a MISS" '[ "$s3" = miss ]'
   done
 fi
+ctl_test_only_end gate-cache.test.sh
 [ "$fails" -eq 0 ] && { echo "gate-cache.test.sh ($MODE): all ok"; exit 0; } || { echo "gate-cache.test.sh ($MODE): $fails FAILED"; exit 1; }

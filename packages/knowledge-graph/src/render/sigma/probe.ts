@@ -96,6 +96,14 @@ export function createProbe(
         return img.data[(py * img.width + px) * 4 + 3]!;
       });
     },
+    hitAt(points) {
+      // sigma@4.0.0-beta.7 declares the picking read `private`; it is the same read a hover or click makes
+      const s = sigma as unknown as { getHitAtPosition(p: { x: number; y: number }): { kind: string; key: string } | null };
+      return points.map((p) => {
+        const h = s.getHitAtPosition(p);
+        return h === null ? null : `${h.kind}:${h.key}`;
+      });
+    },
     invalidated: () => [...invalidated],
     positions() {
       const out: Record<string, { x: number; y: number }> = {};

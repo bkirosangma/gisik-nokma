@@ -3,7 +3,9 @@ import type { EdgeAttributes, NodeAttributes } from '../node-attributes.js';
 import type { ThemePalette } from '../palette.js';
 import { iconUri } from './icons.js';
 import { initialsOf } from '../initials.js';
-import { createSigma } from './program.js';
+import { cardShape } from './card-box.js';
+import { hasHead } from './card-style.js';
+import { createSigma, labelsOf } from './program.js';
 
 /**
  * Resolves once Sigma has drawn nothing for `quietMs` (or after `capMs`). The icon atlas and the label attachments are built
@@ -31,7 +33,8 @@ function renderQuiet(sigma: { on(event: 'afterRender', cb: () => void): unknown;
 
 export type SweepStats = { frames: number; fps: number; worstMs: number; p99Ms: number; over167: number; overAt: number[] };
 /** `fps`/`worstMs` and the rest describe the FIRST sweep (what the spec §7 bar reads); `pass2` is an identical second sweep, warm. */
-export type StressResult = SweepStats & { cards: number; fog: number; edges: number; renderer: string; firstMs: number; pass2: SweepStats };
+/** `searched`: the edges that end at their target's card border (owner ruling B), so the sweep pays for that search. */
+export type StressResult = SweepStats & { cards: number; fog: number; edges: number; searched: number; renderer: string; firstMs: number; pass2: SweepStats };
 
 /** 500 clear + 2,000 fog + 3,000 edges (spec §7), moved for `durationMs` while every frame is timed. */
 export async function runStress(
@@ -59,10 +62,13 @@ export async function runStress(
   for (let i = 0, k = 0; k < edgeCount; i += 1) {
     const a = nodes[(i * 7919) % nodes.length]!, b = nodes[(i * 104729 + 13) % nodes.length]!;
     if (a === b) continue;
-    graph.addEdgeWithKey(`x${k}`, a, b, { id: `x${k}`, grp: groups[k % groups.length]!, fog: a.startsWith('f') || b.startsWith('f'), sug: false, on: false });
+    graph.addEdgeWithKey(`x${k}`, a, b, { id: `x${k}`, grp: groups[k % groups.length]!, fog: a.startsWith('f') || b.startsWith('f'), sug: false, on: false, card: null });
     k += 1;
   }
   const sigma = createSigma(graph, container, () => palette, { nodeHovered: () => false, highlightOn: () => false });
+  // the heads end at their target's card border, as the adapter draws them (owner ruling B): the sweep pays for that search
+  const labels = labelsOf(sigma);
+  graph.updateEachEdgeAttributes((_id, a, _s, target) => (hasHead(a) ? { ...a, card: cardShape(graph.getNodeAttributes(target), labels) } : a));
   await renderQuiet(sigma, 200, 10_000);
   const camera = sigma.getCamera();
   /** One timed camera sweep: every frame's delta, from a fresh `last`. */
@@ -96,7 +102,8 @@ export async function runStress(
   const gl = container.querySelector('canvas')?.getContext('webgl2');
   const info = gl?.getExtension('WEBGL_debug_renderer_info');
   const renderer = gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : 'unknown';
-  const result: StressResult = { cards, fog, edges: graph.size, renderer, ...summary(first), firstMs: +(first[0] ?? 0).toFixed(1), pass2: summary(second) };
+  const searched = graph.filterEdges((_id, a) => a.card !== null).length;
+  const result: StressResult = { cards, fog, edges: graph.size, searched, renderer, ...summary(first), firstMs: +(first[0] ?? 0).toFixed(1), pass2: summary(second) };
   sigma.kill();
   return result;
 }

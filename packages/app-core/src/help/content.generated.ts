@@ -8148,6 +8148,59 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "Or press Add transition."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It opens a small form: pick where the arrow starts under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "From"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (a state, or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Any state"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " for a move allowed from anywhere) and where it ends under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "To"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", then press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If that arrow already exists, or you picked the same state twice, the form says so and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " stays greyed out. The new arrow is selected, so its rules are right there to edit."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "The canvas opens showing the whole drawing"
                   },
                   {
@@ -8221,7 +8274,132 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Only one row is open at a time — opening another closes the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas. An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so the canvas and the page do not move while you read down it. Two moves are listed at the bottom of "
+                    "text": ". Only one row is open at a time — opening another closes the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas. An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide screen (outside full screen, below) the column stays beside the canvas and scrolls by itself when it is longer than the window, so the canvas and the page do not move while you read down it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Full screen gives the drawing the whole window."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Full screen"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", at the top or in the canvas's top-right corner, and the editor covers the window, keeping your zoom and where you were. The controls float in one row along the top: the name, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add state"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add transition"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", zoom, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Tidy"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Issues"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (with the number of problems that stop you publishing), "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Publish"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Exit full screen"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; on a narrower window zoom and Tidy are under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". The left-hand column is not shown. In its place a panel on the right opens when you click a box or an arrow, or press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Issues"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; its tabs are "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Selection"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "States & transitions"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "System rules"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Issues"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and you can drag its left edge to make it wider or narrower. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Escape"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " closes one thing at a time: an open menu or the publishing dialog first, then the panel, then full screen. Switching full screen on or off leaves a publish you have started open, with the destinations you picked. A reload keeps you in full screen until you exit it. On a phone the panel rises from the bottom instead. Two moves are listed at the bottom of "
                   },
                   {
                     "kind": "bold",
@@ -8678,7 +8856,15 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Confirm."
+                      "text": "Confirm, or press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (or Escape) to stop without publishing."
                     }
                   ]
                 ]
