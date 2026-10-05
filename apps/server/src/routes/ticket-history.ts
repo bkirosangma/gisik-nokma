@@ -71,7 +71,7 @@ export type TicketHistoryEvent = {
  *
  * Both clocks are `timestamptz`, so both arrive as `Date`.
  */
-type HistoryRow = {
+export type HistoryRow = {
   id: string;
   type: string;
   version: number;
@@ -193,7 +193,7 @@ export function parsePaging(query: { afterSeq?: unknown; limit?: unknown }): Pag
   return { afterSeq, limit };
 }
 
-function toHistoryEvent(row: HistoryRow): TicketHistoryEvent {
+export function toHistoryEvent(row: HistoryRow): TicketHistoryEvent {
   return {
     id: row.id,
     type: row.type,

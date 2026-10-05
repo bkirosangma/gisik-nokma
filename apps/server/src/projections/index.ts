@@ -1,4 +1,5 @@
 import { projConcepts } from './proj-concepts.js';
+import { projConceptRejections } from './proj-concept-rejections.js';
 import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
 import { lifecycleProjection } from './lifecycle.js';
@@ -214,5 +215,8 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // concept tables inside an ingest transaction — their readers are the door (`check-concept.ts`) and request-path
   // reads.
   registry.register(projConcepts);
+  // KG-D Task 5. APPENDED by the same question: `apply` reads no table, and no projection reads
+  // proj_concept_rejections inside an ingest transaction; its one reader is the suggestion job.
+  registry.register(projConceptRejections);
   return registry;
 }

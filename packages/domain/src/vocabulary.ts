@@ -5,6 +5,7 @@ import {
   groupReorderedPayload,
 } from './events/groups.js';
 import { CONCEPT_EVENT_TYPES, CONCEPT_PAYLOADS } from './events/concept-events.js';
+import { suggestionRejectedPayload } from './events/suggestion-events.js';
 import {
   membershipGrantedPayload,
   membershipRevokedPayload,
@@ -679,4 +680,16 @@ domainRegistry.register({
   version: 1,
   entityKind: 'workspace',
   payloadSchema: workspaceSettingsSetPayloadSchema,
+});
+
+/**
+ * Knowledge Graph spec D §3.1/§4.3 (KG-D Task 5): a member rejected a suggested concept. Against the WORKSPACE, so
+ * it reaches every non-guest replica (`audienceClassOf` → `'workspace'`) and carries hashes, never item ids. Who may
+ * write it is the door's `checkSuggestionRejection` (`apps/server/src/permissions/check-concept.ts`).
+ */
+domainRegistry.register({
+  type: 'workspace.concept_suggestion_rejected',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: suggestionRejectedPayload,
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059, 13.2070–13.2086 and 13.2240–13.2249. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991, 13.2040–13.2059, 13.2070–13.2086, 13.2240–13.2249 and 13.2350–13.2351. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -11,6 +11,9 @@ fails=0
 T="$(cd "$(mktemp -d)" && pwd -P)"; R="$T/roles"; L="$T/logs"; N="$T/notes.md"; S="ctlpm-$$"
 mkdir -p "$R" "$L"; : > "$N"
 export CTL_POSTMAN_ROOT="$R" CTL_LOG_DIR="$L" CTL_POSTMAN_NOTES="$N" CTL_TMUX_SESSION="$S" CTL_PROOF_TRIES=4 CTL_POSTMAN_CMD_RE='^(bash|cat)$'
+# P51: lib.sh's paste waits (1 s settle, 2 s submit, 1 s per proof poll) are seams; a fake seat answers in milliseconds, so this suite (and
+# ONLY this suite — 13.2350) scales them, and the fake seat's 3 s turn with them. The live defaults are pinned by 13.2351.
+export CTL_PASTE_SETTLE_SECS=0.05 CTL_SUBMIT_WAIT_SECS=0.2 CTL_PROOF_POLL_SECS=0.05 FAKESEAT_TURN_SECS=0.1
 unset TMUX_PANE
 NOW=1790000000
 pm() { CTL_POSTMAN_NOW="$NOW" "$CTL" "$@"; }
@@ -19,11 +22,21 @@ cleanup() { tmux kill-session -t "$S" 2>/dev/null; for f in "$L"/inbox-watch-*.p
 trap cleanup EXIT
 reset() { rm -rf "$R"/* "$L"/*; : > "$N"; NOW=1790000000; for w in $(tmux list-windows -t "$S" -F '#{window_name}' | grep -v '^anchor$'); do tmux kill-window -t "$S:=$w"; done; }
 # a killed child of this shell stays a zombie until reaped, and `kill -0` still succeeds on a zombie: read the process state instead
+pane_cmd_is() { [ "$(tmux display-message -p -t "$S:=$1" '#{pane_current_command}' 2>/dev/null)" = "$2" ]; }
 proc_alive() { local st; st="$(ps -o stat= -p "$1" 2>/dev/null)"; [ -n "$st" ] && [ "${st#Z}" = "$st" ]; }
 jget() { python3 -c 'import json,sys; [print(json.loads(l).get(sys.argv[2],"")) for l in open(sys.argv[3]) if json.loads(l)["id"]==int(sys.argv[1])]' "$1" "$2" "$R/LEDGER.jsonl"; }
 ledger_n() { [ -f "$R/LEDGER.jsonl" ] && wc -l < "$R/LEDGER.jsonl" | tr -d ' ' || echo 0; }
 count_kind() { python3 -c 'import json,sys; print(sum(1 for l in open(sys.argv[2]) if json.loads(l)["kind"]==sys.argv[1] and (len(sys.argv)<4 or json.loads(l)["to"]==sys.argv[3])))' "$1" "$R/LEDGER.jsonl" ${2:+"$2"} 2>/dev/null || echo 0; }
-mkseat() { : > "$T/rec-$1"; tmux new-window -d -t "$S:${IDX:-}" -n "$1" "bash '$HERE/test/fakeseat.sh' $2 '$T/rec-$1' '${3:-}'"; sleep 0.7; }
+# Bounded polls (P51) in place of fixed sleeps: poll5 WHAT CMD… re-runs CMD every 50 ms and, after 100 tries (~5 s), prints a FAIL line and
+# counts it in $fails — a wait that never comes true is a red run, never a silent pass.
+poll5() { local what="$1" i; shift; for i in $(seq 1 100); do "$@" && return 0; sleep 0.05; done; echo "  FAIL poll: $what (not within ~5 s)"; fails=$((fails+1)); return 1; }
+# A seat is up when fakeseat.sh has written RECORD.ready (after its screen and its stty) and tmux shows its screen.
+seat_up() { local want; case "$2" in dialog) want="Do you want to proceed?";; prefill) want="$3";; *) want="❯";; esac
+  [ -e "$T/rec-$1.ready" ] && tmux capture-pane -p -t "$S:=$1" 2>/dev/null | grep -qF -- "$want"; }
+mkseat() { : > "$T/rec-$1"; rm -f "$T/rec-$1.ready"; tmux new-window -d -e "FAKESEAT_TURN_SECS=$FAKESEAT_TURN_SECS" -t "$S:${IDX:-}" -n "$1" "bash '$HERE/test/fakeseat.sh' $2 '$T/rec-$1' '${3:-}'"; poll5 "seat $1 ($2) up" seat_up "$1" "$2" "${3:-}"; }
+idle_wait() { poll5 "seat $1 back at its prompt" test -e "$T/rec-$1.ready"; }      # the seat's turn is over: whatever it was typed is in its record
+all_idle() { local w; for w in $(tmux list-windows -t "$S" -F '#{window_name}'); do [ ! -e "$T/rec-$w" ] || [ -e "$T/rec-$w.ready" ] || return 1; done; }
+seats_idle() { poll5 "every seat back at its prompt" all_idle; }
 rec_n() { local n; n="$(grep -c . "$T/rec-$1" 2>/dev/null)"; echo "${n:-0}"; }
 rec_has() { grep -qF -- "$2" "$T/rec-$1"; }
 status_of() { pm postman status 2>&1 | grep "^$1 " | head -1; }
@@ -91,7 +104,8 @@ pm ack 1 --seat exec3 >/dev/null 2>&1; rm -f "$L"/cursor-exec3-inbox
 check "13.1921 watch: a MISSING cursor starts at 0 and prints only the still-unacked ids" \
   'o="$(watch_once exec3)"; printf "%s" "$o" | grep -q "#2 " && ! printf "%s" "$o" | grep -q "#1 "'
 reset; sleep 300 & old=$!; echo $old > "$L/inbox-watch-exec3.pid"
-( exec -a "ctl inbox --watch --seat exec3" sleep 300 ) & old=$!; echo $old > "$L/inbox-watch-exec3.pid"; sleep 0.3
+( exec -a "ctl inbox --watch --seat exec3" sleep 300 ) & old=$!; echo $old > "$L/inbox-watch-exec3.pid"
+watcher_named() { ps -o args= -p "$1" 2>/dev/null | grep -q "^ctl inbox --watch --seat exec3"; }; poll5 "the fake watcher exec'd" watcher_named "$old"
 CTL_WATCH_ONCE=1 pm inbox --watch --seat exec3 >/dev/null 2>&1
 check "13.1922 watch: starting a second watcher for the seat stops the old one by its exact pid and takes over" \
   '! proc_alive $old && { [ "$(cat "$L/inbox-watch-exec3.pid" 2>/dev/null)" != "$old" ] || [ ! -s "$L/inbox-watch-exec3.pid" ]; }; r=$?; kill $old 2>/dev/null; [ $r = 0 ]'
@@ -111,7 +125,7 @@ check "13.1931 bridge: the first run starts at EOF — history is never reposted
 no_paste() { local n; for n in 1 2 3 4 5; do [ "$(rec_n exec$n)" = 0 ] || return 1; done; }
 note_text() { jget "$1" body | xargs cat; echo; }
 queue_n() { python3 -c 'import json,sys; print(sum(1 for l in open(sys.argv[1]) if json.loads(l)["from"]=="queue"))' "$R/LEDGER.jsonl"; }
-printf '06:01 FIX 4 %s (task/foo-bar abcdef12; reviewer B)\n06:02 NEXT 2 %s\n06:03 MERGETIP 5 task/foo-bar base=release/smoothness\n06:04 FIX lane3 %s\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1; sleep 1
+printf '06:01 FIX 4 %s (task/foo-bar abcdef12; reviewer B)\n06:02 NEXT 2 %s\n06:03 MERGETIP 5 task/foo-bar base=release/smoothness\n06:04 FIX lane3 %s\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1; seats_idle
 check "13.1930 bridge: a FIX / NEXT / MERGETIP queue line becomes ONE note to main (from queue; laneN accepted; ref from the line or the brief) — 'needs ctl restart' for FIX/NEXT, 'needs ctl tipmerge' for MERGETIP — and NOTHING is pasted into any lane (no next/fix/mergetip message exists); CONTROL in the same check: a manual ctl post of a fix to exec4 IS pasted into its pane" \
   '[ "$(count_kind note main)" = 4 ] && [ "$(count_kind fix)" = 0 ] && [ "$(count_kind next)" = 0 ] && [ "$(count_kind mergetip)" = 0 ] && no_paste && [ "$(jget 1 from)" = queue ] && note_text 1 | grep -q "^FIX 4 $T/BRIEF-b.md needs ctl restart" && note_text 2 | grep -q "^NEXT 2 .* needs ctl restart" && note_text 3 | grep -q "^MERGETIP task/foo-bar base=release/smoothness needs ctl tipmerge" && note_text 4 | grep -q "^FIX 3 " && [ "$(jget 1 ref)" = task/foo-bar ] && [ "$(jget 2 ref)" = task/foo-bar ] && [ "$(jget 3 ref)" = task/foo-bar ] && [ "$(jget 4 ref)" = task/foo-bar ] && pm post exec4 --kind fix --text "manual" --from main >/dev/null 2>&1 && pm postman once >/dev/null 2>&1 && [ "$(rec_n exec4)" = 1 ] && rec_has exec4 "[postman #5 fix"'
 before="$(ledger_n)"; pm postman once >/dev/null 2>&1; echo 0 > "$R/postman/cursor-queue-dispatch"; echo "06:09 NOTE x" >> "$Q"; pm postman once >/dev/null 2>&1
@@ -123,7 +137,7 @@ check "13.1933 bridge: an unparsable line (missing brief, target orchestrator or
   '[ "$(count_kind note main)" = 6 ] && [ "$(count_kind fix)" = 0 ] && [ "$(count_kind mergetip)" = 0 ] && no_paste && [ "$(for i in 1 2 3 4 5 6; do note_text $i; done | grep -c "could not route")" = 4 ] && note_text 5 | grep -q "^FIX 6 " && note_text 6 | grep -q "^FIX 7 "'
 # 13.1934 gets its OWN setup: window 3 is reviewerA, so a queue line addressed to it must still reach no pane
 reset; mkdir -p "$T/lanes"; Q="$R/QUEUE-dispatch.md"; : > "$Q"; for n in 1 2 4 5; do IDX=$n mkseat exec$n idle; done; IDX=3 mkseat reviewerA idle; pm postman once >/dev/null 2>&1
-printf '06:40 FIX 3 %s\n06:43 FIX 2 %s\n06:44 MERGETIP 3 task/foo-bar base=release/x\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1; sleep 1
+printf '06:40 FIX 3 %s\n06:43 FIX 2 %s\n06:44 MERGETIP 3 task/foo-bar base=release/x\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1; seats_idle
 check "13.1934 bridge: a line addressed to a window that is NOT an exec lane (3 = reviewerA here) reaches no pane — notes only; CONTROL in the same check: a manual post to that same reviewerA window IS pasted (the pane tier is alive)" \
   '[ "$(count_kind note main)" = 3 ] && [ "$(rec_n reviewerA)" = 0 ] && no_paste && pm post reviewerA --kind fix --text manual --from main >/dev/null 2>&1 && pm postman once >/dev/null 2>&1 && [ "$(rec_n reviewerA)" = 1 ]'
 bridge_reset; pm postman once >/dev/null 2>&1
@@ -138,7 +152,7 @@ check "13.1981 pane tier off (CTL_POSTMAN_PANE=0): the bridge posts its notes bu
   'shadow_case 0 && [ "$(count_kind note main)" = 2 ] && ! grep -q " DONE " "$Q" && shadow_case 1 && [ "$(grep -cE "^[0-9]{2}:[0-9]{2} DONE 06:4[01] postman" "$Q")" = 2 ] && grep -q "DONE 06:41 postman refused" "$Q"'
 
 bridge_reset; pm postman once >/dev/null 2>&1; NOW=$((NOW+10)); pm postman restarted exec4 >/dev/null 2>&1; NOW=$((NOW+10))
-printf '06:50 MERGETIP 4 task/foo-bar base=release/smoothness\n' >> "$Q"; pm postman once >/dev/null 2>&1; NOW=$((NOW+10)); pm postman once >/dev/null 2>&1; sleep 1
+printf '06:50 MERGETIP 4 task/foo-bar base=release/smoothness\n' >> "$Q"; pm postman once >/dev/null 2>&1; NOW=$((NOW+10)); pm postman once >/dev/null 2>&1; seats_idle
 check "13.2042 a MERGETIP queue line that arrives AFTER its lane was restarted produces only the note to main (ctl tipmerge) — nothing is pasted into the new session; CONTROL in the same check: a manual mergetip message to the same lane IS pasted" \
   '[ "$(count_kind note main)" = 1 ] && [ "$(count_kind mergetip)" = 0 ] && [ "$(rec_n exec4)" = 0 ] && note_text 1 | grep -q "needs ctl tipmerge" && pm post exec4 --kind mergetip --text "manual tip" --from main >/dev/null 2>&1 && pm postman once >/dev/null 2>&1 && [ "$(rec_n exec4)" = 1 ]'
 
@@ -151,7 +165,7 @@ shadow_run() { # MODE shadow|live — pass 1 (the baseline), then a manual fix p
   bridge_reset; IDX=7 mkseat planner idle; : > "$TL2"; local fl=""; [ "$1" = shadow ] && fl="--shadow"
   spm postman once $fl >/dev/null 2>&1
   pm post exec3 --kind fix --text "manual go" --from main >/dev/null 2>&1; pm post planner --kind question --text "which way?" --from exec3 >/dev/null 2>&1
-  printf '06:50 FIX 2 %s\n' "$T/BRIEF-b.md" >> "$Q"; spm postman once $fl >/dev/null 2>&1; sleep 1; }
+  printf '06:50 FIX 2 %s\n' "$T/BRIEF-b.md" >> "$Q"; spm postman once $fl >/dev/null 2>&1; seats_idle; }
 shadow_run shadow
 check "13.2043 --shadow computes every delivery and writes nothing a seat can see: the tmux shim logged NO write (no paste, no send-keys), no pane received a line, no inbox file, no notes line, no DONE in QUEUE-dispatch.md, the ledger holds only the 2 manual posts; the shadow log holds the queue line, the manual fix (channel pane, would paste) and the planner question (channel flag); CONTROL in the same check: the same passes WITHOUT --shadow reach the shim with a load-buffer, create the inbox and write a ⚑ line" \
   '[ ! -s "$TL2" ] && no_paste && [ "$(rec_n exec3)" = 0 ] && [ "$(rec_n planner)" = 0 ] && [ ! -d "$R/postman/inbox" ] && [ ! -s "$N" ] && ! grep -q " DONE " "$Q" && [ "$(ledger_n)" = 2 ] && [ "$(sjson "sum(1 for x in r if x[\"origin\"]==\"queue\")")" = 1 ] && [ "$(sjson "[(x[\"channel\"],x[\"would\"]) for x in r if x[\"origin\"]==\"ledger\"]")" = "[[\"pane\", \"paste\"], [\"flag\", \"flag\"]]" ] && [ "$(sjson "[x[\"text\"][:20] for x in r if x[\"origin\"]==\"ledger\"][0]")" = "[postman #1 fix ← ma" ] && shadow_run live && grep -q "^load-buffer" "$TL2" && [ -d "$R/postman/inbox" ] && [ "$(grep -c "⚑" "$N")" = 1 ] && grep -q " DONE " "$Q"'
@@ -183,15 +197,15 @@ check "13.1942 watched + BUSY: no pane paste at all (the Monitor line is already
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1943 unwatched seat (every lane): the pane pointer goes at once, one line, carrying the id and the ack command" \
   '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix ← main]" && rec_has exec3 "ctl ack 1" && [ "$(wc -c < "$T/rec-exec3")" -lt 450 ]'
-sleep 4; NOW=$((NOW+60)); pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
+idle_wait exec3; NOW=$((NOW+60)); pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
 check "13.1944 a PROVEN delivery is not re-pasted before 15 min (the seat has it, it is busy)" '[ "$(rec_n exec3)" = 1 ]'
-NOW=$((NOW+600)); pm postman once >/dev/null 2>&1; sleep 4
+NOW=$((NOW+600)); pm postman once >/dev/null 2>&1; idle_wait exec3
 check "13.1971 …and is re-pointed after 15 min of silence" '[ "$(rec_n exec3)" = 2 ]'
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; pm ack 1 --seat exec3 >/dev/null 2>&1; NOW=$((NOW+3000)); pm postman once >/dev/null 2>&1
 check "13.1945 ack stops redelivery: nothing more is pasted after the ack, however late" '[ "$(rec_n exec3)" = 1 ] && ! status_of exec3 | grep -q "head=#1"'
 reset; mkseat exec3 idle; pm post exec3 --kind next --text "first" --from main >/dev/null 2>&1; pm post exec3 --kind fix --text "second" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1946 one open message per seat, in id order: the second waits; its inbox line appears only after the first is acked" \
-  '[ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ] && rec_has exec3 "#1 next" && ! rec_has exec3 "#2" && { pm ack 1 --seat exec3 >/dev/null 2>&1; sleep 3; NOW=$((NOW+5)); pm postman once >/dev/null 2>&1; [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 2 ] && rec_has exec3 "#2 fix"; }'
+  '[ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ] && rec_has exec3 "#1 next" && ! rec_has exec3 "#2" && { pm ack 1 --seat exec3 >/dev/null 2>&1; idle_wait exec3; NOW=$((NOW+5)); pm postman once >/dev/null 2>&1; [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 2 ] && rec_has exec3 "#2 fix"; }'
 reset; mkseat exec3 mute; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm_noage postman once >/dev/null 2>&1
 for dt in 200 620 1220; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done
 check "13.1947 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try" \
@@ -202,8 +216,8 @@ reset; mkseat main mute; pm post main --kind fix --text "go" --from exec3 >/dev/
 for dt in 200 620 1220 5; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done     # the last pass delivers the page the 4th try posted to the planner
 check "13.1948 page chain: an unreachable main pages the planner (inbox) AND appends exactly ONE ⚑ line to the notes file (the page's own flag on delivery; a second write beside the page — mutant N10 — is red)" \
   '[ "$(count_kind page planner)" = 1 ] && [ "$(grep -c "⚑ POSTMAN" "$N")" = 1 ] && grep -q "#1" "$N"'
-reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; sleep 4
-NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1; sleep 4; p1="$(count_kind page main)"; NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1
+reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; idle_wait exec3
+NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1; idle_wait exec3; p1="$(count_kind page main)"; NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1
 check "13.1980 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min" '[ "$p1" = 0 ] && [ "$(count_kind page main)" = 1 ]'
 reset; mkseat planner idle; pm post planner --kind question --text "which way?" --from exec3 >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
@@ -558,13 +572,13 @@ check "13.1961 pane_state text: a box holding foreign text is never cleared or p
   'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { pane_case text "half a thought"; [ ! -s "$T/rec-exec3" ] && tmux capture-pane -p -t "$S:=exec3" | grep -q "half a thought" && status_of exec3 | grep -q "last=text"; }'
 copy_case() { reset; mkseat exec3 idle; tmux copy-mode -t "$S:=exec3"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; }
 check "13.1962 pane_state copy-mode: nothing typed while in copy mode; after 180 s cancelled once and delivered; CONTROL in the same check: an idle (not copy-mode) pane is pasted at once" \
-  'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { copy_case; [ "$(rec_n exec3)" = 0 ] && status_of exec3 | grep -q "last=copy-mode" && { NOW=$((NOW+200)); pm postman once >/dev/null 2>&1; sleep 4; [ "$(rec_n exec3)" = 1 ] && [ "$(tmux display-message -p -t "$S:=exec3" "#{pane_in_mode}")" = 0 ]; }; }'
+  'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { copy_case; [ "$(rec_n exec3)" = 0 ] && status_of exec3 | grep -q "last=copy-mode" && { NOW=$((NOW+200)); pm postman once >/dev/null 2>&1; idle_wait exec3; [ "$(rec_n exec3)" = 1 ] && [ "$(tmux display-message -p -t "$S:=exec3" "#{pane_in_mode}")" = 0 ]; }; }'
 reset; mkseat exec3 idle
 pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; CTL_POSTMAN_CMD_RE='^([0-9]+\.[0-9]+\.[0-9]+|claude|node)$' pm postman once >/dev/null 2>&1
 check "13.1963 pane_state not-claude: with the DEFAULT allowlist a bash pane is never typed into; CONTROL: the same pane under a regex that allows bash is pasted" \
   '[ ! -s "$T/rec-exec3" ] && status_of exec3 | grep -q "last=not-claude" && { NOW=$((NOW+200)); pm postman once >/dev/null 2>&1; [ "$(rec_n exec3)" = 1 ]; }'
-check "13.1964 pane_state not-claude: a less pane (not a shell, still not claude) is refused — the guard is an allowlist; CONTROL: an idle pane is pasted" 'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { reset; tmux new-window -d -t "$S:" -n exec3 "less /etc/hosts"; sleep 0.5; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; ! tmux capture-pane -p -t "$S:=exec3" | grep -q "postman" && status_of exec3 | grep -q "last=not-claude"; }'
-reset; mkseat exec3 prefill "[postman #1 fix ← main] Read the WHOLE file x"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; sleep 1
+check "13.1964 pane_state not-claude: a less pane (not a shell, still not claude) is refused — the guard is an allowlist; CONTROL: an idle pane is pasted" 'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { reset; tmux new-window -d -t "$S:" -n exec3 "less /etc/hosts"; poll5 "less started" pane_cmd_is exec3 less; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; ! tmux capture-pane -p -t "$S:=exec3" | grep -q "postman" && status_of exec3 | grep -q "last=not-claude"; }'
+reset; mkseat exec3 prefill "[postman #1 fix ← main] Read the WHOLE file x"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; idle_wait exec3
 check "13.1965 pane_state ours: our own unsubmitted pointer in the box is SUBMITTED, not pasted a second time (exactly one copy reaches the seat)" '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix" && [ "$(grep -o "\\[postman #1 fix" "$T/rec-exec3" | wc -l | tr -d " ")" = 1 ]'
 reset; mkseat exec3 busy; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
 check "13.1966 busy seat: the pointer is pasted once (it queues) and not again inside 15 min" '[ "$(rec_n exec3)" = 1 ]'
@@ -601,6 +615,25 @@ check "13.1991 ctl restart whose dry-run exit is REMOVED (a stripped copy) reach
   ': > "$TL" && { PATH="$T/shim:$PATH" tmux kill-window -t "ctlpm-nosuch-$$:99" >/dev/null 2>&1; [ $? = 1 ]; } && grep -q "^kill-window -t ctlpm-nosuch-$$:99" "$TL" && PATH="$T/shim:$PATH" tmux list-windows -t "$S" >/dev/null && o="$(rs_dry 91)" && printf "%s" "$o" | grep -q "^DRY: mark reviewerB restarted" && printf "%s" "$o" | tail -1 | grep -q "^OK restart" && rs_nodry_case'
 check "13.1969 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail" \
   '( unset CTL_POSTMAN_CMD_RE; for c in 2.1.288 claude node; do ctl_cmd_is_claude "$c" || exit 1; done; for c in zsh bash sh fish less vim python3 ssh ""; do ! ctl_cmd_is_claude "$c" || exit 1; done )'
+
+# ───────────────────────────── the paste-wait seams (P51) ─────────────────────────────
+SEAMS='CTL_PASTE_SETTLE_SECS|CTL_SUBMIT_WAIT_SECS|CTL_PROOF_POLL_SECS|FAKESEAT_TURN_SECS'
+seam_files() { grep -rlE "($SEAMS):?=|environ(\.setdefault\(|\[)[\"']($SEAMS)" "$1" 2>/dev/null | sed "s|^$1/||" | sort | tr '\n' ' '; }   # DIR → every file under it that SETS a seam (VAR=, \${VAR:=}, os.environ), relative to DIR
+seam_setters() { seam_files "$1" | tr ' ' '\n' | grep -vE '^$|(^|/)test/|\.test\.' | tr '\n' ' '; }   # … minus the tests (filtered AFTER the DIR prefix is gone)
+seam_root="$(cd "$HERE/.." && pwd)"
+mkdir -p "$T/seamscan/test" "$T/seamscan/ctl"; printf 'export CTL_SUBMIT_WAIT_SECS=0\n' > "$T/seamscan/ctl/lib.sh"; printf 'import os\nos.environ["CTL_PROOF_POLL_SECS"] = "0"\n' > "$T/seamscan/a.py"
+printf 'env FAKESEAT_TURN_SECS=0 bash x\n' > "$T/seamscan/test/x.test.sh"; printf 'sleep "${CTL_PASTE_SETTLE_SECS:-1}"\n' > "$T/seamscan/reader.sh"; printf ': "${CTL_PROOF_POLL_SECS:=0}"\n' > "$T/seamscan/b.sh"
+printf 'import os\nos.environ.setdefault("CTL_SUBMIT_WAIT_SECS", "0")\n' > "$T/seamscan/c.py"   # each clause of the two predicates has its own file (P11):
+printf 'export CTL_PROOF_POLL_SECS=0\n' > "$T/seamscan/test/fx.sh"; printf 'export CTL_PASTE_SETTLE_SECS=0\n' > "$T/seamscan/y.test.sh"   # setdefault; under test/ only; .test. only
+check "13.2350 the paste-wait seams are set ONLY by tests: no file under scripts/ outside a test sets CTL_PASTE_SETTLE_SECS, CTL_SUBMIT_WAIT_SECS, CTL_PROOF_POLL_SECS or FAKESEAT_TURN_SECS; the same scan of scripts/ unfiltered DOES list ctl/test/postman.test.sh (the tree was read, with a pattern that matches a real setter); CONTROL in the same check: in a scratch tree a shell export, a \${VAR:=} default, a python os.environ write and an os.environ.setdefault ARE found, while a test file that sets one (a file under a test/ dir, and a .test. file outside one) and a file that only reads one are not" \
+  '[ -z "$(seam_setters "$seam_root")" ] && seam_files "$seam_root" | tr " " "\n" | grep -qx "ctl/test/postman.test.sh" && [ "$(seam_setters "$T/seamscan")" = "a.py b.sh c.py ctl/lib.sh " ]'
+mkdir -p "$T/sleepshim"; printf '#!/bin/bash\necho "$1" >> "%s"\n' "$T/sleep.log" > "$T/sleepshim/sleep"; chmod +x "$T/sleepshim/sleep"
+lib_waits() { # [VAR=VALUE…] → the sleeps lib.sh's paste path asks for (one ctl_pane_deliver_line into the mute exec3, CTL_PROOF_TRIES=1: settle, submit, one proof poll), the suite's own seams UNSET, through a PATH sleep shim that records its argument and waits for nothing
+  : > "$T/sleep.log"; ( unset CTL_PASTE_SETTLE_SECS CTL_SUBMIT_WAIT_SECS CTL_PROOF_POLL_SECS; for kv in "$@"; do export "$kv"; done
+    PATH="$T/sleepshim:$PATH" CTL_PROOF_TRIES=1 bash -c '. "$1"; ctl_pane_deliver_line "$2" x' _ "$HERE/lib.sh" "$S:=exec3" >/dev/null 2>&1 ); tr '\n' ' ' < "$T/sleep.log"; }
+reset; mkseat exec3 mute
+check "13.2351 lib.sh's paste waits keep their live defaults: with the seams unset, one deliver asks sleep for exactly 1 (settle), 2 (submit) and 1 (proof poll); CONTROL in the same check: the seams set to 0.7 / 0.8 / 0.9 reach the same three sleeps" \
+  '[ "$(lib_waits)" = "1 2 1 " ] && [ "$(lib_waits CTL_PASTE_SETTLE_SECS=0.7 CTL_SUBMIT_WAIT_SECS=0.8 CTL_PROOF_POLL_SECS=0.9)" = "0.7 0.8 0.9 " ]'
 
 ctl_test_only_end postman.test.sh
 [ "$fails" -eq 0 ] && { echo "postman tests: all ok"; exit 0; } || { echo "postman tests: $fails FAILED"; exit 1; }

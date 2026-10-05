@@ -18,8 +18,10 @@ export function emptyStore(): GraphStore {
   return { items: new Map(), edges: new Map(), adj: new Map(), rings: 0, exhausted: false };
 }
 
+/** Unions one ring (or page) into the store. The ring's `center` is seeded too (planner ruling Q1): no ring holds its own centre. */
 export function mergeRing(store: GraphStore, ring: GraphRingResponse): GraphStore {
   const items = new Map(store.items);
+  if (!items.has(ring.center.ref)) items.set(ring.center.ref, ring.center);
   for (const it of ring.items) if (!items.has(it.ref)) items.set(it.ref, it);
   const edges = new Map(store.edges);
   const adj = new Map<string, AdjEntry[]>([...store.adj].map(([k, v]) => [k, [...v]]));
