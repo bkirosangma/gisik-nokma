@@ -383,7 +383,7 @@ check "13.2303 red in ONE member's package: FIX candidate names it, the union is
    && ! inside "$(sha task/b)" "$(gated 2)" && [ "$(gtree 1)" != "$(gtree 2)" ] && inside "$(sha task/a)" "$(gated 2)" && inside "$(sha task/c)" "$(gated 2)" && [ "$(prf 12 state)" = OPEN ] \
    && ! $G -C "$bare" merge-base --is-ancestor "$(sha task/b)" "$BASE" && says "^MEMBER #12 task/b .* ejected: FIX candidate" && [ "$(ncalls land)" = 1 ] && [ "$(wc -l < "$S/install.log" | tr -d " ")" = 1 ]'
 
-# --- 13.2304: red, several or none; a gate that did not run; a red that is not a member's ---------------------------------------------------
+# --- 13.2304: red, several or none; a FAIL with no log; a red that is not a member's -------------------------------------------------------
 check "13.2304 red touching SEVERAL members: bisect — the first half in READY order re-gates, the rest is HELD (left open, not landed); the green half lands" \
   'mk && printf "red @t/a#test,@t/c#test\ngreen\n" > "$S/gates" && b 11 12 13 14 && [ $rc -eq 0 ] && [ "$(ngated)" = 2 ] && says "^BISECT after gate 1: 2 members" && says "^HELD #13 " && says "^HELD #14 " \
    && inside "$(sha task/a)" "$(gated 2)" && inside "$(sha task/b)" "$(gated 2)" && ! inside "$(sha task/c)" "$(gated 2)" && ! inside "$(sha task/d)" "$(gated 2)" && [ "$(prf 13 state)" = OPEN ] \

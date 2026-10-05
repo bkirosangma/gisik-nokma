@@ -614,7 +614,7 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.2297 🧪 READY.
   - A PR whose head no `READY` / `needs-tip` line of `roles/QUEUE-review.md` names is refused (`REFUSE #<pr> (ready) …`), and the WHOLE call refuses: nothing merged, gated or pushed. The refusal prints the one spelling read: `HH:MM DONE <time> READY|needs-tip <branch> <sha>`.
   - A needs-tip line counts as READY.
-  - A FIX of the same branch AFTER the READY line refuses. CONTROL: a FIX before it, or a later FIX of another branch, does not.
+  - A FIX of the same branch AFTER the READY line refuses, and the refusal quotes the whole FIX line. CONTROL: a FIX before it, or a later FIX of another branch, does not.
   - A FIX line after the READY line refuses the PR it names in every spelling the live queue holds, one leg each: `FIX <n> task/<x> <sha>`; `FIX (task/<x> <sha> → BRIEF…)`; the ORCH's gate-red `FIX (<slug> <sha>)` and `FIX (<slug> gate fail → lane 4)` (no sha: the bare slug names it); `FIX-<n> task/<x> <sha>`; `FIX (<sha>; …)` naming only 7 hex of the head; and a FIX naming only the needs-tip sha under a clean tip merge.
   - CONTROL in each leg: the same spelling naming another branch (`task/ab`), slug (`ab`, `a-b`: a slug is a WHOLE token) or sha refuses nothing. So do 6 hex of the head (too short for a sha) and `FIX (BRIEF-a-fix-1.md)` (it names neither, so it cannot be attributed).
   - RIDER, VOID, REVIEW and TOOK lines, and a READY naming an older sha, are no READY.
