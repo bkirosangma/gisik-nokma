@@ -235,6 +235,35 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpow
 <!-- wtg-part2-model T19 -->
 
 <!-- wtg-part3-workflow-graph -->
+## 29.3 Part 3 — The Workflow graph (29.230–29.289)
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part3-workflow-graph.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md` §9–10. Ids tile 29.230–29.289: T1 230–233 · T2 234–239 · T3 240–245 · T4 246–250 · T5 251–254 · T6 255–259 · T7 260–262 · T8 263–266 · T9 267–269 · T10 270–275 · T11 276–279 · T12 280–289.
+
+<!-- wtg-part3-workflow-graph T1 -->
+
+<!-- wtg-part3-workflow-graph T2 -->
+
+<!-- wtg-part3-workflow-graph T3 -->
+
+<!-- wtg-part3-workflow-graph T4 -->
+
+<!-- wtg-part3-workflow-graph T5 -->
+
+<!-- wtg-part3-workflow-graph T6 -->
+
+<!-- wtg-part3-workflow-graph T7 -->
+
+<!-- wtg-part3-workflow-graph T8 -->
+
+<!-- wtg-part3-workflow-graph T9 -->
+
+<!-- wtg-part3-workflow-graph T10 -->
+
+<!-- wtg-part3-workflow-graph T11 -->
+
+<!-- wtg-part3-workflow-graph T12 -->
+
+<!-- wtg-part3-workflow-graph end -->
 
 <!-- WTG4 -->
 
