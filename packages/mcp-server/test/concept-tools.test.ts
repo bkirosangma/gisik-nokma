@@ -320,7 +320,9 @@ describe('27.479 the registry', () => {
   it('27.479 the five concept tools follow similar, the fixture agrees, and each description names its confirm rule where it has one', () => {
     const tools = allTools(fake().session);
     const names = tools.map((t) => t.name);
-    expect(names.slice(-7)).toEqual(['list_deleted', 'similar', 'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts']);
+    // The registry ENDED here until KG-D T5 appended its two suggestion tools after `link_concepts` (27.500).
+    const from = names.indexOf('list_deleted');
+    expect(names.slice(from, from + 7)).toEqual(['list_deleted', 'similar', 'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts']);
     expect(TOOL_NAMES).toEqual(names);
     const describe = (name: string) => tools.find((t) => t.name === name)?.description ?? '';
     expect(describe('manage_concept')).toContain('confirm_name');
