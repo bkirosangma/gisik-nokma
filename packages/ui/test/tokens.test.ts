@@ -1536,8 +1536,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
     // No two rows share a pair: a duplicate is a row that guards nothing new but inflates the count below (UX fixes T1
     // fix 1). Asserted BEFORE the count so a re-added copy fails here, by name, and not only as a number that moved.
     expect(new Set(CONTRAST_PAIRS.map((pair) => `${pair.fg}|${pair.bg}`)).size, 'duplicate fg|bg rows').toBe(CONTRAST_PAIRS.length);
-    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows = 52; the Knowledge Graph adds 18 (27.257: eight edge roles on two surfaces, text on two concept fills).
-    expect(CONTRAST_PAIRS.length).toBe(70);
+    // HK-4 (2026-10-02, 24.121): 56 minus the four retired fieldRim rows = 52; the Knowledge Graph adds 18 (27.257: eight edge roles on two surfaces, text on two concept fills); 70 until Knowledge Graph E Task 3 added `warning` on `surfaceRaised` (Home's Past due edge, 27.635).
+    expect(CONTRAST_PAIRS.length).toBe(71);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);

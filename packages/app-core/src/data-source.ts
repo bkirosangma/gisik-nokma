@@ -1,6 +1,7 @@
 import type {
   DeletedItem,
   GroupRow,
+  HomeResponse,
   IngestResult,
   LedgerEvent,
   LinkedFromPage,
@@ -434,6 +435,11 @@ export type DataSourceQuery = {
   ): Promise<NoteSearchResult>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
+  /**
+   * Home's six numbers and their capped ids (Knowledge Graph spec E, `GET /v1/workspaces/:ws/home`). Online only:
+   * the replica refuses (`HOME_ABSENCES`) — a local count would disagree with the server's visibility and IST day.
+   */
+  getHome(workspaceId: string): Promise<HomeResponse>;
   /**
    * The workspace's thresholds and auto-close window, as `/settings`'s Workspace
    * tab shows them (second wave, Task 6).

@@ -465,6 +465,15 @@ const ATTENTION_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+const HOME_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'HomeResponse (every number)',
+    because:
+      "Home's numbers are a COMPUTED server read over the viewer's visibility and the server's IST day (`classifyDue`); a count over the local replica would disagree with the graph it lights, and with the attention strip it must equal",
+    owner: 'Knowledge Graph spec E: Home is online only',
+  },
+];
+
 /**
  * Second wave, Task 6. The local store DOES mirror the ledger the settings live
  * in, so unlike the attention strip this is a real "could be built" rather than
@@ -688,6 +697,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   searchNotes: NOTE_SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
+  getHome: HOME_ABSENCES,
   getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
   getPreferences: PREFERENCES_ABSENCES,
   putPreferences: PREFERENCES_ABSENCES,
@@ -1373,6 +1383,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     },
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
+    getHome: () => Promise.reject(new ReplicaGapError('getHome', HOME_ABSENCES)),
     getWorkspaceSettings: () =>
       Promise.reject(new ReplicaGapError('getWorkspaceSettings', WORKSPACE_SETTINGS_ABSENCES)),
     getPreferences: () => Promise.reject(new ReplicaGapError('getPreferences', PREFERENCES_ABSENCES)),
