@@ -117,14 +117,15 @@ test('29.040 the panel fills the height under its filters (16 px short of the wi
   });
   expect(axis.scrollTop).toBeGreaterThan(100);
   expect(Math.abs(axis.gap)).toBeLessThan(1);
-  // weekend tint: the Week preset (24 px/day) shows it, Month (8) hides it, Day (56) shows it again
+  // weekend tint: the Week preset (24 px/day) shows it, Month (8) hides it, Day (56) shows it again. The radios are found by
+  // their EXACT names: a substring match would also find a renamed 'Days' or 'Monthly'.
   expect((await state(page)).weekend).toBe('on');
-  await page.getByRole('radio', { name: 'Month' }).click();
+  await page.getByRole('radio', { name: 'Month', exact: true }).click();
   await page.waitForTimeout(700);
   let z = await state(page);
   expect(z.ppd).toBeCloseTo(8, 0);
   expect(z.weekend).toBe('off');
-  await page.getByRole('radio', { name: 'Day' }).click();
+  await page.getByRole('radio', { name: 'Day', exact: true }).click();
   await page.waitForTimeout(700);
   z = await state(page);
   expect(z.ppd).toBeCloseTo(56, 0);
@@ -200,8 +201,16 @@ test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the
   const onBar = (p: Page, x: number, y: number) =>
     p.evaluate(([px, py]) => document.elementFromPoint(px, py)?.closest('.gn-timeline__bar') != null, [x, y] as const);
   const box = (await canvas.boundingBox()) as { x: number; y: number };
-  const before = await state(page);
   expect(await onBar(page, box.x + 700, box.y + 250)).toBe(false);
+  // only the PRIMARY button drags: the same gesture with the right button leaves the canvas where it was
+  const still = await state(page);
+  await page.mouse.move(box.x + 700, box.y + 250);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(box.x + 500, box.y + 250, { steps: 8 });
+  await page.mouse.up({ button: 'right' });
+  await page.waitForTimeout(900);
+  expect((await state(page)).scrollLeft).toBe(still.scrollLeft);
+  const before = await state(page);
   await page.mouse.move(box.x + 700, box.y + 250);
   await page.mouse.down();
   await page.mouse.move(box.x + 500, box.y + 250, { steps: 8 });
@@ -209,7 +218,7 @@ test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the
   await page.waitForTimeout(900);
   expect((await state(page)).scrollLeft - before.scrollLeft).toBeGreaterThan(190);
   // keys
-  await page.getByRole('button', { name: 'Today' }).click();
+  await page.getByRole('button', { name: 'Today', exact: true }).click();
   await page.waitForTimeout(700);
   expect(Math.abs(await todayCentre(page))).toBeLessThan(2);
   await canvas.focus();
@@ -355,6 +364,21 @@ test('29.043 a fast pan of 10 viewports at one per second leaves no frame with a
   await scrollToDay(right.start + 12 - 1);
   const left = await band();
   expect({ start: left.start, end: left.end }).toEqual({ start: right.start + 11 - 48, end: right.start + 11 + 47 + 48 });
+  // `days` is the visible day count: at 48 days its quarter is a whole 12 and an `end - start` miscount (11.75) falls between
+  // the same two scroll positions. At 49 days the quarter is 12.25: a visible end 13 days short of the band end is inside, 12
+  // days short is outside (12 < 12.25), where a 48-day count (quarter 12) would still hold the band.
+  await page.setViewportSize({ width: 49 * PPD + inset, height: 720 });
+  await page.goto('/timeline.html?n=1200&span=1500&theme=light');
+  await expect(page.locator('.gn-timeline__canvas')).toBeVisible();
+  await scrollToDay(600);
+  const wide = await band();
+  expect(wide.width).toBe(49 * PPD);
+  expect({ start: wide.start, end: wide.end }).toEqual({ start: 600 - 49, end: 600 + 48 + 49 });
+  await scrollToDay(wide.end - 48 - 13);
+  expect(await band()).toMatchObject({ start: wide.start, end: wide.end });
+  await scrollToDay(wide.end - 48 - 12);
+  const wider = await band();
+  expect({ start: wider.start, end: wider.end }).toEqual({ start: wide.end - 60 - 49, end: wide.end - 60 + 48 + 49 });
 });
 
 test('29.044 a custom date claim is a callout that opens on hover and on focus and is hidden otherwise', async ({ page }) => {
