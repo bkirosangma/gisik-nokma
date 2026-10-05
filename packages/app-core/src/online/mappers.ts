@@ -1,4 +1,4 @@
-import type { GroupRow } from '@gisik-nokma/domain';
+import type { GroupRow, LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
 import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, TICKET_LINK_KINDS, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
@@ -2962,6 +2962,50 @@ export function mapNoteSummaries(raw: unknown): NoteSummary[] {
     const path = `notes[${index}]`;
     return noteSummaryOf(asRecord(entry, path), path);
   });
+}
+
+/** `GET /v1/workspaces/:id/references` (Knowledge Graph B). */
+export function mapLinkedFromPage(raw: unknown): LinkedFromPage {
+  const record = asRecord(raw, 'linkedFrom');
+  const items = asArray(record['items'], 'linkedFrom.items').map((entry, index): LinkedFromRow => {
+    const path = `linkedFrom.items[${index}]`;
+    const row = asRecord(entry, path);
+    const parent = asRecord(row['parent'], `${path}.parent`);
+    const sourceKind = asString(row['sourceKind'], `${path}.sourceKind`);
+    if (sourceKind !== 'ticket' && sourceKind !== 'note' && sourceKind !== 'comment') {
+      throw new MappingError(`${path}.sourceKind`, 'ticket | note | comment');
+    }
+    const parentKind = parent['kind'];
+    const mapped: LinkedFromRow['parent'] =
+      parentKind === 'ticket'
+        ? {
+            kind: 'ticket',
+            ticketId: asString(parent['ticketId'], `${path}.parent.ticketId`),
+            projectId: asString(parent['projectId'], `${path}.parent.projectId`),
+            key: asString(parent['key'], `${path}.parent.key`),
+            title: asString(parent['title'], `${path}.parent.title`),
+            stateCategory: asStateCategory(parent['stateCategory'], `${path}.parent.stateCategory`),
+          }
+        : parentKind === 'note'
+          ? { kind: 'note', noteId: asString(parent['noteId'], `${path}.parent.noteId`), title: asString(parent['title'], `${path}.parent.title`) }
+          : (() => {
+              throw new MappingError(`${path}.parent.kind`, 'ticket | note');
+            })();
+    return {
+      sourceKind,
+      sourceId: asString(row['sourceId'], `${path}.sourceId`),
+      parent: mapped,
+      authorId: asString(row['authorId'], `${path}.authorId`),
+      snippet: asString(row['snippet'], `${path}.snippet`),
+      updatedAt: asString(row['updatedAt'], `${path}.updatedAt`),
+    };
+  });
+  const next = record['nextCursor'];
+  return {
+    total: asNumber(record['total'], 'linkedFrom.total'),
+    items,
+    nextCursor: next === null ? null : asString(next, 'linkedFrom.nextCursor'),
+  };
 }
 
 /**

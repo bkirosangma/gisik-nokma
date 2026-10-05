@@ -65,6 +65,10 @@ export function createFakeDataSource(
     getDeletedNotes: async () => [],
     getNote: async () => null,
     getNotesForTicket: async () => [],
+    // "Linked from" (Knowledge Graph B) defaults to the empty page on the same
+    // argument: a view test that has not stubbed this read is rendering an item
+    // nothing links to, which is the state most items are in.
+    getLinkedFrom: async () => ({ total: 0, items: [], nextCursor: null }),
     getTicketLinks: async () => [],
     getNoteComments: async () => [],
     getNoteHistory: async () => [],
