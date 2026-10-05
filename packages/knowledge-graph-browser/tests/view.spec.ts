@@ -67,7 +67,7 @@ test('27.367 the scope note keeps a one-line slot: outside the scope the canvas 
   const out = await canvasTops(page, '?ws=st&delay=500');
   expect(out.loading).toBe(true); // read while ring 1 is still out, or both reads land after the note
   const note = await noteSlot(page);
-  expect(note!.text).toBe('GN-142 is outside the projects you picked. It stays in the middle, and its links follow your scope.');
+  expect(note!.text).toBe('GN-142 is outside the workspaces you picked. It stays in the middle, and its links follow your scope.'); // the workspace is out, so the note names it (27.663)
   // the note keeps its warning tint: only the EMPTY slot drops it (`:empty`), read off the token on a probe element
   const tint = await page.evaluate(() => {
     const d = document.body.appendChild(document.createElement('div'));
