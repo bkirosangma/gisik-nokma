@@ -4,15 +4,18 @@ import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { embedQuery } from '../search/embedding.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec } from './compile-filter.js';
-import { MEANING_CANDIDATES, MEANING_LIMIT, snippetOf } from './note-search.js';
+import { MEANING_LIMIT, snippetOf } from './note-search.js';
 import { SqlParams } from './sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from './ticket-cards.js';
 import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './visible-where.js';
 
 /**
  * Spec D §2 + §5.1: meaning search over tickets, from `search_item_chunks`. The nearest chunk PER TICKET
- * (`DISTINCT ON`, then sorted in code: `meaningNoteSearch`'s two-step, and its bounds and snippet, imported).
- * Visibility at QUERY time through the same WHERE as lexical tickets (`routes/search.ts`); a comment
+ * (`DISTINCT ON`, which must order by `ticket_id` first), then the nearest tickets: the outer query re-sorts
+ * by distance and only then takes the first `MEANING_LIMIT` (note search's 20, and its snippet, imported). A
+ * candidate `LIMIT` on the inner query would cut in `ticket_id` order, so the newest tickets would never
+ * answer once a workspace has more than the bound; the cut comes after the distance sort, in SQL, and there
+ * is no second bound in code. Visibility at QUERY time through the same WHERE as lexical tickets (`routes/search.ts`); a comment
  * follows its ticket because its row carries `ticket_id`. Deleted comments are excluded by the join, never
  * by trusting the worker to have caught up.
  *
@@ -45,20 +48,22 @@ export async function meaningTicketHits(
   where.push(...compiled.clauses);
   const cte = compiled.needsBlockedCte ? `WITH ${BLOCKED_STATES_CTE} ` : '';
   const { rows } = await db.query<ProjTicketRow & { chunk_text: string; item_kind: 'ticket' | 'comment'; chunk_index: number; distance: number }>(
-    `${cte}SELECT DISTINCT ON (t.ticket_id) ${PROJ_TICKET_COLUMNS},
-            c.chunk_text, c.item_kind, c.chunk_index, (c.embedding <=> ${query}::vector) AS distance
-       FROM search_item_chunks c
-       JOIN proj_tickets t ON t.ticket_id = c.ticket_id
-       JOIN proj_visibility v ON v.ticket_id = t.ticket_id
-      WHERE ${where.join(' AND ')}
-      ORDER BY t.ticket_id, distance
-      LIMIT ${params.add(MEANING_CANDIDATES)}`,
+    `${cte}SELECT * FROM (
+       SELECT DISTINCT ON (t.ticket_id) ${PROJ_TICKET_COLUMNS},
+              c.chunk_text, c.item_kind, c.chunk_index, (c.embedding <=> ${query}::vector) AS distance
+         FROM search_item_chunks c
+         JOIN proj_tickets t ON t.ticket_id = c.ticket_id
+         JOIN proj_visibility v ON v.ticket_id = t.ticket_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY t.ticket_id, distance
+     ) d
+     ORDER BY d.distance, d.ticket_id
+     LIMIT ${params.add(MEANING_LIMIT)}`,
     params.toArray(),
   );
-  const ordered = [...rows].sort((a, b) => Number(a.distance) - Number(b.distance)).slice(0, MEANING_LIMIT);
-  const cards = await assembleTicketCards(db, viewerId, ordered);
+  const cards = await assembleTicketCards(db, viewerId, rows);
   const cardById = new Map(cards.map((card) => [card.ticketId, card]));
-  return ordered.map((row) => {
+  return rows.map((row) => {
     const card = cardById.get(row.ticket_id);
     if (card === undefined) throw new Error(`meaningTicketHits: no card assembled for ticket ${row.ticket_id}`);
     const matchedIn: SearchHit['matchedIn'] = row.item_kind === 'comment' ? 'comment' : row.chunk_index === 0 ? 'title' : 'description';

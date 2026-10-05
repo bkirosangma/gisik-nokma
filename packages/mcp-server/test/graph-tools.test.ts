@@ -49,8 +49,12 @@ describe('27.431–27.432 the MCP graph reads (KG-D T2)', () => {
     expect(paths[2]).toBe('/v1/workspaces/w/similar?item=note%3An&k=20');
     await expect(similar!.handler({ workspaceId: 'w', item: { kind: 'note', id: 'n' }, k: 21 })).rejects.toThrow();
     await expect(similar!.handler({ workspaceId: 'w', item: { kind: 'note', id: 'n' }, k: 0 })).rejects.toThrow();
+    await expect(similar!.handler({ workspaceId: 'w', item: { kind: 'note', id: 'n' }, k: 1.5 })).rejects.toThrow();
     await expect(similar!.handler({ workspaceId: 'w', item: { kind: 'widget', id: 'n' } })).rejects.toThrow();
     expect(paths).toHaveLength(3);
+    // Every path segment is encoded, the workspace id too.
+    await similar!.handler({ workspaceId: 'w/x', item: { kind: 'ticket', id: 'a b' } });
+    expect(paths[3]).toBe('/v1/workspaces/w%2Fx/similar?item=ticket%3Aa%20b');
     // The registered schema says the same (the SDK reads `inputSchema`, not the handler's parse).
     const schema = z.object(similar!.inputSchema);
     expect(schema.safeParse({ workspaceId: 'w', item: { kind: 'ticket', id: 't' }, k: 20 }).success).toBe(true);

@@ -36,8 +36,8 @@ import { visibleNotesWhere } from './visible-where.js';
 /** Spec §7.4's default. */
 const SEARCH_LIMIT = 50;
 
-/** Spec §7.6's `LIMIT 200` — the inner bound on the client-side sort. Also KG-D T2's ticket meaning search (`item-search.ts`). */
-export const MEANING_CANDIDATES = 200;
+/** Spec §7.6's `LIMIT 200` — the inner bound on the client-side sort. */
+const MEANING_CANDIDATES = 200;
 
 /** Spec §7.6's first-20. Also KG-D T2's ticket meaning search (`item-search.ts`). */
 export const MEANING_LIMIT = 20;

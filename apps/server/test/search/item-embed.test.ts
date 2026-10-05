@@ -196,6 +196,28 @@ describe('27.420–27.426 the embedding worker’s items pass (KG-D T2)', () => 
     expect(await pass()).toBe(0);
     expect(await rowsWhere('TRUE', [])).toEqual(before);
     expect(embedCalls.length).toBe(calls);
+
+    // One pass embeds one batch (20 items), newest id first; the next pass takes the rest. Of 21 fresh
+    // tickets the OLDEST is left for the second pass. They are deleted after, so later cases count only theirs.
+    const fresh = Array.from({ length: 21 }, () => newUlid());
+    await applyCommitted(db.pool, fresh.map((id, index) => created(id, `Batch errand ${String(index + 1)}`)));
+    const unembedded = async (): Promise<string[]> =>
+      (
+        await db.pool.query<{ id: string }>(
+          `SELECT t.ticket_id AS id FROM proj_tickets t WHERE t.ticket_id = ANY($1::text[])
+             AND NOT EXISTS (SELECT 1 FROM search_item_chunks c WHERE c.item_kind = 'ticket' AND c.item_id = t.ticket_id)
+           ORDER BY 1`,
+          [fresh],
+        )
+      ).rows.map((row) => row.id);
+    expect(await unembedded()).toHaveLength(21);
+    expect(await pass()).toBe(20);
+    expect(await unembedded()).toEqual([[...fresh].sort()[0]]);
+    expect(await pass()).toBe(1);
+    expect(await unembedded()).toEqual([]);
+    await applyCommitted(db.pool, fresh.map((id) => ticketEv(id, 'ticket.deleted', {})));
+    expect(await pass()).toBeGreaterThanOrEqual(1);
+    expect(await rowsWhere('ticket_id = ANY($1::text[])', [fresh])).toEqual([]);
     expect(logged).toEqual([]);
   });
 
@@ -336,6 +358,37 @@ describe('27.420–27.426 the embedding worker’s items pass (KG-D T2)', () => 
       [0, '', TQ_TITLE],
       [1, '', 'Version two text'],
     ]);
+
+    // (3) The COMMENT recheck, one clause at a time: a comment deleted while it is embedded gets no row, and a
+    // comment whose TICKET is deleted while it is embedded gets none either. (A comment's id is its event's,
+    // minted after its ticket's, so the pass reaches it first: its ticket is live when the embedding starts.)
+    const [TC, TC2] = [newUlid(), newUlid()];
+    await applyCommitted(db.pool, [created(TC, 'Comment race host'), created(TC2, 'Comment race host two')]);
+    const doomedComment = ticketEv(TC, 'comment.added', { body: docOf(paragraph(textNode('Race comment alpha'))) });
+    const orphanedComment = ticketEv(TC2, 'comment.added', { body: docOf(paragraph(textNode('Race comment beta'))) });
+    await applyCommitted(db.pool, [doomedComment, orphanedComment]);
+    const fires: string[] = [];
+    await pass(async (texts) => {
+      if (!fires.includes('alpha') && texts.includes('Race comment alpha')) {
+        fires.push('alpha');
+        await applyCommitted(db.pool, [ticketEv(TC, 'comment.deleted', { commentId: doomedComment.id })]);
+      }
+      if (!fires.includes('beta') && texts.includes('Race comment beta')) {
+        fires.push('beta');
+        await applyCommitted(db.pool, [ticketEv(TC2, 'ticket.deleted', {})]);
+      }
+    });
+    expect(fires.sort()).toEqual(['alpha', 'beta']);
+    expect(await commentRows(doomedComment.id)).toEqual([]);
+    expect(await commentRows(orphanedComment.id)).toEqual([]);
+    expect(shape(await ticketRows(TC))[0], 'control: the live host is written in the same pass').toEqual([0, '', 'Comment race host']);
+
+    // In step after the races: the refused items are not picked again. The staleness query skips a deleted
+    // ticket, a deleted comment and a deleted ticket's comment itself; the recheck is not the only guard, so a
+    // re-pick shows here as a wasted embedding call, not as a row.
+    const calls = embedCalls.length;
+    expect(await pass()).toBe(0);
+    expect(embedCalls.length).toBe(calls);
     expect(logged).toEqual([]);
   });
 
