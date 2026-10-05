@@ -2067,6 +2067,10 @@ do it yourself.
 - **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
 - **Every ticket action** — change any field, close and reopen, reorder the backlog, link two tickets (*blocks*,
   *relates to*, *duplicates*) or remove a link from either end, see a ticket's history, delete one or bring it back.
+- **Drafts.** Ask for a ticket as a *draft*: only you can see it, it has no key yet, and it appears on your Drafts
+  page. The assistant can list your drafts, publish one (it gets its key and joins the end of the project's
+  Backlog) and discard one. Before it discards anything it shows what would be erased, the draft, its sub-drafts
+  and the files attached to them, and waits until it is given the draft's exact title.
 - **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
   read), and invitations waiting for you.
 - **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,
@@ -2078,7 +2082,7 @@ do it yourself.
 ticket links appear in comments and notes exactly as if you had typed them in the app.
 
 **Deleting is never final here.** When your assistant deletes a workspace or a project it goes to **Deleted
-items** on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased.
+items** on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased. Discarding a draft is the one exception: a draft was never shared, so it is erased at once and cannot be recovered, which is why the assistant asks you to repeat its title first.
 
 **Archiving and deleting need the exact name.** The assistant must give the workspace's or project's name
 exactly as it is written now — same capitals, same spaces — or nothing happens and it is told what the name

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { SubmittedEvent } from '@gisik-nokma/domain';
+import { DRAFT_NO_OUTSIDERS_REASON, DRAFT_NO_OUTSIDERS_RULE, type SubmittedEvent } from '@gisik-nokma/domain';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import { confirmOrPreview, type Preview } from './preview.js';
@@ -51,6 +51,11 @@ export type Resolved = { preview: Preview & { person: LookedUpPerson; joinsAsGue
 /**
  * Look the address up and either answer the preview of whoever it resolves to NOW, or (when `confirm` is exactly that person's userId)
  * hand the person back to be acted on. `headline` is the tool's own first sentence, built only if a preview is needed.
+ *
+ * `draft` (create_ticket's `draft: true`, drafts T7; assign_ticket on an existing draft, from its call-1 ticket read): a draft takes
+ * nobody from outside (R8), so for an outsider the preview states the server's own refusal, in its rule and sentence
+ * (`@gisik-nokma/domain`, one definition), instead of promising a guest that the confirmation would then be refused. Call 2 still goes
+ * to the server, which refuses it as before (planner rulings 2026-10-04 23:35 and 2026-10-05 00:44).
  */
 export async function resolveAssignee(
   session: Session,
@@ -58,11 +63,14 @@ export async function resolveAssignee(
   email: string,
   confirm: string | undefined,
   headline: (person: LookedUpPerson) => Promise<string>,
+  draft = false,
 ): Promise<Resolved> {
   const person = await lookUp(session, workspaceId, email);
   if (person === null) throw new Error(`${NO_USER_WITH_THAT_EMAIL} ${NO_USER_HINT}`);
-  const preview = await confirmOrPreview(person.userId, confirm, async () => ({ sentence: `${await headline(person)} ${guestSentence(person)}` }), 'confirm_assignee');
-  if (preview !== null) return { preview: { ...preview, person, joinsAsGuest: !person.inWorkspace } };
+  const refusedAsOutsider = draft && !person.inWorkspace;
+  const effect = refusedAsOutsider ? `refused by ${DRAFT_NO_OUTSIDERS_RULE}: ${DRAFT_NO_OUTSIDERS_REASON}` : guestSentence(person);
+  const preview = await confirmOrPreview(person.userId, confirm, async () => ({ sentence: `${await headline(person)} ${effect}` }), 'confirm_assignee');
+  if (preview !== null) return { preview: { ...preview, person, joinsAsGuest: !person.inWorkspace && !refusedAsOutsider } };
   return { person };
 }
 

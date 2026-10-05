@@ -67,7 +67,7 @@ the token is cached — you will not be asked again unless it is revoked.
 
 Read: `list_workspaces`, `get_workspace`, `list_projects`, `get_project`, `search_tickets`, `list_tickets` (the tickets of one project, or of every project you can see in a workspace; filters take lists and `"me"`), `get_ticket`, `list_members` (the people in a workspace — a guest is shown only the people on tickets shared with them).
 
-Write, **as you**: `create_ticket`, `transition_ticket`, `add_comment`, `assign_ticket`; workspaces — `create_workspace`, `rename_workspace`, `archive_workspace`, `restore_workspace`, `delete_workspace`, `undelete_workspace`; projects — `create_project`, `update_project`, `archive_project`, `restore_project`, `delete_project`, `undelete_project`. Deletes are soft (Deleted items, restorable for 15 days), and `archive_*`/`delete_*` need `confirm_name` to be the exact current name.
+Write, **as you**: `create_ticket`, `transition_ticket`, `add_comment`, `assign_ticket`; drafts — `list_my_drafts`, `publish_draft`, `discard_draft` (and `create_ticket` takes `draft: true`); workspaces — `create_workspace`, `rename_workspace`, `archive_workspace`, `restore_workspace`, `delete_workspace`, `undelete_workspace`; projects — `create_project`, `update_project`, `archive_project`, `restore_project`, `delete_project`, `undelete_project`. Deletes are soft (Deleted items, restorable for 15 days), and `archive_*`/`delete_*` need `confirm_name` to be the exact current name.
 
 A write is a real event in the real ledger, attributed to your account. There is no preview and no undo
 beyond the product's own — a ticket the assistant creates is a ticket, and a transition it makes is one

@@ -28,6 +28,8 @@ export type SweepEntry = { args: Record<string, unknown>; session?: Partial<Sess
  */
 /** The ticket-detail answer the T9 sweep entries read (`key`, `title`, a rank, a workflow). */
 const TICKET_DETAIL = { key: 'W-1', title: 'A ticket', ticketState: { fields: {}, rank: 'm', workflowId: 'wf' }, rollup: null };
+/** The author's own draft as the ticket read answers it (drafts T7): no key, a `ticketState.draft`. */
+const DRAFT_DETAIL = { key: null, title: 'A draft', ticketState: { fields: {}, workflowId: 'wf', draft: { authorId: 'u', at: '2026-10-03T08:00:00.000Z' } }, rollup: null };
 
 export const SWEEP: Record<string, SweepEntry> = {
   // read begin
@@ -109,6 +111,9 @@ export const SWEEP: Record<string, SweepEntry> = {
   get_attention: { args: { workspaceId: 'w' } },
   list_notifications: { args: {}, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
   mark_notifications_read: { args: { all: true }, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
+  get_notification_preferences: { args: {}, session: { get: async () => ({ mutedKinds: [] }) } },
+  set_notification_preferences: { args: { mute: ['mention'] }, session: { get: async () => ({ mutedKinds: [] }), put: async (_path, body) => body } },
+  list_saved_filters: { args: { workspaceId: 'w' }, session: { get: async () => ({ savedFilters: [], listColumns: {}, grouping: {} }) } },
   list_my_invitations: { args: {}, session: { get: async () => ({ invitations: [] }) } },
   respond_to_invitation: { args: { inviteId: 'i', answer: 'accept' } },
   // discovery end
@@ -131,4 +136,12 @@ export const SWEEP: Record<string, SweepEntry> = {
   // trash begin (T13)
   list_deleted: { args: {} },
   // trash end
+  // draft begin (drafts T7)
+  list_my_drafts: { args: {}, session: { get: async () => ({ items: [] }) } },
+  publish_draft: { args: { workspaceId: 'w', ticketId: 't' }, session: { post: async () => ({ results: [{ ticketId: 't', key: 'K-1' }] }) } },
+  discard_draft: {
+    args: { workspaceId: 'w', ticketId: 't' },
+    session: { get: async (path) => (path.endsWith('/drafts') ? { items: [] } : DRAFT_DETAIL) },
+  },
+  // draft end
 };

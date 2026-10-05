@@ -9,7 +9,8 @@ import {
   TICKET_NOT_VISIBLE_REASON,
 } from '../../src/permissions/check-permission.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
-import { DRAFT_NO_OUTSIDERS_REASON, DRAFT_NO_OUTSIDERS_RULE, NO_ACCOUNT_REASON } from '../../src/routes/people.js';
+import { DRAFT_NO_OUTSIDERS_REASON, DRAFT_NO_OUTSIDERS_RULE } from '@gisik-nokma/domain';
+import { NO_ACCOUNT_REASON } from '../../src/routes/people.js';
 import { canSee } from '../../src/visibility/can-see.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';

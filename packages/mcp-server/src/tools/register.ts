@@ -4,6 +4,7 @@ import type { Session } from '../session.js';
 import { attachmentTools } from './attachment-tools.js';
 import { commentTools } from './comment-tools.js';
 import { definitionAdminTools } from './definition-admin-tools.js';
+import { draftTools } from './draft-tools.js';
 import { discoveryTools } from './discovery-tools.js';
 import { memberAdminTools } from './member-admin-tools.js';
 import { noteTools } from './note-tools.js';
@@ -18,7 +19,7 @@ import { writeTools } from './write-tools.js';
 /**
  * Every tool, in one order, from one place: the reads, the ticket writes, the
  * workspace tools, the project tools, then one module per MCP-everything lane (comments, notes,
- * attachments, tickets, discovery, member admin, definition admin, trash). A tool dropped from any factory disappears from the
+ * attachments, tickets, discovery, member admin, definition admin, trash, drafts). A tool dropped from any factory disappears from the
  * assistant's world silently — there is no error, the capability simply stops
  * existing — so the order and the count are pinned by a test rather than left
  * to whoever edits the factories next. Both doors (stdio and the hosted `/mcp`)
@@ -38,6 +39,7 @@ export function allTools(session: Session): ToolDefinition[] {
     ...memberAdminTools(session),
     ...definitionAdminTools(session),
     ...trashTools(session),
+    ...draftTools(session),
   ];
 }
 

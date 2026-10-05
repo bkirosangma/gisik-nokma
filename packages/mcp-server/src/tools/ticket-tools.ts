@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS, withheldLinkPayload, type TicketLinkKind } from '@gisik-nokma/domain';
+import { draftNotAllowedReason, linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS, withheldLinkPayload, type TicketLinkKind } from '@gisik-nokma/domain';
 import { spliceDoc, type BodyEdit } from '@gisik-nokma/editor/markdown-doc';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
@@ -12,7 +12,13 @@ import { envelopeFor, submitBatch, submitBatchByIndex, submitOne, type EventResu
 export type TicketDetailWire = {
   key: string | null;
   title: string;
-  ticketState: { fields: Record<string, { value: unknown }>; rank?: string | null; workflowId: string };
+  ticketState: {
+    fields: Record<string, { value: unknown }>;
+    rank?: string | null;
+    workflowId: string;
+    /** Present only on the author's own draft (drafts G7). */
+    draft?: { authorId: string; at: string; discarded?: boolean };
+  };
   rollup?: { totalChildren?: number } | null;
 };
 const id = z.string().min(1);
@@ -221,11 +227,15 @@ export function ticketTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'delete_ticket',
-      description: 'Move a ticket to Deleted items (restorable for 15 days with restore_ticket). confirm_name must be the ticket KEY (e.g. CCSO-4); without it you get a preview and nothing changes.',
+      description: 'Move a ticket to Deleted items (restorable for 15 days with restore_ticket). confirm_name must be the ticket KEY (e.g. CCSO-4); without it you get a preview and nothing changes. A draft cannot be deleted: use discard_draft.',
       inputSchema: { workspaceId: id, ticketId: id, confirm_name: z.string().optional() },
       handler: async (args) => {
         const a = z.object({ workspaceId: id, ticketId: id, confirm_name: z.string().optional() }).parse(args);
         const ticket = await readTicket(session, a.workspaceId, a.ticketId);
+        // A draft has no key to confirm with, and G1 refuses the delete anyway: say so in its words, before any preview.
+        if (ticket.ticketState.draft !== undefined) {
+          throw new Error(`refused by draft.not-allowed: ${draftNotAllowedReason('ticket.deleted')}`);
+        }
         const key = ticket.key ?? a.ticketId;
         const children = ticket.rollup?.totalChildren ?? 0;
         const preview = await confirmOrPreview(key, a.confirm_name, async () => ({
