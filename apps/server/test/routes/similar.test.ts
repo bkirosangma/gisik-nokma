@@ -179,9 +179,9 @@ describe('27.430 similar (KG-D T2)', () => {
     // matches kind AND id, so nNear is never its own neighbour, and the other notes still answer.
     const fromNote = await hitsOf('owner', `item=note:${nNear.id}`);
     expect(fromNote.length, 'a note source answers').toBeGreaterThanOrEqual(1);
-    expect(fromNote[0], 'TP is nearest to its paraphrase').toMatchObject({ kind: 'ticket', id: TP });
     expect(fromNote.map((hit) => hit.id), 'never the note itself').not.toContain(nNear.id);
     expect(fromNote.some((hit) => hit.kind === 'note'), 'other notes still answer a note source').toBe(true);
+    expect(fromNote[0], 'TP is nearest to its paraphrase').toMatchObject({ kind: 'ticket', id: TP });
     // A note the guest cannot read is the same 404 as a ticket; control: their explicit note answers.
     expect(await similar('guest', `item=note:${N.nProject}`), 'a note the guest cannot read').toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
     expect((await similar('guest', `item=note:${N.nExplicit}`)).status).toBe(200);
