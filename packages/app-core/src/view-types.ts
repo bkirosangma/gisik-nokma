@@ -249,7 +249,10 @@ export type TransitionCause =
  */
 export type RollupToViewer = {
   totalChildren: number;
+  /** Done children: terminal and not closed Not taken (wtg2 T17). */
   terminalChildren: number;
+  /** wtg2 T17 (Q1): terminal children closed Not taken, counted APART from `terminalChildren`; ABSENT when 0. */
+  notTakenChildren?: number;
   restrictedCount: number;
 };
 
@@ -551,6 +554,8 @@ export type ListRow = {
    * after them by `ticketId`, so the distinction is the whole sort.
    */
   rank: string | null;
+  /** wtg2 T17 (Q1): closed "Not taken" by the flow; ABSENT otherwise. Optional (unlike `closed`) so no legacy literal changes; read by `countRows` and `toTicketDatesInput` (the web Timeline's mark, 29.440). */
+  notTaken?: true;
 };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };
@@ -782,6 +787,12 @@ export type TicketHistoryEvent = {
    * when this event was not labelled (any other type, or an older server).
    */
   linkTarget?: { key: string | null } | null;
+  /**
+   * Flow-caused events only (wtg2 T17's History route): the key of the ticket the cause names (the finished source, or
+   * the Decision), `null` when the server withheld a ticket this viewer cannot see (and nulled the cause's ids), absent
+   * for an event with no flow cause, an older server, or the offline replica (all three read as "cannot name it").
+   */
+  causeTicket?: { key: string | null } | null;
   /**
    * Link events only (drafts T6 FIX 1): which way the link reads from THIS
    * ticket. `'in'` is a draft-side `from` entry on a published draft's stream

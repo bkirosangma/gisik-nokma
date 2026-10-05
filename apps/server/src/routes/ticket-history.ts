@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { isTicketLinkEvent, isWithheldLinkEvent, linkPayloadDirection } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { keysForAncestors } from '../read/ancestry.js';
+import { annotateFlowCauses } from '../read/history-causes.js';
 import { canSee } from '../visibility/can-see.js';
 import { targetSight, withholdEvent } from '../visibility/withhold-link-targets.js';
 import { NOT_FOUND_BODY } from './tickets.js';
@@ -14,13 +15,15 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * where from (`origin`), when they say it happened and when we received it
  * (`clientTime`, `serverTime`), and where it sits in this entity's own history
  * (`seq`). Nothing is summarised, and nothing is derived but the two link
- * labels — spec §3's exception is that the history view IS the ledger,
- * filtered, and a field this route computed would make it something else. The
- * exceptions are two fields on link events only: the tenth, `linkTarget`
- * (typed-links T4, spec A §2.4), the other end's key, or `null` when this
- * viewer cannot see it; and the eleventh, `linkDirection` (drafts T6 FIX 1),
- * which way the link reads from this ticket. Their own docblocks below say why
- * they are derived here.
+ * labels and the flow-cause key — spec §3's exception is that the history view
+ * IS the ledger, filtered, and a field this route computed would make it
+ * something else. The exceptions are two fields on link events only: the
+ * tenth, `linkTarget` (typed-links T4, spec A §2.4), the other end's key, or
+ * `null` when this viewer cannot see it; and the eleventh, `linkDirection`
+ * (drafts T6 FIX 1), which way the link reads from this ticket; and one on
+ * flow-caused events only: the twelfth, `causeTicket` (wtg2 T17), the key of
+ * the ticket a flow cause names, or `null` when this viewer cannot see it.
+ * Their own docblocks below say why they are derived here.
  *
  * ## What is deliberately NOT here, and why that is not a redaction
  *
@@ -32,14 +35,18 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * from this ticket's own history and belongs to the sync surface that resumes
  * by it. Provenance is untouched — spec §6's rule is that a claim is never
  * redacted from someone entitled to the state, and every claim-bearing field
- * above goes out whole, with ONE exception: a link event's other end
+ * above goes out whole, with TWO exceptions. The first: a link event's other end
  * (`payload.targetId`, or a draft-side entry's `from` with its `targetId`) is
  * withheld (`null`) when this viewer cannot see it (spec A §2.4, see
  * `linkTarget`), and a contest of such a link claim goes out with that
  * payload withheld and the gate's cause in place of its own, because a
  * `link.reverse` reason names the hidden ticket's title (typed-links T4b). The
  * claim is not cut: only the other end's id and the contest's cause are
- * withheld, per viewer (`visibility/withhold-link-targets.ts`).
+ * withheld, per viewer (`visibility/withhold-link-targets.ts`). The second
+ * (wtg2 T17, AMEND 2): a flow cause naming a ticket this viewer cannot see goes
+ * out with that ticket id and its person (`triggeredBy` / `decidedBy`) nulled,
+ * their keys kept (`withholdCauseTicket`, `read/history-causes.ts`); its kind,
+ * label or outcome, pass and decision event id stay.
  */
 export type TicketHistoryEvent = {
   id: string;
@@ -70,6 +77,14 @@ export type TicketHistoryEvent = {
    * withhold. `'out'` is every other link. Absent on every other event type.
    */
   linkDirection?: 'out' | 'in';
+  /**
+   * Flow-caused events only (wtg2 T17): the second derived field this route
+   * serves, with `linkTarget`. `{ key }` names the ticket the cause names (a
+   * promotion's finished source, or the Decision), which this viewer can see;
+   * `null` is one they cannot see, and then the cause's ticket id and person
+   * are nulled too (`annotateFlowCauses`). Absent on an event with no flow cause.
+   */
+  causeTicket?: { key: string | null } | null;
 };
 
 /**
@@ -385,6 +400,7 @@ export function registerTicketHistoryRoute(
         }
         e.linkDirection = linkPayloadDirection(e.payload);
       }
+      await annotateFlowCauses(deps.pool, sees, events);
       return { ticketId: id, events };
     },
   );

@@ -31,3 +31,12 @@ describe('3.145 formatRollup — derived progress to the viewer (spec §6)', () 
     expect(formatRollup({ totalChildren: 0, terminalChildren: 0, restrictedCount: 0 })).toBe('0 of 0 done');
   });
 });
+
+describe('29.374 formatRollup names the not-taken children', () => {
+  it('29.374 names the not-taken children between done and restricted, and says nothing when there are none', () => {
+    expect(formatRollup({ totalChildren: 8, terminalChildren: 4, notTakenChildren: 1, restrictedCount: 2 })).toBe('4 of 8 done, 1 not taken, 2 restricted');
+    expect(formatRollup({ totalChildren: 8, terminalChildren: 4, notTakenChildren: 2, restrictedCount: 0 })).toBe('4 of 8 done, 2 not taken');
+    expect(formatRollup({ totalChildren: 8, terminalChildren: 5, restrictedCount: 0 })).toBe('5 of 8 done');
+    expect(formatRollup({ totalChildren: 8, terminalChildren: 5, notTakenChildren: 0, restrictedCount: 0 })).toBe('5 of 8 done');
+  });
+});
