@@ -29,7 +29,9 @@ describe('25.179 the route skeletons wear the real component frames', () => {
 
   it('WorkflowBuilderLoading is .workflow-builder-screen, as the real screen root is', () => {
     const source = readFileSync(SCREEN, 'utf8');
-    const roots = [...source.matchAll(/<div className="(workflow-builder-screen)">/g)];
+    // AMENDED 2026-10-05 (G-9 T5 FIX 1): the root div now carries `ref`, `data-fullscreen`, `role` and more across several lines, so
+    // the read tolerates other attributes around the class (a `[^>]` run crosses the line breaks and stops at the tag's end).
+    const roots = [...source.matchAll(/<div\b[^>]*\bclassName="(workflow-builder-screen)"[^>]*>/g)];
     expect(roots).toHaveLength(1); // control: the source names one root, so the read is not a miss
     const loading = render(<WorkflowBuilderLoading />);
     expect(frame(loading.container.firstElementChild!)).toBe(roots[0]![1]);

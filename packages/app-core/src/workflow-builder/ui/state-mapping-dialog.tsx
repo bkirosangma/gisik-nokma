@@ -50,11 +50,15 @@ export function StateMappingDialog(props: {
    * pressing Publish again reopened an EMPTY dialog. The owner of the mapping
    * is now the caller, and this is how it hands it back.
    *
-   * It is the INITIAL value and not a controlled one, deliberately: the dialog
-   * still owns what is typed into it from this point on, or every keystroke
-   * would need a round trip through the parent to appear.
+   * It is the INITIAL value and not a controlled one: the dialog keeps its own
+   * working copy from this point on, and reports each pick through
+   * `onMappingChange`, so the caller's copy is always current and a REMOUNT
+   * (G-9 T5 FIX 1: the full-screen toggle moves `PublishControls` between the
+   * toolbar and the title row) starts again from every pick made so far.
    */
   initialMapping?: Record<string, string>;
+  /** Every pick, as the whole mapping after it (G-9 T5 FIX 1): what the caller seeds `initialMapping` from on a remount. */
+  onMappingChange?(mapping: Record<string, string>): void;
   onCancel(): void;
   onConfirm(mapping: Record<string, string>): void;
   /**
@@ -93,7 +97,11 @@ export function StateMappingDialog(props: {
               <Select
                 options={props.targetStates.map((target) => ({ value: target.id, label: target.name }))}
                 value={mapping[state.id] ?? null}
-                onChange={(next) => setMapping((current) => ({ ...current, [state.id]: next }))}
+                onChange={(next) => {
+                  const picked = { ...mapping, [state.id]: next };
+                  setMapping(picked);
+                  props.onMappingChange?.(picked);
+                }}
                 aria-label={`Send tickets from ${state.name} to`}
               />
             </div>

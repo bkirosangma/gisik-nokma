@@ -124,7 +124,7 @@ One row, top centre, over the canvas. It uses the existing components:
 - Publish (`PublishControls`, the state-mapping dialog included);
 - **Exit full screen**.
 
-On narrow widths, the zoom controls and Tidy fold into a **More** menu (the shared `Menu`).
+On narrow widths, the zoom controls and Tidy fold into a **More** menu. (There is no shared `Menu` component: the More menu is the shared `Popover` holding a `role="menu"` list, planner ruling 2026-10-04 Q6.)
 
 ### 4.3 Floating panel
 - **Where:** a right-hand panel inside the canvas, resizable between 280 and 480 px. Its width is remembered for the session.
