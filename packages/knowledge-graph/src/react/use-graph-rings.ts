@@ -1,13 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { GRAPH_MAX_HOPS, type GraphGroup } from '@gisik-nokma/domain';
+import { GRAPH_MAX_HOPS, type GraphEdgeView, type GraphGroup } from '@gisik-nokma/domain';
 import { emptyStore, mergeRing, type GraphStore } from '../engine/model.js';
 import type { GraphSource } from './types.js';
 
 type Entry = { store: GraphStore; loaded: number };
 /** One shared empty store, so a key with nothing loaded yet does not hand the view a new store (and a new draw model) each render. */
 const EMPTY: GraphStore = emptyStore();
-export type RingState = { store: GraphStore; loading: boolean; failedHop: number | null; retry: () => void; key: string };
-// Task 8 adds `forget(edgeId: string): void` and `restore(edge: GraphEdgeView): void` (planner ruling 2026-10-04, Undo restores the edge).
+export type RingState = {
+  store: GraphStore;
+  loading: boolean;
+  failedHop: number | null;
+  retry: () => void;
+  key: string;
+  /**
+   * "Remove link" (KG-C T8): drops the edge from THIS key's cached store. Nothing refetches a loaded entry, so without it the
+   * removed link stays drawn. Another key's entry (another centre or scope) keeps it until that key is fetched again. Answers
+   * whether THIS key is still the one shown: the view may have moved on while the host answered, and then nothing is drawn.
+   */
+  forget: (edgeId: string) => boolean;
+  /** Undo (planner ruling 2026-10-04): puts the edge back through the door it first came in by, `mergeRing`. Answers as `forget`. */
+  restore: (edge: GraphEdgeView) => boolean;
+};
 
 /**
  * Rings 1…`rings` for one (centre, scope, groups), fetched one at a time (§2.2) and cached for the session per that key
@@ -35,7 +48,9 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
         const hop = entry.loaded + 1;
         try {
           const ring = await source.ring({ center: q.centre, hops: hop, workspaceIds: q.workspaceIds, projectIds: q.projectIds, groups: q.groups });
-          entry = { store: mergeRing(entry.store, ring), loaded: hop };
+          // merged into the entry AS CACHED NOW: a link removed (`forget`) while this ring was out stays removed
+          const base = cache.current.get(key) ?? entry;
+          entry = { store: mergeRing(base.store, ring), loaded: hop };
           cache.current.set(key, entry); // cached even if stale: a later visit reuses it
         } catch {
           if (current.current === key) setFailed({ key, hop });
@@ -61,6 +76,26 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
     retry: () => {
       setFailed(null);
       setAttempt((n) => n + 1);
+    },
+    forget: (edgeId: string) => {
+      const e = cache.current.get(key);
+      if (e === undefined) return false;
+      const edges = new Map(e.store.edges);
+      edges.delete(edgeId);
+      const adj = new Map([...e.store.adj].map(([k, v]) => [k, v.filter((x) => x.edge.id !== edgeId)]));
+      cache.current.set(key, { ...e, store: { ...e.store, edges, adj } });
+      bump((n) => n + 1);
+      return current.current === key;
+    },
+    restore: (edge: GraphEdgeView) => {
+      const e = cache.current.get(key);
+      const center = e?.store.items.get(q.centre); // seeded by the first ring (planner ruling Q1); a ring must carry it
+      if (e === undefined || center === undefined) return false;
+      // the add's own door; `exhausted` is kept, because an items-less ring would otherwise read as "the walk ended"
+      const merged = mergeRing(e.store, { hop: e.store.rings, center, items: [], edges: [edge], frontier: [], truncated: false, cursor: null });
+      cache.current.set(key, { ...e, store: { ...merged, exhausted: e.store.exhausted } });
+      bump((n) => n + 1);
+      return current.current === key;
     },
   };
 }
