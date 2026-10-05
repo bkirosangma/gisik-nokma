@@ -69,11 +69,24 @@ Read: `list_workspaces`, `get_workspace`, `list_projects`, `get_project`, `searc
 
 Write, **as you**: `create_ticket`, `transition_ticket`, `add_comment`, `assign_ticket`; drafts — `list_my_drafts`, `publish_draft`, `discard_draft` (and `create_ticket` takes `draft: true`); workspaces — `create_workspace`, `rename_workspace`, `archive_workspace`, `restore_workspace`, `delete_workspace`, `undelete_workspace`; projects — `create_project`, `update_project`, `archive_project`, `restore_project`, `delete_project`, `undelete_project`. Deletes are soft (Deleted items, restorable for 15 days), and `archive_*`/`delete_*` need `confirm_name` to be the exact current name.
 
-A write is a real event in the real ledger, attributed to your account. There is no preview and no undo
-beyond the product's own — a ticket the assistant creates is a ticket, and a transition it makes is one
-you will have to move back yourself if you did not want it. The rule engine still refuses what it would
-refuse for you, and when it does, the assistant is told the rule's name and the reason in the server's
-own words rather than a summary of them.
+Added in MCP sweep 2: `get_ticket` also answers the notes attached to the ticket (`notes`, at most 50, and `notesTotal`);
+`restore_note_version` puts an earlier version of a note back exactly as stored; `close_tickets` closes up to 100 tickets
+after you repeat how many (`confirm_count`) and answers a row per ticket; `get_notification_preferences` and
+`set_notification_preferences` read and change which kinds of notification are muted; `list_saved_filters` lists your saved
+filters in a workspace. `assign_ticket` and `create_ticket` take `assignee_email` instead of `assigneeId`: the first call
+looks the address up and previews who it is (and, in capitals, if they would be added as a guest to the workspace; a draft
+takes nobody from outside, so for a draft the preview says the server would refuse); a second call with `confirm_assignee`
+set to that person's `userId` does it. Nothing happens on the first call.
+
+A write is a real event in the real ledger, attributed to your account. The exceptions are your own settings:
+`mark_notifications_read` and `set_notification_preferences` change a preference of yours and record no event. A
+write has no undo beyond the product's own — a ticket the assistant creates is a ticket, and a transition it makes
+is one you will have to move back yourself if you did not want it. A few writes ask first: the first call only
+previews, and nothing happens until a second call repeats what it previewed. They are the admin acts
+(`archive_*`/`delete_*` with `confirm_name`, and the others with their exact-name check), `discard_draft` (with
+`confirm_name`, the draft's exact title), `close_tickets` (with `confirm_count`) and assigning or creating a ticket
+by email (with `confirm_assignee`). The rule engine still refuses what it would refuse for you, and when it does,
+the assistant is told the rule's name and the reason in the server's own words rather than a summary of them.
 
 ## Revoke
 

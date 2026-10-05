@@ -2072,7 +2072,9 @@ Three things are worth knowing before you press it:
   read-only choice and no picking one workspace.
 - **It can never do more than you can.** A ticket you cannot see, it cannot see. A move your role does not
   allow is refused for the assistant in the same words it would be refused for you.
-- **Every change it makes is recorded under your name**, like any other change in the ticket's history.
+- **Every change it makes is recorded under your name**, like any other change in the ticket's history — adding
+  someone as a guest included. The exceptions are your own settings: muting a kind of notification, or marking
+  notifications read, changes a preference and leaves no history entry.
 
 ### What your assistant can do
 
@@ -2087,9 +2089,12 @@ do it yourself.
 - **People.** See who is in a workspace. If you are a guest, you are shown only the people on the tickets
   shared with you — never the full list, and never anyone's email address.
 - **Tickets.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
-  me* works — and add, move, comment on and assign them.
+  me* works — and add, move, comment on and assign them. A ticket shows the notes attached to it. You can have
+  several tickets closed at once: the assistant first tells you how many it is about to close and waits for you to
+  say that number, then closes the ones that can be closed and tells you which could not and why.
 - **Notes.** Read, write and change notes — the whole body, one section under a heading, or a few lines at the end —
-  move them, attach them to tickets, and delete or bring them back.
+  move them, attach them to tickets, and delete or bring them back. It can also put an earlier version of a note
+  back: the stored text is copied exactly, nothing is lost, and the version it replaces stays in the note's history.
 - **Comments.** Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete
   anyone's). Mentions like *@Asha* notify only people who can read the ticket or note.
 - **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
@@ -2100,11 +2105,19 @@ do it yourself.
   Backlog) and discard one. Before it discards anything it shows what would be erased, the draft, its sub-drafts
   and the files attached to them, and waits until it is given the draft's exact title.
 - **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
-  read), and invitations waiting for you.
+  read), and invitations waiting for you. It can show which kinds of notification you have muted, mute or unmute
+  kinds for you, and list the saved filters you made in a workspace so it can use one.
 - **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,
   who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing
   happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the
   item's current name.
+
+**Assigning someone by email address asks you first.** Ask the assistant to assign a ticket — or to create one — to
+someone by their email address and it looks the address up, then shows you who it found and what would happen, and
+waits. If the person is not yet in the workspace it says so in capitals: they will be **added as a guest** and will
+see only that ticket. Nothing is created, assigned or added until you confirm; then it does it in one step. If nobody
+has that address it says so, and you can ask for the person from the workspace's member list instead. A draft is the
+exception: it cannot be given to someone outside the workspace, and the assistant tells you so instead.
 
 **Formatting comes through.** The assistant writes in Markdown, so headings, lists, bold text, links, mentions and
 ticket links appear in comments and notes exactly as if you had typed them in the app.
