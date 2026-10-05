@@ -2,10 +2,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DECISION_TYPE_ID, newUlid, SYSTEM_ACTOR_FLOW, type FlowRead, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
-import { AUTO_MOVE_LIMIT } from '../../src/flow/auto-moves.js';
+import { AUTO_MOVE_LIMIT, loadAutoMoves } from '../../src/flow/auto-moves.js';
 import { loadFlowFacts } from '../../src/flow/flow-facts.js';
 import { readFlowView } from '../../src/flow/flow-view.js';
 import { requireMember } from '../../src/read/membership.js';
+import { listNotesForTickets } from '../../src/read/notes.js';
 import { ticketNumbers } from '../../src/read/ticket-numbers.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -141,6 +142,30 @@ describe('29.243 the flow read for one viewer', () => {
     );
     await db.pool.query("UPDATE proj_tickets SET state_id = 'nowhere' WHERE ticket_id = $1", [lone[1]]);
     await expect(load([lone[1]!])).rejects.toThrow(`loadFlowFacts: workflow ${wf}@${v} has no state nowhere, which ticket ${lone[1]} is in`);
+  });
+
+  it('29.243 every loader keeps to the path\'s workspace: another workspace\'s ticket passed in by id gets no facts, no moves and no notes; control: its own workspace reads all three', async () => {
+    // The ids a loader is handed come from this workspace's walk, so these clauses never decide a read today; they are the
+    // tenant guard of three exported functions, and each is pinned here by a direct call rather than trusted to the walk.
+    const nb = read.neighbour;
+    const nbOwner = read.userIds.neighbour;
+    const nbNote = newUlid();
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: nb.workspaceId, actorId: SYSTEM_ACTOR_FLOW, entity: { kind: 'ticket', id: nb.ticketId }, type: 'ticket.transitioned', payload: { to: 'todo', cause: { kind: 'led-to', sourceTicketId: nb.ticketId, triggeredBy: nbOwner } } }),
+      makeCommitted({ workspaceId: nb.workspaceId, actorId: nbOwner, entity: { kind: 'note', id: nbNote }, type: 'note.created', payload: { title: 'Next door', homeProjectId: nb.projectId, scope: { mode: 'workspace' }, attachTicketId: nb.ticketId } }),
+    ]);
+    const here = (await requireMember(db.pool, read.world.owner, read.world.workspaceId))!;
+    const there = (await requireMember(db.pool, nbOwner, nb.workspaceId))!;
+    // CONTROL: the neighbour's own workspace reads the ticket's facts, its flow move and its note
+    const own = await loadFlowFacts(db.pool, { eff: there, viewerId: nbOwner, workspaceId: nb.workspaceId, ids: [nb.ticketId] });
+    expect(own.get(nb.ticketId)).toMatchObject({ title: nb.ticketTitle, notes: [{ id: nbNote, title: 'Next door' }] });
+    expect((await loadAutoMoves(db.pool, nb.workspaceId, [nb.ticketId])).map((m) => m.ticketId)).toEqual([nb.ticketId]);
+    expect([...(await listNotesForTickets(db.pool, there, nbOwner, nb.workspaceId, [nb.ticketId])).keys()]).toEqual([nb.ticketId]);
+    // through this workspace, the same id is nothing; B, passed beside it, still loads, so the answer is not merely empty
+    const across = await loadFlowFacts(db.pool, { eff: here, viewerId: read.world.owner, workspaceId: read.world.workspaceId, ids: [id.b, nb.ticketId] });
+    expect([...across.keys()]).toEqual([id.b]);
+    expect(await loadAutoMoves(db.pool, read.world.workspaceId, [nb.ticketId])).toEqual([]);
+    expect([...(await listNotesForTickets(db.pool, here, read.world.owner, read.world.workspaceId, [id.b, nb.ticketId])).keys()]).toEqual([id.b]);
   });
 
   it('29.243 the automatic moves: the flow actor\'s moves of every kind, newest first, one per reset, only on tickets in the read, at most the limit', async () => {
