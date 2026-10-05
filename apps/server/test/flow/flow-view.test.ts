@@ -144,7 +144,7 @@ describe('29.243 the flow read for one viewer', () => {
     await expect(load([lone[1]!])).rejects.toThrow(`loadFlowFacts: workflow ${wf}@${v} has no state nowhere, which ticket ${lone[1]} is in`);
   });
 
-  it('29.243 every loader keeps to the path\'s workspace: another workspace\'s ticket passed in by id gets no facts, no moves and no notes; control: its own workspace reads all three', async () => {
+  it('29.243 every loader keeps to the path\'s workspace and to the ids it is given: another workspace\'s ticket passed in by id gets no facts, no moves and no notes; control: its own workspace reads all three', async () => {
     // The ids a loader is handed come from this workspace's walk, so these clauses never decide a read today; they are the
     // tenant guard of three exported functions, and each is pinned here by a direct call rather than trusted to the walk.
     const nb = read.neighbour;
@@ -166,6 +166,8 @@ describe('29.243 the flow read for one viewer', () => {
     expect([...across.keys()]).toEqual([id.b]);
     expect(await loadAutoMoves(db.pool, read.world.workspaceId, [nb.ticketId])).toEqual([]);
     expect([...(await listNotesForTickets(db.pool, here, read.world.owner, read.world.workspaceId, [id.b, nb.ticketId])).keys()]).toEqual([id.b]);
+    // and the id list binds too: E, a ticket of this workspace with no notes, asked alone, gets none of B's
+    expect((await listNotesForTickets(db.pool, here, read.world.owner, read.world.workspaceId, [id.e])).size).toBe(0);
   });
 
   it('29.243 the automatic moves: the flow actor\'s moves of every kind, newest first, one per reset, only on tickets in the read, at most the limit', async () => {

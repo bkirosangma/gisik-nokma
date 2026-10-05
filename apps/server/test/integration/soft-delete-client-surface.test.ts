@@ -845,7 +845,9 @@ async function walkAll(): Promise<Map<AbsenceDecision, string>> {
   // draw the same nothing for "this ticket has no files" and "we could not read
   // them"). The throw killed this `beforeAll`, and the four cases below it
   // reported as SKIPPED — a green-looking suite that says nothing, which is the
-  // failure this file's own docblock warns about.
+  // failure this file's own docblock warns about. `getFlow` (Workflow graph, Part 3
+  // T3) is the second: its route refuses a deleted seed, and the client re-raises
+  // the 404 as `getBoard` does, so it too is in `MAY_REFUSE`.
   //
   // A refusal is not a leak: it is the strongest form of absence, so it is
   // RECORDED as its own reading rather than crashing the hook. The tolerance is
