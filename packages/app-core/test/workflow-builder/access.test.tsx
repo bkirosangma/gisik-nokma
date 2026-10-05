@@ -189,7 +189,8 @@ describe('read-only workflow views for non-admins', () => {
       // 21.170: the phone Panels / Done buttons only open and close the sheet that holds those rows — navigation too.
       // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
       // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
-      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit/);
+      // AMENDED 2026-10-05 (G-9 T5): the full-screen controls only change what is shown (see the member sweep below).
+      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close|gn-segmented__item/);
     }
     expect(gateway.submitted).toEqual([]);
   });
@@ -393,7 +394,10 @@ describe('no authoring action is reachable by any path the builder screen offers
         // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
         // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
         // 23.175: the canvas's "Fit to screen" only moves the viewport — a view control, not an authoring action.
-        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit/);
+        // AMENDED 2026-10-05 (G-9 T5, 25.552): Full screen (header, and the corner's on the Fit class), and inside it the toolbar's
+        // zoom steps, Issues badge and Exit, the panel's tabs and its × only change what is shown. The sweep presses Full screen,
+        // so everything after it runs IN full screen, where the left column and the floating panel both hold the inspectors.
+        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close|gn-segmented__item/);
       }
     }
 
@@ -412,10 +416,15 @@ describe('no authoring action is reachable by any path the builder screen offers
     // StateInspector) — the two other ways a button could appear after the
     // first paint.
     await user.click(await screen.findByTestId('transition-label-8'));
-    expect(screen.getByText('From In progress to Done')).toBeInTheDocument();
+    expect(screen.getAllByText('From In progress to Done').length).toBeGreaterThan(0);
     everyButtonIsAJump();
     await user.click(await screen.findByTestId('state-node-waiting'));
-    expect(screen.getByRole('textbox', { name: 'State name' })).toBeDisabled();
+    const stateNames = screen.getAllByRole('textbox', { name: 'State name' });
+    expect(stateNames.length).toBeGreaterThan(0);
+    for (const field of stateNames) expect(field).toBeDisabled();
+    // the sweep ran in full screen, and the floating panel is the one place both inspectors appeared
+    expect(screen.getByRole('region', { name: 'Workflow editor, full screen' })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Workflow panel' })).getByRole('textbox', { name: 'State name' })).toBeDisabled();
     everyButtonIsAJump();
   }, SWEEP_TIMEOUT_MS);
 

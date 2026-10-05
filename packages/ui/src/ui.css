@@ -4230,6 +4230,185 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 
 /* G-9: T5 fullscreen */
+/* Full screen (spec §4.1) is the builder screen itself, fixed over the window: above the shell's bars (the top bar at 20, the phone bottom
+   bar at 30, portalled after the page) and below every scrim (40). The popovers and Select panels it opens are portalled to the body at
+   30, so while it is on they are lifted over it. The canvas fills it, flat; the left column is hidden at every width, because the floating
+   panel holds those panels. Nothing here transforms or zooms the screen: a drag has to track the pointer 1:1 (25.553). */
+.workflow-builder-screen[data-fullscreen="true"] {
+  position: fixed;
+  inset: 0;
+  z-index: 31;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  background: var(--gn-surface);
+}
+.workflow-builder-screen[data-fullscreen="true"]:focus { outline: none; }
+body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-select__panel) { z-index: 32; }
+.workflow-builder-screen[data-fullscreen="true"] .workflow-builder-screen__header { position: relative; z-index: 5; gap: 0; }
+.workflow-builder-screen[data-fullscreen="true"] .workflow-builder-screen__layout {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+.workflow-builder-screen[data-fullscreen="true"] .workflow-builder-screen__left,
+.workflow-builder-screen[data-fullscreen="true"] .workflow-builder-screen__scrim { display: none; }
+.workflow-builder-screen[data-fullscreen="true"] .workflow-builder-screen__canvas {
+  order: 0;
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+.workflow-builder-screen[data-fullscreen="true"] .gn-workflow-canvas { min-height: 0; }
+/* The floating toolbar (spec §4.2): one raised strip, top centre, just under the header (whose only in-flow child in full screen is a
+   viewer's read-only banner). It wraps rather than overflow a narrow window. */
+.gn-wf-toolbar {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.375rem;
+  width: max-content;
+  max-width: calc(100vw - 1.5rem);
+  box-sizing: border-box;
+  padding: 0.375rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-near-lg);
+}
+.gn-wf-toolbar .workflow-builder-screen__name { width: 12rem; min-height: 2.75rem; font-size: 1rem; font-weight: 600; line-height: 1.25; }
+.gn-wf-toolbar .gn-button { min-height: 2.75rem; }
+.gn-wf-toolbar__zoom { display: inline-flex; gap: 0.125rem; }
+.gn-wf-toolbar__zoom .gn-button { min-width: 2.75rem; justify-content: center; }
+/* The Issues badge: the validator's count in a pill, tinted danger while it blocks Publish. */
+.gn-wf-toolbar__count {
+  display: inline-block;
+  min-width: 1.25rem;
+  margin-left: 0.375rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.gn-wf-toolbar__issues[data-count="some"] .gn-wf-toolbar__count { background: var(--gn-danger); color: var(--gn-danger-text); }
+/* Publish's outcome sentence hangs under the strip instead of stretching it. */
+.gn-wf-toolbar .publish-controls { position: relative; flex: 0 0 auto; }
+.gn-wf-toolbar .publish-controls__banner {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  width: max-content;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+/* The More menu (narrow widths): a column of full-width items on the shared popover surface; Tidy and "Undo tidy" are items too. */
+.gn-wf-more { display: flex; flex-direction: column; gap: 0.125rem; min-width: 12rem; margin: 0; padding: 0; list-style: none; }
+.gn-wf-more .gn-tidy { display: flex; flex-direction: column; align-items: stretch; gap: 0.125rem; }
+.gn-wf-more__item,
+.gn-wf-more .gn-tidy .gn-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-wf-more__item:hover,
+.gn-wf-more .gn-tidy .gn-button:hover { background: var(--gn-fill-tertiary); }
+.gn-wf-more__item:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+/* The floating panel (spec §4.3): a raised card over the right of the canvas, under the toolbar's row; its width is inline (280–480). */
+.gn-wf-panel {
+  position: absolute;
+  top: 4.5rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100% - 1.5rem);
+  box-sizing: border-box;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-near-lg);
+}
+/* The resize handle straddles the panel's left edge; its grip turns accent on hover and on keyboard focus. */
+.gn-wf-panel__resize { position: absolute; top: 0; bottom: 0; left: -0.375rem; width: 0.75rem; cursor: ew-resize; touch-action: none; }
+.gn-wf-panel__resize::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 2.5rem;
+  margin: -1.25rem 0 0 -2px;
+  border-radius: 2px;
+  background: var(--gn-border);
+}
+.gn-wf-panel__resize:hover::after,
+.gn-wf-panel__resize:focus-visible::after { background: var(--gn-accent); }
+.gn-wf-panel__resize:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-wf-panel__head { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 0.75rem 0.5rem; }
+.gn-wf-panel__tabs { flex: 1 1 auto; min-width: 0; }
+.gn-wf-panel__close {
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.gn-wf-panel__close:hover { background: var(--gn-fill-tertiary); color: var(--gn-text); }
+.gn-wf-panel__close:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-wf-panel__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-height: 0;
+  padding: 0 0.75rem 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gn-wf-panel__empty { margin: 1rem 0; color: var(--gn-text-muted); }
+/* On a phone (spec §4.5) the panel is a bottom sheet across the window. */
+.gn-wf-panel--sheet {
+  position: fixed;
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-width: none;
+  max-height: 70vh;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: var(--gn-radius-track) var(--gn-radius-track) 0 0;
+}
+@media (max-width: 40rem) {
+  .workflow-builder-screen__actions > .workflow-builder-screen__fullscreen { flex: 1 1 0; min-height: 2.75rem; }
+  .gn-wf-toolbar { right: 0.5rem; left: 0.5rem; width: auto; max-width: none; transform: none; }
+  .gn-wf-toolbar .workflow-builder-screen__name { flex: 1 1 100%; width: auto; }
+}
 
 /* G-9: end */
 .gn-state-node--open { border-left: 6px solid var(--gn-category-open); }

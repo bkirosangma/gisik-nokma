@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   Background,
   MarkerType,
@@ -40,6 +40,8 @@ const FIT_MIN_ZOOM = 0.25;
 const FIT_OPTIONS = { minZoom: FIT_MIN_ZOOM, padding: 0.1 };
 
 type Point = { x: number; y: number };
+/** The canvas corner's "Full screen" button (G-9 T5): the screen owns the state and the ref (focus returns here on exit); absent in full screen. */
+export type CornerFullScreen = { buttonRef: RefObject<HTMLButtonElement | null>; onEnter: () => void };
 type Size = { width: number; height: number };
 const NO_GUIDES: Guide[] = [];
 
@@ -73,7 +75,7 @@ function nudgeBlocker(from: Rect, to: Rect, others: Node[]): Node | null {
 const stateKey = (nodeId: string) => (nodeId === ANY_STATE_NODE_ID ? nodeId : nodeId.slice('s:'.length));
 const nameOf = (candidate: Node) => (candidate.type === 'state' ? (candidate.data as StateNodeData).name : 'Any state');
 
-function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
+function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void; fullScreen?: CornerFullScreen | null }) {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
   const draft = useDraft();
@@ -89,7 +91,7 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
   const { altDown, arrow, selectKey } = useCanvasKeys();
   const live = useRef({ nodes: working.nodes });
   live.current = { nodes: working.nodes };
-  useCanvasApi(props.onReady, live);
+  useCanvasApi(props.onReady, live, FIT_OPTIONS);
 
   const clearOverlays = useCallback(() => {
     setGuides(NO_GUIDES);
@@ -251,7 +253,7 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
         <Background />
         <CanvasOverlays guides={guides} outline={outline} />
         <Panel position="bottom-left">
-          {/* G-9 T4: Tidy sits beside Fit to screen; it renders nothing for a viewer. */}
+          {/* G-9 T4: Tidy sits beside Fit to screen; it renders nothing for a viewer. T5: Full screen too, for every role. */}
           <div className="gn-workflow-canvas__corner">
             <button
               type="button"
@@ -261,6 +263,11 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
               Fit to screen
             </button>
             <TidyControl sizes={() => measuredSizes(getNodes())} />
+            {props.fullScreen ? (
+              <button type="button" ref={props.fullScreen.buttonRef} className="gn-workflow-canvas__fit" onClick={props.fullScreen.onEnter}>
+                Full screen
+              </button>
+            ) : null}
           </div>
         </Panel>
       </ReactFlow>
@@ -271,10 +278,10 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
   );
 }
 
-export function WorkflowCanvas(props: { onReady?: (api: CanvasApi | null) => void }) {
+export function WorkflowCanvas(props: { onReady?: (api: CanvasApi | null) => void; fullScreen?: CornerFullScreen | null }) {
   return (
     <ReactFlowProvider>
-      <CanvasInner onReady={props.onReady} />
+      <CanvasInner onReady={props.onReady} fullScreen={props.fullScreen} />
     </ReactFlowProvider>
   );
 }

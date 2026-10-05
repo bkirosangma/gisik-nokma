@@ -190,7 +190,11 @@ describe('25.547 the floating toolbar: its order, the validator\'s count, and th
       expect(found[at]!.compareDocumentPosition(found[at + 1]!) & Node.DOCUMENT_POSITION_FOLLOWING, `${names[at]} before ${names[at + 1]}`).toBeTruthy();
     }
     const zoom = within(row).getByRole('group', { name: 'Zoom' });
-    expect(within(zoom).getAllByRole('button').map((button) => button.textContent)).toEqual(['Zoom out', 'Zoom in', 'Fit to screen']);
+    const zoomButtons = within(zoom).getAllByRole('button');
+    expect(zoomButtons).toHaveLength(3);
+    expect(zoomButtons[0]).toHaveAccessibleName('Zoom out');
+    expect(zoomButtons[1]).toHaveAccessibleName('Zoom in');
+    expect(zoomButtons[2]).toHaveAccessibleName('Fit to screen');
     expect(within(row).queryByRole('button', { name: 'More' })).toBeNull();
   });
 
