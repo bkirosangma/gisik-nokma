@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AttentionShow } from '@gisik-nokma/domain';
 import type { DataSource } from '../data-source.js';
-import type { AttentionShow } from '../my-work-global-contract.js';
 import type { AttentionItem, MyWorkView, WorkspaceRef } from '../view-types.js';
 import { showForWorkspace } from './my-work-global.js';
 import { scheduleReload, subscribeReloads } from './reload-scheduler.js';

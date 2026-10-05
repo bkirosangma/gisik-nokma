@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AttentionShow } from '../../src/my-work-global-contract.js';
+import type { AttentionShow } from '@gisik-nokma/domain';
 import type { AttentionItem, MyWorkView, WorkItem, WorkspaceRef } from '../../src/view-types.js';
 import { useGlobalMyWork } from '../../src/views/use-global-my-work.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';

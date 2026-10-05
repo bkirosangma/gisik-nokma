@@ -1,4 +1,4 @@
-import type { AttentionShow } from '../my-work-global-contract.js';
+import { ATTENTION_SHOW_VALUES, type AttentionShow } from '@gisik-nokma/domain';
 import type { WorkspaceRef } from '../view-types.js';
 
 /**
@@ -14,9 +14,6 @@ export interface WorkspaceGroup<T> {
 
 /** What a project nobody named for this viewer is called — never its id (case 30.023). */
 export const UNKNOWN_PROJECT_NAME = 'Unknown project';
-
-/** The one order every `show` list is written in, whatever order it was selected in. */
-const SHOW_ORDER: readonly AttentionShow[] = ['created', 'assigned', 'ws-admin', 'project-admin'];
 
 const byName = (a: string, b: string): number => a.localeCompare(b, 'en', { sensitivity: 'base' });
 
@@ -87,7 +84,7 @@ const runsAProject = (workspace: WorkspaceRef): boolean => (workspace.adminProje
  */
 export function showOptionsFor(workspaces: readonly WorkspaceRef[]): AttentionShow[] {
   const live = workspaces.filter((workspace) => !workspace.archived);
-  return SHOW_ORDER.filter(
+  return ATTENTION_SHOW_VALUES.filter(
     (value) =>
       value === 'created' ||
       value === 'assigned' ||
@@ -102,11 +99,12 @@ export function showOptionsFor(workspaces: readonly WorkspaceRef[]): AttentionSh
  * it — the attention route refuses either elsewhere (400 `invalid_query`), and a refusal
  * there would blank a workspace whose created/assigned tickets the viewer did ask for.
  *
- * Canonical order and no repeats, so one selection always produces one request URL. An
- * empty answer means the workspace has nothing to be asked, and is skipped.
+ * Canonical order (`ATTENTION_SHOW_VALUES`, the domain's one spelling of the set) and no
+ * repeats, so one selection always produces one request URL. An empty answer means the
+ * workspace has nothing to be asked, and is skipped.
  */
 export function showForWorkspace(workspace: WorkspaceRef, show: readonly AttentionShow[]): AttentionShow[] {
-  return SHOW_ORDER.filter(
+  return ATTENTION_SHOW_VALUES.filter(
     (value) =>
       show.includes(value) &&
       (value === 'created' ||

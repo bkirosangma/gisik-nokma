@@ -1,5 +1,5 @@
 import { useId, useRef, type KeyboardEvent } from 'react';
-import type { AttentionShow, MyWorkPreferences } from '../my-work-global-contract.js';
+import type { AttentionShow, MyWorkPreferences } from '@gisik-nokma/domain';
 
 /**
  * The two controls above the global My work page (my-work-global T3, spec D4): the

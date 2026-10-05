@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { AttentionShow } from '../../src/my-work-global-contract.js';
+import type { AttentionShow } from '@gisik-nokma/domain';
 import { GroupToggle, SHOW_LABELS, ShowFilter } from '../../src/views/my-work-controls.js';
 
 /**

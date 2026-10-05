@@ -14,7 +14,7 @@ import type {
 // twinned in `packages/editor`); re-declaring it here would be the second
 // spelling of one contract that `attachment-list.tsx`'s own docblock forbids.
 import type { AttachmentListEntry } from './views/attachment-list.js';
-import type { AttentionShow, MyWorkPreferences } from './my-work-global-contract.js';
+import type { AttentionShow, MyWorkPreferences } from '@gisik-nokma/domain';
 import type { TicketComment } from './views/comments-thread.js';
 // The note read models come straight from the DOMAIN, not from a view type
 // here: `NoteSummary` and its siblings describe the wire body the routes send

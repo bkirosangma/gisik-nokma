@@ -1,5 +1,5 @@
 import type { GroupRow } from '@gisik-nokma/domain';
-import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
+import { ATTENTION_SHOW_VALUES, isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
   DeletedItem,
@@ -62,7 +62,7 @@ import { memberLabel } from '../member-label.js';
 // The list entry union lives with the component that renders it; see the note
 // on the same import in `../data-source.ts`. Type-only, so no runtime edge.
 import type { AttachmentListEntry } from '../views/attachment-list.js';
-import type { AttentionShow, MyWorkPreferences } from '../my-work-global-contract.js';
+import type { MyWorkPreferences } from '@gisik-nokma/domain';
 // The comment view type lives with its component for the same reason, and the
 // same type-only import keeps the dependency erased at runtime.
 import type { TicketComment } from '../views/comments-thread.js';
@@ -1252,9 +1252,6 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
   return spec;
 }
 
-/** The `show` values the attention route accepts, in their one order (my-work-global T1's `ATTENTION_SHOW_VALUES`). */
-const MY_WORK_SHOW_VALUES: readonly AttentionShow[] = ['created', 'assigned', 'ws-admin', 'project-admin'];
-
 /**
  * `GET`/`PUT /v1/me/my-work-preferences` → `MyWorkPreferences` (my-work-global T3).
  *
@@ -1269,8 +1266,8 @@ export function mapMyWorkPreferences(raw: unknown): MyWorkPreferences {
   const show = asArray(record['show'], 'myWorkPreferences.show').map((value, index) => {
     const path = `myWorkPreferences.show[${index}]`;
     const text = asString(value, path);
-    const known = MY_WORK_SHOW_VALUES.find((candidate) => candidate === text);
-    if (known === undefined) throw new MappingError(path, MY_WORK_SHOW_VALUES.join('/'));
+    const known = ATTENTION_SHOW_VALUES.find((candidate) => candidate === text);
+    if (known === undefined) throw new MappingError(path, ATTENTION_SHOW_VALUES.join('/'));
     return known;
   });
   const grouping = asString(record['grouping'], 'myWorkPreferences.grouping');
