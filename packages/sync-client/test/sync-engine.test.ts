@@ -3191,9 +3191,9 @@ describe('29.430-29.436 the workspace bootstrap retries a transient failure', ()
     expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
   });
 
-  it('29.433 a 429 (rate limited: the bootstrap shares the events: bucket) is retried on the same backoff, subscribed after exactly one 1 s wait; control: a 403, a 404 and the 428/430 either side of 429 surface with zero retries', async () => {
+  it('29.433 a 429 (rate limited: the bootstrap shares the events: bucket) is retried on the same backoff, subscribed after exactly one 1 s wait; control: a 403, a 404, the 428/430 either side of 429 and a 499 (the edge below 500) surface with zero retries', async () => {
     // CONTROL first: every other 4xx is still the server's word, and asking again gets the same one.
-    for (const status of [403, 404, 428, 430]) {
+    for (const status of [403, 404, 428, 430, 499]) {
       const { engine, script } = await retryRig([status]);
       const run = begin(engine);
       await drain();
@@ -3426,6 +3426,21 @@ describe('29.430-29.436 the workspace bootstrap retries a transient failure', ()
         expect(script.subscribes, label).toEqual([{ afterSeq: 7 }]);
         engine.stop();
       }
+
+      // A bare `stop()` in the same window (no newer call): the call resumes and opens nothing. The guard's
+      // `!stopped` clause and `subscribe()`'s own check each cover it alone, so only this leg pins the pair (P44, reviewer A).
+      const label = `${where}, stop only`;
+      const { engine, script, release } = await gatedRig(where);
+      const first = begin(engine);
+      await drain();
+      expect(first.state.settled, label).toBe(false);
+      engine.stop();
+      release();
+      await drain();
+      expect(first.state.settled, label).toBe(true);
+      expect(first.state.error, label).toBeUndefined();
+      expect(script.bootstraps, label).toBe(where === 'load' ? 1 : 0);
+      expect(script.subscribes, label).toEqual([]);
     }
   });
 });
