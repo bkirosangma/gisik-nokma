@@ -22,8 +22,10 @@ import { signInWithPhone } from '../helpers/session.js';
  * 2026-10-04, report Q1): every member is on every founded project (`effective-role.ts:5-19`), so S1 = {TP, nProject,
  * nWorkspace} is read by every non-guest, `memberOut` included. S2 = {nWorkspace, nExplicit, TE} is read by the owner
  * alone (TE and nExplicit are explicit `[guestListed]`, nExplicit's author arm admits `author`, and `guestListed` does
- * not read nWorkspace). Everything is seeded with `applyCommitted` before the one describe that writes through the
- * door (27.496, last): a door write takes the ledger's next seqs.
+ * not read nWorkspace). S4 = {TE, nWorkspace, nProject} hides exactly ONE item (TE) from `memberIn`; the two door cases
+ * write it and remove it inside their own `it` (`withS4`), so no other case's exact list holds it. Everything is seeded
+ * with `applyCommitted` before the one describe that writes through the door (27.496, last): a door write takes the
+ * ledger's next seqs.
  */
 type Who = NotesUser | 'outsider';
 let db: TestDatabase;
@@ -37,6 +39,7 @@ const GUEST = { refused: true, rule: 'permission.concept', reason: 'Guests can r
 // S2's id sorts BEFORE S1's and its score is lower, so "highest score first" and "id order" disagree.
 const [S2, S1] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
 const S3 = newUlid();
+const S4 = newUlid(); // ONE item hidden from memberIn; written and removed inside a door `it` (`withS4`)
 const SF = newUlid(); // a suggestion of ANOTHER workspace
 const FW = newUlid();
 const TX = newUlid();
@@ -74,6 +77,23 @@ const reject = (who: NotesUser, signature: string, itemHashes: string[]) =>
   gate(who, { kind: 'workspace', id: world.WS }, 'workspace.concept_suggestion_rejected', { signature, itemHashes });
 const createFrom = (who: NotesUser, fromSuggestion: string) =>
   gate(who, { kind: 'concept', id: newUlid() }, 'concept.created', { name: 'From a suggestion', fromSuggestion });
+/**
+ * S4 = {TE, nWorkspace, nProject}: `memberIn` reads both notes (Rule A) and not TE, so S4 hides EXACTLY one item from
+ * it, which no other row does (S2 hides two). The row lives only inside the calling `it`: the other cases' lists are
+ * exact, and S4's items are the equal-scores case's first set (a signature is unique per workspace). The control runs
+ * before any leg, so a leg can never quietly test a row that hides two.
+ */
+async function withS4(legs: (row: Cached) => Promise<void>): Promise<void> {
+  const row = await cache(S4, [{ kind: 'ticket', id: world.TE }, { kind: 'note', id: world.NOTES.nWorkspace }, { kind: 'note', id: world.NOTES.nProject }], 0.2, 'i:mixed');
+  try {
+    const eff = await resolveEffectiveRole(db.pool, world.ids.memberIn, world.WS);
+    const hidden = await hiddenItems(db.pool, eff, world.ids.memberIn, world.WS, row.keys.map(parseItemKey));
+    expect(hidden, 'control: S4 hides exactly one item (TE) from memberIn').toEqual([{ kind: 'ticket', id: world.TE }]);
+    await legs(row);
+  } finally {
+    expect((await db.pool.query('DELETE FROM sem_suggestions WHERE id = $1', [S4])).rowCount, 'S4 is removed before the it ends').toBe(1);
+  }
+}
 
 beforeAll(async () => {
   db = await createTestDatabase();
@@ -144,7 +164,7 @@ describe('27.492 the suggestions read is D4 per reader', () => {
 });
 
 describe('27.493 the rejection door', () => {
-  it('27.493 memberIn may reject S1 and not S2 (as a made-up signature, or another workspace’s), nor S1 with S2’s hashes; the owner may reject S2; a guest is refused permission.concept', async () => {
+  it('27.493 memberIn may reject S1 and not S2 (as a made-up signature, or another workspace’s), nor S1 with S2’s hashes, nor S4, which hides ONE item from memberIn; the owner may reject S2 and S4; a guest is refused permission.concept', async () => {
     expect(await reject('memberIn', cached.S1.signature, cached.S1.itemHashes)).toBeNull();
     expect(await reject('memberIn', cached.S1.signature, [...cached.S1.itemHashes].reverse())).toBeNull(); // any order
     expect(await reject('memberIn', cached.S2.signature, cached.S2.itemHashes)).toEqual(UNKNOWN);
@@ -153,16 +173,24 @@ describe('27.493 the rejection door', () => {
     expect(await reject('memberIn', cached.SF.signature, cached.SF.itemHashes)).toEqual(UNKNOWN); // another workspace's
     expect(await reject('owner', cached.S2.signature, cached.S2.itemHashes)).toBeNull();
     expect(await reject('guestListed', cached.S1.signature, cached.S1.itemHashes)).toEqual(GUEST);
+    await withS4(async (s4) => {
+      expect(await reject('memberIn', s4.signature, s4.itemHashes)).toEqual(UNKNOWN); // one hidden item is enough
+      expect(await reject('owner', s4.signature, s4.itemHashes)).toBeNull();
+    });
   });
 });
 
 describe('27.495 concept.created { fromSuggestion } at the door', () => {
-  it('27.495 a random id and another workspace’s suggestion are unknown; S1 is admitted for memberIn; S2 is unknown to memberIn and admitted for the owner', async () => {
+  it('27.495 a random id and another workspace’s suggestion are unknown; S1 is admitted for memberIn; S2, and S4 (ONE item hidden), are unknown to memberIn and admitted for the owner', async () => {
     expect(await createFrom('memberIn', newUlid())).toEqual(UNKNOWN);
     expect(await createFrom('memberIn', SF)).toEqual(UNKNOWN);
     expect(await createFrom('memberIn', S1)).toBeNull();
     expect(await createFrom('memberIn', S2)).toEqual(UNKNOWN);
     expect(await createFrom('owner', S2)).toBeNull();
+    await withS4(async () => {
+      expect(await createFrom('memberIn', S4)).toEqual(UNKNOWN); // one hidden item is enough
+      expect(await createFrom('owner', S4)).toBeNull();
+    });
     // Control: without `fromSuggestion` the same create is admitted.
     expect(await gate('memberIn', { kind: 'concept', id: newUlid() }, 'concept.created', { name: 'Plain' })).toBeNull();
   });

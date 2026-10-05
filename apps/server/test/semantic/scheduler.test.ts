@@ -14,8 +14,9 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
  * Knowledge Graph spec D §4.1 "When it runs" (KG-D Task 5), case 27.491 (`test-cases/27-knowledge-graph.md` §27.D):
- * the 200-change trigger and its debounce on fake timers, the nightly tick against a real database, and the app's
- * commit-feed listener that feeds `change`. The job itself is a spy here (`job.test.ts` owns what it writes).
+ * the 200-change trigger and its debounce on fake timers, the nightly tick against a real database, the hourly
+ * interval that fires that tick (only `setInterval` faked, the database real), and the app's commit-feed listener that
+ * feeds `change`. The job itself is a spy here (`job.test.ts` owns what it writes).
  */
 const MIN = 60 * 1000;
 const NOON_IST = new Date('2026-10-06T06:30:00Z'); // 12:00 IST: the hourly tick, if reached, returns before any query
@@ -223,6 +224,47 @@ describe('27.491 the nightly tick and the commit feed', () => {
       expect(changed, 'control: a transition is no embedding change').toEqual([A, A]);
     } finally {
       await app.close();
+    }
+  });
+
+  // LAST in this describe: no later `it` reads `sem_job_state`.
+  it('27.491 the hourly interval itself fires the nightly run: at 02:10 IST on a date with no state row, nothing after 59 minutes (the clock unread), every live workspace once after 60', async () => {
+    const NIGHT = new Date('2026-10-07T20:40:00Z'); // 02:10 IST on 2026-10-08, a date no earlier `it` reaches
+    expect(istClock(NIGHT)).toEqual({ date: '2026-10-08', hour: 2 });
+    const ahead = await db.pool.query('SELECT workspace_id FROM sem_job_state WHERE last_nightly_ist_date >= $1::date', ['2026-10-08']);
+    expect(ahead.rows, 'control: no workspace has its state on or after this date').toEqual([]);
+    const runs: string[] = [];
+    const logs: string[] = [];
+    let clockReads = 0;
+    // Only the interval is faked: it is the code under test, and the pool's own timers and sockets stay real.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let scheduler: ReturnType<typeof startSuggestionScheduler> | undefined;
+    try {
+      scheduler = startSuggestionScheduler(db.pool, {
+        runJob: spyJob(runs),
+        now: () => {
+          clockReads += 1;
+          return NIGHT;
+        },
+        log: (msg) => logs.push(msg),
+      });
+      await vi.advanceTimersByTimeAsync(59 * MIN);
+      expect(runs).toEqual([]);
+      expect(clockReads, 'no tick has started (a tick reads the clock first)').toBe(0);
+      await vi.advanceTimersByTimeAsync(1 * MIN);
+      // The tick's LAST write is the due workspaces' state rows: once all four carry this date, it has settled.
+      await vi.waitFor(
+        async () => {
+          const settled = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM sem_job_state WHERE last_nightly_ist_date = $1::date', ['2026-10-08']);
+          expect(settled.rows[0]?.n, `the interval's tick ran every live workspace (logs: ${logs.join('; ')})`).toBe(4);
+        },
+        { timeout: 10_000, interval: 20 },
+      );
+      expect([...runs].sort()).toEqual([A, B, E, F]);
+      expect(logs).toEqual([]);
+    } finally {
+      scheduler?.stop();
+      vi.useRealTimers();
     }
   });
 });

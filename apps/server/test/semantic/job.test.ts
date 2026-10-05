@@ -138,7 +138,7 @@ describe('27.485 the rejection projection and the three tables', () => {
 });
 
 describe('27.487 the job never clusters across audiences', () => {
-  it('27.487 identical vectors in two audiences give two rows, an inherit note follows its unembedded ticket, dead items are none; control: one audience gives one row', async () => {
+  it('27.487 identical vectors in two audiences give two rows, an inherit note follows its unembedded ticket, dead items are none (a ticket in a deleted project too); control: one audience gives one row', async () => {
     await clearCache();
     const W = await newTickets(4, 'workspace');
     const E = await newTickets(4, 'owner');
@@ -146,6 +146,8 @@ describe('27.487 the job never clusters across audiences', () => {
     const [TU] = (await newTickets(1, 'owner')) as [string];
     const [WT] = await newTickets(1, 'workspace'); // trashed below: its chunks stay, it is no item
     const [WE] = await newTickets(1, 'workspace'); // its only chunk is empty text: no item
+    const P2 = newUlid(); // a SECOND project of this workspace, deleted below
+    const DP = newUlid(); // live, workspace-audience, in P2: "a ticket in a deleted project" is no item, though its chunks stay
     const N = newUlid();
     const ND = newUlid(); // a deleted workspace note: no item
     const other = newUlid();
@@ -177,9 +179,14 @@ describe('27.487 the job never clusters across audiences', () => {
       makeCommitted({ workspaceId: other, actorId: world.ids.owner, entity: { kind: 'ticket', id: TX }, type: 'ticket.created', payload: { typeId: 'task', projectId: newUlid(), parentId: null, title: 'Elsewhere' } }),
       makeCommitted({ workspaceId: other, actorId: world.ids.owner, entity: { kind: 'ticket', id: TX }, type: 'visibility.set', payload: { ticketId: TX, mode: 'workspace' } }),
       makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'ticket', id: WT as string }, type: 'ticket.deleted', payload: {} }),
+      // P2's ticket DP, then P2's deletion. The embed worker drops a TRASHED ticket's chunks only, so DP keeps its own.
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'project', id: P2 }, type: 'project.created', payload: { name: 'Closed branch' } }),
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'ticket', id: DP }, type: 'ticket.created', payload: { typeId: 'task', projectId: P2, parentId: null, title: 'In a deleted project' } }),
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'ticket', id: DP }, type: 'visibility.set', payload: { ticketId: DP, mode: 'workspace' } }),
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'project', id: P2 }, type: 'project.deleted', payload: {} }),
     ]);
     const text = 'licence renewal permit';
-    for (const id of [...W, ...E, WT as string]) await chunkTicket(id, basis(0), text);
+    for (const id of [...W, ...E, WT as string, DP]) await chunkTicket(id, basis(0), text);
     await chunkTicket(WE as string, basis(0), '');
     await chunkNote(N, basis(0), text);
     await chunkNote(ND, basis(0), text);
@@ -190,9 +197,14 @@ describe('27.487 the job never clusters across audiences', () => {
     expect((await db.pool.query('SELECT 1 FROM proj_notes WHERE note_id = $1', [NX])).rows).toHaveLength(1);
     // TX is live with an audience row: only the job's two workspace clauses (its chunks, its audience map) keep it out.
     expect((await db.pool.query(`SELECT v.resolved_mode FROM proj_tickets t JOIN proj_visibility v ON v.ticket_id = t.ticket_id WHERE t.ticket_id = $1 AND t.deleted_at IS NULL`, [TX])).rows).toEqual([{ resolved_mode: 'workspace' }]);
+    // DP is NOT trashed and has W's audience; only its project is deleted. So the deleted-PROJECT clause of the job's
+    // live-ticket filter keeps it out, not the trash clause.
+    expect((await db.pool.query(`SELECT v.resolved_mode FROM proj_tickets t JOIN proj_visibility v ON v.ticket_id = t.ticket_id WHERE t.ticket_id = $1 AND t.deleted_at IS NULL`, [DP])).rows).toEqual([{ resolved_mode: 'workspace' }]);
+    expect((await db.pool.query('SELECT 1 FROM proj_projects WHERE project_id = $1 AND deleted_at IS NOT NULL', [P2])).rows).toHaveLength(1);
 
     await runSuggestionJob(db.pool, world.WS);
     const rows = await suggestionRows();
+    expect(rows.map((row) => sorted(row.item_id)), 'DP, a ticket in a deleted project, is in no row').toEqual([sorted([...E, N]), sorted(W)]);
     expect(rows).toHaveLength(2);
     expect(rows.map((row) => row.partition_key)).toEqual([`e:${world.ids.owner}`, 'w']);
     const [ownerRow, workspaceRow] = rows as [Row, Row];
