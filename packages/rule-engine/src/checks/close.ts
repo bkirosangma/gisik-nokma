@@ -35,6 +35,11 @@ import { ACCEPT, refuse } from './refusals.js';
  * move together — E6-4 (soft-deleted children) is the change that will move
  * them.
  *
+ * And closing a Decision needs its outcome (wtg2 T6, spec DC-5): a Decision with at least one branch (an outgoing
+ * `leads_to`) and no outcome is refused `decision.outcome-required`, after the open-child count, through
+ * `decisionOutcomeRequired` (`checks/decision.ts`), the same function the transition door and the client mirror call.
+ * The auto-close sweep's SELECT mirrors this refusal too.
+ *
  * Same shape as every other check's entity-kind guard (`transition.ts:42-48`,
  * `workflow-rebind.ts:44-50`, `fields.ts:90-96`): a misfiled kind is a
  * malformed claim and is REFUSED, naming the kind it actually points at — it
