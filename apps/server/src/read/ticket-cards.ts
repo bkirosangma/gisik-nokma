@@ -218,16 +218,20 @@ export async function assembleTicketCards(
   return cards;
 }
 
-function titleOf(row: ProjTicketRow): string {
+/**
+ * A row's title claim, or a throw naming the ticket: `assembleTicketCards` and the Workflow graph's facts loader
+ * (`flow/flow-facts.ts` `loadFlowFacts`) both print it, so the messages name this function, not either caller.
+ */
+export function titleOf(row: ProjTicketRow): string {
   const claim = row.fields['title'];
   if (claim === undefined) {
     throw new Error(
-      `assembleTicketCards: no title claim on ticket ${row.ticket_id} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
+      `titleOf: no title claim on ticket ${row.ticket_id} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
     );
   }
   if (typeof claim.value !== 'string') {
     throw new Error(
-      `assembleTicketCards: the title claim on ticket ${row.ticket_id} is not a string — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
+      `titleOf: the title claim on ticket ${row.ticket_id} is not a string — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
     );
   }
   return claim.value;

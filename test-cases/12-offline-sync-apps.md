@@ -1392,10 +1392,14 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   `{status:'offline', queued:0, failed:0}` before, `{status:'offline', queued:2, failed:0}` after two
   accepted claims. This is one of the two channels ruling P30 names for accepted-for-now, and the case
   measures it moving rather than existing.
-- 12.185 ✅ **NINE methods refuse, enumerated by id rather than counted**, and the enumeration is
-  compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift:
-  `getMyWorkspaces`, `getMembers`, `getTicketAttachments`, `search`, `getMyWork`, `getAttention`,
-  `getWorkspaceSettings`, `getPreferences`, `putPreferences`. **⚠ CORRECTED 2026-09-20, and the count
+- 12.185 ✅ **The methods that refuse, enumerated by id rather than counted**, and the enumeration is
+  compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift, in that
+  registry's key order:
+  `getMyWorkspaces`, `getGroups`, `getDeletedItems`, `getMembers`, `getTicketAttachments`, `getTicketComments`, `search`, `searchNotes`, `getMyWork`, `getAttention`, `getFlow`, `getWorkspaceSettings`, `getPreferences`, `putPreferences`, `getLinkedFrom`. **⚠ CORRECTED 2026-10-05 (the Workflow graph, Part 3 T3, which added `getFlow`): this
+  read "NINE methods refuse" and listed nine, while the test's own title said FOURTEEN: `getGroups`,
+  `getDeletedItems`, `getTicketComments`, `searchNotes` and `getLinkedFrom` had joined the registry
+  without joining this line. The count is gone from the line and from the test's title; the list is the
+  claim.** **⚠ CORRECTED 2026-09-20, and the count
   was wrong in BOTH halves rather than late by one:** this read "SEVEN methods refuse" and listed
   seven — `getWorkspaceSettings` has been in the registry since second wave Task 6 and had never been
   added to the list here, and `getTicketAttachments` joined it with the attachments read. **The number
@@ -1417,8 +1421,9 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   `apps/server/test/integration/client-contract.test.ts` measures each against a real `/v1` body, and a
   REPLICA absence has no route to measure — feeding one into `SERVING_GAPS` would either break that
   suite or pass vacuously through a `wireRoute: null`, which is a check that cannot fail wearing the
-  costume of one that can. Every `owner` is checked to start with `Plan 10 — `, i.e. to name something
-  the CLIENT would have to change. And the two methods that do NOT refuse are named beside them
+  costume of one that can. Every `owner` is checked to start with a named plan and `: ` (`Plan 10`, `Plan 2 of the notes series`,
+  `Trash series Plan 3`, `Prefixes and groups plan`, `Knowledge Graph spec [A-E]`, `Workflow graph plan`),
+  i.e. to name something the CLIENT would have to change. And the two methods that do NOT refuse are named beside them
   (`getTicketTypes`, `getTicketHistory`), because a refusal list is only evidence next to the list of
   what answers.
 - 12.186 ✅ **`subscribe` hands its callback a real `ServerStreamFrame` — the kind `useLiveQuery` acts on.** *(Written as `StreamItem`; closure 3 deleted that duplicate and the client now re-exports the domain union.)*

@@ -33,7 +33,7 @@ export type FlowRead = {
 
 export type FlowWalk = {
   read: FlowRead;
-  /** The folded state of each returned node, for the route's titles and keys. */
+  /** The folded state of each returned node. Nothing reads it, `stateNames` or `blocks` since wtg3 T3 retired the route's small wire (the route serves `readFlowView`, whose facts come from `loadFlowFacts`). */
   states: Map<string, TicketState>;
   /** The display name of each node's current state, in the workflow version the ticket is folded to. */
   stateNames: Map<string, string>;

@@ -489,7 +489,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 27.141 FOURTEEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 27.141 29.245 the methods that refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -529,6 +529,9 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['searchNotes', () => ds.query.searchNotes(WS, 'x', { mode: 'lexical' })],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
+      // Added by the Workflow graph (Part 3 T3, case 29.245), directly under `getAttention` because REPLICA_GAPS gained
+      // the key there: a flow is a walk over tickets, a roster, attachment counts and notes this device does not hold.
+      ['getFlow', () => ds.query.getFlow(WS, newUlid())],
       // Added by second wave Task 6. This list is enumerated rather than
       // counted, and it is compared against `Object.keys(REPLICA_GAPS)` below,
       // so adding the method to the replica WITHOUT adding it here reddens this
@@ -567,9 +570,9 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         // property this line holds is that the owner is a NAMED plan the client
         // must change — widening the set to the plans that will actually do the
         // work keeps the property; hard-coding any one of them would have made
-        // the sentence false for the others. Prefixes and groups Task 7 added the FOURTH, for `getGroups`. The Knowledge Graph series (specs A–E) added the FIFTH, naming the spec letter that does the work.
+        // the sentence false for the others. Prefixes and groups Task 7 added the FOURTH, for `getGroups`. The Knowledge Graph series (specs A–E) added the FIFTH, naming the spec letter that does the work. The Workflow graph (Part 3 T3) added the SIXTH, for `getFlow`.
         expect(absence.owner, `${name}: ${absence.field}`).toMatch(
-          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan|Knowledge Graph spec [A-E]): /,
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan|Knowledge Graph spec [A-E]|Workflow graph plan): /,
         );
       }
       names.push(name);

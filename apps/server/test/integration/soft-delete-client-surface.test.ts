@@ -499,6 +499,7 @@ type AbsenceDecision =
   // Drafts T8 (28.151): the caller's own drafts.
   | 'getMyDrafts'
   | 'getAttention'
+  | 'getFlow'
   | 'getWorkspaceSettings'
   | 'getPreferences'
   | 'putPreferences'
@@ -674,6 +675,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     why: 'drafts T8: lists only the caller\'s own unpublished drafts, and a draft cannot be deleted (R7: `ticket.deleted` on a draft is refused `draft.not-allowed`), so the published, soft-deleted ticket this file plants can never reach it',
   },
   getAttention: { verdict: 'excluded', carries: true },
+  getFlow: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'the flow route refuses a deleted seed with the shared liveness guard (`ticketIsLive`, routes/flow.ts), and the walk reads live tickets only: a deleted ticket is a hole in a flow, never a node',
+  },
   getWorkspaceSettings: { verdict: 'excluded', carries: false },
   getPreferences: { verdict: 'excluded', carries: false },
   putPreferences: {
@@ -794,6 +800,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getMyWork: () => ds.getMyWork(workspaceId),
     getMyDrafts: () => ds.getMyDrafts(workspaceId),
     getAttention: () => ds.getAttention(workspaceId),
+    getFlow: () => ds.getFlow(workspaceId, childId),
     getWorkspaceSettings: () => ds.getWorkspaceSettings(workspaceId),
     getPreferences: () => ds.getPreferences(workspaceId),
     putPreferences: async () => ds.putPreferences(workspaceId, await ds.getPreferences(workspaceId)),
@@ -838,7 +845,9 @@ async function walkAll(): Promise<Map<AbsenceDecision, string>> {
   // draw the same nothing for "this ticket has no files" and "we could not read
   // them"). The throw killed this `beforeAll`, and the four cases below it
   // reported as SKIPPED — a green-looking suite that says nothing, which is the
-  // failure this file's own docblock warns about.
+  // failure this file's own docblock warns about. `getFlow` (Workflow graph, Part 3
+  // T3) is the second: its route refuses a deleted seed, and the client re-raises
+  // the 404 as `getBoard` does, so it too is in `MAY_REFUSE`.
   //
   // A refusal is not a leak: it is the strongest form of absence, so it is
   // RECORDED as its own reading rather than crashing the hook. The tolerance is
@@ -872,7 +881,7 @@ const REFUSED_PREFIX = 'REFUSED ';
  * `null`, so it still answers, and a `REFUSED` from it would be a change in the
  * client rather than the server.
  */
-const MAY_REFUSE: AbsenceDecision[] = ['getTicketAttachments'];
+const MAY_REFUSE: AbsenceDecision[] = ['getTicketAttachments', 'getFlow'];
 
 const MEMBERS = Object.keys(DECIDED) as AbsenceDecision[];
 const CARRIERS = MEMBERS.filter((key) => DECIDED[key].carries);
@@ -890,8 +899,8 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
   // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
   // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`; 30 until drafts T8 added
-  // `getMyDrafts`.
-  expect(MEMBERS).toHaveLength(31);
+  // `getMyDrafts`; 31 until the Workflow graph (Part 3 T3) added `getFlow`.
+  expect(MEMBERS).toHaveLength(32);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

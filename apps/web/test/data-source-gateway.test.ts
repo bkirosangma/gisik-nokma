@@ -64,6 +64,7 @@ function fakeDataSource(overrides: Partial<DataSource['query']> = {}) {
       search: unstubbed('search'),
       getMyWork: unstubbed('getMyWork'),
       getAttention: unstubbed('getAttention'),
+      getFlow: unstubbed('getFlow'),
       getPreferences: unstubbed('getPreferences'),
       putPreferences: unstubbed('putPreferences'),
       ...overrides,

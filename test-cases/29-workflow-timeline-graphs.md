@@ -263,6 +263,41 @@ Plan `docs/superpowers/plans/2026-10-03-wtg-part2-model.md`; spec `docs/superpow
 <!-- wtg-part2-model T19 -->
 
 <!-- wtg-part3-workflow-graph -->
+## 29.3 Part 3 — The Workflow graph (29.230–29.289)
+
+Plan `docs/superpowers/plans/2026-10-03-wtg-part3-workflow-graph.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md` §9–10. Ids tile 29.230–29.289: T1 230–233 · T2 234–239 · T3 240–245 · T4 246–250 · T5 251–254 · T6 255–259 · T7 260–262 · T8 263–266 · T9 267–269 · T10 270–275 · T11 276–279 · T12 280–289.
+
+<!-- wtg-part3-workflow-graph T1 -->
+
+<!-- wtg-part3-workflow-graph T2 -->
+
+<!-- wtg-part3-workflow-graph T3 -->
+- ✅ **29.240 — A Decision's other branches are named, and a flow's shape is stable:** a ticket on exactly one branch of a Decision names the other branches (outcome and first ticket); the Decision, the ticket before it, a loop target reached over a back edge only and the shared tail of a diamond get none; nodes arrive in flow order with starts, ends, a stable `flowId` (the smallest ticket id), `blocks` edges only between members, and a draft has no key; an unlabelled edge out of a Decision is no branch (never named as an alternate, and beside one label it makes no pair); control: a Decision with one forward label has no alternates, and a ticket with no card facts is a loud error, never a blank. Mutation: count a ticket on two branches as on one → reds.
+- ✅ **29.241 — A Decision's edges say which way it went:** a loop edge counts the passes whose FINAL outcome is its label (a revision replaces it), the chosen edge is full weight and the others are not, a source that is not a settled Decision has `chosen: null`; control: a pending Decision chooses none but keeps its history. Mutation: count the first outcome of a revised pass → reds.
+- ✅ **29.242 — The read carries the dates and the reasons:** periods and the actual span are IST days with an open period ending null and the 18:29:59Z / 18:30:00Z pair falling on different days; planned intervals keep pass, basis and `pruned`; the tray carries its reason; a Not-taken ticket keeps its resolution, and names its Decision only when the read holds that Decision (`decisionTicketId: null` for a hole, the outcome and pass kept: FL-1); notes and the pin counts pass through; control: a ticket the plan does not know has none of these. Mutation: slice the instant's date instead of `istDayOf` → reds.
+- ✅ **29.243 — A hidden ticket is a hole:** for a member who cannot see one ticket in the middle of a flow, the read has no node, no edge, no key and no count for it, and nothing behind it that is only reachable through it; the owner's read of the same seed has all of them; titles, keys, state names, assignee names, visible notes and pin counts match the rows; a note the viewer cannot read, a deleted note and a note homed in a deleted project are absent and uncounted (each listed while live, as the control); a block link with one hidden end is absent; the automatic moves are the flow actor's transitions with a flow cause, one per move (a reset's paired reopen is not a second), only for tickets in the read, newest first and at most 50, while a person's move, even one carrying a flow cause, is not one; the facts loader refuses a ticket whose workflow version or state is not published, by name; the facts, automatic-moves and notes loaders each keep to the path's workspace (another workspace's ticket passed in by id gets nothing, while its own workspace reads all three) and to the ids they are given (a ticket with no notes, asked alone, gets none); control: the number of queries is the same for a 6-ticket flow and a flow 34 tickets wider (one query per ring, FL-2; planner ruling 2026-10-04). Mutation: read nodes with `viewerId: null` → reds.
+- ✅ **29.244 — The route:** `GET /v1/workspaces/:ws/tickets/:id/flow` answers 401 with no session, a byte-identical 404 for a stranger, a neighbour workspace's owner, an unknown id, a deleted ticket and a ticket the viewer cannot see, and 200 `FlowRead` for a member; the author's own draft seeds a 200 read that holds it (`draft: true`, no key) while anyone else, the owner included, gets the same 404 for it (FL-1, planner ruling 2026-10-04); an own draft of ANOTHER workspace, and a published ticket the viewer sees there, each seed nothing through this workspace's path (the path's workspace is the liveness check's to hold, on both arms); control: the owner's 200 on the same URL, and the other workspace's path reading that draft and that ticket. Mutation: skip the `ticketAccess` refusal → reds.
+- ✅ **29.245 — `getFlow` is online only:** the online source returns the route's body through `mapFlow` (a body missing `nodes`, `edges`, `order` or `flowId` throws); a 404 comes back as `HttpError` 404, never as a mapping failure; the real route's body passes the real `mapFlow` unchanged (`client-contract.test.ts`); the soft-delete census lists `getFlow` as refusing a deleted seed; the replica rejects with `ReplicaGapError('getFlow', …)` and `getFlow` is a key of `REPLICA_GAPS`; control: a replica method that answers still resolves. Mutation: remove the key from `REPLICA_GAPS` → 12.185 reds.
+
+<!-- wtg-part3-workflow-graph T4 -->
+
+<!-- wtg-part3-workflow-graph T5 -->
+
+<!-- wtg-part3-workflow-graph T6 -->
+
+<!-- wtg-part3-workflow-graph T7 -->
+
+<!-- wtg-part3-workflow-graph T8 -->
+
+<!-- wtg-part3-workflow-graph T9 -->
+
+<!-- wtg-part3-workflow-graph T10 -->
+
+<!-- wtg-part3-workflow-graph T11 -->
+
+<!-- wtg-part3-workflow-graph T12 -->
+
+<!-- wtg-part3-workflow-graph end -->
 
 <!-- WTG4 -->
 
