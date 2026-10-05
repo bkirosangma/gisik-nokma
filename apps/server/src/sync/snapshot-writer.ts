@@ -2,12 +2,13 @@ import type { Pool, PoolClient } from 'pg';
 import {
   foldTicketEvent,
   TICKET_EVENT_TYPES,
+  TICKET_FOLD_VERSION,
   type TicketState,
   type TicketStateDeps,
 } from '@gisik-nokma/domain';
 import { readEntityEvents } from '../ledger/event-store.js';
-import { readLatestSnapshot, writeSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
-import { buildLedgerDeps } from './ledger-deps.js';
+import { overwriteSnapshot, readLatestSnapshot, writeSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
+import { buildLedgerDeps, memoizedDepsAsOfEvent, type DepsAsOfEvent } from './ledger-deps.js';
 
 const DEFAULT_MIN_EVENTS = 20;
 
@@ -21,12 +22,17 @@ const DEFAULT_MIN_EVENTS = 20;
  * snapshots primary key). The publish door must NOT skip: a publish moves no
  * ticket event, so `seq === previousSeq` is its ordinary case and re-stating
  * the head state under the new vocabulary is the whole job.
+ *
+ * `restated` (wtg2 T9): the latest snapshot was written by an older fold (`foldVersion` below `TICKET_FOLD_VERSION`),
+ * so this head is a FULL fold and `previousSeq` is 0. The write may land on the seq the stale row already holds, so
+ * the background pass writes a restated head with `overwriteSnapshot`.
  */
 export type FoldedTicketHead = {
   seq: number;
   state: TicketState;
   previousSeq: number;
   provenance: SnapshotProvenance | null;
+  restated: boolean;
 };
 
 /**
@@ -47,13 +53,30 @@ export type FoldedTicketHead = {
  * on: the pass hands the workspace's NEWEST definitions, the publish door hands
  * the definitions in force strictly below the publish. See
  * `ledger-deps.ts`'s `belowWorkspaceSeq` for why that difference exists.
+ *
+ * **The exception: a STALE snapshot (wtg2 T9).** A row whose `foldVersion` is
+ * below `TICKET_FOLD_VERSION` was written before a retroactive member (work
+ * periods) joined the state, so resuming from it would make every later fold
+ * wrong. It is as good as none for folding: the fold starts from event 1 (the
+ * tail read's `afterSeq` is 0), the provenance block is recomputed from the
+ * whole history, and each event is folded with the definitions in force AT it
+ * (`depsAsOfEvent`), never the caller's `deps`: a whole history can span a
+ * state-dropping publish that the caller's definitions cannot fold (planner
+ * ruling 2026-10-04, Q9). `asOf` is that resolver, memoized per definition
+ * change; the background pass shares one across the pass, any other caller
+ * gets a fresh one per call. Everything above about resuming holds for a
+ * current-version snapshot only.
  */
 export async function foldTicketHead(
   client: PoolClient,
   ticketId: string,
   deps: TicketStateDeps,
+  asOf: DepsAsOfEvent = memoizedDepsAsOfEvent(),
 ): Promise<FoldedTicketHead | null> {
-  const previous = await readLatestSnapshot(client, 'ticket', ticketId);
+  const stored = await readLatestSnapshot(client, 'ticket', ticketId);
+  // A snapshot written by an older fold is as good as none for FOLDING (wtg2 T9): see the docblock's exception.
+  const stale = stored !== null && stored.foldVersion < TICKET_FOLD_VERSION;
+  const previous = stale ? null : stored;
   // The bounded-replay claim, made structurally: the fold RESUMES from the
   // previous snapshot's state and reads only the tail past its seq. Folding
   // from event 1 would produce the same bytes and cost the whole history,
@@ -84,7 +107,7 @@ export async function foldTicketHead(
       // creation, and its redacted publish (drafts T2), produce no state
       // (spec §5.4), and the `state === undefined`
       // return below already means "nothing to snapshot".
-      state = foldTicketEvent(state, env, deps);
+      state = foldTicketEvent(state, env, stale ? await asOf(client, env) : deps);
     }
     // READ off the event row, never computed and never a neighbour's: these are
     // the two claims `TicketState` cannot carry. Every FIELD claim already
@@ -112,7 +135,7 @@ export async function foldTicketHead(
     stateClaim === null
       ? null
       : { state: stateClaim, assigned: state.assigneeId === null ? null : assignedClaim };
-  return { seq, state, previousSeq, provenance };
+  return { seq, state, previousSeq, provenance, restated: stale };
 }
 
 /**
@@ -184,7 +207,9 @@ type Due = { workspaceId: string; entityId: string };
  *   reader and a DELETE would buy nothing but a longer replay. See
  *   `snapshot-refresh.ts`.
  * - **`deps` here resolve the NEWEST definitions, and that is safe only because
- *   of the publish door.** `buildLedgerDeps` with no bound answers at the
+ *   of the publish door.** (A STALE snapshot is the exception: its restate
+ *   folds the whole history with the definitions in force at each event,
+ *   `memoizedDepsAsOfEvent`, planner ruling A of 2026-10-05 on Q9; see `foldTicketHead`.) `buildLedgerDeps` with no bound answers at the
  *   latest workflow version, so folding a tail that spans a state-dropping
  *   publish throws `applyTicketEvent: workflow "…" has no state "…"` — measured,
  *   not feared. What removes the span is `snapshot-refresh.ts`: every publish
@@ -205,7 +230,10 @@ type Due = { workspaceId: string; entityId: string };
  *   interval wrapper logs and swallows it whichever population it came from.
  * - **The whole due set is folded in one call, serially.** Bounded by the
  *   number of tickets that crossed the threshold since the last pass, not by
- *   ledger size, but nothing here yields between entities.
+ *   ledger size, but nothing here yields between entities. The exception is
+ *   the first pass after a `TICKET_FOLD_VERSION` bump (wtg2 T9): every
+ *   snapshotted ticket is stale then, so that pass restates ALL of them, each
+ *   from its full history with a definition load per event.
  * - **`startSnapshotWriter` is not re-entrant.** `setInterval` fires the next
  *   pass whether or not the previous one returned, so a pass slower than
  *   `intervalMs` overlaps itself: both reads see the same previous snapshot,
@@ -229,18 +257,21 @@ export async function runSnapshotPass(
   opts: { minEvents?: number } = {},
 ): Promise<{ written: Array<{ entityId: string; seq: number }> }> {
   const minEvents = opts.minEvents ?? DEFAULT_MIN_EVENTS;
+  // Due: the head ran `minEvents` past the LATEST snapshot, or that latest row was written by an older fold (wtg2 T9).
+  // `DISTINCT ON` picks the latest row per ticket, and that is load-bearing: superseded rows are never deleted (below),
+  // so a `fold_version < $2` over every row would keep a restated ticket due on every pass after its restate.
   const { rows } = await pool.query<Record<string, unknown>>(
     `SELECT e.workspace_id, e.entity_id
        FROM events e
        LEFT JOIN (
-         SELECT entity_id, MAX(seq) AS snap_seq
-           FROM snapshots WHERE entity_kind = 'ticket' GROUP BY entity_id
+         SELECT DISTINCT ON (entity_id) entity_id, seq AS snap_seq, fold_version
+           FROM snapshots WHERE entity_kind = 'ticket' ORDER BY entity_id, seq DESC
        ) s ON s.entity_id = e.entity_id
       WHERE e.entity_kind = 'ticket'
-      GROUP BY e.workspace_id, e.entity_id, s.snap_seq
-     HAVING MAX(e.seq) - COALESCE(s.snap_seq, 0) >= $1
+      GROUP BY e.workspace_id, e.entity_id, s.snap_seq, s.fold_version
+     HAVING MAX(e.seq) - COALESCE(s.snap_seq, 0) >= $1 OR s.fold_version < $2
       ORDER BY e.entity_id`,
-    [minEvents],
+    [minEvents, TICKET_FOLD_VERSION],
   );
   const due: Due[] = rows.map((row) => ({
     workspaceId: row['workspace_id'] as string,
@@ -252,6 +283,8 @@ export async function runSnapshotPass(
   // the same for every ticket in a workspace and the fold is pure, so caching
   // them cannot change an answer.
   const depsByWorkspace = new Map<string, Awaited<ReturnType<typeof buildLedgerDeps>>>();
+  // The restate path's as-of definitions (wtg2 T9), memoized for the whole pass: one load per definition change.
+  const asOf = memoizedDepsAsOfEvent();
 
   for (const item of due) {
     let deps = depsByWorkspace.get(item.workspaceId);
@@ -261,7 +294,7 @@ export async function runSnapshotPass(
     }
     const client = await pool.connect();
     try {
-      const head = await foldTicketHead(client, item.entityId, deps);
+      const head = await foldTicketHead(client, item.entityId, deps, asOf);
       if (head === null) continue;
       // Reachable only through the programmatic door: `minEvents: 0` makes
       // every entity due on every pass, so a second pass would recompute a
@@ -269,7 +302,10 @@ export async function runSnapshotPass(
       // primary key. `SNAPSHOT_MIN_EVENTS` is `.positive()` in the config
       // schema, so no environment can produce a 0. Case 12.89 walks it.
       if (head.seq <= head.previousSeq) continue;
-      await writeSnapshot(client, {
+      // A restate may land on the seq its stale row already holds (no event since), so it overwrites; the plain
+      // INSERT's primary-key collision stays reserved for overlapping passes (case 12.89).
+      const write = head.restated ? overwriteSnapshot : writeSnapshot;
+      await write(client, {
         entityKind: 'ticket',
         entityId: item.entityId,
         seq: head.seq,
@@ -301,14 +337,18 @@ export async function runSnapshotPass(
  */
 export function startSnapshotWriter(
   pool: Pool,
-  opts: { intervalMs: number; minEvents: number; log?: (msg: string) => void },
+  opts: { intervalMs: number; minEvents: number; log?: (msg: string) => void; immediate?: boolean },
 ): () => void {
   const log = opts.log ?? ((): undefined => undefined);
-  const timer = setInterval(() => {
+  const pass = (): void => {
     void runSnapshotPass(pool, { minEvents: opts.minEvents }).catch((err: unknown) => {
       log(`snapshot pass failed: ${String(err)}`);
     });
-  }, opts.intervalMs);
+  };
+  // `immediate` (wtg2 T9): one pass now, before the first tick, so a deploy that bumps `TICKET_FOLD_VERSION` restates
+  // the stale snapshots within seconds rather than one interval later.
+  if (opts.immediate === true) pass();
+  const timer = setInterval(pass, opts.intervalMs);
   timer.unref();
   return () => {
     clearInterval(timer);

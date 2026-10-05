@@ -306,6 +306,8 @@ async function main(): Promise<void> {
   const stopSnapshots = startSnapshotWriter(pool, {
     intervalMs: config.snapshotIntervalMs,
     minEvents: config.snapshotMinEvents,
+    // wtg2 T9: the first pass runs at boot, so snapshots written before work periods are restated at deploy.
+    immediate: true,
     log: (msg) => {
       app.log.warn(msg);
     },

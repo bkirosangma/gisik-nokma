@@ -44,6 +44,7 @@ import {
   type WorkflowDef,
 } from './workflow.js';
 import { isCreatableState, stateCategoryOf } from './workflow-helpers.js';
+import { foldWorkPeriods, setPeriods } from './flow/periods.js';
 
 /**
  * What the reducer needs looked up, and nothing more.
@@ -114,6 +115,9 @@ export const TICKET_EVENT_TYPES = [
   'comment.added',
   'attachment.added',
 ] as const;
+
+/** Bump when a retroactive member joins `TicketState`: a snapshot written under an older value is restated (T9). 2 = work periods and rounds. */
+export const TICKET_FOLD_VERSION = 2;
 
 function claim(value: unknown, env: EventEnvelope): FieldClaim {
   return { value, actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
@@ -204,6 +208,8 @@ export function applyTicketEvent(
     if (!category) {
       throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${bornIn}"`);
     }
+    // WP-1: a ticket born in an active state starts its first period at its creation.
+    const born = foldWorkPeriods([], { toStateId: bornIn, toCategory: category, at: env.serverTime, wasTerminal: false, round: 1 });
     return {
       kind: 'ticket',
       id: env.entity.id,
@@ -295,6 +301,8 @@ export function applyTicketEvent(
       // concerned, and both read `null` — which is what the undo
       // (`ticket.restored`) folds BACK to, not a third value.
       deleted: null,
+      // Work periods (wtg2 T9, WP-1): ABSENT when the ticket was not born in work, the `links` rule.
+      ...(born.length > 0 ? { periods: [...born] } : {}),
       // Drafts (spec §2.3): the key is ABSENT for a published ticket, never `undefined`.
       ...(p.draft === true ? { draft: { authorId: env.actorId, at: env.serverTime } } : {}),
     };
@@ -319,7 +327,22 @@ export function applyTicketEvent(
       if (!category) {
         throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${p.to}"`);
       }
-      const moved: TicketState = {
+      // PS-2 (wtg2 T9): the flow's loop reset counts BEFORE the periods fold, so a reset into an active initial state
+      // opens the next period with the new round. Only the TRANSITION counts: the paired `ticket.reopened` adds nothing.
+      const reset = p.cause?.kind === 'reopened-by-flow';
+      const round = (state.rounds ?? 1) + (reset ? 1 : 0);
+      // A not-taken move places nobody in work (PS-8): it opens and closes nothing.
+      const periods =
+        p.cause?.kind === 'branch-not-taken'
+          ? (state.periods ?? [])
+          : foldWorkPeriods(state.periods ?? [], {
+              toStateId: p.to,
+              toCategory: category,
+              at: env.serverTime,
+              wasTerminal: state.stateCategory === 'terminal',
+              round,
+            });
+      const moved: TicketState = setPeriods({
         ...state,
         stateId: p.to,
         stateCategory: category,
@@ -363,7 +386,8 @@ export function applyTicketEvent(
         // a "was the last event before this state's entry a reopen" query would
         // have to walk the log per candidate on every hourly run.
         reopenedAt: null,
-      };
+        ...(reset ? { rounds: round } : {}),
+      }, periods);
       // PS-2's last rule (wtg2 T8): the flow's loop reset of a Decision releases its current outcome and leaves `passes`
       // alone, so the next choice opens the next pass. Only `reopened-by-flow`, and only on a Decision (29.206).
       return p.cause?.kind === 'reopened-by-flow' && moved.typeId === DECISION_TYPE_ID ? releaseOutcome(moved) : moved;
@@ -434,13 +458,23 @@ export function applyTicketEvent(
       // them out instead of walking them through a chain they were never
       // written in. Rewriting them would destroy the very fact that filter
       // reads.
-      return {
-        ...state,
-        workflowId: p.toWorkflowId,
-        workflowVersion: wf.version,
-        stateId: p.toStateId,
-        stateCategory: category,
-      };
+      // WP-1: a rebound that lands the ticket in an active or terminal state opens (or closes) a period like a move.
+      return setPeriods(
+        {
+          ...state,
+          workflowId: p.toWorkflowId,
+          workflowVersion: wf.version,
+          stateId: p.toStateId,
+          stateCategory: category,
+        },
+        foldWorkPeriods(state.periods ?? [], {
+          toStateId: p.toStateId,
+          toCategory: category,
+          at: env.serverTime,
+          wasTerminal: state.stateCategory === 'terminal',
+          round: state.rounds ?? 1,
+        }),
+      );
     }
     case 'ticket.closed': {
       // Terminal-only is the engine's door to police (Plan 3's refusal layer),
