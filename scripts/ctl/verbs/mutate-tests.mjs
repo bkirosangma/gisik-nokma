@@ -11,7 +11,7 @@
 //    `.ts`, `.tsx`, `.mts` and then `/index.ts`, `/index.tsx`. A bare specifier (another package, or this package by its own name) is
 //    never this file: a test that reaches it only that way is not in the set.
 //  - via: `direct`, or the package-relative module M the test imports when M re-exports the file (`export … from`, not type-only).
-//    One hop only: a re-export of a re-export, and a module that imports the file and exports something of its own (test/helpers →
+//    The re-exporting module must sit in the same package (not under node_modules). One hop only: a re-export of a re-export, and a module that imports the file and exports something of its own (test/helpers →
 //    src/app.ts → a route), are NOT in the set. A mutant only such a distant test kills therefore reports as a SURVIVOR (loud).
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, statSync, realpathSync, existsSync } from 'node:fs';
@@ -114,7 +114,7 @@ for (const tf of files) {
   let via = resolved.includes(target) ? 'direct' : null;
   for (const m of resolved) {
     if (via) break;
-    if (inPkg(m) && /\.[cm]?tsx?$/.test(m) && reExports(m).includes(target)) via = relative(pkgReal, m);
+    if (inPkg(m) && reExports(m).includes(target)) via = relative(pkgReal, m);
   }
   if (via) tests.push({ file: relative(pkgReal, tf), via });
 }

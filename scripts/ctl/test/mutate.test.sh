@@ -197,13 +197,15 @@ sig_ok() { local sig="$1" want="$2" vp n=0 rc; rm -f "$R1.fake/fake.pid" "$R1.fa
 check "13.2215 SIGINT mid-run (the injected calc.ts in place: precondition checked): exit 130, calc.ts restored, a file Stryker rewrote in place put back from its backup-*/, no Stryker temp dir and no new stryker-setup-<n>.js, git status unchanged, the running run-tests got TERM" 'sig_ok INT 130'
 check "13.2216 SIGTERM mid-run: exit 143, the same restore" 'sig_ok TERM 143'
 watchdog_ok() { local out rc; rm -f "$R1.fake/signals"; out="$(FAKE_MODE=sleep FAKE_SLEEP=5 CTL_MUTATE_MAX_SECS=1 mut "$R1")"; rc=$?
-  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): mutate-1-calc.ts: the slot-run passed 1 s in its slot and was stopped (P10: no slot-run over 10 min; the file needs a smaller split) (the other files" \
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): mutate-2-calc.ts: the slot-run passed 1 s in its slot and was stopped (P10: no slot-run over 10 min; the file needs a smaller split) (the other files" \
   && grep -qx 'command TERM' "$R1.fake/signals" && ! grep -q 'run-tests TERM' "$R1.fake/signals" && clean_tree "$R1" && committed "$R1"; }
-check "13.2217 a command that holds its slot past CTL_MUTATE_MAX_SECS is stopped by the watchdog INSIDE the slot (TERM to the command's group, run-tests itself untouched) and is exit 2; CONTROL 13.2218 below" 'watchdog_ok'
+check "13.2217 a command that holds its slot past CTL_MUTATE_MAX_SECS is stopped by the watchdog INSIDE the slot (TERM to the command's group, run-tests itself untouched) and, once its one retry without statics (13.2265) overruns too, is exit 2 ('mutate-2-calc.ts: …'); CONTROL 13.2218 below" 'watchdog_ok'
 under_ok() { local out rc; out="$(FAKE_MODE=flips-dup FAKE_SLEEP=0 CTL_MUTATE_MAX_SECS=10 mut "$R1")"; rc=$?; [ $rc -eq 1 ]; }
 check "13.2218 CONTROL for 13.2217: a run under the cap completes (exit 1, its survivors); the defaults are pinned: 600 s per slot-run and 300 mutants per run" \
   'under_ok && [ "$(grep -c "env_int(.CTL_MUTATE_MAX_SECS., 600)" "$PY")" = 1 ] && [ "$(grep -c "env_int(.CTL_MUTATE_SPLIT., 300)" "$PY")" = 1 ]'
-R2="$T/r2"; mkrepo "$R2"; mkfake "$R2"; cp "$FX/big.ts" "$FX/small.ts" "$R2/packages/calc/src/"; $G -C "$R2" add -A; $G -C "$R2" commit -q -m big
+R2="$T/r2"; mkrepo "$R2"; mkfake "$R2"; cp "$FX/big.ts" "$FX/small.ts" "$R2/packages/calc/src/"
+printf "import '../src/big.js';\nimport '../src/small.js';\n" > "$R2/packages/calc/test/bs.test.ts"   # their own test (13.2261's cap), so their runs take the vitest-list control
+$G -C "$R2" add -A; $G -C "$R2" commit -q -m big
 runs_of() { mut "$R2" --dry-run | grep -c "run [0-9]*: stryker on src/$1"; }
 caps() { local out; out="$(mut "$R2" --dry-run)"; printf '%s\n' "$out" | grep "stryker on src/$1" | sed -E 's/.*\(~([0-9]+) mutants\).*/\1/'; }
 split_ok() { local b s; b="$(runs_of big.ts)"; s="$(runs_of small.ts)"
@@ -214,8 +216,8 @@ check "13.2220 split boundary: a cap EQUAL to the file's count is one run; one b
 check "13.2221 exit 2 on an unknown argument, and when Stryker is not installed in the repo" \
   'out=$(mut "$R1" --nope); [ $? -eq 2 ] && printf "%s" "$out" | tail -1 | grep -q "^FAIL mutate unknown arg --nope" && R3="$T/r3" && mkrepo "$R3" && mkfake "$R3" && rm "$R3/node_modules/@stryker-mutator" && out=$(mut "$R3"); [ $? -eq 2 ] && printf "%s" "$out" | tail -1 | grep -q "Stryker is not installed"'
 fallback_ok() { local out rc; : > "$R1.fake/calls"; out="$(FAKE_MODE=flips-dup CTL_MUTATE_INJECT_FAIL='calc\.ts$' mut "$R1")"; rc=$?
-  printf '%s\n' "$out" | grep -q "FALLBACK (A) for this file only" && [ "$(grep -c -- '-- node .*vitest.mjs run --maxWorkers=2' "$R1.fake/calls")" -eq 2 ] && [ $rc -eq 0 ] && clean_tree "$R1" && committed "$R1"; }
-check "13.2222 an injected copy that fails to parse falls back to (A) for that file only and says so: Stryker on the cast-only copy, then each custom mutant as one vitest run (2 runs, each killed by the shim's rc) — exit 0" 'fallback_ok'
+  printf '%s\n' "$out" | grep -q "FALLBACK (A) for this file only" && [ "$(grep -c -- '-- node .*vitest.mjs run --maxWorkers=2 test/calc.test.ts$' "$R1.fake/calls")" -eq 2 ] && [ $rc -eq 0 ] && clean_tree "$R1" && committed "$R1"; }
+check "13.2222 an injected copy that fails to parse falls back to (A) for that file only and says so: Stryker on the cast-only copy, then each custom mutant as one vitest run of the file's own tests only (2 runs of test/calc.test.ts, each killed by the shim's rc) — exit 0" 'fallback_ok'
 json_ok() { FAKE_MODE=flips-dup mut "$R1" --json | grep '^{' | python3 -c 'import json,sys; d=json.load(sys.stdin); assert [(s["line"], s["replacement"]) for s in d["survivors"]] == [(3, "2000"), (3, "20")], d["survivors"]; assert d["files"][0]["path"] == "packages/calc/src/calc.ts"'; }
 check "13.2223 --json prints one JSON object (files, survivors with line and replacement, skipped) before the summary line" 'json_ok'
 
@@ -356,13 +358,14 @@ run = lambda pkg: json.loads(subprocess.run(['node', js, rl, f'{rl}/{pkg}', 'src
 d = run('pkg')
 got = [(t['file'], t['via']) for t in d['tests']]
 want = [('test/actual.test.ts', 'direct'), ('test/direct.test.ts', 'direct'), ('test/dynamic.test.ts', 'direct'), ('test/nested/deep.test.ts', 'direct'),
-        ('test/noext.test.ts', 'direct'), ('test/side-effect.test.ts', 'direct'), ('test/via-barrel.test.ts', 'src/barrel.ts'), ('test/via-index.test.ts', 'src/dir/index.ts')]
-assert (d['testDir'], got, d['scanned']) == ('test', want, 15), d
+        ('test/noext.test.ts', 'direct'), ('test/reexport.test.ts', 'direct'), ('test/side-effect.test.ts', 'direct'), ('test/via-barrel.test.ts', 'src/barrel.ts'),
+        ('test/via-index.test.ts', 'src/dir/index.ts')]
+assert (d['testDir'], got, d['scanned']) == ('test', want, 19), d
 d2 = run('pkg2')
 assert (d2['testDir'], [(t['file'], t['via']) for t in d2['tests']], d2['scanned']) == ('.', [('src/target.test.ts', 'direct')], 2), d2
 PY
 }
-check "13.2260 the capped set (mutate-tests.mjs): IN = a test in the package's own test/ that imports the file (.js → .ts, extensionless, a nested dir, a side-effect import, a dynamic import(), vi.importActual) or imports a module that re-exports it (export * from, /index resolution); OUT = import type, vi.mock with no import, two re-export hops, a type-only re-export, a non-test helper, a near-named file, an import in a comment or a string, a bare self-name, a colocated src test when test/ exists, another package's test (15 scanned); with no test/ the whole package is scanned, node_modules and dot-dirs skipped (2 scanned)" 'walker_ok'
+check "13.2260 the capped set (mutate-tests.mjs): IN = a test in the package's own test/ that imports the file (.js → .ts, extensionless, a nested dir, a side-effect import, a dynamic import(), vi.importActual, export … from) or imports a module of the package that re-exports it (export * from, /index resolution); OUT = import type, export type … from, vi.mock with no import, two re-export hops, a type-only re-export, a re-export from ANOTHER package's module, a non-test helper, a near-named file, an import in a comment or a string, a bare self-name, a bare specifier that would resolve as a path, a colocated src test when test/ exists, another package's test (19 scanned); with no test/ the whole package is scanned, node_modules and dot-dirs skipped (2 scanned)" 'walker_ok'
 # R10: calc.ts plus a barrel (src/index.ts) and two more tests: one through the barrel, one that imports nothing of calc
 R10="$T/r10"; mkrepo "$R10"; mkfake "$R10"; printf "export * from './calc.js';\n" > "$R10/packages/calc/src/index.ts"
 printf "import { it, expect } from 'vitest';\nimport { over } from '../src/index.js';\nit('via', () => expect(over(1)).toBe(false));\n" > "$R10/packages/calc/test/via.test.ts"
@@ -374,9 +377,16 @@ cap_ok() { local out rc; out="$(mut "$R10" --base HEAD~2 --dry-run)"
   [ $rc -eq 1 ] && grep -qx 'const ONLY = \["test/calc.test.ts", "test/via.test.ts"\];' "$R10.fake/wrapper.mjs" && grep -q 'include: ONLY' "$R10.fake/wrapper.mjs" \
   && grep -q "^import base from \".*/packages/calc/vitest.config.ts\";" "$R10.fake/wrapper.mjs" \
   && python3 -c 'import json,sys; c=[json.loads(l) for l in open(sys.argv[1])]; assert c and all(x["vitest"]["related"] is False and x["ignoreStatic"] is False for x in c), c' "$R10.fake/confs.jsonl" \
-  && grep -q "control: 6 tests in 2 files on the injected copy, 6 unmutated" "$(mdof "$R10")" && clean_tree "$R10" \
+  && grep -q "control: 6 tests in 2 files on the injected copy, 6 unmutated" "$(mdof "$R10")" && ! printf '%s\n' "$out" | grep -q "NO OWN TEST" && clean_tree "$R10" \
   || { echo "       (rc $rc; wrapper: $(grep ONLY "$R10.fake/wrapper.mjs" 2>/dev/null | head -1 | cut -c1-160))"; return 1; }; }
-check "13.2261 the cap in the run: the dry run names the file's own tests ('own tests: 2 of 3 … test/calc.test.ts, test/via.test.ts (via src/index.ts)'; test/other.test.ts, which imports nothing of it, is out); the run's vitest wrapper keeps the package config and sets include to exactly those 2 files; vitest.related false and ignoreStatic false on every run; the control lists the same 2 files" 'cap_ok'
+esc_ok() { python3 - "$PY" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('mutate', sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+assert m.glob_escape('test/[id]/a(b){c}*?!+@.test.ts') == 'test/\\[id\\]/a\\(b\\)\\{c\\}\\*\\?\\!\\+\\@.test.ts', m.glob_escape('test/[id]/a(b){c}*?!+@.test.ts')
+assert 'const ONLY = ["test/\\\\[id\\\\].test.ts"];' in m.wrapper_text(None, ['test/[id].test.ts']) and 'const base = {};' in m.wrapper_text(None, ['x'])
+PY
+}
+check "13.2261 the cap in the run: the dry run names the file's own tests ('own tests: 2 of 3 … test/calc.test.ts, test/via.test.ts (via src/index.ts)'; test/other.test.ts, which imports nothing of it, is out); the run's vitest wrapper keeps the package config and sets include to exactly those 2 files; vitest.related false and ignoreStatic false on every run; the control lists the same 2 files and no NO OWN TEST line is printed; a test path is a literal glob (every glob character escaped: 'test/[id]/a(b)…'), and a package without a vitest config gets an empty base" 'cap_ok && esc_ok'
 leak_ok() { local out rc
   out="$(FAKE_MODE=flips-dup FAKE_CAP_LEAK=test/leak.test.ts mut "$R1")"; rc=$?
   [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run [0-9]*: the test cap did not hold: the run used test/leak.test.ts outside its 1 own test file(s); log " && clean_tree "$R1" \
@@ -398,10 +408,13 @@ sentinel_ok() { local out rc md; out="$(mut "$R11" --dry-run)"
   && grep -q "lone.ts:1  custom:numeric  7 → 70\`  (no coverage)" "$md" && grep -q "^NO OWN TEST packages/calc/src/lone.ts n=2" "$md" && grep -q "custom injected 2 == counted 2" "$md" \
   && grep -q "control: none (NO OWN TEST: only the sentinel ran, 1 test)" "$md" && ! grep -q -- "--label mutate-[0-9]*-control" "$R11.fake/calls" && clean_tree "$R11" \
   || { echo "       (sentinel: rc $rc)"; printf '%s\n' "$out" | tail -4 | cut -c1-200 | sed 's/^/       /'; return 1; }
+  : > "$R11.fake/calls"; out="$(FAKE_MODE=flips-dup CTL_MUTATE_INJECT_FAIL='lone\.ts$' mut "$R11")"; rc=$?
+  [ $rc -eq 1 ] && printf '%s\n' "$out" | grep -qx "  NO OWN TEST packages/calc/src/lone.ts n=2" && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/lone.ts:1  custom:numeric  7 → 70" \
+  && ! grep -q 'vitest.mjs run' "$R11.fake/calls" && clean_tree "$R11" || { echo "       (fallback: rc $rc)"; return 1; }
   out="$(FAKE_MODE=flips-dup FAKE_SENTINEL_TESTS=5 mut "$R11")"; rc=$?
   [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "the sentinel run saw 5 tests, not 1 (a whole-suite fallback?)" && clean_tree "$R11" \
   || { echo "       (5 tests: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; }
-check "13.2263 NO OWN TEST (planner ruling 12:40 (A)): a file no own test imports runs with ONE sentinel test (the wrapper's include is the sentinel alone), every mutant is a no-coverage SURVIVOR, the custom ones counted (injected 2 == counted 2), the table says 'NO OWN TEST packages/calc/src/lone.ts n=2' and what its survivors mean, no vitest-list control runs, exit 1; a sentinel run that saw 5 tests instead of 1 (a whole-suite fallback) is exit 2" 'sentinel_ok'
+check "13.2263 NO OWN TEST (planner ruling 12:40 (A)): a file no own test imports runs with ONE sentinel test (the wrapper's include is the sentinel alone), every mutant is a no-coverage SURVIVOR, the custom ones counted (injected 2 == counted 2), the table says 'NO OWN TEST packages/calc/src/lone.ts n=2' and what its survivors mean, no vitest-list control runs, exit 1; in the parse fallback (A) its custom mutants are no-coverage survivors with no vitest run at all; a sentinel run that saw 5 tests instead of 1 (a whole-suite fallback) is exit 2" 'sentinel_ok'
 pg_closed_ok() { local out rc
   out="$(mut "$R8" --base HEAD~2 --dry-run)"; rc=$?
   [ $rc -eq 2 ] && printf '%s\n' "$out" | grep -qx "  TOOL-FAILURE apps/server/src/s.ts: apps/server needs the test Postgres 127.0.0.1:$PGPORT_CLOSED, which is not reachable (start the shared test PG; a closed port is never a skip)" \
@@ -438,14 +451,14 @@ check "13.2266 the statics retry is THAT chunk's alone: with small.ts over the c
 PYS="$T/pyshim"; mkdir -p "$PYS"; REALPY="$(command -v python3)"
 printf '#!/bin/bash\ncase "$*" in *version_info*) echo "$FAKE_PYV";; *) exec "%s" "$@";; esac\n' "$REALPY" > "$PYS/python3"; chmod +x "$PYS/python3"
 pyfloor_ok() { local v out rc
-  for v in 3.10 3.9 2.7 x; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
-    [ $rc -eq 2 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): $PYS/python3 is $v" ] || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
+  for v in 3.10 3.9 2.7 x ''; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
+    [ $rc -eq 2 ] && [ "$out" = "FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): $PYS/python3 is ${v:-not runnable}" ] || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
   for v in 3.11 3.14 4.0; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
     [ $rc -eq 0 ] && printf '%s\n' "$out" | tail -1 | grep -q "^OK mutate dry-run" || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
   if [ -x /usr/bin/python3 ] && ! /usr/bin/python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
     mkdir -p "$T/syspy"; ln -sf /usr/bin/python3 "$T/syspy/python3"; out="$(PATH="$T/syspy:$PATH" mut "$R1" --dry-run)"; rc=$?
     [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate needs python3 >= 3.11" || { echo "       (the real /usr/bin/python3: rc $rc)"; return 1; }; fi; }
-check "13.2267 the Python floor: python3 3.10, 3.9, 2.7 or an unreadable version is exit 2 'FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): <path> is <version>' before anything runs; 3.11, 3.14 and 4.0 pass (the dry run completes); the real /usr/bin/python3, when it is below 3.11, is refused too" 'pyfloor_ok'
+check "13.2267 the Python floor: python3 3.10, 3.9, 2.7, an unreadable version or none is exit 2 with 'FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): <path> is <version|not runnable>' as the ONLY output line (no shell error leaks, nothing runs); 3.11, 3.14 and 4.0 pass (the dry run completes); the real /usr/bin/python3, when it is below 3.11, is refused too" 'pyfloor_ok'
 
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"
