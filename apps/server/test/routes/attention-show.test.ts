@@ -433,9 +433,6 @@ describe('30.027 the online client against these two routes (my-work-global T3)'
     expect(all.filter((item) => item.kind === 'contested').map((item) => item.ticketId)).toEqual([tc, ta, tp, tw]);
 
     const filtered = await client.query.getAttention(W1, ['created', 'assigned']);
-    // The comma-joined `show` reached BOTH routes, and the real parser took it.
-    expect(calls).toContain(`/v1/workspaces/${W1}/attention?show=created,assigned`);
-    expect(calls).toContain(`/v1/contests?workspaceId=${W1}&open=true&show=created,assigned`);
     expect(filtered.map((item) => [item.kind, item.ticketId, item.workspaceId])).toEqual([
       ['blocked', tc, W1],
       ['blocked', ta, W1],
@@ -443,5 +440,9 @@ describe('30.027 the online client against these two routes (my-work-global T3)'
       ['contested', tc, W1],
       ['contested', ta, W1],
     ]);
+    // ...asked with 30.026's spelling: a literal comma, on BOTH routes. (The server
+    // also decodes `%2C`, so only this line tells the two spellings apart.)
+    expect(calls).toContain(`/v1/workspaces/${W1}/attention?show=created,assigned`);
+    expect(calls).toContain(`/v1/contests?workspaceId=${W1}&open=true&show=created,assigned`);
   });
 });
