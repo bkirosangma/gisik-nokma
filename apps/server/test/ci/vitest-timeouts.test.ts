@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,17 @@ const configsUnder = (dir: string): string[] =>
     return name === 'vitest.config.ts' ? [path] : [];
   });
 
+/**
+ * git's own list of tracked configs, minus ctl's fixtures: the oracle the sweep is checked against (planner 2026-10-05).
+ * It does not share the walker's code, so its prefix is written out rather than taken from `CTL_FIXTURES`, and a release
+ * that adds a package needs no edit here.
+ */
+const trackedConfigs = (): string[] =>
+  execFileSync('git', ['ls-files', '-z', '--', '*vitest.config.ts'], { cwd: REPO_ROOT, encoding: 'utf8' })
+    .split('\0')
+    .filter((p) => p !== '' && !p.startsWith('scripts/ctl/test/fixtures/'))
+    .sort();
+
 /** The numeric literal after `key:` (underscores allowed), or null when the key is not set. */
 const settingOf = (text: string, key: string): number | null => {
   const hit = new RegExp(`^\\s*${key}:\\s*([0-9_]+)\\s*,`, 'm').exec(text);
@@ -37,21 +49,12 @@ const settingOf = (text: string, key: string): number | null => {
 describe('13.1733 every vitest.config.ts gives tests a 20 s budget and hooks a 30 s one', () => {
   it('sets testTimeout >= 20000 and hookTimeout >= 30000 in every config in the repo', () => {
     const configs = configsUnder(REPO_ROOT).map((p) => relative(REPO_ROOT, p)).sort();
-    // CONTROL, same it: the sweep is not blind and drops no package — it finds exactly the twelve package configs.
-    expect(configs, 'the configs the sweep found').toEqual([
-      'apps/desktop/vitest.config.ts',
-      'apps/mobile/vitest.config.ts',
-      'apps/server/vitest.config.ts',
-      'apps/web/vitest.config.ts',
-      'packages/app-core/vitest.config.ts',
-      'packages/domain/vitest.config.ts',
-      'packages/editor/vitest.config.ts',
-      'packages/knowledge-graph/vitest.config.ts',
-      'packages/mcp-server/vitest.config.ts',
-      'packages/rule-engine/vitest.config.ts',
-      'packages/sync-client/vitest.config.ts',
-      'packages/ui/vitest.config.ts',
-    ]);
+    // CONTROL, same it: the sweep is not blind and drops no package — it finds exactly the configs git tracks, and two
+    // floors keep that oracle from being vacuous (an empty or wrongly rooted list would agree with a blind sweep).
+    const tracked = trackedConfigs();
+    expect(tracked.length, 'at least 11 tracked configs').toBeGreaterThanOrEqual(11);
+    expect(tracked, 'the server config is tracked').toContain('apps/server/vitest.config.ts');
+    expect(configs, 'the configs the sweep found').toEqual(tracked);
     // ctl mutate's fixture config is on disk and the sweep leaves it out ...
     const fixture = 'scripts/ctl/test/fixtures/mutate/before/packages/calc/vitest.config.ts';
     expect(existsSync(join(REPO_ROOT, fixture)), `${fixture} exists`).toBe(true);
