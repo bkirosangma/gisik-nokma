@@ -101,15 +101,127 @@ function vectorLiteral(vector: Float32Array): string {
   return `[${Array.from(vector).join(',')}]`;
 }
 
+/**
+ * Knowledge Graph spec D §2: tickets (title, then description) and ticket comments, into
+ * `search_item_chunks`. The note pass's shape, kept deliberately the same:
+ * - removals first, by their own statement;
+ * - a staleness query;
+ * - embed outside any transaction;
+ * - a `FOR SHARE` recheck, then REPLACE.
+ * The staleness key is a hash because `proj_tickets` has no per-entity seq.
+ */
+const TICKET_TEXT_HASH = `md5(coalesce(t.fields->'title'->>'value', '') || E'\\n' || coalesce((t.fields->'description'->'value')::text, ''))`;
+const COMMENT_TEXT_HASH = `md5(coalesce(k.body::text, ''))`;
+type StaleItemRow = {
+  item_kind: 'ticket' | 'comment';
+  item_id: string;
+  ticket_id: string;
+  workspace_id: string;
+  title: string;
+  body: unknown;
+  source_hash: string;
+};
+
+async function itemsPass(pool: Pool, embedTexts: (texts: string[]) => Promise<Float32Array[]>, model: string): Promise<number> {
+  let processed = 0;
+  // Removals first, as the note pass does: the staleness query below reads live rows only, so a
+  // deleted (or erased) ticket's rows and a deleted comment's rows are never reached by it.
+  const cleaned = await pool.query(
+    `DELETE FROM search_item_chunks c
+      WHERE NOT EXISTS (SELECT 1 FROM proj_tickets t WHERE t.ticket_id = c.ticket_id AND t.deleted_at IS NULL)
+         OR (c.item_kind = 'comment'
+             AND NOT EXISTS (SELECT 1 FROM proj_ticket_comments k WHERE k.comment_id = c.item_id AND k.deleted_at IS NULL))`,
+  );
+  processed += cleaned.rowCount ?? 0;
+
+  const { rows } = await pool.query<StaleItemRow>(
+    `SELECT * FROM (
+       SELECT 'ticket'::text AS item_kind, t.ticket_id AS item_id, t.ticket_id, t.workspace_id,
+              coalesce(t.fields->'title'->>'value', '') AS title, t.fields->'description'->'value' AS body,
+              ${TICKET_TEXT_HASH} AS source_hash
+         FROM proj_tickets t
+         LEFT JOIN (SELECT item_id, min(source_hash) AS h, min(model) AS model
+                      FROM search_item_chunks WHERE item_kind = 'ticket' GROUP BY item_id) c ON c.item_id = t.ticket_id
+        WHERE t.deleted_at IS NULL AND (c.item_id IS NULL OR c.h <> ${TICKET_TEXT_HASH} OR c.model <> $1)
+       UNION ALL
+       SELECT 'comment'::text, k.comment_id, k.ticket_id, k.workspace_id, '', k.body, ${COMMENT_TEXT_HASH}
+         FROM proj_ticket_comments k
+         JOIN proj_tickets t ON t.ticket_id = k.ticket_id
+         LEFT JOIN (SELECT item_id, min(source_hash) AS h, min(model) AS model
+                      FROM search_item_chunks WHERE item_kind = 'comment' GROUP BY item_id) c ON c.item_id = k.comment_id
+        WHERE k.deleted_at IS NULL AND t.deleted_at IS NULL
+          AND (c.item_id IS NULL OR c.h <> ${COMMENT_TEXT_HASH} OR c.model <> $1)
+     ) s
+     ORDER BY s.item_id DESC
+     LIMIT $2`,
+    [model, BATCH],
+  );
+
+  for (const item of rows) {
+    const isPurged = await purgedResolverFor(pool, [item.body]);
+    const bodyChunks = item.body === null || item.body === undefined ? [] : chunkDoc(item.body, { isPurged });
+    const pieces =
+      item.item_kind === 'ticket'
+        ? [{ headingPath: '', text: item.title }, ...bodyChunks]
+        : bodyChunks.length > 0
+          ? bodyChunks
+          : [{ headingPath: '', text: '' }]; // an empty comment: one blank chunk, so it is not re-picked forever; reads skip ''
+    const vectors = await embedTexts(pieces.map((piece) => piece.text));
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // The note pass's recheck (above), for the same reason: the embedding call ran outside any
+      // transaction, so the ticket (or the comment) may have been deleted or erased since it was picked.
+      const still =
+        item.item_kind === 'ticket'
+          ? await client.query('SELECT 1 FROM proj_tickets WHERE ticket_id = $1 AND deleted_at IS NULL FOR SHARE', [item.item_id])
+          : await client.query(
+              `SELECT 1 FROM proj_ticket_comments k JOIN proj_tickets t ON t.ticket_id = k.ticket_id
+                WHERE k.comment_id = $1 AND k.deleted_at IS NULL AND t.deleted_at IS NULL FOR SHARE OF k, t`,
+              [item.item_id],
+            );
+      if (still.rowCount === 0) {
+        await client.query('ROLLBACK');
+        continue;
+      }
+      // REPLACE, not upsert: a new text can have fewer chunks than the old one.
+      await client.query('DELETE FROM search_item_chunks WHERE item_kind = $1 AND item_id = $2', [item.item_kind, item.item_id]);
+      for (let index = 0; index < pieces.length; index += 1) {
+        const piece = pieces[index]!;
+        const vector = vectors[index];
+        if (vector === undefined) throw new Error(`no embedding for chunk ${String(index)} of ${item.item_kind} ${item.item_id}`);
+        if (vector.length !== EMBEDDING_DIM) throw new Error(`embedding of ${String(vector.length)} dims, expected ${String(EMBEDDING_DIM)}`);
+        await client.query(
+          `INSERT INTO search_item_chunks
+             (item_kind, item_id, chunk_index, workspace_id, ticket_id, heading_path, chunk_text, model, source_hash, embedding)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [item.item_kind, item.item_id, index, item.workspace_id, item.ticket_id, piece.headingPath, piece.text, model, item.source_hash, vectorLiteral(vector)],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+    processed += 1;
+  }
+  return processed;
+}
+
 export function startEmbedWorker(pool: Pool, options: EmbedWorkerOptions): EmbedWorker {
   const log = options.log ?? ((): undefined => undefined);
   const embedTexts = options.embedTexts ?? defaultEmbedTexts;
   const model = options.model ?? CURRENT_MODEL;
 
   /**
-   * The pass. Returns how many notes it processed — embedded notes plus notes
-   * whose chunks were dropped because the note is deleted. Zero means the
-   * database is in step, which is what makes it a usable control.
+   * The pass. Returns how many items it processed — embedded notes plus notes
+   * whose chunks were dropped because the note is deleted, then (KG-D T2,
+   * `itemsPass`) embedded tickets and ticket comments plus the item chunk rows
+   * removed for deleted or erased ones. Zero means the database is in step,
+   * which is what makes it a usable control.
    */
   async function runOnce(): Promise<number> {
     let processed = 0;
@@ -199,6 +311,7 @@ export function startEmbedWorker(pool: Pool, options: EmbedWorkerOptions): Embed
       processed += 1;
     }
 
+    processed += await itemsPass(pool, embedTexts, model);
     return processed;
   }
 

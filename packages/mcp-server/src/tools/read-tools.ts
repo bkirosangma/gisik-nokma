@@ -65,8 +65,8 @@ export function readTools(session: Session): ToolDefinition[] {
       description:
         'Full-text search across the tickets and notes you can see in one workspace. Returns at most 50 hits ' +
         'and has no pages — narrow the query, `kinds` or the filter rather than expecting a next page. ' +
-        '`kinds` limits it to tickets, notes, or both (the default is both); `mode: "meaning"` ranks notes by ' +
-        'what they say rather than the words they use and answers notes only. ' +
+        '`kinds` limits it to tickets, notes, or both (the default is both); `mode: "meaning"` ranks by ' +
+        'what they say rather than the words they use, for tickets (their title, description and comments) and notes alike. ' +
         'A ticket key such as "CCSO-12" (any case) returns that ticket first, also by a key it held before a ' +
         'prefix change. Use list_tickets when you need to enumerate.',
       inputSchema: { ...searchShape, kinds: z.array(z.enum(['ticket', 'note'])).min(1).optional(), mode: z.enum(['lexical', 'meaning']).optional() },

@@ -129,7 +129,7 @@ describe('18.149–18.153 the search route, notes side', () => {
     expect(meaning.body.notes[0]?.snippet, 'the snippet is the chunk text').toBe(QUERY);
 
     const meaningWithTickets = await search('owner', `q=${encodeURIComponent(QUERY)}&mode=meaning`);
-    expect(meaningWithTickets.body.hits, 'tickets have no chunks in v1').toEqual([]);
+    expect(meaningWithTickets.body.hits, 'no item chunks are seeded in this file (KG-D 27.429)').toEqual([]);
   });
 
   /**

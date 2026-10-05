@@ -1392,10 +1392,14 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   `{status:'offline', queued:0, failed:0}` before, `{status:'offline', queued:2, failed:0}` after two
   accepted claims. This is one of the two channels ruling P30 names for accepted-for-now, and the case
   measures it moving rather than existing.
-- 12.185 ✅ **NINE methods refuse, enumerated by id rather than counted**, and the enumeration is
+- 12.185 ✅ **FIFTEEN methods refuse, enumerated by id rather than counted**, and the enumeration is
   compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift:
-  `getMyWorkspaces`, `getMembers`, `getTicketAttachments`, `search`, `getMyWork`, `getAttention`,
-  `getWorkspaceSettings`, `getPreferences`, `putPreferences`. **⚠ CORRECTED 2026-09-20, and the count
+  `getMyWorkspaces`, `getGroups`, `getDeletedItems`, `getMembers`, `getTicketAttachments`,
+  `getTicketComments`, `search`, `searchNotes`, `getMyWork`, `getAttention`, `getHome`,
+  `getWorkspaceSettings`, `getPreferences`, `putPreferences`, `getLinkedFrom`. **⚠ CORRECTED 2026-10-05
+  (Knowledge Graph E Task 3, which added `getHome`): this read "NINE" and listed nine while the test held
+  fourteen — `getGroups`, `getDeletedItems`, `getTicketComments`, `searchNotes` and `getLinkedFrom` had joined
+  the registry without joining this list. Recounted from the test's own list.** **⚠ CORRECTED 2026-09-20, and the count
   was wrong in BOTH halves rather than late by one:** this read "SEVEN methods refuse" and listed
   seven — `getWorkspaceSettings` has been in the registry since second wave Task 6 and had never been
   added to the list here, and `getTicketAttachments` joined it with the attachments read. **The number

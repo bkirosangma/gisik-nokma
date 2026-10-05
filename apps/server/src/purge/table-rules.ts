@@ -179,6 +179,11 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
     by: ['workspace_id', 'note_id'],
     why: 'Erased for the set; a surviving note’s chunks are deleted and the embed worker re-chunks it (Task 7).',
   },
+  search_item_chunks: {
+    rule: 'rederive',
+    by: ['workspace_id', 'ticket_id'],
+    why: 'Erased for the set by ticket_id (a comment row carries its ticket); a surviving ticket’s rows are deleted and the embed worker re-chunks it (KG-D Task 2).',
+  },
   proj_workspaces: { rule: 'erase', by: ['workspace_id'], why: 'The workspace’s lifecycle row.' },
   purged_entities: {
     rule: 'purge-registry',

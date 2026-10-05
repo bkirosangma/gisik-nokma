@@ -448,6 +448,11 @@ export type SearchHit = {
    * (A, B, C). A query that matches two columns is answered by the first of
    * them, stated here so the order is a rule rather than an accident of how the
    * CASE happened to be written.
+   *
+   * In `mode=meaning` (Knowledge Graph spec D Task 2) it names the column of the
+   * ticket's NEAREST chunk instead: chunk 0 is the title, its other chunks the
+   * description, and a comment's chunk the comment — the same three words, and
+   * no precedence, because one chunk is nearest.
    */
   matchedIn: 'title' | 'description' | 'comment';
 };
@@ -504,6 +509,11 @@ export type SearchResponse = {
    */
   corrected?: string[];
 };
+
+/** Knowledge Graph spec D §5.1 `similar`: one nearest item, by meaning. `score` is cosine similarity (1 = same direction). */
+export type SimilarHit = { kind: 'ticket' | 'note'; id: string; title: string; score: number };
+/** `GET /v1/workspaces/:workspaceId/similar?item=<kind>:<id>&k=<1..20>`: the item asked about, and its nearest visible items. */
+export type SimilarResponse = { workspaceId: string; item: { kind: 'ticket' | 'note'; id: string }; hits: SimilarHit[] };
 
 export type MyWorkResponse = {
   workspaceId: string;

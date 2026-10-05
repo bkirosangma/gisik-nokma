@@ -95,6 +95,15 @@ export function createFakeDataSource(
     // workspace, which is what a default is for. Overrides that care take it.
     getMyWork: async () => ({ assigned: [], inTransit: [], contested: [], shared: [] }),
     getAttention: async () => [],
+    // Home (Knowledge Graph E Task 3): an empty workspace's answer, with the domain's default window. A default, not
+    // a claim: a case that cares about the numbers overrides it.
+    getHome: async (workspaceId) => ({
+      workspaceId,
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      dueSoonDays: 7,
+      counts: { tickets: 0, open: 0, pastDue: 0, dueSoon: 0, members: 0, notes: 0 },
+      ids: { tickets: [], open: [], pastDue: [], dueSoon: [], members: [], notes: [] },
+    }),
     // The server's REAL answer for a workspace nobody has configured, not an
     // invented blank (second wave, Task 6): `getWorkspaceSettings` applies the
     // domain's defaults and answers `provenance: null` when no row exists, so
