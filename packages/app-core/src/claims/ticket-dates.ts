@@ -44,6 +44,13 @@ export type TicketDatesInput = {
    * names a marker by it (UX fixes T8, 23.140): a marker that said only "needed by 28 Sep" never said WHICH ticket.
    */
   key?: string | null;
+  /**
+   * wtg2 T17: closed "Not taken" by the flow, as the server already answered it through `notTakenOf` (`ListRow.notTaken`);
+   * ABSENT otherwise. A web shell's `state` carries no `closed` (a `ListRow`'s has no cause), so `resolutionOf(state)` cannot
+   * see the close there: the shell carries this flag instead, and the Timeline's mark reads it beside `resolutionOf`. Optional
+   * so no legacy literal changes.
+   */
+  notTaken?: true;
 };
 
 /**

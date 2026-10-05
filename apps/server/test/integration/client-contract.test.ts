@@ -1087,10 +1087,10 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     // this file, so it would pin nothing on the client side at all — the day
     // the fourth field arrived in `app-core` this case would have stayed green.
     const CLIENT_ROLLUP_FIELDS = clientTypeFields('view-types.ts', 'RollupToViewer');
-    // The pin and its own positive control in one line: the client type is
-    // these three fields, in this order, and no others. It is what turns
-    // "exactly three" from a transcription into a measurement, and it is what
-    // goes red the day anybody adds a fourth to `RollupToViewer`. wtg2 T17 (29.374) added the OPTIONAL
+    // The pin and its own positive control in one line: the client type is three required fields plus
+    // the optional `notTakenChildren`, in this order, and no others. It is what turns
+    // "exactly these" from a transcription into a measurement, and it is what
+    // goes red the day anybody adds another field to `RollupToViewer`. wtg2 T17 (29.374) added the OPTIONAL
     // `notTakenChildren`, which the server sends only when a child is closed Not taken: it is not the fourth
     // field this case is about (the server's `uncategorizedChildren` is still the one the client lacks).
     expect(CLIENT_ROLLUP_FIELDS).toEqual(['totalChildren', 'terminalChildren', 'notTakenChildren', 'restrictedCount']);

@@ -259,7 +259,7 @@ function axisLabels(first: number, last: number): Array<{ day: number; month: st
 /**
  * TG-14: status is never colour alone. A finished bar carries a check, one in progress a play mark, a not-started one nothing.
  * A terminal bar the flow closed Not taken (wtg2 T17, AMEND-wtg2-t17-timeline-mark; spec TG-10, WG-8) is closed, never done:
- * it reads "Not taken" with its own glyph. `notTaken` is `resolutionOf`'s answer, the one definition; this view tests no cause.
+ * it reads "Not taken" with its own glyph. `notTaken` is the one definition's answer (the input's `notTaken`, the server's `notTakenOf`; else `resolutionOf` on its state); this view tests no cause.
  */
 function stateMark(category: string, notTaken: boolean): { glyph: string; word: string; state: 'done' | 'not-taken' | 'active' } | null {
   if (category === 'terminal') return notTaken ? { glyph: '⊘', word: 'Not taken', state: 'not-taken' } : { glyph: '✓', word: 'Done', state: 'done' };
@@ -274,7 +274,7 @@ type TimelineBarProps = {
   firstDay: number;
   ppd: number;
   category: string;
-  /** Closed Not taken by the flow (`resolutionOf`), so a terminal bar does not read Done. */
+  /** Closed Not taken by the flow (the input's `notTaken` from the server's `notTakenOf`, else `resolutionOf`), so a terminal bar does not read Done. */
   notTaken: boolean;
   measure: KeyMeasure;
   detailId: string;
@@ -400,7 +400,7 @@ export function TimelineView(props: TimelineViewProps) {
     return byId;
   }, [model.groups]);
   const categoryById = useMemo(() => new Map(props.tickets.map((t) => [t.state.id, t.state.stateCategory])), [props.tickets]);
-  const notTakenIds = useMemo(() => new Set(props.tickets.filter((t) => resolutionOf(t.state) !== null).map((t) => t.state.id)), [props.tickets]);
+  const notTakenIds = useMemo(() => new Set(props.tickets.filter((t) => t.notTaken === true || resolutionOf(t.state) !== null).map((t) => t.state.id)), [props.tickets]);
 
   // ---- the adapter ----
   useLayoutEffect(() => {
