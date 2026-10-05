@@ -46,6 +46,11 @@ describe('29.208 the purge door reads a flow cause', () => {
     expect(await checkPurged(db.pool, env('ticket.transitioned', { to: 'todo', cause: ledTo(ERASED_SOURCE) }))).toMatchObject(refused);
     expect(await checkPurged(db.pool, env('ticket.transitioned', { to: 'todo', cause: ledTo(LIVE) }))).toBeNull();
     expect(await checkPurged(db.pool, env('ticket.transitioned', { to: 'todo', cause: decisionCause('reopened-by-flow', ERASED_DECISION) }))).toMatchObject(refused);
+    // A raw `cause: null` names nothing and must not throw: the door reads the payload BEFORE the engine's schema parse
+    // (ingest-service.ts checkPurged, ahead of the permission gate), and the engine then refuses it as malformed. Each type.
+    for (const type of ['ticket.transitioned', 'ticket.closed', 'ticket.reopened'] as const) {
+      expect(await checkPurged(db.pool, env(type, type === 'ticket.transitioned' ? { to: 'todo', cause: null } : { cause: null })), type).toBeNull();
+    }
     // Control: an uncaused move of the same ticket names nothing erased.
     expect(await checkPurged(db.pool, env('ticket.transitioned', { to: 'todo' }))).toBeNull();
   });

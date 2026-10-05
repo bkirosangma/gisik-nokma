@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makeEnvelope, SYSTEM_ACTOR_FLOW, type EventEnvelope, type PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { makeEnvelope, SYSTEM_ACTOR_FLOW, validateWorkflowDef, type EventEnvelope, type PublishedWorkflowDef } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { evaluateEvent } from '../src/evaluate.js';
 import { flowExemptEdge } from '../src/index.js';
@@ -99,6 +99,11 @@ describe('29.204 the flow moves over undeclared edges', () => {
     const WF_RESET_DECLARED: PublishedWorkflowDef = { ...WF_STRICT, transitions: [...WF_STRICT.transitions, { from: 'done', to: 'todo', rules: [{ kind: 'require-comment' }] }] };
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened }), atDone(WF_RESET_DECLARED))).toMatchObject({ rule: 'require-comment' });
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened, comment: { text: 'loop' } }), atDone(WF_RESET_DECLARED))).toEqual({ refused: false });
+    // "The FIRST-declared terminal" when the terminal state is declared first, a legal shape (validateWorkflowDef finds no
+    // issue; control below): the not-taken move lands there. A search that skips index 0 finds no terminal and refuses it.
+    const WF_TERMINAL_FIRST: PublishedWorkflowDef = { ...WF_STRICT, states: [WF_STRICT.states[2]!, WF_STRICT.states[0]!, WF_STRICT.states[1]!] };
+    expect(validateWorkflowDef(WF_TERMINAL_FIRST)).toEqual([]);
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), buildMemoryContext([WF_TERMINAL_FIRST], [typeDefined(TASK), createdIn('focus')]))).toEqual({ refused: false });
   });
 });
 
