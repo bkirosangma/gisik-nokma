@@ -157,14 +157,15 @@ export const SWEEP: Record<string, SweepEntry> = {
   // concept begin (KG-D T4, T5)
   list_concepts: { args: { workspaceId: 'w' }, session: { get: async () => ({ workspaceId: 'w', concepts: [] }) } },
   get_concept: { args: { conceptId: 'c' }, session: { get: async () => SWEEP_CONCEPT } },
-  // No `confirm_name`: the delete answers its preview.
-  manage_concept: { args: { action: 'delete', conceptId: 'c' }, session: { get: async () => SWEEP_CONCEPT } },
+  // KG-D T7 (27.516): these four entries POST (no preview: a create, an add that narrows nobody, an accept), so the
+  // D2 audit's "posts only what it declares" leg runs over each D write tool's events, not over [].
+  manage_concept: { args: { action: 'create', workspaceId: 'w', name: 'C' }, session: { get: async () => SWEEP_CONCEPT } },
   tag_items: {
     args: { conceptId: 'c', action: 'add', items: [{ kind: 'ticket', id: 't' }] },
-    session: { get: async (path) => (path.includes('/audience') ? { conceptId: 'c', members: 2, before: 2, after: 1 } : SWEEP_CONCEPT) },
+    session: { get: async (path) => (path.includes('/audience') ? { conceptId: 'c', members: 2, before: 2, after: 2 } : SWEEP_CONCEPT) },
   },
   link_concepts: { args: { conceptId: 'c', otherId: 'd', relation: 'related', action: 'add' }, session: { get: async () => SWEEP_CONCEPT } },
   review_suggestions: { args: { workspaceId: 'w' }, session: { get: async () => ({ workspaceId: 'w', suggestions: [] }) } },
-  resolve_suggestion: { args: { workspaceId: 'w', suggestionId: 's', action: 'reject' }, session: { get: async () => ({ workspaceId: 'w', suggestions: [SWEEP_SUGGESTION] }) } },
+  resolve_suggestion: { args: { workspaceId: 'w', suggestionId: 's', action: 'accept', name: 'S' }, session: { get: async () => ({ workspaceId: 'w', suggestions: [SWEEP_SUGGESTION] }) } },
   // concept end
 };
