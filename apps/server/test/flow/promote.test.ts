@@ -13,7 +13,7 @@ import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js'
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
-import { createFlowPromoter, FLOW_SERVER_CAP, promoteTargets, triggeredByOf, type FlowPromoteDeps } from '../../src/flow/promote.js';
+import { createFlowPromoter, FLOW_SERVER_CAP, promoteTargets, retargetsOf, triggeredByOf, type FlowPromoteDeps } from '../../src/flow/promote.js';
 import { readFlow } from '../../src/flow/read-flow.js';
 import type { CommittedEventListener, IngestService } from '../../src/ingest/ingest-service.js';
 import { resetEntitySeqs } from '../helpers/apply.js';
@@ -114,7 +114,10 @@ describe('29.214 the committed finish files one led-to move', () => {
     expect([await stateOf(db.pool, t), await stateOf(db.pool, k)]).toEqual(['backlog', 'backlog']);
     expect(await ledger(db.pool, t, 'ticket.transitioned')).toEqual([]);
     // finished by a DIFFERENT person than the one who created and started it
-    await p.onCommitted(await finishing(s, ASSIGNEE));
+    const finish = await finishing(s, ASSIGNEE);
+    // the re-target: s's live Backlog leads_to targets, in id order; not u, which s only blocks
+    expect(await retargetsOf(db.pool, finish)).toEqual([t, k].sort());
+    await p.onCommitted(finish);
     expect(await stateOf(db.pool, t)).toBe('todo');
     expect(await stateOf(db.pool, k)).toBe('kickoff');
     expect(await ledger(db.pool, t, 'ticket.transitioned')).toEqual([
@@ -125,6 +128,8 @@ describe('29.214 the committed finish files one led-to move', () => {
     expect(rows.map((r) => r.client_time.toISOString())).toEqual([NOW]); // the claimed time is deps.now
     // only the finished source's targets were re-read: u's satisfied edge from x is not this event's business
     expect(await stateOf(db.pool, u)).toBe('backlog');
+    // the same event, asked again, names nothing: t and k have left the Backlog
+    expect(await retargetsOf(db.pool, finish)).toEqual([]);
   });
 
   it('29.214 a labelled edge carries its label on the cause', async () => {
@@ -195,11 +200,26 @@ describe('29.215 every AP-4 trigger re-evaluates the right target', () => {
     // the draft-side form a published source's link into a draft takes (drafts R42): filed on the draft's stream, keyed by its source
     const link = await step(db.pool, t, 'ticket.link_added', { kind: 'leads_to', targetId: t, from: s });
     await promoter().onCommitted(link);
-    await promoter().onCommitted(await finishing(s)); // the source finishes while t is still a draft
+    const finish = await finishing(s); // the source finishes while t is still a draft
+    expect(await retargetsOf(db.pool, finish)).toEqual([]); // the draft's link row (source s) is there; the draft is not live
+    await promoter().onCommitted(finish);
     expect(await stateOf(db.pool, t)).toBe('backlog');
     const published = await step(db.pool, t, 'ticket.published', { projectId: PROJECT });
+    expect(await retargetsOf(db.pool, finish)).toEqual([t]); // control: the same finish names t once it is published
     await promoter().onCommitted(published);
     expect(await stateOf(db.pool, t)).toBe('todo');
+  });
+
+  it('29.215 a target-side trigger re-reads its own ticket, never the tickets IT leads to', async () => {
+    const t = await addTicket(db.pool);
+    const u = await addTicket(db.pool);
+    await lead(db.pool, t, u); // t leads to u, a live Backlog ticket: t's own Backlog triggers must not name u
+    const on = (type: string, payload: Record<string, unknown>) =>
+      makeEnvelope({ type, workspaceId: WS, entity: { kind: 'ticket', id: t }, payload }); // hand-built, never applied
+    expect(await retargetsOf(db.pool, on('ticket.field_set', { fieldId: 'waitForAll', value: true }))).toEqual([t]);
+    expect(await retargetsOf(db.pool, on('ticket.published', { projectId: PROJECT }))).toEqual([t]);
+    expect(await retargetsOf(db.pool, on('ticket.restored', {}))).toEqual([t, u].sort()); // restored is both: its own and its outgoing
+    expect(await retargetsOf(db.pool, on('ticket.closed', {}))).toEqual([u]); // control: a source-side event re-reads what t leads to
   });
 });
 
