@@ -12,7 +12,7 @@ const hashes = (n: number): string[] => Array.from({ length: n }, (_, index) => 
 const signature = createHash('sha256').update('ticket:T0\nticket:T1\nticket:T2').digest('hex');
 
 describe('27.486 the suggestion rejection payload', () => {
-  it('27.486 { signature, itemHashes } parses; a 63-hex signature, 2 or 13 hashes and an extra member are refused; control: 3 and 12 parse', () => {
+  it('27.486 { signature, itemHashes } parses; a 63-hex signature, 2 or 13 hashes, a 31-hex hash and an extra member are refused; control: 3 and 12 parse', () => {
     expect(signature).toMatch(/^[0-9a-f]{64}$/);
     expect(hashes(1)[0]).toMatch(/^[0-9a-f]{32}$/);
     expect(suggestionRejectedPayload.parse({ signature, itemHashes: hashes(4) })).toEqual({ signature, itemHashes: hashes(4) });
@@ -23,6 +23,7 @@ describe('27.486 the suggestion rejection payload', () => {
     expect(suggestionRejectedPayload.safeParse({ signature: signature.slice(1), itemHashes: hashes(4) }).success).toBe(false);
     expect(suggestionRejectedPayload.safeParse({ signature, itemHashes: hashes(2) }).success).toBe(false);
     expect(suggestionRejectedPayload.safeParse({ signature, itemHashes: hashes(13) }).success).toBe(false);
+    expect(suggestionRejectedPayload.safeParse({ signature, itemHashes: [...hashes(3), (hashes(4)[3] as string).slice(1)] }).success).toBe(false);
     expect(suggestionRejectedPayload.safeParse({ signature, itemHashes: hashes(4), itemIds: ['T0', 'T1', 'T2', 'T3'] }).success).toBe(false);
   });
 

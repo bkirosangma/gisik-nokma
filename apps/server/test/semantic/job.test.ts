@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
+import { purgeItem } from '../../src/purge/purge-item.js';
 import { PURGE_TABLE_RULES } from '../../src/purge/table-rules.js';
 import { runSuggestionJob } from '../../src/semantic/suggestion-job.js';
 import { itemHash, itemKey, signatureOf } from '../../src/semantic/signature.js';
@@ -8,6 +9,7 @@ import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedNotesFixture, type NotesFixture } from '../helpers/notes-fixture.js';
+import { dueAt, recordingStore } from '../purge/world.js';
 
 /**
  * Knowledge Graph spec D §4.1/§4.3 (KG-D Task 5): the suggestion job's database plumbing, cases 27.485 and 27.487–27.490
@@ -288,5 +290,39 @@ describe('27.490 a group already half tagged into one live concept is not sugges
     const rows = await suggestionRows();
     expect(rows).toHaveLength(1);
     expect(sorted(rows[0]?.item_id ?? [])).toEqual(sorted(C));
+  });
+});
+
+// LAST in the file: a purge appends its own events, which `makeCommitted`'s process-local counter never saw.
+describe('27.485 a purge erases the cached suggestions that name the purged item', () => {
+  it('27.485 purging TP takes the row naming TP, purging nProject the row naming it; control: the row naming neither stays', async () => {
+    const { TP } = world;
+    const { nProject } = world.NOTES;
+    const cached = async (label: string, itemKinds: string[], itemIds: string[]) =>
+      db.pool.query(
+        `INSERT INTO sem_suggestions (id, workspace_id, signature, partition_key, item_kind, item_id, item_hashes, terms, label, score, computed_at)
+         VALUES ($1, $2, $3, 'p', $4, $5, '{}', '{}', $3, 0, now())`,
+        [newUlid(), world.WS, label, itemKinds, itemIds],
+      );
+    await clearCache();
+    await cached('names-tp', ['ticket', 'ticket'], [newUlid(), TP]);
+    await cached('names-note', ['note', 'ticket'], [nProject, newUlid()]);
+    await cached('names-neither', ['ticket', 'note'], [newUlid(), newUlid()]);
+    const labels = async () => (await db.pool.query<{ label: string }>('SELECT label FROM sem_suggestions WHERE workspace_id = $1 ORDER BY label', [world.WS])).rows.map((row) => row.label);
+    const deps = (now: Date) => ({ projections: buildProjectionRegistry(), store: recordingStore(), now });
+    const nextWorkspaceSeq = async () =>
+      (await db.pool.query<{ n: number }>('SELECT max(workspace_seq)::int + 1 AS n FROM events WHERE workspace_id = $1', [world.WS])).rows[0]?.n ?? 1;
+    const onEntity = (kind: 'ticket' | 'note', id: string, type: string, extra: Partial<LedgerEvent> = {}) =>
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind, id }, type, payload: {}, ...extra });
+
+    await applyCommitted(db.pool, [onEntity('ticket', TP, 'ticket.deleted', { workspaceSeq: await nextWorkspaceSeq() })]);
+    await applyCommitted(db.pool, [onEntity('ticket', TP, 'purge.marked', { workspaceSeq: await nextWorkspaceSeq() })]);
+    expect((await purgeItem(db.pool, { kind: 'ticket', id: TP }, deps(await dueAt(db.pool, 'ticket', TP)))).status).toBe('purged');
+    expect(await labels()).toEqual(['names-neither', 'names-note']);
+
+    await applyCommitted(db.pool, [onEntity('note', nProject, 'note.deleted', { workspaceSeq: await nextWorkspaceSeq() })]);
+    await applyCommitted(db.pool, [onEntity('note', nProject, 'purge.marked', { workspaceSeq: await nextWorkspaceSeq() })]);
+    expect((await purgeItem(db.pool, { kind: 'note', id: nProject }, deps(await dueAt(db.pool, 'note', nProject)))).status).toBe('purged');
+    expect(await labels()).toEqual(['names-neither']);
   });
 });
