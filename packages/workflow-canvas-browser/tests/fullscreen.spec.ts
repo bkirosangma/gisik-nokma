@@ -176,6 +176,11 @@ test.describe('phone', () => {
     expect(box.height).toBeLessThanOrEqual(0.7 * 844 + 1);
     await expect(sheet.getByRole('tab', { name: 'Selection' })).toHaveAttribute('aria-selected', 'true');
     await expect(sheet.getByRole('textbox', { name: 'State name' })).toHaveValue(name);
+    // G-9 T5 FIX 1 (O2): the bound above is from above only, and a sheet capped at 7vh (59 px) passes it. From below: the sheet is
+    // tall enough to show what it opened for, the tapped state's State name field lying wholly inside it.
+    const field = await boxOf(sheet.getByRole('textbox', { name: 'State name' }));
+    expect(field.y).toBeGreaterThanOrEqual(box.y);
+    expect(field.y + field.height).toBeLessThanOrEqual(box.y + box.height);
     await sheet.getByRole('button', { name: 'Close panel' }).tap();
     await expect(sheet).toHaveCount(0);
 
