@@ -3887,6 +3887,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 - ⚙️ **Flow analysis** (wtg2 T10; `packages/domain/src/flow/{types,analysis,graph,node}.ts`) — pure, clock-free functions over a ticket's "leads to" links: Start and End tickets, loop-closing edges, flow order, the effective graph after a Decision's choice, the live set, loop bodies and branches, and the single `FlowNode` shape every flow feature reads. Cases 29.180-29.186.
 <!-- wtg-part2-model T11 bullet -->
 <!-- wtg-part2-model T12 bullet -->
+- ⚙️ **Flow read** (wtg2 T12; `apps/server/src/flow/read-flow.ts`, `apps/server/src/routes/flow.ts`) — the connected component of a ticket over "leads to" links for one viewer, walked ring by ring: a ticket the viewer cannot read is a hole (no placeholder, no count, not walked through), the viewer's own drafts are included, at most 300 tickets and 30 rings with `truncated` and `reached`; `GET /v1/workspaces/:workspaceId/tickets/:ticketId/flow` serves it. Cases 29.187-29.189.
 <!-- wtg-part2-model T13 bullet -->
 <!-- wtg-part2-model T14 bullet -->
 <!-- wtg-part2-model T15 bullet -->

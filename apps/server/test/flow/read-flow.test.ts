@@ -1,7 +1,9 @@
+import type { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
-import { readFlow } from '../../src/flow/read-flow.js';
-import type { FlowReadWire } from '../../src/routes/flow.js';
+import { FLOW_DEFAULT_CAP, FLOW_MAX_RINGS, readFlow, walkFlow } from '../../src/flow/read-flow.js';
+import { listMyDrafts } from '../../src/read/drafts.js';
+import { flowWire, type FlowReadWire } from '../../src/routes/flow.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
@@ -128,6 +130,13 @@ describe('29.187 a hidden ticket is a hole', () => {
     expect(await readFlow(db.pool, { workspaceId: WS, seedId: HI, viewerId: MEMBER })).toEqual({ nodes: [], edges: [], truncated: false, reached: 0 });
     // a signed-in person who is not in the workspace reads nothing
     expect((await readFlow(db.pool, { workspaceId: WS, seedId: SH, viewerId: rw.userIds.stranger })).nodes).toEqual([]);
+    // A ticket of ANOTHER workspace, asked for through the path of the asker's own workspace, is the empty read. An
+    // owner's visibility test is `draft_author_id IS NULL` alone, so the ring statement's workspace clause is the only
+    // guard: without it the seed is admitted and counted (reached 1) and only the row fetch drops it.
+    const nb = rw.neighbour;
+    expect(await readFlow(db.pool, { workspaceId: nb.workspaceId, seedId: SH, viewerId: rw.userIds.neighbour })).toEqual({ nodes: [], edges: [], truncated: false, reached: 0 });
+    // CONTROL: the same person reads their own workspace's ticket
+    expect(nodeIds(await readFlow(db.pool, { workspaceId: nb.workspaceId, seedId: nb.ticketId, viewerId: rw.userIds.neighbour }))).toEqual([nb.ticketId]);
   });
 
   it('29.187 through the route: a hidden seed answers the same 404 as a missing one, and the wire carries no trace of the hole', async () => {
@@ -135,6 +144,7 @@ describe('29.187 a hidden ticket is a hole', () => {
     const missing = await get('member', newUlid());
     expect(hidden.statusCode).toBe(404);
     expect(hidden.json()).toEqual(missing.json());
+    expect(hidden.json()).toEqual({ error: 'not_found' }); // the one NOT_FOUND_BODY, not merely two equal bodies
     const member = await get('member', SH);
     expect(member.statusCode).toBe(200);
     const body = member.json() as FlowReadWire;
@@ -143,6 +153,9 @@ describe('29.187 a hidden ticket is a hole', () => {
     expect(JSON.stringify(body)).not.toContain('Salary review'); // the hidden ticket's title
     // CONTROL: the owner opens the same hidden ticket as a seed
     expect((await get('owner', HI)).statusCode).toBe(200);
+    // a seed in another workspace, named through the path of the asker's own workspace, is the same 404
+    const foreign = await rw.app.inject({ method: 'GET', url: `/v1/workspaces/${rw.neighbour.workspaceId}/tickets/${SH}/flow`, headers: rw.authOf('neighbour') });
+    expect([foreign.statusCode, foreign.json()]).toEqual([404, { error: 'not_found' }]);
   });
 });
 
@@ -165,6 +178,29 @@ describe('29.188 drafts, deleted tickets, links that do not extend a flow, and t
     expect([nodeIds(other), other.edges, other.reached]).toEqual([[FA], [], 1]);
     // the system read (viewerId null: the promoter, the settler, the sweep) ignores visibility but never reads a draft
     expect(nodeIds(await readFlow(db.pool, { workspaceId: WS, seedId: FA, viewerId: null }))).toEqual([FA]);
+  });
+
+  it('29.188 a deleted draft is a hole for its author too: listMyDrafts still lists it, so the own-draft arm keeps its own liveness clause', async () => {
+    const PX = newUlid();
+    const DX = newUlid();
+    const DY = newUlid();
+    const toDraft = (draft: string) =>
+      makeCommitted({ workspaceId: WS, actorId: MEMBER, entity: { kind: 'ticket', id: draft }, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: draft, from: PX } });
+    await applyCommitted(db.pool, [
+      created(PX, 'Published X'),
+      created(DX, 'Deleted draft', { draft: true, start: 'backlog' }, MEMBER),
+      created(DY, 'Kept draft', { draft: true, start: 'backlog' }, MEMBER),
+      toDraft(DX),
+      toDraft(DY),
+      makeCommitted({ workspaceId: WS, actorId: MEMBER, entity: { kind: 'ticket', id: DX }, type: 'ticket.deleted', payload: {} }),
+    ]);
+    // The precondition that makes the clause load-bearing: the helper filters discards, not deletions, so it still
+    // hands the deleted draft to the read.
+    expect((await listMyDrafts(db.pool, MEMBER, WS)).map((d) => d.ticketId)).toEqual(expect.arrayContaining([DX, DY]));
+    const author = await readFlow(db.pool, { workspaceId: WS, seedId: PX, viewerId: MEMBER });
+    // CONTROL in the same read: DY, the live draft beside it, is in
+    expect([nodeIds(author), edgeKeys(author), author.reached]).toEqual([[DY, PX].sort(), [`${PX}>${DY}:null`], 2]);
+    expect((await readFlow(db.pool, { workspaceId: WS, seedId: DX, viewerId: MEMBER })).nodes).toEqual([]);
   });
 
   it('29.188 a deleted ticket and a blocks-only neighbour are not in the flow although their links exist; viewerId null ignores visibility', async () => {
@@ -195,6 +231,8 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
   }
 
   it('29.189 at most 30 rings out from the seed; a 31st that is not empty sets truncated', async () => {
+    // FL-2's two bounds, pinned as literals: a leg that reads them from the module moves with a mutated constant.
+    expect([FLOW_DEFAULT_CAP, FLOW_MAX_RINGS]).toEqual([300, 30]);
     const chain = await seedChain(33);
     const head = await readFlow(db.pool, { workspaceId: WS, seedId: chain[0] as string, viewerId: OWNER });
     expect(head.nodes).toHaveLength(31); // the seed and rings 1 to 30
@@ -209,6 +247,10 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
     const exact = await seedChain(31);
     const whole = await readFlow(db.pool, { workspaceId: WS, seedId: exact[0] as string, viewerId: OWNER });
     expect([whole.nodes.length, whole.nodes.at(-1)?.id, whole.truncated, whole.reached]).toEqual([31, exact[30], false, 31]);
+    // The cap counts tickets, not rings: cap 2 on the 33-chain's head keeps the seed and ring 1, and the walk stops
+    // after ring 2, the first ring whose count passes 2, counting it (a `cap + 1` in the stop test reads 4).
+    const two = await readFlow(db.pool, { workspaceId: WS, seedId: chain[0] as string, viewerId: OWNER, cap: 2 });
+    expect([two.nodes.map((n) => n.id), two.edges.length, two.truncated, two.reached]).toEqual([[chain[0], chain[1]], 1, true, 3]);
   });
 
   it('29.189 past the cap the first `cap` tickets in ring order are returned, reached counts the ring, and no edge reaches a cut ticket', async () => {
@@ -226,9 +268,40 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
     // so `reached` counts it and `truncated` is true (a `>=` in `order.length > cap` stops at the seed: 1 and false).
     const seedOnly = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 1 });
     expect([seedOnly.nodes.map((n) => n.id), seedOnly.edges, seedOnly.truncated, seedOnly.reached]).toEqual([[hub], [], true, 6]);
+    // cap 0 is read as 1: a caller cannot turn a readable seed into the empty read (which the route answers with 404)
+    const zero = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 0 });
+    expect([zero.nodes.map((n) => n.id), zero.edges, zero.truncated, zero.reached]).toEqual([[hub], [], true, 6]);
     // CONTROL: room for all six
     const roomy = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 6 });
     expect([roomy.nodes.length, roomy.truncated, roomy.reached, roomy.edges.length]).toEqual([6, false, 6, 5]);
+    // A row gone between the ring statement and the row fetch (a purge in between) is left out with no edge to it,
+    // and the read does not throw. The proxy hides leaves[1] from the row fetch only; `roomy` above is the control.
+    const between = new Proxy(db.pool, {
+      get(target, prop, receiver) {
+        if (prop !== 'query') return Reflect.get(target, prop, receiver);
+        return async (text: string, values?: unknown[]) => {
+          const result = await target.query(text, values);
+          if (!text.startsWith('SELECT t.* FROM proj_tickets')) return result;
+          return { ...result, rows: result.rows.filter((row: { ticket_id: string }) => row.ticket_id !== leaves[1]) };
+        };
+      },
+    }) as Pool;
+    const gone = await readFlow(between, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 6 });
+    expect([nodeIds(gone), gone.edges.length, gone.truncated, gone.reached]).toEqual([[hub, ...leaves.filter((id) => id !== leaves[1])].sort(), 4, false, 6]);
+  });
+
+  it('29.189 the default cap is 300: a 301-ticket star reads its first 300 in ring order, truncated, reached 301, and so does the route', async () => {
+    const hub = newUlid();
+    const spokes = Array.from({ length: 300 }, () => newUlid()).sort();
+    await applyCommitted(db.pool, [created(hub, 'Big hub'), ...spokes.map((id, i) => created(id, `Spoke ${i}`)), ...spokes.map((id) => link(hub, id))]);
+    const read = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER });
+    expect([read.nodes.length, read.nodes.at(-1)?.id, read.truncated, read.reached, read.edges.length]).toEqual([300, spokes[298], true, 301, 299]);
+    // CONTROL: room for one more reads the whole star, so it was the default that cut it
+    const room = await readFlow(db.pool, { workspaceId: WS, seedId: hub, viewerId: OWNER, cap: 301 });
+    expect([room.nodes.length, room.truncated, room.reached]).toEqual([301, false, 301]);
+    // the route reads with the default, and its wire carries the same cut, truncated and reached
+    const wire = (await get('owner', hub)).json() as FlowReadWire;
+    expect([wire.tickets.length, wire.links.length, wire.truncated, wire.reached]).toEqual([300, 299, true, 301]);
   });
 
   it('29.189 the wire: titles, keys, state names, the node, leads_to with its label and blocks drawn between members; a draft has no key', async () => {
@@ -238,7 +311,9 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
     expect(body.rootId).toBe(SH);
     expect(body.tickets.map((t) => t.id).sort()).toEqual([HI, SH, TE].sort());
     const shared = body.tickets.find((t) => t.id === SH);
-    expect(shared).toMatchObject({ title: 'Renew the trade licence', stateName: 'Waiting on counterparty' });
+    expect(shared).toMatchObject({ title: 'Renew the trade licence', stateName: 'Waiting on counterparty', projectId: PROJECT, assigneeId: null });
+    // TE is the member's assigned task: the assignee rides the wire (SH above is the unassigned control)
+    expect(body.tickets.find((t) => t.id === TE)).toMatchObject({ title: 'File the GST return', projectId: PROJECT, assigneeId: MEMBER });
     expect(shared?.node).toMatchObject({ id: SH, stateId: 'waiting', category: 'active', draft: false });
     const links = body.links.map((l) => `${l.kind}:${l.sourceId}>${l.targetId}:${l.label}`).sort();
     expect(links).toEqual([`blocks:${SH}>${TE}:null`, `leads_to:${HI}>${TE}:Yes`, `leads_to:${SH}>${HI}:null`].sort());
@@ -256,5 +331,41 @@ describe('29.189 the cap, truncated, reached, the ring limit, and the wire', () 
     expect(draft?.key).toBeNull();
     expect(draft?.node.draft).toBe(true);
     expect(author.tickets.find((t) => t.id === FA)?.node.draft).toBe(false); // CONTROL: a published ticket is not flagged
+  });
+
+  it('29.189 a row the projection cannot name is never drawn: a missing definition, an undeclared state or a missing title throws, naming the ticket', async () => {
+    const [x1, x2, x3, x4] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    await applyCommitted(db.pool, [x1, x2, x3, x4].map((id, i) => created(id, `Lone ${i}`)));
+    const { workflow_id: wf, workflow_version: v } = (
+      await db.pool.query<{ workflow_id: string; workflow_version: number }>('SELECT workflow_id, workflow_version FROM proj_tickets WHERE ticket_id = $1', [x1])
+    ).rows[0] as { workflow_id: string; workflow_version: number };
+    // CONTROL: each one reads and wires before its row is broken
+    for (const id of [x1, x2, x3, x4]) expect((await get('owner', id)).statusCode).toBe(200);
+    await db.pool.query('UPDATE proj_tickets SET workflow_version = workflow_version + 100 WHERE ticket_id = $1', [x1]);
+    await expect(readFlow(db.pool, { workspaceId: WS, seedId: x1, viewerId: OWNER })).rejects.toThrow(
+      `walkFlow: no workflow definition ${wf}@${v + 100} for ticket ${x1}; the projection and the ledger disagree`,
+    );
+    await db.pool.query("UPDATE proj_tickets SET state_id = 'nowhere' WHERE ticket_id = $1", [x2]);
+    await expect(readFlow(db.pool, { workspaceId: WS, seedId: x2, viewerId: OWNER })).rejects.toThrow(
+      `walkFlow: ticket ${x2} is in state nowhere, which ${wf}@${v} does not declare`,
+    );
+    // no title claim at all (x3), and a title claim whose value is not a string (x4): the walk does not read the
+    // title, so it still returns the node; the wire refuses to print one
+    await db.pool.query("UPDATE proj_tickets SET fields = fields - 'title' WHERE ticket_id = $1", [x3]);
+    await db.pool.query("UPDATE proj_tickets SET fields = jsonb_set(fields, '{title,value}', '7') WHERE ticket_id = $1", [x4]);
+    for (const id of [x3, x4]) {
+      const walk = await walkFlow(db.pool, { workspaceId: WS, seedId: id, viewerId: OWNER });
+      expect(walk.read.nodes.map((n) => n.id)).toEqual([id]);
+      await expect(flowWire(db.pool, WS, id, walk)).rejects.toThrow(
+        `flow read: ticket ${id} has no string title claim; ticket.created writes one, so proj_tickets and the ledger disagree`,
+      );
+    }
+    // the wire's own two guards: a node whose state, or state name, the walk did not hand over
+    const whole = await walkFlow(db.pool, { workspaceId: WS, seedId: SH, viewerId: OWNER });
+    expect((await flowWire(db.pool, WS, SH, whole)).tickets).toHaveLength(3); // CONTROL: the intact walk wires
+    const noName = { ...whole, stateNames: new Map([...whole.stateNames].filter(([id]) => id !== TE)) };
+    await expect(flowWire(db.pool, WS, SH, noName)).rejects.toThrow(`flow read: no state name for node ${TE}`);
+    const noState = { ...whole, states: new Map([...whole.states].filter(([id]) => id !== TE)) };
+    await expect(flowWire(db.pool, WS, SH, noState)).rejects.toThrow(`flow read: no state for node ${TE}`);
   });
 });
