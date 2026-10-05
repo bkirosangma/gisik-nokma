@@ -129,7 +129,8 @@ cd "$rundir" || exit 1
 # The residual (13.2349): the cap firing as the job ends. The kernel can reap the job inside `wait` while the USR1 is pending; bash then
 # longjmps out of `wait` before it records the status, so rc is 128+USR1 (158 on macOS), the job's own rc is gone for good (a second `wait`
 # returns 127), and the job is not alive, so no TIMEOUT either. The verb says so in the log ("CAP RACE") and keeps the 128+USR1: a false RED
-# that a re-run clears, never a false green. Weighed and rejected 2026-10-05: no timer at all, the verb polling `kill -0` and then `wait`
+# that a re-run clears, never a false green (the arm cannot tell this from a cap firing just after a normal `wait`, which logs the same line
+# with the job's kept rc: only a 128+USR1 rc is a real loss). Weighed and rejected 2026-10-05: no timer at all, the verb polling `kill -0` and then `wait`
 # (option D), and `wait -n -p` on the job and a sleeping timer (option A, a bash >= 5.1 floor; ctl is 3.2-safe). Each re-architects the
 # cap for a microsecond window at its boundary.
 set -m
