@@ -285,6 +285,9 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
     }
     case 'concept.deleted':
       return 'Deleted the concept';
+    // KG-D Task 5: on the workspace stream, hashes only, so there is nothing to name.
+    case 'workspace.concept_suggestion_rejected':
+      return 'Rejected a suggested concept';
     default:
       return event.type;
   }

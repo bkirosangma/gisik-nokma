@@ -1,7 +1,9 @@
 import {
+  conceptCreatedPayload,
   conceptItemTaggedPayload,
   conceptLinkedPayload,
   conceptMergedPayload,
+  suggestionRejectedPayload,
   type ConceptEventType,
   type EventEnvelope,
 } from '@gisik-nokma/domain';
@@ -28,6 +30,9 @@ export const CONCEPT_GUEST_REASON = 'Guests can read concepts but cannot change 
 export const CONCEPT_UNKNOWN_REASON = 'That concept does not exist or you cannot see it.';
 export const CONCEPT_ITEM_UNKNOWN_REASON = 'That ticket or note does not exist or you cannot see it.';
 export const CONCEPT_RELATED_STREAM_REASON = 'A related link is posted on the concept with the lower id.';
+/** KG-D Task 5: ONE answer for an absent suggestion, one this actor cannot see in full, and a rejection whose hashes are not the row's. */
+export const SUGGESTION_UNKNOWN_RULE = 'suggestion.unknown';
+export const SUGGESTION_UNKNOWN_REASON = 'That suggestion does not exist or you cannot see it.';
 
 /** The merge waits for D's tags (`concepts/merge.ts`); the refusal counts what is still missing. */
 export function conceptMergeIncompleteReason(missing: number): string {
@@ -56,6 +61,47 @@ async function seesConcept(db: Queryable, ctx: VisibilityContext, workspaceId: s
   if (rows.length === 0) return false;
   const items = await liveConceptItems(db, workspaceId, conceptId);
   return (await hiddenItems(db, ctx.eff, ctx.sessionUserId, workspaceId, items)).length === 0;
+}
+
+/**
+ * The cached suggestion (`sem_suggestions`) with this signature or id in this workspace, when the actor sees every live
+ * item in it (D4, as the suggestions read decides it, `routes/suggestions.ts`); `null` for absent and hidden alike. Its
+ * `itemHashes` are returned so a rejection can be bound to the row it names.
+ */
+async function visibleSuggestion(
+  db: Queryable,
+  ctx: VisibilityContext,
+  workspaceId: string,
+  where: { signature?: string; id?: string },
+): Promise<{ itemHashes: string[] } | null> {
+  const { rows } = await db.query<{ item_kind: ('ticket' | 'note')[]; item_id: string[]; item_hashes: string[] }>(
+    'SELECT item_kind, item_id, item_hashes FROM sem_suggestions WHERE workspace_id = $1 AND (signature = $2 OR id = $3)',
+    [workspaceId, where.signature ?? null, where.id ?? null],
+  );
+  const row = rows[0];
+  if (row === undefined) return null;
+  const items = row.item_id.map((id, index) => ({ kind: row.item_kind[index] as ItemRef['kind'], id }));
+  return (await hiddenItems(db, ctx.eff, ctx.sessionUserId, workspaceId, items)).length === 0 ? { itemHashes: row.item_hashes } : null;
+}
+
+/** The same multiset of hashes, in any order. */
+function sameHashes(a: readonly string[], b: readonly string[]): boolean {
+  return [...a].sort().join('\n') === [...b].sort().join('\n');
+}
+
+/**
+ * `workspace.concept_suggestion_rejected` (spec D §4.2/§4.3, KG-D Task 5): a member who sees every item of the
+ * suggestion. A pass of its own, after `checkConceptPermission` in `checkPermission`'s chain, because the event is on
+ * the WORKSPACE, which `checkConceptPermission` never reads. The payload's hashes must be the row's: the job skips any
+ * group too like a rejected hash set (`pipeline.ts`), so a rejection naming its own hashes could suppress groups its
+ * author never saw.
+ */
+export async function checkSuggestionRejection(env: EventEnvelope, ctx: VisibilityContext): Promise<Refusal | null> {
+  if (env.type !== 'workspace.concept_suggestion_rejected') return null;
+  if (ctx.eff.workspaceRole === 'guest') return refuse(CONCEPT_RULES.permission, CONCEPT_GUEST_REASON);
+  const p = suggestionRejectedPayload.parse(env.payload);
+  const seen = await visibleSuggestion(ctx.db, ctx, env.workspaceId, { signature: p.signature });
+  return seen !== null && sameHashes(seen.itemHashes, p.itemHashes) ? null : refuse(SUGGESTION_UNKNOWN_RULE, SUGGESTION_UNKNOWN_REASON);
 }
 
 async function seesItem(db: Queryable, ctx: VisibilityContext, workspaceId: string, item: ItemRef): Promise<boolean> {
@@ -87,7 +133,14 @@ export async function checkConceptPermission(env: EventEnvelope, ctx: Visibility
   const type = env.type as ConceptEventType;
   const ws = env.workspaceId;
   const self = env.entity.id;
-  if (type === 'concept.created') return null;
+  if (type === 'concept.created') {
+    // KG-D Task 5: a concept made FROM a suggestion names one this actor sees in full (its items are tagged after).
+    const p = conceptCreatedPayload.parse(env.payload);
+    if (p.fromSuggestion !== undefined && (await visibleSuggestion(ctx.db, ctx, ws, { id: p.fromSuggestion })) === null) {
+      return refuse(SUGGESTION_UNKNOWN_RULE, SUGGESTION_UNKNOWN_REASON);
+    }
+    return null;
+  }
   if (!(await seesConcept(ctx.db, ctx, ws, self))) return refuse(CONCEPT_RULES.unknown, CONCEPT_UNKNOWN_REASON);
 
   if (type === 'concept.item_tagged' || type === 'concept.item_untagged') {

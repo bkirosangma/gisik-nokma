@@ -26,6 +26,7 @@ import { registerEventRoutes } from './routes/events.js';
 import { registerConceptRoutes } from './routes/concepts.js';
 import { registerGroupRoutes } from './routes/groups.js';
 import { registerSimilarRoutes } from './routes/similar.js';
+import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerGraphRoutes } from './routes/graph.js';
@@ -1041,6 +1042,8 @@ export function buildApp(
   registerSimilarRoutes(app, { pool: deps.pool }, requireSession);
   // Knowledge Graph spec D §5.1 concepts (KG-D T4): list, get, history, audience; D4 decided at read time, 404 otherwise.
   registerConceptRoutes(app, { pool: deps.pool }, requireSession);
+  // KG-D T5: the suggestion job's cache, member read, D4 per reader at read time, 404 otherwise.
+  registerSuggestionRoutes(app, { pool: deps.pool }, requireSession);
   // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
   // here. Board, list and the builder surface all take their scope from a path
   // parameter the door resolves; this one spans a whole workspace, so
