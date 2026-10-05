@@ -3907,6 +3907,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part2-model T13 bullet -->
 <!-- wtg-part2-model T14 bullet -->
 <!-- wtg-part2-model T15 bullet -->
+- ⚙️ **Settle plan** (wtg2 T15; `packages/domain/src/flow/settle.ts`) — a pure function from a flow's current states and a Decision's outcome to the moves that settle it: close the branches not taken (children first), re-run a loop body, return a revised or cleared Decision's Not-taken tickets to Backlog, refuse the whole plan when the engine would refuse a step (a finished parent, an open child, an outcome with no branch, a workflow with no terminal state), and build the events as the Flow actor with the right causes. Cases 29.364-29.367.
 <!-- wtg-part2-model T16 bullet -->
 <!-- wtg-part2-model T17 bullet -->
 <!-- wtg-part2-model T18 bullet -->
