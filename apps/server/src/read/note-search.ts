@@ -39,8 +39,8 @@ const SEARCH_LIMIT = 50;
 /** Spec §7.6's `LIMIT 200` — the inner bound on the client-side sort. */
 const MEANING_CANDIDATES = 200;
 
-/** Spec §7.6's first-20. */
-const MEANING_LIMIT = 20;
+/** Spec §7.6's first-20. Also KG-D T2's ticket meaning search (`item-search.ts`). */
+export const MEANING_LIMIT = 20;
 
 /** Spec §7.6's snippet length for a meaning hit. */
 const MEANING_SNIPPET_CHARS = 160;
@@ -367,9 +367,10 @@ export async function meaningNoteSearch(
  *
  * The heading is already in `heading_path` and is shown as the hit's location,
  * so repeating it inside the snippet would spend the first line of a 160-char
- * window saying where the reader already is.
+ * window saying where the reader already is. Exported for KG-D T2's ticket
+ * meaning search (`item-search.ts`), so a meaning snippet is cut one way.
  */
-function snippetOf(chunkText: string): string {
+export function snippetOf(chunkText: string): string {
   const newline = chunkText.indexOf('\n');
   const body = newline === -1 ? chunkText : chunkText.slice(newline + 1);
   return body.slice(0, MEANING_SNIPPET_CHARS);

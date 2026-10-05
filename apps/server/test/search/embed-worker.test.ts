@@ -136,7 +136,8 @@ describe('18.136–18.140 the embedding worker', () => {
     const first = await worker.runOnce();
     // All five fixture notes: four have empty documents (so they take the title
     // fallback) and this one has a body. None has any chunk row yet.
-    expect(first, 'every unembedded note is picked up').toBe(5);
+    // 5 notes, plus the fixture's two tickets TP and TE: the same pass embeds them since KG-D T2 (`itemsPass`, 27.420).
+    expect(first, 'every unembedded note is picked up, and the two tickets').toBe(5 + 2);
 
     const rows = await chunksOf(fixture.NOTES.nWorkspace);
     expect(rows).toHaveLength(1);
@@ -393,8 +394,11 @@ describe('18.140 — buildApp registers the note-body commit listener', () => {
     for (const listener of listeners) listener(eventOf('note', noteId, 'note.body_set'));
     expect(nudged).toEqual([noteId, noteId]);
 
-    for (const listener of listeners) listener(eventOf('ticket', ticketId, 'ticket.created'));
-    expect(nudged, 'control: a ticket is not a note').toEqual([noteId, noteId]);
+    // KG-D T2 (27.425) ORs `nudgesItemEmbedding` into this listener, so a ticket TEXT event now nudges;
+    // the control is a ticket event that changes no embedded text. `nudgesEmbedding` alone still answers
+    // false for `ticket.created` (the predicate half above).
+    for (const listener of listeners) listener(eventOf('ticket', ticketId, 'ticket.transitioned'));
+    expect(nudged, 'control: a ticket event that changes no embedded text').toEqual([noteId, noteId]);
 
     // The subscription is dropped on close, like the hub's and the fan-out's:
     // a test file that builds several apps over one ingest service would

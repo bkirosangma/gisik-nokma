@@ -14,7 +14,7 @@ import { registerAuthMethodRoutes } from './routes/auth-methods.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { createNotificationFanout } from './notifications/fanout.js';
-import { nudgesEmbedding } from './search/nudge.js';
+import { nudgesEmbedding, nudgesItemEmbedding } from './search/nudge.js';
 import { createInAppTransport } from './notifications/transport.js';
 import type { ObjectStore } from './attachments/object-store.js';
 import { registerAttachmentRoutes } from './routes/attachments.js';
@@ -24,6 +24,7 @@ import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerGroupRoutes } from './routes/groups.js';
+import { registerSimilarRoutes } from './routes/similar.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerGraphRoutes } from './routes/graph.js';
@@ -190,7 +191,11 @@ export type AppDeps = {
   stream?: Omit<StreamRouteDeps, 'pool' | 'hub' | 'now'>;
   /**
    * Called once per committed note event whose TEXT changed — `note.created`
-   * and `note.body_set`, filtered by `nudgesEmbedding`.
+   * and `note.body_set`, filtered by `nudgesEmbedding` — and, since Knowledge
+   * Graph spec D Task 2, once per committed ticket or ticket-comment event that
+   * `nudgesItemEmbedding` names (the id passed is then the TICKET's). The
+   * callback now means "a text that is embedded changed"; the name is kept to
+   * avoid churn in `index.ts`, and the worker ignores the id anyway.
    *
    * A CALLBACK rather than the worker itself, and that is the whole design: the
    * embedding loop is a timer, and `buildApp` is called by around sixty test
@@ -1022,6 +1027,9 @@ export function buildApp(
   registerBuilderReadRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
   // The project-group tree (prefixes and groups Task 6): one flat read, owner/admin/member only.
   registerGroupRoutes(app, { pool: deps.pool }, requireSession);
+  // Knowledge Graph spec D §5.1 `similar` (KG-D T2): the nearest visible tickets and notes to one item by
+  // meaning, read from the embed worker's chunk caches. Same door as the group tree: a member read, 404 otherwise.
+  registerSimilarRoutes(app, { pool: deps.pool }, requireSession);
   // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
   // here. Board, list and the builder surface all take their scope from a path
   // parameter the door resolves; this one spans a whole workspace, so
@@ -1156,7 +1164,9 @@ export function buildApp(
   });
   // The embedding worker's NUDGE (Plan 3 of 6, spec §7.6) — the third listener on
   // the commit feed, and the only one that tells a background loop rather than a
-  // person or a socket. The loop itself is started in `index.ts` beside the
+  // person or a socket. Since KG-D T2 it is "a text that is embedded changed":
+  // a note's (`nudgesEmbedding`) or a ticket's or ticket comment's
+  // (`nudgesItemEmbedding`); the callback keeps its note-era name. The loop itself is started in `index.ts` beside the
   // snapshot writer; see `AppDeps.onNoteBodyCommitted` for why the split is
   // where it is.
   //
@@ -1171,7 +1181,7 @@ export function buildApp(
   if (deps.onNoteBodyCommitted !== undefined) {
     const onNoteBodyCommitted = deps.onNoteBodyCommitted;
     const unsubscribeEmbedNudge = deps.ingest.onEventCommitted((event) => {
-      if (nudgesEmbedding(event)) onNoteBodyCommitted(event.entity.id);
+      if (nudgesEmbedding(event) || nudgesItemEmbedding(event)) onNoteBodyCommitted(event.entity.id);
     });
     app.addHook('onClose', () => {
       unsubscribeEmbedNudge();
