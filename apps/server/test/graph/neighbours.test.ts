@@ -1,6 +1,6 @@
 /**
  * Knowledge Graph spec C §2.2 (KG-C T6): `GET /v1/graph/neighbours` (`src/routes/graph.ts`) over the ring read
- * (`src/read/graph-neighbours.ts`), cases 27.290–27.307 (`test-cases/27-knowledge-graph.md`, under `<!-- KG-C T6 -->`).
+ * (`src/read/graph-neighbours.ts`), cases 27.290–27.309 (`test-cases/27-knowledge-graph.md`, under `<!-- KG-C T6 -->`).
  *
  * ## The REAL tables (planner ruling, 2026-10-04)
  *
@@ -119,6 +119,32 @@ async function reference(r: ReferenceRow): Promise<void> {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '2026-10-01T06:00:00Z', 1)`,
     [ws(), r.sourceKind, r.sourceId, r.parentKind, r.parentId, r.targetKind, r.targetId, r.ordinal ?? 0, r.snippet ?? 'see [[it]]', r.by ?? w().owner],
   );
+}
+/**
+ * A workspace of the owner's and the member's beside the seeded one, with one project, workflow and type, and `tickets`
+ * created in that project, all in ONE batch. Seeded here: `seedNeighbourWorkspace` makes its caller the OWNER and its fixed
+ * `nb-` ids would collide on a second seed. Workflow and type ids carry a ULID for the same reason.
+ */
+async function freshWorkspace(name: string, tickets: ReadonlyArray<{ id: string; title: string }>): Promise<{ workspaceId: string; projectId: string }> {
+  const workspaceId = newUlid();
+  const projectId = newUlid();
+  const flow = `kg6-flow-${newUlid()}`;
+  const type = `kg6-task-${newUlid()}`;
+  const base = { workspaceId, actorId: w().owner };
+  await applyCommitted(db.pool, [
+    makeCommitted({ ...base, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name } }),
+    makeCommitted({ ...base, entity: { kind: 'membership', id: membershipId(workspaceId, w().owner) }, type: 'membership.granted', payload: { userId: w().owner, role: 'owner' } }),
+    makeCommitted({ ...base, entity: { kind: 'membership', id: membershipId(workspaceId, w().member) }, type: 'membership.granted', payload: { userId: w().member, role: 'member' } }),
+    makeCommitted({ ...base, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name: `${name} errands` } }),
+    makeCommitted({ ...base, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: w().member, projectAdmin: false } }),
+    makeCommitted({
+      ...base, entity: { kind: 'workflow', id: flow }, type: 'workflow.defined',
+      payload: { id: flow, version: 1, name: `${name} flow`, initialStateId: 'todo', states: [{ id: 'todo', name: 'To do', category: 'open' }], transitions: [{ from: '*', to: 'todo', rules: [] }] },
+    }),
+    makeCommitted({ ...base, entity: { kind: 'ticket-type', id: type }, type: 'ticket-type.defined', payload: { id: type, name: 'Task', icon: 'check', rank: 3, workflowId: flow, fields: [] } }),
+    ...tickets.map((t) => makeCommitted({ ...base, entity: { kind: 'ticket', id: t.id }, type: 'ticket.created', payload: { typeId: type, projectId, parentId: null, title: t.title } })),
+  ]);
+  return { workspaceId, projectId };
 }
 
 describe('27.290–27.292 the door: session, query, the one 404', () => {
@@ -303,7 +329,27 @@ describe('27.296–27.297 order and page', () => {
     for (let k = 0; k < 2; k += 1) await link('relates', P2, await ticket(`Pair ${String(k)}`));
     const exact = await readGraphRing(db.pool, w().owner, request(P2, 0, 2));
     expect([exact?.items.length, exact?.truncated, exact?.cursor]).toEqual([2, false, null]);
-  });
+
+    // The ROUTE's page (it never passes `pageSize`): a ring of 2,001 is 2,000 items cut at cursor '2000', and that cursor is
+    // the last item. The literals are the page on purpose: a test importing `GRAPH_RING_PAGE` would move with it. The ring
+    // lives in a workspace of its own, because in the seeded project its tickets would join 27.302's ring 2 (the projects
+    // group) and push that ring past a page.
+    const hub = newUlid();
+    const spokes = Array.from({ length: 2001 }, () => newUlid());
+    const big = await freshWorkspace('Big ring', [{ id: hub, title: 'Hub of 2,001' }, ...spokes.map((id, k) => ({ id, title: `Spoke ${String(k)}` }))]);
+    // columns: A's migration, as `link` above; ONE statement for the 2,001 links
+    await db.pool.query(
+      `INSERT INTO proj_ticket_links (workspace_id, source_id, target_id, kind, created_by, created_at, origin, seq)
+       SELECT $1, $3, t, 'relates', $4, '2026-10-01T05:00:00Z', 'web', 1 FROM unnest($2::text[]) AS x(t)`,
+      [big.workspaceId, spokes, hub, w().owner],
+    );
+    const bq = { center: T(hub), hops: '1', ws: big.workspaceId, groups: 'relates' };
+    const first = await ring('owner', bq);
+    const rest = await ring('owner', { ...bq, cursor: '2000' });
+    expect([first.status, first.body.items.length, first.body.truncated, first.body.cursor]).toEqual([200, 2000, true, '2000']);
+    expect([rest.status, rest.body.items.length, rest.body.truncated, rest.body.cursor]).toEqual([200, 1, false, null]);
+    expect(new Set([...refsOf(first.body), ...refsOf(rest.body)])).toEqual(new Set(spokes.map(T)));
+  }, 120_000);
 });
 
 describe('27.298–27.301 people, references, provenance, attachments', () => {
@@ -396,27 +442,9 @@ describe('27.302–27.304 projects, workspaces, deleted items', () => {
   });
 
   it('27.303 a person assigned in two workspaces joins them: in scope with both chosen, fog with one, and the person is never fog; control: a workspace the member is not in is 404', async () => {
-    // A second workspace of the member's, seeded here: `seedNeighbourWorkspace` makes its caller the OWNER and its fixed
-    // `nb-` ids would collide on a second seed. Workflow and type ids carry a ULID for the same reason.
-    const w2 = newUlid();
-    const p2 = newUlid();
-    const flow = `kg6-flow-${newUlid()}`;
-    const type = `kg6-task-${newUlid()}`;
+    // A second workspace of the member's (`freshWorkspace`).
     const y = newUlid();
-    const base = { workspaceId: w2, actorId: w().owner };
-    await applyCommitted(db.pool, [
-      makeCommitted({ ...base, entity: { kind: 'workspace', id: w2 }, type: 'workspace.created', payload: { name: 'Second shop' } }),
-      makeCommitted({ ...base, entity: { kind: 'membership', id: membershipId(w2, w().owner) }, type: 'membership.granted', payload: { userId: w().owner, role: 'owner' } }),
-      makeCommitted({ ...base, entity: { kind: 'membership', id: membershipId(w2, w().member) }, type: 'membership.granted', payload: { userId: w().member, role: 'member' } }),
-      makeCommitted({ ...base, entity: { kind: 'project', id: p2 }, type: 'project.created', payload: { name: 'Second shop errands' } }),
-      makeCommitted({ ...base, entity: { kind: 'project', id: p2 }, type: 'project.member_added', payload: { userId: w().member, projectAdmin: false } }),
-      makeCommitted({
-        ...base, entity: { kind: 'workflow', id: flow }, type: 'workflow.defined',
-        payload: { id: flow, version: 1, name: 'Second flow', initialStateId: 'todo', states: [{ id: 'todo', name: 'To do', category: 'open' }], transitions: [{ from: '*', to: 'todo', rules: [] }] },
-      }),
-      makeCommitted({ ...base, entity: { kind: 'ticket-type', id: type }, type: 'ticket-type.defined', payload: { id: type, name: 'Task', icon: 'check', rank: 3, workflowId: flow, fields: [] } }),
-      makeCommitted({ ...base, entity: { kind: 'ticket', id: y }, type: 'ticket.created', payload: { typeId: type, projectId: p2, parentId: null, title: 'Over in the second shop' } }),
-    ]);
+    const { workspaceId: w2 } = await freshWorkspace('Second shop', [{ id: y, title: 'Over in the second shop' }]);
     await ticketEvent(y, 'ticket.assigned', { assigneeId: w().member }, w2);
     const x = await ticket('Here in the first shop');
     await ticketEvent(x, 'ticket.assigned', { assigneeId: w().member });
@@ -471,6 +499,87 @@ describe('27.306–27.307 groups and hops', () => {
     const q = { center: T(C), ws: ws(), groups: NO_PROJECTS };
     expect(await ring('member', { ...q, hops: '8' })).toEqual({ status: 200, body: empty(8) });
     expect(await ring('member', { ...q, hops: '3' })).toEqual({ status: 200, body: empty(3) });
-    expect(refsOf((await ring('member', { ...q, hops: '2' })).body)).toEqual([T(E)]);
+    const two = await ring('member', { ...q, hops: '2' });
+    expect(refsOf(two.body)).toEqual([T(E)]);
+    // The answer's `hop` and its item's `hop` are the ring asked for (the empty answers above pin only the first).
+    expect(two.body).toMatchObject({ hop: 2, items: [{ ref: T(E), hop: 2, out: false }] });
+  });
+});
+
+describe('27.308–27.309 trashed notes', () => {
+  // The viewer is the OWNER: `visibleNotesWhere` is `TRUE` for an owner (`read/visible-where.ts`), so the trash clause
+  // under test is the only thing that can exclude the note. Each case collects its trashed answers, untrashes, then
+  // asserts, so a red leaves no trashed row behind.
+  it('27.308 a trashed note is neither drawn nor a centre; control: once restored it is both again', async () => {
+    const C = await ticket('Centre of a trashed note');
+    const V = await ticket('Its live neighbour');
+    await link('relates', C, V);
+    const N = await note('Trashed referrer');
+    await reference({ sourceKind: 'note', sourceId: N, parentKind: 'note', parentId: N, targetKind: 'ticket', targetId: C });
+    const trash = (type: 'note.deleted' | 'note.restored') =>
+      applyCommitted(db.pool, [makeCommitted({ workspaceId: ws(), actorId: w().owner, entity: { kind: 'note', id: N }, type, payload: {} })]);
+    const ofC = { center: T(C), hops: '1', ws: ws(), groups: NO_PROJECTS };
+    const ofN = { center: graphRef('note', N), hops: '1', ws: ws(), groups: NO_PROJECTS };
+
+    await trash('note.deleted');
+    // The haystack holds its subject: the note is trashed and its reference row stays (`projections/references.ts`:
+    // "trash: rows stay, reads hide them"), so only the read can leave it out.
+    const notes = (await db.pool.query('SELECT deleted FROM proj_notes WHERE note_id = $1', [N])).rows;
+    const refs = (await db.pool.query('SELECT target_id FROM proj_references WHERE source_id = $1', [N])).rows;
+    const asCentre = await ring('owner', ofN);
+    const around = await ring('owner', ofC);
+    await trash('note.restored');
+    const restoredCentre = await ring('owner', ofN);
+    const restoredAround = await ring('owner', ofC);
+
+    expect(notes).toEqual([{ deleted: true }]);
+    expect(refs).toEqual([{ target_id: C }]);
+    expect(asCentre).toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
+    expect(around.status).toBe(200);
+    expect(refsOf(around.body)).toEqual([T(V)]);
+    expect(JSON.stringify(around.body)).not.toContain(N);
+    expect(restoredCentre.status).toBe(200);
+    expect(refsOf(restoredCentre.body)).toEqual([T(C)]);
+    expect([...refsOf(restoredAround.body)].sort()).toEqual([T(V), graphRef('note', N)].sort());
+  });
+
+  it("27.309 a note homed in a trashed project is neither drawn nor a centre, while a live project's note stays; control: once the project is undeleted it is back", async () => {
+    const P3 = newUlid();
+    const base = { workspaceId: ws(), actorId: w().owner, entity: { kind: 'project', id: P3 } } as const;
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...base, type: 'project.created', payload: { name: 'Soon in the trash' } }),
+      makeCommitted({ ...base, type: 'project.member_added', payload: { userId: w().member, projectAdmin: false } }),
+    ]);
+    const K = await ticket('Centre of two notes');
+    const V = await ticket('Its live neighbour');
+    await link('relates', K, V);
+    const homedInTrash = await note('Homed in the trashed project', { homeProjectId: P3 });
+    const homedLive = await note('Homed in the live project');
+    for (const N of [homedInTrash, homedLive]) await reference({ sourceKind: 'note', sourceId: N, parentKind: 'note', parentId: N, targetKind: 'ticket', targetId: K });
+    // `project.deleted` / `project.undeleted` (`{}` payloads, `projections/lifecycle.ts`) set and clear `deleted_at`, which is what the clause reads.
+    const trash = (type: 'project.deleted' | 'project.undeleted') => applyCommitted(db.pool, [makeCommitted({ ...base, type, payload: {} })]);
+    const ofK = { center: T(K), hops: '1', ws: ws(), groups: NO_PROJECTS };
+    const ofN = { center: graphRef('note', homedInTrash), hops: '1', ws: ws(), groups: NO_PROJECTS };
+
+    await trash('project.deleted');
+    // The haystack: the note itself is NOT trashed and its project is, so only `NOTE_PROJECT_LIVE_WHERE` can leave it out.
+    const notes = (await db.pool.query('SELECT deleted FROM proj_notes WHERE note_id = $1', [homedInTrash])).rows;
+    const projects = (await db.pool.query('SELECT deleted_at IS NOT NULL AS trashed FROM proj_projects WHERE project_id = $1', [P3])).rows;
+    const asCentre = await ring('owner', ofN);
+    const around = await ring('owner', ofK);
+    await trash('project.undeleted');
+    const restoredCentre = await ring('owner', ofN);
+    const restoredAround = await ring('owner', ofK);
+
+    expect(notes).toEqual([{ deleted: false }]);
+    expect(projects).toEqual([{ trashed: true }]);
+    expect(asCentre).toEqual({ status: 404, body: READ_NOT_FOUND_BODY });
+    expect(around.status).toBe(200);
+    // The live project's note is the clause's other side: only the trashed project's notes go.
+    expect([...refsOf(around.body)].sort()).toEqual([T(V), graphRef('note', homedLive)].sort());
+    expect(JSON.stringify(around.body)).not.toContain(homedInTrash);
+    expect(restoredCentre.status).toBe(200);
+    expect(refsOf(restoredCentre.body)).toEqual([T(K)]);
+    expect([...refsOf(restoredAround.body)].sort()).toEqual([T(V), graphRef('note', homedLive), graphRef('note', homedInTrash)].sort());
   });
 });
