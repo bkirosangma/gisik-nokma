@@ -213,6 +213,14 @@ export type AppDeps = {
    * staleness is decided by the tables.
    */
   onNoteBodyCommitted?: (noteId: string) => void;
+  /**
+   * Knowledge Graph spec D §4.1 (KG-D Task 5): called with the WORKSPACE id once per committed event that reaches
+   * `onNoteBodyCommitted` above (`nudgesEmbedding` or `nudgesItemEmbedding`): "an embedded text in this workspace
+   * changed", which is what the suggestion job's 200-change trigger counts. The same listener serves both callbacks,
+   * registered when EITHER is given; `index.ts` hands this `suggestionScheduler.change`, a test hands it nothing. A
+   * callback for the reason `onNoteBodyCommitted` gives: the scheduler owns timers, and `buildApp` starts none.
+   */
+  onSemanticChange?: (workspaceId: string) => void;
 };
 
 /**
@@ -1177,14 +1185,19 @@ export function buildApp(
   // callback's whole job is to schedule work for later, so there is nothing for
   // a request to wait on and nothing a slow embedding could slow down.
   //
-  // Registered ONLY when the caller supplied the callback. Without this guard
+  // Since KG-D T5 the same filtered event also tells the suggestion scheduler which WORKSPACE changed
+  // (`onSemanticChange`, its 200-change trigger): one listener, one predicate, two callbacks.
+  //
+  // Registered ONLY when the caller supplied either callback. Without this guard
   // every `buildApp` in the suite would take a subscription it has no use for
   // and could never observe — and the suite's own app fixtures would each hold
   // a live listener on the ingest service they were built over.
-  if (deps.onNoteBodyCommitted !== undefined) {
-    const onNoteBodyCommitted = deps.onNoteBodyCommitted;
+  if (deps.onNoteBodyCommitted !== undefined || deps.onSemanticChange !== undefined) {
+    const { onNoteBodyCommitted, onSemanticChange } = deps;
     const unsubscribeEmbedNudge = deps.ingest.onEventCommitted((event) => {
-      if (nudgesEmbedding(event) || nudgesItemEmbedding(event)) onNoteBodyCommitted(event.entity.id);
+      if (!(nudgesEmbedding(event) || nudgesItemEmbedding(event))) return;
+      onNoteBodyCommitted?.(event.entity.id);
+      onSemanticChange?.(event.workspaceId);
     });
     app.addHook('onClose', () => {
       unsubscribeEmbedNudge();
