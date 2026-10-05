@@ -50,7 +50,10 @@ test('29.111 on a 390 px phone the view is portrait: time runs down, bars are 10
   expect(Math.abs(stuck as number)).toBeLessThan(1);
   // ERRATA E9, measured (AMEND leg A): a bar in its lane's SECOND column sits exactly 112 + 6 px into the lane and is 100 px wide (a
   // first-column bar alone cannot tell a 0 px inset from 6, nor a 112 px pitch from 120); the lane is its columns x 112 px wide and
-  // starts after the 80 px gutter.
+  // starts after the 80 px gutter. The view opened on today (day 60), past this fixture's bars: scroll to its first days so the
+  // packed rows are mounted.
+  await page.evaluate(() => { (document.querySelector('.gn-timeline__canvas') as HTMLElement).scrollTop = 0; });
+  await expect.poll(() => page.locator('.gn-timeline__bar').count(), { timeout: 3000 }).toBeGreaterThan(10);
   const box = await page.evaluate(() => {
     const bars = [...document.querySelectorAll<HTMLElement>('.gn-timeline__bar')];
     const rowOf = (b: HTMLElement) => Number((b.parentElement as HTMLElement).style.getPropertyValue('--row'));
