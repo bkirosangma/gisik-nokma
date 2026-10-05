@@ -3232,6 +3232,12 @@ param **on its own route**, and the click keeps the reader where they were.
    **A ticket the server will not place says so and mounts nothing**; it is not redirected somewhere
    plausible, and no fallback project is guessed.
 
+**AMENDED 2026-10-05 (my-work-global T4): My work is ONE global page, `/my-work`, and these cases run
+against it** (`apps/web/app/my-work/page.tsx`; the old route only redirects, case 30.040). The open
+ticket is `?ticket=<id>&ws=<workspaceId>`, since a page that spans workspaces can only learn the
+sheet's workspace from the URL, so every push below that reads `/w/:ws/my-work?ticket=<id>` is now
+`/my-work?ticket=<id>&ws=<ws>`, and a close pushes `/my-work`. The three decisions above are unchanged.
+
 - **13.1391** ✅ **A CLICK ON A MY WORK ROW OPENS THE SHEET ON THE MY WORK PAGE.** One push, to
   `/w/:ws/my-work?ticket=<id>` with `{ scroll: false }` — asserted as `toHaveBeenCalledTimes(1)` plus a
   negative on any `/p/` path, because the defect is a SECOND push to the project page — and the sheet is
