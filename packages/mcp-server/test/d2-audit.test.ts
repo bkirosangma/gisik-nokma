@@ -67,13 +67,11 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
   });
 
   it('27.516 under the sweep, a read-only tool never writes and a write tool posts only the events it declares', async () => {
-    const postedBy = new Map<string, string[]>();
-    for (const tool of allTools(fakeSession())) {
-      const entry = SWEEP[tool.name];
-      if (entry === undefined) throw new Error(`${tool.name} has no SWEEP entry`);
+    /** Runs one tool once on its sweep entry's session, recording every event and every write-route call. */
+    const drive = async (name: string, args: Record<string, unknown>) => {
       const posted: string[] = [];
       let routePosts = 0;
-      const base: Session = { ...fakeSession(), ...entry.session };
+      const base: Session = { ...fakeSession(), ...SWEEP[name]?.session };
       const session: Session = {
         ...base,
         postEvents: async (events) => {
@@ -91,8 +89,14 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
           return base.postMultipart(path, fields, file);
         },
       };
-      const handler = allTools(session).find((t) => t.name === tool.name)!.handler;
-      await handler(entry.args); // 14.88 runs every sweep entry to completion the same way (register.test.ts:274-279)
+      await allTools(session).find((t) => t.name === name)!.handler(args); // 14.88 runs every sweep entry to completion the same way (register.test.ts:274-279)
+      return { posted, routePosts };
+    };
+    const postedBy = new Map<string, string[]>();
+    for (const tool of allTools(fakeSession())) {
+      const entry = SWEEP[tool.name];
+      if (entry === undefined) throw new Error(`${tool.name} has no SWEEP entry`);
+      const { posted, routePosts } = await drive(tool.name, entry.args);
       postedBy.set(tool.name, posted);
       if (MCP_READ_ONLY_TOOLS.includes(tool.name)) {
         expect(posted, `${tool.name} is read-only`).toEqual([]);
@@ -106,6 +110,23 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
     // above is not a loop over [] for them.
     for (const name of ['create_ticket', 'manage_concept', 'tag_items', 'link_concepts', 'resolve_suggestion']) {
       expect(postedBy.get(name)?.length ?? 0, `${name}'s sweep entry posted nothing`).toBeGreaterThan(0);
+    }
+    // Paths the sweep's one call per tool does not take, each a call that POSTS (control: it posted). close/reopen
+    // share one templated block, where the source leg below can only check the union, so their comments run here.
+    const EXTRA: [string, Record<string, unknown>][] = [
+      ['close_ticket', { workspaceId: 'w', ticketId: 't', comment: 'Done.' }],
+      ['reopen_ticket', { workspaceId: 'w', ticketId: 't', comment: 'Again.' }],
+      ['manage_concept', { action: 'rename', conceptId: 'c', name: 'D' }],
+      ['manage_concept', { action: 'describe', conceptId: 'c', summary: 'S' }],
+      ['manage_concept', { action: 'delete', conceptId: 'c', confirm_name: 'C' }],
+      ['tag_items', { conceptId: 'c', action: 'remove', items: [{ kind: 'ticket', id: 't' }] }],
+      ['link_concepts', { conceptId: 'c', otherId: 'd', relation: 'related', action: 'remove' }],
+      ['resolve_suggestion', { workspaceId: 'w', suggestionId: 's', action: 'reject' }],
+    ];
+    for (const [name, args] of EXTRA) {
+      const { posted } = await drive(name, args);
+      expect(posted.length, `${name} ${JSON.stringify(args)} posted nothing`).toBeGreaterThan(0);
+      for (const type of posted) expect(MCP_WRITE_AUDIT[name]!.events, `${name} posted ${type}`).toContain(type);
     }
   });
 
