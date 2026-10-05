@@ -1,4 +1,4 @@
-import { PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type PurgedRef } from '@gisik-nokma/domain';
+import { EMPTY_LINKED_FROM, PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type PurgedRef } from '@gisik-nokma/domain';
 import type { DataSource, DataSourceQuery } from '../data-source.js';
 import type { Actor, FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
 import { SessionExpiredError } from '../session-expired.js';
@@ -25,6 +25,7 @@ import {
   mapMyWork,
   mapNoteComments,
   mapNoteDetail,
+  mapLinkedFromPage,
   mapNoteSummaries,
   mapNoteVersionBody,
   mapNoteVersions,
@@ -464,6 +465,12 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
     getNotesForTicket: async (workspaceId, ticketId) => {
       const raw = await http.get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}/notes`);
       return raw === null ? [] : mapNoteSummaries(raw);
+    },
+    getLinkedFrom: async (workspaceId, target, cursor) => {
+      const q = new URLSearchParams({ target: `${target.kind}:${target.id}` });
+      if (cursor !== undefined) q.set('cursor', cursor);
+      const raw = await http.get(`/v1/workspaces/${workspaceId}/references?${q.toString()}`);
+      return raw === null ? EMPTY_LINKED_FROM : mapLinkedFromPage(raw);
     },
     getTicketLinks: async (workspaceId, ticketId) => {
       // A 404 (a ticket this viewer cannot see) resolves `null`: no links, like the notes read above.

@@ -455,6 +455,14 @@ const NOTE_SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+const LINKED_FROM_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'LinkedFromPage (every field)',
+    because: 'the device holds no reference index (proj_references is server-side) and no audience for another person’s notes; an empty page would claim nothing links here',
+    owner: 'Knowledge Graph spec B: a local reference table folded from the replicated bodies, and the note/ticket audiences to filter it', // planner ruling 2026-10-04: matches 12.185's owner rule
+  },
+];
+
 const MY_WORK_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'WorkItem.projectName',
@@ -704,6 +712,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
   getPreferences: PREFERENCES_ABSENCES,
   putPreferences: PREFERENCES_ABSENCES,
+  getLinkedFrom: LINKED_FROM_ABSENCES,
 };
 
 /* ------------------------------------------------------------------ *
@@ -1438,6 +1447,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     putPreferences: () => Promise.reject(new ReplicaGapError('putPreferences', PREFERENCES_ABSENCES)),
     search: () => Promise.reject(new ReplicaGapError('search', SEARCH_ABSENCES)),
     searchNotes: () => Promise.reject(new ReplicaGapError('searchNotes', NOTE_SEARCH_ABSENCES)),
+    getLinkedFrom: () => Promise.reject(new ReplicaGapError('getLinkedFrom', LINKED_FROM_ABSENCES)),
 
     /**
      * `grouping` is READ AND NOT USED, and that is the shipped view type rather

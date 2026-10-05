@@ -30,7 +30,7 @@ ctl_node22 || exit 1
 if [ "$explicit_repo" = 1 ]; then rundir="$CTL_REPO"; else rundir="$PWD"; fi
 shown="${cmd[*]}"; [ "${#shown}" -le 120 ] || shown="${shown:0:119}…"
 if [ "$CTL_DRY_RUN" = 1 ]; then
-  echo "DRY: acquire a slot (1..$(ctl_sem_slots) in $(ctl_sem_dir); waits while a gate runs, memory pressure is not normal, or swap-in is high), then in $rundir: $shown > $(ctl_log run-tests)"
+  echo "DRY: acquire a slot (1..$(ctl_sem_slots) in $(ctl_sem_dir); waits while a gate runs and at least $(ctl_sem_gate_slots) slot(s) are held (CTL_SEM_GATE_SLOTS), memory pressure is not normal, or swap-in is high), then in $rundir: $shown > $(ctl_log run-tests)"
   ctl_ok run-tests "dry-run"
 fi
 log="$(ctl_log run-tests)"

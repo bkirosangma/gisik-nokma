@@ -4311,6 +4311,144 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "linking-tickets",
+            "title": "Linking tickets",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A ticket can be linked to other tickets, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Links"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " section on its sheet, just under the fields, lists them. A link has one of three kinds, and reads differently from each end:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Blocks"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Is blocked by"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": this ticket has to be finished before the other can go ahead."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Relates to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": the two tickets are connected. It reads the same from both."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Duplicates"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Is duplicated by"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": this ticket repeats the other."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", pick how this ticket relates ("
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Is blocked by"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", say), search for the other ticket by its key or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and GN-133 is blocked by GN-142, added on GN-133, make the same link. The new row shows at once, faded, and settles when it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block each other), the reason appears beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and nothing is added."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Remove"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " takes a link away, from either end, and a message offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " for a few seconds. Links to tickets you cannot see are not shown, and neither is a count of them."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A link only records the relationship. It does not mark the card, move it, or close a duplicate: close or move the tickets yourself."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "why-it-shows-who-claimed-everything",
             "title": "Why it shows who claimed everything",
             "blocks": [
@@ -5671,7 +5809,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Whoever built your workflow can mark a state as a waiting or blocked one — \"Waiting on parts\", \"Waiting on customer\". Every ticket in that column is in that state by definition. There is no switch you flip on an individual ticket to say it is stuck; you need a state built for it."
+                    "text": " Whoever built your workflow can mark a state as a waiting or blocked one — \"Waiting on parts\", \"Waiting on customer\". Every ticket in that column is in that state by definition. There is no switch you flip on an individual ticket to say it is stuck; you need a state built for it. To record what a ticket is waiting on, link it to the blocking ticket (see Linking tickets in §5): a link notes the blocker and does not mark the card or move it."
                   }
                 ]
               },
@@ -10800,6 +10938,51 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " — the same as pressing Attach note yourself. Referencing a note inside the note's own comments does not attach anything anywhere."
                   }
                 ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Linked from."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " A ticket and a note each show what links to them: under the ticket's Notes, and under a note's text, a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Linked from"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " list names every ticket, note and comment that chips or links to it, with the sentence it sits in and the reference highlighted. Click a row to open it; a comment opens its ticket or note scrolled to the comment. Only what "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " can see is listed, and the number beside the heading counts only those. Past twenty, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " loads the rest. A plain "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "GN-142"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " typed as text is not a link — only a chip is. Nothing to list, no list."
+                  }
+                ]
               }
             ]
           },
@@ -10943,12 +11126,6 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": "Meaning search understands English only; a Garo-tuned model is a planned follow-up, not built."
-                    }
-                  ],
-                  [
-                    {
-                      "kind": "text",
-                      "text": "There is no list on a note or a ticket showing what else links to it."
                     }
                   ]
                 ]
