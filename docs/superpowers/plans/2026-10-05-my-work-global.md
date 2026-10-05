@@ -198,6 +198,8 @@ Route parsing: `show` must be a single string. Split it on `,`; every value must
 - Create: `apps/server/src/my-work-preferences/store.ts`
 - Create: `apps/server/src/routes/my-work-preferences.ts`
 - Modify: `apps/server/src/app.ts` (register beside notification-preferences)
+- Modify: `apps/server/src/http-origin.ts` (protect `/v1/me/my-work-preferences`, below the E3-14 notification-preferences rows) and the 13.116 table in `apps/server/test/http/security-middleware.test.ts` (one PUT row). Guard 13.198 reds any mutating route left out (AMEND 16:5x).
+- Modify: the purge table rules: `user_my_work_preferences` is `not-entity-bearing`, beside `user_notification_preferences`. Guard 19.083 (`test/purge/table-rules.test.ts`) requires a rule for every table.
 - Test: `apps/server/test/routes/my-work-preferences.test.ts`
 
 **Interfaces:**
