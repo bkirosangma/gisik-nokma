@@ -524,7 +524,7 @@ const BOOTSTRAP_RETRY_JITTER = 0.2;
 /** The wait before retry number `attempt + 1`; `random` is in [0, 1], 0.5 adds no jitter. */
 function bootstrapRetryDelayMs(attempt: number, random: () => number): number {
   const capped = Math.min(BOOTSTRAP_RETRY_BASE_MS * 2 ** attempt, BOOTSTRAP_RETRY_CAP_MS);
-  return Math.round(capped * (1 + BOOTSTRAP_RETRY_JITTER * (2 * random() - 1)));
+  return capped * (1 + BOOTSTRAP_RETRY_JITTER * (2 * random() - 1));
 }
 
 /**
@@ -568,7 +568,11 @@ export function createSyncEngine(deps: {
    * because the later call set it back to false.
    */
   let startGeneration = 0;
-  /** The pending bootstrap retry's timer, and the wake that settles its wait early. */
+  /**
+   * The last bootstrap retry's timer, and the wake that settles its wait early.
+   * Left in place once it fires: clearing a fired timer and resolving a settled
+   * wait are both no-ops, so `cancelBootstrapRetry` need not tell the two apart.
+   */
   let bootstrapRetry: { timer: ReturnType<typeof setTimeout>; wake: () => void } | null = null;
   /** Frames apply strictly in arrival order. Never rejects: every link ends in a handler. */
   let applyChain: Promise<unknown> = Promise.resolve();
@@ -610,10 +614,7 @@ export function createSyncEngine(deps: {
   /** Wait `ms` before the next bootstrap attempt; `cancelBootstrapRetry` ends the wait early. */
   function waitBeforeBootstrapRetry(ms: number): Promise<void> {
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        bootstrapRetry = null;
-        resolve();
-      }, ms);
+      const timer = setTimeout(resolve, ms);
       bootstrapRetry = { timer, wake: resolve };
     });
   }

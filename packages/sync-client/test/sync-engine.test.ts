@@ -3149,7 +3149,8 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     const { engine, script, statuses } = await retryRig([403]);
     const run = begin(engine);
     await drain();
-    await run.done;
+    // Settled with no fake time spent: a retried 403 would still be waiting here.
+    expect(run.state.settled).toBe(true);
     expect(run.state.error).toBeInstanceOf(WorkspaceAccessLost);
     expect(script.bootstraps).toBe(1);
     expect(vi.getTimerCount()).toBe(0);
@@ -3164,7 +3165,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
       const { engine, script } = await retryRig([status]);
       const run = begin(engine);
       await drain();
-      await run.done;
+      expect(run.state.settled).toBe(true);
       expect(run.state.error).toBeInstanceOf(HttpStatusError);
       expect((run.state.error as HttpStatusError).status).toBe(status);
       expect((run.state.error as Error).message).toBe(`bootstrap failed: ${status}`);
@@ -3266,6 +3267,8 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
       if (stopBetween) engine.stop();
       const second = begin(engine);
       await drain();
+      // Both settled with no fake time spent: the superseded wait was woken, not left to its timer.
+      expect([first.state.settled, second.state.settled]).toEqual([true, true]);
       await Promise.all([first.done, second.done]);
       expect(first.state.error).toBeUndefined();
       expect(second.state.error).toBeUndefined();
