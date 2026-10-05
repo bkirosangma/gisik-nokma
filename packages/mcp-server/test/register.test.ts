@@ -84,7 +84,7 @@ describe('the tools, registered', () => {
     }
   });
 
-  it('14.555 the final registry is the 69 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
+  it('14.555 the final registry is the 72 tools of the plan, in its order, in the package door (the hosted door is mcp-http 14.262)', async () => {
     // The plan's header order, spelled out HERE and not read from the fixture: editing the fixture alone cannot make this green.
     const FINAL = [
       'search', 'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
@@ -99,8 +99,9 @@ describe('the tools, registered', () => {
       'manage_members', 'change_prefix', 'manage_groups',
       'define_workflow', 'define_ticket_type', 'migrate_ticket_type', 'set_visibility', 'update_workspace_settings',
       'list_deleted',
+      'list_my_drafts', 'publish_draft', 'discard_draft',
     ];
-    expect(FINAL).toHaveLength(69); // 63 until typed links T4 added `link_tickets` (27.060), 64 until MCP sweep 2 T4 added `restore_note_version`, 65 until MCP sweep 2 T5 added `close_tickets`, 66 until MCP sweep 2 T6 added the three preference and saved-filter tools (14.555)
+    expect(FINAL).toHaveLength(72); // 63 until typed links T4 added `link_tickets` (27.060), 64 until MCP sweep 2 T4 added `restore_note_version`, 65 until MCP sweep 2 T5 added `close_tickets`, 66 until MCP sweep 2 T6 added the three preference and saved-filter tools (14.555), 69 until drafts T7 added `list_my_drafts`, `publish_draft`, `discard_draft` (28.141)
     const tools = allTools(fakeSession());
     expect(tools.map((t) => t.name)).toEqual(FINAL);
     expect(TOOL_NAMES).toEqual(FINAL);
