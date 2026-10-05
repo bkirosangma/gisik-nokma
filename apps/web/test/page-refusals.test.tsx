@@ -140,6 +140,7 @@ const BOARD_WITH_DONE = {
 const ATTENTION_ITEM = {
   kind: 'due-soon' as const,
   ticketId: '01J9TICKET00000000000000AT',
+  workspaceId: '01J9WORKSPACE0000000000000',
   projectId: '01J9PROJECT000000000000000',
   title: 'File the GST return',
   reason: 'Needed by 2026-08-30 — due within 7 days.',

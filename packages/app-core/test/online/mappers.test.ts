@@ -1734,6 +1734,9 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
       {
         contests: [
           {
+            // The route sends the row's workspace (`sync/contests-route.ts` `toView`), and the
+            // item now carries it (my-work-global T3, case 30.027), so the fixture does too.
+            workspaceId: '01J9GWS0000000000000000000',
             ticketId: 'tkt-9',
             title: 'Chase the licence renewal',
             projectId: '01J9GPRJ000000000000000000',

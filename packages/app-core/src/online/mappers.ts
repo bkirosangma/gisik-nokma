@@ -1,5 +1,5 @@
 import type { GroupRow } from '@gisik-nokma/domain';
-import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
+import { ATTENTION_SHOW_VALUES, isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
   DeletedItem,
@@ -62,6 +62,7 @@ import { memberLabel } from '../member-label.js';
 // The list entry union lives with the component that renders it; see the note
 // on the same import in `../data-source.ts`. Type-only, so no runtime edge.
 import type { AttachmentListEntry } from '../views/attachment-list.js';
+import type { MyWorkPreferences } from '@gisik-nokma/domain';
 // The comment view type lives with its component for the same reason, and the
 // same type-only import keeps the dependency erased at runtime.
 import type { TicketComment } from '../views/comments-thread.js';
@@ -1249,6 +1250,31 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
   // a narrowing like the plural axes above.
   if (filter.closed !== undefined) spec['closed'] = filter.closed;
   return spec;
+}
+
+/**
+ * `GET`/`PUT /v1/me/my-work-preferences` → `MyWorkPreferences` (my-work-global T3).
+ *
+ * Every key is REQUIRED and every value checked against its closed set, the register
+ * `mapPreferences` keeps: the server always answers a whole document (the defaults for a
+ * person who never saved one), so a body short a key, or carrying a `show` value or a
+ * grouping this client cannot render, is a server it does not understand — refused rather
+ * than read as a choice nobody made.
+ */
+export function mapMyWorkPreferences(raw: unknown): MyWorkPreferences {
+  const record = asRecord(raw, 'myWorkPreferences');
+  const show = asArray(record['show'], 'myWorkPreferences.show').map((value, index) => {
+    const path = `myWorkPreferences.show[${index}]`;
+    const text = asString(value, path);
+    const known = ATTENTION_SHOW_VALUES.find((candidate) => candidate === text);
+    if (known === undefined) throw new MappingError(path, ATTENTION_SHOW_VALUES.join('/'));
+    return known;
+  });
+  const grouping = asString(record['grouping'], 'myWorkPreferences.grouping');
+  if (grouping !== 'workspace-project' && grouping !== 'flat') {
+    throw new MappingError('myWorkPreferences.grouping', 'workspace-project/flat');
+  }
+  return { show, grouping };
 }
 
 /**
@@ -2609,6 +2635,7 @@ export function mapAttention(
     items.push({
       kind: 'contested',
       ticketId: asString(contest['ticketId'], `${path}.ticketId`),
+      workspaceId: asString(contest['workspaceId'], `${path}.workspaceId`),
       projectId: asString(contest['projectId'], `${path}.projectId`),
       title: asString(contest['title'], `${path}.title`),
       // The rule that refused it and why, which is what the strip is for. The
@@ -2711,6 +2738,7 @@ function mapAttentionItem(
   const card = asRecord(record['card'], `${path}.card`);
   const base = {
     ticketId: asString(card['ticketId'], `${path}.card.ticketId`),
+    workspaceId: asString(card['workspaceId'], `${path}.card.workspaceId`),
     projectId: asString(card['projectId'], `${path}.card.projectId`),
     title: asString(card['title'], `${path}.card.title`),
     reason: asString(record['reason'], `${path}.reason`),
