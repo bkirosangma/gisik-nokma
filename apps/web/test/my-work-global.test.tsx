@@ -476,9 +476,9 @@ describe('30.038 the choices are the user\'s own document', () => {
     expect(calls.myWork.sort()).toEqual([W1, W2].sort());
   });
 
-  it('30.038 a save that fails says so beside the controls and keeps the pressed chips as chosen; CONTROL: a save that lands says nothing', async () => {
-    const pressAssignedOff = async (putFail: Error | null) => {
-      const mounted = mount({ store: { doc: null, fail: null, putFail } });
+  it('30.038 a save that fails says it was NOT SAVED (never "Reload") and keeps the pressed chips as chosen; CONTROLS: a save that lands says nothing, and a load that fails beside it still says "could not be loaded"', async () => {
+    const pressAssignedOff = async (putFail: Error | null, attention?: Record<string, AttentionItem[] | Error>) => {
+      const mounted = mount({ store: { doc: null, fail: null, putFail }, ...(attention === undefined ? {} : { attention }) });
       const view = renderPage(mounted.services);
       await screen.findByRole('button', { name: 'Count the stock' });
       await userEvent.click(chip('Assigned to me'));
@@ -495,10 +495,22 @@ describe('30.038 the choices are the user\'s own document', () => {
     landed.unmount();
     clearMyWorkspacesCache();
 
-    // The PUT is refused: the choice stays on screen for this visit, and the page says it was not kept.
-    await pressAssignedOff(new Error('HTTP 500 for /v1/me/my-work-preferences'));
+    // The PUT is refused while one workspace's attention read fails too: the choice stays on screen
+    // for this visit, and the page says it was not saved (planner ruling 22:54), not the shared load
+    // sentence, whose "Reload to try again" would throw the choice away.
+    await pressAssignedOff(new Error('HTTP 500 for /v1/me/my-work-preferences'), {
+      [W1]: new Error('HTTP 500 for /v1/workspaces/w1/attention'),
+      [W2]: ATTENTION[W2] ?? [],
+    });
     expect(pressed()).toEqual(['Created by me']);
-    expect(saveRefusal()?.textContent ?? '').toContain('HTTP 500 for /v1/me/my-work-preferences');
+    const refusal = saveRefusal();
+    expect(refusal?.querySelector('.gn-shell__refusal-what')?.textContent).toBe(
+      'Your choice for this page was not saved. It stays as you set it until you leave this page.',
+    );
+    expect(refusal?.textContent ?? '').not.toMatch(/Reload/);
+    expect(refusal?.querySelector('.gn-shell__refusal-wire')?.textContent).toBe('HTTP 500 for /v1/me/my-work-preferences');
+    // CONTROL: the failed LOAD beside it keeps the shared refusal and its sentence.
+    expect(screen.getByText('What needs your attention in Alpha Works could not be loaded. Reload to try again.')).toBeInTheDocument();
   });
 });
 

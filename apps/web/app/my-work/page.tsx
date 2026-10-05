@@ -137,6 +137,24 @@ function useMyWorkPreferences(source: DataSource): {
   return { ...read, saveError, save };
 }
 
+/**
+ * What a failed SAVE of the person's choices says (planner ruling 22:54 on T4 FIX 1). Not
+ * `ShellRefusal`: its sentence, "could not be loaded. Reload to try again.", is a read's, and a
+ * reload is the one thing that would throw away the choice still on screen. The same role and
+ * classes as `ShellRefusal`, so it reads as one of the page's refusals, with the wire string on its
+ * own line as there; the shared component and its copy are left as they are for every read.
+ */
+const SAVE_REFUSED = 'Your choice for this page was not saved. It stays as you set it until you leave this page.';
+
+function SaveRefusal({ message }: { message: string }) {
+  return (
+    <p role="status" className="gn-shell__refusal">
+      <span className="gn-shell__refusal-what">{SAVE_REFUSED}</span>
+      <span className="gn-shell__refusal-wire">{message}</span>
+    </p>
+  );
+}
+
 const lowerFirst = (label: string): string => label.charAt(0).toLowerCase() + label.slice(1);
 
 /**
@@ -331,7 +349,7 @@ function GlobalMyWorkBoard() {
               <GroupToggle value={grouping} onChange={changeGrouping} />
             </div>
             {preferences.saveError !== null ? (
-              <ShellRefusal what="Your choice for this page" message={preferences.saveError} />
+              <SaveRefusal message={preferences.saveError} />
             ) : null}
 
             {attention.error !== null ? (
