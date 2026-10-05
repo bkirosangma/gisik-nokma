@@ -62,6 +62,38 @@ describe('29.183 the effective graph and the live set', () => {
     expect(sameLabel(null, 'Yes')).toBe(false);
     expect(sameLabel('Yes', null)).toBe(false);
   });
+
+  it('29.183 the live set walks each ticket once: a ladder of Decisions that rejoin costs a lookup per link, not one per path', () => {
+    // c0 -> {a0, b0} -> c1 -> {a1, b1} -> ... -> c12: 37 tickets, 48 links, 2^12 paths. The walk's `seen` check is what keeps
+    // the queue to one entry per ticket; without it the queue holds one entry per PATH (16,000+ lookups here). That cost
+    // doubles with each rung (about 160 ms at 20 rungs), and a flow at the 300-ticket cap has room for about 100 rungs, so it
+    // is unbounded long before the cap. The result alone cannot tell the two apart, so count the lookups.
+    const rungs = 12;
+    const c = (i: number) => uid(100 + i);
+    const nodes = [fnode(c(0))];
+    const edges: Array<ReturnType<typeof edge>> = [];
+    for (let i = 0; i < rungs; i += 1) {
+      nodes.push(fnode(uid(200 + i)), fnode(uid(300 + i)), fnode(c(i + 1)));
+      edges.push(edge(c(i), uid(200 + i)), edge(c(i), uid(300 + i)), edge(uid(200 + i), c(i + 1)), edge(uid(300 + i), c(i + 1)));
+    }
+    const analysis = analyzeFlow(nodes, edges);
+    const get = Map.prototype.get;
+    let lookups = 0;
+    Map.prototype.get = function (this: Map<unknown, unknown>, key: unknown) {
+      lookups += 1;
+      return get.call(this, key);
+    };
+    let live = new Set<string>();
+    try {
+      live = liveSet(nodes, edges, analysis);
+    } finally {
+      Map.prototype.get = get;
+    }
+    expect(live.size).toBe(nodes.length);
+    // CONTROL: the counter sees the walk (one adjacency lookup per ticket at least), so a pass is not a blind instrument
+    expect(lookups).toBeGreaterThanOrEqual(nodes.length);
+    expect(lookups).toBeLessThan(4 * (nodes.length + edges.length));
+  });
 });
 
 describe('29.184 loop bodies and branches', () => {

@@ -1,4 +1,4 @@
-import { istDayBounds, istDayOf, newUlid, SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
+import { DECISION_TYPE_ID, istDayBounds, istDayOf, newUlid, SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { IngestService } from '../ingest/ingest-service.js';
 import { isoDatePlusDays } from '../notifications/sweep.js';
@@ -217,9 +217,22 @@ export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseR
                    AND c.state_category <> 'terminal'
                    AND c.draft_author_id IS NULL
               )
+          -- DC-5 (wtg2 T6): a Decision with branches and no outcome is not a
+          -- candidate. checks/decision.ts refuses its close, and a republish can
+          -- leave one terminal with no transition (as for the child guard
+          -- above); clearing a terminal Decision's outcome is allowed too. Read
+          -- from t.links, the column the engine's TicketState.links comes from,
+          -- so the two cannot disagree after a rebuild. A draft-side entry
+          -- (with "from") never sits on a swept row: drafts are not candidates
+          -- (LIVE_TICKET_WHERE) and publishing drops those entries.
+          AND NOT (
+                t.type_id = $3
+            AND t.outcome IS NULL
+            AND EXISTS (SELECT 1 FROM jsonb_array_elements(t.links) AS l WHERE l ->> 'kind' = 'leads_to')
+          )
           AND entered.server_time < $2
         ORDER BY t.ticket_id`,
-      [workspaceId, cutoff],
+      [workspaceId, cutoff, DECISION_TYPE_ID],
     );
     report.candidates += rows.length;
     for (const row of rows) selected.push({ ticketId: row.ticket_id, workspaceId: row.workspace_id });

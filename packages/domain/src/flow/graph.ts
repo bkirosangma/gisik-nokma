@@ -69,6 +69,8 @@ export function liveSet(nodes: readonly FlowNode[], edges: readonly FlowEdge[], 
  * to `D`, i.e. reachable from `T` AND reaching `D` over non-back edges. A ticket the walk merely
  * passes through on its way elsewhere (reachable from `T`, never reaching `D`) is not in it. Taken
  * over the whole flow, not the effective graph: the body is structure, independent of any outcome.
+ * The edges must be one read's (FL-1: a hole's links already dropped). Unlike `analyzeFlow` and `liveSet`, this has no
+ * node list to check them against, so a link through a hidden id would be walked and the hidden id returned.
  */
 export function loopBody(
   backEdge: Pick<FlowEdge, 'sourceId' | 'targetId'>,
@@ -87,6 +89,8 @@ export function loopBody(
  * non-back edges, never passing through the Decision. `label` is null for a Decision's unlabeled edge
  * (the engine requires labels, but a link relabelled out from under a Decision must not crash the plan).
  * Empty when the Decision has no such edge.
+ * The edges must be one read's (FL-1: a hole's links already dropped). Unlike `analyzeFlow` and `liveSet`, this has no
+ * node list to check them against, so a link through a hidden id would be walked and the hidden id returned.
  */
 export function branchOf(
   decisionId: string,

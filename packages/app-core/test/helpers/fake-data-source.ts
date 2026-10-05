@@ -94,6 +94,7 @@ export function createFakeDataSource(
     // defaults reads it: the fake answers the same empty view for every
     // workspace, which is what a default is for. Overrides that care take it.
     getMyWork: async () => ({ assigned: [], inTransit: [], contested: [], shared: [] }),
+    getMyDrafts: async () => [],
     getAttention: async () => [],
     // The server's REAL answer for a workspace nobody has configured, not an
     // invented blank (second wave, Task 6): `getWorkspaceSettings` applies the

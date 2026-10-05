@@ -288,7 +288,7 @@ domainRegistry.register({
   payloadSchema: ticketLinkRemovedPayload,
 });
 
-/** `ticket.decided` (Workflow and Timeline graphs DC-4): FOLDS into `outcome` and `passes`, so it is in `TICKET_EVENT_TYPES` and deliberately not backfilled below a snapshot. Whether the ticket is a Decision will be the engine's door (`checks/decision.ts`, wtg2 T6); until then no check refuses it on another type. */
+/** `ticket.decided` (Workflow and Timeline graphs DC-4): FOLDS into `outcome` and `passes`, so it is in `TICKET_EVENT_TYPES` and deliberately not backfilled below a snapshot. Whether the ticket is a Decision, and whether the outcome is one of its branch labels and current, is the engine's door (`rule-engine` `checks/decision.ts`, wtg2 T6). */
 domainRegistry.register({ type: 'ticket.decided', version: 1, entityKind: 'ticket', payloadSchema: ticketDecidedPayload });
 
 /**

@@ -483,8 +483,8 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
   /**
    * A transition on a closed ticket previews `closed-ticket` — decided BEFORE
    * the def/version-chain gates the ordinary transition branch runs, exactly
-   * where the real engine decides it (`transition.ts:78`, ahead of
-   * `getWorkflowDef` at `:82`): no workflow definition is cached here at all,
+   * where the real engine decides it (`transition.ts:79`, ahead of
+   * `getWorkflowDef` at `:83`): no workflow definition is cached here at all,
    * and the refusal still fires, because it reads only the flag this client
    * already holds.
    */

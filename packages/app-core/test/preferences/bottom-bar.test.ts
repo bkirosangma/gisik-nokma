@@ -91,3 +91,13 @@ describe('21.036 the write side cuts to four known ids as well', () => {
     expect(stored()).toEqual({ userId: 'u', slots: ['board', 'notes', 'inbox'] });
   });
 });
+
+describe('28.198 Drafts is a destination a bar may pin (drafts T8 FIX 1; planner ruled B 09:11)', () => {
+  it('28.198 a pinned drafts slot reads back through the door, and the bytes hold it; an unknown id beside it is still dropped', () => {
+    rememberBottomBar('u', ['drafts', 'zz' as never, 'notes']);
+    expect(readBottomBar('u')).toEqual(['drafts', 'notes']);
+    expect(JSON.parse(localStorage.getItem(BOTTOM_BAR_KEY) ?? 'null')).toEqual({ userId: 'u', slots: ['drafts', 'notes'] });
+    // CONTROL — offered, never slotted by default: the owner's default bar does not carry it.
+    expect(DEFAULT_BAR).not.toContain('drafts');
+  });
+});
