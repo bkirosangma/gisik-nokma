@@ -30,6 +30,8 @@ export type SweepEntry = { args: Record<string, unknown>; session?: Partial<Sess
 const TICKET_DETAIL = { key: 'W-1', title: 'A ticket', ticketState: { fields: {}, rank: 'm', workflowId: 'wf' }, rollup: null };
 /** The references route's empty page (KG-B T4: get_ticket and get_note read it). */
 const NO_REFERENCES = { total: 0, items: [], nextCursor: null };
+/** A minimal `ConceptView` (KG-D T4: every concept tool but the list reads one). */
+const SWEEP_CONCEPT = { id: 'c', name: 'C', summary: '', itemCount: 0, createdBy: 'u', origin: 'web', workspaceId: 'w', createdAt: '2026-10-05T10:00:00.000Z', fromSuggestion: null, items: [], links: [] };
 
 export const SWEEP: Record<string, SweepEntry> = {
   // read begin
@@ -132,4 +134,15 @@ export const SWEEP: Record<string, SweepEntry> = {
   // graph begin (KG-D T2, T6)
   similar: { args: { workspaceId: 'w', item: { kind: 'ticket', id: 't' } }, session: { get: async () => ({ workspaceId: 'w', item: { kind: 'ticket', id: 't' }, hits: [] }) } },
   // graph end
+  // concept begin (KG-D T4, T5)
+  list_concepts: { args: { workspaceId: 'w' }, session: { get: async () => ({ workspaceId: 'w', concepts: [] }) } },
+  get_concept: { args: { conceptId: 'c' }, session: { get: async () => SWEEP_CONCEPT } },
+  // No `confirm_name`: the delete answers its preview.
+  manage_concept: { args: { action: 'delete', conceptId: 'c' }, session: { get: async () => SWEEP_CONCEPT } },
+  tag_items: {
+    args: { conceptId: 'c', action: 'add', items: [{ kind: 'ticket', id: 't' }] },
+    session: { get: async (path) => (path.includes('/audience') ? { conceptId: 'c', members: 2, before: 2, after: 1 } : SWEEP_CONCEPT) },
+  },
+  link_concepts: { args: { conceptId: 'c', otherId: 'd', relation: 'related', action: 'add' }, session: { get: async () => SWEEP_CONCEPT } },
+  // concept end
 };

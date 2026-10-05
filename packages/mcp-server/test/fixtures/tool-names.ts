@@ -63,6 +63,11 @@ export const TOOL_NAMES_BY_MODULE = {
     'similar',
     // graph end
   ],
+  concept: [
+    // concept begin (KG-D T4, T5)
+    'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts',
+    // concept end
+  ],
 } satisfies Record<string, string[]>;
 
 export const TOOL_NAMES: string[] = Object.values(TOOL_NAMES_BY_MODULE).flat();
