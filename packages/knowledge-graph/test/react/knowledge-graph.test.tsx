@@ -661,6 +661,22 @@ describe('KnowledgeGraph: the empty state and the scope note name their cause (K
     expect(fake.last().edges.filter((e) => e.grp === 'blocks').map((e) => e.id)).toContain('blocks|ticket:t133|ticket:t142');
     expect(document.querySelector('.gn-kg__empty')).toBeNull();
     expect(screen.queryByText(chipsOff)).toBeNull();
+    cleanup();
+    // one held link between two withheld ones still makes a filtered centre: every link is read, not only the first or the last
+    const centre9 = item('t9', { label: 'GN-9', ws: 'gn', project: 'j_mw' });
+    const link = (kind: GraphEdgeView['kind'], to: string): GraphEdgeView => ({ id: `${kind}|${T('t9')}|${T(to)}`, kind, from: T('t9'), to: T(to), snippet: null, addedBy: null, addedAt: null, origin: null, suggested: false });
+    const mixed: GraphSource = {
+      ring: async (q): Promise<GraphRingResponse> => ({
+        hop: q.hops, center: { ...centre9, hop: 0 }, frontier: [], truncated: false, cursor: null,
+        items: q.hops === 1 ? [{ ...item('t5', { label: 'GN-5', ws: 'gn', project: 'j_mw' }), hop: 1 }] : [],
+        edges: q.hops === 1 ? [link('relates', 't404'), link('blocks', 't5'), link('relates', 't405')] : [],
+      }),
+    };
+    setup({ centre: T('t9'), onAddLink }, { source: mixed });
+    await everyChipOff(userEvent.setup());
+    expect(await screen.findByText("Every link type is turned off. Turn one on to see GN-9's links.")).toBeInTheDocument();
+    expect(screen.queryByText('Nothing is linked to GN-9 yet.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
   });
 
   it('27.662 a ticket centre with no links: Nothing is linked and Add link, with every chip on and with every chip off; control: the chips-off case does not say Nothing is linked', async () => {
