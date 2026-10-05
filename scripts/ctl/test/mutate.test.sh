@@ -434,7 +434,18 @@ statics_ok() { local out rc md; rm -f "$R1.fake/confs.jsonl"
   && grep -q "retried once without its statics" "$md" && grep -q "stryker run 2 packages/calc/src/calc.ts:2-6 (ignoreStatic)" "$md" \
   && [ "$(python3 -c 'import json,sys; print(" ".join(str(json.loads(l)["ignoreStatic"]) for l in open(sys.argv[1])))' "$R1.fake/confs.jsonl")" = "False True" ] && clean_tree "$R1" && committed "$R1" \
   || { echo "       (rc $rc)"; printf '%s\n' "$out" | tail -3 | cut -c1-200 | sed 's/^/       /'; return 1; }; }
-check "13.2265 STATICS NOT SWEPT (ruling 19:25 (2)): a run the watchdog stops past the cap is retried ONCE for that chunk with ignoreStatic on (confs: False then True); its 2 static mutants (LIMIT = 200's custom flips) are Ignored, the table and the report say 'STATICS NOT SWEPT: packages/calc/src/calc.ts n=2', and with no survivor the exit is 0" 'statics_ok'
+# n is the file's SUM over its retried chunks (reviewer C, P44 rider): at CTL_MUTATE_SPLIT=1 every chunk of calc.ts overruns and is retried; the
+# statics' chunk (line 3) is NOT the last one retried, so a count that kept only the last chunk's Ignored would print n=0
+statics_sum_ok() { local out rc md; rm -f "$R1.fake/confs.jsonl"
+  out="$(FAKE_MODE=flips-dup FAKE_STATIC_SLOW_FILE=calc.ts FAKE_SLEEP=20 CTL_MUTATE_MAX_SECS=1 CTL_MUTATE_SPLIT=1 mut "$R1")"; rc=$?; md="$(mdof "$R1")"
+  python3 -c 'import json,sys
+c=[json.loads(l) for l in open(sys.argv[1])]
+r=[[tuple(map(int, m.split(":")[1].split("-"))) for m in x["mutate"]] for x in c if x["ignoreStatic"]]
+has3=lambda rs: any(a <= 3 <= b for a, b in rs)
+assert len(r) >= 2 and any(map(has3, r)) and not has3(r[-1]), r' "$R1.fake/confs.jsonl" || { echo "       (precondition: two or more retried chunks, the last one without line 3)"; return 1; }
+  [ $rc -eq 0 ] && printf '%s\n' "$out" | grep -qx "  STATICS NOT SWEPT: packages/calc/src/calc.ts n=2" && grep -qx "STATICS NOT SWEPT: packages/calc/src/calc.ts n=2" "$md" \
+  && clean_tree "$R1" && committed "$R1" || { echo "       (sum: rc $rc: $(printf '%s\n' "$out" | grep STATICS | cut -c1-160))"; return 1; }; }
+check "13.2265 STATICS NOT SWEPT (ruling 19:25 (2)): a run the watchdog stops past the cap is retried ONCE for that chunk with ignoreStatic on (confs: False then True); its 2 static mutants (LIMIT = 200's custom flips) are Ignored, the table and the report say 'STATICS NOT SWEPT: packages/calc/src/calc.ts n=2', and with no survivor the exit is 0; n is the SUM over the file's retried chunks (CTL_MUTATE_SPLIT=1: the statics' chunk is not the last retried, still n=2)" 'statics_ok && statics_sum_ok'
 statics_scope_ok() { local out rc; rm -f "$R2.fake/confs.jsonl"
   out="$(FAKE_MODE=flips-dup FAKE_STATIC_SLOW_FILE=small.ts FAKE_SLEEP=20 CTL_MUTATE_MAX_SECS=1 mut "$R2")"; rc=$?
   [ $rc -eq 1 ] && printf '%s\n' "$out" | grep -qx "  STATICS NOT SWEPT: packages/calc/src/small.ts n=0" && ! printf '%s\n' "$out" | grep -q "STATICS NOT SWEPT: packages/calc/src/big.ts" \
