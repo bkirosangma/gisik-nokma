@@ -323,7 +323,7 @@ export type BoardResponse = { projectId: string; workspaceId: string; columns: B
  * No `cause`, unlike `StateProvenance`: a reopen names the child that caused it
  * because `ticket.transitioned` carries a `cause` field, and
  * `ticket.assigned`'s payload is `{ assigneeId }` and nothing else
- * (`packages/domain/src/events/ticket-events.ts:50`). A nullable `cause` here
+ * (`packages/domain/src/events/ticket-events.ts:51`). A nullable `cause` here
  * would be a field no event could ever fill.
  */
 export type AssignmentProvenance = {

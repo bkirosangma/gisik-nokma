@@ -101,7 +101,7 @@ describe('3.71 transitionOptions — what the definition declares plus the unive
  * Ruling P27. `transitionOptions` exists to predict the engine, so where a
  * wildcard and an exact edge both reach one target it must resolve them the way
  * the engine does: `find(exact) ?? find('*')`
- * (`packages/rule-engine/src/transition.ts:120-121`), which `precheck.ts`'s
+ * (`packages/rule-engine/src/transition.ts:124-125`), which `precheck.ts`'s
  * `needsMembership` already mirrors at :467-473.
  *
  * It did not. It kept the first matching edge in DECLARATION ORDER, so a

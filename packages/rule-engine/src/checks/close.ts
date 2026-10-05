@@ -34,7 +34,7 @@ import { ACCEPT, refuse } from './refusals.js';
  * move together — E6-4 (soft-deleted children) is the change that will move
  * them.
  *
- * Same shape as every other check's entity-kind guard (`transition.ts:41-47`,
+ * Same shape as every other check's entity-kind guard (`transition.ts:42-48`,
  * `workflow-rebind.ts:44-50`, `fields.ts:90-96`): a misfiled kind is a
  * malformed claim and is REFUSED, naming the kind it actually points at — it
  * is not silently accepted, which the first cut of this file got backwards

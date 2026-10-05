@@ -49,7 +49,7 @@ export function nonTerminalStates(def: WorkflowDef): Array<{ id: string; name: s
  *
  * ## The wire spelling is `to`, and the plan text said `toStateId`
  *
- * `ticketTransitionedPayloadSchema` (`packages/domain/src/workflow.ts:137`)
+ * `ticketTransitionedPayloadSchema` (`packages/domain/src/workflow.ts:138`)
  * names the destination `to`, with `cause` as its optional sibling declared
  * exactly `{ kind: 'reopened-for-child', childTicketId }`. The schema is not
  * `.strict()`, so a payload spelled `toStateId` is not REFUSED for carrying an

@@ -95,7 +95,7 @@ export async function evaluateTicketTransitioned(
       rule: REFUSAL_RULES.strandedState,
       // No version clause beside the state id, deliberately. `resolveCurrentStateId`
       // reports the id at the point the chain BROKE, not the id it started from
-      // (`foldStateIdForward`, packages/domain/src/workflow.ts:158), while
+      // (`foldStateIdForward`, packages/domain/src/workflow.ts:159), while
       // `ticket.workflowVersion` is the ticket's ORIGIN version. On a chain
       // longer than two those are different versions, so "state X of version Y"
       // named a pair that never coexisted. It coincided — and so read true — only

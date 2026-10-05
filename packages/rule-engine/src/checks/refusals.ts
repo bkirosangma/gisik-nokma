@@ -206,7 +206,7 @@ export function reboundUnknownWorkflowRefusal(workflowId: string): string {
  * The destination is named, never inferred: the outgoing and incoming workflows
  * are unrelated graphs with unrelated state ids, and `stateMapping` cannot help
  * — it is keyed inside a single workflow's version chain
- * (`events/ticket-events.ts:151-156`). Guessing where a ticket lands would be
+ * (`events/ticket-events.ts:152-157`). Guessing where a ticket lands would be
  * inventing its status, which invariant 4 forbids. So the claim says where it
  * goes, and this is the refusal when the target workflow has no such place.
  */

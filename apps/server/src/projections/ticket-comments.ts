@@ -55,7 +55,7 @@ import type { Projection } from './registry.js';
  * ## The id
  *
  * `comment_id` IS the event id. The payload carries none — it is
- * `z.object({ body })` and nothing else (`events/ticket-events.ts:108`) — so the
+ * `z.object({ body })` and nothing else (`events/ticket-events.ts:109`) — so the
  * envelope's id is the only identity a comment has, and it is the one the read
  * serves. That is the same construction `proj_contested` uses for
  * `contested_event_id`.

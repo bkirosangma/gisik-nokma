@@ -10,7 +10,7 @@ import type { Queryable } from '../db/queryable.js';
  * Read from the ledger's own shapes at the branch head:
  *
  *  - `comment.added` is `z.object({ body })` and nothing else
- *    (`packages/domain/src/events/ticket-events.ts:108`) — no files, and no id
+ *    (`packages/domain/src/events/ticket-events.ts:109`) — no files, and no id
  *    of its own beyond the envelope's.
  *  - `attachment.added` is `{kind, attachmentId, filename, mime, size, sha256}`
  *    (or the drive-reference arm) — it names the ticket it belongs to through

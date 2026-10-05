@@ -414,7 +414,7 @@ export function applyTicketEvent(
       // The one payload in this vocabulary whose destination field genuinely IS
       // `toStateId` — the outgoing and incoming workflows are unrelated graphs,
       // so the claim names where the ticket lands rather than leaving it to be
-      // guessed (events/ticket-events.ts:151-156).
+      // guessed (events/ticket-events.ts:152-157).
       const p = ticketWorkflowReboundPayload.parse(env.payload);
       const wf = deps.getWorkflow(p.toWorkflowId);
       if (!wf) {
@@ -699,7 +699,7 @@ export function foldTicketToWorkflowVersion(
     //
     // The message names the id at the point the chain BROKE and no version
     // beside it, because `foldStateIdForward` reports the break-point id, not
-    // the one it started from (workflow.ts:158): on a chain longer than two
+    // the one it started from (workflow.ts:159): on a chain longer than two
     // that id can belong to a version the ticket never sat in, and naming a
     // state and a version that never coexisted is worse than naming neither.
     // Same reasoning, same wording discipline as the engine's stranded-state

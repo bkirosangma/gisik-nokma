@@ -483,8 +483,8 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
   /**
    * A transition on a closed ticket previews `closed-ticket` — decided BEFORE
    * the def/version-chain gates the ordinary transition branch runs, exactly
-   * where the real engine decides it (`transition.ts:72`, ahead of
-   * `getWorkflowDef` at `:76`): no workflow definition is cached here at all,
+   * where the real engine decides it (`transition.ts:78`, ahead of
+   * `getWorkflowDef` at `:82`): no workflow definition is cached here at all,
    * and the refusal still fires, because it reads only the flag this client
    * already holds.
    */
@@ -524,6 +524,66 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
       closed: { actorId: ACTOR, at: '2026-08-20T00:00:00.000Z' },
     });
     expect(await precheckEvent(reopenTicket(), cache)).toEqual({ kind: 'passed' });
+  });
+});
+
+/**
+ * 29.203 (wtg2 T8) — the forged-cause refusal on the client. The engine asks it
+ * first at the transition, close and reopen doors, right after the payload
+ * parses and before it reads the ticket; the precheck asks the engine's own
+ * `flowCauseForgery` at the same point, so a person's flow cause previews
+ * `cause.forged` word for word even where the cache would have answered
+ * something else, or nothing.
+ */
+describe('29.203 precheckEvent refuses a forged flow cause first, as the engine does', () => {
+  const FORGED = {
+    kind: 'refused',
+    rule: 'cause.forged',
+    reason: 'Only the flow can record that a ticket was led here, reopened or passed over by a decision.',
+  };
+  const decided = {
+    decisionTicketId: '01J9GDEC000000000000000000',
+    outcome: 'No',
+    pass: 1,
+    decidedBy: OTHER_ACTOR,
+    decisionEventId: '01J9GEVT000000000000000001',
+  };
+  const notTaken = { kind: 'branch-not-taken', ...decided };
+  const reset = { kind: 'reopened-by-flow', ...decided };
+  const caused = (type: 'ticket.closed' | 'ticket.reopened', cause: unknown) =>
+    make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type, payload: { cause } });
+
+  it('29.203 a person\'s forged close, reopen and transition preview cause.forged ahead of every cached fact', async () => {
+    const terminal = readyCache({ stateId: 'done', stateCategory: 'terminal' });
+    const closed = readyCache({
+      stateId: 'done',
+      stateCategory: 'terminal',
+      closed: { actorId: OTHER_ACTOR, at: '2026-08-20T00:00:00.000Z' },
+    });
+    // Close: the uncaused close passes (control); the forged one is refused, and on a doing ticket it is forged,
+    // not close-requires-terminal.
+    expect(await precheckEvent(closeTicket(), terminal)).toEqual({ kind: 'passed' });
+    expect(await precheckEvent(caused('ticket.closed', notTaken), terminal)).toEqual(FORGED);
+    expect(await precheckEvent(caused('ticket.closed', notTaken), readyCache())).toEqual(FORGED);
+    // Reopen: the uncaused reopen passes (control); the forged one is refused, on an open ticket too (not not-closed).
+    expect(await precheckEvent(reopenTicket(), closed)).toEqual({ kind: 'passed' });
+    expect(await precheckEvent(caused('ticket.reopened', reset), closed)).toEqual(FORGED);
+    expect(await precheckEvent(caused('ticket.reopened', reset), terminal)).toEqual(FORGED);
+    // Transition: on a closed ticket the uncaused move is closed-ticket (control), the forged one is forged.
+    expect(await precheckEvent(transitionTo('todo'), closed)).toMatchObject({ rule: REFUSAL_RULES.closedTicket });
+    expect(await precheckEvent(transitionTo('todo', { cause: reset }), closed)).toEqual(FORGED);
+    // The old cause is no flow cause: a person's reopened-for-child is untouched (control).
+    expect(await precheckEvent(transitionTo('todo', { cause: { kind: 'reopened-for-child', childTicketId: CHILD } }), closed)).toMatchObject({
+      rule: REFUSAL_RULES.closedTicket,
+    });
+    // Nothing cached at all: the uncaused events defer (control), the forged ones are still refused.
+    const empty = createClientStateCache();
+    expect(await precheckEvent(closeTicket(), empty)).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
+    expect(await precheckEvent(reopenTicket(), empty)).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
+    expect(await precheckEvent(transitionTo('todo'), empty)).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
+    expect(await precheckEvent(caused('ticket.closed', notTaken), empty)).toEqual(FORGED);
+    expect(await precheckEvent(caused('ticket.reopened', reset), empty)).toEqual(FORGED);
+    expect(await precheckEvent(transitionTo('todo', { cause: reset }), empty)).toEqual(FORGED);
   });
 });
 

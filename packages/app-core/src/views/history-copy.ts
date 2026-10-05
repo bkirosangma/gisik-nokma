@@ -206,8 +206,8 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       if (typeof outcome !== 'string' || outcome === '') return event.type;
       return from === null ? `Decided: ${outcome}` : `Decision revised: ${from} → ${outcome}`;
     }
-    // The flag events carry no payload at all — the envelope holds actor and
-    // time, and the row beside this sentence already prints both.
+    // A flag event's payload is empty or one flow `cause` (wtg2 T8, not phrased
+    // here); the envelope holds actor and time, which the row already prints.
     case 'ticket.closed':
       return 'Closed';
     case 'ticket.reopened':

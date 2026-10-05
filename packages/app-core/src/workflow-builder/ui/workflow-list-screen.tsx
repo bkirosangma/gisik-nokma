@@ -37,7 +37,7 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *   only published definitions, so a field that can hold exactly one value would
  *   be a badge that lies by omission the moment a second state exists.
  *   `PublishedWorkflowDef` stays `{id,version,name,initialStateId,states,
- *   transitions,stateMapping?}` (`packages/domain/src/workflow.ts:100-133`) with
+ *   transitions,stateMapping?}` (`packages/domain/src/workflow.ts:101-134`) with
  *   no status anywhere on the wire; `"Published"` is derivable from the read
  *   itself, and the prototype's other two badge values (`"Superseded"`,
  *   `"Draft · N issues"`, `:3175-3178`) are not.
@@ -164,7 +164,7 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  * ## The category bar is DATA, not decoration
  *
  * `WorkflowState.category` is `'open' | 'active' | 'terminal'`
- * (`packages/domain/src/workflow.ts:3-7`), so the bar's colour is a function of
+ * (`packages/domain/src/workflow.ts:4-8`), so the bar's colour is a function of
  * a field the read already carries. It maps onto the three `--gn-category-*`
  * roles the product's own `.gn-chip__dot` uses for the same three categories,
  * which is why no new role is invented for it.

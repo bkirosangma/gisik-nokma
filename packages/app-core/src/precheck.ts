@@ -1,4 +1,10 @@
-import { REFUSAL_RULES, evaluateEvent, workflowStateNotCreatableRefusal, type EngineContext } from '@gisik-nokma/rule-engine';
+import {
+  REFUSAL_RULES,
+  evaluateEvent,
+  flowCauseForgery,
+  workflowStateNotCreatableRefusal,
+  type EngineContext,
+} from '@gisik-nokma/rule-engine';
 import {
   BACKLOG_STATE_ID,
   isCreatableState,
@@ -193,12 +199,21 @@ export async function precheckEvent(
   // pre-check result — it is the absence of one.
   if (submitted.type !== 'ticket.transitioned') return notEvaluated();
 
+  // The engine's own door for this payload. It is parsed first because the
+  // engine's first question is a payload-and-actor one (wtg2 T8: a forged flow
+  // cause, `transition.ts:63`, asked before it reads the ticket); later it
+  // answers the two questions the verdict alone cannot: which state is being
+  // entered, and which edge carries the rule that refused.
+  const payload = ticketTransitionedPayloadSchema.safeParse(submitted.payload);
+  const forged = payload.success ? forgedCause(submitted, payload.data.cause) : null;
+  if (forged !== null) return forged;
+
   const ticket = cache.getTicket(submitted.entity.id);
   if (ticket === undefined) return notEvaluated();
 
   // The explicit reopen (backlog/closed spec §2), mirrored from the engine's
-  // OWN order: `transition.ts:72` decides this before it even fetches the
-  // workflow def at `:76`, because a closed ticket has no legal move at all
+  // OWN order: `transition.ts:78` decides this before it even fetches the
+  // workflow def at `:82`, because a closed ticket has no legal move at all
   // and the flag is a fact this cache already holds — no def, no version
   // chain, nothing further is needed to answer confidently. Deciding it here,
   // ahead of the gates below, is what makes this branch predict the engine on
@@ -218,11 +233,6 @@ export async function precheckEvent(
     envelope,
     contextFromCache(cache, pendingFieldClaims(envelope, deps.pendingFields)),
   );
-  // The engine's own door for this payload, asked again for the two questions
-  // the verdict alone cannot answer: which state is being entered, and which
-  // edge carries the rule that refused.
-  const payload = ticketTransitionedPayloadSchema.safeParse(submitted.payload);
-
   if (!verdict.refused) {
     if (!payload.success) return notEvaluated();
     if (acceptRestsOnUnseenChildren(ticket, def, payload.data, cache)) return notEvaluated();
@@ -465,6 +475,19 @@ function precheckParentTerminal(submitted: SubmittedEvent, cache: ClientStateCac
 }
 
 /**
+ * The engine's `cause.forged` (wtg2 T8; the spec's census row for this file:
+ * "the same rules on the client"), asked of the engine's own
+ * `flowCauseForgery` so the sentence cannot drift. A client is never the flow
+ * actor, so a flow cause on anything it builds is refused here as the server
+ * refuses it: first, from the payload and the actor alone, before any cached
+ * fact is read (29.203).
+ */
+function forgedCause(submitted: SubmittedEvent, cause: unknown): PrecheckResult | null {
+  const forged = flowCauseForgery(completeForPrecheck(submitted), cause);
+  return forged === null ? null : { kind: 'refused', rule: forged.rule, reason: forged.reason };
+}
+
+/**
  * `ticket.closed`/`ticket.reopened`, hand-rolled from `checks/close.ts`'s own
  * conditions and rule ids (backlog/closed spec §2, 2026-09-17) — the same
  * shape `precheckParentTerminal` takes, and NOT routed through the shared
@@ -474,16 +497,20 @@ function precheckParentTerminal(submitted: SubmittedEvent, cache: ClientStateCac
  * UNLIKE `precheckParentTerminal`, these two CAN answer `passed`. Gate 4
  * exists because `checkTicketCreated`/`checkTicketReparented` read a
  * ticket-type definition this cache has no store for; `checkTicketClosed` and
- * `checkTicketReopened` read neither — `checkTicketClosed` reads only
- * `ticket.closed` and `ticket.stateCategory`, both cached facts, and consults
- * a workflow def ONLY to spell the state's NAME inside a refusal reason it has
- * already decided to give. So once every fact a verdict rests on is genuinely
- * held, a `passed` here is not an accept manufactured from absence — it is the
- * one this module's own invariant permits.
+ * `checkTicketReopened` read neither. Each first asks the forged-cause question
+ * (`forgedCause` below), which reads only the payload and the actor; past it,
+ * `checkTicketClosed` reads `ticket.closed`, `ticket.stateCategory` and the
+ * vouched children's categories, all cached facts, and consults a workflow def
+ * ONLY to spell the state's NAME inside a refusal reason it has already decided
+ * to give. So once every fact a verdict rests on is genuinely held, a `passed`
+ * here is not an accept manufactured from absence — it is the one this
+ * module's own invariant permits.
  */
 function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
   const parsed = ticketClosedPayload.safeParse(submitted.payload);
   if (!parsed.success) return notEvaluated();
+  const forged = forgedCause(submitted, parsed.data.cause);
+  if (forged !== null) return forged;
   const ticket = cache.getTicket(submitted.entity.id);
   if (ticket === undefined) return notEvaluated();
   if ((ticket.closed ?? null) !== null) {
@@ -523,10 +550,15 @@ function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache
   return { kind: 'passed' };
 }
 
-/** `ticket.reopened`'s only condition is the flag itself, which this cache already holds. */
+/**
+ * `ticket.reopened`'s conditions are the forged-cause question (payload and
+ * actor only) and the flag itself, which this cache already holds.
+ */
 function precheckTicketReopened(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
   const parsed = ticketReopenedPayload.safeParse(submitted.payload);
   if (!parsed.success) return notEvaluated();
+  const forged = forgedCause(submitted, parsed.data.cause);
+  if (forged !== null) return forged;
   const ticket = cache.getTicket(submitted.entity.id);
   if (ticket === undefined) return notEvaluated();
   if ((ticket.closed ?? null) === null) {

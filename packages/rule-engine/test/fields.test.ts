@@ -56,7 +56,7 @@ function ctxWithoutTheTicketsType(): MemoryContext {
 
 /**
  * Candidate payloads spell the key `fieldId`, which is what the DOMAIN schema
- * says (`events/ticket-events.ts:90`). The fixture harness's PRIOR-event parser
+ * says (`events/ticket-events.ts:91`). The fixture harness's PRIOR-event parser
  * spells it `field`, and the split is deliberate — controller ruling P8,
  * pre-flight A16. Neither is adapted into the other.
  */

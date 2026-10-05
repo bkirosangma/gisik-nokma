@@ -50,7 +50,7 @@ function rebind(ticketId: string, toWorkflowId: string, toStateId: string): Even
     entity: { kind: 'ticket', id: ticketId },
     workspaceId: WS,
     // The one payload in this vocabulary whose destination field genuinely IS
-    // `toStateId` (`events/ticket-events.ts:158-161`, pre-flight A10). Spelled
+    // `toStateId` (`events/ticket-events.ts:159-162`, pre-flight A10). Spelled
     // `to` here it would not parse.
     payload: { toWorkflowId, toStateId },
   });

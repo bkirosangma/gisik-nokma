@@ -40,7 +40,7 @@ export type ContestLike = {
  *
  * Deliberately not `DataSource['ingest']`: that would bind these functions to
  * the online result union, and the replica's `ingest` answers
- * `LocalIngestResult` (`../replica/replica-data-source.ts:96`) — `IngestResult`
+ * `LocalIngestResult` (`../replica/replica-data-source.ts:98`) — `IngestResult`
  * plus a `pending` arm. Both satisfy this shape; neither is imported. Verified
  * assignable with a real `tsc` probe rather than by reading the types, because
  * `& Record<string, unknown>` turns on implicit index signatures and every test

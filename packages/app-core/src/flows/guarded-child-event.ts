@@ -291,8 +291,8 @@ export type ReopenOutcome =
  * `TicketSheet.submitTransition` translates at the same boundary and for the
  * same reason — the view vocabulary says `toStateId`, the ledger says `to`, and
  * the translation happens where the envelope is built. `ticket.reopened`
- * carries no payload at all (`ticketReopenedPayload = z.object({}).strict()`),
- * the same empty shape `ticket.closed` uses.
+ * goes out with an empty payload: its one member, an optional `cause`, is the
+ * flow's (`reopened-by-flow`, wtg2 T8); `ticket.closed` has the same shape.
  */
 export async function reopenAndProceed(
   source: DataSource,

@@ -482,7 +482,7 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
  *
  * The route has sent `role` since it first answered
  * (`routes/builder-reads.ts:247`, returned at `:259`), and the wire type is
- * `WorkspaceMember` (`packages/domain/src/read-models.ts:547`).
+ * `WorkspaceMember` (`packages/domain/src/read-models.ts:553`).
  *
  * ## What did NOT change
  *
@@ -1059,7 +1059,7 @@ export function mapWorkflowDef(raw: unknown): WorkflowDef {
  *
  * Every field the client needs is on the wire, under the client's own spelling:
  * the route's body is typed `TicketTypeListResponse`
- * (`packages/domain/src/read-models.ts:301`) whose `ticketTypes` are the very
+ * (`packages/domain/src/read-models.ts:307`) whose `ticketTypes` are the very
  * `TicketTypeDef` this returns, and `readTicketTypes`
  * (`apps/server/src/routes/builder-reads.ts:172`) builds each entry as
  * `{id, name, icon, rank, workflowId, fields}`. Case 7.38

@@ -10,7 +10,7 @@ import type { EngineContext, TenantScope } from '../engine.js';
  * NARROWS, never casts. `getEntityState` returns a union keyed on `kind`, and a
  * cast to `TicketState` would compile happily against a `MembershipState` and
  * then read `undefined` off every field the check asks about. Same pattern as
- * `transition.ts:41-42`.
+ * `transition.ts:42-43`.
  */
 export async function getTicketState(ctx: EngineContext, id: string): Promise<TicketState | null> {
   const state = await ctx.getEntityState('ticket', id);
@@ -21,7 +21,7 @@ export async function getTicketState(ctx: EngineContext, id: string): Promise<Ti
  * A ticket TYPE's definition arrives through the fourth `EngineContext` method,
  * NOT through `getEntityState('ticket-type', id)` — that door answers
  * `OtherEntityState`, literally `{ kind, id }`, with no rank, name, workflowId
- * or fields (`packages/domain/src/entity-state.ts:49-53`), which makes every
+ * or fields (`packages/domain/src/entity-state.ts:54-58`), which makes every
  * rank check unimplementable through it (pre-flight BA-4). Controller ruling P3
  * settled the widening: the union stays as it is, and the definition comes from
  * `getTicketTypeDef` (`engine.ts`, and its comment for why the alternative was

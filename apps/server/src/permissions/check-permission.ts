@@ -1809,7 +1809,7 @@ export async function checkVisibilityPermission(
    *
    * ## Where the project id comes from, and why it is not the payload
    *
-   * The payload is EMPTY, like `ticket.closed`'s: the envelope carries the actor
+   * The payload is EMPTY, `z.object({}).strict()`: the envelope carries the actor
    * and the instant, and there is no project for a client to assert. So the
    * project is read from the ticket's own row through `getTicketStateFromDb` —
    * the reader that deliberately does NOT filter deleted rows, because

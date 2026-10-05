@@ -466,7 +466,7 @@ function ProjectBoard() {
    * **And the axis is `'active'` alone because the WIRE cannot say anything wider.**
    * The first version of this asked for `['open', 'active']` — *"hide done"*, which
    * is the narrowing a person would actually reach for. `toServerFilterSpec`
-   * (`mappers.ts:855-870`, re-pointed 2026-09-17 — the exclude-mode refusal
+   * (`mappers.ts:860-875`, re-pointed 2026-09-17 — the exclude-mode refusal
    * above it shifted this block) throws `UnexpressibleFilterError` on it: the SIX
    * id-shaped axes are LISTS client-side — `assigneeIds`, `collaboratorIds`,
    * `typeIds`, `stateIds`, `stateCategories`, `projectIds` — while
@@ -1207,7 +1207,7 @@ function ProjectBoard() {
    *
    * ⚠ **AND THE PREDICATE HAS A REPLICA EDGE THIS FOLD CANNOT SEE.** A row's
    * `typeRank` comes from the roster the read resolved against, and
-   * `replica-data-source.ts:759` fills an UNKNOWN type with `?? 0` — so an epic
+   * `replica-data-source.ts:763` fills an UNKNOWN type with `?? 0` — so an epic
    * the replica's own type table does not hold arrives as rank 0 and is drawn on
    * this tab. That is the conservative direction (it draws MORE, never less, and
    * a row whose type nothing can name is one nothing can honestly exclude) and
