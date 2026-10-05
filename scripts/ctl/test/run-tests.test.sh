@@ -321,20 +321,24 @@ dry3=$(rt --dry-run -- pnpm turbo run test); dry4=$(rt --dry-run -- pnpm --filte
 check "13.2281 …each trigger alone: a turbo command names ports" 'printf "%s" "$dry3" | grep -q " with KG_PW_PORT=[0-9]* FG_PW_PORT="'
 check "13.2281 …a command naming a *-graph-browser package names ports" 'printf "%s" "$dry4" | grep -q " with KG_PW_PORT=[0-9]* FG_PW_PORT="'
 check "13.2281 …a plain \`pnpm test\` run FROM a *-graph-browser directory names ports" 'printf "%s" "$dry5" | grep -q " with KG_PW_PORT=[0-9]* FG_PW_PORT="'
+longpad=$(printf 'a%.0s' $(seq 1 130)); dryl=$(rt --dry-run -- sh -c ": $longpad # playwright"); dryn=$(rt --dry-run -- sh -c ": $longpad # nothing here")
+check "13.2281 …a command longer than the 120-character display whose \`playwright\` falls after the cut names ports (the trigger reads the WHOLE command, not the shown one); CONTROL — the shown command IS cut (… and no \`playwright\` in the DRY line) and the same long command without the word names none" 'printf "%s" "$dryl" | grep -q "…" && ! printf "%s" "$dryl" | grep -q "# playwright" && dry_in_range "$dryl" && ! printf "%s" "$dryn" | grep -q KG_PW_PORT'
 
-pw_hold() {   # pw_hold <family> <port> <file>: a background listener on that port, reported ready by <file>; its pid goes to $fx/pids (cleaned up on exit)
+pw_hold() {   # pw_hold <host> <port> <file>: a background listener on that host and port (::1, 127.0.0.1, or a wildcard 0.0.0.0 / ::), reported ready by <file>; its pid goes to $fx/pids (cleaned up on exit)
   python3 -c '
 import socket, sys, time
-fam = socket.AF_INET6 if sys.argv[1] == "6" else socket.AF_INET
+fam = socket.AF_INET6 if ":" in sys.argv[1] else socket.AF_INET
 s = socket.socket(fam); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(("::1" if sys.argv[1] == "6" else "127.0.0.1", int(sys.argv[2]))); s.listen()
+s.bind((sys.argv[1], int(sys.argv[2]))); s.listen()
 open(sys.argv[3], "w").write("up"); time.sleep(60)' "$1" "$2" "$3" >/dev/null 2>&1 &   # stdout closed: a $(...) caller must not wait for the holder
   echo $! >> "$fx/pids"; hp=$!; n=0; while [ ! -f "$3" ] && [ "$n" -lt 50 ]; do sleep 0.1; n=$((n+1)); done; echo "$hp"
 }
-for fam in 6 4; do
-  reset; rm -f "$fx/pw1.out" "$fx/held"; hp=$(pw_hold $fam "$pwbase" "$fx/held")
+# a WILDCARD holder (a node / next dev server started with no host listens on ::, vite --host on 0.0.0.0) holds the port for localhost too (F2, FIX 1)
+for hold in "::1 IPv6" "127.0.0.1 IPv4" "0.0.0.0 wildcard 0.0.0.0" ":: wildcard ::"; do
+  host=${hold%% *}; what=${hold#* }
+  reset; rm -f "$fx/pw1.out" "$fx/held"; hp=$(pw_hold "$host" "$pwbase" "$fx/held")
   rt_real --label pwh -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null; read -r kh fh < "$fx/pw1.out"; dryh=$(rt --dry-run -- sh -c ': # playwright'); kill "$hp" 2>/dev/null; wait "$hp" 2>/dev/null
-  check "13.2282 a HELD port is skipped (IPv$fam listener on the range's first port): the run gets KG >= base+1 and FG another free one, and its --dry-run names a different port too" '[ -f "$fx/held" ] && [ "$kh" -ge $((pwbase+1)) ] && [ "$fh" -ge $((pwbase+1)) ] && [ "$kh" != "$fh" ] && printf "%s" "$dryh" | grep -q " with KG_PW_PORT=$((pwbase+1)) "'
+  check "13.2282 a HELD port is skipped ($what listener on the range's first port): the run gets KG >= base+1 and FG another free one, and its --dry-run names a different port too" '[ -f "$fx/held" ] && [ "$kh" -ge $((pwbase+1)) ] && [ "$fh" -ge $((pwbase+1)) ] && [ "$kh" != "$fh" ] && printf "%s" "$dryh" | grep -q " with KG_PW_PORT=$((pwbase+1)) "'
 done
 reset; rm -f "$fx/ran"; nofree=$(CTL_PW_PORT_COUNT=1 rt --label pwx -- sh -c ': > "$1" # playwright' x "$fx/ran"); nofreerc=$?; nofreed=$(CTL_PW_PORT_COUNT=1 rt --dry-run -- sh -c ': # playwright')
 check "13.2285 with fewer than two free ports the run FAILS (rc 1) and the command is not run; its --dry-run fails too" '[ $nofreerc -eq 1 ] && [ ! -e "$fx/ran" ] && printf "%s" "$nofree" | tail -1 | grep -q "^FAIL run-tests pwx no free Playwright ports" && printf "%s" "$nofreed" | tail -1 | grep -q "^FAIL run-tests no free Playwright ports"'
@@ -342,6 +346,8 @@ reset; rm -f "$fx/pw1.out"; rt_real --label pw0 -- sh -c 'echo "$KG_PW_PORT $FG_
 check "13.2282 CONTROL: with nothing held a lone run gets the range's first two ports" '[ "$(cat "$fx/pw1.out")" = "$pwbase $((pwbase+1))" ]'
 reset; rm -f "$fx/pw1.out"; KG_PW_PORT=4999 rt_real --label pwk -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null; read -r kp fp < "$fx/pw1.out"
 check "13.2283 a KG_PW_PORT the caller exported is kept (FG still picked inside the range)" '[ "$kp" = 4999 ] && [ "$fp" -ge "$pwbase" ] && [ "$fp" -lt $((pwbase+100)) ]'
+reset; rm -f "$fx/pw1.out"; FG_PW_PORT=4998 rt_real --label pwg -- sh -c 'echo "$KG_PW_PORT $FG_PW_PORT" > "$1" # playwright' x "$fx/pw1.out" >/dev/null; read -r kq fq < "$fx/pw1.out"
+check "13.2283 …and a FG_PW_PORT the caller exported is kept too (KG still picked inside the range)" '[ "$fq" = 4998 ] && [ "$kq" -ge "$pwbase" ] && [ "$kq" -lt $((pwbase+100)) ]'
 reset; rm -f "$fx/pw1.out"; rt_real --label pwn -- sh -c 'echo "${KG_PW_PORT:-unset} ${FG_PW_PORT:-unset}" > "$1"' x "$fx/pw1.out" >/dev/null
 check "13.2283 a command that names neither Playwright, a *-graph-browser package nor turbo runs with its environment untouched" '[ "$(cat "$fx/pw1.out")" = "unset unset" ]'
 reset; pwlog=$(rt_real --label pws -- sh -c 'true # playwright' | tr "\n" "~")
