@@ -19,7 +19,7 @@ const PLACED_AFTER: Array<[tool: string, after: string, keys: string[]]> = [
 /** The tools of PLACED_AFTER that are not exactly once, directly after their anchor, in `names`. */
 const misplaced = (names: string[]): string[] =>
   PLACED_AFTER.filter(([tool, after]) => names.filter((n) => n === tool).length !== 1 || names.indexOf(tool) !== names.indexOf(after) + 1).map(([tool]) => tool);
-const fake = { userId: () => 'u', get: async () => ({}), post: async () => ({}), put: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER };
+const fake = { userId: () => 'u', get: async () => ({}), post: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER };
 
 describe('14.657 the sweep-2 tools are registered', () => {
   it('14.657 each new tool appears once, right after its anchor, with a description and an object schema; the pin and the registry agree', () => {
