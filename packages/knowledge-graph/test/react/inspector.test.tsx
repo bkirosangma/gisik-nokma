@@ -174,7 +174,7 @@ describe('the item inspector (spec C §3.5)', () => {
     // ST-15 (Studio) is outside the scope: picking it selects its one clear neighbour, Tengsrang (mentioned in it), and says why
     select(fake, T('s15'));
     expect([title(), status()]).toEqual(['Tengsrang Marak', 'ST-15 is outside the scope.']);
-    expect(insp().querySelector('.gn-kg-insp__outs > p')!.textContent).toBe('1 link leads outside the scope, so it stays in the fog.');
+    expect(insp().querySelector('.gn-kg-insp__outs > p')?.textContent).toBe('1 link leads outside the scope, so it stays in the fog.');
     const user = userEvent.setup();
     await user.click(within(insp()).getByRole('button', { name: 'Add Studio (1)' }));
     expect(status()).toBe(''); // the scope changed: the sentence about it is gone
@@ -190,14 +190,14 @@ describe('the item inspector (spec C §3.5)', () => {
     await waitFor(() => expect(b.fx.log.some((q) => q.projectIds.includes('j_ds'))).toBe(true));
     await settle();
     select(b.fake, T('t142'));
-    expect(insp().querySelector('.gn-kg-insp__outs > p')!.textContent).toBe('8 links lead outside the scope, so they stay in the fog.');
+    expect(insp().querySelector('.gn-kg-insp__outs > p')?.textContent).toBe('8 links lead outside the scope, so they stay in the fog.');
     expect(buttons().filter((x) => x!.startsWith('Add '))).toEqual(['Add Mobile web (7)', 'Add Workflows (1)']);
     await user.click(within(insp()).getByRole('button', { name: 'Add Workflows (1)' }));
     await waitFor(() => expect(b.fx.log[b.fx.log.length - 1]!.projectIds).toEqual(['j_ds', 'j_wf']));
     await settle();
     // two lead out of Design and Workflows from Tengsrang: one into Mobile web (a project), one into Studio (a workspace)
     select(b.fake, P('pT'));
-    expect(insp().querySelector('.gn-kg-insp__outs > p')!.textContent).toBe('2 links lead outside the scope, so they stay in the fog.');
+    expect(insp().querySelector('.gn-kg-insp__outs > p')?.textContent).toBe('2 links lead outside the scope, so they stay in the fog.');
     expect(buttons().filter((x) => x!.startsWith('Add ')).sort()).toEqual(['Add Mobile web (1)', 'Add Studio (1)']);
     // control: in scope, nothing leads out
     cleanup();
@@ -255,7 +255,7 @@ describe('Linked from (spec C §3.5)', () => {
     const section = within(insp()).getByRole('heading', { level: 4, name: /^Linked from/ }).parentElement!;
     expect(section.querySelector('h4')!.textContent).toBe('Linked from 3');
     const quotes = [...section.querySelectorAll('blockquote')];
-    expect(quotes.map((q) => q.querySelector('.gn-kg-snip__src')!.textContent)).toEqual(['In GN-125 44 px touch targets', 'In Mobile release checklist', 'In Board drag measurements']);
+    expect(quotes.map((q) => q.querySelector('.gn-kg-snip__src')?.textContent)).toEqual(['In GN-125 44 px touch targets', 'In Mobile release checklist', 'In Board drag measurements']);
     expect(quotes[1]!.querySelector('p')!.textContent).toBe('Every row in Phone pass rulings has a ticket before we cut the release.');
     expect([...quotes[1]!.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['Phone pass rulings']);
     expect(section.textContent).not.toContain('[[');
@@ -319,12 +319,12 @@ describe('the edge inspector (spec C §3.5)', () => {
     const { fake, fx } = setup({}, { source: mentionSnip });
     await drawn(fake, T('t126'));
     selectEdge(fake, `ref|${N('n7')}|${N('n1')}`);
-    expect(insp().querySelector('.gn-kg-snip__src')!.textContent).toBe('In Fourteen chars');
-    expect(insp().querySelector('.gn-kg-snip mark')!.textContent).toBe('Phone pass rulings');
+    expect(insp().querySelector('.gn-kg-snip__src')?.textContent).toBe('In Fourteen chars');
+    expect(insp().querySelector('.gn-kg-snip mark')?.textContent).toBe('Phone pass rulings');
     expect(insp().querySelector('.gn-kg-insp__prov')!.textContent).toBe('Comes from the text: edit the text to change it.');
     expect(buttons()).toContain('Center on Fourteen chars');
     selectEdge(fake, `mention|${N('n2')}|${P('pA')}`);
-    expect(insp().querySelector('.gn-kg-snip mark')!.textContent).toBe('Ama Rangsa');
+    expect(insp().querySelector('.gn-kg-snip mark')?.textContent).toBe('Ama Rangsa');
     expect(buttons()).toContain('Center on Scroll restor…'); // 'Scroll restoration: what we tried': 13 characters and the ellipsis
     selectEdge(fake, `tag|concept:c2|${T('t160')}`);
     expect(insp().querySelector('.gn-kg-insp__head')!.textContent).toBe('ConceptsSuggested');
