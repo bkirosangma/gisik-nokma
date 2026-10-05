@@ -178,8 +178,20 @@ describe('27.444 tag and untag', () => {
     // Replay-safe: the same tag applied again (a replayed ledger, or two tabs) keeps one row, the first tagger's.
     await applyCommitted(db.pool, [cev(C, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'author', 'web')]);
     expect(await itemRows(C)).toHaveLength(2);
+    // Another concept holding the same note keeps it when C lets it go: the untag names C.
+    const other = newUlid();
+    await applyCommitted(db.pool, [
+      cev(other, 'concept.created', { name: 'Also tagging' }),
+      cev(other, 'concept.item_tagged', { itemKind: 'note', itemId: world.NOTES.nProject }),
+    ]);
     await applyCommitted(db.pool, [cev(C, 'concept.item_untagged', { itemKind: 'note', itemId: world.NOTES.nProject })]);
     const onlyTP = [{ workspace_id: world.WS, item_kind: 'ticket', item_id: world.TP, tagged_by: world.ids.memberIn, origin: 'mcp' }];
+    expect(await itemRows(C)).toEqual(onlyTP);
+    expect((await itemRows(other)).map((row) => row.item_id)).toEqual([world.NOTES.nProject]);
+    // And of two tickets, the untag names its one: TE comes and goes, TP stays.
+    await applyCommitted(db.pool, [cev(C, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE })]);
+    expect(await itemRows(C)).toHaveLength(2);
+    await applyCommitted(db.pool, [cev(C, 'concept.item_untagged', { itemKind: 'ticket', itemId: world.TE })]);
     expect(await itemRows(C)).toEqual(onlyTP);
 
     // Control: trash keeps rows (a projection that dropped the tag on ticket.deleted would lose it for good).

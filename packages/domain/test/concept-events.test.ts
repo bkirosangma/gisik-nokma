@@ -7,9 +7,13 @@ import {
   conceptDeletedPayload,
   conceptDescribedPayload,
   conceptItemTaggedPayload,
+  conceptItemUntaggedPayload,
   conceptLinkedPayload,
   conceptMergedPayload,
+  conceptRenamedPayload,
+  conceptUnlinkedPayload,
   domainRegistry,
+  type ConceptEventType,
 } from '../src/index.js';
 
 /** Knowledge Graph spec D §3.1: the concept vocabulary (KG-D Task 3, cases 27.440–27.442). */
@@ -70,6 +74,20 @@ describe('27.440–27.442 the concept vocabulary', () => {
       // A loop that registered every type with ONE schema can: identity per type (planner ruling 2026-10-04, Q7: accepted).
       expect(domainRegistry.get(type, 1)?.payloadSchema, type).toBe(CONCEPT_PAYLOADS[type]);
     }
+    // And the table those schemas come from names each type's own: a swapped row passes every sample above that the
+    // two schemas both accept (renamed's `{ name }` parses as a created).
+    const own: Record<ConceptEventType, unknown> = {
+      'concept.created': conceptCreatedPayload,
+      'concept.renamed': conceptRenamedPayload,
+      'concept.described': conceptDescribedPayload,
+      'concept.item_tagged': conceptItemTaggedPayload,
+      'concept.item_untagged': conceptItemUntaggedPayload,
+      'concept.linked': conceptLinkedPayload,
+      'concept.unlinked': conceptUnlinkedPayload,
+      'concept.merged': conceptMergedPayload,
+      'concept.deleted': conceptDeletedPayload,
+    };
+    for (const type of CONCEPT_EVENT_TYPES) expect(CONCEPT_PAYLOADS[type], type).toBe(own[type]);
     // `registrations()` is the ref's listing (registry.ts:40-41).
     const conceptTypes = domainRegistry
       .registrations()

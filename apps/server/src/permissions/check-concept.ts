@@ -38,7 +38,7 @@ export function conceptMergeIncompleteReason(missing: number): string {
 
 const refuse = (rule: string, reason: string): Refusal => ({ refused: true, rule, reason });
 
-/** The concept's tagged items that are LIVE (D4 counts live items only; `hiddenItems` ignores the rest anyway). */
+/** The concept's tagged items, live or not: D4 counts live items only, and `hiddenItems` ignores the rest. */
 export async function liveConceptItems(db: Queryable, workspaceId: string, conceptId: string): Promise<ItemRef[]> {
   const { rows } = await db.query<{ item_kind: 'ticket' | 'note'; item_id: string }>(
     'SELECT item_kind, item_id FROM proj_concept_items WHERE workspace_id = $1 AND concept_id = $2',

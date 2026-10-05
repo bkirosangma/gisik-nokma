@@ -18,6 +18,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CONCEPT_EVENT_TYPES, makeEnvelope, newUlid, type ConceptEventType, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
+import { liveConceptItems } from '../../src/permissions/check-concept.js';
 import { checkPermission } from '../../src/permissions/check-permission.js';
 import { checkPurged } from '../../src/purge/check-purged.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -156,6 +157,9 @@ describe('27.449 hidden, absent and deleted concepts get one refusal', () => {
     expect(await permits('concept.linked', { otherId: CE, relation: 'broader' }, CW, 'owner')).toBeNull();
     expect(await permits('concept.merged', { intoId: CE }, CQ, 'memberOut')).toEqual(UNKNOWN);
     expect(await permits('concept.merged', { intoId: CE }, CQ, 'owner')).toBeNull();
+    // The items read is the workspace's: CP's own workspace lists TP, any other lists nothing.
+    expect(await liveConceptItems(db.pool, world.WS, CP)).toEqual([{ kind: 'ticket', id: world.TP }]);
+    expect(await liveConceptItems(db.pool, newUlid(), CP)).toEqual([]);
     // Before the related-stream rule (27.459): a related link to an unknown LOWER id is unknown, not "post it there".
     expect(await permits('concept.linked', { otherId: '00000000000000000000000000', relation: 'related' }, CW, 'memberIn')).toEqual(UNKNOWN);
   });

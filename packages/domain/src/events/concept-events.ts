@@ -46,7 +46,7 @@ export const conceptLinkedPayload = z.object({ otherId: entityId, relation: z.en
 export type ConceptLinkedPayload = z.infer<typeof conceptLinkedPayload>;
 export const conceptUnlinkedPayload = conceptLinkedPayload;
 export type ConceptUnlinkedPayload = ConceptLinkedPayload;
-/** Its tags move to `intoId`; this concept is deleted (§3.1). */
+/** This concept is deleted into `intoId`. Its live items reach `intoId` first, as `intoId`'s own tags (R1, 27.463). */
 export const conceptMergedPayload = z.object({ intoId: entityId }).strict();
 export type ConceptMergedPayload = z.infer<typeof conceptMergedPayload>;
 export const conceptDeletedPayload = z.object({}).strict();
