@@ -348,6 +348,17 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     expect(padded.ingested).toEqual([]);
   });
 
+  it('29.131 a label given to a label-free row is undone back to NO label; control: the relabel itself carries the new label', async () => {
+    const source = await relabelTo([row('leads_to', 'out', 'GN-147')], false, 'Edit label: leads to GN-147', 'Yes');
+    expect(calls(source)[0]![1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(calls(source)[1]).toEqual([
+      ['ticket.link_removed', TICKET, { kind: 'leads_to', targetId: OTHER }],
+      ['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER }],
+    ]);
+  });
+
   it("29.131 an incoming row's relabel files the pair on the OTHER stream; on a draft's sheet the pair and its Undo stay on the DRAFT's stream as the from-form, the label on the add only (owner ruling O1)", async () => {
     const published = await relabelTo([row('leads_to', 'in', 'GN-133', 'Yes')], false, 'Edit label: comes after GN-133', 'Maybe');
     expect(calls(published)).toEqual([
@@ -387,9 +398,9 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     render(<Harness dataSource={local} workspaceId={WS} ticketId={TICKET} canEdit isDecision make={make} />);
     await user.click(await screen.findByRole('button', { name: 'Edit label: leads to GN-150' }));
     await user.clear(screen.getByLabelText('New label'));
-    await user.type(screen.getByLabelText('New label'), ' yes');
+    await user.type(screen.getByLabelText('New label'), ' YES'); // folded on BOTH sides: the stored "Yes" and the typed "YES"
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('This Decision already has a branch labelled "yes".');
+    expect((await screen.findByRole('alert')).textContent).toBe('This Decision already has a branch labelled "YES".');
     expect(local.ingested).toHaveLength(0);
     // control: a case-only change of the row's OWN label is no clash with itself (the form stays open after a local refusal)
     await user.clear(screen.getByLabelText('New label'));
@@ -415,15 +426,26 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
       ) as IngestResult[];
     const yes = [row('leads_to', 'out', 'GN-147', 'Yes')];
     const user = userEvent.setup();
-    const server = createFakeDataSource({ getTicketLinks: async () => yes }, (events) => (events.length === 2 ? refuseAdd(events) : COMMIT(events)));
+    let reads = 0;
+    const server = createFakeDataSource(
+      {
+        getTicketLinks: async () => {
+          reads += 1;
+          return yes;
+        },
+      },
+      (events) => (events.length === 2 ? refuseAdd(events) : COMMIT(events)),
+    );
     render(<Harness dataSource={server} workspaceId={WS} ticketId={TICKET} canEdit make={make} />);
     await user.click(await screen.findByRole('button', { name: 'Edit label: leads to GN-147' }));
     await user.clear(screen.getByLabelText('New label'));
     await user.type(screen.getByLabelText('New label'), 'Maybe');
+    const before = reads;
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(server.ingested).toHaveLength(2));
     expect(calls(server)[1]).toEqual([['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]]);
     expect((await screen.findByRole('alert')).textContent).toBe(REASON);
+    await waitFor(() => expect(reads).toBeGreaterThan(before)); // the list is read again after the compensation
     expect(screen.getByLabelText('New label')).toBeInTheDocument(); // the form stays open for another label
     cleanup();
 
