@@ -514,6 +514,30 @@ describe('30.038 the choices are the user\'s own document', () => {
     expect(refusal?.querySelector('.gn-shell__refusal-wire')?.textContent).toBe('HTTP 500 for /v1/me/my-work-preferences');
     // CONTROL: the failed LOAD beside it keeps the shared refusal and its sentence.
     expect(screen.getByText('What needs your attention in Alpha Works could not be loaded. Reload to try again.')).toBeInTheDocument();
+    // The same ROLE as that shared refusal too (planner 22:54: "the same refusal styling and role"). CONTROL: the
+    // load refusal's role is ShellRefusal's `status`, so the equality below cannot pass with both roles missing.
+    const loadRefusal = screen.getByText('What needs your attention in Alpha Works could not be loaded. Reload to try again.').closest('.gn-shell__refusal');
+    expect(loadRefusal?.getAttribute('role')).toBe('status');
+    expect(refusal?.getAttribute('role')).toBe(loadRefusal?.getAttribute('role'));
+  });
+
+  it('30.038 a save that LANDS after a refused one takes the not-saved sentence away (it speaks for the last save only); CONTROL: the refused save says it first, and the landed one is the stored document', async () => {
+    const store: Store = { doc: null, fail: null, putFail: new Error('HTTP 500 for /v1/me/my-work-preferences') };
+    const { services, calls } = mount({ store });
+    renderPage(services);
+    await screen.findByRole('button', { name: 'Count the stock' });
+    await userEvent.click(chip('Assigned to me'));
+    // CONTROL: the refused save is said.
+    expect(await screen.findByText('Your choice for this page was not saved. It stays as you set it until you leave this page.')).toBeInTheDocument();
+
+    // The next save lands: it is the stored document, and nothing on the page says otherwise any more.
+    store.putFail = null;
+    await userEvent.click(chip('Assigned to me'));
+    await waitFor(() => expect(calls.puts).toHaveLength(2));
+    await settle();
+    expect(store.doc).toEqual(calls.puts[1]);
+    expect(screen.queryByText('Your choice for this page was not saved. It stays as you set it until you leave this page.')).toBeNull();
+    expect(pressed()).toEqual(['Created by me', 'Assigned to me']);
   });
 });
 
