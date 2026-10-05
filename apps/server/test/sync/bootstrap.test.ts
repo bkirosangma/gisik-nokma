@@ -1242,7 +1242,7 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
 });
 
 /**
- * Cases 29.406-29.409 (wtg2 fold-version overlap, planner ruling E 2026-10-05, its instant re-pinned at 17:5x on the
+ * Cases 29.406-29.409 (wtg2 fold-version overlap, planner ruling E 2026-10-05, its instant re-pinned at 17:52 on the
  * lane's question). A rolling deploy runs the OLD instance's interval writer beside the new one, and it writes rows
  * stamped with the old fold (the column default, 1). Such a row written after the new instance's boot pass read its due
  * set was never seen by that pass, so it is not a restate that failed: served as stored, a schema-5 device would clear
@@ -1295,7 +1295,7 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
   const refusalOf = (ticketId: string) =>
     withClient(async (client) => bootstrapTicket(client, ticketId, targetSight(client, memberId)).catch((err: unknown) => err));
 
-  it('29.406 after the boot pass, a stale row created after its dueAt is refused (SnapshotRestatePending, the route 503s); control: the same row created before dueAt is served as stored with one warning; and a row an old instance writes during a real pass, after its due query, is refused', async () => {
+  it('29.406 after the boot pass, a stale row created after its dueAt is refused (SnapshotRestatePending, both bootstrap routes 503); control: the same row created before dueAt is served as stored with one warning; and a row an old instance writes during a real pass, after its due query, is refused', async () => {
     const world = await fvWorkspace();
     const { ticketId } = await fvTicket(world, null);
     const dueAt = new Date((await db.pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t.getTime() - 60_000);
@@ -1315,6 +1315,10 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
     });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: SNAPSHOT_RESTATE_PENDING });
+    // The workspace door holds the same ticket, so it refuses the whole request.
+    const whole = await app.inject({ method: 'GET', url: `/v1/sync/bootstrap?workspaceId=${world.workspaceId}`, headers: memberHeaders });
+    expect(whole.statusCode).toBe(503);
+    expect(whole.json()).toEqual({ error: SNAPSHOT_RESTATE_PENDING });
     expect(warnings).toEqual([]);
     expect(await snapshotRows(ticketId)).toBe(1);
 
