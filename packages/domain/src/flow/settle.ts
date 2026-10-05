@@ -82,6 +82,7 @@ export function planSettle(input: {
   const leave = (n: FlowNode, to: SettleStep & { kind: 'to-initial' | 'to-backlog' }): SettleStep[] => (n.closed ? [{ kind: 'reopen', ticketId: n.id }, to] : [to]);
   /** PS-9: a ticket may not leave a finished state under a finished parent unless the parent leaves first. */
   const leavesUnderFinishedParent = (moved: readonly FlowNode[]): FlowNode | undefined => {
+    // equivalent (planner 2026-10-06 03:50): the parent test below already requires a terminal parent; kept for the reader
     const leaving = new Set(moved.filter((n) => n.category === 'terminal').map((n) => n.id));
     return moved.find((n) => {
       if (n.category !== 'terminal') return false;
@@ -149,6 +150,7 @@ export function planSettle(input: {
   const waiting: string[] = [];
   for (const id of [...left].sort((a, b) => (flowRank.get(a) ?? 0) - (flowRank.get(b) ?? 0))) {
     const n = byId.get(id);
+    // `n === undefined` and `n.id === d.id` are equivalent (planner 2026-10-06 03:50): branchOf returns only node ids, never the Decision
     if (n === undefined || n.id === d.id || !movable(n) || live.has(id) || n.notTaken !== null || n.category === 'terminal') continue;
     if (n.started && !named.has(id)) waiting.push(id);
     else closing.add(id);
@@ -167,7 +169,7 @@ export function planSettle(input: {
     }
   }
   const closes = [...closing].map((id) => byId.get(id)).filter((n): n is FlowNode => n !== undefined).sort(childrenFirst);
-  if (closes.length > 0 && closes.some((n) => n.firstTerminalStateId === null)) {
+  if (closes.some((n) => n.firstTerminalStateId === null)) {
     return blockedPlan((closes.find((n) => n.firstTerminalStateId === null) as FlowNode).id, 'no-terminal-state');
   }
   const reopened = nodes.filter((n) => movable(n) && live.has(n.id) && n.notTaken !== null).sort(parentsFirst);
