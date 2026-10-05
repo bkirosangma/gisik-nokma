@@ -8,11 +8,13 @@
 #   gate-slots        optional: the gate cap (read after CTL_SEM_GATE_SLOTS, re-read every poll, so a rewrite needs no restart)
 #                     (the marker globs are gate-[0-9]*, so this file is never mistaken for a stale marker and reclaimed)
 #   slots             optional: the slot count (read before CTL_TEST_SLOTS so two callers cannot disagree on N)
-#   waits.tsv         one row per run: time, label, queue wait seconds, reason, slot count — the history the count is tuned from
+#   swap.verdict      `<epoch> <ok|high>`: the last swap-in sample's result, shared by every waiter while it is at most CTL_SEM_SWAP_TTL s old
+#   waits.tsv         one row per run: time, label, queue wait seconds, reason, slot count, probe seconds (the grant poll's own sampling time, which the
+#                     wait excludes: wait + probe = queue entry to grant; 0 when a shared verdict was reused) — the history the count is tuned from
 # macOS has no flock(1): mkdir is the lock. Bash 3.2-safe (no wait -n, mapfile, declare -A, EPOCHREALTIME; no empty array under set -u).
 # Test seams (env): CTL_SEM_CLOCK_FILE (fake clock: ctl_sem_sleep advances it and runs CTL_SEM_SLEEP_HOOK with CTL_SEM_NOW / CTL_SEM_SLEEP_SECS),
 # CTL_SEM_CLAIM_HOOK (runs right after a slot was claimed), CTL_SEM_POLL_SECS, CTL_SEM_SAMPLE_SECS.
-# Knobs: CTL_TEST_SLOTS (2), CTL_SEM_MIN_FREE_PCT (15), CTL_SEM_MAX_SWAPIN_MBS (8), CTL_SEM_SAMPLE_SECS (3), CTL_SEM_POLL_SECS (5),
+# Knobs: CTL_TEST_SLOTS (2), CTL_SEM_MIN_FREE_PCT (15), CTL_SEM_MAX_SWAPIN_MBS (8), CTL_SEM_SAMPLE_SECS (3), CTL_SEM_SWAP_TTL (10), CTL_SEM_POLL_SECS (1),
 # CTL_SEM_MAX_WAIT (1800), CTL_SEM_GRACE_SECS (10), CTL_SEM_GATE_SLOTS (the gate-slots file, else 1).
 
 ctl_sem_dir() { local d="${CTL_SEM_DIR:-$HOME/.cache/gisik-ctl/sem}"; mkdir -p "$d"; echo "$d"; }
@@ -109,17 +111,37 @@ ctl_sem_swap_window_high() {
   psz="$(ctl_sem_pagesize)"; max="${CTL_SEM_MAX_SWAPIN_MBS:-8}"
   [ $(( (c1 - c0) * psz )) -ge $(( max * 1048576 * dt )) ]
 }
-# 0 when swap-in is calm. TWO consecutive high windows are needed to block — one window is a blip (measured: 253 pages/s once among ~1/s).
+# The shared verdict (13.2310-13.2315): `ok` or `high` when swap.verdict is at most CTL_SEM_SWAP_TTL (10) s old by ctl_sem_now, nothing when it is
+# missing, unparsable, older, or stamped in the FUTURE (a clock stepped back must not keep a `high` alive past its TTL). The read sits in a group so
+# a missing file (the cold state) prints nothing.
+ctl_sem_swap_cached() {
+  local t="" v="" age ttl="${CTL_SEM_SWAP_TTL:-10}"
+  case "$ttl" in ''|*[!0-9]*) ttl=10;; esac
+  { read -r t v < "$(ctl_sem_dir)/swap.verdict"; } 2>/dev/null || return 0
+  case "$t" in ''|*[!0-9]*) return 0;; esac
+  case "$v" in ok|high) ;; *) return 0;; esac
+  age=$(( $(ctl_sem_now) - t ))
+  if [ "$age" -ge 0 ] && [ "$age" -le "$ttl" ]; then echo "$v"; fi
+  return 0
+}
+# 0 when swap-in is calm. A fresh shared verdict is reused as it stands (no sleep: a reused `high` blocks exactly as a sampled one); only a stale or
+# missing one samples, and that sample's result, stamped with the time it ENDED, becomes the verdict for every waiter. TWO consecutive high windows
+# are needed to make it `high` — one window is a blip (measured: 253 pages/s once among ~1/s). Runs in the caller's shell (CTL_SEM_PROBE_SECS).
 ctl_sem_swap_why() {
-  ctl_sem_swap_window_high || return 0
-  ctl_sem_swap_window_high || return 0
+  local v sem; sem="$(ctl_sem_dir)"; v="$(ctl_sem_swap_cached)"
+  if [ -z "$v" ]; then
+    v=ok; if ctl_sem_swap_window_high && ctl_sem_swap_window_high; then v=high; fi
+    printf '%s %s\n' "$(ctl_sem_now)" "$v" > "$sem/swap.verdict.$$" && mv "$sem/swap.verdict.$$" "$sem/swap.verdict"
+  fi
+  [ "$v" = ok ] && return 0
   echo "swap-in at least ${CTL_SEM_MAX_SWAPIN_MBS:-8} MB/s over two ${CTL_SEM_SAMPLE_SECS:-3} s windows"; return 1
 }
 
 # ctl_sem_acquire LABEL — wait for a slot. Order per poll: reclaim stale → a gate runs with the gate cap already held? → a slot free? →
 # pressure → swap-in → claim → re-check the gate (one that began between the probe and the claim gets the slot back when, counting the claim,
-# more than the gate cap are held). Sets CTL_SEM_SLOT, CTL_SEM_SLOTS, CTL_SEM_WAITED (seconds from
-# entering the queue to the grant, minus the final probe's own sampling window: a measurement, not a wait) and CTL_SEM_REASONS (a+b, "-" none).
+# more than the gate cap are held); every CTL_SEM_POLL_SECS (1) while nothing is granted. Sets CTL_SEM_SLOT, CTL_SEM_SLOTS, CTL_SEM_WAITED (seconds
+# from entering the queue to the grant, minus the grant poll's own sampling time CTL_SEM_PROBE_SECS: a measurement, not a wait; 0 on a reused
+# verdict) and CTL_SEM_REASONS (a+b, "-" none). The waits.tsv row carries both: wait + probe = queue entry to grant.
 # Returns 75 when CTL_SEM_MAX_WAIT elapses first (nothing claimed).
 ctl_sem_acquire() {
   local label="$1" sem n N free got start now reasons="" why max="${CTL_SEM_MAX_WAIT:-1800}"
@@ -149,11 +171,11 @@ ctl_sem_acquire() {
     case "+$reasons+" in *"+$why+"*) ;; *) reasons="${reasons:+$reasons+}$why";; esac
     now="$(ctl_sem_now)"
     if [ $(( now - start )) -ge "$max" ]; then CTL_SEM_WAITED=$(( now - start )); CTL_SEM_REASONS="${reasons:--}"; return 75; fi
-    ctl_sem_sleep "${CTL_SEM_POLL_SECS:-5}"
+    ctl_sem_sleep "${CTL_SEM_POLL_SECS:-1}"
   done
   now="$(ctl_sem_now)"; CTL_SEM_WAITED=$(( now - start - CTL_SEM_PROBE_SECS )); [ "$CTL_SEM_WAITED" -ge 0 ] || CTL_SEM_WAITED=0
   CTL_SEM_REASONS="${reasons:--}"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$label" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$N" >> "$sem/waits.tsv"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$label" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$N" "$CTL_SEM_PROBE_SECS" >> "$sem/waits.tsv"
   return 0
 }
 # Only while the holder file names THIS run: a slot that was wrongly reclaimed and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both survive our exit.

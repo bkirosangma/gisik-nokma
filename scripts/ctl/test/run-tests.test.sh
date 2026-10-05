@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235, 13.2270-13.2276 and 13.2280-13.2286, test-cases/13-deploy-and-ops.md);
+# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235, 13.2270-13.2276, 13.2280-13.2286 and 13.2310-13.2317, test-cases/13-deploy-and-ops.md);
 # run by `ctl selftest`. Every case id starts its check's name. No real load is needed: `memory_pressure`, `sysctl` and `vm_stat` are PATH
 # stubs that read files, the clock is a file (CTL_SEM_CLOCK_FILE: a sleep advances it and runs CTL_SEM_SLEEP_HOOK, so a wait of minutes costs
 # no real time), and a slot is "held" by planting its directory with a live pid. Two cases (13.1767, 13.1774) use the REAL clock and real
@@ -15,7 +15,7 @@ cleanup() { while read -r p; do kill "$p" 2>/dev/null; done < "$fx/pids" 2>/dev/
 trap cleanup EXIT
 st="$fx/state"; FB="$fx/bin"; mkdir -p "$st" "$FB" "$fx/logs"
 export CTL_SEM_DIR="$fx/sem" CTL_LOG_DIR="$fx/logs" FX_STATE="$st"   # NEVER the machine's real semaphore
-unset CTL_TEST_SLOTS CTL_SEM_MAX_WAIT CTL_SEM_GATE_SLOTS
+unset CTL_TEST_SLOTS CTL_SEM_MAX_WAIT CTL_SEM_GATE_SLOTS CTL_SEM_POLL_SECS CTL_SEM_SAMPLE_SECS CTL_SEM_SWAP_TTL
 repo="$fx/repo"; mkdir -p "$repo/sub"; ( cd "$repo" && /usr/bin/git init -q . )
 
 # --- stubs (bare names, found first on PATH — the way the docker stub in lib.test.sh works) ---
@@ -210,6 +210,57 @@ check "13.2275 --dry-run names the cap from the file: file 3 names 3, env 0 over
 reset; hold 1; gp=$(plant_gate); script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; outm=$(rt -- true); [ -e "$CTL_SEM_DIR/gate-slots" ]; gm=$?
 reset; dm=$(rt --dry-run -- true)
 check "13.2276 no gate-slots file (the normal state) prints no read error on any poll: one slot held and a live gate waits (20 s, reason gate — the CONTROL that the output was captured) with no 'No such file' in its 2>&1 output; --dry-run names cap 1 (CONTROL) with no 'No such file' either" '[ $gm -ne 0 ] && printf "%s" "$outm" | grep -q "^queue wait: 20s (waited for: gate)\$" && ! printf "%s" "$outm" | grep -q "No such file" && printf "%s" "$dm" | grep -qF "at least 1 slot(s) are held" && ! printf "%s" "$dm" | grep -q "No such file"'
+
+# --- the shared swap verdict and the 1 s poll (13.2310-13.2317): rtd runs with CTL_SEM_POLL_SECS / CTL_SEM_SAMPLE_SECS / CTL_SEM_SWAP_TTL UNSET, so the
+# defaults (1 s, 3 s, 10 s) are what is measured; its hook logs every fake sleep's seconds to state/sleeps (one per line), then runs hook.sh ---
+cat > "$fx/hookd.sh" <<'HOOK'
+#!/bin/sh
+echo "$CTL_SEM_SLEEP_SECS" >> "$FX_STATE/sleeps"
+exec "$(dirname "$0")/hook.sh"
+HOOK
+chmod +x "$fx/hookd.sh"
+rtd() { ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_CLOCK_FILE="$st/clock" CTL_SEM_SLEEP_HOOK="$fx/hookd.sh" CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" "$@" 2>&1 ); }
+dreset() { reset; rm -f "$st/sleeps"; }
+verdict() { echo "$1 $2" > "$CTL_SEM_DIR/swap.verdict"; }
+sleeps() { tr '\n' ' ' < "$st/sleeps" 2>/dev/null; }
+clock() { cat "$st/clock"; }
+col6() { awk -F'\t' -v l="$1" '$2==l {print NF ":" $6}' "$CTL_SEM_DIR/waits.tsv"; }
+
+dreset; verdict 1000 ok; o_fresh=$(rtd --label fresh -- true); c_fresh=$(clock); s_fresh=$(sleeps); v_fresh=$(cat "$CTL_SEM_DIR/swap.verdict")
+dreset; o_cold=$(rtd --label cold -- true); c_cold=$(clock); s_cold=$(sleeps); v_cold=$(cat "$CTL_SEM_DIR/swap.verdict")
+check "13.2310 a fresh ok verdict on file is reused: granted at 0 s with ZERO sleeps (fake clock still 1000, the verdict untouched); CONTROL — no verdict on file samples once (one 3 s sleep, clock 1003) and writes '1003 ok'" 'printf "%s" "$o_fresh" | grep -q "^queue wait: 0s (slot " && [ "$c_fresh" = 1000 ] && [ -z "$s_fresh" ] && [ "$v_fresh" = "1000 ok" ] && printf "%s" "$o_cold" | grep -q "^queue wait: 0s (slot " && [ "$c_cold" = 1003 ] && [ "$s_cold" = "3 " ] && [ "$v_cold" = "1003 ok" ]'
+
+dreset; verdict 989 ok; o_11=$(rtd -- true); c_11=$(clock); s_11=$(sleeps); v_11=$(cat "$CTL_SEM_DIR/swap.verdict")
+dreset; verdict 990 ok; o_10=$(rtd -- true); c_10=$(clock); s_10=$(sleeps)
+check "13.2311 a verdict 11 s old is stale: exactly one sample (one 3 s sleep, clock 1003, the verdict rewritten '1003 ok'); at 10 s old (the TTL itself) it is still reused — no sleep, clock 1000" 'printf "%s" "$o_11" | grep -q "^queue wait: 0s (slot " && [ "$c_11" = 1003 ] && [ "$s_11" = "3 " ] && [ "$v_11" = "1003 ok" ] && printf "%s" "$o_10" | grep -q "^queue wait: 0s (slot " && [ "$c_10" = 1000 ] && [ -z "$s_10" ]'
+
+dreset; verdict 1000 high; o_high=$(rtd --label high -- true); s_high=$(sleeps)
+check "13.2312 a fresh high verdict blocks as a sampled one does, with swap-in quiet: no grant while it is fresh (eleven 1 s polls, no sample), then one 3 s sample at 1011 finds it calm — queue wait 11s, reason swap, probe 3 in waits.tsv" 'printf "%s" "$o_high" | grep -q "^queue wait: 11s (waited for: swap)\$" && [ "$s_high" = "1 1 1 1 1 1 1 1 1 1 1 3 " ] && [ "$(col6 high)" = "6:3" ]'
+
+dreset; echo 1000 > "$st/swaprate"; o_two=$(CTL_SEM_MAX_WAIT=5 rtd -- true); r_two=$?; v_two=$(cat "$CTL_SEM_DIR/swap.verdict"); s_two=$(sleeps)
+rm -f "$st/sleeps"; echo 0 > "$st/swaprate"; o_next=$(CTL_SEM_MAX_WAIT=5 rtd -- true); r_next=$?; s_next=$(sleeps)
+dreset; echo 1000 > "$st/swaprate"; script_line "1003 echo 0 > \"$st/swaprate\""; o_one=$(rtd --label blip -- true); v_one=$(cat "$CTL_SEM_DIR/swap.verdict")
+check "13.2313 a NEW sample keeps the two-window rule: two consecutive high windows are written as '1006 high' and block (CTL_SEM_MAX_WAIT=5: rc 75, reason swap); the next waiter, with swap-in now quiet, is blocked by that verdict without sampling (five 1 s polls, rc 75); one high window then a quiet one is '1006 ok', granted at 0 s, probe 6" '[ $r_two -eq 75 ] && printf "%s" "$o_two" | tail -1 | grep -q "waited for: swap" && [ "$v_two" = "1006 high" ] && [ "$s_two" = "3 3 " ] && [ $r_next -eq 75 ] && printf "%s" "$o_next" | tail -1 | grep -q "waited for: swap" && [ "$s_next" = "1 1 1 1 1 " ] && printf "%s" "$o_one" | grep -q "^queue wait: 0s (slot " && [ "$v_one" = "1006 ok" ] && [ "$(col6 blip)" = "6:6" ]'
+
+dreset; verdict 995 ok; CTL_SEM_SWAP_TTL=3 rtd -- true >/dev/null; s_t3=$(sleeps)
+dreset; verdict 995 ok; CTL_SEM_SWAP_TTL=abc rtd -- true >/dev/null; s_tabc=$(sleeps)
+dreset; verdict 1005 high; rtd -- true >/dev/null; s_fut=$(sleeps)
+dreset; echo "x ok" > "$CTL_SEM_DIR/swap.verdict"; rtd -- true >/dev/null; s_gx=$(sleeps)
+dreset; verdict +1000 high; rtd -- true >/dev/null; s_gp=$(sleeps)
+dreset; verdict 1000 maybe; rtd -- true >/dev/null; s_gm=$(sleeps)
+check "13.2314 CTL_SEM_SWAP_TTL=3 makes a 5 s old verdict stale (one 3 s sample); a TTL that is not a number (abc) falls to 10 (the same verdict reused, no sleep); a verdict stamped in the FUTURE (1005 high at clock 1000), a non-numeric stamp (x, and +1000 which shell arithmetic would read as 1000) and an unknown word are not verdicts (one sample each, no block)" '[ "$s_t3" = "3 " ] && [ -z "$s_tabc" ] && [ "$s_fut" = "3 " ] && [ "$s_gx" = "3 " ] && [ "$s_gp" = "3 " ] && [ "$s_gm" = "3 " ]'
+
+dreset; hold 1; hold 2; verdict 1000 ok; script_line "1001 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_poll=$(rtd -- true); s_poll=$(sleeps)
+check "13.2315 the default poll is 1 s: both slots full, one freed when the fake clock reaches 1001 (the integer clock's stand-in for t+0.5), the waiter is granted at the next poll — queue wait exactly 1s, reason slots, one 1 s sleep (5 s polls would wait 5s)" 'printf "%s" "$o_poll" | grep -q "^queue wait: 1s (waited for: slots)\$" && [ "$s_poll" = "1 " ]'
+
+dreset; echo 1 > "$CTL_SEM_DIR/slots"; hp=$(live_pid); hold 1 "$hp"; verdict "$(date +%s)" ok
+t0=$(python3 -c 'import time; print(time.time())'); ( sleep 0.5; kill "$hp" ) & kb=$!
+o_real=$( ( cd "$repo" && PATH="$FB:$PATH" CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" -- true 2>&1 ) ); t1=$(python3 -c 'import time; print(time.time())'); wait "$kb" 2>/dev/null
+el=$(python3 -c "print(round($t1 - $t0, 2))")
+check "13.2316 REAL clock, default knobs: the only slot held by a live pid killed at t+0.5, a fresh ok verdict on file — the waiter (reason slots) is done by t+3 (measured ${el}s; a 5 s poll or a missed verdict's 3 s sample would not be), and not before t+0.5" 'printf "%s" "$o_real" | grep -q "waited for: slots" && python3 -c "import sys; sys.exit(0 if 0.5 <= $el < 3.0 else 1)"'
+
+dreset; verdict 1000 ok; rtd --label reused -- true >/dev/null; rm -f "$CTL_SEM_DIR/swap.verdict"; rtd --label sampled -- true >/dev/null
+check "13.2317 every waits.tsv row has 6 tab-separated columns, the 6th the grant poll's probe seconds: 0 on a reused verdict, 3 on a sampled grant (whose queue wait, column 3, stays 0)" '[ "$(col6 reused)" = "6:0" ] && [ "$(col6 sampled)" = "6:3" ] && awk -F"\t" "\$2==\"sampled\" && \$3==0 {f=1} END{exit !f}" "$CTL_SEM_DIR/waits.tsv" && [ "$(wc -l < "$CTL_SEM_DIR/waits.tsv" | tr -d " ")" -eq 2 ]'
 reset; d=$(dead_pid); plant_gate "$d" "Thu Jan  1 00:00:00 1970" >/dev/null; lp=$(live_pid); plant_gate "$lp" "Mon Jan  1 00:00:00 2001" >/dev/null
 out=$(rt -- true)
 check "13.1765 a stale gate marker is ignored and removed: a dead pid, and a live pid whose start time differs (pid reuse)" 'printf "%s" "$out" | grep -q "^queue wait: 0s" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^gate-")" ]'
@@ -255,7 +306,7 @@ wait "$rp" 2>/dev/null
 gc=$(cat "$fx/grandchild.pid" 2>/dev/null); child_left=0; if [ -n "$gc" ] && kill -0 "$gc" 2>/dev/null; then child_left=1; kill "$gc" 2>/dev/null; fi
 check "13.1768 the verb terminated by SIGTERM exits within 12 s (not when the command ends), releases its slot (held while it ran), and the 300 s grandchild it spawned is dead" '[ "$held" -eq 1 ] && [ "$verb_gone" -eq 1 ] && [ -n "$gc" ] && [ "$child_left" -eq 0 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
 reset; rt --label first -- true >/dev/null; hold 1; hold 2; script_line "1030 rm -rf \"$CTL_SEM_DIR/slot-1\""; rt --label second -- true >/dev/null
-check "13.1769 every run appends its queue wait to a tally in the sem dir (time, label, seconds, reason, slots) — the history the slot count is tuned from" 'f="$CTL_SEM_DIR/waits.tsv"; [ "$(wc -l < "$f" | tr -d " ")" -eq 2 ] && awk -F"\t" "NR==1 && \$2==\"first\" && \$3==0 && \$4==\"-\" && \$5==2 {a=1} NR==2 && \$2==\"second\" && \$3==30 && \$4==\"slots\" && \$5==2 {b=1} END{exit !(a&&b)}" "$f"'
+check "13.1769 every run appends its queue wait to a tally in the sem dir (time, label, seconds, reason, slots; the 6th column, probe seconds, is 13.2317) — the history the slot count is tuned from" 'f="$CTL_SEM_DIR/waits.tsv"; [ "$(wc -l < "$f" | tr -d " ")" -eq 2 ] && awk -F"\t" "NR==1 && \$2==\"first\" && \$3==0 && \$4==\"-\" && \$5==2 {a=1} NR==2 && \$2==\"second\" && \$3==30 && \$4==\"slots\" && \$5==2 {b=1} END{exit !(a&&b)}" "$f"'
 reset; hold 1; hold 2; rm -f "$fx/ran"; out=$(CTL_SEM_MAX_WAIT=30 rt -- sh -c ': > "$1"' x "$fx/ran"); rc=$?
 check "13.1770 a queue wait past CTL_SEM_MAX_WAIT gives up with exit 75, runs nothing, and says so" '[ $rc -eq 75 ] && [ ! -e "$fx/ran" ] && printf "%s" "$out" | tail -1 | grep -q "^FAIL run-tests .*no slot after"'
 reset; rm -f "$fx/ran"; out=$(rt --dry-run -- sh -c ': > "$1"' x "$fx/ran"); rc=$?
