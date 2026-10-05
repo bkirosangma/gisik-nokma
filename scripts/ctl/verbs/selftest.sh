@@ -16,6 +16,9 @@ step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- t
 step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
 step "run-tests cap suite (--max-min: 124 + TIMEOUT, the group stopped, slot time not queue time, siblings live, no stray timer)" "bash '$HERE/test/run-tests-cap.test.sh'"
 step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
+# The batch suite builds scratch origins and stubs gh and the gate/land/pr-open ctl (never a real PR or gate; ~1 min).
+step "batch suite (READY + rules b-d refuse the call, the union --no-ff in READY order, conflict eject, one gate, red eject/bisect, 3-gate cap, dry-run reads only)" "bash '$HERE/test/batch.test.sh'"
+step "batch refuses main as the base" "out=\$('$HERE/ctl' batch main 1 2 --repo '$repo' --dry-run 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'main refused'"
 step "harness suite (CTL_TEST_ONLY: one case runs one, no match is red, no filter runs all; every suite wired)" "bash '$HERE/test/harness.test.sh'"
 # The mutate suite runs real Stryker on a scratch fixture repo (six runs, ~1.5 min) through a private semaphore dir.
 step "mutate suite (ranges, filter, custom pre-step, reconcile, control, skips, signals, split, exit codes, real Stryker legs)" "bash '$HERE/test/mutate.test.sh'"

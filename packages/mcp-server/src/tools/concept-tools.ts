@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { newUlid, type ConceptAudienceResponse, type ConceptListResponse, type ConceptView } from '@gisik-nokma/domain';
+import { newUlid, type ConceptAudienceResponse, type ConceptListResponse, type ConceptView, type SuggestionListResponse } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
@@ -40,6 +40,14 @@ const manageShape = {
 };
 const tagShape = { conceptId: id, action: z.enum(['add', 'remove']), items: z.array(itemRef).min(1).max(50), confirm_name: z.string().optional() };
 const linkShape = { conceptId: id, otherId: id, relation: z.enum(['broader', 'related']), action: z.enum(['add', 'remove']) };
+const reviewShape = { workspaceId: id, ...pageArgs };
+const resolveShape = {
+  workspaceId: id,
+  suggestionId: id,
+  action: z.enum(['accept', 'reject']),
+  name: z.string().min(1).optional(),
+  summary: z.string().max(2000).optional(),
+};
 
 export function conceptTools(session: Session): ToolDefinition[] {
   const ev = (workspaceId: string, conceptId: string, type: string, payload: unknown) =>
@@ -153,6 +161,52 @@ export function conceptTools(session: Session): ToolDefinition[] {
         // R1: a related link lives on the lower id's stream; broader on the narrower concept's, as asked.
         const [stream, other] = a.relation === 'related' && a.otherId < concept.id ? [a.otherId, concept.id] : [concept.id, a.otherId];
         return submitOne(session, ev(concept.workspaceId, stream, a.action === 'add' ? 'concept.linked' : 'concept.unlinked', { otherId: other, relation: a.relation }));
+      },
+    },
+    // KG-D Task 5 (spec §4.2/§5.2): the model's suggestions, reviewed and resolved by the assistant for its person.
+    {
+      name: 'review_suggestions',
+      description:
+        'Concepts the model SUGGESTS for a workspace: groups of tickets and notes that read alike, each with a provisional ' +
+        'label from its most distinctive words. Only suggestions whose items you can all see. Accept or reject one with resolve_suggestion.',
+      inputSchema: reviewShape,
+      handler: async (args) => {
+        const a = z.object(reviewShape).parse(args);
+        const body = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/suggestions`, 'workspace')) as SuggestionListResponse;
+        const { items, nextCursor } = page(body.suggestions, a.cursor, a.limit);
+        return { workspaceId: body.workspaceId, suggestions: items, nextCursor };
+      },
+    },
+    {
+      name: 'resolve_suggestion',
+      description:
+        'accept (name, summary?) makes the suggestion a concept with its items tagged; if an item cannot be tagged, the ' +
+        "concept is still made and the error names that item's index; reject records that this group is " +
+        'not a concept, and it will not be suggested again unless more than half of it changes.',
+      inputSchema: resolveShape,
+      handler: async (args) => {
+        const a = z.object(resolveShape).parse(args);
+        // Read through the route, so the suggestion is one this person sees in full (D4), and the door checks it again.
+        const body = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/suggestions`, 'workspace')) as SuggestionListResponse;
+        const s = body.suggestions.find((x) => x.id === a.suggestionId);
+        if (s === undefined) throw new Error('suggestion not found or not visible to you');
+        if (a.action === 'reject') {
+          return submitOne(
+            session,
+            envelopeFor(session, a.workspaceId, { kind: 'workspace', id: a.workspaceId }, 'workspace.concept_suggestion_rejected', {
+              signature: s.signature,
+              itemHashes: s.itemHashes,
+            }),
+          );
+        }
+        if (a.name === undefined) throw new Error('accept needs name');
+        // ONE batch, not atomic (`ingest-service.ts`): a refused tag leaves the concept and the earlier tags committed,
+        // each visible, attributed and removable (D2), and `submitBatch` names the refused event's index.
+        const conceptId = newUlid();
+        return submitBatch(session, [
+          ev(a.workspaceId, conceptId, 'concept.created', { name: a.name, fromSuggestion: s.id, ...(a.summary === undefined ? {} : { summary: a.summary }) }),
+          ...s.items.map((item) => ev(a.workspaceId, conceptId, 'concept.item_tagged', { itemKind: item.kind, itemId: item.id })),
+        ]);
       },
     },
   ];

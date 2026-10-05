@@ -184,8 +184,11 @@ export async function readConceptView(db: Queryable, eff: EffectiveRole, userId:
   };
 }
 
-/** A ticket's `<key> <title>` (the title alone when it has no key, as `read/deleted-items.ts` labels one); a note's title. */
-async function itemLabels(db: Queryable, workspaceId: string, items: readonly ItemRef[]): Promise<Map<string, string>> {
+/**
+ * A ticket's `<key> <title>` (the title alone when it has no key, as `read/deleted-items.ts` labels one); a note's title.
+ * Exported for the suggestion read (`routes/suggestions.ts`, KG-D T5), whose items are labelled as a concept's are.
+ */
+export async function itemLabels(db: Queryable, workspaceId: string, items: readonly ItemRef[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const ticketIds = items.filter((item) => item.kind === 'ticket').map((item) => item.id);
   const noteIds = items.filter((item) => item.kind === 'note').map((item) => item.id);

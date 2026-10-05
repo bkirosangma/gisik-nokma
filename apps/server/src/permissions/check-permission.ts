@@ -25,7 +25,7 @@ import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkCommentAuthority } from './check-comment-authority.js';
-import { checkConceptPermission } from './check-concept.js';
+import { checkConceptPermission, checkSuggestionRejection } from './check-concept.js';
 import { checkLifecycle } from './check-lifecycle.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
@@ -1929,6 +1929,9 @@ export async function checkMembershipOwnerAuthority(
  *    the role gate (its call site says why).
  * 3. `checkConceptPermission` — the concept kind's (Knowledge Graph spec D
  *    §3.3), for the note pass's reason. It reads nothing for any other kind.
+ *    `checkSuggestionRejection` follows it, for the one workspace-stream
+ *    concept act (a rejected suggestion, KG-D Task 5); it reads nothing for any
+ *    other type.
  * 4. `checkMembershipOwnerAuthority` — the owner-only act the role gate cannot
  *    finish, because it needs the TARGET's current row. Before every other
  *    reading pass, so that a claim from below admin is still answered by the
@@ -1985,6 +1988,11 @@ export async function checkPermission(
   const conceptRefusal = await checkConceptPermission(env, permissionContext);
   if (conceptRefusal !== null) {
     return conceptRefusal;
+  }
+  // KG-D Task 5: a suggestion's rejection, on the WORKSPACE stream (so the concept pass never reads it), beside it.
+  const suggestionRefusal = await checkSuggestionRejection(env, permissionContext);
+  if (suggestionRefusal !== null) {
+    return suggestionRefusal;
   }
   // After the role gate on purpose (and after the note and concept passes, which
   // read nothing for a membership claim): it is the question the role

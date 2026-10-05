@@ -30,3 +30,22 @@ export type ConceptListResponse = { workspaceId: string; concepts: ConceptSummar
 export type ConceptAudienceResponse = { conceptId: string | null; members: number; before: number; after: number };
 /** The ticket history's event shape (`routes/ticket-history.ts` `TicketHistoryEvent`), mapped client-side as that one is. */
 export type ConceptHistoryResponse = { conceptId: string; events: unknown[] };
+
+/**
+ * Knowledge Graph spec D §4.1/§5.2 (KG-D Task 5): one model suggestion, as `GET /v1/workspaces/:id/suggestions` serves
+ * it. Already D4's per reader (every live item visible), never stored per reader. `signature` and `itemHashes` are
+ * what a rejection carries (`workspace.concept_suggestion_rejected`); `id` is what `concept.created`'s
+ * `fromSuggestion` names. Each item's `label` is a concept item's (a ticket's key and title, a note's title).
+ */
+export type SuggestionView = {
+  id: string;
+  label: string;
+  terms: string[];
+  score: number;
+  computedAt: string;
+  signature: string;
+  itemHashes: string[];
+  items: Array<{ kind: ConceptItemKind; id: string; label: string }>;
+};
+/** Highest score first. */
+export type SuggestionListResponse = { workspaceId: string; suggestions: SuggestionView[] };
