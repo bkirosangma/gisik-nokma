@@ -99,7 +99,9 @@ describe('14.451 update_ticket', () => {
       '"title" is a built-in field: use the title argument',
     );
     for (const id of ['estimate', 'reworkEstimate', 'waitForAll']) {
-      await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { [id]: 3 } })).rejects.toThrow(`"${id}" is a built-in field and cannot be set through fields`);
+      // Graph Part 5 T1 gave them their own doors (29.377, 29.378), so the refusal names the door to use
+      const door = id === 'waitForAll' ? 'the set_wait_for_all tool' : `the ${id} argument`;
+      await expect(tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, fields: { [id]: 3 } })).rejects.toThrow(`"${id}" is a built-in field: use ${door}`);
     }
     expect(f.batches, '29.163 refusals send nothing').toHaveLength(1);
     await tool('update_ticket', f.session).handler({ workspaceId: WS, ticketId: T, title: 'Only' }); // control
@@ -251,7 +253,7 @@ describe('27.055–27.057 link_tickets', () => {
   };
 
   it("27.055 action 'add' files ONE ticket.link_added on ticketId's stream, origin mcp, the session's actor; control: kind 'parent' is refused before anything is sent", async () => {
-    const f = fake();
+    const f = fake(ROUTES); // both ends are read first: a draft end changes the stream (Graph Part 5 T1, 29.375)
     await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'blocks', action: 'add' });
     expect(f.batches).toHaveLength(1);
     expect(f.batches[0]).toHaveLength(1);
@@ -262,21 +264,9 @@ describe('27.055–27.057 link_tickets', () => {
     expect(f.batches).toHaveLength(1);
   });
 
-  it("29.126 link_tickets still refuses kind 'leads_to' (no label argument until Part 5): the input schema lists three kinds, and a call is refused before anything is sent", async () => {
-    const f = fake();
-    const kindSchema = (tool('link_tickets', f.session).inputSchema as Record<string, { options?: unknown }>)['kind'];
-    expect(kindSchema?.options).toEqual(['blocks', 'relates', 'duplicates']);
-    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'leads_to', action: 'add' })).rejects.toThrow();
-    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'leads_to', action: 'remove' })).rejects.toThrow();
-    expect(f.batches).toHaveLength(0);
-    // control: the same call with a kind it files is sent
-    await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'relates', action: 'add' });
-    expect(f.batches).toHaveLength(1);
-  });
-
   it("27.056 action 'remove' files link_removed on the STORED source, from either end; a links-read 404 is the uniform sentence and sends nothing; control: an outgoing link stays on this stream, a missing one is an error naming it", async () => {
     const removal = async (kind: string, targetId: string) => {
-      const f = fake(linkRoutes);
+      const f = fake({ ...ROUTES, ...linkRoutes }); // the ends' details answer: neither is a draft, so each files plain (29.376)
       await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId, kind, action: 'remove' });
       expect(f.batches).toHaveLength(1);
       expect(f.batches[0]).toHaveLength(1);
