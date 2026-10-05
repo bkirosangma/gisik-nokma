@@ -1,6 +1,7 @@
 import type { TicketLinkKind } from './events/ticket-events.js';
 import type { StateCategory } from './workflow.js';
 import type { FlowCause } from './flow/causes.js';
+import type { WorkPeriod } from './flow/derive.js';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
 
@@ -131,6 +132,10 @@ export type TicketState = {
    * reducer drops the key with the last link, so the two shapes agree.
    */
   links?: TicketLink[];
+  /** Work periods (WP-1), oldest first; ABSENT when the ticket never started. Derived dates: `flow/derive.ts`. */
+  periods?: WorkPeriod[];
+  /** 1 plus the flow resets (`reopened-by-flow` transitions) filed on this ticket; ABSENT = 1. */
+  rounds?: number;
   /** A Decision's CURRENT outcome (DC-4/PS-2). ABSENT when none: never decided, cleared, or released by a loop reset. */
   outcome?: string;
   /** A Decision's pass records, oldest first (PS-2). ABSENT until the first choice; the reducer, `rowToTicketState` and the replica all agree. */
