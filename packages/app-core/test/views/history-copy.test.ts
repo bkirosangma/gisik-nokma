@@ -476,6 +476,9 @@ describe('29.371 history copy: flow and decision sentences', () => {
     expect(describeEvent(ev('ticket.closed', { cause: decision('reopened-by-flow') }, { key: 'GN-151' }))).toBe('Closed');
     expect(describeEvent(ev('ticket.reopened', { cause: decision('branch-not-taken') }, { key: 'GN-151' }))).toBe('Reopened');
     expect(describeEvent(ev('ticket.transitioned', { to: 'todo', cause: { kind: 'reopened-for-child', childTicketId: SRC } }), ctx)).toBe('Moved to To do');
+    // a decision cause with no outcome is not one the copy can phrase: the plain flag
+    const noOutcome = { kind: 'branch-not-taken', decisionTicketId: SRC, pass: 1, decidedBy: 'user_anselma', decisionEventId: 'dec-1' };
+    expect(describeEvent(ev('ticket.closed', { cause: noOutcome }, { key: 'GN-151' }))).toBe('Closed');
   });
 
   it('29.371 narrates the decision: first choice, revision, clearing, and a payload it cannot read', () => {
@@ -513,5 +516,15 @@ describe('29.372 historyRounds', () => {
     ];
     expect(Object.fromEntries(historyRounds(events))).toEqual({ a: 1, b: 1, c: 2, d: 2, f: 2, g: 2, h: 2, i: 3, j: 3 });
     expect(historyRounds([])).toEqual(new Map());
+  });
+
+  it('29.372 a reset filed as a transition alone counts; a cause without its event id counts once per event', () => {
+    // a loop reset whose ticket was not finished files no reopen, only the move to Backlog
+    const lone = [e('a', 'ticket.created', { typeId: 'task' }), e('b', 'ticket.transitioned', { to: 'backlog', cause: reset(1) })];
+    expect(Object.fromEntries(historyRounds(lone))).toEqual({ a: 1, b: 2 });
+    // no decisionEventId to pair on: each event is its own reset
+    const bare = { kind: 'reopened-by-flow', decisionTicketId: '01J9GTKB000000000000000000', outcome: 'No', pass: 1, decidedBy: 'u' };
+    const unpaired = [e('c', 'ticket.transitioned', { to: 'backlog', cause: bare }), e('d', 'ticket.transitioned', { to: 'backlog', cause: bare })];
+    expect(Object.fromEntries(historyRounds(unpaired))).toEqual({ c: 2, d: 3 });
   });
 });

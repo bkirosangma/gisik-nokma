@@ -70,6 +70,31 @@ describe('29.364 a non-loop outcome closes what only the other branches lead to'
     expect(show(stray)).toEqual(show(plan));
   });
 
+  it('29.364 the left side is only this Decision\'s other forward branches: not its loop label, not another Decision\'s cut side, not a stray name', () => {
+    // s -> w -> e (Decision, chose Again): Again -> a -> d, No -> b -> d; d (Decision, chose Go): Go -> f, Again -> w (d's
+    // loop); f (Decision, chose A): A -> p, B -> q. b is cut by e and q by f: neither is live, neither is on a branch d leaves
+    const [w, e, a, b, f, p, q, s] = [30, 31, 32, 33, 34, 35, 36, 41].map(uid) as [string, string, string, string, string, string, string, string];
+    const edges = [edge(s, w), edge(w, e), edge(e, a, 'Again'), edge(e, b, 'No'), edge(a, DEC), edge(b, DEC), edge(DEC, f, 'Go'), edge(DEC, w, 'Again'), edge(f, p, 'A'), edge(f, q, 'B')];
+    const nodes = [fnode(s), fnode(w), decision(e, { outcome: 'Again' }), fnode(a), fnode(b, WORKING), decision(DEC, decided('Go')), decision(f, { outcome: 'A' }), fnode(p), fnode(q, WORKING)];
+    const quiet = { steps: [], blocked: null, started: [], touchesOthers: false };
+    expect(planSettle({ nodes, edges, decisionId: DEC })).toEqual(quiet);
+    // a name for a ticket off d's branches is not honoured either
+    expect(planSettle({ nodes, edges, decisionId: DEC, closeStarted: [b, q] })).toEqual(quiet);
+    // CONTROL: d's own other forward label does close what only it leads to (z); y, already resolved Not taken (its state
+    // since edited off the terminal one), is not closed again
+    const resolved = { closed: true, notTaken: { kind: 'not-taken' as const, decisionTicketId: uid(97), outcome: 'Yes', pass: 1 } };
+    const stop = planSettle({ nodes: [...nodes, fnode(Z), fnode(Y, resolved)], edges: [...edges, edge(DEC, Z, 'Stop'), edge(DEC, Y, 'Halt')], decisionId: DEC });
+    expect(show(stop, letters)).toEqual(['not-taken-transition:z', 'not-taken-close:z']);
+  });
+
+  it('29.364 started tickets on the left side are listed in flow order, whatever order the links were drawn in', () => {
+    // d: Go -> p, Stop -> y, Halt -> x; the Stop link is drawn first, the flow order puts x (the smaller id) first
+    const edges = [edge(DEC, P, 'Go'), edge(DEC, Y, 'Stop'), edge(DEC, X, 'Halt')];
+    const plan = planSettle({ nodes: [decision(DEC, decided('Go')), fnode(P), fnode(Y, WORKING), fnode(X, WORKING)], edges, decisionId: DEC });
+    expect(plan.steps).toEqual([]);
+    expect(letters(plan.started)).toEqual(['x', 'y']);
+  });
+
   it('29.364 the children of a closing ticket close before it; a child that must stay open blocks the whole plan', () => {
     // d: Yes -> a (live), No -> x -> y; y is a child of x, and the flow order puts x before y
     const edges = [edge(DEC, P, 'Yes'), edge(DEC, X, 'No'), edge(X, Y)];
@@ -88,6 +113,18 @@ describe('29.364 a non-loop outcome closes what only the other branches lead to'
     const startedChild = [decision(DEC, decided('Yes')), fnode(P), fnode(X), fnode(Y, { parentId: X, ...WORKING })];
     expect(planSettle({ nodes: startedChild, edges, decisionId: DEC }).blocked).toEqual({ ticketId: X, reason: 'child-open' });
     expect(planSettle({ nodes: startedChild, edges, decisionId: DEC, closeStarted: [Y] }).blocked).toBeNull();
+    // a started child off the flow's left side (cut by another Decision, e chose A): named, it closes with its parent;
+    // unnamed, it blocks (the name is honoured in the child walk too, not only on the left side)
+    const E = uid(40);
+    const offSide = [...edges, edge(E, Q, 'A'), edge(E, Z, 'B')];
+    const offChild = [decision(DEC, decided('Yes')), fnode(P), fnode(X), decision(E, { outcome: 'A' }), fnode(Q), fnode(Z, { parentId: X, ...WORKING })];
+    expect(planSettle({ nodes: offChild, edges: offSide, decisionId: DEC }).blocked).toEqual({ ticketId: X, reason: 'child-open' });
+    expect(show(planSettle({ nodes: offChild, edges: offSide, decisionId: DEC, closeStarted: [Z] }), letters)).toEqual([
+      'not-taken-transition:z', 'not-taken-close:z', 'not-taken-transition:x', 'not-taken-close:x',
+    ]);
+    // a finished child (live: it is on no link) is left as it is, and does not block its parent's close
+    const doneChild = [decision(DEC, decided('Yes')), fnode(P), fnode(X), fnode(Y, { parentId: X, ...FINISHED })];
+    expect(show(planSettle({ nodes: doneChild, edges, decisionId: DEC }), letters)).toEqual(['not-taken-transition:x', 'not-taken-close:x']);
     // a draft child the live side does not reach blocks as well: a draft is never moved, so it cannot close with its parent
     const draftChild = [decision(DEC, decided('Yes')), fnode(P), fnode(X), fnode(Y, { parentId: X, draft: true })];
     expect(planSettle({ nodes: draftChild, edges, decisionId: DEC })).toEqual({ steps: [], blocked: { ticketId: X, reason: 'child-open' }, started: [], touchesOthers: false });
@@ -216,6 +253,21 @@ describe('29.366 revising, clearing and the second pass', () => {
     expect(show(planSettle({ nodes: under('No', {}), edges, decisionId: DEC }), names)).toEqual(['reopen:y', 'to-backlog:y', 'not-taken-transition:x', 'not-taken-close:x']);
   });
 
+  it('29.366 a returning Not-taken ticket must be live and movable: one cut by a later Decision, or trashed, stays', () => {
+    // d: Yes -> x, No -> e (Decision): P -> p, Q -> y; y was closed Not taken by d
+    const E = uid(40);
+    const flow = [edge(DEC, X, 'Yes'), edge(DEC, E, 'No'), edge(E, P, 'P'), edge(E, Y, 'Q')];
+    const nodes = (eOutcome: string | null, y: Partial<FlowNode>) => [decision(DEC, decided(null)), fnode(X), decision(E, { outcome: eOutcome }), fnode(P), fnode(Y, y)];
+    // cleared d: y is cut by e's P, so it is not live and stays; CONTROL: e undecided, y is live and returns
+    expect(planSettle({ nodes: nodes('P', notTaken(DEC)), edges: flow, decisionId: DEC }).steps).toEqual([]);
+    expect(show(planSettle({ nodes: nodes(null, notTaken(DEC)), edges: flow, decisionId: DEC }), letters)).toEqual(['reopen:y', 'to-backlog:y']);
+    // a trashed Not-taken ticket never returns, on a clear or on a revise
+    expect(planSettle({ nodes: nodes(null, { ...notTaken(DEC), trashed: true }), edges: flow, decisionId: DEC }).steps).toEqual([]);
+    const revise = (y: Partial<FlowNode>) => planSettle({ nodes: [decision(DEC, decided('No')), fnode(X), fnode(Y, y)], edges: [edge(DEC, X, 'Yes'), edge(DEC, Y, 'No')], decisionId: DEC });
+    expect(show(revise({ ...notTaken(DEC), trashed: true }), letters)).toEqual(['not-taken-transition:x', 'not-taken-close:x']);
+    expect(show(revise(notTaken(DEC)), letters)).toEqual(['reopen:y', 'to-backlog:y', 'not-taken-transition:x', 'not-taken-close:x']); // CONTROL
+  });
+
   it('29.366 an outcome whose label has no edge any more refuses the plan instead of closing every branch', () => {
     const plan = planSettle({ nodes: pass1('Maybe', {}), edges, decisionId: DEC });
     expect(plan).toEqual({ steps: [], blocked: { ticketId: DEC, reason: 'outcome-has-no-branch' }, started: [], touchesOthers: false });
@@ -278,6 +330,15 @@ describe('29.367 a plan the engine would refuse is refused whole; the events car
     expect(show(together, (ids) => [...ids].map((id) => ({ [P]: 'p', [X]: 'x', [DEC]: 'd' })[id] ?? id))).toEqual([
       'reopen:p', 'to-initial:p', 'to-backlog:d', 'to-backlog:x', // parents (depth 0) before children, then flow order
     ]);
+  });
+
+  it('29.367 only a ticket leaving a FINISHED state needs its parent to leave: an open one under a finished parent moves', () => {
+    // s -> w -> x -> d; d: Again -> w (the loop), Done -> p. x is working, its parent q is finished and stays
+    const S0 = uid(41);
+    const edges = [edge(S0, W), edge(W, X), edge(X, DEC), edge(DEC, W, 'Again'), edge(DEC, P, 'Done')];
+    const plan = planSettle({ nodes: [fnode(S0), fnode(W), fnode(X, { ...WORKING, parentId: Q }), decision(DEC, decided('Again')), fnode(P), fnode(Q, FINISHED)], edges, decisionId: DEC });
+    expect(plan.blocked).toBeNull();
+    expect(show(plan, letters)).toEqual(['to-backlog:d', 'to-backlog:x']);
   });
 
   it('29.367 a ticket to close Not taken whose workflow has no terminal state refuses the plan, naming the first such ticket in closing order', () => {
