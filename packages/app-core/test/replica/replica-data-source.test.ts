@@ -1701,7 +1701,7 @@ describe('29.374 the replica list row carries notTaken from the folded close cau
     await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.transitioned', { to: 'done', cause }));
     await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.closed', { cause }));
     await replica.applyServerItem(envelope({ kind: 'ticket', id: finished }, 'ticket.transitioned', { to: 'done' }));
-    const rows = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.filter((r) => [skipped, finished].includes(r.ticketId));
+    const rows = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.filter((r) => (r.ticketId === skipped || r.ticketId === finished));
     expect(rows.find((r) => r.ticketId === skipped)?.notTaken).toBe(true);
     expect(rows.find((r) => r.ticketId === finished)).not.toHaveProperty('notTaken');
     expect(countRows(rows)).toEqual({ total: 2, terminal: 1 });

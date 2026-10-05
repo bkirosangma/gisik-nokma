@@ -456,6 +456,8 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
   return {
     totalChildren: asNumber(record['totalChildren'], `${path}.totalChildren`),
     terminalChildren: asNumber(record['terminalChildren'], `${path}.terminalChildren`),
+    // wtg2 T17: absent stays absent (the server sends it only when nonzero).
+    ...(record['notTakenChildren'] === undefined ? {} : { notTakenChildren: asNumber(record['notTakenChildren'], `${path}.notTakenChildren`) }),
     restrictedCount: asNumber(record['restrictedCount'], `${path}.restrictedCount`),
   };
 }
@@ -1917,6 +1919,8 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
     // server assembler reads `proj_tickets.rank` (`read/ticket-cards.ts`), the
     // card's `rank` rides the JSON, and this is the client half — case 13.703.
     rank: mapRank(record['rank'], `${path}.rank`),
+    // wtg2 T17 (Q1): the card's mark, absent when the server did not set it.
+    ...(record['notTaken'] === true ? { notTaken: true as const } : {}),
   };
 }
 

@@ -249,7 +249,10 @@ export type TransitionCause =
  */
 export type RollupToViewer = {
   totalChildren: number;
+  /** Done children: terminal and not closed Not taken (wtg2 T17). */
   terminalChildren: number;
+  /** wtg2 T17 (Q1): terminal children closed Not taken, counted APART from `terminalChildren`; ABSENT when 0. */
+  notTakenChildren?: number;
   restrictedCount: number;
 };
 
@@ -551,6 +554,8 @@ export type ListRow = {
    * after them by `ticketId`, so the distinction is the whole sort.
    */
   rank: string | null;
+  /** wtg2 T17 (Q1): closed "Not taken" by the flow; ABSENT otherwise. Optional (unlike `closed`) so no legacy literal changes; `countRows` is its reader. */
+  notTaken?: true;
 };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };

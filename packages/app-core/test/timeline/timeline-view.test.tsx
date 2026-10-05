@@ -726,10 +726,10 @@ describe('29.440 the Timeline mark knows Not taken (wtg2 T17, AMEND-wtg2-t17-tim
       decisionTicketId: '01J9GTKB000000000000000000',
       outcome: 'Yes',
       pass: 1,
-      decidedBy: '01J9GUSA000000000000000000',
+      decidedBy: '01J9GVSA000000000000000000',
       decisionEventId: '01J9GEVT000000000000000001',
     };
-    const closed = { actorId: '01J9GUSA000000000000000000', at: '2026-08-28T10:00:00.000Z', cause };
+    const closed = { actorId: '01J9GVSA000000000000000000', at: '2026-08-28T10:00:00.000Z', cause };
     const bar = (title: string, stateCategory: TicketState['stateCategory'], over: Partial<TicketState>): TicketDatesInput =>
       ticket({ stateCategory, ...over, fields: { title: claimField(title), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField({ date: '2026-08-28' }) } });
     // the SECOND terminal bar decides: the first is a plain finish
