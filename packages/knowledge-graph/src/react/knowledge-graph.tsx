@@ -275,13 +275,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         )}
         {empty && (
           <div className="gn-kg__empty">
-            <p>
-              {!chipsHideAll
-                ? `Nothing is linked to ${label(centre)} yet.`
-                : everyChipOff
-                  ? `Every link type is turned off. Turn one on to see ${label(centre)}'s links.`
-                  : `The link types that carry ${label(centre)}'s links are turned off. Turn one on to see them.`}
-            </p>
+            <p>{chipsHideAll ? (everyChipOff ? `Every link type is turned off. Turn one on to see ${label(centre)}'s links.` : `The link types that carry ${label(centre)}'s links are turned off. Turn one on to see them.`) : `Nothing is linked to ${label(centre)} yet.`}</p>
             {!chipsHideAll && centreItem?.kind === 'ticket' && props.onAddLink && (
               <button type="button" className="gn-button gn-button--primary" onClick={() => props.onAddLink!(centreItem)}>
                 Add link
