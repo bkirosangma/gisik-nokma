@@ -148,10 +148,10 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
     }
     expect(seen.sort(), 'every registered tool has exactly one block').toEqual([...tools].sort());
     // Control, on the parser: two blocks split at the second name; an unregistered type, a helper before the first
-    // name and a `rename: \`…\`` inside a block are not events and start nothing.
-    const sample = "'note.created' name: 'x_tool', 'ticket.closed' 'not.a_type' rename: `y` name: 'y_tool' x";
+    // name, a quoted name that is no tool and a `rename: \`…\`` inside a block are not events and start nothing.
+    const sample = "'note.created' name: 'x_tool', 'ticket.closed' 'not.a_type' name: 'not_a_tool', 'comment.added' rename: `y` name: 'y_tool' x";
     expect(blocksOf(sample, new Set(['x_tool', 'y_tool']))).toEqual([
-      { tools: ['x_tool'], events: ['ticket.closed'] },
+      { tools: ['x_tool'], events: ['comment.added', 'ticket.closed'] },
       { tools: ['y_tool'], events: [] },
     ]);
   });
