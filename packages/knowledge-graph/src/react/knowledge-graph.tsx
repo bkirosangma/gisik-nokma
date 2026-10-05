@@ -245,6 +245,13 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           tabIndex={0}
           aria-label={`Knowledge Graph of items linked to ${label(centre)}`}
           data-kg-probe={props.createRenderer ? '' : undefined}
+          // the edge sentence follows the pointer along its edge, as the mockup's does (`knowledge-graph-sigma.html:884-885`):
+          // Sigma reports an edge once, on entering it
+          onPointerMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setTip((t) => (t === null ? t : { ...t, x: e.clientX - r.left, y: e.clientY - r.top }));
+          }}
+          onPointerLeave={() => setTip(null)}
         />
         {firstLoad && (
           <SkeletonRegion label="Loading the Knowledge Graph" className="gn-kg__skeleton">

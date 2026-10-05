@@ -9789,7 +9789,8 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-kg__row { display: flex; flex-wrap: wrap; gap: 0.625rem 0.875rem; align-items: center; min-width: 0; }
 .gn-kg__pick, .gn-kg__reach { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .gn-kg__label { font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-subtle); }
-.gn-kg__count { margin: 0 0 0 auto; font-size: 0.8125rem; color: var(--gn-text-subtle); font-variant-numeric: tabular-nums; }
+/* The count owns its line: its text grows when ring 1 answers, and sharing the controls' row it would wrap them and move the canvas (27.320). */
+.gn-kg__count { flex-basis: 100%; margin: 0; text-align: end; font-size: 0.8125rem; color: var(--gn-text-subtle); font-variant-numeric: tabular-nums; }
 .gn-kg__scope-note { margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); background: var(--gn-tint-warning); border-radius: var(--gn-radius-control); padding: 0.375rem 0.625rem; }
 /* The link chips: the legend is the control. A 32px pill with a 44px hit area (owner 2026-09-30: visuals unchanged, target ≥ 44). */
 .gn-kg__chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
@@ -9838,7 +9839,7 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-kg__status { margin: 0; min-height: 1.2em; font-size: 0.8125rem; color: var(--gn-text-subtle); }
 /* The phone (§5): one hop, the bar folded into "Scope and links", 32px chips. */
 .gn-kg--phone .gn-kg__canvas { height: 70vh; }
-.gn-kg--phone .gn-kg__count { margin: 0; flex-basis: 100%; }
+.gn-kg--phone .gn-kg__count { text-align: start; }
 .gn-kg--phone .gn-kg__pick { flex-basis: 100%; }
 .gn-kg__fold { width: 100%; }
 .gn-kg__fold > summary { display: flex; gap: 0.5rem; align-items: center; min-height: 2.75rem; padding: 0 0.75rem; list-style: none; cursor: pointer; background: var(--gn-surface-track); border-radius: var(--gn-radius-card); font-size: 0.875rem; font-weight: 600; color: var(--gn-text); }
