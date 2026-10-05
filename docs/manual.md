@@ -1105,7 +1105,9 @@ The same idea stretched sideways, as one continuous chart with no pages: drag, s
 through time, press **Today** to glide back to it, and use the **Day**, **Week** and **Month** switch (or
 Ctrl and scroll, or a pinch) to zoom about the spot you point at. The arrow keys move a week at a time.
 A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by. A thin line
-marks today. Tickets that share a day are stacked in rows, and each bar shows its ticket's key.
+marks today. Tickets that share a day are stacked in rows, and each bar shows its ticket's key. On a phone the chart turns so that time runs down the page.
+Scroll to a stretch with nothing on it and a pill reads *"Nothing in view"* with **Jump to the previous
+bar** and **Jump to the next bar**.
 
 Anything with only one date, no dates, or a contradiction goes into a list beside the chart headed
 *"Not on the timeline yet"*, with a count. The sentence under the heading says what to do: *"These

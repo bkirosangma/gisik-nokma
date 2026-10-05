@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import { CalendarView } from '../../src/calendar/calendar-view.js';
@@ -121,5 +121,128 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
     // CONTROL: the week band and its column template do not exist any more.
     expect(root?.querySelector('.gn-timeline__weeks')).toBeNull();
     expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe('');
+  });
+
+  it('29.110 the panel names its orientation: narrower than 40rem (640 px) is portrait, 640 and wider and an unmeasured panel (jsdom, a hidden tab) are landscape', () => {
+    const orientationAt = (width: number): string | null => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      try {
+        return renderIt().container.querySelector('.gn-timeline')?.getAttribute('data-orientation') ?? null;
+      } finally {
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    expect(orientationAt(390)).toBe('portrait');
+    expect(orientationAt(639)).toBe('portrait');
+    expect(orientationAt(1)).toBe('portrait'); // the narrowest measured panel: only 0 (no layout yet) reads as landscape
+    // CONTROLS, same it: the edge, a desktop width and no layout at all are landscape.
+    expect(orientationAt(640)).toBe('landscape');
+    expect(orientationAt(1280)).toBe('landscape');
+    expect(orientationAt(0)).toBe('landscape');
+  });
+
+  it('29.110 in portrait a key is a line down a 100 px column, so a bar a line tall or more carries its key INSIDE (the portrait packer reserved a line, not the key\'s width); control: the same bar in landscape, shorter than its key, puts the key outside', () => {
+    // Two days at the Week preset: 48 px along time. The key's measured width (jsdom's estimate, 7 characters + the bar's padding)
+    // is wider than 48 px, so landscape puts it outside the bar; in portrait the bar is 100 px wide and 46 px tall, room for a line.
+    const short: TicketState = { ...ticket, fields: { title: claim('A short one'), startDate: claim({ date: '2026-08-23' }), dueDate: claim({ date: '2026-08-24' }) } };
+    const keysAt = (width: number) => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      try {
+        const { container } = render(
+          <TimelineView tickets={[{ key: 'GN-1234', state: short, pendingFieldIds: [], customDateFields: [] }]} today="2026-08-23" userName={(id) => id} onOpenTicket={vi.fn()} />,
+        );
+        const bar = container.querySelector('.gn-timeline__bar');
+        return {
+          orientation: container.querySelector('.gn-timeline')?.getAttribute('data-orientation'),
+          inside: bar?.querySelector('.gn-timeline__key')?.textContent ?? null,
+          outside: container.querySelector('.gn-timeline__key--outside')?.textContent ?? null,
+        };
+      } finally {
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    expect(keysAt(390)).toEqual({ orientation: 'portrait', inside: 'GN-1234', outside: null });
+    // CONTROL, same it: landscape keeps T9's decision on the bar's drawn LENGTH, so this short bar's key is outside it.
+    expect(keysAt(1280)).toEqual({ orientation: 'landscape', inside: null, outside: 'GN-1234' });
+    // The PACKER reserves the same line: a second short bar starting the day after the first one ends shares its column in portrait,
+    // where the first one's key takes no room along time; in landscape the first one's key, drawn after its end, pushes it a row down.
+    const next: TicketState = { ...ticket, id: 't2', fields: { title: claim('The next one'), startDate: claim({ date: '2026-08-25' }), dueDate: claim({ date: '2026-08-26' }) } };
+    const rowsAt = (width: number) => {
+      // A height too, so the portrait scroller (time runs down) has days in view and mounts both bars.
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      const tall = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700);
+      try {
+        const { container } = render(
+          <TimelineView
+            tickets={[{ key: 'GN-1234', state: short, pendingFieldIds: [], customDateFields: [] }, { key: 'GN-1235', state: next, pendingFieldIds: [], customDateFields: [] }]}
+            today="2026-08-23"
+            userName={(id) => id}
+            onOpenTicket={vi.fn()}
+          />,
+        );
+        return [...container.querySelectorAll<HTMLElement>('.gn-timeline__row')].map((row) => [row.dataset['ticketId'], row.style.getPropertyValue('--row')]);
+      } finally {
+        tall.mockRestore();
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    expect(rowsAt(390)).toEqual([['t1', '0'], ['t2', '0']]);
+    expect(rowsAt(1280)).toEqual([['t1', '0'], ['t2', '1']]);
+  });
+
+  it('29.110 in portrait a bar with no key (an offline ticket, no prefix yet) reserves no line, so the next bar shares its column; control: the same bars with keys', async () => {
+    // At Month (8 px a day) a one-day bar is drawn 12 px tall (MIN_BAR_PX), shorter than a 16 px key line, so a KEYED bar's key
+    // sits after its end and the packer reserves it (to day 23 + 3); the second bar, two days on, takes the next column. A keyless
+    // bar has no line to reserve: its footprint is its own two drawn days, and the second bar shares its column.
+    const day = (id: string, date: string): TicketState => ({ ...ticket, id, fields: { title: claim(id), startDate: claim({ date }), dueDate: claim({ date }) } });
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+    const rowsAtMonth = async (keys: readonly [string | null, string | null]) => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
+      const tall = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700);
+      try {
+        const { container } = render(
+          <TimelineView
+            tickets={[
+              { key: keys[0], state: day('t1', '2026-08-23'), pendingFieldIds: [], customDateFields: [] },
+              { key: keys[1], state: day('t2', '2026-08-25'), pendingFieldIds: [], customDateFields: [] },
+            ]}
+            today="2026-08-23"
+            userName={(id) => id}
+            onOpenTicket={vi.fn()}
+          />,
+        );
+        // Reduced motion makes the zoom instant: the frame lands once Month is marked.
+        const zoom = within(container).getByRole('radiogroup', { name: 'Timeline zoom' });
+        fireEvent.click(within(zoom).getByRole('radio', { name: 'Month' }));
+        await waitFor(() => expect(within(zoom).getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true'));
+        return {
+          orientation: container.querySelector('.gn-timeline')?.getAttribute('data-orientation'),
+          rows: [...container.querySelectorAll<HTMLElement>('.gn-timeline__row')].map((row) => [row.dataset['ticketId'], row.style.getPropertyValue('--row')]),
+        };
+      } finally {
+        tall.mockRestore();
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    try {
+      // CONTROL first: keyed, the first bar's key line pushes the second bar a column over (the leg CAN fail).
+      expect(await rowsAtMonth(['GN-1', 'GN-2'])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '1']] });
+      expect(await rowsAtMonth([null, null])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '0']] });
+      // An empty key is no key either (the measure's second clause; reviewer B, P11: dropping it survived the null-only leg).
+      expect(await rowsAtMonth(['', ''])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '0']] });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

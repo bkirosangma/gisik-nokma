@@ -1,10 +1,16 @@
-import { maxOverlap, type PackItem } from '@gisik-nokma/viewport';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ROW_GAP_PX, maxOverlap, routeEdge, type Box, type PackItem } from '@gisik-nokma/viewport';
 import { describe, expect, it } from 'vitest';
 import {
   BAR_HEIGHT,
   COLUMN_WIDTH,
   LANE_HEADING,
   PIN_PX,
+  PORTRAIT_BAR_INSET,
+  PORTRAIT_BAR_WIDTH,
+  PORTRAIT_GUTTER_PX,
   ROW_PITCH,
   barsInRange,
   layoutLanes,
@@ -142,5 +148,98 @@ describe('29.086 what is mounted', () => {
     // The slice is in start-day order, then id: ids that sort the other way, and a tie on day 5.
     const mixed = layoutLanes([{ laneId: 'm', items: [item('z', 0, 2), item('y', 5, 6), item('x', 5, 8)] }], { ppd: 24, measure: fixed(0) }).lanes[0]!;
     expect(barsInRange(mixed, { start: 0, end: 10 }).map((b) => b.id)).toEqual(['z', 'x', 'y']);
+  });
+});
+
+/** `packages/app-core/test/timeline` -> four levels up (not `new URL(..., import.meta.url)`: see timeline-view.test.tsx's REPO_ROOT). */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+
+/**
+ * 29.109's E9 legs (owner ruling E9, 2026-10-04; AMEND-wtg-e9-portrait-gutter): a portrait bar is 100 px inside its 112 px
+ * column, inset 6 px a side, so a 12 px gutter (`ROW_GAP_PX`, the landscape row gap) runs between columns and an edge's channel
+ * runs on its midline. The constants are the source of truth; ui.css draws the same numbers (it cannot import them), so its
+ * copies are pinned against the constants AND against the literals: a value scaled on both sides still reddens.
+ */
+describe('29.109 E9: a portrait bar is 100 px inside its 112 px column, and an edge runs in the gutter between columns', () => {
+  it('29.109 PORTRAIT_BAR_WIDTH = COLUMN_WIDTH - ROW_GAP_PX (100 = 112 - 12), inset 6 px a side; ui.css draws the 112 px pitch, the 6 px inset, the 100 px bar and the 80 px gutter from the same numbers', () => {
+    expect(PORTRAIT_BAR_WIDTH).toBe(COLUMN_WIDTH - ROW_GAP_PX);
+    expect([PORTRAIT_BAR_WIDTH, PORTRAIT_BAR_INSET, ROW_GAP_PX, COLUMN_WIDTH, PORTRAIT_GUTTER_PX]).toEqual([100, 6, 12, 112, 80]);
+    expect(2 * PORTRAIT_BAR_INSET + PORTRAIT_BAR_WIDTH).toBe(COLUMN_WIDTH);
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const body = (selector: string) => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const hits = [...css.matchAll(new RegExp(`^${escaped} \\{([^}]*)\\}`, 'gm'))];
+      expect(hits, selector).toHaveLength(1);
+      return hits[0]?.[1] ?? '';
+    };
+    const value = (text: string, name: string) => new RegExp(`(?:^|;)\\s*${name}:\\s*([^;]+);`).exec(text)?.[1]?.trim();
+    const bar = body(".gn-timeline[data-orientation='portrait'] .gn-timeline__bar");
+    expect(value(bar, 'left')).toBe(`calc(var(--row) * ${COLUMN_WIDTH}px + ${PORTRAIT_BAR_INSET}px)`);
+    expect(value(bar, 'left')).toBe('calc(var(--row) * 112px + 6px)');
+    expect(value(bar, 'width')).toBe(`${PORTRAIT_BAR_WIDTH}px`);
+    expect(value(bar, 'width')).toBe('100px');
+    const panel = body(".gn-timeline[data-orientation='portrait']");
+    expect(value(panel, '--tl-gutter')).toBe(`${PORTRAIT_GUTTER_PX}px`);
+    expect(value(panel, '--tl-gutter')).toBe('80px');
+    // The claims callout under a portrait bar sits in the same box.
+    const claims = body(".gn-timeline[data-orientation='portrait'] .gn-timeline__row > .gn-timeline__claims");
+    expect(value(claims, 'left')).toBe(value(bar, 'left'));
+    expect(value(claims, 'max-width')).toBe(`${PORTRAIT_BAR_WIDTH}px`);
+  });
+
+  it('29.109 the bar width is defined once, derived, never a re-typed 100; control: the scan counts a planted copy', () => {
+    const roots = [join(REPO_ROOT, 'packages/viewport/src'), join(REPO_ROOT, 'packages/app-core/src')];
+    const definitions = (text: string, name: string) => (text.match(new RegExp(`\\b${name}\\s*=(?!=)`, 'g')) ?? []).length;
+    const total = { width: 0, gap: 0 };
+    for (const root of roots) {
+      for (const file of readdirSync(root, { recursive: true }) as string[]) {
+        if (!/\.tsx?$/.test(file)) continue;
+        const text = readFileSync(join(root, file), 'utf8');
+        total.width += definitions(text, 'PORTRAIT_BAR_WIDTH');
+        total.gap += definitions(text, 'ROW_GAP_PX');
+      }
+    }
+    expect(total).toEqual({ width: 1, gap: 1 });
+    const layout = readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-layout.ts'), 'utf8');
+    expect(layout).toMatch(/\bexport const PORTRAIT_BAR_WIDTH = COLUMN_WIDTH - ROW_GAP_PX;/);
+    expect(layout).toMatch(/\bexport const PORTRAIT_BAR_INSET = \(COLUMN_WIDTH - PORTRAIT_BAR_WIDTH\) \/ 2;/);
+    // CONTROL: the scan finds a planted re-typed copy.
+    expect(definitions('const PORTRAIT_BAR_WIDTH = 100;', 'PORTRAIT_BAR_WIDTH')).toBe(1);
+  });
+
+  it('29.109 an edge between bars in adjacent portrait columns runs its channel strictly inside the gutter and crosses no bar; control: the same scene with 112 px bars crosses', () => {
+    const ppd = 24;
+    // The source spans days 0-9; the target (days 3-5) starts before it ends, so the router takes the channel beside the
+    // source's column (TG-5); a third bar (days 7-8) shares the target's column inside the channel's span.
+    const lane = layoutLanes([{ laneId: 'l', items: [item('s', 0, 9), item('t', 3, 5), item('o', 7, 8)] }], { ppd, measure: fixed(0), orientation: 'portrait' }).lanes[0]!;
+    expect(lane.bars.map((bar) => [bar.id, bar.row])).toEqual([['s', 0], ['t', 1], ['o', 1]]);
+    const boxes = (inset: number, width: number): Record<string, Box> =>
+      Object.fromEntries(lane.bars.map((bar) => [bar.id, { x: lane.offset + bar.row * COLUMN_WIDTH + inset, y: bar.startDay * ppd, w: width, h: (bar.endDay - bar.startDay + 1) * ppd }]));
+    const channelXs = (b: Record<string, Box>) => {
+      const route = routeEdge(b['s']!, b['t']!, [b['o']!], 'portrait');
+      const centres = [b['s']!.x + b['s']!.w / 2, b['t']!.x + b['t']!.w / 2];
+      const xs: number[] = [];
+      for (let i = 1; i < route.points.length; i += 1) {
+        const p = route.points[i - 1]!;
+        const q = route.points[i]!;
+        if (p.x === q.x && !centres.includes(p.x)) xs.push(p.x);
+      }
+      return { xs, crossings: route.crossings };
+    };
+    const e9 = boxes(PORTRAIT_BAR_INSET, PORTRAIT_BAR_WIDTH);
+    const got = channelXs(e9);
+    expect(got.xs.length).toBeGreaterThan(0);
+    const gutterFrom = e9['s']!.x + e9['s']!.w;
+    const gutterTo = e9['o']!.x;
+    expect([gutterFrom, gutterTo]).toEqual([106, 118]);
+    for (const x of got.xs) {
+      expect(x).toBeGreaterThan(gutterFrom);
+      expect(x).toBeLessThan(gutterTo);
+    }
+    // On the gutter's midline: the boundary between column 0 and column 1.
+    expect(got.xs).toEqual([112]);
+    expect(got.crossings).toBe(0);
+    // CONTROL, same it: bars as wide as their column (the pre-E9 shape) leave no gutter, and the same route crosses the third bar.
+    expect(channelXs(boxes(0, COLUMN_WIDTH)).crossings).toBeGreaterThan(0);
   });
 });

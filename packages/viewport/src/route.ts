@@ -25,8 +25,12 @@ export type Route = {
 };
 
 export const GUTTER_PX = 14;
-/** The gap between two rows of bars (spec TG-13: a 28 px bar in a 40 px pitch, 12 px of gap). */
-const ROW_GAP_PX = 12;
+/**
+ * The gap between two rows of bars (spec TG-13: a 28 px bar in a 40 px pitch, 12 px of gap), and in portrait the gutter between two
+ * columns (ERRATA E9: a 100 px bar in a 112 px column, `PORTRAIT_BAR_WIDTH` in app-core's `timeline-layout.ts`). The router's
+ * channel runs on its midline.
+ */
+export const ROW_GAP_PX = 12;
 
 const transposeBox = (b: Box): Box => ({ x: b.y, y: b.x, w: b.h, h: b.w });
 const transposePt = (p: Pt): Pt => ({ x: p.y, y: p.x });
