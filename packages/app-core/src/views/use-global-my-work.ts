@@ -23,6 +23,12 @@ export type GlobalSection<T> = {
 export type GlobalMyWork = {
   attention: GlobalSection<AttentionItem[]>;
   myWork: GlobalSection<MyWorkView>;
+  /**
+   * Which workspace answered for each ticket merged above, by ticket id. The ticket sheet
+   * needs a workspace, and a merged `ContestedClaim` carries none of its own — only the
+   * read it came back from knows. Every row of both sections is in it.
+   */
+  workspaceOf: Record<string, string>;
   /** Asks every workspace again, as a stream frame on each would. */
   reload: () => void;
 };
@@ -201,6 +207,17 @@ export function useGlobalMyWork(
   }, [source, streamKey, ask]);
 
   const current = answers.key === key ? answers : null;
+  const workspaceOf: Record<string, string> = {};
+  if (current !== null) {
+    for (const [workspaceId, outcome] of Object.entries(current.attention)) {
+      if (outcome.ok) for (const item of outcome.value) workspaceOf[item.ticketId] = workspaceId;
+    }
+    for (const [workspaceId, outcome] of Object.entries(current.myWork)) {
+      if (!outcome.ok) continue;
+      const { assigned, inTransit, contested, shared } = outcome.value;
+      for (const row of [...assigned, ...inTransit, ...contested, ...shared]) workspaceOf[row.ticketId] = workspaceId;
+    }
+  }
   return {
     attention: section(
       plans.filter((plan) => plan.show !== null).map((plan) => plan.workspaceId),
@@ -212,6 +229,7 @@ export function useGlobalMyWork(
       current === null ? null : current.myWork,
       mergeMyWork,
     ),
+    workspaceOf,
     reload,
   };
 }

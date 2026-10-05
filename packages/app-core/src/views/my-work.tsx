@@ -1,12 +1,31 @@
+import { Fragment } from 'react';
 import { renderContestedClaimAttribution } from '@gisik-nokma/domain';
 import { Card, Chip } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import type { ContestedClaim, MyWorkView, WorkItem } from '../view-types.js';
+import type { WorkspaceGroup } from './my-work-global.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
+
+/**
+ * The global page's grouping of My Work (my-work-global T3, plan AMEND 16:3x): one tree per
+ * section that has a workspace and a project to group by. `contested` has neither
+ * (`ContestedClaim` carries only a ticket), so it stays a flat list in every arrangement.
+ */
+export type MyWorkGroups = {
+  assigned: WorkspaceGroup<WorkItem>[];
+  inTransit: WorkspaceGroup<WorkItem>[];
+  shared: WorkspaceGroup<WorkItem>[];
+};
 
 export type MyWorkProps = {
   view: MyWorkView;
+  /**
+   * Given, the three groupable sections draw an `<h3>` per workspace and an `<h4>` per
+   * project inside their own `<h2>` — the workspace sits UNDER "Assigned to me", so it is a
+   * level below it, never a sibling. Each section's emptiness still reads off `view`.
+   */
+  groups?: MyWorkGroups;
   onOpenTicket: (ticketId: string) => void;
   /**
    * What to call the claimant of a contested claim (a refused claim carries no
@@ -76,7 +95,39 @@ const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
  * fourth kind; a section heading inside a view the user opened on purpose is
  * not read as an all-clear about the product.
  */
-export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
+function WorkItems({
+  items,
+  groups,
+  onOpenTicket,
+  pending = false,
+}: {
+  items: WorkItem[];
+  groups: WorkspaceGroup<WorkItem>[] | undefined;
+  onOpenTicket: (ticketId: string) => void;
+  pending?: boolean;
+}) {
+  const card = (item: WorkItem) => (
+    <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} pending={pending} />
+  );
+  if (groups === undefined) return <>{items.map(card)}</>;
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.workspaceId} className="gn-my-work__group">
+          <h3 className="gn-my-work__workspace">{group.workspaceName}</h3>
+          {group.projects.map((project) => (
+            <Fragment key={project.projectId}>
+              <h4 className="gn-my-work__project-heading">{project.projectName}</h4>
+              {project.items.map(card)}
+            </Fragment>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
+export function MyWork({ view, groups, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
   return (
     <div className="gn-my-work">
       <section role="region" aria-label="Assigned to me" className="gn-my-work__section">
@@ -84,9 +135,7 @@ export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }:
         {view.assigned.length === 0 ? (
           <p className="gn-my-work__empty">Nothing assigned to you.</p>
         ) : (
-          view.assigned.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} />
-          ))
+          <WorkItems items={view.assigned} groups={groups?.assigned} onOpenTicket={onOpenTicket} />
         )}
       </section>
 
@@ -95,9 +144,7 @@ export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }:
         {view.inTransit.length === 0 ? (
           <p className="gn-my-work__empty">No claims in transit.</p>
         ) : (
-          view.inTransit.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} pending />
-          ))
+          <WorkItems items={view.inTransit} groups={groups?.inTransit} onOpenTicket={onOpenTicket} pending />
         )}
       </section>
 
@@ -130,9 +177,7 @@ export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }:
         {view.shared.length === 0 ? (
           <p className="gn-my-work__empty">Nothing has been shared with you.</p>
         ) : (
-          view.shared.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} />
-          ))
+          <WorkItems items={view.shared} groups={groups?.shared} onOpenTicket={onOpenTicket} />
         )}
       </section>
     </div>

@@ -56,7 +56,15 @@ const workItem = (workspaceId: string, ticketId: string): WorkItem => ({
 const myWorkOf = (workspaceId: string): MyWorkView => ({
   assigned: [workItem(workspaceId, `${workspaceId}-assigned`)],
   inTransit: [],
-  contested: [],
+  contested: [
+    {
+      ticketId: `${workspaceId}-contested`,
+      title: 'contested',
+      rule: 'state-machine',
+      reason: 'no transition',
+      claim: { actorId: 'u', clientTime: '2026-10-01T04:00:00.000Z' },
+    } as MyWorkView['contested'][number],
+  ],
   shared: [workItem(workspaceId, `${workspaceId}-shared`)],
 });
 
@@ -104,6 +112,19 @@ describe('useGlobalMyWork', () => {
     expect(myWorkCalls).toEqual(['w-admin', 'w-member']);
     expect(ids(result.current.myWork.data?.assigned)).toEqual(['w-admin-assigned', 'w-member-assigned']);
     expect(ids(result.current.myWork.data?.shared)).toEqual(['w-admin-shared', 'w-member-shared']);
+    expect(ids(result.current.myWork.data?.contested)).toEqual(['w-admin-contested', 'w-member-contested']);
+    // A merged contested claim carries no workspace of its own, and the ticket sheet needs
+    // one: the hook keeps which workspace answered for every ticket it merged.
+    expect(result.current.workspaceOf).toEqual({
+      'w-admin:created+assigned+ws-admin': 'w-admin',
+      'w-member:created+assigned': 'w-member',
+      'w-admin-assigned': 'w-admin',
+      'w-member-assigned': 'w-member',
+      'w-admin-contested': 'w-admin',
+      'w-member-contested': 'w-member',
+      'w-admin-shared': 'w-admin',
+      'w-member-shared': 'w-member',
+    });
 
     // A fresh but EQUAL list (a parent re-rendering `data ?? []`) asks nothing again.
     rerender({ list: [workspace('w-admin', { role: 'admin' }), workspace('w-member')], show: ['created', 'assigned', 'ws-admin'] });
