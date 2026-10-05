@@ -99,30 +99,33 @@ async function tickets(w: World, ...ids: string[]): Promise<void> {
 const tag = (conceptId: string, itemId: string, itemKind = 'ticket') => step(conceptId, 'concept.item_tagged', { itemKind, itemId });
 
 describe('27.458 a link to a concept deleted or merged later goes, live and rebuilt', () => {
-  it('27.458 written on the other concept’s stream, with either concept sorting first; controls: a link between two live concepts stays, and one whose writer is deleted goes', async () => {
-    // [the writer, what happens to the other end]: the writer's link names the target, and the target goes after it.
-    // With the writer = hi, replay meets the link AFTER the target's delete (lo's stream first): the case that drifted.
-    const legs: Array<['lo' | 'hi', 'deleted' | 'merged' | 'stays']> = [
-      ['hi', 'deleted'],
-      ['lo', 'deleted'],
-      ['hi', 'merged'],
-      ['lo', 'merged'],
-      ['hi', 'stays'], // control: nothing deleted, the link stays live and rebuilt
-    ];
-    for (const [who, fate] of legs) {
-      const leg = `${who} links, the other is ${fate}`;
-      await inFreshWorld(async (w) => {
-        const [lo, hi] = pair(); // fresh per database: makeCommitted's per-entity seq counter is process-wide
-        const [writer, target] = who === 'hi' ? [hi, lo] : [lo, hi];
-        await concepts(w, lo, hi);
-        await seed(w, [step(writer, 'concept.linked', { otherId: target, relation: 'broader' })]);
-        if (fate === 'deleted') await seed(w, [step(target, 'concept.deleted', {})]);
-        if (fate === 'merged') await seed(w, [step(target, 'concept.merged', { intoId: writer })]);
-        expect(await links(w), leg).toEqual(fate === 'stays' ? [{ a: writer, b: target, relation: 'broader' }] : []);
-        await expectRebuildAgrees(w, leg);
-      });
-    }
-    // Control: the writer itself deleted (its own stream, related from the lower id): its row goes too.
+  // One it() per leg: each runs a fresh database and a rebuild, so one it() doing all six outlasts the 30 s timeout at
+  // gate load (27.458 as a single it() took 10.9 s idle; gate 192805 timed out at load 26-32). `-t '27[.]458'` still selects all six.
+  // [the writer, what happens to the other end]: the writer's link names the target, and the target goes after it.
+  // With the writer = hi, replay meets the link AFTER the target's delete (lo's stream first): the case that drifted.
+  const legs: Array<['lo' | 'hi', 'deleted' | 'merged' | 'stays']> = [
+    ['hi', 'deleted'],
+    ['lo', 'deleted'],
+    ['hi', 'merged'],
+    ['lo', 'merged'],
+    ['hi', 'stays'], // control: nothing deleted, the link stays live and rebuilt
+  ];
+  it.each(legs)('27.458 %s links, the other is %s', async (who, fate) => {
+    const leg = `${who} links, the other is ${fate}`;
+    await inFreshWorld(async (w) => {
+      const [lo, hi] = pair(); // fresh per database: makeCommitted's per-entity seq counter is process-wide
+      const [writer, target] = who === 'hi' ? [hi, lo] : [lo, hi];
+      await concepts(w, lo, hi);
+      await seed(w, [step(writer, 'concept.linked', { otherId: target, relation: 'broader' })]);
+      if (fate === 'deleted') await seed(w, [step(target, 'concept.deleted', {})]);
+      if (fate === 'merged') await seed(w, [step(target, 'concept.merged', { intoId: writer })]);
+      expect(await links(w), leg).toEqual(fate === 'stays' ? [{ a: writer, b: target, relation: 'broader' }] : []);
+      await expectRebuildAgrees(w, leg);
+    });
+  });
+
+  // Control: the writer itself deleted (its own stream, related from the lower id): its row goes too.
+  it('27.458 writer deleted: its own stream removes its link (control)', async () => {
     await inFreshWorld(async (w) => {
       const [lo, hi] = pair();
       await concepts(w, lo, hi);
