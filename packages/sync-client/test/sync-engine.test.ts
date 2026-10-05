@@ -3042,7 +3042,7 @@ describe('27.088 a withheld link from the stream folds to nothing and does not s
  * REAL `setImmediate` loop so `fetch`'s `Response` body reads complete without
  * moving fake time.
  */
-describe('29.406-29.412 the workspace bootstrap retries a transient failure', () => {
+describe('29.430-29.436 the workspace bootstrap retries a transient failure', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -3099,7 +3099,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     return { state, done };
   }
 
-  it('29.406 a 503 twice then a 200 bootstraps after 1 s + 2 s, connecting throughout; control: a first-try success arms no timer', async () => {
+  it('29.430 a 503 twice then a 200 bootstraps after 1 s + 2 s, connecting throughout; control: a first-try success arms no timer', async () => {
     // CONTROL first: nothing failed, so nothing waits.
     const ok = await retryRig([200]);
     const first = begin(ok.engine);
@@ -3145,7 +3145,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('29.407 a 403 is not retried: the error surfaces, and no timer is armed', async () => {
+  it('29.431 a 403 is not retried: the error surfaces, and no timer is armed', async () => {
     const { engine, script, statuses } = await retryRig([403]);
     const run = begin(engine);
     await drain();
@@ -3160,7 +3160,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     expect(statuses).toEqual(['connecting']);
   });
 
-  it('29.408 a 404 (and a 401) is not retried: the typed status surfaces, and no timer is armed', async () => {
+  it('29.432 a 404 (and a 401) is not retried: the typed status surfaces, and no timer is armed', async () => {
     for (const status of [404, 401]) {
       const { engine, script } = await retryRig([status]);
       const run = begin(engine);
@@ -3177,7 +3177,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     }
   });
 
-  it('29.409 a fetch that rejects (no answer) and a 500 are retried like the 503', async () => {
+  it('29.433 a fetch that rejects (no answer) and a 500 are retried like the 503', async () => {
     const { engine, script, fetchedAt } = await retryRig(['network', 500, 200]);
     const t0 = Date.now();
     const run = begin(engine);
@@ -3190,7 +3190,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     expect(script.subscribes).toEqual([{ afterSeq: 7 }]);
   });
 
-  it('29.410 stop() mid-backoff cancels the retry: no timer, no further attempt, and start() resolves without subscribing', async () => {
+  it('29.434 stop() mid-backoff cancels the retry: no timer, no further attempt, and start() resolves without subscribing', async () => {
     const { engine, script, replica } = await retryRig([503, 200]);
     const run = begin(engine);
     await drain();
@@ -3207,7 +3207,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     expect(engine.status()).toBe('offline');
   });
 
-  it('29.410 stop() while an attempt is in flight: a 503 arms nothing, and a 200 is not loaded', async () => {
+  it('29.434 stop() while an attempt is in flight: a 503 arms nothing, and a 200 is not loaded', async () => {
     for (const outcome of ['fail', 'succeed'] as const) {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       const { script, replica, engine } = await fixture();
@@ -3231,7 +3231,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     }
   });
 
-  it('29.411 the backoff doubles to a 30 s cap, jittered by ±20%: 7 straight failures never wait above 36 s', async () => {
+  it('29.435 the backoff doubles to a 30 s cap, jittered by ±20%: 7 straight failures never wait above 36 s', async () => {
     const failures: Answer[] = [503, 503, 503, 503, 503, 503, 503];
     const schedules: Array<{ random: number; gaps: number[] }> = [
       { random: 1, gaps: [1200, 2400, 4800, 9600, 19200, 36000, 36000] },
@@ -3257,7 +3257,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     }
   });
 
-  it('29.412 a second start() supersedes a retrying one: one loop, one subscribe, with or without a stop() between', async () => {
+  it('29.436 a second start() supersedes a retrying one: one loop, one subscribe, with or without a stop() between', async () => {
     for (const stopBetween of [true, false]) {
       const { engine, script } = await retryRig([503, 200]);
       const first = begin(engine);
@@ -3282,7 +3282,7 @@ describe('29.406-29.412 the workspace bootstrap retries a transient failure', ()
     }
   });
 
-  it('29.412 a second start() while the first attempt is still in flight (desktop `online`, no stop()): the late answer arms nothing and loads nothing', async () => {
+  it('29.436 a second start() while the first attempt is still in flight (desktop `online`, no stop()): the late answer arms nothing and loads nothing', async () => {
     for (const outcome of ['fail', 'succeed'] as const) {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       const { script, engine } = await fixture();
