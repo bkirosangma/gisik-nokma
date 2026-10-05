@@ -9,6 +9,7 @@ import {
   mapActorNames,
   mapActors,
   mapAttention,
+  mapHome,
   mapPurgedLookup,
   mapWorkspaceSettings,
   mapBoardView,
@@ -588,6 +589,9 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       ]);
       return mapAttention(raw, contests, roster);
     },
+
+    /** One read, no roster: Home's numbers name no actor. */
+    getHome: async (workspaceId) => mapHome(await http.get(`/v1/workspaces/${workspaceId}/home`)),
 
     /**
      * The SAME route as `getAttention`, one key of it (second wave, Task 6).
