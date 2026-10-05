@@ -251,13 +251,14 @@ describe('29.226 the SELECT is a superset and the rule decides', () => {
 
 describe('29.227 refusals are counted', () => {
   it('29.227 a refused and an invalid submission both count in refused, summed across workspaces, and are logged; control: the real door promotes', async () => {
-    const s = await finishedSource();
-    const t = await addTicket(db.pool);
-    await lead(db.pool, s, t);
+    // WS2's rows are written FIRST: a SELECT without its ORDER BY would hand WS2 over first, and the log order below would turn
     await seedWs2();
     const s2 = await ws2Ticket('focus', ['doing', 'done']);
     const u = await ws2Ticket();
     await ws2Lead(s2, u);
+    const s = await finishedSource();
+    const t = await addTicket(db.pool);
+    await lead(db.pool, s, t);
 
     const refusing = stubIngest((e) => ({ status: 'refused', eventId: e.id, rule: 'illegal-transition', reason: 'no' }));
     expect(await sweep({ ingest: refusing })).toEqual({ promoted: 0, settled: 0, refused: 2 });
