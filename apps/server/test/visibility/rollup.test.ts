@@ -499,3 +499,28 @@ describe('rollupsFor — one query for many parents (spec D7; audit SM-06)', () 
     expect(five.count()).toBe(batched);
   });
 });
+
+describe('29.374 rollupFor: Not taken is closed, never done', () => {
+  it('29.374 a not-taken terminal child is in notTaken and not in terminal; every control child still counts as before', async () => {
+    const ws = newUlid(); const prj = newUlid(); const parent = newUlid(); const viewer = newUlid();
+    const [done, skipped, junk, stray] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
+    for (const id of [done, skipped, junk]) await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: id, parentId: parent, stateCategory: 'terminal' });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: stray, parentId: parent });
+    await applyAll(db.pool, [done, skipped, junk, stray].map((id) => setVisibilityEnv(ws, id, 'workspace')));
+    const notTaken = { kind: 'branch-not-taken', decisionTicketId: newUlid(), outcome: 'Yes', pass: 1, decidedBy: newUlid(), decisionEventId: newUlid() };
+    const cause = (id: string, value: unknown) => db.pool.query('UPDATE proj_tickets SET closed_cause = $2::jsonb WHERE ticket_id = $1', [id, JSON.stringify(value)]);
+    await cause(skipped, notTaken);
+    await cause(junk, { kind: 'something-else' }); // a terminal child with an unrelated cause is done
+    await cause(stray, notTaken); // an OPEN child carrying the cause is neither done nor not taken
+    expect(await rollupFor(db.pool, viewer, parent)).toEqual({ total: 4, terminal: 2, notTaken: 1, uncategorized: 0, restrictedCount: 0 });
+    // the batch reader is the same rule (cards read it)
+    expect((await rollupsFor(db.pool, viewer, [parent])).get(parent)).toEqual({ total: 4, terminal: 2, notTaken: 1, uncategorized: 0, restrictedCount: 0 });
+    // control: the same child with its cause cleared is done, and the key disappears
+    await cause(skipped, null);
+    const cleared = await rollupFor(db.pool, viewer, parent);
+    expect(cleared).toEqual({ total: 4, terminal: 3, uncategorized: 0, restrictedCount: 0 });
+    expect(cleared).not.toHaveProperty('notTaken');
+  });
+});

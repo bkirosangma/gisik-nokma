@@ -719,6 +719,39 @@ describe('29.100 the key is on the bar; the accessible name stays the title', ()
   });
 });
 
+describe('29.440 the Timeline mark knows Not taken (wtg2 T17, AMEND-wtg2-t17-timeline-mark)', () => {
+  it('29.440 a terminal bar closed Not taken reads "⊘ Not taken", never "✓ Done"; its finished sibling reads "✓ Done"; an open bar carrying the cause reads neither', () => {
+    const cause = {
+      kind: 'branch-not-taken' as const,
+      decisionTicketId: '01J9GTKB000000000000000000',
+      outcome: 'Yes',
+      pass: 1,
+      decidedBy: '01J9GUSA000000000000000000',
+      decisionEventId: '01J9GEVT000000000000000001',
+    };
+    const closed = { actorId: '01J9GUSA000000000000000000', at: '2026-08-28T10:00:00.000Z', cause };
+    const bar = (title: string, stateCategory: TicketState['stateCategory'], over: Partial<TicketState>): TicketDatesInput =>
+      ticket({ stateCategory, ...over, fields: { title: claimField(title), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField({ date: '2026-08-28' }) } });
+    // the SECOND terminal bar decides: the first is a plain finish
+    renderTimeline([bar('Finished', 'terminal', { closed: null }), bar('Skipped', 'terminal', { closed }), bar('Waiting', 'open', { closed })]);
+    const button = (title: string) => screen.getByRole('button', { name: title });
+    const mark = (title: string) => button(title).querySelector('.gn-timeline__mark')?.textContent ?? null;
+    const description = (title: string) => document.getElementById(button(title).getAttribute('aria-describedby') as string)?.textContent;
+    const said = "starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim";
+    expect(mark('Finished')).toBe('✓');
+    expect(button('Finished')).toHaveAttribute('data-state', 'done');
+    expect(button('Finished')).toHaveAttribute('title', `Done; ${said}`);
+    expect(mark('Skipped')).toBe('⊘');
+    expect(button('Skipped')).toHaveAttribute('data-state', 'not-taken');
+    expect(button('Skipped')).toHaveAttribute('title', `Not taken; ${said}`);
+    expect(description('Skipped')).toBe(`Not taken; ${said}`);
+    // control: an open bar carrying the same cause is neither done nor not taken
+    expect(mark('Waiting')).toBeNull();
+    expect(button('Waiting')).not.toHaveAttribute('data-state');
+    expect(button('Waiting')).toHaveAttribute('title', said);
+  });
+});
+
 describe('29.101 the today line is one line, on the prop\'s day', () => {
   it('29.101 one line, aria-hidden, at today\'s day number; a different prop moves it; an invalid day draws none', () => {
     const { container, rerender } = renderTimeline([]);
