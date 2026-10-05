@@ -282,6 +282,11 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
       // live on a replica flips this to `'workspace'` (non-guests) in the same change that adds
       // the fold — one line, and the compile-time switch is what makes it a decision.
       return 'withheld';
+    case 'concept':
+      // Knowledge Graph spec D §3.2: a concept's audience is D4's, computed at READ time from its items, and an
+      // event like concept.item_tagged names an item id. No replica folds concepts; the app reads them online
+      // through D4-checked routes. Fail-closed, the group arm's reasoning.
+      return 'withheld';
     case 'note':
       // The notes series' own class (Plan 2 of 6, spec §5.1). Plan 1 returned
       // `'withheld'` here and said why: it shipped no `notes` replica table, so

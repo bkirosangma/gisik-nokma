@@ -62,6 +62,10 @@ export type HistoryCopyContext = {
    * who that person is.
    */
   nameOf?: (userId: string) => string;
+  /** Knowledge Graph spec D: a concept's name for `concept.linked`/`merged` sentences; the id when unknown. */
+  conceptName?: (conceptId: string) => string;
+  /** A tagged item's label (a ticket key + title, a note title); `undefined` when unknown or hidden, so the sentence reads "a ticket" / "a note". */
+  itemLabel?: (kind: 'ticket' | 'note', id: string) => string | undefined;
 };
 
 /** A string field off an opaque payload, or `null` when it is absent or not a string. */
@@ -245,6 +249,45 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       // read as itself here, not as a missing case.
       return resolution === null ? event.type : `Conflicting claim resolved: ${resolution}`;
     }
+    // Knowledge Graph spec D §3.1 (KG-D Task 3): the concept stream's sentences.
+    case 'concept.created': {
+      const name = str(payload, 'name');
+      if (name === null) return event.type;
+      return str(payload, 'fromSuggestion') === null ? `Created the concept ${name}` : `Created the concept ${name} from a suggestion`;
+    }
+    case 'concept.renamed': {
+      const name = str(payload, 'name');
+      return name === null ? event.type : `Renamed the concept to ${name}`;
+    }
+    case 'concept.described':
+      return str(payload, 'summary') === null ? 'Cleared the summary' : 'Changed the summary';
+    case 'concept.item_tagged':
+    case 'concept.item_untagged': {
+      const kind = str(payload, 'itemKind');
+      const id = str(payload, 'itemId');
+      if (kind !== 'ticket' && kind !== 'note') return event.type;
+      // A redacted item (`itemId: ''`, Task 4's history redaction; `str` reads '' as null) reads "a ticket" / "a note".
+      const label = (id === null ? undefined : ctx.itemLabel?.(kind, id)) ?? (kind === 'ticket' ? 'a ticket' : 'a note');
+      return event.type === 'concept.item_tagged' ? `Added ${label}` : `Removed ${label} from the concept`;
+    }
+    case 'concept.linked':
+    case 'concept.unlinked': {
+      const other = str(payload, 'otherId');
+      const relation = str(payload, 'relation');
+      if (other === null || (relation !== 'broader' && relation !== 'related')) return event.type;
+      const name = ctx.conceptName?.(other) ?? other;
+      if (event.type === 'concept.unlinked') return `Removed the link to ${name}`;
+      return relation === 'broader' ? `Set ${name} as a broader concept` : `Linked the related concept ${name}`;
+    }
+    case 'concept.merged': {
+      const into = str(payload, 'intoId');
+      return into === null ? event.type : `Merged into ${ctx.conceptName?.(into) ?? into}`;
+    }
+    case 'concept.deleted':
+      return 'Deleted the concept';
+    // KG-D Task 5: on the workspace stream, hashes only, so there is nothing to name.
+    case 'workspace.concept_suggestion_rejected':
+      return 'Rejected a suggested concept';
     default:
       return event.type;
   }

@@ -169,7 +169,8 @@ const configSchema = z.object({
   // 18.129: Δ 274.8 MB on first use), and a box that is short on memory must be
   // able to serve the rest of the product while somebody decides what to do
   // about it. Search keeps answering lexically; only `mode=meaning` and
-  // `similar` (KG-D T2) go stale.
+  // `similar` (KG-D T2) go stale, and concept suggestions (KG-D T5) stop: the
+  // suggestion scheduler starts only beside the worker.
   EMBED_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(10000),
   EMBED_WORKER_ENABLED: z.enum(['true', 'false']).default('true'),
 

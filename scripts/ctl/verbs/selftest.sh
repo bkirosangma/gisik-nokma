@@ -14,15 +14,16 @@ step "gate cache correctness (turbo task hashes)" "bash '$HERE/test/gate-cache.t
 step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run-tests.test.sh'"
 step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- true"
 step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
+step "run-tests cap suite (--max-min: 124 + TIMEOUT, the group stopped, slot time not queue time, siblings live, no stray timer)" "bash '$HERE/test/run-tests-cap.test.sh'"
 step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
 # The batch suite builds scratch origins and stubs gh and the gate/land/pr-open ctl (never a real PR or gate; ~1 min).
 step "batch suite (READY + rules b-d refuse the call, the union --no-ff in READY order, conflict eject, one gate, red eject/bisect, 3-gate cap, dry-run reads only)" "bash '$HERE/test/batch.test.sh'"
 step "batch refuses main as the base" "out=\$('$HERE/ctl' batch main 1 2 --repo '$repo' --dry-run 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'main refused'"
 step "harness suite (CTL_TEST_ONLY: one case runs one, no match is red, no filter runs all; every suite wired)" "bash '$HERE/test/harness.test.sh'"
-# The mutate suite runs real Stryker on a scratch fixture repo (four runs, ~1 min) through a private semaphore dir.
+# The mutate suite runs real Stryker on a scratch fixture repo (six runs, ~1.5 min) through a private semaphore dir.
 step "mutate suite (ranges, filter, custom pre-step, reconcile, control, skips, signals, split, exit codes, real Stryker legs)" "bash '$HERE/test/mutate.test.sh'"
 step "mutate refuses an unknown argument (exit 2)" "out=\$('$HERE/ctl' mutate --nope 2>&1); [ \$? -eq 2 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
-# The postman suite builds a scratch tmux session with fake panes and a scratch ledger (never a live seat; ~3.5 min).
+# The postman suite builds a scratch tmux session with fake panes and a scratch ledger (never a live seat; ~80 s at scaled paste waits, P51).
 step "postman suite (ledger, ack, watcher, bridge, state machine, pane safety)" "bash '$HERE/test/postman.test.sh'"
 step "post/ack/postman --dry-run write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' post exec3 --kind fix --text x --from main --dry-run && CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --dry-run && [ ! -e \$d/LEDGER.jsonl ]"
 step "postman --shadow --dry-run and an unknown flag write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --shadow --dry-run && ! CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --shadw && [ ! -e \$d/postman ] && [ ! -e \$d/LEDGER.jsonl ]"
@@ -53,4 +54,8 @@ step "autopilot suite (guards with controls, pull order, needs/stacks/FIX, shado
 step "archive refuses an unknown argument" "out=\$('$HERE/ctl' archive --nope 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
 step "check-base suite (WRONG-BASE vs stale vs tie, main as a candidate, bad input)" "bash '$HERE/test/check-base.test.sh'"
 step "check-base refuses a missing stated base" "out=\$('$HERE/ctl' check-base task/x --repo '$repo' 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q usage"
+step "bundle-fresh suite (SKIP takes no slot, STALE exit 1, every build and the --check in a slot, --fix commits only the bundle, tool failures never STALE, trigger set vs the real package.json)" "bash '$HERE/test/bundle-fresh.test.sh'"
+# A dirty domain/editor tree, generated bundle file or generator is the verb working (it refuses before anything runs), so that named refusal is
+# accepted here.
+step "bundle-fresh --dry-run" "out=\$('$HERE/ctl' bundle-fresh --repo '$repo' --dry-run 2>&1); [ \$? -eq 0 ] || printf '%s' \"\$out\" | grep -q 'uncommitted changes under'"
 [ "$fails" -eq 0 ] && ctl_ok selftest "$n steps" || ctl_fail selftest "$fails steps red"

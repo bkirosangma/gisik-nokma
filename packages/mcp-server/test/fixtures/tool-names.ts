@@ -60,8 +60,14 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   graph: [
     // graph begin (KG-D T2, T6)
-    'similar',
+    'graph_neighbours', 'graph_path', 'graph_trace', 'similar',
     // graph end
+  ],
+  concept: [
+    // concept begin (KG-D T4, T5)
+    'list_concepts', 'get_concept', 'manage_concept', 'tag_items', 'link_concepts',
+    'review_suggestions', 'resolve_suggestion',
+    // concept end
   ],
 } satisfies Record<string, string[]>;
 

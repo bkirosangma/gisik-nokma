@@ -118,6 +118,7 @@ jobs:
   # real 82-file change report zero files).
   scope:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       code_changed: ${{ steps.scope.outputs.code_changed }}
     steps:
@@ -188,6 +189,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -241,6 +243,7 @@ jobs:
   # check. Found by review, not by CI, because CI could not have found it.
   check-runbook:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -269,6 +272,7 @@ jobs:
   # change class it guards is not a check.
   check-citations:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -293,6 +297,7 @@ jobs:
   # quietly producing a plausible wrong document.
   check-help:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -308,6 +313,7 @@ jobs:
   check-tasks:
     needs: scope
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -356,6 +362,7 @@ jobs:
   # manual run of a release branch is checked against what is on `main` today.
   check-migrations:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -376,6 +383,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -402,6 +410,7 @@ jobs:
     # than resting on an assumption either way.
     if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -440,6 +449,7 @@ jobs:
     # than resting on an assumption either way.
     if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -512,6 +522,7 @@ jobs:
     # than resting on an assumption either way.
     if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 55
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -557,6 +568,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       # Task 13's real invocation. The job this replaces only DETECTED
@@ -695,6 +707,7 @@ jobs:
     # gating already covers this was never verified against a real run.
     if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -755,6 +768,7 @@ jobs:
     needs:
       [scope, check-env, check-runbook, check-citations, check-help, check-tasks, check-migrations, build, typecheck, server-tests, other-tests, e2e, viewport]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/setup-node@v7
         with:

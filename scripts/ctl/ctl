@@ -22,6 +22,8 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   lanes [--watch]                 one line per gisik: window
   seats [--json] [--flag]         one line per seat: busy/idle, shells+monitors, input box, Ctx, branch, last DONE/CHECKPOINT (read-only; --flag = only seats needing action)
   check-base <branch> <stated-base>  WRONG-BASE (exit 1) when another origin/release/* or main reaches the branch's first-parent line nearer the tip than the base a REVIEW line states
+  bundle-fresh [--base B] [--fix]  on a domain/editor/lockfile diff vs origin/B: build + build:webview + the mobile bundle --check in ONE slot (exit 1 STALE);
+                                  --fix regenerates and commits ONLY the bundle file; no such diff = SKIP, no slot
   restart <window> <worktree> <brief> [--override FILE] [--model M] [--effort E]
   close <window>                  close an idle lane whose worktree is clean and pushed
   archive [--apply] [--list]      move stale lanes-dir working files to archive/<date>/ + roll the notes (dry-run by default; refuses while a landing is in flight)
@@ -30,7 +32,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   prune-gate-locks [--apply] [--list]  remove gate-lock-* run dirs > 24 h and gate logs > 7 days from the log dir, never a live one (dry-run by default)
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
-  run-tests [--label L] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary
+  run-tests [--label L] [--max-min N] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary; stopped (124 + TIMEOUT) past N min of slot time (default 30)
   mutate [--base REF] [--json]    Stryker + numeric ×10/÷10, ceil/floor/round, casts stripped, on the branch's changed lines; one slot-run per file
                                   (exit 0 no survivor, 1 survivors to triage, 2 tool failure; report ~/.cache/gisik-ctl/mutate-<branch>-<sha8>.md)
   post <to> --kind K (--body FILE | --text STR) [--from SEAT] [--reply-to ID]

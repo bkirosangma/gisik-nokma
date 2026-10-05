@@ -166,6 +166,10 @@ describe('proj_entity_heads', () => {
       'proj_ticket_comments',
       // Knowledge Graph B: appended, as projection-order.test.ts pins.
       'proj_references',
+      // Knowledge Graph D Task 3: appended, as projection-order.test.ts pins.
+      'proj_concepts',
+      // KG-D T5: APPENDED after proj_concepts by the same question (27.485).
+      'proj_concept_rejections',
     ]);
   });
 });

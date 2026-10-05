@@ -62,9 +62,9 @@ export type GraphItemView = {
   workspaceId: string | null;
   /** null for a workspace-level note, a workspace, a person or a concept. */
   projectId: string | null;
-  /** The ticket key, a note's title, a person's display name, a project's or workspace's name. */
+  /** The ticket key, a note's title, a person's display name, a project's, workspace's or concept's name. */
   label: string;
-  /** A ticket's or note's title; null otherwise. */
+  /** A ticket's or note's title, or a concept's summary (null when it has none); null otherwise. */
   title: string | null;
   category: StateCategory | null;
   hop: number;
@@ -93,6 +93,12 @@ export type GraphEdgeView = {
 
 export type GraphRingResponse = {
   hop: number;
+  /**
+   * The centre itself, keyed and visibility-resolved like a ring item (`hop` 0), on EVERY answer, an empty ring
+   * included (planner ruling Q1, 2026-10-05). It is NOT in `items`: a ring is the items at exactly `hop` steps
+   * (27.302). The view seeds its store from it, so a centre with no links still has its label.
+   */
+  center: GraphItemView;
   items: GraphItemView[];
   edges: GraphEdgeView[];
   /** The refs in this page that may be walked from (in scope). */

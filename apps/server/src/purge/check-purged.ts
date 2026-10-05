@@ -19,7 +19,8 @@ function refuse(reason: string): Refusal {
  * The ids a payload names as a container or a link target, by type. Field names
  * are the schemas' own (`events/ticket-events.ts` `ticketCreatedPayload`,
  * `ticketReparentedPayload`; `events/note-events.ts` `noteCreatedPayload`,
- * `noteMovedPayload`, `noteAttachedPayload`). Read defensively: the payload
+ * `noteMovedPayload`, `noteAttachedPayload`; `events/concept-events.ts`
+ * `conceptItemTaggedPayload`, `conceptLinkedPayload`, `conceptMergedPayload`). Read defensively: the payload
  * has already parsed, but this must never throw on a shape it does not know.
  */
 export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<[kind: string, id: string]> {
@@ -69,6 +70,18 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       }
       break;
     }
+    case 'concept.item_tagged':
+    case 'concept.item_untagged':
+      // KG-D T3: the tagged item, of the kind the payload names.
+      if (payload['itemKind'] === 'ticket' || payload['itemKind'] === 'note') add(payload['itemKind'], payload['itemId']);
+      break;
+    case 'concept.linked':
+    case 'concept.unlinked':
+      add('concept', payload['otherId']);
+      break;
+    case 'concept.merged':
+      add('concept', payload['intoId']);
+      break;
     default:
       break;
   }

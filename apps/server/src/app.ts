@@ -23,11 +23,14 @@ import { registerHomeRoutes } from './routes/home.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerConceptRoutes } from './routes/concepts.js';
 import { registerGroupRoutes } from './routes/groups.js';
 import { registerSimilarRoutes } from './routes/similar.js';
+import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerGraphRoutes } from './routes/graph.js';
+import { registerGraphQueryRoutes } from './routes/graph-query.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
 import { registerMcpConnectionRoutes } from './routes/mcp-connections.js';
@@ -190,6 +193,14 @@ export type AppDeps = {
    */
   stream?: Omit<StreamRouteDeps, 'pool' | 'hub' | 'now'>;
   /**
+   * Knowledge Graph spec D §4.1 (KG-D Task 5): called with the WORKSPACE id once per committed event that reaches
+   * `onNoteBodyCommitted` below (`nudgesEmbedding` or `nudgesItemEmbedding`): "an embedded text in this workspace
+   * changed", which is what the suggestion job's 200-change trigger counts. The same listener serves both callbacks,
+   * registered when EITHER is given; `index.ts` hands this `suggestionScheduler.change`, a test hands it nothing. A
+   * callback for the reason `onNoteBodyCommitted` gives: the scheduler owns timers, and `buildApp` starts none.
+   */
+  onSemanticChange?: (workspaceId: string) => void;
+  /**
    * Called once per committed note event whose TEXT changed — `note.created`
    * and `note.body_set`, filtered by `nudgesEmbedding` — and, since Knowledge
    * Graph spec D Task 2, once per committed ticket or ticket-comment event that
@@ -204,8 +215,8 @@ export type AppDeps = {
    * `buildApp` owns is the one thing only it can reach — the commit feed — and
    * it hands the decision to whoever assembled the app. `index.ts` hands it
    * `(noteId) => worker.nudge(noteId)`; the sixty test files hand it nothing,
-   * and a listener is registered only when this is defined, so they subscribe
-   * to nothing at all.
+   * and a listener is registered only when this or `onSemanticChange` is
+   * defined, so they subscribe to nothing at all.
    *
    * The argument is accepted for the caller's benefit — a log line, or a
    * future per-note wake-up — and the shipped worker does not need it:
@@ -1030,6 +1041,10 @@ export function buildApp(
   // Knowledge Graph spec D §5.1 `similar` (KG-D T2): the nearest visible tickets and notes to one item by
   // meaning, read from the embed worker's chunk caches. Same door as the group tree: a member read, 404 otherwise.
   registerSimilarRoutes(app, { pool: deps.pool }, requireSession);
+  // Knowledge Graph spec D §5.1 concepts (KG-D T4): list, get, history, audience; D4 decided at read time, 404 otherwise.
+  registerConceptRoutes(app, { pool: deps.pool }, requireSession);
+  // KG-D T5: the suggestion job's cache, member read, D4 per reader at read time, 404 otherwise.
+  registerSuggestionRoutes(app, { pool: deps.pool }, requireSession);
   // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
   // here. Board, list and the builder surface all take their scope from a path
   // parameter the door resolves; this one spans a whole workspace, so
@@ -1045,8 +1060,10 @@ export function buildApp(
   // answer, and there is deliberately no parameter by which a caller could name
   // somebody else's.
   registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);
-  // The Knowledge Graph's ring read (spec C §2.2): one ring per call, the viewer from the session, visibility per workspace.
+  // The Knowledge Graph's ring read (spec C §2.2): one ring per call, the viewer from the session, visibility per workspace;
+  // and spec D's path and trace (§5.1), walked through the ring read's own visibility.
   registerGraphRoutes(app, { pool: deps.pool }, requireSession);
+  registerGraphQueryRoutes(app, { pool: deps.pool }, requireSession);
   // The attention strip (Plan 5 Task 12) — the first read that is COMPUTED from
   // the stored claims AND THE CLOCK, and stored nowhere: blocked flags, an IST
   // staleness window and an IST due window, with the two thresholds read from
@@ -1174,14 +1191,19 @@ export function buildApp(
   // callback's whole job is to schedule work for later, so there is nothing for
   // a request to wait on and nothing a slow embedding could slow down.
   //
-  // Registered ONLY when the caller supplied the callback. Without this guard
+  // Since KG-D T5 the same filtered event also tells the suggestion scheduler which WORKSPACE changed
+  // (`onSemanticChange`, its 200-change trigger): one listener, one predicate, two callbacks.
+  //
+  // Registered ONLY when the caller supplied either callback. Without this guard
   // every `buildApp` in the suite would take a subscription it has no use for
   // and could never observe — and the suite's own app fixtures would each hold
   // a live listener on the ingest service they were built over.
-  if (deps.onNoteBodyCommitted !== undefined) {
-    const onNoteBodyCommitted = deps.onNoteBodyCommitted;
+  if (deps.onNoteBodyCommitted !== undefined || deps.onSemanticChange !== undefined) {
+    const { onNoteBodyCommitted, onSemanticChange } = deps;
     const unsubscribeEmbedNudge = deps.ingest.onEventCommitted((event) => {
-      if (nudgesEmbedding(event) || nudgesItemEmbedding(event)) onNoteBodyCommitted(event.entity.id);
+      if (!(nudgesEmbedding(event) || nudgesItemEmbedding(event))) return;
+      onNoteBodyCommitted?.(event.entity.id);
+      onSemanticChange?.(event.workspaceId);
     });
     app.addHook('onClose', () => {
       unsubscribeEmbedNudge();
