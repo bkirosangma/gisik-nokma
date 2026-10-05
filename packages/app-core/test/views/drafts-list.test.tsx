@@ -186,7 +186,8 @@ describe('28.169 phone', () => {
     const user = userEvent.setup();
     await user.click(menu);
     expect(menu).toHaveAttribute('aria-expanded', 'true');
-    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Publish', 'Discard']);
+    // The menu is named for its row (13.1059: no unnamed `role="menu"` in product source).
+    expect(within(screen.getByRole('menu', { name: 'Actions for Draft d1' })).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Publish', 'Discard']);
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).toBeNull();
     await user.click(menu);

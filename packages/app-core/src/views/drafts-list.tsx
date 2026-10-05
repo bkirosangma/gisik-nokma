@@ -166,7 +166,7 @@ function RowMenu(props: { title: string; onPublish: () => void; onDiscard: () =>
         <span aria-hidden="true">&#8943;</span>
       </Button>
       {open ? (
-        <div role="menu" className="gn-drafts__menu-list">
+        <div role="menu" aria-label={`Actions for ${props.title}`} className="gn-drafts__menu-list">
           <button type="button" role="menuitem" onClick={pick(props.onPublish)}>
             {DRAFT_PUBLISH_LABEL}
           </button>
