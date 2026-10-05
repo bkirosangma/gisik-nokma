@@ -62,6 +62,8 @@ export type HistoryCopyContext = {
    * who that person is.
    */
   nameOf?: (userId: string) => string;
+  /** The event's round from `historyRounds` (PS-10); a "(pass n)" suffix from 2 on. */
+  round?: number;
 };
 
 /** A string field off an opaque payload, or `null` when it is absent or not a string. */
@@ -119,7 +121,7 @@ function flowFieldSentence(fieldId: string, value: unknown): string | null {
  * The sentence for one ledger event. Unrecognised types return `event.type`
  * unchanged — see this file's docblock on why that is the honest fallback.
  */
-export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext = {}): string {
+function sentenceOf(event: TicketHistoryEvent, ctx: HistoryCopyContext): string {
   const payload = asRecord(event.payload);
   const stateName = (id: string): string => ctx.stateName?.(id) ?? id;
   const typeName = (id: string): string => ctx.typeName?.(id) ?? id;
@@ -162,7 +164,11 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
     }
     case 'ticket.transitioned': {
       const to = str(payload, 'to');
-      return to === null ? event.type : `Moved to ${stateName(to)}`;
+      if (to === null) return event.type;
+      const cause = causeOf(payload);
+      if (cause === null) return `Moved to ${stateName(to)}`;
+      const how = cause.kind === 'led-to' ? 'automatically' : cause.kind === 'reopened-by-flow' ? 'by the flow' : 'as not taken';
+      return `Moved to ${stateName(to)} ${how}, ${because(cause, event)}`;
     }
     case 'visibility.set': {
       const mode = str(payload, 'mode');
@@ -196,7 +202,7 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       const rank = str(payload, 'rank');
       return rank === null ? event.type : `Backlog rank set to ${rank}`;
     }
-    // A Decision's outcome (wtg2 T5, DC-4). The minimal arm the 3.183 census forces; T17 adds the pass suffix.
+    // A Decision's outcome (wtg2 T5, DC-4; the wording is PS-6's). Its pass suffix is `describeEvent`'s, as for every event (wtg2 T17).
     case 'ticket.decided': {
       // Destructured rather than read through `str`: the views' import census (`board.test.tsx`) takes a quoted key
       // spelled like the import keyword for a module specifier. Same reading as `str`: a non-empty string, else null.
@@ -206,12 +212,17 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       if (typeof outcome !== 'string' || outcome === '') return event.type;
       return from === null ? `Decided: ${outcome}` : `Decision revised: ${from} → ${outcome}`;
     }
-    // A flag event's payload is empty or one flow `cause` (wtg2 T8, not phrased
-    // here); the envelope holds actor and time, which the row already prints.
-    case 'ticket.closed':
-      return 'Closed';
-    case 'ticket.reopened':
-      return 'Reopened';
+    // A close or reopen carries at most one flow `cause` (wtg2 T8), phrased here (wtg2 T17); a cause of the other kind
+    // is not this event's and reads as the plain flag.
+    case 'ticket.closed': {
+      const cause = causeOf(payload);
+      return cause?.kind === 'branch-not-taken' ? `Closed as not taken, ${because(cause, event)}` : 'Closed';
+    }
+    case 'ticket.reopened': {
+      const cause = causeOf(payload);
+      return cause?.kind === 'reopened-by-flow' ? `Reopened by the flow, ${because(cause, event)}` : 'Reopened';
+    }
+    // The other flag events carry no payload at all; the envelope holds actor and time, which the row already prints.
     case 'ticket.deleted':
       return 'Deleted';
     case 'ticket.restored':
@@ -282,4 +293,63 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
     default:
       return event.type;
   }
+}
+
+/** `sentenceOf` plus the round suffix (PS-10). The raw-type fallback never takes one: `HistoryList` decides on `headline === event.type` whether to show the slug. */
+export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext = {}): string {
+  const text = sentenceOf(event, ctx);
+  return text !== event.type && ctx.round !== undefined && ctx.round >= 2 ? `${text} (pass ${ctx.round})` : text;
+}
+
+type CauseView =
+  | { kind: 'led-to'; label: string | null }
+  | { kind: 'reopened-by-flow' | 'branch-not-taken'; outcome: string; decisionEventId: string | null };
+
+/**
+ * A flow cause off an opaque payload, read defensively and never parsed whole: for a viewer who cannot see the cause's
+ * ticket the route serves its ticket ids and people as `null` (wtg2 T17, AMEND 2), which the domain schema refuses.
+ */
+function causeOf(payload: Record<string, unknown>): CauseView | null {
+  const raw = asRecord(payload['cause']);
+  const kind = str(raw, 'kind');
+  if (kind === 'led-to') return { kind, label: str(raw, 'label') };
+  if (kind === 'reopened-by-flow' || kind === 'branch-not-taken') {
+    const outcome = str(raw, 'outcome');
+    return outcome === null ? null : { kind, outcome, decisionEventId: str(raw, 'decisionEventId') };
+  }
+  return null;
+}
+
+function because(cause: CauseView, event: TicketHistoryEvent): string {
+  const key = event.causeTicket?.key ?? null; // absent and null both mean "cannot name it"
+  if (cause.kind === 'led-to') {
+    const label = cause.label === null ? '' : ` (${cause.label})`;
+    return key === null ? `because an earlier step was finished${label}` : `because ${key} was closed${label}`;
+  }
+  return key === null ? `because an earlier decision chose ${cause.outcome}` : `because ${key} was decided ${cause.outcome}`;
+}
+
+/**
+ * Round of each event (PS-10): 1 plus the flow resets so far. The reopen and the transition of one reset share a
+ * `decisionEventId` and count once; it agrees with the domain's `ticketRound` because each reset files exactly one pair.
+ * Precondition: the events start at the ticket's first (`afterSeq` 0, which the History tab sends).
+ */
+export function historyRounds(events: readonly TicketHistoryEvent[]): Map<string, number> {
+  const rounds = new Map<string, number>();
+  const resets = new Set<string>();
+  let round = 1;
+  for (const event of events) {
+    if (event.type === 'ticket.transitioned' || event.type === 'ticket.reopened') {
+      const cause = causeOf(asRecord(event.payload));
+      if (cause !== null && cause.kind === 'reopened-by-flow') {
+        const reset = cause.decisionEventId ?? event.id;
+        if (!resets.has(reset)) {
+          resets.add(reset);
+          round += 1;
+        }
+      }
+    }
+    rounds.set(event.id, round);
+  }
+  return rounds;
 }

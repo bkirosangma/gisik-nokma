@@ -783,6 +783,12 @@ export type TicketHistoryEvent = {
    */
   linkTarget?: { key: string | null } | null;
   /**
+   * Flow-caused events only (wtg2 T17's History route): the key of the ticket the cause names (the finished source, or
+   * the Decision), `null` when the server withheld a ticket this viewer cannot see (and nulled the cause's ids), absent
+   * for an event with no flow cause, an older server, or the offline replica (all three read as "cannot name it").
+   */
+  causeTicket?: { key: string | null } | null;
+  /**
    * Link events only (drafts T6 FIX 1): which way the link reads from THIS
    * ticket. `'in'` is a draft-side `from` entry on a published draft's stream
    * ("is blocked by"), `'out'` every other link. Absent from an older server
