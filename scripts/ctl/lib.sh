@@ -122,7 +122,7 @@ ctl_submit() {
   local target="$1" max="${2:-3}" try=1
   while :; do
     ctl_press_enter "$target" || return 1
-    sleep 2
+    sleep "${CTL_SUBMIT_WAIT_SECS:-2}"  # test seam (P51): live pastes keep the default; lowering it in a live env loses keystrokes
     [ -z "$(ctl_box_text "$target")" ] && { echo "$try"; return 0; }
     [ "$try" -lt "$max" ] || return 1
     try=$((try+1))
@@ -155,7 +155,7 @@ ctl_delivered() {
       fi
       if ctl_box_queued "$target"; then echo "queued behind the lane's running turn"; return 0; fi
     fi
-    sleep 1
+    sleep "${CTL_PROOF_POLL_SECS:-1}"  # test seam (P51): live pastes keep the default; lowering it in a live env loses keystrokes
   done
   return 1
 }
@@ -192,7 +192,7 @@ ctl_pane_deliver_line() {
   f="$(mktemp)"; snap="$f.before"; printf '%s' "$line" > "$f"; ctl_pane_above "$t" > "$snap"
   b="ctlpm$$"
   if ! { tmux load-buffer -b "$b" "$f" && tmux paste-buffer -b "$b" -d -t "$t"; }; then rm -f "$f" "$snap"; echo failed; return 1; fi
-  sleep 1
+  sleep "${CTL_PASTE_SETTLE_SECS:-1}"  # test seam (P51): live pastes keep the default; lowering it in a live env loses keystrokes
   if ! ctl_submit "$t" >/dev/null; then rm -f "$f" "$snap"; echo unsubmitted; return 1; fi
   if proof="$(ctl_delivered "$t" "$(printf '%s' "$line" | cut -c1-30)" "$snap")"; then case "$proof" in queued*) echo queued;; *) echo echoed;; esac; else echo unproven; fi
   rm -f "$f" "$snap"

@@ -82,7 +82,12 @@ const SCENARIO_WORKFLOW_ID = 'wf-errands';
 
 let SEEDED = false;
 
-export async function seedNotesFixture(pool: Pool): Promise<NotesFixture> {
+/**
+ * `userIds`, when given, are the seven people's ids instead of fresh ULIDs: a ROUTE test signs seven phones in
+ * first (`signInWithPhone` mints its own user ids) and seeds this world around them, so every person can call
+ * the API with a bearer (KG-D T4, `test/concepts/reads.test.ts`).
+ */
+export async function seedNotesFixture(pool: Pool, userIds?: Record<NotesUser, string>): Promise<NotesFixture> {
   if (SEEDED) {
     throw new Error(
       'seedNotesFixture: already seeded in this process. Its entity ids are minted per call but `applyCommitted` mints seqs process-locally, so a second seed into the same database collides on the ledger unique constraints. Use ONE fresh database per file (`createTestDatabase`).',
@@ -95,7 +100,7 @@ export async function seedNotesFixture(pool: Pool): Promise<NotesFixture> {
   const P = newUlid();
   const TP = newUlid();
   const TE = newUlid();
-  const ids: Record<NotesUser, string> = {
+  const ids: Record<NotesUser, string> = userIds ?? {
     owner: newUlid(),
     admin: newUlid(),
     memberIn: newUlid(),
