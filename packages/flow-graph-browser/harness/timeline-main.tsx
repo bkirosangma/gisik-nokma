@@ -6,7 +6,9 @@ import '@gisik-nokma/ui/ui.css';
 
 /**
  * The product's own Timeline view (the BUILT `@gisik-nokma/app-core`) over a synthetic project, in a page the specs drive.
- * `?n=<tickets>&span=<days the tickets are spread over>&h=<panel height>&theme=light|dark&style=neo|hig|minimal`.
+ * `?n=<tickets>&span=<days the tickets are spread over>&h=<panel height>&theme=light|dark&style=neo|hig|minimal&above=<px>`.
+ * `above` puts a block that many px tall over the host, where the project page has its filter bar (none by default): 29.040
+ * measures the panel filling the window under its own top edge with one there.
  * Today is the fixed day 60 after 2026-08-03 (an injected prop, like the product's: nothing here reads the clock).
  */
 const params = new URLSearchParams(window.location.search);
@@ -19,6 +21,7 @@ document.head.appendChild(themeTag);
 const claim = (value: unknown) => ({ value, actorId: 'u1', clientTime: '2026-08-19T10:00:00.000Z', serverTime: '2026-08-19T10:00:01.000Z' });
 const n = Number(params.get('n') ?? 40);
 const span = Number(params.get('span') ?? 400);
+const above = Number(params.get('above') ?? 0);
 const base = Date.UTC(2026, 7, 3);
 const day = (offset: number): string => new Date(base + offset * 86_400_000).toISOString().slice(0, 10);
 const tickets: TicketDatesInput[] = Array.from({ length: n }, (_, i) => {
@@ -44,6 +47,7 @@ const tickets: TicketDatesInput[] = Array.from({ length: n }, (_, i) => {
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
+    {above > 0 ? <div id="above" style={{ height: `${above}px` }} /> : null}
     <div id="host" style={{ height: params.get('h') ?? '70vh', display: 'flex', flexDirection: 'column' }}>
       <TimelineView tickets={tickets} today={day(60)} userName={(id) => id} onOpenTicket={(id) => ((window as unknown as { __opened: string }).__opened = id)} />
     </div>

@@ -90,7 +90,7 @@ const todayCentre = (page: Page) =>
     return q.left + q.width / 2 - (r.left + r.width / 2);
   });
 
-test('29.040 the panel fills the height under its filters (16 px short of the window, never under 320 px), a bar is 28 px on a 40 px pitch, the axis stays at the top when the lanes scroll, and the weekend tint is on at Day and off at Month', async ({ page }) => {
+test('29.040 the panel fills the height under its filters (16 px short of the window, measured with a block above the panel and with none, never under 320 px), a bar is 28 px on a 40 px pitch, the axis stays at the top when the lanes scroll, and the weekend tint is on at Day and off at Month', async ({ page }) => {
   await page.goto('/timeline.html?n=200&span=60&theme=light&h=80vh');
   await expect(page.locator('.gn-timeline__canvas')).toBeVisible();
   const s = await state(page);
@@ -134,7 +134,8 @@ test('29.040 the panel fills the height under its filters (16 px short of the wi
   // window 321 px taller than the panel's top plus the 16 px gap gets a 321 px panel (the fill, the control), one 319 px taller
   // gets 320 (the floor). `setViewportSize` fires `resize`, which is what re-fits the panel. Exact, so the floor and the gap
   // each break a leg when moved by one pixel.
-  const width = page.viewportSize()?.width ?? 1280;
+  const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+  const width = viewport.width;
   const fitWith = async (free: number) => {
     const top = await page.evaluate(() => (document.querySelector('.gn-timeline') as HTMLElement).getBoundingClientRect().top);
     await page.setViewportSize({ width, height: Math.ceil(top) + 16 + free });
@@ -146,6 +147,21 @@ test('29.040 the panel fills the height under its filters (16 px short of the wi
   const floor = await fitWith(319);
   expect(floor.top).toBe(fill.top); // the premise: the panel's top did not move, so the window really left 319 px for it
   expect(floor.height).toBe(320);
+  // TV-11 fills the window under the panel's OWN top edge. Every leg above has the panel at the top of the page, where that is
+  // the whole window less 16, so a view that ignored its top would pass them; the project page has its filter bar above the
+  // panel. A 120 px block over the host (`above`) must take 120 px off the panel and still leave the 16 px gap. The window
+  // first goes back to its size: the floor leg left it too short for the fill.
+  await page.setViewportSize(viewport);
+  await page.goto('/timeline.html?n=200&span=60&theme=light&h=80vh&above=120');
+  await expect(page.locator('.gn-timeline__canvas')).toBeVisible();
+  const under = await page.evaluate(() => {
+    const r = (document.querySelector('.gn-timeline') as HTMLElement).getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, height: r.height, innerHeight: window.innerHeight };
+  });
+  expect(under.top).toBe(120); // the premise: the block really is above the panel
+  expect(under.innerHeight - under.bottom).toBeGreaterThanOrEqual(15);
+  expect(under.innerHeight - under.bottom).toBeLessThanOrEqual(17);
+  expect(under.height).toBe(under.innerHeight - under.top - 16);
 });
 
 test('29.041 Ctrl + wheel zooms about the pointer: the day under it moves less than half a pixel on every event, and the page does not scroll', async ({ page }) => {
@@ -191,7 +207,7 @@ test('29.041 Ctrl + wheel zooms about the pointer: the day under it moves less t
   expect(cancelled.every((prevented) => prevented)).toBe(true);
 });
 
-test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the arrow keys glide 7 days, Today and Home put today in the middle, and reduced motion lands at once', async ({ page, browser }) => {
+test('29.042 a mouse drag pans as far as the pointer moves while the button is down, a touch swipe is the platform\'s own scroll, the arrow keys glide 7 days, Today and Home put today in the middle, and reduced motion lands at once', async ({ page, browser }) => {
   await page.goto('/timeline.html?n=40&span=200&theme=light');
   const canvas = page.locator('.gn-timeline__canvas');
   await expect(canvas).toBeVisible();
@@ -214,8 +230,14 @@ test('29.042 a mouse drag pans, a touch swipe is the platform\'s own scroll, the
   await page.mouse.move(box.x + 700, box.y + 250);
   await page.mouse.down();
   await page.mouse.move(box.x + 500, box.y + 250, { steps: 8 });
+  // read with the button still DOWN: momentum starts only on pointerup, so here the pan is exactly the pointer's travel (the
+  // bound after release alone would pass a drag that panned 10x the pointer). Two frames first: Chromium hands pointermove
+  // to the page on animation frames.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  const held = (await state(page)).scrollLeft - before.scrollLeft;
   await page.mouse.up();
   await page.waitForTimeout(900);
+  expect(Math.abs(held - 200)).toBeLessThan(2);
   expect((await state(page)).scrollLeft - before.scrollLeft).toBeGreaterThan(190);
   // keys
   await page.getByRole('button', { name: 'Today', exact: true }).click();
