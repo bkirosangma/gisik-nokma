@@ -1550,7 +1550,7 @@ describe('29.420-29.427 an old instance\'s write to a ticket snapshot is demoted
     await withClient((client) => overwriteSnapshot(client, { entityKind: 'ticket', entityId: ticketId, seq: 3, state: again, provenance: null }));
     const kept = await raw('ticket', ticketId, 3);
     expect(kept).toMatchObject({ state: again, fold_version: TICKET_FOLD_VERSION, created_at: past });
-    expect(kept.write_token).toMatch(UUID);
+    expect(kept.write_token).toEqual(expect.stringMatching(UUID));
     expect(kept.write_token).not.toBe(token);
 
     // The old instance's write on the same row: its state lands, and the row is stale again, created now.
@@ -1580,7 +1580,7 @@ describe('29.420-29.427 an old instance\'s write to a ticket snapshot is demoted
     // The premise: the pass restated the row IN PLACE, so its created_at is still at or before dueAt.
     const restated = await raw('ticket', ticketId, head);
     expect(restated.fold_version).toBe(TICKET_FOLD_VERSION);
-    expect(restated.write_token).toMatch(UUID);
+    expect(restated.write_token).toEqual(expect.stringMatching(UUID));
     expect(restated.created_at.getTime()).toBeLessThanOrEqual(dueAt.getTime());
     expect(await snapshotRows(ticketId)).toBe(1);
 
@@ -1636,7 +1636,7 @@ describe('29.420-29.427 an old instance\'s write to a ticket snapshot is demoted
     const upserted = await raw('ticket', ticketId, 2);
     for (const row of [inserted, upserted]) {
       expect(row.fold_version).toBe(TICKET_FOLD_VERSION);
-      expect(row.write_token).toMatch(UUID);
+      expect(row.write_token).toEqual(expect.stringMatching(UUID));
     }
     expect(inserted.write_token).not.toBe(upserted.write_token);
 
