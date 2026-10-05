@@ -23,8 +23,8 @@ export function istClock(at: Date): { date: string; hour: number } {
  *   and `sem_suggestions`), minus the archived and the deleted: nobody curates those. A workspace has a
  *   `proj_workspaces` row only once a lifecycle event names it (`migrations/1790500000000_lifecycle.sql`: absence is
  *   live), so the lifecycle table is LEFT-joined, never the list.
- * - Failures are logged and swallowed, as the embed worker's are (`embed-worker.ts:209-216`): a job that throws, and a
- *   tick whose own query throws, which the hourly `void tick()` would otherwise leave as an unhandled rejection.
+ * - Failures are logged and swallowed, as the embed worker's are (`runGuarded`, `embed-worker.ts:323-330`): a job that
+ *   throws, and a tick whose own query throws, which the hourly `void tick()` would leave as an unhandled rejection.
  */
 export function startSuggestionScheduler(
   pool: Pool,

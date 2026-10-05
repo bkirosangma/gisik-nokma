@@ -214,8 +214,8 @@ export type AppDeps = {
    * `buildApp` owns is the one thing only it can reach — the commit feed — and
    * it hands the decision to whoever assembled the app. `index.ts` hands it
    * `(noteId) => worker.nudge(noteId)`; the sixty test files hand it nothing,
-   * and a listener is registered only when this is defined, so they subscribe
-   * to nothing at all.
+   * and a listener is registered only when this or `onSemanticChange` is
+   * defined, so they subscribe to nothing at all.
    *
    * The argument is accepted for the caller's benefit — a log line, or a
    * future per-note wake-up — and the shipped worker does not need it:
