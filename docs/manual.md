@@ -2083,7 +2083,7 @@ Three things are worth knowing before you press it:
   read-only choice and no picking one workspace.
 - **It can never do more than you can.** A ticket you cannot see, it cannot see. A move your role does not
   allow is refused for the assistant in the same words it would be refused for you.
-- **Every change it makes is recorded under your name**, like any other change in the ticket's history.
+- **Every change it makes is recorded under your name**: the ticket's history shows it as **Claude, for** your name.
 
 ### What your assistant can do
 

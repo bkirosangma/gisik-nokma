@@ -602,6 +602,73 @@ Block `13.1775`–`13.1799` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1788 🧪 `ctl help` lists `tipmerge`; `selftest.sh` runs this suite and a `tipmerge` refusal step as live, uncommented `step` lines (a commented-out step fails; CONTROL — the patterns reject a commented line and accept a live one).
 - 13.1789 🧪 The real thing (2026-10-03, dry-run): `ctl tipmerge task/sm-t13-native-loading --base release/smoothness --expect 9a76ca1fc35f --dry-run` against the live origin reported a clean merge, tree `ef15dfb07a1e` — equal to `git merge-tree --write-tree` run by hand — of `release/smoothness` `dfe7afe3` into `9a76ca1f`, exit 0; with `--expect 0000000` it refused as moved, exit 1. The tree is re-derived offline on every `check:ctl` run from the two shas (skipped, with a printed notice, in a clone that lacks the commits).
 
+## `ctl batch` — 2–4 READY PRs through ONE gate (`task/ctl-batch-verb`, planner P42 re-opened 2026-10-05 12:41: 6 gates in the hour, 105 of 118 slot-wait min/h inside a gate window)
+
+`scripts/ctl/test/batch.test.sh` (scratch origins; `gh` stubbed on PATH, the gate / pr open / land ctl stubbed through `CTL_BATCH_CTL`).
+
+- 13.2296 🧪 Arguments, `main` and the batch tree.
+  - `ctl batch main …` is refused before any `gh`, git or ctl call. CONTROL: the same call on the release base reads the PRs.
+  - Each of these refuses before any `gh` call: a base that is no `release/<name>`, 1 or 5 PRs, a non-number, a PR named twice, an unknown flag.
+  - The batch tree may not be the primary, a tree standing on a branch (a lane's `task/*`; the remedy names `checkout --detach`), a dirty tree, no worktree, or the checkout holding the running ctl. CONTROL: a tree on `batch/*` is accepted.
+  - One batch per tree: a lock held by a live pid refuses; a dead holder's lock is taken over and released at the end.
+- 13.2297 🧪 READY.
+  - A PR whose head no `READY` / `needs-tip` line of `roles/QUEUE-review.md` names is refused (`REFUSE #<pr> (ready) …`), and the WHOLE call refuses: nothing merged, gated or pushed. The refusal prints the one spelling read: `HH:MM DONE <time> READY|needs-tip <branch> <sha>`.
+  - A needs-tip line counts as READY.
+  - A FIX of the same branch AFTER the READY line refuses, and the refusal quotes the whole FIX line. CONTROL: a FIX before it, or a later FIX of another branch that does not name it, does not.
+  - A FIX line after the READY line refuses the PR it names. One leg each for these live spellings (`roles/QUEUE-review.md`, 10-05):
+    - the verdict word first: `FIX <n> task/<x> <sha>`; `FIX (task/<x> <sha> → BRIEF…)`; the ORCH's gate-red `FIX (<slug> <sha>)` and `FIX (<slug> gate fail → lane 4)` (no sha: the bare slug names it); `FIX-<n> task/<x> <sha>`; `FIX (<sha>; …)` naming only 7 hex of the head; and a FIX naming only the needs-tip sha under a clean tip merge;
+    - the branch first (the verb reads the WHOLE body, so the slug and sha before FIX name the PR): `task/<x> <sha> FIX <n> (BRIEF…) reviewer B`; `task/<x> <sha> FIX reviewer B`; `task/<x> FIX (…)` (no sha: the slug names it); `needs-tip+FIX-1 task/<x> <sha> (…)` (no needs-tip verdict); `task/<x> <sha> HELD-FOR-FIX-2 (…)`.
+  - CONTROL in each leg: the same spelling naming another branch (`task/ab`), slug (`ab`, `a-b`: a slug is a WHOLE token) or sha refuses nothing. So do 6 hex of the head (too short for a sha) and `FIX (BRIEF-a-fix-1.md)` (it names neither, so it cannot be attributed).
+  - A FIX inside a parenthesis is no FIX. CONTROL: `task/a <sha> READY (FIX 1; …) (…)` after the canonical READY, and a canonical `READY task/a <sha> (FIX 1 re-check …)` as the admitting line, refuse nothing. `task/b <sha> FIX reviewer B` refuses #12, not #11.
+  - A FIX token is WHOLE and upper case: `FIX` or `FIX-<n>`, no word character on either side and no other `-` after it. CONTROL: `PREFIX`, `FIXED`, `FIX-ups` and a lower-case `fix` after the branch refuse nothing. `HELD-FOR-FIX-2` refuses (a `-` before FIX is a boundary).
+  - A `FIX-<n>` token takes any number of digits: `task/a <sha> FIX-12 (…)` refuses #11 (no live line has a two-digit round yet). CONTROL: the same spelling naming `task/ab` and another sha does not.
+  - An admitting READY is no FIX line, even with a FIX token before its parenthesis. CONTROL: `READY task/c <sha> FIX-1 delta re-check (needs task/a merged first)` refuses nothing. The same line with no admitting verdict (`task/c <sha> FIX-1 …`) is a FIX, and it refuses #11, the PR its body names.
+  - Only DONE lines are read. CONTROL: a NOTE and a CORRECTION line naming `task/a` with a FIX token before any parenthesis (`NOTE ORCH: task/a <sha> FIX 3 re-check is UNTAKEN …`, `CORRECTION task/a <sha>: … keeps the FIX 1 re-check`) after the READY refuse nothing. The same words on a DONE line refuse.
+  - The verdict word right after the cited time is a FIX whenever it starts with FIX, whole token or not (FIX 1's prefix, kept): `FIX2 task/a <sha>` refuses. CONTROL: the same spelling naming `task/ab` and another sha does not.
+  - RIDER, VOID, REVIEW and TOOK lines, and a READY naming an older sha, are no READY.
+  - A needs-tip line admits the CLEAN tip merge of the sha it names (tree = `git merge-tree` of its parents, second parent on the base). A hand-edited merge, a clean merge of a branch NOT on the base (unreviewed work), and a READY naming the pre-merge sha are refused.
+  - These are refused too: a head already on the base, a PR that is not OPEN, a PR against another base.
+- 13.2298 🧪 Rule (b).
+  - A second migration in the union refuses the later PR in READY order, naming the first. CONTROL: one migration above the tip passes.
+  - A migration prefix equal to or below the tip's highest is refused.
+  - One PR with two migrations is refused.
+- 13.2299 🧪 Rule (c), always alone. Each of these is refused, naming the path: `pnpm-lock.yaml`, a `Dockerfile*`, `scripts/ctl/verbs/gate.sh`, `docs/lanes/gate-lock/*`, a new `apps/*` or `packages/*` `package.json`. CONTROL: changing an existing `package.json`, or adding one under a `packages/` dir outside the workspace roots, creates no package.
+- 13.2300 🧪 Rule (d), shared count pins.
+  - Two PRs bumping one pin line refuse the later, naming the pin and the earlier PR.
+  - A pin line REWRITTEN by the second PR still counts, through its removed old form.
+  - Two PRs changing other lines of a pin's file pass. A whole-file pin (the generated editor bundle) changed by two refuses.
+  - A pin bump and a `pnpm-lock.yaml` change that the TIP made after the members were cut are charged to no member (three-dot diffs).
+  - Every `SHARED_PINS` file exists in this checkout and its pattern matches a line. CONTROL: a pattern matching nothing is caught.
+- 13.2301 🧪 The union.
+  - It merges in READY (queue) order, not argument order, each member its OWN `--no-ff` merge commit: the second parents along the first-parent line are the heads in that order, also for heads that already contain the tip.
+  - A conflict aborts that one merge and ejects that PR (`EJECT … conflict: <path>`); the rest gate.
+  - Fewer than 2 left is `gate singly`: exit 3, no gate, nothing pushed.
+  - A member an earlier member already carries is `CONTAINED` and lands with it.
+- 13.2302 🧪 Green.
+  - One gate on the union sha (`--base`, `--repo` the batch tree), one `ctl pr open` of `batch/<pool>-<stamp>` at the gated sha with a body listing every member PR and head sha, one `ctl land` of that PR, the install once.
+  - Members GitHub marked merged are reported merged and not closed.
+  - A member GitHub did not mark is closed with a comment naming the batch PR and the landed sha.
+  - A member whose head is not in the base after the landing, or whose PR head moved right after it, is never closed: it is left open and the FAIL names it.
+  - A member whose head moved after the union was built is not landed: no PR, no land.
+  - A member whose PR was CLOSED while the gate ran, its head unchanged, is not landed: no PR, no land, and the FAIL names it. CONTROL: the same world without the close lands.
+  - Every ctl call's verdict is its stdout `OK|FAIL` line: the stub writes stderr after each one (as the real `pr open`'s push does), and every green leg still lands. A RELATIVE `CTL_LOG_DIR` still hands `ctl pr open` an absolute body path.
+- 13.2303 🧪 Red in one member's package.
+  - The output prints `FIX candidate: #<pr>`, and the union is rebuilt WITHOUT that member: the second gate's tree differs and does not contain it.
+  - The rebuilt union is gated again and landed.
+  - The candidate stays open and out of the base. Two gates run on one install.
+- 13.2304 🧪 Red that is not one member's.
+  - Red touching several members: bisect. The first half in READY order re-gates; the rest is `HELD` and left open.
+  - Red touching no member, with two in the union: `gate singly` for both, exit 3, no second gate.
+  - A gate FAIL with no log is no gate: stop, nothing ejected or bisected, no PR. The leg plays a refusal before the run, and the FAIL says "a FAIL with no log, refused before the run (dirty tree, base moved) or orphans after it" (gate.sh's orphan FAIL comes after a run and names no log either). A red with `timeouts>0`, or with no failing task, stops the same way.
+- 13.2305 🧪 The cap, `--dry-run`, wiring.
+  - The third red stops the call with the state printed: exactly 3 gates, the third red unattributed, nothing landed.
+  - `--dry-run` makes no mutating call (no ctl call; `gh` only `pr view`), leaves origin and the batch tree as they were, and prints the order, the predicted union tree and the commands.
+  - The predicted tree IS the tree the real run gates, and a predicted conflict is the real run's EJECT.
+  - A dry-run with a refusal still prints the order for the rest, and exits 1.
+  - `batch.py` holds no `git push`, `gh pr merge` / `create`, force, `reset --hard` or `branch -D`. CONTROL: the detector flags each.
+  - The REAL ctl verbs print what `batch.py` parses: `ctl_ok` / `ctl_fail` on stdout, `--repo` through lib.sh, gate's `(log X)` with `engine=` / `timeouts=` / `orphans=`, pr-open's un-quiet push and `#N`, land's merge commit (`--merge`). CONTROL: a copy with each one broken fails the leg.
+  - `ctl help` lists `batch`, and `selftest.sh` runs the suite and a refusal step.
+
 ## `ctl archive` — stale lanes-dir files to `archive/<date>/` and a daily notes roll (`task/ctl-archive`, owner plan B13, 2026-10-03)
 
 Why: the lanes directory held ~1,700 loose files (BRIEF/PTR/MSG/NOTE/HANDOFF/EXEC/pr/DISPATCH scratch) and a 2,000-line `CTL-TO-PLANNER-notes.md`; every `ls`, `grep` and tail read paid for them. `ctl archive [--apply] [--list]` MOVES (never deletes) the top-level working files older than 7 days that nothing live references into `archive/<YYYY-MM-DD>/`, writes `INDEX.tsv` (file, mtime, size, original path) and rolls the notes file by rename + a fresh file at the same path (last 40 lines carried, a one-line `# rolled <ts>` header). Dry-run unless `--apply`; refuses `--apply` while a landing is in flight. The lanes root is `CTL_LANES_DIR` (default `/Users/kiro/my_projects/gisik-nokma-lanes`); the clock is `CTL_ARCHIVE_NOW`; the ps command is `CTL_ARCHIVE_PS_CMD` (test seams). `--list` prints one `VERDICT<TAB>name` line per file: `MOVE` or `KEEP:recent|lanes|queue-ref|script-ref|live-ptr|protected|collision`. Known limit: `roles/QUEUE-*.md` lines carry `HH:MM` and no date, so "the last 3 days of the queues" is read as the whole queue files (they began 2026-10-01; later this only over-protects).
@@ -921,7 +988,7 @@ Block `13.2310`–`13.2319` for `task/ctl-sem-handoff` (planner 2026-10-05, P48:
 
 ## `ctl run-tests --max-min`: a wall-clock cap on SLOT time, and `timeout-minutes` on every CI job (`task/ctl-run-tests-cap`, planner P47 2026-10-05: a mutant's synchronous infinite loop held a slot 13+ min at 99.7 % CPU; default 30 by the planner's 14:36 ruling)
 
-Block `13.2320`–`13.2329` (the KG tip's high-water was `13.2295`; `task/ctl-batch-verb` holds `13.2296`–`13.2305` and `task/ctl-sem-handoff` `13.2310`–`13.2319`; `13.2329` was left free and went to the reviewer's getppid leg; `13.2349`, from `task/ctl-run-tests-cap-followup`, is the next id free on the KG, WG and newest task tips). The ctl cases run in `scripts/ctl/test/run-tests-cap.test.sh` (real clock, real processes; a "minute" of cap is scaled to 1 s by `CTL_RUN_SECS_PER_MIN=1`, every run under an alarm).
+Block `13.2320`–`13.2329` (the KG tip's high-water was `13.2295`; `task/ctl-batch-verb` holds `13.2296`–`13.2305` and `task/ctl-sem-handoff` `13.2310`–`13.2319`; `13.2329` was left free and went to the reviewer's getppid leg; `13.2349`, from `task/ctl-run-tests-cap-followup`, is the next id free on the KG, WG and newest task tips; `13.2355`, from `task/ctl-cap-race-guard`, pinned by the planner 2026-10-05 23:30 after `13.2350`–`13.2351` went to `task/ctl-postman-suite-fast`, with `13.2352`–`13.2354` left as a buffer). The ctl cases run in `scripts/ctl/test/run-tests-cap.test.sh` (real clock, real processes; a "minute" of cap is scaled to 1 s by `CTL_RUN_SECS_PER_MIN=1`, every run under an alarm).
 
 - 13.2320 🧪 A job that holds its slot past `--max-min 2` is stopped: exit **124**, the log's LAST line is exactly `TIMEOUT after 2 min`, the summary's last line is `FAIL run-tests <label> TIMEOUT after 2 min — its process group was stopped, slot released (rc=124 …`, no `slot-*` is left, the job's leader AND its TERM-ignoring CPU-spinning child are gone (the KILL after the grace), and a polite child got the GROUP's TERM before the KILL; the verb returns within the cap + the grace + a margin, and the log header names the cap; a job whose whole group exits on the TERM ends the stop at once (under a 10 s grace it is back within the cap + 5 s, never the cap + the grace)
 - 13.2321 🧪 Under the cap the job's own exit code stands: rc 0 (`OK` line) and rc 1 (`FAIL … rc=1`), with no `TIMEOUT` line and no `CAP RACE` line (13.2349) in the log or the output (CONTROL: each log was read, its body line is there); a command's OWN `exit 124` is rc 124 with `FAIL … rc=124` and no `TIMEOUT` line anywhere — the discriminator is 124 PLUS the `TIMEOUT` line
@@ -934,6 +1001,7 @@ Block `13.2320`–`13.2329` (the KG tip's high-water was `13.2295`; `task/ctl-ba
 - 13.2328 🧪 `ctl mutate`, the one ctl verb that runs through run-tests, passes `--max-min` right after its label, above its watchdog's cap + GRACE (3 s) by at least 58 s (600 s → 12, 659 s → 12: 720 s against the watchdog's KILL at 662 s, 1 s → 2), so the watchdog's own stop (exit 2, `stopped`) always comes first
 - 13.2329 🧪 The timer signals only while its parent is the verb (its `getppid` guard, the defence against a reused pid): with the timer run one process further down by a `perl` shim on PATH (the pid it is told to signal, the verb, is alive but no longer its parent), a 4 s job under a 2 s cap runs to its end (rc 0, its output in the log, no `TIMEOUT` in the log or the output) (CONTROL: the shim recorded itself, its parent and the timer's pid). A `kill -9` of the verb cannot show the guard: the orphaned timer's USR1 goes to a dead pid either way
 - 13.2349 🧪 The cap firing in the instant the job exits is a visible false RED, never a false green (planner ruling C+ 2026-10-05): a `perl` shim on PATH replaces the timer, and its worker STOPs the verb inside its `{ wait; } 2>/dev/null` (fd 2 is /dev/null, the job up). It then lets the job `exit 0`, waits until the job is a zombie or gone (macOS: the stopped verb's own wait4 reaps it), sends USR1 and CONTs the verb. The verb returns 128+USR1 (158 on macOS), never 0; the log's last line is `CAP RACE: the cap fired as the job ended; its own rc is lost (158), so re-run`; and there is no `TIMEOUT` in the log or the output (CONTROL: the worker recorded the verb stopped — state T, fd 2 /dev/null —, the job a zombie or gone, and the USR1 sent; the job's last line is in the log). The brief's pinned second `wait` returned 127 in 5 of 5 runs, so the residual stays.
+- 13.2355 🧪 The cap firing just AFTER a normal `wait` (the benign ordering) keeps the job's own rc: the `CAP RACE` line is only for rc = 128+USR1 (an interrupted `wait`). The window is one line wide, so a DEBUG trap read from `BASH_ENV` (acting only in the verb) pauses the verb at `timed_out=0`, after its first `wait` returned the job's 7: it writes that rc and waits for its own USR1 trap to run. The `perl` shim (the timer, as in 13.2349) has a worker that polls for that rc and then sends USR1. The verb returns 7 with `FAIL run-tests … rc=7`, and there is no `CAP RACE` and no `TIMEOUT` in the log or the output (CONTROL: the worker recorded the verb holding 7, its fd 2 off /dev/null, the job gone and the USR1 sent; at the `if` `cap_fired` was 1 with rc 7; the job's last line is in the log). The unguarded arm logs `CAP RACE … lost (7)` here. The same benign ordering with the job's own 159, one ABOVE 128+USR1, keeps it too (`FAIL … rc=159`, no `CAP RACE`): the rc test is an equality, and a `-ge` logs the line there and nowhere else. A job whose OWN rc is 128+USR1, with the cap just after its `wait`, still logs the line (a known limit, no leg): its RED is true, only the line's "its own rc is lost" is wrong. A job whose OWN rc is 128+USR1 under a cap that never fired keeps it (`FAIL … rc=158`) with no `CAP RACE` and no `TIMEOUT` (CONTROL: its line is in the log): the arm's `cap_fired` clause, which 13.2321's rc 0 / 1 / 124 no longer reach
 
 ## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
 

@@ -72,7 +72,7 @@ describe('projection registration order (coordination §8)', () => {
   /**
    * 12.67 — proj_contested is registered directly after proj_visibility, last in the pinned order, in both the DB-free names pin (projection-order.test.ts) and its [name, tables] mirror (also this file, line 149) and the second, DB-required pin in entity-heads.test.ts (line 95-122).
    */
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, notes, contested, workspace settings, search, references, concepts', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, notes, contested, workspace settings, search, references, concepts, concept rejections', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
@@ -168,6 +168,8 @@ describe('projection registration order (coordination §8)', () => {
       // Knowledge Graph D (27.443): APPENDED by the same question: `apply` reads only its own rows and
       // `purged_entities`, and no projection reads the concept tables in a transaction.
       'proj_concepts',
+      // KG-D T5: APPENDED after proj_concepts by the same question (27.485).
+      'proj_concept_rejections',
     ]);
   });
 
@@ -239,6 +241,7 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_references', ['proj_references']],
       // THREE tables, one stream: a concept's tags and links are events on the concept itself.
       ['proj_concepts', ['proj_concepts', 'proj_concept_items', 'proj_concept_links']],
+      ['proj_concept_rejections', ['proj_concept_rejections']],
     ]);
   });
 

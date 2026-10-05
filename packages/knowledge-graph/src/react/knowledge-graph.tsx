@@ -247,6 +247,18 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   const edgeView = selectedEdge === null ? undefined : (rings.store.edges.get(selectedEdge) ?? (removedEdge?.id === selectedEdge ? removedEdge : undefined));
   const selectedItem = selected === null ? undefined : rings.store.items.get(selected);
   const empty = !rings.loading && rings.failedHop === null && centreItem !== undefined && z.clear.length === 1 && z.fog.length === 0;
+  // Empty with a link held means every chip carrying the centre's links is off: the walk follows only the chips that are on,
+  // and a neighbour outside the scope is fog, not nothing. The far end must be held, as the walk requires.
+  const chipsHideAll = empty && (rings.store.adj.get(centre) ?? []).some((x) => rings.store.items.has(x.to));
+  // The scope note names its cause. Each half re-asks `inGraphScope` with the other half opened up; the workspace is the
+  // outer scope, so it wins when both exclude the centre.
+  const outOfWorkspaces = centreItem !== undefined && !inGraphScope(centreItem, { workspaceIds, projectIds: [] });
+  const outOfProjects = centreItem !== undefined && !inGraphScope(centreItem, { workspaceIds: centreItem.workspaceId === null ? [] : [centreItem.workspaceId], projectIds });
+  const scopeNote = outOfWorkspaces
+    ? `${label(centre)} is outside the workspaces you picked. It stays in the middle, and its links follow your scope.`
+    : outOfProjects
+      ? `${label(centre)} is outside the projects you picked. It stays in the middle, and its links follow your scope.`
+      : null;
   const tipPos = tip === null || mountRef.current === null ? null : tooltipPosition(tip.x, tip.y, { width: Math.min(320, tip.text.length * 7 + 20), height: 28 }, mountRef.current.clientWidth);
 
   return (
@@ -278,7 +290,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           });
         }}
         count={count}
-        scopeNote={centreItem !== undefined && !inGraphScope(centreItem, scope) ? `${label(centre)} is outside the projects you picked. It stays in the middle, and its links follow your scope.` : null}
+        scopeNote={scopeNote}
       />
       <div className="gn-kg__body">
         <div className="gn-kg__canvas">
@@ -303,8 +315,8 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           )}
           {empty && (
             <div className="gn-kg__empty">
-              <p>{`Nothing is linked to ${label(centre)} yet.`}</p>
-              {centreItem?.kind === 'ticket' && props.onAddLink && (
+              <p>{chipsHideAll ? `Every link type is turned off. Turn one on to see ${label(centre)}'s links.` : `Nothing is linked to ${label(centre)} yet.`}</p>
+              {!chipsHideAll && centreItem?.kind === 'ticket' && props.onAddLink && (
                 <button type="button" className="gn-button gn-button--primary" onClick={() => props.onAddLink!(centreItem)}>
                   Add link
                 </button>

@@ -1,4 +1,4 @@
-import { IST_DAY_REGEX, formatIstInstant, istDayBounds, SYSTEM_ACTOR_NAMES } from '@gisik-nokma/domain';
+import { IST_DAY_REGEX, formatIstInstant, istDayBounds, MCP_ASSISTANT_LABEL, SYSTEM_ACTOR_NAMES } from '@gisik-nokma/domain';
 import { UNKNOWN_PERSON } from './member-label.js';
 import type { ClaimProvenance } from './view-types.js';
 
@@ -60,6 +60,15 @@ export function actorLabel(actorId: string, actorName: string | null | undefined
   if (systemName !== undefined) return systemName;
   const name = actorName?.trim();
   return name !== undefined && name.length > 0 && name !== actorId ? name : UNKNOWN_PERSON;
+}
+
+/**
+ * Knowledge Graph spec D §5.2 (D2): an MCP write reads "Claude, for Ama Rangsa". The ledger records origin 'mcp'
+ * and the session's user, never which assistant, so the assistant is one label (`MCP_ASSISTANT_LABEL`). Wraps
+ * `actorLabel`'s answer, so the floor (`Unknown person`) still names the person: "Claude, for Unknown person".
+ */
+export function attributionLabel(actorName: string, origin: string): string {
+  return origin === 'mcp' ? `${MCP_ASSISTANT_LABEL}, for ${actorName}` : actorName;
 }
 
 /**

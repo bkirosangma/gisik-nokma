@@ -81,3 +81,11 @@ describe('27.456 concept History sentences', () => {
     expect(describeEvent(event('concept.merged', {}), phones)).toBe('concept.merged');
   });
 });
+
+/** 27.497 (KG-D Task 5): a rejected suggestion is on the workspace stream with hashes only, so its sentence names nothing. */
+describe('27.497 the rejected suggestion’s History sentence', () => {
+  it('27.497 workspace.concept_suggestion_rejected reads "Rejected a suggested concept"; control: an unknown workspace type reads its raw type', () => {
+    expect(describeEvent(event('workspace.concept_suggestion_rejected', { signature: 'a'.repeat(64), itemHashes: ['b'.repeat(32)] }))).toBe('Rejected a suggested concept');
+    expect(describeEvent(event('workspace.concept_suggestion_planted', {}))).toBe('workspace.concept_suggestion_planted');
+  });
+});
