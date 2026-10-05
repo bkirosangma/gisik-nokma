@@ -25,7 +25,7 @@ import type { IngestService } from '../../src/ingest/ingest-service.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
 import { buildContestedClaim } from '../../src/sync/contest-coherence.js';
-import { BOOTSTRAP_BACKFILL_TYPES, bootstrapTicket, SnapshotRestatePending } from '../../src/sync/sync-routes.js';
+import { BOOTSTRAP_BACKFILL_TYPES, bootstrapTicket, SNAPSHOT_RESTATE_PENDING, SnapshotRestatePending } from '../../src/sync/sync-routes.js';
 import { targetSight } from '../../src/visibility/withhold-link-targets.js';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -1205,5 +1205,25 @@ describe('29.400-29.405 a snapshot from an older fold waits for the boot restate
     expect((await owed(device, world)).sort()).toEqual([ticketId, phantom].sort());
     await catchUp();
     expect(await owed(device, world)).toEqual([ticketId]);
+  });
+
+  it('29.405 only the refusal is answered 503: any other failure inside either bootstrap route is still a 500, never the snapshot_restate_pending body; control: the same ticket before its row is corrupted is served by both', async () => {
+    // Reviewer C (P44 rider): the routes' `err instanceof SnapshotRestatePending` guard. Without it every error in the
+    // try (a DB fault, a corrupt row) becomes a retryable 503 the client keeps owed, and skips the 500 and its alert.
+    const world = await fvWorkspace();
+    const { ticketId } = await fvTicket(world, TICKET_FOLD_VERSION);
+    const ticketUrl = `/v1/sync/bootstrap/ticket?workspaceId=${world.workspaceId}&ticketId=${ticketId}`;
+    const workspaceUrl = `/v1/sync/bootstrap?workspaceId=${world.workspaceId}`;
+    // Control: a current row is served by both doors.
+    expect((await app.inject({ method: 'GET', url: ticketUrl, headers: memberHeaders })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: workspaceUrl, headers: memberHeaders })).statusCode).toBe(200);
+    // A corrupt CURRENT-fold row: `state.links` is not iterable, so `withholdLinks` throws a TypeError in the try.
+    await db.pool.query(`UPDATE snapshots SET state = jsonb_set(state, '{links}', '5') WHERE entity_kind = 'ticket' AND entity_id = $1`, [ticketId]);
+    for (const url of [ticketUrl, workspaceUrl]) {
+      const res = await app.inject({ method: 'GET', url, headers: memberHeaders });
+      expect(res.statusCode).toBe(500);
+      expect(res.body).not.toContain(SNAPSHOT_RESTATE_PENDING);
+    }
+    expect(warnings).toEqual([]);
   });
 });
