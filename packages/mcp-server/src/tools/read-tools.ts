@@ -3,7 +3,7 @@ import { filterSpecSchema } from '@gisik-nokma/domain';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import { bodyAsMarkdown } from './markdown-io.js';
-import { readOrNotFound } from './reads.js';
+import { readLinkedFrom, readOrNotFound } from './reads.js';
 
 export type ToolDefinition = {
   name: string;
@@ -152,6 +152,8 @@ export function readTools(session: Session): ToolDefinition[] {
         'Read one ticket in full: its visibility row, its folded state (assignee, collaborators, ' +
         'custom fields, transition history), its title, who last moved it, its parent, its rollup and its typed links ' +
         '(`links`: kind, direction "out"/"in" and the other ticket, visible ends only). ' +
+        'linkedFrom lists the first 20 tickets, notes and comments you can see that reference this ticket, with the sentence each sits in ' +
+        '(the reference marked [[…]]); total counts only those. ' +
         'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found.',
       inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1) },
       handler: async (args) => {
@@ -176,6 +178,8 @@ export function readTools(session: Session): ToolDefinition[] {
           ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
           description: bodyAsMarkdown(description?.value ?? null),
           links: linked.links.map((l) => ({ kind: l.kind, direction: l.direction, ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title } })),
+          // "Linked from" (Knowledge Graph spec B §4): read last, so a ticket the caller cannot see has already answered not_found.
+          linkedFrom: await readLinkedFrom(session, parsed.workspaceId, { kind: 'ticket', id: parsed.ticketId }),
         };
       },
     },

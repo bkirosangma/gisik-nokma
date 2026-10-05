@@ -1,8 +1,9 @@
 /**
- * Knowledge Graph spec C, ring read (`read/graph-neighbours.ts`): 27.208-27.209 smoke on every run, 27.210 the p95 per ring
- * (`KG_PERF=1`), 27.211 the within-ring edge and the page's card keys. 27.027 (typed-links T2): the ring's link edge is the row
- * TL2's projection wrote. `proj_ticket_links` and `proj_references` are the REAL migrated tables (`1791700000000_proj-ticket-links.sql`,
- * `1791500000000_proj-references.sql`); the test-only shim that created them is gone, and `./real-tables.test.ts` (27.028) keeps it gone.
+ * Knowledge Graph spec C, ring read (`read/graph-neighbours.ts`): 27.208-27.209 smoke on every run, 27.210 / 27.305 the p95 per
+ * ring (`KG_PERF=1`; 27.305 is KG-C T6's re-run on the migrated tables), 27.211 the within-ring edge and the page's card keys.
+ * 27.027 (typed-links T2): the ring's link edge is the row TL2's projection wrote. `proj_ticket_links` and `proj_references` are
+ * the REAL migrated tables (`1791700000000_proj-ticket-links.sql`, `1791500000000_proj-references.sql`); the test-only shim
+ * that created them is gone, and `./real-tables.test.ts` (27.028) keeps it gone.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { graphRef, membershipId, newUlid, ticketKey, type LedgerEvent } from '@gisik-nokma/domain';
@@ -171,13 +172,13 @@ function percentile(sorted: number[], fraction: number): number {
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] as number;
 
-describe('27.210 p95 per ring (spec §2.2, §7)', () => {
+describe('27.210 / 27.305 p95 per ring (spec §2.2, §7)', () => {
   if (!ENABLED) {
     console.log('kg-perf: SKIPPED — set KG_PERF=1 to seed the corpus and measure p95 per ring (bar: ≤ 150 ms for a ring of ≤ 500 clear items; ring 1 asserted too; the 2,000-item page-cap rings are recorded, not asserted).');
     it.skip('seeds and measures (set KG_PERF=1)', () => undefined);
     return;
   }
-  it('27.210 p95 ≤ 150 ms for ring 1 and for a ~500-item ring, as a MEMBER (the predicates do work; an owner compiles to TRUE); the page-cap rings are recorded', async () => {
+  it('27.210 / 27.305 p95 ≤ 150 ms for ring 1 and for a ~500-item ring, as a MEMBER (the predicates do work; an owner compiles to TRUE); the page-cap rings are recorded', async () => {
     const corpus = await seedGraphCorpus(db, { tickets: 10_000, notes: 2_500, people: 12, links: 3_000, references: 6_000 });
     type Case = { label: string; asserted: boolean; center: string; hops: number; reps: number };
     const cases: Case[] = [

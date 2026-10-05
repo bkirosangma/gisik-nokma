@@ -83,6 +83,19 @@ describe('14.400–14.407 note tools', () => {
     await expect(tool('get_note', fake({}).session).handler({ noteId: N })).rejects.toThrow('note not found or not visible to you');
   });
 
+  it('27.168 get_note answers linkedFrom from the note’s own workspace', async () => {
+    const f = fake({ ...NOTE_ROUTES, [`/v1/workspaces/${WS}/references`]: { total: 1, nextCursor: null, items: [{ sourceKind: 'ticket', sourceId: T, authorId: ME, snippet: 'per [[Cold room]]', updatedAt: '2026-10-03T10:00:00.000Z', parent: { kind: 'ticket', ticketId: T, projectId: 'P', key: 'CCSO-2', title: 'Fridge', stateCategory: 'active' } }] } });
+    const got = (await tool('get_note', f.session).handler({ noteId: N })) as { linkedFrom: unknown };
+    expect(got.linkedFrom).toEqual({ total: 1, items: [{ sourceKind: 'ticket', sourceId: T, title: 'CCSO-2 Fridge', snippet: 'per [[Cold room]]' }] });
+    expect(f.asked).toEqual([`/v1/notes/${N}`, `/v1/workspaces/${WS}/references?target=note%3A${N}`]);
+  });
+
+  it('27.171 the get_note description says what linkedFrom holds', () => {
+    expect(tool('get_note', fake().session).description).toContain(
+      'linkedFrom lists the first 20 tickets, notes and comments you can see that reference this note, with the sentence each sits in (the reference marked [[…]]); total counts only those.',
+    );
+  });
+
   it('14.402 create_note emits ONE note.created; scope private, inherit when attached, explicit needs people', async () => {
     const f = fake();
     const made = (await tool('create_note', f.session).handler({ workspaceId: WS, title: 'Plain' })) as { noteId: string };

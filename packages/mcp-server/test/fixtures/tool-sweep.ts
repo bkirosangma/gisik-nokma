@@ -28,14 +28,19 @@ export type SweepEntry = { args: Record<string, unknown>; session?: Partial<Sess
  */
 /** The ticket-detail answer the T9 sweep entries read (`key`, `title`, a rank, a workflow). */
 const TICKET_DETAIL = { key: 'W-1', title: 'A ticket', ticketState: { fields: {}, rank: 'm', workflowId: 'wf' }, rollup: null };
+/** The references route's empty page (KG-B T4: get_ticket and get_note read it). */
+const NO_REFERENCES = { total: 0, items: [], nextCursor: null };
 
 export const SWEEP: Record<string, SweepEntry> = {
   // read begin
   search: { args: { workspaceId: 'w', query: 'q' } },
   search_tickets: { args: { workspaceId: 'w', query: 'q' } },
   list_tickets: { args: { projectId: 'p' } },
-  // Typed links T4: get_ticket also reads the links route, which answers `{ links }`.
-  get_ticket: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async (path) => (path.endsWith('/links') ? { links: [] } : TICKET_DETAIL) } },
+  // Typed links T4: get_ticket also reads the links route, which answers `{ links }`; KG-B T4: and the references route, a `LinkedFromPage`.
+  get_ticket: {
+    args: { workspaceId: 'w', ticketId: 't' },
+    session: { get: async (path) => (path.endsWith('/links') ? { links: [] } : path.includes('/references?') ? NO_REFERENCES : TICKET_DETAIL) },
+  },
   list_members: { args: { workspaceId: 'w' } },
   // read end
   create_ticket: { args: { workspaceId: 'w', projectId: 'p', typeId: 'ty', title: 'A ticket' } },
@@ -65,7 +70,8 @@ export const SWEEP: Record<string, SweepEntry> = {
   // comment end
   // note begin (T7)
   list_notes: { args: { workspaceId: 'w' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
-  get_note: { args: { noteId: 'n' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  // KG-B T4: get_note also reads the references route of the note's workspace.
+  get_note: { args: { noteId: 'n' }, session: { get: async (path) => path.includes('/references?') ? NO_REFERENCES : ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   create_note: { args: { workspaceId: 'w', title: 'T' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   update_note: { args: { noteId: 'n', title: 'T2' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   link_note: { args: { noteId: 'n', ticketId: 't', action: 'attach' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },

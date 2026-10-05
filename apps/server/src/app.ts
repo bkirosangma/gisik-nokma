@@ -27,6 +27,7 @@ import { registerGroupRoutes } from './routes/groups.js';
 import { registerSimilarRoutes } from './routes/similar.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
+import { registerGraphRoutes } from './routes/graph.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
 import { registerMcpConnectionRoutes } from './routes/mcp-connections.js';
@@ -1044,6 +1045,8 @@ export function buildApp(
   // answer, and there is deliberately no parameter by which a caller could name
   // somebody else's.
   registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);
+  // The Knowledge Graph's ring read (spec C §2.2): one ring per call, the viewer from the session, visibility per workspace.
+  registerGraphRoutes(app, { pool: deps.pool }, requireSession);
   // The attention strip (Plan 5 Task 12) — the first read that is COMPUTED from
   // the stored claims AND THE CLOCK, and stored nowhere: blocked flags, an IST
   // staleness window and an IST due window, with the two thresholds read from

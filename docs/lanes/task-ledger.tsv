@@ -602,7 +602,7 @@ typed-links	5	todo	-	-	not started (waits for T3 + T4)
 reference-index	1	todo	-	-	not started (needs plan A T1 merged into release/knowledge-graph; stops at Step 11 if the floor run misses the bar)
 reference-index	2	todo	-	-	not started (waits for T1)
 reference-index	3	in-flight	-	-	task/kg-b-t3-app (lane 4): getLinkedFrom, the Linked from section on the ticket sheet and the note, the comment scroll, help
-reference-index	4	todo	-	-	not started (waits for T3)
+reference-index	4	in-flight	-	-	task/kg-b-t4-mcp (lane 3): MCP get_ticket / get_note linkedFrom, the hosted-door parity
 home	1	todo	-	-	not started (needs plan A T1 + the E seed commit; the brief carries prod counts)
 home	2	todo	-	-	not started (needs plan A T1 + the E seed commit; parallel with T1)
 home	3	todo	-	-	not started (waits for T1 + T2)
