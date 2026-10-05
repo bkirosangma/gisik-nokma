@@ -307,7 +307,8 @@ async function main(): Promise<void> {
     intervalMs: config.snapshotIntervalMs,
     minEvents: config.snapshotMinEvents,
     // wtg2 T9: the first pass runs at boot, so snapshots written before work periods are restated at deploy. Until it
-    // settles, a ticket whose row is still stale is refused with a 503 (`bootRestate`, wtg2 fold-version bootstrap).
+    // settles, a ticket whose row is still stale is refused with a 503 (`bootRestate`, wtg2 fold-version bootstrap), and
+    // after it one whose stale row was created after the pass read its due set (an old instance's, wtg2 fold-version overlap).
     immediate: true,
     log: (msg) => {
       app.log.warn(msg);

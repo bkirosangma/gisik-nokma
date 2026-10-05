@@ -111,7 +111,8 @@ export const SNAPSHOT_RESTATE_PENDING = 'snapshot_restate_pending';
 
 /**
  * Thrown by `bootstrapTicket`: a ticket's stored snapshot was written by an older fold and this process's boot
- * restate pass has not settled yet (`bootRestate` in `snapshot-writer.ts`; wtg2 fold-version bootstrap, ruling D).
+ * restate pass has not settled yet, or the row was created after that pass read its due set (`bootRestate` in
+ * `snapshot-writer.ts`; wtg2 fold-version bootstrap, ruling D, and overlap, ruling E).
  * Both bootstrap routes answer it with a 503, never the 404: the client's transport maps only a 404 to
  * `TicketPullNotFound`, which drops an owed pull, and any other failure leaves the pull owed for the next catch-up
  * (`http-transport.ts`, `bootstrapTicket`). Any OTHER error in those routes still reaches the app's error handler
@@ -234,7 +235,11 @@ export type BootstrapResponse = {
  * So until this process's boot pass has settled (`bootRestate.complete`) such a
  * row throws `SnapshotRestatePending`, which both routes answer with a 503 and
  * the client's drain keeps owed; nothing is written on this read. After the pass
- * it can only be a restate that failed: it is served as stored and named on
+ * a row created later than `bootRestate.dueAt` (the database clock the pass read
+ * before its due query) is refused the same way: the pass never saw it, because
+ * an old instance wrote it during a rolling deploy (wtg2 fold-version overlap,
+ * planner ruling E), and the next interval pass restates it. A row created at or
+ * before `dueAt` is a restate that failed: it is served as stored and named on
  * `bootRestate.warn`. A ticket with no snapshot, or one whose row is at the
  * current fold or from a later one, is served as before.
  */
@@ -242,10 +247,11 @@ export async function bootstrapTicket(client: PoolClient, ticketId: string, sees
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
   // wtg2 fold-version bootstrap (planner ruling D, 2026-10-05): a row written by an older fold lacks members the
   // current fold derives (work periods since T9). Until the boot restate pass has settled it is refused, retryably, so
-  // the client's pull stays owed and lands on the restated row; after the pass such a row is a restate that failed, and
-  // it is served as stored, with a warning, rather than leaving the ticket unreadable.
+  // the client's pull stays owed and lands on the restated row, and so is one created after the pass read its due set
+  // (an old instance's write, ruling E). Otherwise it is a restate that failed, and it is served as stored, with a
+  // warning, rather than leaving the ticket unreadable.
   if (snapshot !== null && snapshot.foldVersion < TICKET_FOLD_VERSION) {
-    if (!bootRestate.complete) throw new SnapshotRestatePending(ticketId);
+    if (!bootRestate.complete || (bootRestate.dueAt !== null && snapshot.createdAt > bootRestate.dueAt)) throw new SnapshotRestatePending(ticketId);
     bootRestate.warn(
       `bootstrap: ticket ${ticketId} is served a snapshot from fold ${snapshot.foldVersion} (current ${TICKET_FOLD_VERSION}): its restate failed`,
     );

@@ -57,6 +57,8 @@ describe('snapshot store', () => {
       provenance: null,
       // wtg2 T9: both writes stamp the current fold version (2 = work periods and rounds).
       foldVersion: 2,
+      // wtg2 fold-version overlap: the row's insert time, as pg hands back a timestamptz.
+      createdAt: expect.any(Date),
     });
   });
 });

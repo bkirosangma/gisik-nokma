@@ -16,13 +16,25 @@ const DEFAULT_MIN_EVENTS = 20;
  * The BOOT RESTATE flag (wtg2 fold-version bootstrap, planner ruling D, 2026-10-05). `complete` turns true once the
  * first pass this process's `startSnapshotWriter` started has SETTLED, cleanly or not: T9's boot pass, which restates
  * every snapshot written by an older fold. Until then `bootstrapTicket` refuses a row with `fold_version <
- * TICKET_FOLD_VERSION` (`SnapshotRestatePending`, answered 503, which the client's pull drain keeps owed and retries);
- * after it, such a row can only be a restate that failed, so it is served as stored and named on `warn`, which the
- * writer points at its own log. In-process and per instance: each server process runs its own boot pass, and
- * `deploy/do/app.yaml` runs one server instance.
+ * TICKET_FOLD_VERSION` (`SnapshotRestatePending`, answered 503, which the client's pull drain keeps owed and retries).
+ *
+ * `dueAt` is set with it (wtg2 fold-version overlap, planner ruling E, its instant re-pinned on the lane's question):
+ * the DATABASE clock read immediately before that pass's due query, or `null` when the pass failed before reading it.
+ * After the pass a stale row is not always a restate that failed. During a rolling deploy the OLD instance's writer
+ * keeps running and writes rows stamped with the old fold (the column default), and one created after `dueAt` was
+ * never in the pass's due set. Its publish refresh also rewrites restated rows in place without a fold, and the
+ * database demotes that write (`write_token`, wtg2 fold-version writer token, ruling F): fold 1 and `created_at` the
+ * write's own clock, so the same rule meets it. So a stale row whose `created_at` is later than `dueAt` is still
+ * refused, and the next interval pass restates it. One created at or before `dueAt` was due and its restate failed: it
+ * is served as stored and named on `warn`, which the writer points at its own log. The clock is the database's
+ * because `created_at` is.
+ *
+ * In-process and per instance: each server process runs its own boot pass, and `deploy/do/app.yaml` runs one server
+ * instance.
  */
-export const bootRestate: { complete: boolean; warn: (msg: string) => void } = {
+export const bootRestate: { complete: boolean; dueAt: Date | null; warn: (msg: string) => void } = {
   complete: false,
+  dueAt: null,
   warn: (): undefined => undefined,
 };
 
@@ -185,9 +197,11 @@ type Due = { workspaceId: string; entityId: string };
  * `sync-routes.ts` carries the membership rule and the arithmetic.
  *
  * It also holds only for a row of the CURRENT fold. A row from an older fold is
- * refused until the boot pass settles (`bootRestate`), and a row whose restate
- * failed is served as stored after that, its periods missing, with a warning
- * naming the ticket (wtg2 fold-version bootstrap, `bootstrapTicket`).
+ * refused until the boot pass settles (`bootRestate`), and after it too when the
+ * row was created after the pass read its due set (an old instance's write during
+ * a rolling deploy). A row whose restate failed is served as stored after the
+ * pass, its periods missing, with a warning naming the ticket (wtg2 fold-version
+ * bootstrap and overlap, `bootstrapTicket`).
  *
  * `proj_tickets` happens to be maintained by the same reducer today, which is
  * precisely why reading it would be an invisible mistake — it would agree until
@@ -283,9 +297,16 @@ export async function runSnapshotPass(
      * unfoldable ticket cannot leave every stale ticket after it unrestated once `bootRestate` is complete).
      */
     onTicketError?: (ticketId: string, err: unknown) => void;
+    /**
+     * When given, the pass reads the DATABASE clock immediately before its due query and hands it here (wtg2
+     * fold-version overlap): a row created after that instant is one this pass did not see. The boot pass passes it
+     * (`bootRestate.dueAt`).
+     */
+    onDueAt?: (at: Date) => void;
   } = {},
 ): Promise<{ written: Array<{ entityId: string; seq: number }> }> {
   const minEvents = opts.minEvents ?? DEFAULT_MIN_EVENTS;
+  if (opts.onDueAt !== undefined) opts.onDueAt((await pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t);
   // Due: the head ran `minEvents` past the LATEST snapshot, or that latest row was written by an older fold (wtg2 T9).
   // `DISTINCT ON` picks the latest row per ticket, and that is load-bearing: superseded rows are never deleted (below),
   // so a `fold_version < $2` over every row would keep a restated ticket due on every pass after its restate.
@@ -364,8 +385,11 @@ export async function runSnapshotPass(
  * open on its own.
  *
  * The FIRST pass it starts is the boot pass (wtg2 fold-version bootstrap): when
- * that pass settles, however it ended, it sets `bootRestate.complete`, and from
- * then on a stale row is served as stored and reported on `log`.
+ * that pass settles, however it ended, it sets `bootRestate.complete` and
+ * `bootRestate.dueAt` (the database clock it read before its due query), and from
+ * then on a stale row created at or before `dueAt` is served as stored and
+ * reported on `log`; one created after it is still refused (wtg2 fold-version
+ * overlap).
  *
  * The returned stop function is the whole shutdown story this module owns —
  * `apps/server/src/index.ts` has no SIGTERM handler and no `pool.close()`, so
@@ -385,17 +409,30 @@ export function startSnapshotWriter(
     // re-entrant) settling first must not declare the boot restate done.
     const boot = first;
     first = false;
+    let dueAt: Date | null = null;
     void runSnapshotPass(pool, {
       minEvents: opts.minEvents,
       onTicketError: (ticketId, err) => {
         log(`snapshot pass: ticket ${ticketId} failed: ${String(err)}`);
       },
+      ...(boot
+        ? {
+            onDueAt: (at: Date) => {
+              dueAt = at;
+            },
+          }
+        : {}),
     })
       .catch((err: unknown) => {
         log(`snapshot pass failed: ${String(err)}`);
       })
       .finally(() => {
-        if (boot) bootRestate.complete = true;
+        // Together: a reader never sees the pass complete with an earlier pass's `dueAt`, and a pass that failed before
+        // its clock read publishes `null` (every stale row then served as stored, ruling D).
+        if (boot) {
+          bootRestate.dueAt = dueAt;
+          bootRestate.complete = true;
+        }
       });
   };
   // `immediate` (wtg2 T9): one pass now, before the first tick, so a deploy that bumps `TICKET_FOLD_VERSION` restates
