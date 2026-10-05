@@ -17,13 +17,14 @@ const row = (ticketId: string, extra: Partial<DraftRow> = {}): DraftRow => ({
 });
 const listRows = { getTickets: async () => ({ projectId: 'p1', rows: [{ ticketId: 'a', stateId: 'backlog', rank: 'a0' }] }) as never };
 
-function mount(drafts: DraftRow[], opts: { phone?: boolean; ingest?: (e: never[]) => unknown } = {}) {
+function mount(drafts: DraftRow[], opts: { phone?: boolean; ingest?: (e: never[]) => unknown; parentTitleOf?: (id: string) => string | null } = {}) {
   const source = createFakeDataSource(listRows, (opts.ingest ?? ((e: unknown[]) => e.map(() => committed))) as never);
   const onOpenTicket = vi.fn();
   const onChanged = vi.fn();
   render(
     <DraftsList drafts={drafts} dataSource={source} workspaceId={WS} currentUserId="u1" typeName={(id) => (id === 'task' ? 'Task' : id)}
-      {...(opts.phone === undefined ? {} : { phone: opts.phone })} onOpenTicket={onOpenTicket} onChanged={onChanged} />,
+      {...(opts.phone === undefined ? {} : { phone: opts.phone })}
+      {...(opts.parentTitleOf === undefined ? {} : { parentTitleOf: opts.parentTitleOf })} onOpenTicket={onOpenTicket} onChanged={onChanged} />,
   );
   return { source, onOpenTicket, onChanged };
 }
@@ -49,6 +50,12 @@ describe('28.162 rows', () => {
     expect(within(rows[0]!).getByText('Waiting to sync')).toBeInTheDocument();
     expect(within(rows[1]!).queryByText('Waiting to sync')).toBeNull();
     expect(screen.getByRole('list', { name: 'Drafts' }).textContent).not.toMatch(/\b[A-Z]{2,}-\d+\b/);
+  });
+  it('28.162 a parent that is not one of these drafts (a published one) is named by the host\'s read; unknown names none', () => {
+    mount([row('d5', { parentId: 'pub1' }), row('d6', { parentId: 'pub2' })], { parentTitleOf: (id) => (id === 'pub1' ? 'Road works' : null) });
+    const rows = screen.getAllByRole('listitem');
+    expect(within(rows[0]!).getByText('under Road works')).toBeInTheDocument();
+    expect(within(rows[1]!).queryByText(/^under /)).toBeNull(); // control: the host does not know pub2's title
   });
 });
 
@@ -122,7 +129,9 @@ describe('28.167 the Discard confirm', () => {
     expect(within(dialog).getByText('2 sub-drafts will be erased too')).toBeInTheDocument();
     expect(within(dialog).getByText('2 attachments uploaded to this draft will be permanently deleted')).toBeInTheDocument();
     expect(within(dialog).getByText('Linked notes are kept and unlinked.')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Discard draft' })).toBeInTheDocument();
+    // The erasing button is the danger one (the confirm's only destructive control).
+    expect(within(dialog).getByRole('button', { name: 'Discard draft' })).toHaveClass('gn-button--danger');
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveClass('gn-button--ghost');
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('alertdialog')).toBeNull(); // Escape answered (a dialog that ignored it would leave "sent nothing" vacuous)
@@ -145,6 +154,11 @@ describe('28.167 the Discard confirm', () => {
     mount([row('lone', { attachmentCount: null })]);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Discard Draft lone' }));
     expect(screen.getByText('Attachments uploaded to this draft, if any, will be permanently deleted')).toBeInTheDocument();
+    // The boundary: ONE attachment draws its (singular) line.
+    document.body.innerHTML = '';
+    mount([row('lone', { attachmentCount: 1 })]);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Discard Draft lone' }));
+    expect(screen.getByText('1 attachment uploaded to this draft will be permanently deleted')).toBeInTheDocument();
   });
 });
 
@@ -188,8 +202,11 @@ describe('28.169 phone', () => {
     expect(menu).toHaveAttribute('aria-expanded', 'true');
     // The menu is named for its row (13.1059: no unnamed `role="menu"` in product source).
     expect(within(screen.getByRole('menu', { name: 'Actions for Draft d1' })).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Publish', 'Discard']);
+    await user.tab(); // focus leaves the button for the first item, so the return below is the handler's doing
+    expect(screen.getByRole('menuitem', { name: 'Publish' })).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).toBeNull();
+    expect(menu).toHaveFocus(); // Escape hands focus back to the button that opened the menu
     await user.click(menu);
     await user.click(screen.getByRole('menuitem', { name: 'Publish' }));
     expect(source.ingested[0]![0]!.type).toBe('ticket.published');

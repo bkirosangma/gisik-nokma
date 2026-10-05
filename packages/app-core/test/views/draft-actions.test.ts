@@ -83,6 +83,17 @@ describe('28.161 outcomes', () => {
     }
   });
 
+  it('28.161 a Backlog read that fails is unreachable and publishes nothing (no rank guessed from an empty list)', async () => {
+    const source = createFakeDataSource(
+      { getTickets: async () => { throw new Error('socket'); } },
+      ((events: never[]) => events.map(() => committed)) as never,
+    );
+    expect(await publishDraft(source, make, input)).toEqual({
+      status: 'unreachable', message: 'Could not publish this draft. Check your connection and try again.',
+    });
+    expect(source.ingested).toEqual([]);
+  });
+
   it('28.161 discardDraft sends exactly one ticket.discarded for the ticket', async () => {
     const source = createFakeDataSource({}, (events) => events.map(() => committed));
     expect(await discardDraft(source, make, input)).toEqual({ status: 'committed' });

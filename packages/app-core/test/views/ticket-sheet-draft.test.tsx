@@ -127,6 +127,11 @@ describe('28.172 tabs and comments', () => {
     await act(async () => { ds.pushStreamItem(handle.anyFrame()); });
     await waitFor(() => expect(screen.queryByRole('tab', { name: 'History' })).toBeNull(), { timeout: 4_000 });
     expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+    // Published again: History is offered, but the old choice was forgotten, so it does not come back unasked.
+    current = ticketRead();
+    await act(async () => { ds.pushStreamItem(handle.anyFrame()); });
+    expect(await screen.findByRole('tab', { name: 'History' }, { timeout: 4_000 })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
   });
   it('28.172 control: the published ticket has all three tabs and its comment composer', async () => {
     renderSheet(source({ getTicket: async () => ticketRead() }));
@@ -217,7 +222,9 @@ describe('28.174 Publish from the sheet', () => {
   it('28.174 a refusal is shown verbatim and the pill stays; an unanswered publish says the plan sentence', async () => {
     renderSheet(source({ getTicket: async () => draftRead() }, (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'draft.parent-unpublished', reason: 'Publish the parent first' }))));
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Publish' }));
-    expect(await screen.findByText(/Publish the parent first/)).toBeInTheDocument();
+    // Verbatim, in the sheet's own refusal slot (the server's sentence, rule and reason), not in the banner's notice.
+    const refusal = await screen.findByText('Refused by the server: draft.parent-unpublished: Publish the parent first');
+    expect(refusal.closest('.gn-draft-banner')).toBeNull();
     expect(within(screen.getByTestId('sheet-crumb-ticket')).getByText('Draft')).toBeInTheDocument();
     cleanup();
     const { onDraftChanged } = renderSheet(source({ getTicket: async () => draftRead() }, () => { throw new Error('socket'); }));

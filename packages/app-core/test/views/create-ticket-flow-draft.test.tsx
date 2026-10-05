@@ -6,7 +6,7 @@ import type { SubmittedEvent } from '@gisik-nokma/domain';
 import { OfflineAcceptError } from '../../src/replica/replica-data-source.js';
 import { CreateTicketFlow } from '../../src/views/create-ticket-flow.js';
 import { DraftSavedToast } from '../../src/views/draft-saved-toast.js';
-import { addPendingDraft, mergeDrafts, pendingDraftsOf, resetPendingDrafts, useMyDrafts } from '../../src/views/draft-optimism.js';
+import { addPendingDraft, mergeDrafts, pendingDraftsOf, removePendingDraft, resetPendingDrafts, useMyDrafts } from '../../src/views/draft-optimism.js';
 import type { DraftRow } from '../../src/view-types.js';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
 import { WS } from '../helpers/seed.js';
@@ -97,6 +97,11 @@ describe('28.156 a saved draft', () => {
     const { result } = renderHook(() => useMyDrafts(source, WS));
     await waitFor(() => expect(result.current.data).toEqual([other, { ...mine, pending: false }]));
     await waitFor(() => expect(pendingDraftsOf(WS)).toEqual([other])); // pruned once the list named it; the other stays
+    // The second-element leg of the remove: dropping the LAST row keeps the first (a remove that dropped the head
+    // passed the prune above, where the pruned row was the head).
+    addPendingDraft(WS, mine);
+    removePendingDraft(WS, other.ticketId);
+    expect(pendingDraftsOf(WS)).toEqual([mine]);
   });
 });
 

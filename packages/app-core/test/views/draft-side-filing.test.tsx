@@ -145,4 +145,36 @@ describe('28.173 draft-side filing', () => {
     expect(pubChild.payload).toMatchObject({ parentId: TICKET, start: 'focus' });
     expect(pubChild.payload).not.toHaveProperty('draft');
   });
+
+  it("28.173 a draft's OUTGOING link is already on its own stream (no from); the sheet hands the Links section its draft flag", async () => {
+    const user = userEvent.setup();
+    const pickS = async (kind: string) => {
+      await user.click(await screen.findByRole('button', { name: 'Add link' }));
+      await user.click(screen.getByRole('button', { name: /Link type/ }));
+      await user.click(await screen.findByRole('option', { name: kind }));
+      await user.type(screen.getByLabelText('Find a ticket'), 'Su');
+      await user.click(await screen.findByRole('button', { name: 'RP-9 Survey' }));
+    };
+    const hits = async () => [{ ticketId: S, projectId: 'p', key: 'RP-9', title: 'Survey' }];
+    // "Blocks S" from the draft: the stored source is the draft itself, so the ordinary form, on D, with no `from`.
+    const out = committing({ getTicketLinks: async () => [] });
+    render(<Harness dataSource={out} workspaceId={WS} ticketId={D} canEdit make={make} isDraft queryTickets={hits} />);
+    await pickS('Blocks');
+    await waitFor(() => expect(filed(out)).toEqual([[D, 'ticket.link_added', { kind: 'blocks', targetId: S }]]));
+    cleanup();
+    // Through the SHEET (not the section alone): a draft's sheet files "Is blocked by S" on the draft's stream.
+    const sheet = committing({
+      getTicket: async () => sheetRead(true),
+      getTicketLinks: async () => [],
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [{ id: 'user_kiro', name: 'Kiro', role: 'owner' }],
+      getTicketTypes: async () => [{ id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errand', fields: [] }],
+    });
+    render(
+      <TicketSheet dataSource={sheet} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={() => {}}
+        editorSlot={editorSlot} workspaceName="Roads Co" projectName="Roads" queryTickets={hits} />,
+    );
+    await pickS('Is blocked by');
+    await waitFor(() => expect(filed(sheet)).toEqual([[TICKET, 'ticket.link_added', { kind: 'blocks', targetId: TICKET, from: S }]]));
+  });
 });

@@ -110,4 +110,10 @@ describe('28.197 a draft\'s pending children on its sheet', () => {
     expect(screen.queryByText('Joins when published')).toBeNull();
     expect(screen.queryByText(/Pave the lane/)).toBeNull();
   });
+  it('28.197 a child the page already files under D is listed once, as a child, even while a stale read still holds it pending', async () => {
+    const stale = read({ key: null, draft: true }, { stateId: 'backlog', stateCategory: 'open', pendingChildren: [C1] });
+    mount(world(() => stale, () => [row(C1, 'RP-11', 'Order the kerbs', { parentId: TICKET })]), TICKET);
+    await waitFor(() => expect(listed()).toEqual([`subtask-${C1}`]));
+    expect(screen.queryByText('Joins when published')).toBeNull();
+  });
 });

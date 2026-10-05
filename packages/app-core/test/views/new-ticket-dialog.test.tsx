@@ -1950,6 +1950,20 @@ describe('13.1435–13.1441 the Starting status select', () => {
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ stateId: 'doing' }));
   });
 
+  it('28.153 Save as draft sends no stateId even with Backlog OFF and a status chosen (a draft is born in the backlog)', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    render(<NewTicketDialog {...baseProps({ onCreate })} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    await user.click(backlogSwitch());
+    await user.click(statusTrigger());
+    await user.click(await screen.findByRole('option', { name: 'Doing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate.mock.calls[0]?.[0]).toMatchObject({ draft: true, start: 'backlog' });
+    expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('stateId');
+  });
+
   it('13.1440 initialSelection pre-fills the type and status and switches "Starts in the backlog?" OFF, and an unmatched workflow is ignored entirely (control, same dialog)', () => {
     const { rerender } = render(
       <NewTicketDialog

@@ -75,7 +75,8 @@ export function DraftsList(props: DraftsListProps): ReactElement {
   };
 
   const visible = drafts.filter((d) => !hidden.has(d.ticketId));
-  if (visible.length === 0 && alert === null) return <p className="gn-drafts__empty">{DRAFTS_EMPTY}</p>;
+  // An alert is set only with its row restored and is drawn inside that row, so an empty list has no alert to keep.
+  if (visible.length === 0) return <p className="gn-drafts__empty">{DRAFTS_EMPTY}</p>;
 
   const parentTitle = (draft: DraftRow): string | null =>
     draft.parentId === null
