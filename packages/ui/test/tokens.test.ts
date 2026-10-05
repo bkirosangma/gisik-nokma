@@ -1681,7 +1681,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
  * different questions.
  *
  * **The bar carries DATA, so it owes a ratio.** `WorkflowState.category` is
- * `'open' | 'active' | 'terminal'` (`packages/domain/src/workflow.ts:3-7`) — the
+ * `'open' | 'active' | 'terminal'` (`packages/domain/src/workflow.ts:4-8`) — the
  * bar is the only thing on the chip that says WHICH category, so it is a
  * non-text element conveying information and WCAG 1.4.11 holds it to 3:1
  * against what it sits on. It is measured against the COMPOSITE, because the

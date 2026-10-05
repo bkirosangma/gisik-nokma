@@ -24,7 +24,7 @@ import {
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import type { TicketLinkKind } from './events/ticket-events.js';
-import { DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
+import { DECISION_TYPE_ID, DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
 import { isRedactedTicketCreated, isRedactedTicketPublished } from './purge.js';
 // `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
 // ticket vocabulary: Plan 2 shipped it there because the engine parses it, and
@@ -319,7 +319,7 @@ export function applyTicketEvent(
       if (!category) {
         throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${p.to}"`);
       }
-      return {
+      const moved: TicketState = {
         ...state,
         stateId: p.to,
         stateCategory: category,
@@ -364,6 +364,9 @@ export function applyTicketEvent(
         // have to walk the log per candidate on every hourly run.
         reopenedAt: null,
       };
+      // PS-2's last rule (wtg2 T8): the flow's loop reset of a Decision releases its current outcome and leaves `passes`
+      // alone, so the next choice opens the next pass. Only `reopened-by-flow`, and only on a Decision (29.206).
+      return p.cause?.kind === 'reopened-by-flow' && moved.typeId === DECISION_TYPE_ID ? releaseOutcome(moved) : moved;
     }
     case 'ticket.assigned': {
       const p = ticketAssignedPayload.parse(env.payload);
@@ -411,7 +414,7 @@ export function applyTicketEvent(
       // The one payload in this vocabulary whose destination field genuinely IS
       // `toStateId` — the outgoing and incoming workflows are unrelated graphs,
       // so the claim names where the ticket lands rather than leaving it to be
-      // guessed (events/ticket-events.ts:151-156).
+      // guessed (events/ticket-events.ts:152-157).
       const p = ticketWorkflowReboundPayload.parse(env.payload);
       const wf = deps.getWorkflow(p.toWorkflowId);
       if (!wf) {
@@ -443,12 +446,16 @@ export function applyTicketEvent(
       // Terminal-only is the engine's door to police (Plan 3's refusal layer),
       // not the reducer's: this fold only replays what the engine already
       // accepted, per this function's own header. `stateId` is untouched — the
-      // flag and the state are orthogonal, on purpose (spec §1.2).
-      ticketClosedPayload.parse(env.payload);
-      return { ...state, closed: { actorId: env.actorId, at: env.serverTime } };
+      // flag and the state are orthogonal, on purpose (spec §1.2). The flow's "Not
+      // taken" close keeps its cause on the flag (wtg2 T8); a person's close has
+      // none, and the key is then absent rather than undefined (29.206).
+      const p = ticketClosedPayload.parse(env.payload);
+      return { ...state, closed: { actorId: env.actorId, at: env.serverTime, ...(p.cause === undefined ? {} : { cause: p.cause }) } };
     }
     case 'ticket.reopened': {
-      // The explicit reopen (spec §1.2): clears the flag, moves nothing else.
+      // The explicit reopen (spec §1.2): clears the flag, moves nothing else. A
+      // flow reopen's `reopened-by-flow` cause is provenance only here; `closed:
+      // null` drops a not-taken close's cause with the flag (wtg2 T8).
       ticketReopenedPayload.parse(env.payload);
       return {
         ...state,
@@ -634,8 +641,7 @@ function foldDecided(state: TicketState, outcome: string | null, env: EventEnvel
 
 /**
  * PS-2's last rule: a `reopened-by-flow` transition on the Decision itself releases the current outcome and leaves `passes`
- * alone, so the next choice opens the next pass. Nothing calls this until T8 wires the transition arm; it is exported and
- * tested here so the seam has a name and a contract.
+ * alone, so the next choice opens the next pass. The `ticket.transitioned` arm above calls it (wtg2 T8, 29.206).
  */
 export function releaseOutcome(state: TicketState): TicketState {
   if (state.outcome === undefined) return state;
@@ -693,7 +699,7 @@ export function foldTicketToWorkflowVersion(
     //
     // The message names the id at the point the chain BROKE and no version
     // beside it, because `foldStateIdForward` reports the break-point id, not
-    // the one it started from (workflow.ts:158): on a chain longer than two
+    // the one it started from (workflow.ts:159): on a chain longer than two
     // that id can belong to a version the ticket never sat in, and naming a
     // state and a version that never coexisted is worse than naming neither.
     // Same reasoning, same wording discipline as the engine's stranded-state

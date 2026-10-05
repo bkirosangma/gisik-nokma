@@ -426,7 +426,7 @@ export type TicketSheetProps = {
    * ## Why they are PROPS and not a read, measured at `e9c1a04f`
    *
    * **`TicketRead` carries neither.** It is exactly seven fields
-   * (`view-types.ts:404-458`): `ticket`, `title`, `stateProvenance`,
+   * (`view-types.ts:409-463`): `ticket`, `title`, `stateProvenance`,
    * `assignedProvenance`, `visibility`, `parent`, `rollup`. **The count moved
    * from six to seven on 2026-09-20** when `visibility` was added, and the
    * citation was re-resolved by content in the same change set — the old
@@ -562,7 +562,7 @@ export type TicketSheetProps = {
  * EMPTY, `search` having been its last key and served 2026-09-19 (this read
  * "which now carries ONE key, `search`", corrected 2026-09-20);
  * `getTicket` maps through `mapTicketRead`
- * (`mappers.ts:1672`). So it answers, a failure is ordinary and a retry can
+ * (`mappers.ts:1677`). So it answers, a failure is ordinary and a retry can
  * clear it. **Why the branch exists did NOT change:** `data` is null on a
  * failure AND on a real absence, and an error must never render as an absence.
  *
@@ -1157,8 +1157,8 @@ export function TicketSheet({
    *
    * ## Why the list read is the honest source, measured rather than assumed
    *
-   * A child is a ticket whose `parentId` is this one (`entity-state.ts:30`), and
-   * every `ListRow` carries `parentId` (`view-types.ts:266`). Three things had
+   * A child is a ticket whose `parentId` is this one (`entity-state.ts:31`), and
+   * every `ListRow` carries `parentId` (`view-types.ts:271`). Three things had
    * to hold before deriving them here rather than adding a route, and all three
    * were measured:
    *
@@ -1208,7 +1208,7 @@ export function TicketSheet({
    * NAME on the `Type` row.
    *
    * **`state.typeId` is a domain concept; the word "Defect" is not in the ticket
-   * at all.** The id is what the state carries (`entity-state.ts:29`), and the
+   * at all.** The id is what the state carries (`entity-state.ts:30`), and the
    * ladder is the one place a person-readable name lives —
    * `getTicketTypes(workspaceId)` (`data-source.ts:147`, the thirteenth method),
    * which the sheet did not previously read.
@@ -2552,7 +2552,7 @@ export function TicketSheet({
    * They are NOT all the same kind of thing, and rendering them as though they
    * were would be the defect:
    *
-   * - **Type** is a DOMAIN CONCEPT — `state.typeId` (`entity-state.ts:29`). The
+   * - **Type** is a DOMAIN CONCEPT — `state.typeId` (`entity-state.ts:30`). The
    *   human name is not on the ticket at all, so it comes from the workspace's
    *   type ladder (`ticketTypes` above), falling back to the ID — the same
    *   fallback `readMyWork`'s project names use, and for the same reason: an id
@@ -2739,7 +2739,7 @@ export function TicketSheet({
    * `ClientStateCache` — and that is the difference between this and
    * `precheck.ts`.** That module's own docblock records that it may not answer
    * `passed` for `ticket.created` or `ticket.reparented` because this client's
-   * cache holds *"no ticket-type store"* (`precheck.ts:251-267`), so no accept
+   * cache holds *"no ticket-type store"* (`precheck.ts:261-277`), so no accept
    * is derivable there. Here the definitions ARE held, the empty-vs-unread
    * distinction above is what keeps that honest, and the answer decides only
    * what to OFFER — never whether the event will be accepted, which stays the
@@ -2763,7 +2763,7 @@ export function TicketSheet({
    * Add a subtask (door F, 2026-09-19) — the ordinary `ticket.created` with a
    * parent, through the ingest the sheet already uses. **No route, no
    * migration**: `ticketCreatedPayload` has carried `parentId` since it was
-   * written (`packages/domain/src/events/ticket-events.ts:44`).
+   * written (`packages/domain/src/events/ticket-events.ts:45`).
    *
    * **`start: 'focus'`, transcribed rather than chosen.** The prototype births
    * a subtask in the workflow's FIRST state (`col: states[0].key`,

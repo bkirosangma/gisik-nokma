@@ -234,8 +234,13 @@ export type ClaimProvenance = {
   serverTime: string;
 };
 
-/** Owner decision: a reopen carries its cause; boards render it, never an anonymous flip. */
-export type TransitionCause = { kind: 'reopened-for-child'; childTicketId: string };
+/**
+ * Owner decision: a reopen carries its cause; boards render it, never an anonymous flip. The flow kinds (wtg2 T8) arrive
+ * as their kind only (the server and the replica serve `viewerSafeCause`), and the board draws no chip for them yet.
+ */
+export type TransitionCause =
+  | { kind: 'reopened-for-child'; childTicketId: string }
+  | { kind: 'led-to' | 'reopened-by-flow' | 'branch-not-taken' };
 
 /**
  * Derived child progress as shown to a viewer (prompt-pinned spelling).

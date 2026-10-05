@@ -94,7 +94,7 @@ export type AttentionStripProps = {
  *    an empty list is the honest rendering of that. **This rule used to rest
  *    on a SECOND fact that has expired** — that the strip "cannot presently
  *    contain a contested claim at all (`mapAttention` refuses …)"; where
- *    `mappers.ts:1935-1945` maps a contest's `title` today, so it can.
+ *    `mappers.ts:1940-1950` maps a contest's `title` today, so it can.
  *
  * The list is FLAT rather than sectioned per kind for the same reason: a
  * sectioned strip has to decide what to draw under a heading with no rows, and

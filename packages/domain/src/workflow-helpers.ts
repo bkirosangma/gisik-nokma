@@ -8,7 +8,7 @@ import { BACKLOG_STATE_ID, statesWithBacklog } from './workflow.js';
  *
  * `TicketState.stateCategory` is denormalized from the ticket's workflow so the
  * parent-terminal invariant needs no per-child workflow lookup
- * (`entity-state.ts:12-13`). Denormalized means *derived*, and this is the one
+ * (`entity-state.ts:13-14`). Denormalized means *derived*, and this is the one
  * derivation: every place that writes a `stateCategory` — the reducer on
  * creation, on transition and on rebind, and the refresh-on-publish fold — asks
  * this function rather than reaching into `def.states` itself, so a ticket's

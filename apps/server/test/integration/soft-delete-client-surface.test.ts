@@ -262,7 +262,7 @@ async function directoryTicketCount(): Promise<number> {
  * valid parent of a `task` under the engine's `hierarchy.rank` rule is a bigger
  * kind of work, which in this workspace's seeded types is the epic. So the
  * parent's rollup is reachable on exactly one client surface, and this reads
- * that one. (`ListRow.rollup` — `view-types.ts:301`.)
+ * that one. (`ListRow.rollup` — `view-types.ts:306`.)
  */
 async function parentRollup(): Promise<number | null> {
   const list = (await query().getTickets(projectId, {}, 'status')) as unknown;

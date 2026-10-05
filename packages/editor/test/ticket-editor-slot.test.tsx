@@ -50,7 +50,7 @@ describe('composeEditorSubmission', () => {
 
   it("the field_set payload carries a `value` key — the domain door refuses one that is merely absent", () => {
     const submission = composeEditorSubmission('description', DOC);
-    // `ticketFieldSetPayload` (packages/domain/src/events/ticket-events.ts:89)
+    // `ticketFieldSetPayload` (packages/domain/src/events/ticket-events.ts:90)
     // refines `value !== undefined` precisely because an absent key used to be
     // folded into a null clearing claim. Assert the KEY, not just the value.
     expect(Object.keys(submission.payload)).toContain('value');

@@ -60,7 +60,7 @@ describe('13.478-13.488 moveOutcome — the transition gate, built over transiti
   it('13.483 exact-vs-wildcard precedence follows the ENGINE, not declaration order (P27, one level up)', () => {
     // The wildcard edge is declared FIRST and carries rules; the exact edge
     // is declared SECOND and carries none. `find(exact) ?? find('*')`
-    // (`rule-engine/src/transition.ts:91-93`) means the exact edge supplies
+    // (`rule-engine/src/transition.ts:95-97`) means the exact edge supplies
     // the rules regardless of which was written first. A re-derivation that
     // scanned `def.transitions` in array order and stopped at the first
     // match reaching `to` would see the wildcard's rules first and answer

@@ -61,7 +61,7 @@ function created(id: string, typeId: string, parentId: string | null, seq = 1): 
 
 /**
  * The destination field is `to`, NOT `toStateId` — and a comment is `{ text }`,
- * not a bare string (`packages/domain/src/workflow.ts:137-145`, pre-flight A10 +
+ * not a bare string (`packages/domain/src/workflow.ts:138-146`, pre-flight A10 +
  * addendum 1). The transition LOG ENTRY these events produce separately and
  * correctly spells `toStateId`; both spellings are real and neither is a typo
  * for the other.

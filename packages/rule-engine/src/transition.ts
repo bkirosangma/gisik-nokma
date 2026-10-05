@@ -8,6 +8,7 @@ import {
   type EventEnvelope,
 } from '@gisik-nokma/domain';
 import { getTicketState } from './checks/context-helpers.js';
+import { flowCauseForgery, flowExemptEdge } from './checks/flow-cause.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import { evaluateTransitionRules } from './rules/index.js';
 import { resolveCurrentStateId } from './version-map.js';
@@ -58,6 +59,9 @@ export async function evaluateTicketTransitioned(
     };
   }
   const payload = parsed.data;
+  // wtg2 T8: a flow cause from anyone but the flow actor is forged, and says so before any other rule answers (29.203).
+  const forged = flowCauseForgery(env, payload.cause);
+  if (forged !== null) return forged;
 
   const entity = await ctx.getEntityState('ticket', env.entity.id);
   if (entity === null || entity.kind !== 'ticket') {
@@ -91,7 +95,7 @@ export async function evaluateTicketTransitioned(
       rule: REFUSAL_RULES.strandedState,
       // No version clause beside the state id, deliberately. `resolveCurrentStateId`
       // reports the id at the point the chain BROKE, not the id it started from
-      // (`foldStateIdForward`, packages/domain/src/workflow.ts:158), while
+      // (`foldStateIdForward`, packages/domain/src/workflow.ts:159), while
       // `ticket.workflowVersion` is the ticket's ORIGIN version. On a chain
       // longer than two those are different versions, so "state X of version Y"
       // named a pair that never coexisted. It coincided — and so read true — only
@@ -116,11 +120,15 @@ export async function evaluateTicketTransitioned(
 
   const fromName = statesWithBacklog(latest).find((state) => state.id === resolved.stateId)?.name ?? resolved.stateId;
   const edges = transitionsWithBacklog(latest);
-  const transition =
+  const declared =
     resolved.stateId === BACKLOG_STATE_ID
       ? universalTransitions(latest).find((t) => t.from === BACKLOG_STATE_ID && t.to === payload.to)
       : (edges.find((t) => t.from === resolved.stateId && t.to === payload.to) ??
          edges.find((t) => t.from === '*' && t.to === payload.to));
+  // PS-11 (wtg2 T8): the flow's loop reset and not-taken moves ride a synthetic, rules-less edge. Asked only when no
+  // declared edge exists (a declared one keeps its authored rules), after the closed check above and before the
+  // parent/child invariants below, which no definition and no actor can switch off.
+  const transition = declared ?? flowExemptEdge(env, latest, resolved.stateId, toState, payload.cause) ?? undefined;
   if (transition === undefined) {
     return {
       refused: true,

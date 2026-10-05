@@ -50,7 +50,7 @@ import { signInWithPhone } from '../helpers/session.js';
  * |---|---|
  * | the page builds the CLIENT filter | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:321-324` — `activeOnly ? { stateCategories: ['active'] } : {}` |
  * | the List passes it to the read | `packages/app-core/src/views/ticket-list.tsx:1196` |
- * | the mapper translates plural → SINGULAR | `packages/app-core/src/online/mappers.ts:910` |
+ * | the mapper translates plural → SINGULAR | `packages/app-core/src/online/mappers.ts:915` |
  * | `filterSpecSchema` already has the term | `packages/domain/src/filter-spec.ts:125` |
  * | the LIST route validates the query against that schema | `apps/server/src/routes/list.ts:536` |
  * | ...and compiles it | `apps/server/src/routes/list.ts:136` |
@@ -58,7 +58,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * So this case adds no surface: it drives the read the product already ships. That
  * is also why the wire spelling is SINGULAR — `stateCategory`, from
- * `mappers.ts:910`'s `singular(...)` — and why asserting the client's plural
+ * `mappers.ts:915`'s `singular(...)` — and why asserting the client's plural
  * `stateCategories` against the route would 400 rather than narrow.
  *
  * ## What the narrowing IS, exactly — and why a `todo` ticket is in the fixture

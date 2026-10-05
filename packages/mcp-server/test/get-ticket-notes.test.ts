@@ -14,7 +14,7 @@ const TICKET = `/v1/workspaces/${WS}/tickets/${T}`;
 const LINKS = `${TICKET}/links`;
 const NOTES = `${TICKET}/notes`;
 const DETAIL = { key: 'CCSO-4', title: 'Chiller', ticketState: { kind: 'ticket', id: T, fields: {} }, rollup: null };
-/** What the notes route answers per note (`NoteSummary`, `packages/domain/src/read-models.ts:900-911`): more than `get_ticket` shows. */
+/** What the notes route answers per note (`NoteSummary`, `packages/domain/src/read-models.ts:906-917`): more than `get_ticket` shows. */
 const note = (n: number) => ({
   noteId: `N${n}`, workspaceId: WS, homeProjectId: '', authorId: `U${n}`, title: `Note ${n}`, scope: { mode: 'workspace' },
   attachedTickets: [{ ticketId: T, projectId: 'P', key: 'CCSO-4', title: 'Chiller' }], deleted: false,

@@ -51,6 +51,13 @@ export const SYSTEM_ACTOR_AUTO_CLOSE = '00000000000000000000SYS0AC';
 export const SYSTEM_ACTOR_PURGE = '00000000000000000000SYS0PG';
 
 /**
+ * The workflow-graph flow (wtg Part 2, spec AP-2): files the `led-to`, `reopened-by-flow` and `branch-not-taken` events.
+ * Nobody's act, so not a person's id, for the reason `SYSTEM_ACTOR_AUTO_CLOSE` gives above; and the engine refuses a flow
+ * cause from any other actor (`cause.forged`). Case 29.202 pins the match against `ULID_REGEX`.
+ */
+export const SYSTEM_ACTOR_FLOW = '00000000000000000000SYS0FW';
+
+/**
  * The reserved actors, id → display name. A `ReadonlyMap` rather than an
  * object literal so a lookup of an arbitrary actor id cannot reach
  * `Object.prototype` — an id of `'constructor'` is not in the key space
@@ -58,14 +65,16 @@ export const SYSTEM_ACTOR_PURGE = '00000000000000000000SYS0PG';
  * arrived over the wire, and `'toString' in {}` is the shape of bug that
  * costs an afternoon.
  *
- * Two entries: `SYSTEM_ACTOR_AUTO_CLOSE` (Task 8's sweep is its one consumer; the
+ * Three entries: `SYSTEM_ACTOR_AUTO_CLOSE` (Task 8's sweep is its one consumer; the
  * name is the string the sheet's closed badge renders, and `Auto-close` is the
- * spelling spec §8.2 fixes) and `SYSTEM_ACTOR_PURGE` (the permanent-deletion
- * sweep's tombstone, trash series Plan 2).
+ * spelling spec §8.2 fixes), `SYSTEM_ACTOR_PURGE` (the permanent-deletion
+ * sweep's tombstone, trash series Plan 2) and `SYSTEM_ACTOR_FLOW` (the
+ * workflow-graph flow, wtg2 T8; "Flow" is the spelling spec AP-2 fixes).
  */
 export const SYSTEM_ACTOR_NAMES: ReadonlyMap<string, string> = new Map([
   [SYSTEM_ACTOR_AUTO_CLOSE, 'Auto-close'],
   [SYSTEM_ACTOR_PURGE, 'Permanent deletion'],
+  [SYSTEM_ACTOR_FLOW, 'Flow'],
 ]);
 
 /** Whether `id` is one of this product's reserved system actors. */

@@ -48,3 +48,31 @@ describe('29.137 redactedPayload and ticket.decided', () => {
     expect(redactedPayload('ticket.decided', 'e1', { outcome: 'Yes', closeStarted: [T] })).toEqual({ outcome: 'Yes', closeStarted: [T] });
   });
 });
+
+describe('29.208 redactedPayload phrases a flow cause the server withheld', () => {
+  it("29.208 a nulled cause ticket reads \"a ticket you can't see\" and a nulled actor \"someone you can't see\", on all three types; control: a visible cause is untouched", () => {
+    const [D, S, U, E] = ['01J9GDEC000000000000000000', '01J9GSRC000000000000000000', '01J9GACT000000000000000001', '01J9GEVT000000000000000001'];
+    const notTaken = { kind: 'branch-not-taken', decisionTicketId: D, outcome: 'No', pass: 1, decidedBy: U, decisionEventId: E };
+    // Both withheld on a close: each id is phrased by its own kind, every other member kept.
+    expect(redactedPayload('ticket.closed', 'e1', { cause: { ...notTaken, decisionTicketId: null, decidedBy: null } })).toEqual({
+      cause: { ...notTaken, decisionTicketId: "a ticket you can't see", decidedBy: "someone you can't see" },
+    });
+    // Control: the same close with both ids present is untouched (neither phrase).
+    expect(redactedPayload('ticket.closed', 'e1', { cause: notTaken })).toEqual({ cause: notTaken });
+    // One at a time, on a reopen: only the nulled member is phrased.
+    const reopened = { ...notTaken, kind: 'reopened-by-flow' };
+    expect(redactedPayload('ticket.reopened', 'e1', { cause: { ...reopened, decisionTicketId: null } })).toEqual({ cause: { ...reopened, decisionTicketId: "a ticket you can't see" } });
+    expect(redactedPayload('ticket.reopened', 'e1', { cause: { ...reopened, decidedBy: null } })).toEqual({ cause: { ...reopened, decidedBy: "someone you can't see" } });
+    // A led-to on a transition: its source and trigger, and the transition's comment is still stripped.
+    const ledTo = { kind: 'led-to', sourceTicketId: S, label: 'Yes', triggeredBy: U };
+    expect(redactedPayload('ticket.transitioned', 'e1', { to: 'todo', comment: { text: 'x' }, cause: { ...ledTo, sourceTicketId: null } })).toEqual({
+      to: 'todo', cause: { ...ledTo, sourceTicketId: "a ticket you can't see" },
+    });
+    expect(redactedPayload('ticket.transitioned', 'e1', { to: 'todo', cause: { ...ledTo, triggeredBy: null } })).toEqual({ to: 'todo', cause: { ...ledTo, triggeredBy: "someone you can't see" } });
+    // Controls: an uncaused event gains no cause key; a null cause stays null; a type that carries no flow cause is untouched.
+    expect(redactedPayload('ticket.closed', 'e1', {})).toStrictEqual({});
+    expect(redactedPayload('ticket.transitioned', 'e1', { to: 'done', cause: null })).toStrictEqual({ to: 'done', cause: null });
+    expect(redactedPayload('ticket.assigned', 'e1', { assigneeId: U, cause: { decisionTicketId: null } })).toStrictEqual({ assigneeId: U, cause: { decisionTicketId: null } });
+    expect(redactedPayload('ticket.transitioned', 'e1', { to: 'doing', cause: { kind: 'reopened-for-child', childTicketId: S } })).toEqual({ to: 'doing', cause: { kind: 'reopened-for-child', childTicketId: S } });
+  });
+});

@@ -33,7 +33,7 @@ import type { FieldClaim } from '@gisik-nokma/domain';
  * urgent rather than academic.
  *
  * **Deliberately NOT done by importing the engine's own check.**
- * `packages/rule-engine/src/index.ts:32-39` withholds `refuse()`/`ACCEPT` —
+ * `packages/rule-engine/src/index.ts:34-41` withholds `refuse()`/`ACCEPT` —
  * "a consumer outside this package has no business minting a `Refusal`" —
  * and re-deriving that vocabulary here would be the same door reopened from
  * the client side. This predicate mirrors the ENGINE'S SEMANTICS (the exact
