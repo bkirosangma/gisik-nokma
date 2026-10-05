@@ -25,9 +25,11 @@ let U = '';
 
 const W1 = newUlid();
 const W2 = newUlid();
-const P1 = newUlid();
-const P2 = newUlid();
-const P3 = newUlid();
+// Hand-built so P1 is founded FIRST but sorts LAST: the sorted answer in 30.012
+// then differs from the founding (insertion) order, and an unsorted list shows.
+const P1 = `0MWGAP${'0'.repeat(19)}2`;
+const P2 = `0MWGAP${'0'.repeat(19)}1`;
+const P3 = `0MWGAP${'0'.repeat(19)}3`;
 
 function ev(
   workspaceId: string,
@@ -103,6 +105,7 @@ describe('30.012 a workspace role administers no project by itself', () => {
       ev(W1, { kind: 'project', id: P2 }, 'project.member_added', { userId: U, projectAdmin: true }),
       ev(W1, { kind: 'project', id: P1 }, 'project.member_added', { userId: U, projectAdmin: true }),
     ]);
-    expect(await adminProjectIdsByWorkspace(tokenU)).toEqual({ [W1]: [P1, P2].sort(), [W2]: [] });
+    // P2 before P1: sorted, not the order the projects were founded or rostered in.
+    expect(await adminProjectIdsByWorkspace(tokenU)).toEqual({ [W1]: [P2, P1], [W2]: [] });
   });
 });

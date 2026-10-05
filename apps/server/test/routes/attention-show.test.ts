@@ -8,6 +8,8 @@ import {
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
 import { getWorkspaceSettings } from '../../src/projections/workspace-settings.js';
+import { requireMember } from '../../src/read/membership.js';
+import { readAttention } from '../../src/routes/attention.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -311,6 +313,16 @@ describe('30.007 show=project-admin covers the projects the viewer administers',
     // workspace role is `ws-admin`'s arm, never this one.
     const owner = await attention(tokenU, W1, '?show=project-admin');
     expect({ status: owner.status, body: owner.body }).toEqual({ status: 400, body: INVALID_QUERY });
+
+    // `readAttention` is exported, so a caller that skips the route's parse can
+    // hand it `project-admin` for a viewer who administers nothing: the arm is
+    // then `FALSE` — nothing — never the whole workspace.
+    const effW2 = await requireMember(db.pool, V, W2);
+    const direct = await readAttention(db.pool, effW2!, V, W2, SCENARIO_NOW, new Set(['project-admin']));
+    expect(direct.items).toEqual([]);
+    // CONTROL, same call shape: the same viewer's `created` arm there is not empty.
+    const control = await readAttention(db.pool, effW2!, V, W2, SCENARIO_NOW, new Set(['created']));
+    expect(control.items.map((item) => item.card.ticketId)).toEqual([tv]);
   });
 });
 
