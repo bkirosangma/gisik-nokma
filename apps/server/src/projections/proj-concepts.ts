@@ -69,9 +69,15 @@ export const projConcepts: Projection = {
       case 'concept.linked': {
         const p = conceptLinkedPayload.parse(event.payload);
         const [a, b] = linkKey(concept, p.otherId, p.relation);
+        // A link naming a deleted (or merged) end is never written. Both are terminal, and the door refuses a link to
+        // a deleted concept, so a deleted end was deleted AFTER this event — but replay runs one concept's whole
+        // stream at a time (`readLedger`'s order), so it can meet this event after the other end's delete. Skipped
+        // here or deleted there, live and a rebuild both end with no row.
         await tx.query(
           `INSERT INTO proj_concept_links (workspace_id, a, b, relation, linked_by, linked_at, origin)
-           VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+           SELECT $1, $2, $3, $4, $5, $6, $7
+            WHERE NOT EXISTS (SELECT 1 FROM proj_concepts WHERE concept_id IN ($2, $3) AND deleted = TRUE)
+           ON CONFLICT DO NOTHING`,
           [event.workspaceId, a, b, p.relation, event.actorId, event.serverTime, event.origin],
         );
         return;

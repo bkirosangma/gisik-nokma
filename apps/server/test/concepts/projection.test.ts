@@ -129,8 +129,24 @@ describe('27.443 proj_concepts folds created, renamed, described and deleted', (
     await applyCommitted(db.pool, [cev(C, 'concept.described', { summary: '' })]);
     expect(await conceptRow(C)).toMatchObject({ name: 'Scroll jumps', summary: '' });
 
+    // A delete drops every link naming the concept, at EITHER end, and keeps the other concepts' rows.
+    // The two written on ANOTHER concept's stream hold C at b and at a; 27.452's rebuild meets each after C's delete.
+    const [O1, O2, O3] = [newUlid(), newUlid(), newUlid()];
+    expect(C < O3).toBe(true); // so the related row is (C, O3)
+    await applyCommitted(db.pool, [
+      cev(O1, 'concept.created', { name: 'Narrow' }),
+      cev(O2, 'concept.created', { name: 'Wide' }),
+      cev(O3, 'concept.created', { name: 'Near' }),
+      cev(C, 'concept.linked', { otherId: O1, relation: 'broader' }), // stored (C, O1)
+      cev(O2, 'concept.linked', { otherId: C, relation: 'broader' }), // stored (O2, C)
+      cev(O3, 'concept.linked', { otherId: C, relation: 'related' }), // stored (C, O3)
+      cev(O1, 'concept.linked', { otherId: O2, relation: 'broader' }), // names no C: the control
+    ]);
+    expect(await linkRows(C)).toHaveLength(3);
     await applyCommitted(db.pool, [cev(C, 'concept.deleted', {})]);
     expect(await conceptRow(C)).toMatchObject({ name: 'Scroll jumps', deleted: true, merged_into: null });
+    expect(await linkRows(C)).toEqual([]);
+    expect(await linkRows(O1, O2)).toEqual([{ a: O1, b: O2, relation: 'broader' }]);
 
     // The INSERT's other columns: an assistant's creation from a suggestion, with no summary.
     const S = newUlid();
@@ -161,6 +177,9 @@ describe('27.444 tag and untag', () => {
       { workspace_id: world.WS, item_kind: 'ticket', item_id: world.TP, tagged_by: world.ids.memberIn, origin: 'mcp' },
     ]);
 
+    // Replay-safe: the same tag applied again (a replayed ledger, or two tabs) keeps one row, the first tagger's.
+    await applyCommitted(db.pool, [cev(C, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'author', 'web')]);
+    expect(await itemRows(C)).toHaveLength(2);
     await applyCommitted(db.pool, [cev(C, 'concept.item_untagged', { itemKind: 'note', itemId: world.NOTES.nProject })]);
     const onlyTP = [{ workspace_id: world.WS, item_kind: 'ticket', item_id: world.TP, tagged_by: world.ids.memberIn, origin: 'mcp' }];
     expect(await itemRows(C)).toEqual(onlyTP);
@@ -181,6 +200,10 @@ describe('27.445 concept links', () => {
 
     // From the HIGHER id: the related row is stored (C2, C1).
     await applyCommitted(db.pool, [cev(C1, 'concept.linked', { otherId: C2, relation: 'related' })]);
+    expect(await linkRows(C1, C2)).toEqual([{ a: C2, b: C1, relation: 'related' }]);
+
+    // The same link again (from the other side) keeps one row.
+    await applyCommitted(db.pool, [cev(C2, 'concept.linked', { otherId: C1, relation: 'related' })]);
     expect(await linkRows(C1, C2)).toEqual([{ a: C2, b: C1, relation: 'related' }]);
 
     // broader from C1 to C2 is stored as written, although C2 < C1; by an assistant, so actor and origin are the event's.
@@ -227,10 +250,12 @@ describe('27.446 merge', () => {
       cev(C1, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }),
       cev(C1, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TE }, 'author', 'mcp'),
       cev(C2, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }),
-      cev(C1, 'concept.linked', { otherId: C3, relation: 'related' }),
+      cev(C1, 'concept.linked', { otherId: C3, relation: 'broader' }), // stored (C1, C3): C1 as a
+      cev(C3, 'concept.linked', { otherId: C1, relation: 'broader' }), // stored (C3, C1): C1 as b
+      cev(C3, 'concept.linked', { otherId: C2, relation: 'broader' }), // names no C1: the control
     ]);
-    // Something for "no links" to remove.
-    expect(await linkRows(C1)).toHaveLength(1);
+    // Something for "no links" to remove, at both ends.
+    expect(await linkRows(C1)).toHaveLength(2);
 
     await applyCommitted(db.pool, [cev(C1, 'concept.merged', { intoId: C2 })]);
 
@@ -244,6 +269,7 @@ describe('27.446 merge', () => {
     expect(await conceptRow(C1)).toMatchObject({ name: 'Merged', deleted: true, merged_into: C2 });
     expect(await conceptRow(C2)).toMatchObject({ name: 'Kept', deleted: false, merged_into: null });
     expect(await conceptRow(C3)).toMatchObject({ name: 'Third', deleted: false, merged_into: null });
+    expect(await linkRows(C3)).toEqual([{ a: C3, b: C2, relation: 'broader' }]);
   });
 });
 
