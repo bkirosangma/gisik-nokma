@@ -5,7 +5,7 @@
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 G=/usr/bin/git
 BASE=release/2026-10-99
 unset CTL_DRY_RUN
@@ -130,4 +130,5 @@ check "13.1788 CONTROL — the step patterns reject a commented-out step and acc
 # --- 13.1789: the live witness, re-derived offline -----------------------------------------------------------------------------
 check "13.1789 the live witness re-derives: git merge-tree --write-tree of release/smoothness dfe7afe3 into task/sm-t13-native-loading 9a76ca1f is tree ef15dfb07a1e (says so and skips where those commits are not in this clone)" 'if $G -C "$HERE" cat-file -e 9a76ca1f^{commit} 2>/dev/null && $G -C "$HERE" cat-file -e dfe7afe3^{commit} 2>/dev/null; then t=$($G -C "$HERE" merge-tree --write-tree 9a76ca1f dfe7afe3 2>/dev/null | sed -n 1p); [ "${t:0:12}" = ef15dfb07a1e ]; else echo "       (13.1789 skipped: 9a76ca1f / dfe7afe3 are not in this clone)"; fi'
 
+ctl_test_only_end tipmerge.test.sh
 [ "$fails" -eq 0 ] && echo "tipmerge.test.sh: ok" || { echo "tipmerge.test.sh: $fails FAILED"; exit 1; }

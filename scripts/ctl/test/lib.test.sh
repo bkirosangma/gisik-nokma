@@ -6,7 +6,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 fails=0
 # `ctl gate` writes a priority marker into the machine-wide semaphore dir: every fixture gate below must write into a temp one.
 export CTL_SEM_DIR="$(mktemp -d)"
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 # node 22
 check "node22 on PATH" '[ "$(ctl_node22 >/dev/null; node --version | cut -c1-4)" = "v22." ]'
 # repo resolution: a .git DIRECTORY and a .git FILE (worktree)
@@ -367,4 +367,5 @@ check "13.1594 failure: CONTROL — with nothing failing ctl_prune reports zero"
 check "13.1594 order: rebuild.sh prunes only AFTER the last verification gate and BEFORE the final ctl_ok, and the OK line carries the prune result and the disk line" 'v="$HERE/verbs/rebuild.sh"; g=$(/usr/bin/grep -an "GOOGLE_CLIENT_ID empty" "$v" | cut -d: -f1); p=$(/usr/bin/grep -an "^if ctl_prune >>" "$v" | cut -d: -f1); o=$(/usr/bin/grep -an "^ctl_ok rebuild \"\$branch" "$v" | cut -d: -f1); [ -n "$g" ] && [ -n "$p" ] && [ -n "$o" ] && [ "$g" -lt "$p" ] && [ "$p" -lt "$o" ] && sed -n "${o}p" "$v" | /usr/bin/grep -q "\$pr, \$(ctl_disk_line)"'
 rm -rf "$pk"
 rm -rf "$tmp" "$wt"
+ctl_test_only_end lib.test.sh
 [ "$fails" -eq 0 ] && echo "lib.test.sh: ok" || { echo "lib.test.sh: $fails FAILED"; exit 1; }

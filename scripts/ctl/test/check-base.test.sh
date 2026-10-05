@@ -2,7 +2,7 @@
 # scripts/ctl/test/check-base.test.sh — ctl check-base (cases 13.2060–13.2066). Run by `ctl selftest`. A scratch repo + bare origin; nothing live is read.
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"; CTL="$HERE/ctl"; fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 T="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 G="/usr/bin/git -C $T/w"; /usr/bin/git init -q --bare "$T/o.git"; /usr/bin/git init -q -b main "$T/w"; $G remote add origin "$T/o.git"
@@ -38,4 +38,5 @@ check "13.2065 check-base, planner arm (c): a branch cut from release/knowledge-
   '[ "$(cnt origin/release/smoothness)" -lt "$(cnt origin/release/knowledge-graph)" ] && [ "$(cnt origin/release/knowledge-graph)" -lt "$(cnt origin/release/deep)" ] && o="$(cb task/c-sm release/knowledge-graph)" && printf "%s" "$o" | tail -1 | grep -q "^OK check-base" && o="$(cb task/c-deep release/knowledge-graph)" && printf "%s" "$o" | tail -1 | grep -q "^OK check-base" && ! printf "%s" "$o" | grep -q WRONG-BASE && { o2="$(cb task/from-sm release/knowledge-graph)"; [ $? = 1 ]; } && printf "%s" "$o2" | grep -q "closest=release/smoothness" && { o3="$(cb task/c-deep release/deep)"; [ $? = 1 ]; } && printf "%s" "$o3" | grep -q "^WRONG-BASE task/c-deep stated=release/deep closest=release/knowledge-graph"'
 check "13.2066 check-base, planner arm (b) FAR behind: a branch cut from release/deep's first commit, with deep 4 commits further on — more than smoothness (2) or ta (1) hold, so it is MORE commits behind its own base than behind those — is OK stated as deep; CONTROL in the same check: the fixture really is far behind (behind deep > behind smoothness > behind ta, and > 0) and the same branch stated as release/ta IS WRONG-BASE closest=release/deep" \
   'bd="$(cnt origin/task/far-deep..origin/release/deep)"; bs="$(cnt origin/task/far-deep..origin/release/smoothness)"; bt="$(cnt origin/task/far-deep..origin/release/ta)"; [ "$bd" -gt "$bs" ] && [ "$bs" -gt "$bt" ] && [ "$bt" -gt 0 ] && o="$(cb task/far-deep release/deep)" && printf "%s" "$o" | tail -1 | grep -q "^OK check-base" && ! printf "%s" "$o" | grep -q WRONG-BASE && { o2="$(cb task/far-deep release/ta)"; [ $? = 1 ]; } && printf "%s" "$o2" | grep -q "closest=release/deep"'
+ctl_test_only_end check-base.test.sh
 [ "$fails" -eq 0 ] && { echo "check-base tests: all ok"; exit 0; } || { echo "check-base tests: $fails FAILED"; exit 1; }

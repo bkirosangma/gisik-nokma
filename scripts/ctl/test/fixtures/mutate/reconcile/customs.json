@@ -1,0 +1,31 @@
+[
+ {
+  "kind": "numeric",
+  "line": 3,
+  "original": "200",
+  "alts": [
+   "2000",
+   "20"
+  ],
+  "tokenPos": [
+   {
+    "line": 3,
+    "column": 29
+   },
+   {
+    "line": 3,
+    "column": 44
+   }
+  ],
+  "switch": {
+   "start": {
+    "line": 3,
+    "column": 28
+   },
+   "end": {
+    "line": 3,
+    "column": 61
+   }
+  }
+ }
+]
