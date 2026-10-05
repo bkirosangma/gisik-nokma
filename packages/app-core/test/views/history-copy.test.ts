@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONTEST_EVENT_TYPES, TICKET_EVENT_TYPES, TICKET_LINK_KINDS, withheldLinkPayload } from '@gisik-nokma/domain';
 import type { TicketHistoryEvent } from '../../src/view-types.js';
-import { describeEvent } from '../../src/views/history-copy.js';
+import { describeEvent, historyRounds } from '../../src/views/history-copy.js';
 
 /**
  * 3.183 / E5-8 — THE CENSUS: every event type that reaches the History tab is
@@ -442,5 +442,76 @@ describe('29.137 ticket.decided in History', () => {
     expect(said({})).toBe('ticket.decided'); // control: no payload, the wire name
     expect(said({ outcome: '' })).toBe('ticket.decided');
     expect(said({ outcome: 3 })).toBe('ticket.decided');
+  });
+});
+
+describe('29.371 history copy: flow and decision sentences', () => {
+  const ev = (type: string, payload: unknown, causeTicket?: { key: string | null } | null): TicketHistoryEvent => ({
+    ...eventOf(type), payload, ...(causeTicket === undefined ? {} : { causeTicket }),
+  });
+  const names: Record<string, string> = { todo: 'To do', backlog: 'Backlog', done: 'Done' };
+  const ctx = { stateName: (id: string): string => names[id] ?? id };
+  const SRC = '01J9GTKB000000000000000000';
+  const ledTo = { kind: 'led-to', sourceTicketId: SRC, triggeredBy: 'user_anselma' };
+  const decision = (kind: string) => ({ kind, decisionTicketId: SRC, outcome: 'Yes', pass: 1, decidedBy: 'user_anselma', decisionEventId: 'dec-1' });
+
+  it('29.371 narrates led-to, reopened-by-flow and branch-not-taken, with the key, without it, and with an old server', () => {
+    const move = (cause: unknown, key?: { key: string | null } | null) => describeEvent(ev('ticket.transitioned', { to: 'todo', cause }, key), ctx);
+    expect(move(ledTo, { key: 'GN-145' })).toBe('Moved to To do automatically, because GN-145 was closed');
+    expect(move({ ...ledTo, label: 'Yes' }, { key: 'GN-145' })).toBe('Moved to To do automatically, because GN-145 was closed (Yes)');
+    expect(move(ledTo, null)).toBe('Moved to To do automatically, because an earlier step was finished');
+    expect(move(ledTo)).toBe('Moved to To do automatically, because an earlier step was finished'); // causeTicket absent
+    // what the route serves a viewer who cannot see the source (AMEND 2: the ids nulled, the keys kept)
+    expect(move({ kind: 'led-to', sourceTicketId: null, label: 'Yes', triggeredBy: null }, null)).toBe('Moved to To do automatically, because an earlier step was finished (Yes)');
+    expect(describeEvent(ev('ticket.transitioned', { to: 'backlog', cause: decision('reopened-by-flow') }, { key: 'GN-151' }), ctx)).toBe('Moved to Backlog by the flow, because GN-151 was decided Yes');
+    expect(describeEvent(ev('ticket.transitioned', { to: 'done', cause: decision('branch-not-taken') }, { key: 'GN-151' }), ctx)).toBe('Moved to Done as not taken, because GN-151 was decided Yes');
+    expect(describeEvent(ev('ticket.reopened', { cause: decision('reopened-by-flow') }, { key: 'GN-151' }))).toBe('Reopened by the flow, because GN-151 was decided Yes');
+    expect(describeEvent(ev('ticket.closed', { cause: decision('branch-not-taken') }, { key: 'GN-151' }))).toBe('Closed as not taken, because GN-151 was decided Yes');
+    const hidden = { kind: 'branch-not-taken', decisionTicketId: null, outcome: 'Yes', pass: 1, decidedBy: null, decisionEventId: 'dec-1' };
+    expect(describeEvent(ev('ticket.closed', { cause: hidden }, null))).toBe('Closed as not taken, because an earlier decision chose Yes');
+    expect(describeEvent(ev('ticket.reopened', { cause: { ...hidden, kind: 'reopened-by-flow' } }, null))).toBe('Reopened by the flow, because an earlier decision chose Yes');
+    // controls: no cause, a cause of the wrong kind for the event, and the pre-existing cause read as before
+    expect(describeEvent(ev('ticket.closed', {}))).toBe('Closed');
+    expect(describeEvent(ev('ticket.reopened', {}))).toBe('Reopened');
+    expect(describeEvent(ev('ticket.closed', { cause: decision('reopened-by-flow') }, { key: 'GN-151' }))).toBe('Closed');
+    expect(describeEvent(ev('ticket.reopened', { cause: decision('branch-not-taken') }, { key: 'GN-151' }))).toBe('Reopened');
+    expect(describeEvent(ev('ticket.transitioned', { to: 'todo', cause: { kind: 'reopened-for-child', childTicketId: SRC } }), ctx)).toBe('Moved to To do');
+  });
+
+  it('29.371 narrates the decision: first choice, revision, clearing, and a payload it cannot read', () => {
+    expect(describeEvent(ev('ticket.decided', { outcome: 'Yes' }))).toBe('Decided: Yes');
+    expect(describeEvent(ev('ticket.decided', { outcome: 'No', from: 'Yes' }))).toBe('Decision revised: Yes → No');
+    expect(describeEvent(ev('ticket.decided', { outcome: null, from: 'Yes' }))).toBe('Cleared the decision (was Yes)');
+    expect(describeEvent(ev('ticket.decided', { outcome: null }))).toBe('Cleared the decision');
+    expect(describeEvent(ev('ticket.decided', { outcome: 7 }))).toBe('ticket.decided');
+  });
+
+  it('29.371 the pass suffix is added from round 2 and never to the raw-type fallback', () => {
+    expect(describeEvent(ev('ticket.closed', {}), { round: 2 })).toBe('Closed (pass 2)');
+    expect(describeEvent(ev('ticket.closed', {}), { round: 1 })).toBe('Closed');
+    expect(describeEvent(ev('ticket.never_seen', {}), { round: 2 })).toBe('ticket.never_seen');
+  });
+});
+
+describe('29.372 historyRounds', () => {
+  const e = (id: string, type: string, payload: unknown): TicketHistoryEvent => ({ ...eventOf(type), id, payload });
+  const reset = (n: number) => ({ kind: 'reopened-by-flow', decisionTicketId: '01J9GTKB000000000000000000', outcome: 'No', pass: n, decidedBy: 'u', decisionEventId: `dec-${n}` });
+  // what the route leaves a viewer who cannot see the Decision (AMEND 2: the ids nulled, the keys kept)
+  const withheld = { kind: 'reopened-by-flow', decisionTicketId: null, outcome: 'No', pass: 2, decidedBy: null, decisionEventId: 'dec-2' };
+
+  it('29.372 counts a reset once, however its pair is split, and nothing else', () => {
+    const events = [
+      e('a', 'ticket.created', { typeId: 'task' }),
+      e('b', 'ticket.transitioned', { to: 'done' }),
+      e('c', 'ticket.reopened', { cause: reset(1) }),
+      e('d', 'ticket.transitioned', { to: 'backlog', cause: reset(1) }),
+      e('f', 'ticket.reopened', {}), // a person's reopen
+      e('g', 'ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: 'x', triggeredBy: 'u' } }),
+      e('h', 'ticket.closed', { cause: { ...reset(1), kind: 'branch-not-taken' } }),
+      e('i', 'ticket.reopened', { cause: withheld }),
+      e('j', 'ticket.transitioned', { to: 'backlog', cause: withheld }),
+    ];
+    expect(Object.fromEntries(historyRounds(events))).toEqual({ a: 1, b: 1, c: 2, d: 2, f: 2, g: 2, h: 2, i: 3, j: 3 });
+    expect(historyRounds([])).toEqual(new Map());
   });
 });
