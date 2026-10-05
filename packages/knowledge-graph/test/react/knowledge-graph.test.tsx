@@ -10,7 +10,7 @@ import { fakeRenderer } from './fake-renderer.js';
 import { fixtureSource, type FixtureOptions } from './fixture/fixture-source.js';
 
 /*
- * The view over a fake renderer (cases 27.313–27.326, 27.365–27.367). The source is a test-only copy of the browser harness's
+ * The view over a fake renderer (cases 27.313–27.326, 27.365–27.367, 27.661–27.664). The source is a test-only copy of the browser harness's
  * fixture (the owner-approved mockup's world, centred on GN-142). Every count below is a LITERAL, read off the fixture by
  * an independent brute-force BFS over its raw edge table (roles/mut-out/kg-c-t7-view/oracle.py), never by `zones`.
  */
@@ -626,6 +626,96 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     const one = setup({ hops: 1 });
     await drawn(one.fake, T('t125'));
     expect(count()).toBe('11 items within 1 hop, 11 more in the fog');
+  });
+});
+
+describe('KnowledgeGraph: the empty state and the scope note name their cause (KV7 follow-up)', () => {
+  const chipsOff = "Every link type is turned off. Turn one on to see GN-142's links.";
+  const workspacesNote = 'GN-142 is outside the workspaces you picked. It stays in the middle, and its links follow your scope.';
+  const projectsNote = 'GN-142 is outside the projects you picked. It stays in the middle, and its links follow your scope.';
+  const scopeNote = () => document.querySelector('.gn-kg__scope-note')!.textContent;
+  /** Turns every chip off, one click each, and proves they all read off. */
+  async function everyChipOff(user: ReturnType<typeof userEvent.setup>) {
+    const n = document.querySelectorAll('.gn-kg__chip').length;
+    expect(n).toBe(CHIP_GROUPS.length);
+    for (let i = 0; i < n; i++) await user.click(document.querySelectorAll('.gn-kg__chip')[i]!);
+    await settle();
+    expect([...document.querySelectorAll('.gn-kg__chip')].map((b) => b.getAttribute('aria-pressed'))).toEqual(CHIP_GROUPS.map(() => 'false'));
+  }
+  const lonely = (center: GraphItemView): GraphSource => ({
+    ring: async (q): Promise<GraphRingResponse> => ({ hop: q.hops, center: { ...center, hop: 0 }, items: [], edges: [], frontier: [], truncated: false, cursor: null }),
+  });
+
+  it('27.661 every chip off with a centre that has links: the chips-off sentence and no Add link; control: Blocks back on draws its link and the empty block is gone', async () => {
+    const onAddLink = vi.fn();
+    const { fake } = setup({ onAddLink });
+    await drawn(fake, T('t126'));
+    const user = userEvent.setup();
+    await everyChipOff(user);
+    expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe(chipsOff);
+    expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull(); // t142 is a ticket and onAddLink is given: only the state hides it
+    expect(fake.last().edges).toEqual([]);
+    // control: one chip back on
+    await user.click(screen.getByRole('button', { name: /^Blocks/ }));
+    await settle();
+    expect(fake.last().edges.filter((e) => e.grp === 'blocks').map((e) => e.id)).toContain('blocks|ticket:t133|ticket:t142');
+    expect(document.querySelector('.gn-kg__empty')).toBeNull();
+    expect(screen.queryByText(chipsOff)).toBeNull();
+  });
+
+  it('27.662 a ticket centre with no links: Nothing is linked and Add link, with every chip on and with every chip off; control: the chips-off case does not say Nothing is linked', async () => {
+    const onAddLink = vi.fn();
+    setup({ centre: T('t9'), onAddLink }, { source: lonely(item('t9', { label: 'GN-9', ws: 'gn', project: 'j_mw' })) });
+    expect(await screen.findByText('Nothing is linked to GN-9 yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add link' })).toBeInTheDocument();
+    expect(screen.queryByText("Every link type is turned off. Turn one on to see GN-9's links.")).toBeNull();
+    // every chip off does not make a lonely centre look filtered: it still has nothing linked
+    const user = userEvent.setup();
+    await everyChipOff(user);
+    expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe('Nothing is linked to GN-9 yet.');
+    await user.click(screen.getByRole('button', { name: 'Add link' }));
+    expect(onAddLink).toHaveBeenCalledWith(expect.objectContaining({ ref: T('t9') }));
+    cleanup();
+    // control: the centre with links, every chip off
+    const { fake } = setup({ onAddLink });
+    await drawn(fake, T('t126'));
+    await everyChipOff(userEvent.setup());
+    expect(await screen.findByText(chipsOff)).toBeInTheDocument();
+    expect(screen.queryByText('Nothing is linked to GN-142 yet.')).toBeNull();
+  });
+
+  it('27.663 Gisik Nokma removed from Workspaces: the note says workspaces; control: the same centre with only Workflows picked says projects', async () => {
+    const { fake, fx } = setup();
+    await drawn(fake, T('t126'));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Remove Gisik Nokma' }));
+    await waitFor(() => expect(fx.log.at(-1)!).toMatchObject({ workspaceIds: ['st'], projectIds: [] }));
+    await waitFor(() => expect(scopeNote()).toBe(workspacesNote));
+    cleanup();
+    // control: GN-142's workspace is in, its project (Mobile web) is not
+    const p = setup();
+    await drawn(p.fake, T('t126'));
+    const u2 = userEvent.setup();
+    await u2.click(screen.getByRole('button', { name: /Projects/ }));
+    await u2.click(await screen.findByRole('option', { name: 'Workflows' }));
+    await u2.keyboard('{Escape}');
+    await waitFor(() => expect(p.fx.log.at(-1)!).toMatchObject({ workspaceIds: ['gn', 'st'], projectIds: ['j_wf'] }));
+    await waitFor(() => expect(scopeNote()).toBe(projectsNote));
+  });
+
+  it('27.664 both excluded (Website picked, then Gisik Nokma removed): the note says workspaces, the outer scope; control: a centre in scope has no note', async () => {
+    const { fake, fx } = setup();
+    await drawn(fake, T('t126'));
+    expect(scopeNote()).toBe(''); // after ring 1, so the centre item is held: the in-scope arm, not the not-yet-loaded one
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Projects/ }));
+    await user.click(await screen.findByRole('option', { name: 'Website' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(fx.log.at(-1)!).toMatchObject({ workspaceIds: ['gn', 'st'], projectIds: ['j_web'] }));
+    await waitFor(() => expect(scopeNote()).toBe(projectsNote));
+    await user.click(screen.getByRole('button', { name: 'Remove Gisik Nokma' }));
+    await waitFor(() => expect(fx.log.at(-1)!).toMatchObject({ workspaceIds: ['st'], projectIds: ['j_web'] }));
+    await waitFor(() => expect(scopeNote()).toBe(workspacesNote));
   });
 });
 
