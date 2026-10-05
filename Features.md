@@ -3886,6 +3886,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part2-model T10 bullet -->
 - ⚙️ **Flow analysis** (wtg2 T10; `packages/domain/src/flow/{types,analysis,graph,node}.ts`) — pure, clock-free functions over a ticket's "leads to" links: Start and End tickets, loop-closing edges, flow order, the effective graph after a Decision's choice, the live set, loop bodies and branches, and the single `FlowNode` shape every flow feature reads. Cases 29.180-29.186.
 <!-- wtg-part2-model T11 bullet -->
+- ⚙️ **The flow planner** (wtg2 T11; `packages/domain/src/flow/plan.ts`) — plans every ticket in a flow as inclusive IST-day intervals: explicit dates win, otherwise the ticket starts the day after its predecessors end (earliest, or latest with Wait for all) and lasts its estimate; loops get a planned interval per pass, an un-chosen branch is a pruned ghost, and a reason is given for every ticket left unscheduled. Cases 29.190-29.199.
 <!-- wtg-part2-model T12 bullet -->
 <!-- wtg-part2-model T13 bullet -->
 <!-- wtg-part2-model T14 bullet -->
