@@ -21,7 +21,7 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 - ✅ **30.012 — a workspace role administers no project by itself:** the owner U, on no roster, gets `[]` in both workspaces. Control: given `projectAdmin` rows on P2 and P1, the same owner gets both, sorted.
 - ✅ **30.012b — `mapWorkspaceRefs` always sets `adminProjectIds`:** a row carrying `['P1']` maps to `['P1']`; a row without the key maps to `[]` with the key present; a non-array value and a non-string member are refused, naming the field. `packages/app-core/test/online/mappers.test.ts`.
 
-## 30.2 Contests take the same `show` (T1, plan AMEND 16:26)
+### Contests take the same show (T1, plan AMEND 16:26)
 
 - ✅ **30.059 — `GET /v1/contests?show=created,assigned` returns only the contests on tickets V created or is assigned to** (tc, ta); `show=assigned` is ta alone; `show=ws-admin` on W1 is every contest V may see. Control: with no `show`, every contest V may see (tc, ta, tp, tw; th's is hidden by `canSee`). `apps/server/test/routes/attention-show.test.ts`.
 - ✅ **30.060 — contests refuse what the attention route refuses, with the same body:** `show=ws-admin` on W2 (V a `member`), `show=bogus` and a repeated `show` are each **400 `{error:'invalid_query'}`**. Control: `show=created` on W2 answers 200.
