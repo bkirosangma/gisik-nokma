@@ -177,6 +177,24 @@ describe('27.475 manage_concept', () => {
     expect(f.batches.map((batch) => batch.map(shape))).toEqual([[{ entity: { kind: 'concept', id: E }, type: 'concept.merged', payload: { intoId: D } }]]);
   });
 
+  it('27.475 a missing argument is named before anything is read or posted; control: the same call with it posts', async () => {
+    const f = fake();
+    const manage = tool('manage_concept', f.session);
+    await expect(manage.handler({ action: 'create', name: 'Ledgers' })).rejects.toThrowError(/^create needs workspaceId and name$/);
+    await expect(manage.handler({ action: 'create', workspaceId: WS })).rejects.toThrowError(/^create needs workspaceId and name$/);
+    for (const action of ['rename', 'describe', 'merge', 'delete']) {
+      await expect(manage.handler({ action })).rejects.toThrowError(new RegExp(`^${action} needs conceptId$`));
+    }
+    expect([f.gets, f.batches]).toEqual([[], []]);
+    await expect(manage.handler({ action: 'rename', conceptId: C })).rejects.toThrowError(/^rename needs name$/);
+    await expect(manage.handler({ action: 'describe', conceptId: C })).rejects.toThrowError(/^describe needs summary$/);
+    await expect(manage.handler({ action: 'merge', conceptId: C, confirm_name: 'Scroll' })).rejects.toThrowError(/^merge needs intoId$/);
+    expect(f.batches).toEqual([]);
+    // Control: each with its argument posts.
+    await manage.handler({ action: 'describe', conceptId: C, summary: '' });
+    expect(f.batches.map((batch) => batch.map(shape))).toEqual([[{ entity: { kind: 'concept', id: C }, type: 'concept.described', payload: { summary: '' } }]]);
+  });
+
   it('27.475 a refusal in the merge comes back in the server\'s words, with its index', async () => {
     const f = fake(ROUTES, { results: [
       { status: 'committed', eventId: 'e1', seq: 1, serverTime: '2026-10-05T10:00:00.000Z' },

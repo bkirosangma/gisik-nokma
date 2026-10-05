@@ -5,11 +5,12 @@
  * The world is `seedNotesFixture` around seven people who signed in over the wire first (its `userIds`), so each
  * can call the API with a bearer; `outsider` signed in and belongs to no workspace. Concepts are seeded with
  * `applyCommitted` (the door is SL3's and is tested there):
- * - CP tags TP (created by the owner over MCP, tagged by `author` over the web), linked `related` to CW and CE and
+ * - CP tags TP (created by the owner over MCP, tagged by `author` from the desktop app), linked `related` to CW and CE and
  *   `broader` to C0 (C0 is broader than CP);
  * - CW tags nWorkspace; CE tags TE (explicit `[guestListed]`); C0 tags nothing; CM tags nWorkspace AND TE (a MIXED
  *   concept: `memberIn` sees only nWorkspace, `guestListed` only TE, so `every` and `some` answer differently).
  * - CP < CW and CP < CE, minted as a sorted triple: a `related` row is written by the lower id (R1, the table's CHECK).
+ * - CD is deleted, and CF lives in another workspace: neither may reach anyone here.
  *
  * Who reads what (Rule A, planner ruling 2026-10-04, report Q1): every member and admin reads every founded project,
  * so `memberOut` READS TP; the owner reads everything; guests read explicit lists only (`guestListed`: TE). Every
@@ -41,6 +42,8 @@ let CW: string;
 let CE: string;
 const C0 = newUlid();
 const CM = newUlid();
+const CD = newUlid();
+const CF = newUlid();
 
 const NOT_FOUND = '{"error":"not_found"}';
 const INVALID = { error: 'invalid_query' };
@@ -81,7 +84,7 @@ beforeAll(async () => {
   [CP, CW, CE] = [newUlid(), newUlid(), newUlid()].sort() as [Ulid, Ulid, Ulid];
   await applyCommitted(db.pool, [
     cev(CP, 'concept.created', { name: 'Licences' }, 'owner', 'mcp'),
-    cev(CP, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'author'),
+    cev(CP, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'author', 'desktop'),
     cev(CW, 'concept.created', { name: 'Workspace notes' }),
     cev(CW, 'concept.item_tagged', { itemKind: 'note', itemId: world.NOTES.nWorkspace }),
     cev(CE, 'concept.created', { name: 'Invoices' }),
@@ -93,6 +96,9 @@ beforeAll(async () => {
     cev(CP, 'concept.linked', { otherId: CW, relation: 'related' }),
     cev(CP, 'concept.linked', { otherId: CE, relation: 'related' }),
     cev(CP, 'concept.linked', { otherId: C0, relation: 'broader' }),
+    cev(CD, 'concept.created', { name: 'Gone' }),
+    cev(CD, 'concept.deleted', {}),
+    makeCommitted({ workspaceId: newUlid(), actorId: world.ids.owner, entity: { kind: 'concept', id: CF }, type: 'concept.created', payload: { name: 'Elsewhere' } }),
   ]);
 }, 120_000);
 afterAll(async () => {
@@ -161,7 +167,7 @@ describe('27.467 one concept', () => {
     const view = res.json() as Record<string, unknown>;
     const tagRow = (await db.pool.query<{ tagged_at: Date }>('SELECT tagged_at FROM proj_concept_items WHERE concept_id = $1', [CP])).rows[0];
     expect(view['items']).toEqual([
-      { kind: 'ticket', id: world.TP, label: 'CCRE-1 Renew the trade licence', taggedBy: world.ids.author, taggedAt: tagRow?.tagged_at.toISOString(), origin: 'web' },
+      { kind: 'ticket', id: world.TP, label: 'CCRE-1 Renew the trade licence', taggedBy: world.ids.author, taggedAt: tagRow?.tagged_at.toISOString(), origin: 'desktop' },
     ]);
     expect(view).toMatchObject({ id: CP, name: 'Licences', summary: '', itemCount: 1, createdBy: world.ids.owner, origin: 'mcp', workspaceId: world.WS, fromSuggestion: null });
     // CE is linked too, and memberIn cannot see TE: the link is dropped, not redacted. C0 is broader than CP.
@@ -180,6 +186,9 @@ describe('27.467 one concept', () => {
     expect(random).toEqual({ status: 404, body: NOT_FOUND });
     expect(await answer('guestUnlisted', `/v1/concepts/${CP}`)).toEqual(random);
     expect(await answer('outsider', `/v1/concepts/${CP}`)).toEqual(random);
+    expect(await answer('outsider', `/v1/concepts/${C0}`)).toEqual(random); // empty, so only the membership gate stands
+    expect(await answer('owner', `/v1/concepts/${CD}`)).toEqual(random); // deleted
+    expect(await answer('owner', `/v1/concepts/${CF}`)).toEqual(random); // another workspace
     // Control, same it: memberOut reads TP on the ref (Rule A), so reads CP.
     expect((await get('memberOut', `/v1/concepts/${CP}`)).statusCode).toBe(200);
   });
@@ -224,6 +233,8 @@ describe('27.482 the audience read refuses what the caller may not ask about', (
     expect(await answer('admin', url(`add=ticket:${world.TP}&add=ticket:${world.TE}`))).toEqual(absent); // one hidden of two
     expect(await answer('admin', url(`conceptId=${CE}&add=ticket:${world.TP}`))).toEqual(absent); // CE is hidden from the admin
     expect(await answer('admin', url(`conceptId=${newUlid()}&add=ticket:${world.TP}`))).toEqual(absent);
+    expect(await answer('owner', url(`conceptId=${CD}&add=ticket:${world.TP}`))).toEqual(absent); // deleted
+    expect(await answer('owner', url(`conceptId=${CF}&add=ticket:${world.TP}`))).toEqual(absent); // another workspace
     expect(await answer('guestListed', url(`add=ticket:${world.TE}`))).toEqual(absent); // a guest sees TE but not the roster
     expect(await answer('outsider', url(`add=ticket:${world.TP}`))).toEqual(absent);
     for (const query of ['', `add=widget:${world.TP}`, `conceptId=${CW}`, `conceptId=${CW}&conceptId=${CP}&add=ticket:${world.TP}`, `conceptId=&add=ticket:${world.TP}`]) {
@@ -261,12 +272,63 @@ describe('27.471 history', () => {
     // Paged as a ticket's history is, and refused as the concept is.
     const page = (await get('owner', `/v1/concepts/${C71}/history?afterSeq=1&limit=2`)).json() as H;
     expect(page.events.map((e) => e.type)).toEqual(['concept.item_tagged', 'concept.item_tagged']);
+    // A page holding only the tag, or only the untag, still blanks it: each type names the item on its own.
+    expect(((await get('memberIn', `/v1/concepts/${C71}/history?afterSeq=2&limit=1`)).json() as H).events.map((e) => [e.type, e.payload])).toEqual([
+      ['concept.item_tagged', { itemKind: 'ticket', itemId: '' }],
+    ]);
+    expect(((await get('memberIn', `/v1/concepts/${C71}/history?afterSeq=3&limit=1`)).json() as H).events.map((e) => [e.type, e.payload])).toEqual([
+      ['concept.item_untagged', { itemKind: 'ticket', itemId: '' }],
+    ]);
     const badPage = await get('owner', `/v1/concepts/${C71}/history?limit=0`);
     expect([badPage.statusCode, badPage.json()]).toEqual([400, { error: 'afterSeq must be a whole number from 0, and limit a whole number from 1' }]);
     const random = await answer('memberIn', `/v1/concepts/${newUlid()}/history`);
     expect(random).toEqual({ status: 404, body: NOT_FOUND });
     expect(await answer('guestUnlisted', `/v1/concepts/${C71}/history`)).toEqual(random);
     expect(await answer('outsider', `/v1/concepts/${C71}/history`)).toEqual(random);
+    expect(await answer('outsider', `/v1/concepts/${C0}/history`)).toEqual(random); // empty: the membership gate alone
+    expect(await answer('owner', `/v1/concepts/${CD}/history`)).toEqual(random); // deleted
+  });
+});
+
+describe('27.483 trash (Review Focus 3, at read time)', () => {
+  it('27.483 a trashed ticket and a deleted note leave the items, the count and the D4 check, so the concept is empty; a restore brings the ticket back', async () => {
+    const TT = newUlid();
+    const nT = newUlid();
+    const C83 = newUlid();
+    await applyCommitted(db.pool, [
+      ticketCreated(TT, 'Return the crates'),
+      tev(TT, 'visibility.set', { ticketId: TT, mode: 'explicit', userIds: [world.ids.guestListed] }),
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.author, entity: { kind: 'note', id: nT }, type: 'note.created', payload: { title: 'Crate count', homeProjectId: world.P, scope: { mode: 'explicit', userIds: [world.ids.guestListed] } } }),
+      cev(C83, 'concept.created', { name: 'Crates' }),
+      cev(C83, 'concept.item_tagged', { itemKind: 'ticket', itemId: TT }),
+      cev(C83, 'concept.item_tagged', { itemKind: 'note', itemId: nT }),
+    ]);
+    const owned = async () => {
+      const list = (await get('owner', `/v1/workspaces/${world.WS}/concepts`)).json() as { concepts: Array<{ id: string; itemCount: number }> };
+      const view = (await get('owner', `/v1/concepts/${C83}`)).json() as { itemCount: number; items: Array<{ id: string }> };
+      return { listed: list.concepts.find((c) => c.id === C83)?.itemCount, count: view.itemCount, items: view.items.map((i) => i.id) };
+    };
+    // Both live: the concept has their audience (guestListed in, memberOut out).
+    expect(await owned()).toEqual({ listed: 2, count: 2, items: [TT, nT] });
+    expect(await listIds('guestListed')).toContain(C83);
+    expect(await listIds('memberOut')).not.toContain(C83);
+    await applyCommitted(db.pool, [
+      tev(TT, 'ticket.deleted', {}),
+      makeCommitted({ workspaceId: world.WS, actorId: world.ids.author, entity: { kind: 'note', id: nT }, type: 'note.deleted', payload: {} }),
+    ]);
+    // Neither counts now: the concept is EMPTY, so the empty rule decides (members in, guests out).
+    expect(await owned()).toEqual({ listed: 0, count: 0, items: [] });
+    expect(await listIds('guestListed')).not.toContain(C83);
+    expect(await listIds('memberOut')).toContain(C83);
+    // A trashed item is the absent item's 404 on `?item=`, even for the owner.
+    expect(await answer('owner', `/v1/workspaces/${world.WS}/concepts?item=ticket:${TT}`)).toEqual(
+      await answer('owner', `/v1/workspaces/${world.WS}/concepts?item=ticket:${newUlid()}`),
+    );
+    // The tag was kept, so a restore brings the ticket back into the items and the check.
+    await applyCommitted(db.pool, [tev(TT, 'ticket.restored', {})]);
+    expect(await owned()).toEqual({ listed: 1, count: 1, items: [TT] });
+    expect(await listIds('guestListed')).toContain(C83);
+    expect(await listIds('memberOut')).not.toContain(C83);
   });
 });
 

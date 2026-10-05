@@ -16,12 +16,12 @@ function parseItem(raw: unknown): ItemRef | null {
   return match === null ? null : { kind: match[1] as 'ticket' | 'note', id: match[2] as string };
 }
 
-/** The workspace a live concept lives in, or `null` (absent and deleted alike). */
+/**
+ * The workspace a concept lives in, or `null` for an unknown id. A deleted concept still names its workspace: whether
+ * it may be read at all is D4's one decision (`visibleConcepts` reads live concepts only), not a second one here.
+ */
 async function conceptWorkspace(db: Queryable, conceptId: string): Promise<string | null> {
-  const { rows } = await db.query<{ workspace_id: string }>(
-    'SELECT workspace_id FROM proj_concepts WHERE concept_id = $1 AND deleted = FALSE',
-    [conceptId],
-  );
+  const { rows } = await db.query<{ workspace_id: string }>('SELECT workspace_id FROM proj_concepts WHERE concept_id = $1', [conceptId]);
   return rows[0]?.workspace_id ?? null;
 }
 

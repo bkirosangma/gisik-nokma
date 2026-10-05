@@ -104,8 +104,8 @@ export async function seesLiveItems(
 
 /**
  * One concept as this viewer may read it, or `null` (absent, deleted and hidden alike), composed in four steps:
- * 1. the live concept row;
- * 2. D4: `visibleConceptIds(…, [id])`;
+ * 1. the concept row (`null` when there is none);
+ * 2. D4: `visibleConceptIds(…, [id])`, the ONE decision, which also refuses a deleted concept;
  * 3. its LIVE items, labelled (a ticket by its key and title, `read/ticket-cards.ts` `cardKeysFor`; a note by its
  *    title). A trashed item keeps its tag and is left out until a restore (Review Focus 3);
  * 4. its links, keeping only those whose other concept this viewer sees. A hidden one is DROPPED, not redacted: the
@@ -122,7 +122,7 @@ export async function readConceptView(db: Queryable, eff: EffectiveRole, userId:
     from_suggestion: string | null;
   }>(
     `SELECT workspace_id, name, summary, created_by, created_at, origin, from_suggestion
-       FROM proj_concepts WHERE concept_id = $1 AND deleted = FALSE`,
+       FROM proj_concepts WHERE concept_id = $1`,
     [conceptId],
   );
   const row = concept.rows[0];
