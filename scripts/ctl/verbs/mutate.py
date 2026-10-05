@@ -362,6 +362,13 @@ def backstop_secs(max_secs):
     return env_int('CTL_MUTATE_BACKSTOP_SECS', max_secs + env_int('CTL_SEM_MAX_WAIT', 1800) + GRACE + 60)
 
 
+def run_tests_cap_min(max_secs):
+    """The explicit `--max-min` this verb hands run-tests (planner ruling 2026-10-05 14:36: every ctl internal caller names its cap): above the
+    watchdog's cap + GRACE by at least 58 s (the worst case, 659 s: the watchdog's KILL at 662 s, the cap at 720 s), so the watchdog (exit 2,
+    `stopped`) always fires first and run-tests' 124 is only a backstop."""
+    return max_secs // 60 + 2
+
+
 def slot_run(label, cwd, cmd, max_secs):
     """One ctl run-tests call (one slot). -> (rc, slot_secs, log). The command runs under `watchdog`, INSIDE the slot: past max_secs of slot
     time it is stopped and this is a tool failure (P10's 10-minute rule is never broken quietly); the queue wait before the slot is not
@@ -374,7 +381,7 @@ def slot_run(label, cwd, cmd, max_secs):
 
 
 def slot_run_in(label, cwd, cmd, max_secs, d):
-    argv = run_tests_cmd() + ['--label', label, '--', sys.executable, os.path.abspath(__file__), 'watchdog', str(max_secs), d, '--'] + cmd
+    argv = run_tests_cmd() + ['--label', label, '--max-min', str(run_tests_cap_min(max_secs)), '--', sys.executable, os.path.abspath(__file__), 'watchdog', str(max_secs), d, '--'] + cmd
     backstop = backstop_secs(max_secs)
     t0 = time.time()
     p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
