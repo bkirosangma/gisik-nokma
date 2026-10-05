@@ -218,9 +218,11 @@ noise_lines() { local h; h=$(sha "$1"); printf '%s\n' "13:51 DONE 12:00 RIDER $h
   "13:53 REVIEW $1 $h base=origin/$BASE" "13:54 TOOK 13:53 $1 ${h:0:8} (reviewer B, pull, FULL)" >> "$Q"; }
 s8() { sha "$1" | cut -c1-"${2:-8}"; }   # s8 BRANCH [N] — the first N (8) hex of BRANCH's origin tip
 # fixq TEXT… — the queue: READY task/a, READY task/b, then one FIX line per TEXT, verbatim after `13:59 DONE 12:00 ` (a live spelling);
-# a dry-run of #11 #12. Only #11 (task/a) may be named by the legs; a CONTROL names neither a nor b.
+# a dry-run of #11 #12. Only #11 (task/a) may be named by the legs; a CONTROL names neither a nor b. The verb reads a FIX line's WHOLE body,
+# so a leg's text never holds a standalone lowercase `a` or `b` (an English "a" names task/a by its slug).
 fixq() { local t; : > "$Q"; ready task/a READY; ready task/b READY; for t in "$@"; do printf '13:59 DONE 12:00 %s\n' "$t" >> "$Q"; done; b 11 12 --dry-run; }
-refused11() { [ $rc -eq 1 ] && says "^REFUSE #11 (ready) FIX after READY: queue line $1 \"13:59 DONE 12:00 FIX" && ! says "^REFUSE #12"; }   # the WHOLE line quoted
+# refused11 N [START] — #11 alone is refused by queue line N, quoted WHOLE from its start: `13:59 DONE 12:00 ` then START (default FIX).
+refused11() { [ $rc -eq 1 ] && says "^REFUSE #11 (ready) FIX after READY: queue line $1 \"13:59 DONE 12:00 ${2:-FIX}" && ! says "^REFUSE #12"; }
 
 # --- 13.2296: arguments, main, the batch tree --------------------------------------------------------------------------------------------
 check "13.2296 main is refused before any call: exit 1, the FAIL names main, no gh call, no ctl call, the batch tree untouched" \
@@ -251,11 +253,11 @@ check "13.2297 a PR with no READY / needs-tip line naming its head is refused (t
    && summary "^FAIL batch refused: 1 refusal(s) on #12" && [ "$(originrefs)" = "$o0" ] && [ "$(treestate)" = "$s0" ] && [ ! -e "$S/ctl.log" ] && [ ! -e "$S/mut.log" ]'
 check "13.2297 a needs-tip line names a head as a READY line does (CONTROL for the refusals around it)" \
   'mk && : > "$Q" && ready task/a needs-tip && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 0 ]'
-check "13.2297 a FIX after the READY line refuses the PR (rule ready, the FIX line quoted); CONTROL — a FIX BEFORE the READY line, or a later FIX of ANOTHER branch, does not" \
+check "13.2297 a FIX after the READY line refuses the PR (rule ready, the FIX line quoted); CONTROL — a FIX BEFORE the READY line, or a later FIX of ANOTHER branch that does not name it, does not" \
   'mk && : > "$Q" && ready task/a READY && ready task/b READY && ready task/a FIX && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) FIX after READY: queue line 3 \"13:[0-5][0-9] DONE 12:00 FIX task/a " \
    && : > "$Q" && ready task/a FIX && ready task/a READY && ready task/b READY && ready task/c FIX && b 11 12 --dry-run && [ $rc -eq 0 ]'
-# FIX spellings of the live queue (QUEUE-review.md on 10-05: 33 of 180 FIX lines are not `FIX <branch> <sha>`): each refuses #11 when it
-# names task/a, and its CONTROL (first, same world) names ANOTHER branch, slug or sha and refuses nothing.
+# FIX spellings of the live queue (QUEUE-review.md on 10-05: 33 of 180 FIX lines are not `FIX <branch> <sha>`, and 23 more put FIX AFTER
+# the branch): each refuses #11 when it names task/a, and its CONTROL (first, same world) names ANOTHER branch, slug or sha and refuses nothing.
 check "13.2297 FIX spelling FIX <n> task/<x> <sha> (queue lines 1466, 1482) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
   'mk && fixq "FIX 1 task/ab $(s8 task/c) (BRIEF-ab-fix-1.md; REVIEW-ab-$(s8 task/c).md; reviewer B)" && [ $rc -eq 0 ] \
    && fixq "FIX 1 task/a $(s8 task/a) → BRIEF-a-fix-1.md (reviewer B)" && refused11 3'
@@ -275,6 +277,33 @@ check "13.2297 FIX spelling — a FIX naming only the needs-tip sha under a clea
   'mk && x=$(s8 task/a) && : > "$Q" && ready task/a needs-tip && ready task/b READY && tipmerge_a \
    && printf "%s\n" "13:59 DONE 12:00 FIX ($(s8 task/c) = merge of $(s8 task/d), delta verified; content FIX 1)" >> "$Q" && b 11 12 --dry-run && [ $rc -eq 0 ] \
    && printf "%s\n" "13:59 DONE 12:00 FIX (merge of $x, delta verified; content FIX 1)" >> "$Q" && b 11 12 --dry-run && refused11 4'
+# Branch-first FIX spellings (FIX 2): a DONE line that is no admitting READY / needs-tip and carries a whole FIX token before its first `(`
+# is a FIX line, and its WHOLE body is read: the slug and sha come BEFORE the FIX word, so the text after it names nothing.
+check "13.2297 FIX spelling task/<x> <sha> FIX <n> (BRIEF…) reviewer B (queue lines 834-1072) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "task/ab $(s8 task/c) FIX 1 (BRIEF-ab-fix-1.md) reviewer B" && [ $rc -eq 0 ] \
+   && fixq "task/a $(s8 task/a) FIX 1 (BRIEF-a-fix-1.md) reviewer B" && refused11 3 "task/a $(s8 task/a) FIX 1 (BRIEF-a-fix-1.md) reviewer B\""'
+check "13.2297 FIX spelling task/<x> <sha> FIX reviewer B (queue lines 471, 482) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "task/ab $(s8 task/c) FIX reviewer B" && [ $rc -eq 0 ] \
+   && fixq "task/a $(s8 task/a) FIX reviewer B" && refused11 3 "task/a $(s8 task/a) FIX reviewer B\""'
+check "13.2297 FIX spelling task/<x> FIX (…) with no sha (queue lines 96, 127, 153) after the READY refuses #11 by its slug; CONTROL — the same spelling naming task/ab does not" \
+  'mk && fixq "task/ab FIX (7/10; 3 weak survivors → BRIEF-ab-fix-1.md)" && [ $rc -eq 0 ] \
+   && fixq "task/a FIX (7/10; 3 weak survivors → BRIEF-a-fix-1.md)" && refused11 3 "task/a FIX (7/10; 3 weak survivors"'
+check "13.2297 FIX spelling needs-tip+FIX-1 task/<x> <sha> (…) (queue line 150: no needs-tip verdict, + is a boundary) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "needs-tip+FIX-1 task/ab $(s8 task/c) (content sound, 13/17 mutations, 1 real → 22.027)" && [ $rc -eq 0 ] \
+   && fixq "needs-tip+FIX-1 task/a $(s8 task/a) (content sound, 13/17 mutations, 1 real → 22.027)" && refused11 3 "needs-tip+FIX-1 task/a $(s8 task/a) (content"'
+check "13.2297 a FIX inside a parenthesis is no FIX: CONTROL — task/<x> <sha> READY (FIX 1; …) (…) after the canonical READY, and a canonical READY task/<x> <sha> (FIX 1 re-check …) as the admitting line, refuse nothing; task/b <sha> FIX reviewer B refuses #12, not #11" \
+  'mk && fixq "task/a $(s8 task/a) READY (FIX 1; 5/5 red) (review=REVIEW-a-$(s8 task/a).md) reviewer B" && [ $rc -eq 0 ] \
+   && : > "$Q" && ready task/b READY && printf "%s\n" "13:59 DONE 12:00 READY task/a $(s8 task/a) (FIX 1 re-check: F1 closed; 5/5 red)" >> "$Q" && b 11 12 --dry-run && [ $rc -eq 0 ] \
+   && fixq "task/b $(s8 task/b) FIX reviewer B" && [ $rc -eq 1 ] && says "^REFUSE #12 (ready) FIX after READY: queue line 3 \"13:59 DONE 12:00 task/b $(s8 task/b) FIX reviewer B\"" && ! says "^REFUSE #11"'
+check "13.2297 a FIX token is WHOLE and upper case: CONTROL — task/<x> <sha> PREFIX …, … FIXED in <sha> …, … FIX-ups … and … READY, no fix needed … refuse nothing (a word character, or a - not before digits, is no boundary); task/<x> <sha> HELD-FOR-FIX-2 (…) (queue line 472: - before FIX is one) refuses #11" \
+  'mk && fixq "task/a $(s8 task/a) PREFIX noted (13.2297 control)" "task/a $(s8 task/a) FIXED in $(s8 task/c) (13.2297 control)" "task/a $(s8 task/a) FIX-ups queued (13.2297 control)" "task/a $(s8 task/a) READY, no fix needed (13.2297 control)" && [ $rc -eq 0 ] \
+   && fixq "task/a $(s8 task/a) HELD-FOR-FIX-2 (fix 1 content ok; planner FIX 2 pending) reviewer B" && refused11 3 "task/a $(s8 task/a) HELD-FOR-FIX-2 (fix 1"'
+check "13.2297 an admitting READY is no FIX line, even with a FIX token before its parenthesis: CONTROL — READY task/c <sha> FIX-1 delta re-check (needs task/a …) refuses nothing; the same line with no admitting verdict (task/c <sha> FIX-1 …) is a FIX, and it refuses #11, the PR it names" \
+  'mk && fixq "READY task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)" && [ $rc -eq 0 ] \
+   && fixq "task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)" && refused11 3 "task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)\""'
+check "13.2297 the verdict word right after the cited time is a FIX when it starts with FIX, whole token or not (FIX 1's prefix, kept): FIX2 task/<x> <sha> refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "FIX2 task/ab $(s8 task/c) (BRIEF-ab-fix-2.md)" && [ $rc -eq 0 ] \
+   && fixq "FIX2 task/a $(s8 task/a) (BRIEF-a-fix-2.md)" && refused11 3 "FIX2 task/a $(s8 task/a) (BRIEF-a-fix-2.md)\""'
 check "13.2297 RIDER, VOID, REVIEW and TOOK lines naming the head are no READY; a READY naming an OLDER sha of the branch is none either" \
   'mk && : > "$Q" && noise_lines task/a && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY" \
    && : > "$Q" && ready task/a READY "$($G -C "$bare" rev-parse task/a^)" && ready task/b READY && b 11 12 --dry-run && [ $rc -eq 1 ] && says "^REFUSE #11 (ready) no READY"'

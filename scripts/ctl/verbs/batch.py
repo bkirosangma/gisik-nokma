@@ -7,9 +7,14 @@ the lever left is the NUMBER of gates. The batch rules are the lanes dir's BATCH
 
 1. The WHOLE call is refused (nothing merged, gated or pushed) unless every PR is open against <base>, READY in roles/QUEUE-review.md at
    its head sha with no later FIX naming it, and breaks none of rules (b) migrations, (c) always alone, (d) shared count pins. A FIX is
-   any `HH:MM DONE <time> FIX…` line, in every spelling the queue holds (`FIX`, `FIX <n>`, `FIX-<n>`, parenthesised or not). It names
-   a member by its slug as a WHOLE token (`task/<x>`, `(<x>`; not `<x>b`, `<x>-b`), or by a hex run (>= 7) that its head or a
-   needs-tip sha under it begins with. A FIX naming neither (`FIX (BRIEF-<x>-fix-1.md)`) cannot be attributed and refuses nothing.
+   a `HH:MM DONE <time> ` line that is no admitting READY / needs-tip line and whose verdict body (the text after that prefix) either
+   starts with FIX (`FIX`, `FIX <n>`, `FIX-<n>`, `FIX (…)`; any word starting FIX) or holds a whole FIX token before its first `(`:
+   `<branch> <sha> FIX <n> (…)`, `<branch> <sha> FIX reviewer B`, `<branch> FIX (…)`, `needs-tip+FIX-<n> <branch> <sha>`,
+   `HELD-FOR-FIX-<n>`. A token is `FIX` or `FIX-<n>`, upper case, with no word character on either side and no other `-` after it
+   (`PREFIX`, `FIXED`, `FIX-up`, `fix` are none). A FIX inside a parenthesis is no FIX (`<branch> <sha> READY (FIX 1; …)`), and no
+   other line is read (REVIEW, TOOK, NOTE, CORRECTION). The WHOLE body names a member by its slug as a WHOLE token (`task/<x>`, `(<x>`;
+   not `<x>b`, `<x>-b`), or by a hex run (>= 7) that its head or a needs-tip sha under it begins with. A FIX naming neither
+   (`FIX (BRIEF-<x>-fix-1.md)`) cannot be attributed and refuses nothing.
    Every refusal is printed (`REFUSE #<pr> (<rule>) …`); the summary names the PRs that passed.
 2. The union is built in the batch tree — never the primary, never the checkout running this ctl, never a tree standing on a branch
    (a lane or reviewer tree stands on its task branch; a batch tree is detached or on batch/*): detached at a fresh origin/<base>, each
@@ -50,10 +55,18 @@ POOLS = {'release/knowledge-graph': 'kg', 'release/workflow-graph': 'wg'}
 # (autopilot's grammar), so RIDER, VOID and `DONE <t> READY … (FIX 1 delta)` read right; REVIEW, TOOK and NOTE lines are no verdicts.
 # Only this spelling admits: a READY in any other spelling admits nothing (fails closed), and the refusal prints the spelling read.
 VERDICT = re.compile(r'^(\d\d:\d\d) DONE (\d\d:\d\d) (READY|needs-tip) (\S+) ([0-9a-f]{7,40})(?=\s|$)')
-# A FIX verdict in ANY spelling: the word after the cited time starts with FIX (`FIX`, `FIX <n>`, `FIX-<n>`, …), then branches, slugs,
-# shas or a parenthesis in any order. On 10-05, 33 of the queue's 180 FIX lines were not `FIX <branch> <sha>`, and the ORCH's gate-red
-# FIXes are `FIX (<slug> …)`. A FIX line refuses every member it names (fix_names), so a new spelling fails closed instead of open.
-FIX_LINE = re.compile(r'^\d\d:\d\d DONE \d\d:\d\d FIX')
+# A FIX verdict (fix_body), on a `HH:MM DONE <time> ` line that is no admitting VERDICT, in two shapes:
+# - the body starts with FIX (`FIX`, `FIX <n>`, `FIX-<n>`, `FIX (…)`; any word starting FIX, so `FIX2` fails closed). On 10-05, 33 of
+#   the queue's 180 such lines were not `FIX <branch> <sha>`, and the ORCH's gate-red FIXes are `FIX (<slug> …)`;
+# - a whole FIX_TOKEN before the body's first `(`. On 10-05, 23 lines put FIX AFTER the branch: `<branch> <sha> FIX 1 (…)`,
+#   `<branch> <sha> FIX reviewer B`, `<branch> FIX (…)`, `needs-tip+FIX-1 <branch> <sha>`, `HELD-FOR-FIX-2`. FIX_TOKEN is FIX or
+#   FIX-<n> in upper case (`task/<x>-fix <sha> READY` holds none), with no word character on either side and no other `-` after it:
+#   `PREFIX`, `FIXED` and `FIX-up` are none.
+# A FIX inside a parenthesis is no FIX (`<branch> <sha> READY (FIX 1; …)`, `READY <branch> <sha> (FIX 1 re-check)`). A FIX line refuses
+# every member its WHOLE body names (fix_names): in the second shape the slug and sha come BEFORE the FIX word. A new spelling with a
+# whole FIX token fails closed instead of open.
+DONE_AT = re.compile(r'^\d\d:\d\d DONE \d\d:\d\d ')
+FIX_TOKEN = re.compile(r'(?<!\w)FIX(?:-\d+)?(?![\w-])')
 MIGRATION = re.compile(r'^apps/server/migrations/(\d+)_[^/]*$')
 PACKAGE_ROOT = re.compile(r'^(apps|packages)/[^/]+/package\.json$')
 # BATCHING-workflow-graph.md (d): "No two tasks may bump the same count pin … These merge cleanly and then FAIL." A pin is (name, file, line
@@ -253,10 +266,22 @@ def read_queue():
         m = VERDICT.match(line)
         if m:
             verdicts.append((i, m.group(1), m.group(3), m.group(4), m.group(5), line))
-        f = FIX_LINE.match(line)
-        if f:
-            fixes.append((i, line[f.end():], line))
+        body = fix_body(line)
+        if body is not None:
+            fixes.append((i, body, line))
     return verdicts, fixes
+
+
+def fix_body(line):
+    """A FIX line's verdict body (the text after `HH:MM DONE <time> `: fix_names reads all of it), or None when the line is no FIX: not a
+    DONE line, an admitting VERDICT, or neither a body starting with FIX nor a whole FIX_TOKEN before the body's first `(`."""
+    d = DONE_AT.match(line)
+    if not d or VERDICT.match(line):
+        return None
+    body = line[d.end():]
+    if body.startswith('FIX') or FIX_TOKEN.search(body.split('(', 1)[0]):
+        return body
+    return None
 
 
 def tip_merge_chain(sha):
@@ -277,10 +302,11 @@ def tip_merge_chain(sha):
 
 
 def fix_names(text, m, chain):
-    """Whether a FIX line's text (what follows its FIX word) names member m. By its slug (`<x>` of `task/<x>`) as a WHOLE token: no
-    word character or `-` on either side, so `task/<x>`, `(<x>` and `<x>,` name it, while `task/<x>b`, `<x>-b` and `BRIEF-<x>-fix-1.md`
-    do not. Or by a hex run (>= 7) that a sha of its chain begins with: its head, or a needs-tip sha a clean tip merge put it on
-    (`REVIEW-<x>-<sha8>.md` names it too). A FIX that names neither cannot be attributed to any member."""
+    """Whether a FIX line's verdict body (fix_body: all of it, so the slug and sha BEFORE a branch-first FIX word count) names member m.
+    By its slug (`<x>` of `task/<x>`) as a WHOLE token: no word character or `-` on either side, so `task/<x>`, `(<x>` and `<x>,` name
+    it, while `task/<x>b`, `<x>-b` and `BRIEF-<x>-fix-1.md` do not. Or by a hex run (>= 7) that a sha of its chain begins with: its
+    head, or a needs-tip sha a clean tip merge put it on (`REVIEW-<x>-<sha8>.md` names it too). A FIX that names neither cannot be
+    attributed to any member."""
     slug = re.escape(m.ref.split('/', 1)[-1])
     if re.search(rf'(?<![\w-]){slug}(?![\w-])', text):
         return True
