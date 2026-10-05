@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import { parseResult } from './harness/results.js';
 
-// The harness serves the REAL built `@gisik-nokma/app-core` so a browser measures the view the product ships. Port 3192, never
-// 3190 (G-9's harness), 3191 (the Knowledge Graph's) or 3001 (the dev stack).
+// The harness serves the REAL built `@gisik-nokma/app-core` so a browser measures the view the product ships. Port FG_PW_PORT, else 3192 (never
+// 3190 (G-9's harness), 3191 (the Knowledge Graph's) or 3001 (the dev stack); playwright.config.ts passes the same port).
 // `--host` (vite CLI) serves it on the LAN: that is how a real phone opens `stress.html?auto=1`. A run posts its record to
 // /__results and this plugin appends one line per accepted run to test-results/stress.jsonl (the root .gitignore ignores test-results/ on every branch).
 function results(): Plugin {
@@ -49,6 +49,6 @@ export default defineConfig({
   // first page load and RELOADS the page mid-test.
   optimizeDeps: { include: ['react/jsx-dev-runtime'] },
   plugins: [results()],
-  server: { port: 3192, strictPort: true },
+  server: { port: Number(process.env['FG_PW_PORT']) || 3192, strictPort: true },
   build: { rollupOptions: { input: [resolve(__dirname, 'harness/stress.html'), resolve(__dirname, 'harness/timeline.html'), resolve(__dirname, 'harness/timeline-geometry.html'), resolve(__dirname, 'harness/timeline-stress.html')] } },
 });

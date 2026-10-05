@@ -484,10 +484,31 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
       ],
     } as unknown as BoardResponse;
     expect(() => mapBoardView(withUnknownCause)).toThrow(
-      /stateProvenance\.cause\.kind: expected reopened-for-child \(got reopened-by-decree\)/,
+      /stateProvenance\.cause\.kind: expected reopened-for-child, led-to, reopened-by-flow, branch-not-taken \(got reopened-by-decree\)/,
     );
     // Control: `null` is the wire's own value for "no cause" and still passes.
     expect(mapBoardView(body).groups[0]?.columns[0]?.cards[0]?.cause).toBeNull();
+  });
+
+  it('29.207 maps the three flow kinds to { kind } only; reopened-for-child keeps its child; reopened-by-decree still throws', () => {
+    const withCause = (cause: unknown) =>
+      ({
+        ...body,
+        columns: [
+          {
+            ...body.columns[0],
+            cards: [{ ...serverBoardCard(), stateProvenance: { ...serverBoardCard().stateProvenance, cause } }],
+          },
+        ],
+      }) as unknown as BoardResponse;
+    const mapped = (cause: unknown) => mapBoardView(withCause(cause)).groups[0]?.columns[0]?.cards[0]?.cause;
+    // The server serves a flow cause as its kind (`servedCause`); a stray id on the wire is dropped, never carried.
+    expect(mapped({ kind: 'led-to' })).toEqual({ kind: 'led-to' });
+    expect(mapped({ kind: 'reopened-by-flow' })).toEqual({ kind: 'reopened-by-flow' });
+    expect(mapped({ kind: 'branch-not-taken', decisionTicketId: 'dec_1' })).toEqual({ kind: 'branch-not-taken' });
+    // Control: the old kind still carries its child, and an unknown kind still refuses.
+    expect(mapped({ kind: 'reopened-for-child', childTicketId: 'child_1' })).toEqual({ kind: 'reopened-for-child', childTicketId: 'child_1' });
+    expect(() => mapped({ kind: 'reopened-by-decree' })).toThrow(/got reopened-by-decree/);
   });
 
   it('3.43 REFUSES a card whose required nullable fields are ABSENT, not merely null', () => {

@@ -85,7 +85,7 @@ export function contradictionCopy(start: AttributedDate, due: AttributedDate): s
  * 2026-09-20 by a reviewer who falsified the first draft of this note.** The
  * first draft said the page's closed-hidden rule "cannot be expressed as a
  * `FilterSpec`". That is FALSE: `closed?: boolean` is one of `FilterSpec`'s own
- * axes (`view-types.ts:238-243`) and `matchesFilter` evaluates it
+ * axes (`view-types.ts:431-442`) and `matchesFilter` evaluates it
  * (`filter/matches-filter.ts:89`) — the page already expresses that rule as a
  * spec, `{ ...listFilterSpec, closed: effectiveClosed }`. The reason wiring
  * fails is different and survives: **the view is handed ALREADY-NARROWED rows**,

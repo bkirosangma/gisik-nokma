@@ -137,7 +137,7 @@ describe('checkTicketCreated', () => {
           entity: { kind: 'ticket', id: PARENT },
           payload: { typeId: 'story', projectId: PROJECT, parentId: null, title: 'Quarterly filings' },
         }),
-        // The destination field is `to`, NOT `toStateId` (`workflow.ts:137-145`,
+        // The destination field is `to`, NOT `toStateId` (`workflow.ts:138-146`,
         // pre-flight A10 + addendum 1). The transition LOG ENTRY this produces
         // separately and correctly spells `toStateId`; both spellings are real.
         // Spelled `toStateId` here the reducer throws at SETUP and this test
@@ -203,7 +203,7 @@ describe('checkTicketCreated', () => {
   });
 
   /**
-   * The two-layer guard (pre-flight A19, the precedent `transition.ts:11-28`
+   * The two-layer guard (pre-flight A19, the precedent `transition.ts:12-29`
    * set). On the server, ingest's door has already checked the entity kind and
    * parsed the payload against the registered schema before the engine runs —
    * but the fixture suite and Plan 10's offline replica enter at

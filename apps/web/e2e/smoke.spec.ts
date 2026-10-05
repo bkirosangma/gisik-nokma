@@ -53,7 +53,7 @@ const PRJ = '01J9PROJECT000000000000000';
 const TICKET = '01J9TICKET0000000000000000';
 const ANSELMA = '01J9USER000000000000000001';
 
-/** `BoardResponse` — `packages/domain/src/read-models.ts:218`, flat `columns`. */
+/** `BoardResponse` — `packages/domain/src/read-models.ts:224`, flat `columns`. */
 const BOARD = {
   projectId: PRJ,
   workspaceId: WS,

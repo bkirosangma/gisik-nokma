@@ -36,9 +36,9 @@ import type { WorkflowDef } from '@gisik-nokma/domain';
  * wildcard`, nothing unioned — but not the STATE the engine selects it
  * against, and that second gap is real, not hedging. The engine does not
  * match `resolved.stateId` against the ticket's stored state id; it first
- * calls `resolveCurrentStateId` (`transition.ts:60`), which walks the
+ * calls `resolveCurrentStateId` (`transition.ts:61`), which walks the
  * ticket's state through every published `stateMapping` since it was set,
- * and matches THAT folded id (`transition.ts:92`). This function has no
+ * and matches THAT folded id (`transition.ts:96`). This function has no
  * such walk — it matches whatever `fromStateId` the caller hands it,
  * verbatim, against `def.transitions`. So long as the caller supplies the
  * already-folded id, the two resolutions agree; if a caller instead passes

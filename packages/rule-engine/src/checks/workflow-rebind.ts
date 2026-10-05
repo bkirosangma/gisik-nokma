@@ -24,7 +24,7 @@ import {
  * workflow, the workflow the payload names, and that workflow's states.
  *
  * **The payload's destination field genuinely IS `toStateId`** — the one place
- * in this vocabulary where that spelling is correct (`events/ticket-events.ts:158-161`,
+ * in this vocabulary where that spelling is correct (`events/ticket-events.ts:159-162`,
  * pre-flight A10 / Verified facts). `ticket.transitioned`'s is `to`. Both
  * spellings are real and neither is "adapted" into the other.
  *

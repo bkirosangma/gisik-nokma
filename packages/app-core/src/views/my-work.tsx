@@ -61,7 +61,7 @@ const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
  * CAN now arrive from a real answer — and the sentence above needed a real argument
  * rather than an inherited one. **It has one, and it is a property of the MAPPER
  * rather than of a refusal: `mapMyWork` reads
- * `asArray(record['contested'], 'myWork.contested')` (`online/mappers.ts:1890`), and
+ * `asArray(record['contested'], 'myWork.contested')` (`online/mappers.ts:1895`), and
  * `asArray` THROWS `MappingError(…, 'an array')` (`:261`) when the key is absent or
  * is not an array.** The key is therefore REQUIRED on the wire — absence throws, it
  * does not degrade to `[]` — so the only way `contested: []` reaches this component

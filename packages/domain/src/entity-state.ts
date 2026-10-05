@@ -1,5 +1,6 @@
 import type { TicketLinkKind } from './events/ticket-events.js';
 import type { StateCategory } from './workflow.js';
+import type { FlowCause } from './flow/causes.js';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
 
@@ -44,8 +45,12 @@ export type TicketState = {
    * across five packages predate it; every producer sets it (the reducer,
    * `rowToTicketState`, the replica) and every reader spells
    * `state.closed ?? null`. The wire types carry it required.
+   *
+   * `cause` is the flow's `branch-not-taken` close cause (wtg2 T8, PS-5), present only on such a close; the reducer
+   * stores it and `ticket.reopened` drops it with the flag. Reducer-only for now: `rowToTicketState` rebuilds `closed`
+   * from `closed_at` / `closed_by`, which hold no cause.
    */
-  closed?: { actorId: string; at: string } | null;
+  closed?: { actorId: string; at: string; cause?: FlowCause } | null;
   /**
    * The backlog rank key (spec §8.1): set by `ticket.ranked`, and `null` on a
    * ticket nobody has ranked — including one just created, which writes the

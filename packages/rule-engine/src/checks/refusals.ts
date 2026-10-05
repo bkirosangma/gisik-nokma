@@ -109,6 +109,12 @@ export const REFUSALS = {
   /** Leads-to labels (workflow-timeline-graphs LK-3). The duplicate reason is built by `labelDuplicateRefusal`; it names the label only. */
   'link.label-required': 'Name the branch: a link from a Decision needs a label, such as "Yes" or "No".',
   'link.label-duplicate': 'This Decision already has a branch with that label.',
+  /**
+   * A flow cause (`led-to`, `reopened-by-flow`, `branch-not-taken`) filed by anyone but the flow actor (wtg2 T8, spec
+   * AP-2): those causes unlock moves no workflow declares, so a person cannot dress a manual move as the flow's.
+   * `checks/flow-cause.ts` raises it at the transition, close and reopen doors, before any other rule.
+   */
+  'cause.forged': 'Only the flow can record that a ticket was led here, reopened or passed over by a decision.',
 } as const;
 
 export function rankRefusal(childTypeName: string, parentTypeName: string): string {
@@ -200,7 +206,7 @@ export function reboundUnknownWorkflowRefusal(workflowId: string): string {
  * The destination is named, never inferred: the outgoing and incoming workflows
  * are unrelated graphs with unrelated state ids, and `stateMapping` cannot help
  * — it is keyed inside a single workflow's version chain
- * (`events/ticket-events.ts:151-156`). Guessing where a ticket lands would be
+ * (`events/ticket-events.ts:152-157`). Guessing where a ticket lands would be
  * inventing its status, which invariant 4 forbids. So the claim says where it
  * goes, and this is the refusal when the target workflow has no such place.
  */

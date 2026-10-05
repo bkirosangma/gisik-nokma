@@ -27,9 +27,9 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  *
  * **The exact edge supplies the rules, and declaration order does not matter.**
  * That is not a preference — it is what the engine does, and this function's
- * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:120-121`
+ * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:126-127`
  * resolves `find(exact) ?? find('*')`, and `precheck.ts`'s `needsMembership`
- * already mirrors it at :467-473. This is the third copy of one rule.
+ * already mirrors it at :797-798. This is the third copy of one rule.
  *
  * This paragraph used to say the target *"keeps the FIRST edge's rules, in
  * declaration order, rather than merging two rule sets into one that no
@@ -52,7 +52,7 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  * Start (`backlog → def.initialStateId`) and Send to backlog (every declared
  * non-terminal state → backlog) are offered like declared ones — read off the
  * SAME `statesWithBacklog`/`transitionsWithBacklog` helpers the engine itself
- * resolves edges over (`packages/rule-engine/src/transition.ts:106-121`), so
+ * resolves edges over (`packages/rule-engine/src/transition.ts:110-125`), so
  * this function still predicts the engine rather than keeping a second,
  * driftable copy of the universal set.
  *
@@ -168,7 +168,7 @@ export type TransitionDialogProps = {
    * no verdict to carry verbatim. Before this ruling, `MoveArrows` (`board.tsx`)
    * built `{ rule: 'transport', … }`/`{ rule: 'no-response', … }` objects by
    * hand and fed them into `serverRefusal` — never through this package's own
-   * `refuse()` (deliberately unexported, `rule-engine/src/index.ts:32-41`, for
+   * `refuse()` (deliberately unexported, `rule-engine/src/index.ts:34-43`, for
    * exactly this reason: "a consumer outside this package has no business
    * minting a `Refusal`"), but arriving at the identical forbidden result
    * through a different door: a plain client-built object, shaped like a

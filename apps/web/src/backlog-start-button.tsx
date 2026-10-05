@@ -50,7 +50,7 @@ export type BacklogStartButtonProps = {
  *
  * Ruling 41 (coordinator, backlog-and-closed-core dispatch, 2026-09-17):
  * spec §1.2 says the Start edge "carries no rules, ever" and
- * `universalTransitions` (`packages/domain/src/workflow.ts:87`) builds it
+ * `universalTransitions` (`packages/domain/src/workflow.ts:88`) builds it
  * with `rules: []`, so §5.4's "a gated initial edge still asks" is
  * unreachable — `moveOutcome` could only ever answer `direct`. Start
  * therefore submits `ticket.transitioned { to: toStateId }` DIRECTLY through

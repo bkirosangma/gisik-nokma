@@ -21,7 +21,7 @@ import type { Accept, EngineContext, Refusal } from './engine.js';
  * cases; every other event type passes through — later plans add their own.
  *
  * Each case's check carries its OWN `env.entity.kind` guard rather than
- * trusting this dispatch, the two-layer precedent `transition.ts:11-28` set:
+ * trusting this dispatch, the two-layer precedent `transition.ts:12-29` set:
  * the fixture suite and Plan 10's offline replica enter here and never pass
  * through ingest's door, so the door's answer is not available to them.
  *

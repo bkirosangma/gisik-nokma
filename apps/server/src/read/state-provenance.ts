@@ -1,10 +1,11 @@
-import type { StateProvenance, TransitionCause } from '@gisik-nokma/domain';
+import { isFlowCause, viewerSafeCause, type StateProvenance, type TransitionCause } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 
 /**
  * The claim that produced each ticket's CURRENT state: the latest
  * `ticket.transitioned`, or `ticket.created` if it was never transitioned —
- * the actor, both clocks, and the reopen `cause` if the transition carried one.
+ * the actor, both clocks, and the transition's `cause` if it carried one (a
+ * flow cause as its kind only, `servedCause`).
  * Batched: one `DISTINCT ON` over the ledger's `(entity_kind, entity_id, seq)`
  * unique index.
  *
@@ -54,7 +55,7 @@ export async function stateProvenanceFor(
     actor_id: string;
     client_time: Date;
     server_time: Date;
-    payload: { cause?: TransitionCause };
+    payload: { cause?: unknown };
   }>(
     `SELECT DISTINCT ON (entity_id) entity_id, type, actor_id, client_time, server_time, payload
        FROM events
@@ -70,15 +71,26 @@ export async function stateProvenanceFor(
       actorId: row.actor_id,
       clientTime: row.client_time.toISOString(),
       serverTime: row.server_time.toISOString(),
-      // A creation never carries a cause, and a transition carries one only
-      // when the actor reopened a parent for a child. `null` here is the
-      // complete answer "this claim named no cause" — not a missing value:
-      // the claim itself is present, with its actor and both clocks.
+      // A creation never carries a cause; a transition carries one when the
+      // actor reopened a parent for a child, or when the flow moved it (wtg2
+      // T8). `null` here is the complete answer "this claim named no cause" —
+      // not a missing value: the claim itself is present, with its actor and
+      // both clocks.
       cause:
         row.type === 'ticket.transitioned' && row.payload.cause !== undefined
-          ? row.payload.cause
+          ? servedCause(row.payload.cause)
           : null,
     });
   }
   return provenance;
+}
+
+/**
+ * A transition's cause as a viewer may see it (wtg2 T8, spec FL-1). A flow cause names a source or Decision ticket and a
+ * person this viewer may not be able to see, so it is served as `{ kind }` only (`viewerSafeCause`); the old
+ * `reopened-for-child` cause passes through whole, as it always has (29.207). Nothing serves `closed.cause` yet: the
+ * projection stores no close cause, so `rowToTicketState` has none to hand a route.
+ */
+export function servedCause(raw: unknown): TransitionCause | null {
+  return isFlowCause(raw) ? viewerSafeCause(raw) : (raw as TransitionCause);
 }

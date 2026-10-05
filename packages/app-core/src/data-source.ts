@@ -209,7 +209,7 @@ export type NoteListFilter = {
  *
  * It returns the DOMAIN's `TicketTypeDef`, not a client view model, exactly as
  * `getWorkflowDef` returns `WorkflowDef`: the wire body is
- * `TicketTypeListResponse` (`packages/domain/src/read-models.ts:301`), whose
+ * `TicketTypeListResponse` (`packages/domain/src/read-models.ts:307`), whose
  * `ticketTypes` are `TicketTypeDef` already. There is no rename to adapt and
  * therefore no view model to invent. It is NOT one of the refusals — and there are
  * none left to be one of. **⚠ CORRECTED 2026-09-20:** this read *"(six of them until

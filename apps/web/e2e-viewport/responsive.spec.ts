@@ -1814,7 +1814,7 @@ test('13.299 — /workspaces with an EMPTY roster renders the empty state and th
 }, testInfo) => {
   // THE BODY IS `{ workspaces: [] }`, NOT `[]`, and the difference is the whole
   // case. `mapWorkspaceRefs` calls `asRecord(raw, 'workspaces')` FIRST
-  // (`packages/app-core/src/online/mappers.ts:1035`), so a bare array throws a
+  // (`packages/app-core/src/online/mappers.ts:1040`), so a bare array throws a
   // MappingError before it can ever mean "no workspaces" — and the page renders
   // `ShellRefusal` for that, not the empty state.
   //

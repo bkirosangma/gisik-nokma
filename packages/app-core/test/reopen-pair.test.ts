@@ -94,7 +94,7 @@ describe('buildReopenPair', () => {
    * built. Nothing in that passes the payload through a schema, so it is green
    * for any spelling the builder happens to use — including one the real door
    * refuses. `ticketTransitionedPayloadSchema` names the destination `to`
-   * (`packages/domain/src/workflow.ts:138`).
+   * (`packages/domain/src/workflow.ts:139`).
    *
    * This parses through `domainRegistry`, the registration the ingest door
    * itself consults, and carries the NEGATIVE CONTROL in the same test: the

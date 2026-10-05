@@ -3,6 +3,7 @@ import { statesWithBacklog, ticketClosedPayload, ticketReopenedPayload } from '@
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState } from './context-helpers.js';
+import { flowCauseForgery } from './flow-cause.js';
 import { ACCEPT, refuse } from './refusals.js';
 
 /**
@@ -33,7 +34,7 @@ import { ACCEPT, refuse } from './refusals.js';
  * move together — E6-4 (soft-deleted children) is the change that will move
  * them.
  *
- * Same shape as every other check's entity-kind guard (`transition.ts:41-47`,
+ * Same shape as every other check's entity-kind guard (`transition.ts:42-48`,
  * `workflow-rebind.ts:44-50`, `fields.ts:90-96`): a misfiled kind is a
  * malformed claim and is REFUSED, naming the kind it actually points at — it
  * is not silently accepted, which the first cut of this file got backwards
@@ -54,6 +55,9 @@ export async function checkTicketClosed(env: EventEnvelope, ctx: EngineContext):
     return refuse(REFUSAL_RULES.malformedPayload,
       `This ticket.closed event's payload is malformed: ${malformedPayloadDetail(parsed.error)}`);
   }
+  // wtg2 T8: only the flow may close "Not taken"; a forged cause hears so before the terminal check (29.203).
+  const forged = flowCauseForgery(env, parsed.data.cause);
+  if (forged !== null) return forged;
   const ticket = await getTicketState(ctx, env.entity.id);
   if (ticket === null) return refuse(REFUSAL_RULES.unknownTicket, `This event closes ticket ${env.entity.id}, but no such ticket is known.`);
   if ((ticket.closed ?? null) !== null) return refuse(REFUSAL_RULES.alreadyClosed, 'This ticket is already closed.');
@@ -91,6 +95,9 @@ export async function checkTicketReopened(env: EventEnvelope, ctx: EngineContext
     return refuse(REFUSAL_RULES.malformedPayload,
       `This ticket.reopened event's payload is malformed: ${malformedPayloadDetail(parsed.error)}`);
   }
+  // wtg2 T8: only the flow may reopen for a loop reset; a forged cause hears so before the not-closed check (29.203).
+  const forged = flowCauseForgery(env, parsed.data.cause);
+  if (forged !== null) return forged;
   const ticket = await getTicketState(ctx, env.entity.id);
   if (ticket === null) return refuse(REFUSAL_RULES.unknownTicket, `This event reopens ticket ${env.entity.id}, but no such ticket is known.`);
   if ((ticket.closed ?? null) === null) return refuse(REFUSAL_RULES.notClosed, 'This ticket is not closed.');

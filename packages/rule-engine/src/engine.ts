@@ -92,7 +92,7 @@ export type EngineContext = {
    * A fourth method rather than a fourth answer from `getEntityState`, because
    * `getEntityState('ticket-type', id)` cannot serve one: `'ticket-type'` is an
    * `OtherEntityState` in the domain union — literally `{ kind, id }`, identity
-   * and nothing else (`packages/domain/src/entity-state.ts:49-53`) — and the
+   * and nothing else (`packages/domain/src/entity-state.ts:54-58`) — and the
    * server context returns exactly that, by design. Every hierarchy rank check
    * (Plan 3 Tasks 5–7) needs `rank`, so without this method not one of them is
    * implementable through the shipped context (pre-flight BA-4).

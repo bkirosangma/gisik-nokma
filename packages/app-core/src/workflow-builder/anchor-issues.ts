@@ -61,7 +61,7 @@ export function anchorIssues<T extends Issue | Advisory>(
 
 /**
  * validateWorkflowDef fills its `duplicateIds` Set at the SECOND sighting of
- * each repeated id (packages/domain/src/validate-workflow.ts:19-23), so with
+ * each repeated id (packages/domain/src/validate-workflow.ts:20-24), so with
  * two-or-more distinct duplicated ids its issues come out in second-sighting
  * order, not first-occurrence definition order. Mirrored here — the anchor
  * VALUE only ever carries the id (position within the states array is not
@@ -85,7 +85,7 @@ function duplicateStateAnchors(def: WorkflowDef): IssueAnchor[] {
   return anchors;
 }
 
-/** validateWorkflowDef guards BOTH `from` and `to` against the '*' wildcard (validate-workflow.ts:39-40). */
+/** validateWorkflowDef guards BOTH `from` and `to` against the '*' wildcard (validate-workflow.ts:40-41). */
 function unknownTransitionStateAnchors(def: WorkflowDef): IssueAnchor[] {
   const stateIds = new Set(def.states.map((state) => state.id));
   const anchors: IssueAnchor[] = [];
@@ -100,7 +100,7 @@ function unknownTransitionStateAnchors(def: WorkflowDef): IssueAnchor[] {
  * validateWorkflowDef emits exactly ONE `duplicate-transition` issue per
  * distinct repeated edge, however many times it repeats — `duplicateEdges` is
  * a Set, so a triplicated edge still produces one issue, not two
- * (validate-workflow.ts:49-62). Mirrored here: one anchor per distinct edge
+ * (validate-workflow.ts:50-63). Mirrored here: one anchor per distinct edge
  * key, at the index of its SECOND occurrence (first-detected-duplicate),
  * never one anchor per extra repeat.
  */

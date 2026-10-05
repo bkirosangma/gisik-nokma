@@ -79,7 +79,7 @@ export const REFERENCE_BODY_EVENT_TYPES = [
  * hand when its event type is removed.
  */
 export const NOT_A_REFERENCE_BODY: Readonly<Record<string, string>> = {
-  'ticket.transitioned': 'its optional comment is plain text `{ text }`, not a document (`mcp-server` `redactedPayload`)',
+  'ticket.transitioned': 'its optional comment is plain text `{ text }`, not a document (`mcp-server` `redactedPayload`); its optional cause holds ids (wtg2 T8)',
   'ticket.assigned': 'a person id, not a document',
   'ticket.collaborator_added': 'a person id, not a document',
   'ticket.collaborator_removed': 'a person id, not a document',
@@ -87,8 +87,8 @@ export const NOT_A_REFERENCE_BODY: Readonly<Record<string, string>> = {
   'ticket.link_added': 'a typed link {kind, targetId, from?} between tickets, not a document (spec A, drafts R42; spec C reads it)',
   'ticket.link_removed': 'a typed link {kind, targetId, from?} between tickets, not a document (spec A, drafts R42; spec C reads it)',
   'ticket.workflow_rebound': 'a workflow id',
-  'ticket.closed': 'no body',
-  'ticket.reopened': 'no body',
+  'ticket.closed': 'no body: at most a flow cause of ids (wtg2 T8)',
+  'ticket.reopened': 'no body: at most a flow cause of ids (wtg2 T8)',
   'ticket.ranked': 'a rank string',
   'ticket.decided': "a Decision's outcome label and the ticket ids it asks the settle to close, not a document (wtg2 T5)",
   'ticket.discarded': 'the author\'s intent to erase a draft: empty, no document, and a draft wrote no row to remove (drafts T3, E1)',

@@ -56,7 +56,7 @@ import {
  * check forces, which is not the same as every precondition creation has.
  */
 export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
-  // Two layers, by design, exactly as in transition.ts:11-28 (pre-flight A19):
+  // Two layers, by design, exactly as in transition.ts:12-29 (pre-flight A19):
   // the fixture suite and Plan 10's offline replica enter at `evaluateEvent`
   // and never pass through ingest's door, so this check keeps its own kind
   // guard. Server-side the door answers first and this never runs — but it says

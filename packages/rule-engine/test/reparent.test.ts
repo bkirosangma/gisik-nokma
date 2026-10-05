@@ -282,7 +282,7 @@ describe('checkTicketReparented', () => {
   });
 
   /**
-   * The two-layer guard (pre-flight A19, the precedent `transition.ts:11-28`
+   * The two-layer guard (pre-flight A19, the precedent `transition.ts:12-29`
    * set). Ingest's door has already checked the kind and parsed the payload —
    * but the fixture suite and Plan 10's offline replica enter at `evaluateEvent`
    * and never pass through it.
@@ -351,7 +351,7 @@ describe('checkTicketReparented', () => {
 
 describe('checkTicketReparented under a terminal parent (owner decision 2026-08-20)', () => {
   /**
-   * The destination field is `to`, NOT `toStateId` (`workflow.ts:137-145`,
+   * The destination field is `to`, NOT `toStateId` (`workflow.ts:138-146`,
    * pre-flight A10 + addendum 1). Spelled `toStateId` the reducer throws at
    * SETUP and these tests never reach the assertions they exist to make.
    */

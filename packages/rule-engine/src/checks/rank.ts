@@ -16,7 +16,7 @@ import { ACCEPT, refuse } from './refusals.js';
  *
  * THE TEST IS `stateId`, NOT `stateCategory`, and the difference is not
  * pedantic: the universal `BACKLOG_STATE` is `category: 'open'`
- * (`packages/domain/src/workflow.ts:73`), so a category test would admit every
+ * (`packages/domain/src/workflow.ts:74`), so a category test would admit every
  * open ticket in the workspace — `"To do"` among them — and the backlog is not
  * a category, it is one reserved id no workflow can declare.
  *
@@ -27,7 +27,7 @@ import { ACCEPT, refuse } from './refusals.js';
  *
  * The entity-kind guard REFUSES a misfiled kind rather than accepting it,
  * naming the kind it actually points at — the shape every check in this file's
- * neighbourhood shares (`transition.ts:41-47`, `workflow-rebind.ts:44-50`,
+ * neighbourhood shares (`transition.ts:42-48`, `workflow-rebind.ts:44-50`,
  * `fields.ts:90-96`), and the one `close.ts`'s first cut got backwards. There
  * is deliberately NO `env.type` guard ahead of it: `close.ts` carries one only
  * because two handlers share that one file, and this file has a single handler
@@ -53,7 +53,7 @@ export async function checkTicketRanked(env: EventEnvelope, ctx: EngineContext):
     // than turning a decided refusal into something weaker. `statesWithBacklog`
     // rather than `def.states`, because the synthetic Backlog state is appended
     // by that helper and never declared by a workflow. Both mirror
-    // `checks/close.ts:41-42` exactly.
+    // `checks/close.ts:42-43` exactly.
     const def = await ctx.getWorkflowDef(env, ticket.workflowId);
     const stateName = def === null ? ticket.stateId
       : (statesWithBacklog(def).find((state) => state.id === ticket.stateId)?.name ?? ticket.stateId);
