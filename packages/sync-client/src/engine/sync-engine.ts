@@ -191,6 +191,11 @@ export class WorkspaceAccessLost extends Error {
  * "the server said no" (401 signed out, 403, 500 — surface it, as online) from
  * "no answer at all" (a `fetch` that rejected — the only thing a saved copy may
  * stand in for).
+ *
+ * The workspace bootstrap throws it too (sync-start-retry), and `start()` reads
+ * the split the other way round: it retries a 5xx, a 429, and anything untyped —
+ * no answer at all, or an answer whose body would not parse — and surfaces any
+ * other status. See `isRetryableBootstrapFailure`.
  */
 export class HttpStatusError extends Error {
   readonly status: number;
@@ -234,6 +239,16 @@ export type ApplyFailure = {
 };
 
 export type SyncEngine = {
+  /**
+   * Bootstrap if there is nothing to lose, then subscribe. A RETRYABLE bootstrap
+   * failure (no answer or one that would not parse, a 5xx such as ruling D's
+   * `snapshot_restate_pending`, or a 429) is retried here, on a doubling backoff,
+   * for as long as this call is current — status stays `connecting` throughout —
+   * so the promise settles only when the engine subscribes, a non-retryable
+   * failure rejects it, or `stop()` / a newer `start()` supersedes it (it then
+   * resolves without subscribing; a `loadBootstrap` already under way when that
+   * happened runs to its end first).
+   */
   start(workspaceId: string): Promise<void>;
   stop(): void;
   /** Drain every due outbox batch now. */
@@ -498,14 +513,54 @@ const PULL_TIMEOUT_MS = 15_000;
  */
 const RECONCILE_MIN_INTERVAL_MS = 60_000;
 
+/**
+ * The workspace bootstrap's retry schedule (sync-start-retry): 1 s, 2 s, 4 s …
+ * doubling up to 30 s, each wait then jittered by ±20% so a fleet that lost the
+ * same deploy does not come back in step. Unbounded: a device that cannot reach
+ * the server keeps asking until it is stopped, because the alternative — the one
+ * this replaces — was a device left at `connecting` until its app relaunched.
+ */
+const BOOTSTRAP_RETRY_BASE_MS = 1_000;
+const BOOTSTRAP_RETRY_CAP_MS = 30_000;
+const BOOTSTRAP_RETRY_JITTER = 0.2;
+
+/** The wait before retry number `attempt + 1`; `random` is in [0, 1], 0.5 adds no jitter. */
+function bootstrapRetryDelayMs(attempt: number, random: () => number): number {
+  const capped = Math.min(BOOTSTRAP_RETRY_BASE_MS * 2 ** attempt, BOOTSTRAP_RETRY_CAP_MS);
+  return capped * (1 + BOOTSTRAP_RETRY_JITTER * (2 * random() - 1));
+}
+
+/**
+ * Whether a failed workspace bootstrap is worth asking again. A status the
+ * server ANSWERED below 500 is its word — 401 signed out, 404, 400 — and asking
+ * again gets the same word, so it surfaces as it always did. The one exception
+ * is a 429, whose word is "later": the bootstrap draws on the same
+ * `events:<clientKey>` bucket as the outbox flush (`apps/server/src/app.ts:679-688`),
+ * so a device that has just flushed, or its NAT neighbours after a deploy, can be
+ * told to wait, and surfacing that would leave it at `connecting` (planner ruling
+ * 2026-10-05 18:56; the backoff spaces the retries, and `Retry-After` is not
+ * read). A 5xx (a deploy, a 502 from the edge, ruling D's 503 while the boot
+ * restate pass runs) is transient, and so is anything untyped: no answer at all
+ * (a `fetch` that rejected), or an answer whose body would not parse (a captive
+ * portal's HTML page makes `res.json()` throw). The 403 never reaches here:
+ * `start()` handles `WorkspaceAccessLost` first.
+ */
+function isRetryableBootstrapFailure(err: unknown): boolean {
+  if (err instanceof HttpStatusError) return err.status >= 500 || err.status === 429;
+  return true;
+}
+
 export function createSyncEngine(deps: {
   replica: Replica;
   outbox: Outbox;
   transport: SyncTransport;
   reconnectDelayMs?: number;
+  /** The bootstrap retry's jitter source, in [0, 1]; a seam for tests. */
+  random?: () => number;
 }): SyncEngine {
   const { replica, outbox, transport } = deps;
   const reconnectDelayMs = deps.reconnectDelayMs ?? 2000;
+  const random = deps.random ?? Math.random;
 
   let currentStatus: SyncStatus = 'offline';
   let handle: StreamHandle | null = null;
@@ -516,6 +571,22 @@ export function createSyncEngine(deps: {
   /** Set when the subscription ended for good (a workspace revocation): no reconnect. */
   let streamEnded = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Which `start()` call is current. A call whose number is no longer this one
+   * — a later `start()` began, as desktop's `online` handler does after a
+   * `stop()` — must not ask again, load an answer that arrives after that, or
+   * subscribe: `stopped` alone cannot say so, because the later call set it back
+   * to false. A `loadBootstrap` already under way when the call was superseded
+   * runs to its end; the check before `subscribe` is what keeps that call from
+   * opening a second stream.
+   */
+  let startGeneration = 0;
+  /**
+   * The last bootstrap retry's timer, and the wake that settles its wait early.
+   * Left in place once it fires: clearing a fired timer and resolving a settled
+   * wait are both no-ops, so `cancelBootstrapRetry` need not tell the two apart.
+   */
+  let bootstrapRetry: { timer: ReturnType<typeof setTimeout>; wake: () => void } | null = null;
   /** Frames apply strictly in arrival order. Never rejects: every link ends in a handler. */
   let applyChain: Promise<unknown> = Promise.resolve();
   let flushing: Promise<void> | null = null;
@@ -551,6 +622,23 @@ export function createSyncEngine(deps: {
     if (next === currentStatus) return;
     currentStatus = next;
     for (const cb of statusListeners) cb(next);
+  }
+
+  /** Wait `ms` before the next bootstrap attempt; `cancelBootstrapRetry` ends the wait early. */
+  function waitBeforeBootstrapRetry(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      bootstrapRetry = { timer, wake: resolve };
+    });
+  }
+
+  /** Clear a pending retry timer and settle its wait, so the superseded `start()` returns rather than hangs. */
+  function cancelBootstrapRetry(): void {
+    if (bootstrapRetry === null) return;
+    clearTimeout(bootstrapRetry.timer);
+    const { wake } = bootstrapRetry;
+    bootstrapRetry = null;
+    wake();
   }
 
   function closeStream(): void {
@@ -1112,6 +1200,9 @@ export function createSyncEngine(deps: {
 
   const engine: SyncEngine = {
     async start(ws) {
+      const generation = ++startGeneration;
+      const isCurrent = (): boolean => !stopped && generation === startGeneration;
+      cancelBootstrapRetry();
       workspaceId = ws;
       stopped = false;
       stalled = false;
@@ -1125,31 +1216,49 @@ export function createSyncEngine(deps: {
       setStatus('connecting');
       if (await needsBootstrap(ws)) {
         let body: BootstrapResponse;
-        try {
-          body = await transport.bootstrap(ws);
-        } catch (err) {
-          // Trash Plan 3 (D5): a 403 is either a revoke or a purge. Ask; a
-          // purge empties this device and ends here, anything else is the
-          // failure it always was.
-          if (err instanceof WorkspaceAccessLost) {
-            await learnPurges(ws);
-            // A relaunch after the purge: the workspace is already recorded, so
-            // the lookup had nothing to ask — the recorded answer is the answer
-            // (review fix I-4).
-            if (!streamEnded && (await replica.purgedAmong([ws])).some((ref) => ref.kind === 'workspace')) {
-              streamEnded = true;
+        // Only the network call is retried: a `needsBootstrap` or
+        // `loadBootstrap` failure is this device's, and asking again would not
+        // change it.
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            body = await transport.bootstrap(ws);
+            break;
+          } catch (err) {
+            // Trash Plan 3 (D5): a 403 is either a revoke or a purge. Ask; a
+            // purge empties this device and ends here, anything else is the
+            // failure it always was.
+            if (err instanceof WorkspaceAccessLost) {
+              await learnPurges(ws);
+              // A relaunch after the purge: the workspace is already recorded, so
+              // the lookup had nothing to ask — the recorded answer is the answer
+              // (review fix I-4).
+              if (!streamEnded && (await replica.purgedAmong([ws])).some((ref) => ref.kind === 'workspace')) {
+                streamEnded = true;
+              }
+              if (streamEnded) return;
+              throw err;
             }
-            if (streamEnded) return;
+            if (!isRetryableBootstrapFailure(err)) throw err;
+            // Stopped or superseded while the attempt was in flight: arm nothing.
+            if (!isCurrent()) return;
+            await waitBeforeBootstrapRetry(bootstrapRetryDelayMs(attempt, random));
+            if (!isCurrent()) return;
           }
-          throw err;
         }
+        // An answer that arrived after `stop()` or a newer `start()` is not this call's to load.
+        if (!isCurrent()) return;
         await replica.loadBootstrap(body);
       }
-      subscribe(await replica.getCursor(ws));
+      const cursor = await replica.getCursor(ws);
+      // Superseded while it loaded the bootstrap or read the cursor (desktop's
+      // `offline`/`online` flap resets `stopped`): the newer call subscribes.
+      if (!isCurrent()) return;
+      subscribe(cursor);
     },
 
     stop() {
       stopped = true;
+      cancelBootstrapRetry();
       closeStream();
     },
 

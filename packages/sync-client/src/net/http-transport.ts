@@ -190,7 +190,8 @@ export function createHttpTransport(opts: {
       const url = `${opts.baseUrl}/v1/sync/bootstrap?workspaceId=${encodeURIComponent(workspaceId)}`;
       const res = await doFetch(url, { headers });
       if (res.status === 403) throw new WorkspaceAccessLost(workspaceId, `bootstrap failed: ${res.status}`);
-      if (!res.ok) throw new Error(`bootstrap failed: ${res.status}`);
+      // Typed so `start()` can tell a 4xx it surfaces from a 5xx or a 429 it retries (sync-start-retry, 29.430-29.436).
+      if (!res.ok) throw new HttpStatusError(`bootstrap failed: ${res.status}`, res.status);
       return (await res.json()) as BootstrapResponse;
     },
 
