@@ -49,7 +49,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // for the dev rewrites) and, in principle, any page under app/. Scanning only
 // src/ left both invisible, so a NEXT_PUBLIC_ variable baked into the browser
 // bundle from a page could ship undocumented. The walker already skips
-// node_modules, dist, .next and *.test.* files, so widening this costs one
+// node_modules, dist, .next, *.test.* and *.spec.* files (Playwright specs
+// are tests, and their titles are prose that D3 reads as config keys), so widening this costs one
 // config file and covers the whole app.
 // 'apps/mobile' and 'apps/desktop' added 2026-09-07 (pre-launch checklist item
 // 4, "no secrets stored in the frontend"). The reason is the one already given
@@ -87,7 +88,7 @@ function* walk(dir) {
     if (stats.isDirectory()) {
       if (name === 'node_modules' || name === 'dist' || name === '.next') continue;
       yield* walk(path);
-    } else if (/\.(ts|tsx|mts|js|mjs|cjs)$/.test(name) && !/\.test\./.test(name)) {
+    } else if (/\.(ts|tsx|mts|js|mjs|cjs)$/.test(name) && !/\.(test|spec)\./.test(name)) {
       yield path;
     }
   }

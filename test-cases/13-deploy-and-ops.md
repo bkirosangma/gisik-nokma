@@ -850,6 +850,8 @@ Block `13.2270`–`13.2279` for `task/ctl-sem-gate-slots-file` (planner 2026-10-
 - 13.2284 🧪 The summary prints `ports: KG_PW_PORT=… FG_PW_PORT=…` right after the queue wait, and the log header records them
 - 13.2285 🧪 With fewer than two free ports in the range (`CTL_PW_PORT_COUNT=1`) the run FAILS (`FAIL run-tests <label> no free Playwright ports — nothing was run`, rc 1) and the command is not run; its `--dry-run` fails too
 - 13.2286 🧪 turbo's strict env mode would drop the gate's port: `turbo run test --filter=@gisik-nokma/knowledge-graph-browser --dry=json` lists `KG_PW_PORT` as a pass-through variable of that task, and the task hash is identical under two different ports (a pass-through is not hashed; an `env` entry would split the cache per port)
+- 13.2294 ✅ `pnpm check:env` passes on the tree with the Playwright port variables documented (`KG_PW_PORT`, `FG_PW_PORT` as commented optional lines in `.env.example`) (CONTROL: the same run against a copy of `.env.example` without the `# KG_PW_PORT=` line fails, rc 1, naming `KG_PW_PORT`) — `apps/server/test/deploy/check-env-example.test.ts`
+- 13.2295 ✅ A Playwright `*.spec.ts` whose test title reads `'x; CONTROL: 1'` is not scanned by `check:env` (no `CONTROL` reported; D3 reads titles as config keys) (CONTROL: the same text in a non-test `.ts` file IS reported, rc 1, proving D3 still runs) — `apps/server/test/deploy/check-env-example.test.ts`
 
 ## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
 
