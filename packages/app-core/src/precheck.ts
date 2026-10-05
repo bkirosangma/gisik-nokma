@@ -213,7 +213,7 @@ export async function precheckEvent(
 
   // The engine's own door for this payload. It is parsed first because the
   // engine's first question is a payload-and-actor one (wtg2 T8: a forged flow
-  // cause, `transition.ts:63`, asked before it reads the ticket); later it
+  // cause, `transition.ts:64`, asked before it reads the ticket); later it
   // answers the two questions the verdict alone cannot: which state is being
   // entered, and which edge carries the rule that refused.
   const payload = ticketTransitionedPayloadSchema.safeParse(submitted.payload);
@@ -224,8 +224,8 @@ export async function precheckEvent(
   if (ticket === undefined) return notEvaluated();
 
   // The explicit reopen (backlog/closed spec §2), mirrored from the engine's
-  // OWN order: `transition.ts:78` decides this before it even fetches the
-  // workflow def at `:82`, because a closed ticket has no legal move at all
+  // OWN order: `transition.ts:79` decides this before it even fetches the
+  // workflow def at `:83`, because a closed ticket has no legal move at all
   // and the flag is a fact this cache already holds — no def, no version
   // chain, nothing further is needed to answer confidently. Deciding it here,
   // ahead of the gates below, is what makes this branch predict the engine on
