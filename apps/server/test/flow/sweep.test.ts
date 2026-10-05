@@ -251,7 +251,8 @@ describe('29.226 the SELECT is a superset and the rule decides', () => {
 
 describe('29.227 refusals are counted', () => {
   it('29.227 a refused and an invalid submission both count in refused, summed across workspaces, and are logged; control: the real door promotes', async () => {
-    // WS2's rows are written FIRST: a SELECT without its ORDER BY would hand WS2 over first, and the log order below would turn
+    // WS2's rows are written FIRST, so the WS-then-WS2 log order below is never insertion order. (Without its ORDER BY the SELECT
+    // still hands WS over first today: the planner reads proj_tickets_live_idx, which leads with workspace_id. Mutant S_order.)
     await seedWs2();
     const s2 = await ws2Ticket('focus', ['doing', 'done']);
     const u = await ws2Ticket();
