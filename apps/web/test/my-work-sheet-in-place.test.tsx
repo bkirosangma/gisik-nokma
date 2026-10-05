@@ -127,6 +127,7 @@ function workItem(over: Partial<WorkItem> & { ticketId: string; title: string })
 function attentionItem(over: Partial<AttentionItem> & { ticketId: string; title: string }): AttentionItem {
   return {
     kind: 'blocked',
+    workspaceId: WORKSPACE,
     projectId: PROJECT,
     reason: 'nothing has moved it for nine days',
     claim: null,
