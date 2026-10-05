@@ -58,11 +58,13 @@ describe('29.190 every row of the planned-interval table', () => {
     expect(get(p, E).unscheduled).toBe('no-dates');
     // CONTROL: an estimate and no predecessor at all is also "no-dates"
     expect(get(planOf([fnode(A, { estimate: 3 })]), A).unscheduled).toBe('no-dates');
+    // a link from a ticket that is not in the read (a hole) is no predecessor: the estimate alone is still "no-dates"
+    expect(get(planOf([fnode(E, { estimate: 2 })], [edge(uid(99), E)]), E)).toEqual({ intervals: [], unscheduled: 'no-dates', onTimeline: false });
   });
 });
 
 describe('29.191 explicit dates and the warning glyph', () => {
-  it('29.191 an explicit start earlier than the ready day carries startsBeforePredecessor and still wins; a later one does not', () => {
+  it('29.191 an explicit start earlier than the ready day carries startsBeforePredecessor and still wins; a later one, or one on the ready day, does not', () => {
     const edges = [edge(A, B), edge(A, C)];
     const nodes = [
       fnode(A, { explicitStart: '2026-10-05', estimate: 3 }), // ends 2026-10-07, so successors are ready 2026-10-08
@@ -77,6 +79,9 @@ describe('29.191 explicit dates and the warning glyph', () => {
     // exact, so a missing interval cannot pass a `not.toHaveProperty` on `undefined`, and the flag is keyed on the explicit
     // START (`from` is 10-06, before the ready day 10-08: a flag computed from `from` would appear here)
     expect(get(due, B).intervals[0]).toEqual({ pass: 1, start: '2026-10-06', end: '2026-10-06', basis: 'explicit' });
+    // a start ON the ready day (10-08) is not before it: no glyph (kills `<=`)
+    const onDay = planOf([nodes[0] as FlowNode, fnode(D, { explicitStart: '2026-10-08', estimate: 1 })], [edge(A, D)]);
+    expect(get(onDay, D).intervals[0]).toEqual({ pass: 1, start: '2026-10-08', end: '2026-10-08', basis: 'explicit' });
   });
 });
 
@@ -134,6 +139,13 @@ describe('29.194 loop edges are not chained', () => {
     // CONTROL: a forward edge from the same late ticket does feed its successor
     const forward = planFlow({ nodes: [fnode(A, { explicitDue: '2026-10-20' }), fnode(B, { estimate: 1 })], edges: [edge(A, B)] });
     expect(span(forward, B)).toBe('2026-10-21..2026-10-21 chained');
+    // a loop inside the branch a Decision did not choose: the ghost B is fed by the Decision (10-06) only, never by the
+    // loop-closing C -> B, although C's own due (10-02) is earlier and would start B on 10-03
+    const ghost = planFlow({
+      nodes: [decision(D, { explicitDue: '2026-10-06', outcome: 'Yes', category: 'terminal' }), fnode(A, { estimate: 1 }), fnode(B, { estimate: 2 }), fnode(C, { explicitDue: '2026-10-02' })],
+      edges: [edge(D, A, 'Yes'), edge(D, B, 'No'), edge(B, C), edge(C, B)],
+    });
+    expect(get(ghost, B).intervals).toEqual([{ pass: 1, start: '2026-10-07', end: '2026-10-08', basis: 'chained', pruned: true }]);
   });
 });
 
@@ -147,7 +159,7 @@ const diamond = (over: { d?: Partial<FlowNode>; a?: Partial<FlowNode>; b?: Parti
 ];
 
 describe('29.195 decisions: pruned ghosts and revisions', () => {
-  it('29.195 before a choice both branches are planned; after one the other branch is a pruned ghost that no live ticket chains from', () => {
+  it('29.195 before a choice both branches are planned; after one the other branch is a pruned ghost that no live ticket chains from, nor from the Decision\'s un-chosen edge', () => {
     const undecided = planOf(diamond(), diamondEdges);
     expect(span(undecided, A)).toBe('2026-10-07..2026-10-07 chained');
     expect(span(undecided, B)).toBe('2026-10-07..2026-10-09 chained');
@@ -161,6 +173,13 @@ describe('29.195 decisions: pruned ghosts and revisions', () => {
     expect(get(decided, B).intervals[0]).not.toHaveProperty('pruned');
     // the tail is live through B alone: ready 10-10, not 10-08 from the pruned ghost
     expect(span(decided, C)).toBe('2026-10-10..2026-10-11 chained');
+    // the Decision's own un-chosen edge D -> C, into a ticket that is live through the chosen branch, feeds nothing either
+    const cut = [edge(D, A, 'Yes'), edge(D, C, 'No'), edge(A, C)];
+    const three = (d: Partial<FlowNode>): FlowNode[] => [decision(D, { explicitDue: '2026-10-06', ...d }), fnode(A, { estimate: 1 }), fnode(C, { estimate: 2 })];
+    // CONTROL: undecided, the same edge is live and C follows the earlier end, the Decision's own (10-06)
+    expect(span(planOf(three({}), cut), C)).toBe('2026-10-07..2026-10-08 chained');
+    // decided Yes, C waits for A (10-07)
+    expect(span(planOf(three({ outcome: 'Yes', category: 'terminal' }), cut), C)).toBe('2026-10-08..2026-10-09 chained');
   });
 
   it('29.195 a revised Decision ends at the later of its period end and its latest revision, so the new branch chains from the revision', () => {
@@ -183,6 +202,19 @@ describe('29.195 decisions: pruned ghosts and revisions', () => {
       diamondEdges,
     );
     expect(span(early, B)).toBe('2026-10-07..2026-10-09 chained');
+    // two revisions in one pass: the LATEST day counts, in either recorded order
+    const rev = (at: string) => ({ from: 'Yes', to: 'No', by: 'u', at });
+    for (const revisions of [[rev('2026-10-09T08:00:00.000Z'), rev('2026-10-08T08:00:00.000Z')], [rev('2026-10-08T08:00:00.000Z'), rev('2026-10-09T08:00:00.000Z')]]) {
+      const twice = planOf(diamond({ d: { ...base, passes: [{ ...base.passes[0]!, revisions }] } }), diamondEdges);
+      expect(span(twice, B)).toBe('2026-10-10..2026-10-12 chained');
+    }
+    // a Decision with no end of its own (undated, never finished) ends on its revision day
+    const undated = planOf(
+      diamond({ d: { outcome: 'No', explicitDue: null, passes: [{ ...base.passes[0]!, revisions: [rev('2026-10-09T08:00:00.000Z')] }] } }),
+      diamondEdges,
+    );
+    expect(get(undated, D).intervals).toEqual([]);
+    expect(span(undated, B)).toBe('2026-10-10..2026-10-12 chained');
   });
 
   it('29.195 waitForAll on the shared tail waits for the branch taken only, and a Not-taken source is not a predecessor', () => {
@@ -250,9 +282,31 @@ describe('29.196 passes: a loop re-runs its body', () => {
       once.edges,
     );
     expect(span(q, E)).toBe('2026-10-13..2026-10-14 chained');
+    // the loop's last run is pass 2, where the Decision chose 'Done': E chains from that pass's end moved by its revision
+    // (10-20), not from pass 1's record (no revision); a pass-2 'Done' re-runs nothing (A keeps two passes, not three)
+    const revisedLast = planOf(
+      [
+        fnode(A, { explicitStart: '2026-10-05', estimate: 3, reworkEstimate: 2, rounds: 2, periods: [period('2026-10-07T06:00:00.000Z'), period('2026-10-14T06:00:00.000Z', 2)] }),
+        fnode(B, { estimate: 2, rounds: 2, periods: [period('2026-10-10T06:00:00.000Z'), period('2026-10-16T06:00:00.000Z', 2)] }),
+        decision(D, {
+          estimate: 1,
+          rounds: 2,
+          outcome: 'Done',
+          periods: [period('2026-10-12T06:00:00.000Z'), period('2026-10-18T06:00:00.000Z', 2)],
+          passes: [
+            { pass: 1, outcome: 'Again', by: 'u', at: '2026-10-12T06:00:00.000Z', revisions: [] },
+            { pass: 2, outcome: 'Done', by: 'u', at: '2026-10-18T06:00:00.000Z', revisions: [{ from: 'Again', to: 'Done', by: 'u', at: '2026-10-20T06:00:00.000Z' }] },
+          ],
+        }),
+        fnode(E, { estimate: 2 }),
+      ],
+      edges,
+    );
+    expect(span(revisedLast, E)).toBe('2026-10-21..2026-10-22 chained');
+    expect(get(revisedLast, A).intervals.map((i) => i.pass)).toEqual([1, 2]);
   });
 
-  it('29.196 a pass with no estimate is unscheduled "no-estimate" while pass 1 keeps its interval; a loop outcome not yet reset still plans the target\'s next pass', () => {
+  it('29.196 a pass with no estimate is unscheduled "no-estimate" while pass 1 keeps its interval; a loop outcome not yet reset still plans the target\'s next pass; a reset ticket owes its pass even when its Decision is a hole', () => {
     const { nodes, edges } = loopWorld();
     const noRework = nodes.map((n) => (n.id === A ? { ...n, estimate: null, reworkEstimate: null, explicitDue: '2026-10-07' } : n));
     const p = planOf(noRework, edges);
@@ -263,6 +317,82 @@ describe('29.196 passes: a loop re-runs its body', () => {
     const q = planOf(pending.nodes, pending.edges);
     expect(get(q, A).intervals.map((i) => i.pass)).toEqual([1, 2]);
     expect(get(q, B).intervals.map((i) => i.pass)).toEqual([1]);
+    // a reset ticket whose Decision is not in the read (a hole) still owes its pass: with no ready day it is "no-dates",
+    // which wins over a missing estimate (B has none)
+    const hole = planOf([fnode(A, { explicitStart: '2026-10-05', estimate: 3, rounds: 2 }), fnode(B, { rounds: 2 })], [edge(A, B)]);
+    expect([get(hole, A).intervals.map((i) => i.pass), get(hole, A).unscheduled]).toEqual([[1], 'no-dates']);
+    expect(get(hole, B)).toEqual({ intervals: [], unscheduled: 'no-dates', onTimeline: false });
+    // pass 1 is planned for every node, whatever its round reads
+    expect(span(planOf([fnode(A, { explicitDue: '2026-10-05', rounds: 0 })]), A)).toBe('2026-10-05..2026-10-05 explicit');
+  });
+
+  it('29.196 only the Decision\'s loop outcome of that pass re-runs the target: a forward outcome, a cleared pass and a non-Decision\'s stale record re-run nothing; the label matches after case folding', () => {
+    const pending = loopWorld({ passes: 1 }); // D chose 'Again' in pass 1 and nothing is reset yet (rounds 1)
+    type Revision = { from: string | null; to: string | null; by: string; at: string };
+    const record = (outcome: string | null, revisions: Revision[] = []) => [{ pass: 1, outcome, by: 'u', at: '2026-10-12T06:00:00.000Z', revisions }];
+    const withD = (d: Partial<FlowNode>, edges = pending.edges) => planOf(pending.nodes.map((n) => (n.id === D ? { ...n, ...d } : n)), edges);
+    const passesOf = (p: Map<string, NodePlan>, id: string) => get(p, id).intervals.map((i) => i.pass);
+    // CONTROL: the loop outcome re-runs the target
+    expect(passesOf(withD({}), A)).toEqual([1, 2]);
+    // ... and matches its label after trim and case folding (the link was relabelled 'again' -> 'Again' after the choice)
+    expect(passesOf(withD({ outcome: 'again', passes: record('again') }), A)).toEqual([1, 2]);
+    // the forward outcome 'Done' re-runs neither the loop target nor what it leads to
+    const done = withD({ outcome: 'Done', passes: record('Done') });
+    expect([passesOf(done, A), passesOf(done, E)]).toEqual([[1], [1]]);
+    // a cleared pass (outcome null) re-runs nothing, even over an unlabelled loop edge
+    const unlabelled = [edge(A, B), edge(B, D), edge(D, A), edge(D, E, 'Done')];
+    const cleared = withD({ outcome: null, passes: record(null, [{ from: 'Again', to: null, by: 'u', at: '2026-10-12T08:00:00.000Z' }]) }, unlabelled);
+    expect(passesOf(cleared, A)).toEqual([1]);
+    // a ticket that is no longer a Decision keeps its pass records but loops nothing, and its stale revision (10-20) does
+    // not move its end; F, reset to round 2 elsewhere in the flow, makes a pass 2 exist
+    const stale = record('Again', [{ from: 'Done', to: 'Again', by: 'u', at: '2026-10-20T06:00:00.000Z' }]);
+    const retyped = planOf(
+      [...pending.nodes.map((n) => (n.id === D ? { ...n, typeId: 'task', isDecision: false, passes: stale } : n)), fnode(F, { rounds: 2 })],
+      pending.edges,
+    );
+    expect(passesOf(retyped, A)).toEqual([1]);
+    expect(span(retyped, E)).toBe('2026-10-13..2026-10-14 chained'); // D's own end, 10-12
+  });
+
+  it('29.196 a feeder from outside the loop feeds pass 1 only, and of two Decisions looping into one target only the one that chose its loop re-runs it, in either order', () => {
+    const { nodes, edges } = loopWorld();
+    const againIn = (pass: number, day: string) => ({ pass, outcome: 'Again', by: 'u', at: `${day}T06:00:00.000Z`, revisions: [] });
+    const runs = (p: Map<string, NodePlan>, id: string) => get(p, id).intervals.map((i) => `${i.pass}:${i.start}..${i.end}`);
+    // F -> A feeds A's pass 1 only: A's pass 2 still starts the day after D's pass-1 finish (10-12), not after F (10-01)
+    const fed = planOf([...nodes, fnode(F, { explicitDue: '2026-10-01' })], [...edges, edge(F, A)]);
+    expect(runs(fed, A)).toEqual(['1:2026-10-05..2026-10-07', '2:2026-10-13..2026-10-14']);
+    // D chose 'Again' in passes 1 and 2 and A waits for all: in pass 2 the feeder, which does not run again, neither
+    // feeds A nor holds it back as an unknown end
+    const twice = planOf(
+      [
+        fnode(F, { explicitDue: '2026-10-01' }),
+        fnode(A, { explicitStart: '2026-10-05', estimate: 3, reworkEstimate: 2, rounds: 2, waitForAll: true, periods: [period('2026-10-07T06:00:00.000Z')] }),
+        fnode(B, { estimate: 2, rounds: 2, periods: [period('2026-10-10T06:00:00.000Z')] }),
+        decision(D, {
+          estimate: 1,
+          rounds: 2,
+          outcome: 'Again',
+          periods: [period('2026-10-12T06:00:00.000Z'), period('2026-10-18T06:00:00.000Z', 2)],
+          passes: [againIn(1, '2026-10-12'), againIn(2, '2026-10-18')],
+        }),
+        fnode(E, { estimate: 2 }),
+      ],
+      [edge(F, A), ...edges],
+    );
+    expect(runs(twice, A)).toEqual(['1:2026-10-05..2026-10-07', '2:2026-10-13..2026-10-14', '3:2026-10-19..2026-10-20']); // after D's 10-12 and 10-18
+    // two Decisions loop into A: D chose its loop 'Again' (10-12); X chose 'Fine', not its loop 'Retry', and its own end
+    // (10-09) is earlier, so a loop edge counted without its choice would start A's pass 2 on 10-10
+    const X = F;
+    const pair = [
+      fnode(A, { explicitStart: '2026-10-05', estimate: 3, reworkEstimate: 2, periods: [period('2026-10-07T06:00:00.000Z')] }),
+      fnode(B, { estimate: 2, periods: [period('2026-10-10T06:00:00.000Z')] }),
+      decision(D, { estimate: 1, outcome: 'Again', periods: [period('2026-10-12T06:00:00.000Z')], passes: [againIn(1, '2026-10-12')] }),
+      decision(X, { explicitDue: '2026-10-09', outcome: 'Fine', passes: [{ ...againIn(1, '2026-10-09'), outcome: 'Fine' }] }),
+    ];
+    const pairEdges = [edge(A, B), edge(B, D), edge(B, X), edge(D, A, 'Again'), edge(X, A, 'Retry')];
+    for (const p of [planOf(pair, pairEdges), planOf([...pair].reverse(), [...pairEdges].reverse())]) {
+      expect(runs(p, A)).toEqual(['1:2026-10-05..2026-10-07', '2:2026-10-13..2026-10-14']);
+    }
   });
 });
 
