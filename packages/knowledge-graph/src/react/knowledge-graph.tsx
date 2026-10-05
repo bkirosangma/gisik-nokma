@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { GRAPH_CHIP_ORDER, GRAPH_MAX_HOPS, inGraphScope, type GraphGroup } from '@gisik-nokma/domain';
+import { GRAPH_CHIP_ORDER, GRAPH_MAX_HOPS, inGraphScope, type GraphEdgeView, type GraphGroup } from '@gisik-nokma/domain';
 import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { RING_CONFIGS } from '../engine/layout.js';
 import type { GraphStore } from '../engine/model.js';
@@ -9,7 +9,11 @@ import { CLEAR_CAP, zones as computeZones } from '../engine/zones.js';
 import type { GraphRenderer, HoverEvent, PickEvent } from '../render/renderer.js';
 import { readThemePalette, watchTheme } from '../theme/read-palette.js';
 import { buildDrawModel } from './draw-model.js';
+import { EdgeInspector } from './edge-inspector.js';
 import { GraphBar } from './graph-bar.js';
+import { GraphList } from './graph-list.js';
+import type { ScopeKey } from './inspect-model.js';
+import { Inspector, type ScopeNames } from './inspector.js';
 import { readSemantic, writeSemantic } from './semantic-pref.js';
 import { tooltipPosition } from './tooltip.js';
 import type { HopChoice, KnowledgeGraphProps } from './types.js';
@@ -24,8 +28,9 @@ const OWNS_KEYS = 'input, textarea, select, [role="combobox"], [role="listbox"],
 
 /**
  * The Knowledge Graph view (spec C §3, §5, §6): the mockup's `makeGraph` view half (`knowledge-graph-sigma.html:709-1080`).
- * State, the bar, the chrome of `render` (`:950-965`), the trail (`:969-975`), `pick` (`:1036`), `centre` (`:1040`),
- * `goTrail` (`:1041`), and the click and key handlers (`:1043-1080`). The renderer is behind the seam and loaded with
+ * State, the bar, the chrome of `render` (`:950-965`), the trail (`:969-975`), the inspectors and the list (`inspector.tsx`,
+ * `edge-inspector.tsx`, `graph-list.tsx`: `:977-1035`), `pick` (`:1036`), `centre` (`:1040`), `goTrail` (`:1041`), and the
+ * click and key handlers (`:1043-1080`). The renderer is behind the seam and loaded with
  * `import()`, so this file never evaluates WebGL code on a server. CLIENT-ONLY: the web loads it with `next/dynamic`.
  */
 export function KnowledgeGraph(props: KnowledgeGraphProps) {
@@ -42,6 +47,8 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   const [ownHops, setOwnHops] = useState<HopChoice>(2);
   const [semantic, setSemanticState] = useState(true);
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
+  /** The link "Remove link" just took out of the store: its inspector stays up, with Undo, until another selection. */
+  const [removedEdge, setRemovedEdge] = useState<GraphEdgeView | null>(null);
   const hops: HopChoice = phone ? 1 : props.hops ?? ownHops;
   const setHops = (h: HopChoice) => (props.onHopsChange ? props.onHopsChange(h) : setOwnHops(h));
   useEffect(() => setSemanticState(readSemantic()), []);
@@ -76,6 +83,11 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   }
   const label = (ref: string) => rings.store.items.get(ref)?.label ?? seen.current.get(ref) ?? '';
   const centreItem = rings.store.items.get(centre);
+  const scopeNames = useMemo<ScopeNames>(() => {
+    const ws = new Map(props.scope.workspaces.map((w) => [w.id, w.name]));
+    const pj = new Map(props.scope.workspaces.flatMap((w) => w.projects.map((x) => [x.id, x.name] as const)));
+    return { workspace: (id) => ws.get(id) ?? null, project: (id) => pj.get(id) ?? null };
+  }, [props.scope]);
 
   // The renderer's callbacks are registered once, at mount: they read the CURRENT render through these refs.
   const labelRef = useRef(label);
@@ -170,6 +182,30 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     }
     if (e.kind === 'edge-leave') setTip(null);
   };
+  /** The inspector's "Add <name> (n)" (`knowledge-graph-sigma.html:1064`): a project of a chosen workspace, or another workspace. */
+  function addScope(key: ScopeKey) {
+    if ('projectId' in key) setProjectIds((ids) => (ids.includes(key.projectId) ? ids : [...ids, key.projectId]));
+    else setWorkspaceIds((ids) => (ids.includes(key.workspaceId) ? ids : [...ids, key.workspaceId]));
+    setStatus('');
+  }
+  // "Remove link" (spec A's `ticket.link_removed`, through the host): the cached store drops the edge, and Undo puts it back
+  // through `mergeRing` with no refetch (planner ruling 2026-10-04). The camera stays where it is either way.
+  const removeLink =
+    props.onRemoveLink === undefined
+      ? undefined
+      : async (edge: GraphEdgeView) => {
+          const done = await props.onRemoveLink!(edge);
+          keepView.current = true;
+          rings.forget(edge.id);
+          setRemovedEdge(edge);
+          return {
+            undo: async () => {
+              await done.undo();
+              keepView.current = true;
+              rings.restore(edge);
+            },
+          };
+        };
   function setSemantic(next: boolean) {
     setSemanticState(next);
     writeSemantic(next);
@@ -203,6 +239,8 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         ? `${n} items, everything connected${fogTxt}${outTxt}`
         : `${n} items within ${reach} hop${reach > 1 ? 's' : ''}${fogTxt}${outTxt}`;
   const firstLoad = rings.loading && rings.store.items.size === 0;
+  const edgeView = selectedEdge === null ? undefined : (rings.store.edges.get(selectedEdge) ?? (removedEdge?.id === selectedEdge ? removedEdge : undefined));
+  const selectedItem = selected === null ? undefined : rings.store.items.get(selected);
   const empty = !rings.loading && rings.failedHop === null && centreItem !== undefined && z.clear.length === 1 && z.fog.length === 0;
   const tipPos = tip === null || mountRef.current === null ? null : tooltipPosition(tip.x, tip.y, { width: Math.min(320, tip.text.length * 7 + 20), height: 28 }, mountRef.current.clientWidth);
 
@@ -237,86 +275,127 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         count={count}
         scopeNote={centreItem !== undefined && !inGraphScope(centreItem, scope) ? `${label(centre)} is outside the projects you picked. It stays in the middle, and its links follow your scope.` : null}
       />
-      <div className="gn-kg__canvas">
-        <div
-          ref={mountRef}
-          className="gn-kg__mount"
-          role="img"
-          tabIndex={0}
-          aria-label={`Knowledge Graph of items linked to ${label(centre)}`}
-          data-kg-probe={props.createRenderer ? '' : undefined}
-          // the edge sentence follows the pointer along its edge, as the mockup's does (`knowledge-graph-sigma.html:884`):
-          // Sigma reports an edge once, on entering it (and leaving the canvas is Sigma's leaveEdge, 27.329)
-          onPointerMove={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            setTip((t) => (t === null ? t : { ...t, x: e.clientX - r.left, y: e.clientY - r.top }));
-          }}
-        />
-        {firstLoad && (
-          <SkeletonRegion label="Loading the Knowledge Graph" className="gn-kg__skeleton">
-            <Skeleton shape="circle" width="6rem" height="6rem" />
-          </SkeletonRegion>
-        )}
-        {empty && (
-          <div className="gn-kg__empty">
-            <p>{`Nothing is linked to ${label(centre)} yet.`}</p>
-            {centreItem?.kind === 'ticket' && props.onAddLink && (
-              <button type="button" className="gn-button gn-button--primary" onClick={() => props.onAddLink!(centreItem)}>
-                Add link
+      <div className="gn-kg__body">
+        <div className="gn-kg__canvas">
+          <div
+            ref={mountRef}
+            className="gn-kg__mount"
+            role="img"
+            tabIndex={0}
+            aria-label={`Knowledge Graph of items linked to ${label(centre)}`}
+            data-kg-probe={props.createRenderer ? '' : undefined}
+            // the edge sentence follows the pointer along its edge, as the mockup's does (`knowledge-graph-sigma.html:884`):
+            // Sigma reports an edge once, on entering it (and leaving the canvas is Sigma's leaveEdge, 27.329)
+            onPointerMove={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setTip((t) => (t === null ? t : { ...t, x: e.clientX - r.left, y: e.clientY - r.top }));
+            }}
+          />
+          {firstLoad && (
+            <SkeletonRegion label="Loading the Knowledge Graph" className="gn-kg__skeleton">
+              <Skeleton shape="circle" width="6rem" height="6rem" />
+            </SkeletonRegion>
+          )}
+          {empty && (
+            <div className="gn-kg__empty">
+              <p>{`Nothing is linked to ${label(centre)} yet.`}</p>
+              {centreItem?.kind === 'ticket' && props.onAddLink && (
+                <button type="button" className="gn-button gn-button--primary" onClick={() => props.onAddLink!(centreItem)}>
+                  Add link
+                </button>
+              )}
+            </div>
+          )}
+          {trail.length > 0 && (
+            <div className="gn-kg__trail">
+              <button type="button" className="gn-button gn-kg__back" aria-label={`Back to ${label(trail[trail.length - 2]!)}`} onClick={() => goTrail(trail.length - 2)}>
+                ‹ Back
               </button>
-            )}
-          </div>
-        )}
-        {trail.length > 0 && (
-          <div className="gn-kg__trail">
-            <button type="button" className="gn-button gn-kg__back" aria-label={`Back to ${label(trail[trail.length - 2]!)}`} onClick={() => goTrail(trail.length - 2)}>
-              ‹ Back
+              {trail.map((ref, i) => (
+                <button key={`${ref}-${i}`} type="button" className="gn-button gn-kg__crumb" aria-current={i === trail.length - 1} onClick={() => goTrail(i)}>
+                  {label(ref)}
+                </button>
+              ))}
+            </div>
+          )}
+          {z.beyond > 0 && (
+            <button type="button" className="gn-button gn-kg__further" onClick={() => setStatus(`${z.beyond} items are further than the ${CLEAR_CAP} nearest. Turn off a link type, or Center closer to them.`)}>
+              {`+${z.beyond} further out`}
             </button>
-            {trail.map((ref, i) => (
-              <button key={`${ref}-${i}`} type="button" className="gn-button gn-kg__crumb" aria-current={i === trail.length - 1} onClick={() => goTrail(i)}>
-                {label(ref)}
+          )}
+          {rings.failedHop !== null && (
+            <p className="gn-kg__error" role="alert">
+              Couldn&apos;t load the next hop.{' '}
+              <button type="button" className="gn-button" onClick={rings.retry}>
+                Retry
               </button>
-            ))}
-          </div>
-        )}
-        {z.beyond > 0 && (
-          <button type="button" className="gn-button gn-kg__further" onClick={() => setStatus(`${z.beyond} items are further than the ${CLEAR_CAP} nearest. Turn off a link type, or Center closer to them.`)}>
-            {`+${z.beyond} further out`}
-          </button>
-        )}
-        {rings.failedHop !== null && (
-          <p className="gn-kg__error" role="alert">
-            Couldn&apos;t load the next hop.{' '}
-            <button type="button" className="gn-button" onClick={rings.retry}>
-              Retry
+            </p>
+          )}
+          {tip !== null && tipPos !== null && (
+            <div className="gn-kg__tip" role="tooltip" style={{ transform: `translate(${tipPos.left}px, ${tipPos.top}px)` }}>
+              {tip.text}
+            </div>
+          )}
+          <div className="gn-kg__zoom" role="group" aria-label="Zoom">
+            <button type="button" className="gn-button gn-kg__zoom-button" aria-label="Zoom in" onClick={() => renderer.current?.zoomBy(1.5)}>
+              +
             </button>
-          </p>
-        )}
-        {tip !== null && tipPos !== null && (
-          <div className="gn-kg__tip" role="tooltip" style={{ transform: `translate(${tipPos.left}px, ${tipPos.top}px)` }}>
-            {tip.text}
+            <button type="button" className="gn-button gn-kg__zoom-button" aria-label="Zoom out" onClick={() => renderer.current?.zoomBy(1 / 1.5)}>
+              −
+            </button>
+            <button type="button" className="gn-button gn-kg__zoom-button" aria-label="Fit to view" onClick={() => renderer.current?.setCamera('fit')}>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
-        )}
-        <div className="gn-kg__zoom" role="group" aria-label="Zoom">
-          <button type="button" className="gn-button gn-kg__zoom-button" aria-label="Zoom in" onClick={() => renderer.current?.zoomBy(1.5)}>
-            +
-          </button>
-          <button type="button" className="gn-button gn-kg__zoom-button" aria-label="Zoom out" onClick={() => renderer.current?.zoomBy(1 / 1.5)}>
-            −
-          </button>
-          <button type="button" className="gn-button gn-kg__zoom-button" aria-label="Fit to view" onClick={() => renderer.current?.setCamera('fit')}>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
         </div>
+        {/* The inspector (§3.5): a side column on a desktop, a card under the canvas on a phone; it never overlays or resizes the
+            canvas. It is there before ring 1 too, and it holds the view's one live region. */}
+        <aside className={`gn-kg-insp${phone ? ' gn-kg-insp--card' : ''}`} aria-label="Inspector">
+          {edgeView !== undefined ? (
+            <EdgeInspector
+              key={edgeView.id}
+              edge={edgeView}
+              store={rings.store}
+              label={label}
+              onPick={pick}
+              onCenter={centreOn}
+              onRemoveLink={removeLink}
+              canRemoveLink={props.canRemoveLink}
+              status={status}
+              setStatus={setStatus}
+            />
+          ) : selectedItem !== undefined ? (
+            <Inspector
+              item={selectedItem}
+              centre={centre}
+              store={rings.store}
+              zones={z}
+              on={on}
+              inScope={inScope}
+              workspaceIds={workspaceIds}
+              scopeNames={scopeNames}
+              phone={phone}
+              label={label}
+              canOpen={props.canOpen}
+              onCenter={centreOn}
+              onOpen={props.onOpen}
+              onPick={pick}
+              onAddScope={addScope}
+              status={status}
+            />
+          ) : (
+            <p className="gn-kg__status" aria-live="polite">
+              {status}
+            </p>
+          )}
+        </aside>
       </div>
       {!phone && props.showHops !== false && (
         <p className="gn-kg__keys">Keys: 1–4 hops, C center on the selected item, Esc back. Scroll or pinch to zoom, drag to pan, double-click an item to center on it.</p>
       )}
-      <p className="gn-kg__status" aria-live="polite">
-        {status}
-      </p>
+      {centreItem !== undefined && <GraphList centre={centre} store={rings.store} zones={z} selected={selectedEdge === null ? selected : null} label={label} onPick={pick} />}
     </div>
   );
 }
