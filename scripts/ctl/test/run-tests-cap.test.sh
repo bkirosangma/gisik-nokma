@@ -38,15 +38,20 @@ gone() { local st; st="$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')"; [ -z "$s
 slots_left() { ls "$CTL_SEM_DIR" 2>/dev/null | grep -c '^slot-'; }
 now() { date +%s; }
 
-# THE HUNG JOB: a leader (sh) that records its pid and group, then a CPU spinner that IGNORES TERM (only the KILL after the grace stops it).
-HUNG='echo $$ >> "$FXP"; echo $$ > "$1.leader"; ps -o pgid= -p $$ | tr -d " " > "$1.pgid"; date +%s > "$1.start"
-bash -c "trap \"\" TERM; while :; do :; done" & echo $! >> "$FXP"; echo $! > "$1.spin"; wait'
+# THE HUNG JOB (sh "$fx/hung.sh" PREFIX): a leader that records its pid and group, a CPU spinner that IGNORES TERM (only the KILL after the
+# grace stops it), and a polite child that writes PREFIX.polite on TERM and exits (only a TERM sent to the GROUP reaches it before the KILL).
+cat > "$fx/hung.sh" <<'SH'
+echo $$ >> "$FXP"; echo $$ > "$1.leader"; ps -o pgid= -p $$ | tr -d " " > "$1.pgid"; date +%s > "$1.start"
+bash -c 'trap "" TERM; while :; do :; done' & echo $! >> "$FXP"; echo $! > "$1.spin"
+bash -c 'trap "echo term > \"$0.polite\"; exit 0" TERM; while :; do sleep 0.2; done' "$1" & echo $! >> "$FXP"; echo $! > "$1.politepid"
+wait
+SH
 
 # ---- 13.2320 the cap fires: a job past --max-min is stopped (its whole group), 124, TIMEOUT, slot freed ----
-reset; t0=$(now); out=$(rt --label capx --max-min 2 -- sh -c "$HUNG" x "$fx/j.a"); rc=$?; t1=$(now); log=$(lastlog)
-spin=$(cat "$fx/j.a.spin" 2>/dev/null); leader=$(cat "$fx/j.a.leader" 2>/dev/null)
-check "13.2320 a job that holds its slot past --max-min 2 (scaled: 2 s) is stopped: exit 124, the log's LAST line is exactly 'TIMEOUT after 2 min', the summary's last line says TIMEOUT, the slot is freed, and the TERM-ignoring CPU spinner and its leader are both gone" \
-  '[ $rc -eq 124 ] && [ "$(tail -1 "$log")" = "TIMEOUT after 2 min" ] && printf "%s\n" "$out" | tail -1 | grep -q "^FAIL run-tests capx TIMEOUT after 2 min — its process group was stopped, slot released (rc=124" && [ "$(slots_left)" = 0 ] && [ -n "$spin" ] && gone "$spin" && [ -n "$leader" ] && gone "$leader"'
+reset; t0=$(now); out=$(rt --label capx --max-min 2 -- sh "$fx/hung.sh" "$fx/j.a"); rc=$?; t1=$(now); log=$(lastlog)
+spin=$(cat "$fx/j.a.spin" 2>/dev/null); leader=$(cat "$fx/j.a.leader" 2>/dev/null); polite=$(cat "$fx/j.a.politepid" 2>/dev/null)
+check "13.2320 a job that holds its slot past --max-min 2 (scaled: 2 s) is stopped: exit 124, the log's LAST line is exactly 'TIMEOUT after 2 min', the summary's last line says TIMEOUT, the slot is freed, the TERM-ignoring CPU spinner and its leader are both gone, and the polite child got the group's TERM (its file) and is gone too" \
+  '[ $rc -eq 124 ] && [ "$(tail -1 "$log")" = "TIMEOUT after 2 min" ] && printf "%s\n" "$out" | tail -1 | grep -q "^FAIL run-tests capx TIMEOUT after 2 min — its process group was stopped, slot released (rc=124" && [ "$(slots_left)" = 0 ] && [ -n "$spin" ] && gone "$spin" && [ -n "$leader" ] && gone "$leader" && [ -f "$fx/j.a.polite" ] && [ -n "$polite" ] && gone "$polite"'
 check "13.2320 …within the cap + the KILL grace + a margin (2 + 1 + 4 s of wall clock, the spinner needed the KILL), and the log header names the cap" \
   '[ $((t1 - t0)) -ge 3 ] && [ $((t1 - t0)) -le 7 ] && grep -qx "# cap 2 min of slot time (then TERM the group, KILL 1 s later, exit 124)" "$log"'
 
@@ -68,13 +73,13 @@ holdslot() { local p; sleep 600 & p=$!; echo "$p" >> "$fx/pids"; mkdir -p "$CTL_
 reset; holdslot 6; q0=$(now); oq=$(CTL_TEST_SLOTS=1 rt --label queued --max-min 3 -- sh -c 'date +%s > "$1.start"; sleep 2; echo ran-to-the-end' x "$fx/j.q"); rq=$?; lq=$(lastlog)
 check "13.2322 a job queued 6 s behind a held slot, then 2 s in its slot under a 3 s cap, runs to completion: rc 0, its last output line is in the log, no TIMEOUT (precondition: it really queued ≥ 5 s, the start is ≥ 5 s after the call)" \
   '[ $rq -eq 0 ] && grep -qx ran-to-the-end "$lq" && ! grep -q TIMEOUT "$lq" && [ $(( $(cat "$fx/j.q.start") - q0 )) -ge 5 ] && printf "%s" "$oq" | grep -q "^queue wait: [5-9]s (waited for: slots)"'
-reset; holdslot 6; oh=$(CTL_TEST_SLOTS=1 rt --label queuedhung --max-min 3 -- sh -c "$HUNG" x "$fx/j.h"); rh=$?; th=$(now); lh=$(lastlog)
+reset; holdslot 6; oh=$(CTL_TEST_SLOTS=1 rt --label queuedhung --max-min 3 -- sh "$fx/hung.sh" "$fx/j.h"); rh=$?; th=$(now); lh=$(lastlog)
 check "13.2322 …and a HUNG job behind the same queue is still capped, after a full cap of SLOT time: rc 124 + TIMEOUT after 3 min, ≥ 3 s from its own start to the verb's end (a clock started at the queue would kill it at once, or never)" \
   '[ $rh -eq 124 ] && [ "$(tail -1 "$lh")" = "TIMEOUT after 3 min" ] && [ -f "$fx/j.h.start" ] && [ $(( th - $(cat "$fx/j.h.start") )) -ge 3 ] && gone "$(cat "$fx/j.h.spin")"'
 
 # ---- 13.2323 the job runs in its OWN process group, and nothing outside it is killed ----
 sleep 600 & sib=$!   # a sibling in the CALLER's group (this shell has no job control): what a kill of the wrong group would take
-reset; og=$(rt --label grp --max-min 2 -- sh -c "$HUNG" x "$fx/j.g"); rg=$?
+reset; og=$(rt --label grp --max-min 2 -- sh "$fx/hung.sh" "$fx/j.g"); rg=$?
 mypg=$(ps -o pgid= -p $$ | tr -d ' ')
 check "13.2323 the job is the leader of its own process group (pgid = its pid, not the caller's group), and after its TIMEOUT a sibling in the caller's group is still alive and the verb itself returned 124 (it did not signal its own group)" \
   '[ -s "$fx/j.g.pgid" ] && [ "$(cat "$fx/j.g.pgid")" = "$(cat "$fx/j.g.leader")" ] && [ "$(cat "$fx/j.g.pgid")" != "$mypg" ] && kill -0 "$sib" 2>/dev/null && [ $rg -eq 124 ]'
@@ -91,18 +96,20 @@ check "13.2324 refusals are exit 64 and run nothing: GISIK_RUN_MAX_MIN=0 (no cap
   '( BADMSG="GISIK_RUN_MAX_MIN=0 is refused: no cap only with an explicit --max-min 0"; GISIK_RUN_MAX_MIN=0 bad rt --dry-run -- true ) && ( BADMSG="GISIK_RUN_MAX_MIN=abc is not a whole number"; GISIK_RUN_MAX_MIN=abc bad rt -- true ) && ( BADMSG="--max-min abc is not a whole number"; bad rt --max-min abc -- true ) && ( BADMSG="--max-min -1 is not a whole number"; bad rt --max-min -1 -- true ) && ( BADMSG="--max-min needs a value"; bad rt --max-min ) && [ -z "$(ls "$CTL_LOG_DIR")" ]'
 
 # ---- 13.2325 the env default really caps a run, and an explicit 0 really is no cap ----
-reset; oe=$(GISIK_RUN_MAX_MIN=2 rt --label envcap -- sh -c "$HUNG" x "$fx/j.e"); re=$?
+reset; oe=$(GISIK_RUN_MAX_MIN=2 rt --label envcap -- sh "$fx/hung.sh" "$fx/j.e"); re=$?
 reset; oz=$(GISIK_RUN_MAX_MIN=1 rt --label nocap --max-min 0 -- sh -c 'sleep 3; echo outlived-the-env-cap'); rz=$?; lz=$(lastlog)
 check "13.2325 GISIK_RUN_MAX_MIN=2 caps a hung run (rc 124, TIMEOUT after 2 min); --max-min 0 over GISIK_RUN_MAX_MIN=1 lets a 3 s job finish (rc 0, its output in the log, no TIMEOUT)" \
   '[ $re -eq 124 ] && printf "%s\n" "$oe" | tail -1 | grep -q "TIMEOUT after 2 min" && [ $rz -eq 0 ] && grep -qx outlived-the-env-cap "$lz" && ! grep -q TIMEOUT "$lz"'
 
 # ---- 13.2326 no timer outlives its run ----
-# The timer sleeps the scaled cap: `--max-min 97` makes it a `sleep 97` that nothing else on the machine runs.
-ntimers() { ps -eo args= | grep -cx 'sleep 97'; }
-reset; rt --label tnorm --max-min 97 -- sh -c 'ps -eo args= | grep -cx "sleep 97" > "$1.during"' x "$fx/j.t" > /dev/null; after_norm=$(ntimers); during_norm=$(cat "$fx/j.t.during" 2>/dev/null)
-reset; ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_RUN_SECS_PER_MIN=1 CTL_DRY_RUN=0 exec "$HERE/ctl" run-tests --repo "$repo" --label tterm --max-min 97 -- sh -c 'echo $$ >> "$FXP"; : > "$1.up"; sleep 60' x "$fx/j.u" > "$fx/j.u.out" 2>&1 ) & vp=$!
+# The timer sleeps the scaled cap: `--max-min $TM` (a value of this run's own, 5000-9999) makes it a `sleep $TM` that nothing else on the machine
+# runs, a leftover of an earlier run of this suite included.
+TM=$(( 5000 + ($$ * 7 + RANDOM) % 5000 ))
+ntimers() { ps -eo args= | grep -cx "sleep $TM"; }
+reset; rt --label tnorm --max-min "$TM" -- sh -c 'ps -eo args= | grep -cx "sleep $2" > "$1.during"' x "$fx/j.t" "$TM" > /dev/null; after_norm=$(ntimers); during_norm=$(cat "$fx/j.t.during" 2>/dev/null)
+reset; ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_RUN_SECS_PER_MIN=1 CTL_DRY_RUN=0 exec "$HERE/ctl" run-tests --repo "$repo" --label tterm --max-min "$TM" -- sh -c 'echo $$ >> "$FXP"; : > "$1.up"; sleep 60' x "$fx/j.u" > "$fx/j.u.out" 2>&1 ) & vp=$!
 n=0; while [ ! -f "$fx/j.u.up" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; during_term=$(ntimers); kill -TERM "$vp"; wait "$vp"; rterm=$?; sleep 0.3; after_term=$(ntimers)
-check "13.2326 the timer is there while the job runs (CONTROL: one 'sleep 97' seen from inside the job, and from outside before the TERM) and gone after the run: after a normal end, and after a TERM to the verb (exit 143, slot released)" \
+check "13.2326 the timer is there while the job runs (CONTROL: one 'sleep <its scaled cap>' seen from inside the job, and from outside before the TERM) and gone after the run: after a normal end, and after a TERM to the verb (exit 143, slot released)" \
   '[ "$during_norm" = 1 ] && [ "$after_norm" = 0 ] && [ "$during_term" = 1 ] && [ $rterm -eq 143 ] && [ "$after_term" = 0 ] && [ "$(slots_left)" = 0 ]'
 
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----

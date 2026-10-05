@@ -170,7 +170,14 @@ describe('13.2327 every ci.yml job carries a numeric timeout-minutes', () => {
 
   // CONTROL, same describe: with one job's line deleted the same reader names that job (an empty or wrong parse cannot pass the leg above).
   it('CONTROL: with the e2e job\'s timeout-minutes line deleted, the reader reports e2e and only e2e', () => {
-    const without = ciYml.replace(/(\n  e2e:\n(?:    .*\n|\s*\n|\s+#.*\n)*?)    timeout-minutes: \d+\n/, '$1');
+    // Line-based, not a regex over the file: a lazy multi-line pattern that finds no match backtracks exponentially (it hung the kill run
+    // of this very leg for 10 min, stopped by `ctl run-tests --max-min`).
+    const lines = ciYml.split('\n');
+    const start = lines.indexOf('  e2e:');
+    const end = lines.findIndex((l, i) => i > start && /^  [a-z][a-z0-9-]*:\s*$/.test(l));
+    const at = lines.findIndex((l, i) => i > start && (end < 0 || i < end) && /^    timeout-minutes: \d+$/.test(l));
+    expect(start, 'ci.yml has no e2e job').toBeGreaterThan(0);
+    const without = at < 0 ? ciYml : [...lines.slice(0, at), ...lines.slice(at + 1)].join('\n');
     expect(without).not.toBe(ciYml);
     expect(untimed(without)).toEqual(['e2e']);
   });

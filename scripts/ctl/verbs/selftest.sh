@@ -14,6 +14,7 @@ step "gate cache correctness (turbo task hashes)" "bash '$HERE/test/gate-cache.t
 step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run-tests.test.sh'"
 step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- true"
 step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
+step "run-tests cap suite (--max-min: 124 + TIMEOUT, the group stopped, slot time not queue time, siblings live, no stray timer)" "bash '$HERE/test/run-tests-cap.test.sh'"
 step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
 step "harness suite (CTL_TEST_ONLY: one case runs one, no match is red, no filter runs all; every suite wired)" "bash '$HERE/test/harness.test.sh'"
 # The mutate suite runs real Stryker on a scratch fixture repo (four runs, ~1 min) through a private semaphore dir.
