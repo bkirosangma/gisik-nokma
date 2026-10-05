@@ -941,6 +941,15 @@ describe('9.422 the draft-restore banner', () => {
     );
   }
   const editorText = (container: HTMLElement): string => container.querySelector('.ProseMirror')?.textContent ?? '';
+  /**
+   * Wait for the editor to DRAW these words. The banner is in the first commit, but the editor is built in an effect
+   * (`useEditor({ immediatelyRender: false })`), so `.ProseMirror` is drawn a macrotask later: read in the banner's own tick,
+   * a cold or loaded worker got `''` (measured: 20/20 red run alone). The budget is explicit because the FIRST editor mount
+   * in a fresh worker (jsdom, TipTap's first schema) can outlast `waitFor`'s 1 s default (measured: 1/20 run alone); it is
+   * a wait on a condition, bounded well inside the file's 20 s test timeout, not a retry.
+   */
+  const editorDraws = (container: HTMLElement, text: string) =>
+    waitFor(() => expect(editorText(container)).toContain(text), { timeout: 10_000 });
 
   beforeEach(() => {
     window.localStorage.clear();
@@ -951,7 +960,7 @@ describe('9.422 the draft-restore banner', () => {
     const { container } = renderDocument();
     const banner = await screen.findByTestId('draft-restore-banner');
     expect(banner).toHaveTextContent('Restored unsaved changes from 5m ago.');
-    expect(editorText(container)).toContain(DRAFT_TEXT);
+    await editorDraws(container, DRAFT_TEXT);
     // CONTROL, same it: with no draft stored the same page draws no banner.
     cleanup();
     window.localStorage.clear();
@@ -965,7 +974,7 @@ describe('9.422 the draft-restore banner', () => {
     const { container } = renderDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Keep' }));
     expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
-    expect(editorText(container)).toContain(DRAFT_TEXT);
+    await editorDraws(container, DRAFT_TEXT);
     expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).not.toBeNull();
   });
 
