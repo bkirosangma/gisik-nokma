@@ -2,6 +2,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ACCOUNTANT_EMAIL, OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { openSeededBoard } from './helpers/board.js';
 
+// PROBE ONLY: keep this file's traces on a pass too (recording is identical; only retention changes).
+test.use({ trace: 'on' });
+
 /**
  * 18.254–18.257 — the ticket's Notes section (Plan 6 of 7, spec §10, §11.10),
  * from a real browser against the built stack.
@@ -64,6 +67,55 @@ async function clickTriggerSettled(page: Page, trigger: Locator) {
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );
   await trigger.click();
+}
+
+/**
+ * PROBE ONLY (probe/mwg-18256-*, never merged): logs the owner page's geometry around the
+ * Visibility popover. `evaluate` only — it reads rects and timings, and never scrolls, waits or clicks.
+ */
+async function geom(page: Page, label: string): Promise<void> {
+  const g = await page.evaluate(() => {
+    const r = (el: Element | null) => {
+      if (el === null) return null;
+      const b = el.getBoundingClientRect();
+      const f = (n: number) => Math.round(n * 10) / 10;
+      return { t: f(b.top), b: f(b.bottom), l: f(b.left), r: f(b.right), h: f(b.height), w: f(b.width) };
+    };
+    const q = (sel: string) => document.querySelector(sel);
+    const body = q('.gn-sheet__body') as HTMLElement | null;
+    const pop = q('.gn-popover') as HTMLElement | null;
+    const apply = pop === null ? null : ([...pop.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Apply') ?? null);
+    const se = document.scrollingElement as HTMLElement;
+    const res = (pat: string) =>
+      performance
+        .getEntriesByType('resource')
+        .filter((e) => e.name.includes(pat))
+        .map((e) => [Math.round(e.startTime), Math.round((e as PerformanceResourceTiming).responseEnd)]);
+    return {
+      now: Math.round(performance.now()),
+      vp: [innerWidth, innerHeight],
+      doc: { sh: se.scrollHeight, ch: se.clientHeight, st: se.scrollTop },
+      card: q('[data-testid^="ticket-card-"]')?.getAttribute('data-testid') ?? null,
+      boardCrumb: q('.gn-project__breadcrumb')?.textContent ?? null,
+      sheet: r(q('.gn-sheet')),
+      header: r(q('.gn-sheet__header')),
+      crumbs: r(q('.gn-ticket-sheet__crumbs')),
+      crumbWs: q('[data-testid="sheet-crumb-workspace"]') !== null,
+      title: r(q('.gn-ticket-sheet__title-input')),
+      move: r(q('.gn-sheet__move')),
+      body: body === null ? null : { ...r(body), st: body.scrollTop, sh: body.scrollHeight, ch: body.clientHeight },
+      trigger: r(q('.gn-visibility__trigger')),
+      triggerText: q('.gn-visibility__trigger')?.textContent ?? null,
+      pop: pop === null ? null : { ...r(pop), style: pop.getAttribute('style'), place: pop.getAttribute('data-placement'), sh: pop.scrollHeight, oh: pop.offsetHeight },
+      mode: (q('.gn-popover input[type=radio]:checked') as HTMLInputElement | null)?.value ?? null,
+      people: [...document.querySelectorAll('.gn-popover .gn-visibility__person')].map((el) => [el.textContent, Math.round(el.getBoundingClientRect().height)]),
+      lockout: q('.gn-popover .gn-visibility__lockout') !== null,
+      apply: r(apply),
+      css: [...document.styleSheets].map((sheet) => (sheet.href ?? 'inline').replace(location.origin, '')),
+      net: { ws: res('/v1/me/workspaces'), members: res('/members'), stream: res('/v1/stream') },
+    };
+  });
+  console.log(`[geom18256] ${label} ${JSON.stringify(g)}`);
 }
 
 /** Opens the ticket sheet's Attach-note popover and returns its search box. */
@@ -203,6 +255,7 @@ test('18.256 two sessions: narrowing a ticket away from a guest leaves their ope
 
     await signIn(ownerPage, OWNER_EMAIL);
     const { ticketId, workspaceId, projectId } = await openFirstSeededTicket(ownerPage);
+    await geom(ownerPage, 'P0-open');
 
     // A grants the accountant EXPLICIT visibility on this ticket — and names
     // every OTHER person on the roster too. Apply is disabled while `explicit`
@@ -211,11 +264,14 @@ test('18.256 two sessions: narrowing a ticket away from a guest leaves their ope
     // accountant empties the list, and the click waits out the 90 s timeout on
     // a disabled button.
     await clickTriggerSettled(ownerPage, ownerPage.locator('.gn-visibility__trigger'));
+    await geom(ownerPage, 'P1-popover');
     await ownerPage.getByRole('radio', { name: 'Only the people I name' }).check();
+    await geom(ownerPage, 'P2-explicit');
     await expect(ownerPage.getByRole('checkbox', { name: new RegExp(ACCOUNTANT_EMAIL) })).toBeVisible();
     for (const person of await ownerPage.locator('.gn-popover').getByRole('checkbox').all()) {
       await person.check();
     }
+    await geom(ownerPage, 'P3-preApply');
     await ownerPage.getByRole('button', { name: 'Apply' }).click();
     await expect(ownerPage.getByRole('button', { name: 'Apply' })).toBeHidden({ timeout: 10_000 });
 
@@ -242,11 +298,14 @@ test('18.256 two sessions: narrowing a ticket away from a guest leaves their ope
     // (Naming nobody leaves Apply disabled, hence the others are checked.)
     await ownerPage.goto(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`, { waitUntil: 'networkidle' });
     await clickTriggerSettled(ownerPage, ownerPage.locator('.gn-visibility__trigger'));
+    await geom(ownerPage, 'P4-popover2');
     await ownerPage.getByRole('radio', { name: 'Only the people I name' }).check();
+    await geom(ownerPage, 'P5-explicit2');
     const everyoneButB = ownerPage
       .locator('.gn-popover')
       .getByRole('checkbox', { name: /^(?!accountant@)/ });
     for (const person of await everyoneButB.all()) await person.check();
+    await geom(ownerPage, 'P6-preApply2');
     await expect(ownerPage.getByRole('checkbox', { name: new RegExp(ACCOUNTANT_EMAIL) })).not.toBeChecked();
     await expect(ownerPage.getByRole('button', { name: 'Apply' })).toBeEnabled();
     await ownerPage.getByRole('button', { name: 'Apply' }).click();
