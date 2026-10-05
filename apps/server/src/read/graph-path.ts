@@ -6,12 +6,14 @@ import { createGraphVisibility, expandGraph, graphEdgeView } from './graph-neigh
 export const PATH_MAX_HOPS = 6;
 export const PATH_MAX_PATHS = 3;
 /**
- * The groups a path walks when the caller names none: every group but `projects` and `concepts`. Containment makes any
- * two items of one project two hops apart (item → project → item), so with it on, every shortest path inside a project
- * would be "both are in P"; a concept's tags do the same for its items, and the ring read leaves `concepts` out by
- * default too (`routes/graph.ts`). Both stay available by name.
+ * The groups a path walks when the caller names none: every group but `projects`, `concepts` and `people`, each a hub.
+ * Containment makes any two items of one project two hops apart (item → project → item), so with it on, every shortest
+ * path inside a project would be "both are in P"; a concept's tags do the same for its items, and the ring read leaves
+ * `concepts` out by default too (`routes/graph.ts`); a person's assignee and mention edges do the same for every ticket
+ * one person is assigned and every item that mentions them ("A is assigned to P, P is the assignee of B"). All three stay
+ * available by name.
  */
-export const PATH_DEFAULT_GROUPS: readonly GraphGroup[] = GRAPH_GROUPS.filter((g) => g !== 'projects' && g !== 'concepts');
+export const PATH_DEFAULT_GROUPS: readonly GraphGroup[] = GRAPH_GROUPS.filter((g) => g !== 'projects' && g !== 'concepts' && g !== 'people');
 
 type Raw = Awaited<ReturnType<typeof expandGraph>>[number];
 /** `maxHops` is 1..`PATH_MAX_HOPS`: the route's bound (`routes/graph-query.ts`), the one place it is checked. */
