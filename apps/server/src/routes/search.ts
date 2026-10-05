@@ -13,6 +13,7 @@ import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec, resolveMeInSpec } from '../read/compile-filter.js';
 import { FTS_CONFIG } from '../read/fts.js';
 import { HEADLINE_OPTIONS } from '../read/headline.js';
+import { meaningTicketHits } from '../read/item-search.js';
 import { lexicalNoteSearch, meaningNoteSearch } from '../read/note-search.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
@@ -185,12 +186,13 @@ export async function readSearch(
 ): Promise<SearchResponse> {
   const kinds = options.kinds ?? ALL_KINDS;
   const mode = options.mode ?? 'lexical';
-  // Tickets have no chunks in v1, so `mode=meaning` is a NOTE mode and the
-  // ticket half answers `[]`. That is spec §7.7's decision and it is stated
-  // here rather than left to fall out of a query that would have returned the
-  // same rows as `lexical` — which would have been worse than empty: a client
-  // asking for meaning would get spelling matches labelled as meaning.
-  const wantTickets = kinds.includes('ticket') && mode === 'lexical';
+  // Knowledge Graph spec D §2 (KG-D 27.427): tickets HAVE chunks now
+  // (`search_item_chunks`, title + description + comments), so `mode=meaning`
+  // answers both halves. It replaces the v1 ruling (spec §7.7) that made
+  // meaning a NOTE mode with a ticket half of `[]`. The meaning half below is
+  // its own path, never the lexical query relabelled: a client asking for
+  // meaning must not get spelling matches labelled as meaning.
+  const wantTickets = kinds.includes('ticket');
   const wantNotes = kinds.includes('note');
 
   const noteOptions = { authorId: options.authorId, scopeMode: options.scopeMode };
@@ -204,6 +206,10 @@ export async function readSearch(
 
   if (!wantTickets) {
     return { workspaceId, query, hits: [], notes, ...(corrected === undefined ? {} : { corrected }) };
+  }
+  if (mode === 'meaning') {
+    const hits = await meaningTicketHits(db, eff, viewerId, workspaceId, query, spec);
+    return { workspaceId, query, hits, notes, ...(corrected === undefined ? {} : { corrected }) };
   }
 
   // A KEY-shaped query (`CCSO-12`, upper or lower case, spaces around it) also names tickets: the

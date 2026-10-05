@@ -534,9 +534,9 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
 
     searchNotes: async (workspaceId, text, options) => {
       // `kinds=note` because the caller wants notes: leaving it out would ask
-      // the server to search tickets too, and `mode=meaning` would then return
-      // `hits: []` anyway — one wasted query on a path that runs after every
-      // typing pause.
+      // the server to search tickets too (by meaning as well since KG-D T2,
+      // `search_item_chunks`), a `hits` half this caller throws away — a
+      // wasted query on a path that runs after every typing pause.
       const params = new URLSearchParams({ workspaceId, q: text, kinds: 'note', mode: options.mode });
       if (options.authorId !== undefined) params.set('author', options.authorId);
       if (options.scopeMode !== undefined) params.set('scope', options.scopeMode);
