@@ -37,6 +37,38 @@ export type MyWorkProps = {
 
 const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
 
+function WorkItems({
+  items,
+  groups,
+  onOpenTicket,
+  pending = false,
+}: {
+  items: WorkItem[];
+  groups: WorkspaceGroup<WorkItem>[] | undefined;
+  onOpenTicket: (ticketId: string) => void;
+  pending?: boolean;
+}) {
+  const card = (item: WorkItem) => (
+    <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} pending={pending} />
+  );
+  if (groups === undefined) return <>{items.map(card)}</>;
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.workspaceId} className="gn-my-work__group">
+          <h3 className="gn-my-work__workspace">{group.workspaceName}</h3>
+          {group.projects.map((project) => (
+            <Fragment key={project.projectId}>
+              <h4 className="gn-my-work__project-heading">{project.projectName}</h4>
+              {project.items.map(card)}
+            </Fragment>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
 /**
  * My Work: assigned, in transit, contested (spec §7).
  *
@@ -95,38 +127,6 @@ const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
  * fourth kind; a section heading inside a view the user opened on purpose is
  * not read as an all-clear about the product.
  */
-function WorkItems({
-  items,
-  groups,
-  onOpenTicket,
-  pending = false,
-}: {
-  items: WorkItem[];
-  groups: WorkspaceGroup<WorkItem>[] | undefined;
-  onOpenTicket: (ticketId: string) => void;
-  pending?: boolean;
-}) {
-  const card = (item: WorkItem) => (
-    <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} pending={pending} />
-  );
-  if (groups === undefined) return <>{items.map(card)}</>;
-  return (
-    <>
-      {groups.map((group) => (
-        <div key={group.workspaceId} className="gn-my-work__group">
-          <h3 className="gn-my-work__workspace">{group.workspaceName}</h3>
-          {group.projects.map((project) => (
-            <Fragment key={project.projectId}>
-              <h4 className="gn-my-work__project-heading">{project.projectName}</h4>
-              {project.items.map(card)}
-            </Fragment>
-          ))}
-        </div>
-      ))}
-    </>
-  );
-}
-
 export function MyWork({ view, groups, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
   return (
     <div className="gn-my-work">

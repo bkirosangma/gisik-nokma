@@ -132,10 +132,15 @@ function fileUnderGroups(groups: WorkspaceGroup<AttentionItem>[], shown: Attenti
  * if they disagree, so, plainly: a sectioned strip needs one heading per kind,
  * and a kind with no rows has nothing honest to put under its own heading. The
  * heading this component draws names the WHOLE strip, not a kind, and it can
- * never outlive its rows — `items.length === 0` returns `null` above, before
- * any of this is reached. A banner heading over zero rows would be the
- * fabricated all-clear refusal 3 already forbids; that is the case this
- * paragraph rules out, and the flat list above is what keeps it impossible.
+ * never outlive its rows — `source.length === 0` (the flat `items`, or every
+ * row the `groups` hold) returns `null` above, before any of this is reached.
+ * A banner heading over zero rows would be the fabricated all-clear refusal 3
+ * already forbids; that is the case this paragraph rules out, and the flat
+ * list above is what keeps it impossible. The global page's grouped arm
+ * (my-work-global T3) draws per-WORKSPACE and per-PROJECT headings, never
+ * per-kind ones, and keeps the same rule by construction: `fileUnderGroups`
+ * drops a project or workspace left with no shown row, so no heading of its
+ * outlives its rows either.
  */
 export function AttentionStrip({ items, groups, onOpenTicket }: AttentionStripProps) {
   const [showAll, setShowAll] = useState(false);

@@ -1252,6 +1252,34 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
   return spec;
 }
 
+/** The `show` values the attention route accepts, in their one order (my-work-global T1's `ATTENTION_SHOW_VALUES`). */
+const MY_WORK_SHOW_VALUES: readonly AttentionShow[] = ['created', 'assigned', 'ws-admin', 'project-admin'];
+
+/**
+ * `GET`/`PUT /v1/me/my-work-preferences` → `MyWorkPreferences` (my-work-global T3).
+ *
+ * Every key is REQUIRED and every value checked against its closed set, the register
+ * `mapPreferences` keeps: the server always answers a whole document (the defaults for a
+ * person who never saved one), so a body short a key, or carrying a `show` value or a
+ * grouping this client cannot render, is a server it does not understand — refused rather
+ * than read as a choice nobody made.
+ */
+export function mapMyWorkPreferences(raw: unknown): MyWorkPreferences {
+  const record = asRecord(raw, 'myWorkPreferences');
+  const show = asArray(record['show'], 'myWorkPreferences.show').map((value, index) => {
+    const path = `myWorkPreferences.show[${index}]`;
+    const text = asString(value, path);
+    const known = MY_WORK_SHOW_VALUES.find((candidate) => candidate === text);
+    if (known === undefined) throw new MappingError(path, MY_WORK_SHOW_VALUES.join('/'));
+    return known;
+  });
+  const grouping = asString(record['grouping'], 'myWorkPreferences.grouping');
+  if (grouping !== 'workspace-project' && grouping !== 'flat') {
+    throw new MappingError('myWorkPreferences.grouping', 'workspace-project/flat');
+  }
+  return { show, grouping };
+}
+
 /**
  * `GET /v1/me/preferences?workspaceId=` → `UserPreferences`.
  *
@@ -1303,34 +1331,6 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
  * missing `savedFilters` is not a person who saved none; it is a body this
  * client cannot read.
  */
-/** The `show` values the attention route accepts, in their one order (my-work-global T1's `ATTENTION_SHOW_VALUES`). */
-const MY_WORK_SHOW_VALUES: readonly AttentionShow[] = ['created', 'assigned', 'ws-admin', 'project-admin'];
-
-/**
- * `GET`/`PUT /v1/me/my-work-preferences` → `MyWorkPreferences` (my-work-global T3).
- *
- * Every key is REQUIRED and every value checked against its closed set, the register
- * `mapPreferences` keeps: the server always answers a whole document (the defaults for a
- * person who never saved one), so a body short a key, or carrying a `show` value or a
- * grouping this client cannot render, is a server it does not understand — refused rather
- * than read as a choice nobody made.
- */
-export function mapMyWorkPreferences(raw: unknown): MyWorkPreferences {
-  const record = asRecord(raw, 'myWorkPreferences');
-  const show = asArray(record['show'], 'myWorkPreferences.show').map((value, index) => {
-    const path = `myWorkPreferences.show[${index}]`;
-    const text = asString(value, path);
-    const known = MY_WORK_SHOW_VALUES.find((candidate) => candidate === text);
-    if (known === undefined) throw new MappingError(path, MY_WORK_SHOW_VALUES.join('/'));
-    return known;
-  });
-  const grouping = asString(record['grouping'], 'myWorkPreferences.grouping');
-  if (grouping !== 'workspace-project' && grouping !== 'flat') {
-    throw new MappingError('myWorkPreferences.grouping', 'workspace-project/flat');
-  }
-  return { show, grouping };
-}
-
 export function mapPreferences(raw: unknown): UserPreferences {
   const record = asRecord(raw, 'preferences');
   const listColumns = asRecord(record['listColumns'], 'preferences.listColumns');
