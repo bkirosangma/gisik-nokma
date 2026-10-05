@@ -131,7 +131,7 @@ cd "$rundir" || exit 1
 # longjmps out of `wait` before it records the status, so rc is 128+USR1 (158 on macOS), the job's own rc is gone for good (a second `wait`
 # returns 127), and the job is not alive, so no TIMEOUT either. The verb says so in the log ("CAP RACE") and keeps the 128+USR1: a false RED
 # that a re-run clears, never a false green. The line fires only when that first `wait` was interrupted, i.e. rc = 128+USR1: a cap firing just
-# after a normal `wait` keeps the job's own rc and logs nothing (13.2355; a job whose OWN rc is 128+USR1 still logs it, a harmless false RED).
+# after a normal `wait` keeps the job's own rc and logs nothing (13.2355; a job whose OWN rc is 128+USR1 still logs it, though that rc is real: a true RED).
 # Weighed and rejected 2026-10-05: no timer at all, the verb polling `kill -0` and then `wait`
 # (option D), and `wait -n -p` on the job and a sleeping timer (option A, a bash >= 5.1 floor; ctl is 3.2-safe). Each re-architects the
 # cap for a microsecond window at its boundary.
