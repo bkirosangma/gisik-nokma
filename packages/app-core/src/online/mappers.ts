@@ -858,6 +858,15 @@ export function mapHistory(raw: unknown): TicketHistoryEvent[] {
                 ? null
                 : { key: asStringOrNull(asRecord(event['linkTarget'], `${path}.linkTarget`), 'key', `${path}.linkTarget.key`) },
           }),
+      // Flow-caused events only (wtg2 T17): `null` is a withheld cause ticket, absent is no flow cause (or an older server).
+      ...(event['causeTicket'] === undefined
+        ? {}
+        : {
+            causeTicket:
+              event['causeTicket'] === null
+                ? null
+                : { key: asStringOrNull(asRecord(event['causeTicket'], `${path}.causeTicket`), 'key', `${path}.causeTicket.key`) },
+          }),
       // Link events only (drafts T6 FIX 1): absent stays absent, and the copy reads that as `'out'`.
       ...(event['linkDirection'] === undefined
         ? {}
