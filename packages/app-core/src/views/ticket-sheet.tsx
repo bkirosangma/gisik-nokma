@@ -4630,10 +4630,14 @@ export function TicketSheet({
                     data-testid={`subtask-pending-${row.ticketId}`}
                     className="gn-ticket-sheet__subtask-card gn-ticket-sheet__subtask-card--pending"
                   >
-                    {/* The key, then a TEXT space (two adjacent spans are one run of glyphs; see the card above). */}
-                    {row.key === null ? null : <span className="gn-ticket-sheet__subtask-key">{row.key}</span>}
-                    {row.key === null ? null : ' '}
-                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    {/* The key and the title share one line, the key first, with a TEXT space between them (two
+                        adjacent spans are one run of glyphs; see the card above). The card is a flex column, so the
+                        pair needs this inline wrapper or the key would take a line of its own. */}
+                    <span className="gn-ticket-sheet__subtask-head">
+                      {row.key === null ? null : <span className="gn-ticket-sheet__subtask-key">{row.key}</span>}
+                      {row.key === null ? null : ' '}
+                      <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    </span>
                     <span className="gn-ticket-sheet__subtask-meta">
                       <Chip tone={row.stateCategory}>{row.stateName}</Chip>
                       <span className="gn-ticket-sheet__subtask-pending">{DRAFT_PENDING_CHILD_NOTE}</span>
