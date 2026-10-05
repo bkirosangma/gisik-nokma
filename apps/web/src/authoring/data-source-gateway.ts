@@ -74,7 +74,7 @@ import type {
  * `DataSourceQuery.getMembers` returns `Actor[]` — `{ id, name }`
  * (`packages/app-core/src/view-types.ts:3`). `listMembers` must return
  * `WorkspaceMember[]` — `{ userId, displayName, role }`
- * (`packages/domain/src/read-models.ts:310`). The missing field is **`role`**,
+ * (`packages/domain/src/read-models.ts:316`). The missing field is **`role`**,
  * and it is missing in the client, not on the wire: the route answers a full
  * `MemberListResponse` and `online-data-source.ts:130` maps it down through
  * `mapActors`, discarding the role. A cast would have compiled and produced a

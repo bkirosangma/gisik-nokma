@@ -482,7 +482,7 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
  *
  * The route has sent `role` since it first answered
  * (`routes/builder-reads.ts:247`, returned at `:259`), and the wire type is
- * `WorkspaceMember` (`packages/domain/src/read-models.ts:547`).
+ * `WorkspaceMember` (`packages/domain/src/read-models.ts:553`).
  *
  * ## What did NOT change
  *
@@ -597,8 +597,9 @@ export function withActorNames(
 
 /**
  * `StateProvenance.cause` is `TransitionCause | null` — REQUIRED and nullable
- * (`packages/domain/src/read-models.ts`), and `TransitionCause` has exactly one
- * member.
+ * (`packages/domain/src/read-models.ts`), and `TransitionCause` has two members:
+ * `reopened-for-child` with its child, and the three flow kinds (wtg2 T8), which
+ * the server serves as `{ kind }` only and which map to exactly that here.
  *
  * `null` therefore survives and is the TRUTH: the server is saying this
  * transition had no cause, which is what the card renders as an ordinary move.
@@ -609,12 +610,16 @@ export function withActorNames(
  * thing `TransitionCause` was added to prevent, produced by the code meant to
  * carry it.
  */
+const FLOW_KINDS = ['led-to', 'reopened-by-flow', 'branch-not-taken'] as const;
+
 function mapCause(raw: unknown, path: string): TransitionCause | null {
   if (raw === null) return null;
   const record = asRecord(raw, path);
   const kind = asString(record['kind'], `${path}.kind`);
+  const flow = FLOW_KINDS.find((k) => k === kind);
+  if (flow !== undefined) return { kind: flow };
   if (kind !== 'reopened-for-child') {
-    throw new MappingError(`${path}.kind`, `reopened-for-child (got ${kind})`);
+    throw new MappingError(`${path}.kind`, `reopened-for-child, ${FLOW_KINDS.join(', ')} (got ${kind})`);
   }
   return {
     kind: 'reopened-for-child',
@@ -1054,7 +1059,7 @@ export function mapWorkflowDef(raw: unknown): WorkflowDef {
  *
  * Every field the client needs is on the wire, under the client's own spelling:
  * the route's body is typed `TicketTypeListResponse`
- * (`packages/domain/src/read-models.ts:301`) whose `ticketTypes` are the very
+ * (`packages/domain/src/read-models.ts:307`) whose `ticketTypes` are the very
  * `TicketTypeDef` this returns, and `readTicketTypes`
  * (`apps/server/src/routes/builder-reads.ts:172`) builds each entry as
  * `{id, name, icon, rank, workflowId, fields}`. Case 7.38

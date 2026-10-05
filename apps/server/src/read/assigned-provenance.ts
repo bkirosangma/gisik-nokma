@@ -15,7 +15,7 @@ import type { Queryable } from '../db/queryable.js';
  * touches the field in exactly two places: `ticket.created` sets it to `null`
  * (`packages/domain/src/ticket-state.ts:136`) and `ticket.assigned` sets it to
  * the payload's value (`:195`, whose payload is `{ assigneeId: string | null }`
- * — `events/ticket-events.ts:50`, so an UNASSIGNMENT is a `ticket.assigned`
+ * — `events/ticket-events.ts:51`, so an UNASSIGNMENT is a `ticket.assigned`
  * carrying null and not a type of its own). `apps/server/src/projections/tickets.ts`
  * writes `proj_tickets.assignee_id` from that state and from nothing else.
  *

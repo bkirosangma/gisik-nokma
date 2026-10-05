@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   newSubmittedEvent,
   newUlid,
+  SYSTEM_ACTOR_FLOW,
   type IngestResult,
   type LedgerEvent,
   type SubmittedEvent,
@@ -1665,5 +1666,22 @@ describe("29.126 offline History of a served leads_to copy: a hidden source's la
     ]);
     expect(JSON.stringify(lines[1]!.payload)).toBe('{"kind":"leads_to","targetId":null,"from":null}');
     expect(lines.map((e) => e.linkDirection)).toEqual(['in', 'in', 'out']);
+  });
+});
+
+describe('29.207 the replica serves a flow cause as its kind only', () => {
+  it('29.207 a card whose state claim carries a full flow cause serves { kind } and no id; control: reopened-for-child is served whole', async () => {
+    const { ds, replica, taskId, epicId } = await fixture();
+    const [decision, person, decisionEvent, child] = [newUlid(), newUlid(), newUlid(), newUlid()];
+    const reopened = { kind: 'reopened-by-flow', decisionTicketId: decision, outcome: 'No', pass: 2, decidedBy: person, decisionEventId: decisionEvent };
+    // `applyServerItem` replays a fact the server already accepted (this file's idiom); it does not re-run the engine.
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.transitioned', { to: 'todo', cause: reopened }, { actorId: SYSTEM_ACTOR_FLOW }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: epicId }, 'ticket.transitioned', { to: 'doing', cause: { kind: 'reopened-for-child', childTicketId: child } }));
+    const cards = (await ds.query.getBoard(PROJECT)).groups.flatMap((group) => group.columns.flatMap((column) => column.cards));
+    const flowCard = cards.find((card) => card.ticketId === taskId);
+    expect(flowCard?.cause).toEqual({ kind: 'reopened-by-flow' });
+    expect(JSON.stringify(flowCard)).not.toContain(decision);
+    expect(JSON.stringify(flowCard)).not.toContain(person);
+    expect(cards.find((card) => card.ticketId === epicId)?.cause).toEqual({ kind: 'reopened-for-child', childTicketId: child }); // control
   });
 });

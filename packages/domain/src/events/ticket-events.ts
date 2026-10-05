@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString, type EventEnvelope } from '../envelope.js';
+import { branchNotTakenCauseSchema, reopenedByFlowCauseSchema } from '../flow/causes.js';
 import { linkLabelSchema } from '../link-label.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
 import { dueDateValueSchema, estimateValueSchema, prioritySchema } from '../ticket-types.js';
@@ -414,10 +415,13 @@ export const ticketWorkflowReboundPayload = z.object({
   toStateId: z.string().min(1),
 });
 
-/** `ticket.closed` (spec §1.2) — the envelope carries actor and time; the payload says nothing. */
-export const ticketClosedPayload = z.object({}).strict();
-/** `ticket.reopened` (spec §1.2) — the explicit reopen; same empty payload. */
-export const ticketReopenedPayload = z.object({}).strict();
+/**
+ * `ticket.closed` (spec §1.2) — the envelope carries actor and time. A person's close says nothing more; the flow's
+ * "Not taken" close carries its `branch-not-taken` cause (wtg2 T8, PS-5), the only flow cause a close may carry.
+ */
+export const ticketClosedPayload = z.object({ cause: branchNotTakenCauseSchema.optional() }).strict();
+/** `ticket.reopened` (spec §1.2) — the explicit reopen; empty for a person, `reopened-by-flow` for the flow's loop reset (wtg2 T8, PS-4). */
+export const ticketReopenedPayload = z.object({ cause: reopenedByFlowCauseSchema.optional() }).strict();
 
 /** Most tickets one `ticket.decided` may ask the settle to close "Not taken" while they are started (PS-6). */
 export const DECISION_CLOSE_STARTED_MAX = 50;
@@ -447,7 +451,7 @@ export const ticketDecidedPayload = z
  * > "This is why the product says \"deleted\" rather than \"erased\"."
  *
  * The envelope carries the actor and the instant — the payload says nothing,
- * exactly as `ticket.closed` does, and for the same reason: there is nothing
+ * exactly as a person's `ticket.closed` does, and for the same reason: there is nothing
  * here for a client to assert. `restored` is the name of the undo because the
  * product already pairs `project.archived` with `project.restored`
  * (`events/membership.ts`); a second word for the same act would be a second

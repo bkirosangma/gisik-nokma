@@ -52,7 +52,7 @@ const RANK_REASON =
 
 /**
  * What the LOCAL pre-check writes when it refuses off cached state — and this one
- * is ACCURATE, byte for byte against `app-core/src/precheck.ts:268`.
+ * is ACCURATE, byte for byte against `app-core/src/precheck.ts:278`.
  *
  * It stays a literal, and the reason is a gap rather than a choice: `precheck.ts`
  * builds that sentence with an INLINE template inside the function that returns

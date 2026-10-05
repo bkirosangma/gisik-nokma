@@ -31,8 +31,14 @@ import type { NoteScope, NoteScopeMode } from './note-state.js';
  * applied, and both replace a `null`/`0` the plan text carried.
  */
 
-/** Owner decision (coordination doc): a reopen names the child that caused it. */
-export type TransitionCause = { kind: 'reopened-for-child'; childTicketId: string };
+/**
+ * Owner decision (coordination doc): a reopen-for-child names the child that caused it. The three flow kinds (wtg2 T8,
+ * `flow/causes.ts`) name no child, and reach a viewer as their kind only: their ids may name a ticket or a person the
+ * viewer cannot see (spec FL-1, `viewerSafeCause`).
+ */
+export type TransitionCause =
+  | { kind: 'reopened-for-child'; childTicketId: string }
+  | { kind: 'led-to' | 'reopened-by-flow' | 'branch-not-taken' };
 
 /**
  * Who claimed the current state, and when — by both clocks. The provenance
@@ -317,7 +323,7 @@ export type BoardResponse = { projectId: string; workspaceId: string; columns: B
  * No `cause`, unlike `StateProvenance`: a reopen names the child that caused it
  * because `ticket.transitioned` carries a `cause` field, and
  * `ticket.assigned`'s payload is `{ assigneeId }` and nothing else
- * (`packages/domain/src/events/ticket-events.ts:50`). A nullable `cause` here
+ * (`packages/domain/src/events/ticket-events.ts:51`). A nullable `cause` here
  * would be a field no event could ever fill.
  */
 export type AssignmentProvenance = {

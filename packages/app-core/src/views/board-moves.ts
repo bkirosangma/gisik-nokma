@@ -18,7 +18,7 @@ import { transitionOptions } from './transition-dialog.js';
  * (`transition-dialog.ts:41-61`) rather than reading `def.states`/
  * `def.transitions` directly: `transitionOptions` is already the one place
  * that predicts the engine's own resolution — exact edge before wildcard,
- * `find(exact) ?? find('*')` (`rule-engine/src/transition.ts:91-93`) — and a
+ * `find(exact) ?? find('*')` (`rule-engine/src/transition.ts:95-97`) — and a
  * second derivation of "what moves are legal" is exactly the kind of fork
  * this codebase's docblocks argue against (see `transitionOptions`'s own
  * ruling P27). `moveOutcome` asks that one function, once, and reads its

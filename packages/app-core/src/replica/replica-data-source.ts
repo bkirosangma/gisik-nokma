@@ -19,9 +19,11 @@ import {
   isCreatableState,
   isDraft,
   isTicketLinkEvent,
+  isFlowCause,
   isWithheldLinkEvent,
   linkPayloadDirection,
   statesWithBacklog,
+  viewerSafeCause,
   type Priority,
 } from '@gisik-nokma/domain';
 import { DeletedItemsFromCache } from '../deleted-items-from-cache.js';
@@ -744,6 +746,8 @@ function causeOf(event: LedgerEvent): TransitionCause | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const cause = (payload as { cause?: unknown }).cause;
   if (typeof cause !== 'object' || cause === null) return null;
+  // A flow cause (wtg2 T8) is served as its kind only, as the server serves it (`state-provenance.ts` `servedCause`).
+  if (isFlowCause(cause)) return viewerSafeCause(cause);
   const record = cause as { kind?: unknown; childTicketId?: unknown };
   if (record.kind !== 'reopened-for-child' || typeof record.childTicketId !== 'string') return null;
   return { kind: 'reopened-for-child', childTicketId: record.childTicketId };

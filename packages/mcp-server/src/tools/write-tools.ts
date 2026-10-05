@@ -144,7 +144,7 @@ export function writeTools(session: Session): ToolDefinition[] {
             comment: z.string().min(1).optional(),
           })
           .parse(args);
-        // `to`, not `toStateId` — packages/domain/src/workflow.ts:137.
+        // `to`, not `toStateId` — packages/domain/src/workflow.ts:138.
         const payload: { to: string; comment?: { text: string } } = { to: a.to };
         if (a.comment !== undefined) payload.comment = { text: a.comment };
         return submitOne(session, envelope(session, a.workspaceId, a.ticketId, 'ticket.transitioned', payload));

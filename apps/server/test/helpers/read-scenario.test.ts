@@ -17,7 +17,7 @@ import { createTestDatabase, type TestDatabase } from './db.js';
  *    miss. The seed below therefore proves, by executing: `membership.granted`
  *    with NO `scope` (the 2026-08-27 collapse made it `z.never()`),
  *    `ticket.transitioned` carrying `to` and not the plan text's `toStateId`
- *    (`ticketTransitionedPayloadSchema`, workflow.ts:137), `blocked: true` on a
+ *    (`ticketTransitionedPayloadSchema`, workflow.ts:138), `blocked: true` on a
  *    workflow state (amendment 9), and `visibility.set`'s `userIds`.
  *  - **the resolved audience of every ticket**, asserted as an exact map. That
  *    is what `test/read/visible-where.test.ts` builds its expectations on; if

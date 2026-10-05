@@ -50,7 +50,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (13)
+  // invariant (14)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
@@ -62,6 +62,8 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/app-core/src/views/board.tsx': 'invariant',
   'packages/app-core/src/views/ticket-sheet.tsx': 'invariant',
   'packages/rule-engine/src/checks/close.ts': 'invariant',
+  // wtg2 T8: the flow parks a Not-taken ticket in the FIRST terminal state and never passes over a finished one (PS-8, PS-11).
+  'packages/rule-engine/src/checks/flow-cause.ts': 'invariant',
   'packages/rule-engine/src/checks/hierarchy.ts': 'invariant',
   'packages/rule-engine/src/transition.ts': 'invariant',
   // done-meaning (12): T17 changes these
