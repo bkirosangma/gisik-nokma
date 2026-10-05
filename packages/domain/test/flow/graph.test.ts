@@ -65,8 +65,9 @@ describe('29.183 the effective graph and the live set', () => {
 
   it('29.183 the live set walks each ticket once: a ladder of Decisions that rejoin costs a lookup per link, not one per path', () => {
     // c0 -> {a0, b0} -> c1 -> {a1, b1} -> ... -> c12: 37 tickets, 48 links, 2^12 paths. The walk's `seen` check is what keeps
-    // the queue to one entry per ticket; without it the queue holds one entry per PATH (16,000+ lookups here, and a flow at
-    // the 300-ticket cap with 25 such rungs never finishes). The result alone cannot tell the two apart, so count the lookups.
+    // the queue to one entry per ticket; without it the queue holds one entry per PATH (16,000+ lookups here). That cost
+    // doubles with each rung (about 160 ms at 20 rungs), and a flow at the 300-ticket cap has room for about 100 rungs, so it
+    // is unbounded long before the cap. The result alone cannot tell the two apart, so count the lookups.
     const rungs = 12;
     const c = (i: number) => uid(100 + i);
     const nodes = [fnode(c(0))];
