@@ -130,4 +130,27 @@ describe('29.184 loop bodies and branches', () => {
     const again = [edge(A, A, 'Again')];
     expect(branchOf(A, 'Again', again, analyzeFlow([decision(A)], again)).size).toBe(0);
   });
+
+  it('29.184 an edge with an end the analysis does not know (a hole) is dropped by the loop body and the branch, as by analyzeFlow', () => {
+    const H = uid(9); // a hidden ticket: in the edges, not in the nodes
+    // the loop x -> y, y -> x (closing), plus x -> h -> y around the hole
+    const loopEdges = [edge(X, Y), edge(X, H), edge(H, Y), edge(Y, X)];
+    const loopAnalysis = analyzeFlow([fnode(X), decision(Y)], loopEdges);
+    expect(keysOfTail(loopBody({ sourceId: Y, targetId: X }, loopEdges, loopAnalysis))).toEqual(['x', 'y']);
+    // a back edge that is itself a hole edge has no body
+    expect(loopBody({ sourceId: Y, targetId: H }, loopEdges, loopAnalysis).size).toBe(0);
+    // CONTROL: the same edges with h a node of the flow: h is in the body
+    const seen = analyzeFlow([fnode(X), decision(Y), fnode(H)], loopEdges);
+    expect([...loopBody({ sourceId: Y, targetId: X }, loopEdges, seen)].sort()).toEqual([X, Y, H]);
+
+    // a: Yes -> h (the hole) -> y; No -> x -> h
+    const branchEdges = [edge(A, H, 'Yes'), edge(A, X, 'No'), edge(X, H), edge(H, Y)];
+    const branchAnalysis = analyzeFlow([decision(A), fnode(X), fnode(Y)], branchEdges);
+    expect(branchOf(A, 'Yes', branchEdges, branchAnalysis).size).toBe(0); // the edge itself leads into the hole
+    expect(keysOfTail(branchOf(A, 'No', branchEdges, branchAnalysis))).toEqual(['x']); // y is behind the hole only
+    // CONTROL: with h a node, both branches reach it and y behind it
+    const open = analyzeFlow([decision(A), fnode(X), fnode(Y), fnode(H)], branchEdges);
+    expect([...branchOf(A, 'Yes', branchEdges, open)].sort()).toEqual([Y, H]);
+    expect([...branchOf(A, 'No', branchEdges, open)].sort()).toEqual([X, Y, H]);
+  });
 });
