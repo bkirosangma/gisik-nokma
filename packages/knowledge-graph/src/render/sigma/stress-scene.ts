@@ -3,7 +3,9 @@ import type { EdgeAttributes, NodeAttributes } from '../node-attributes.js';
 import type { ThemePalette } from '../palette.js';
 import { iconUri } from './icons.js';
 import { initialsOf } from '../initials.js';
-import { createSigma } from './program.js';
+import { cardShape } from './card-box.js';
+import { hasHead } from './card-style.js';
+import { createSigma, labelsOf } from './program.js';
 
 /**
  * Resolves once Sigma has drawn nothing for `quietMs` (or after `capMs`). The icon atlas and the label attachments are built
@@ -59,10 +61,13 @@ export async function runStress(
   for (let i = 0, k = 0; k < edgeCount; i += 1) {
     const a = nodes[(i * 7919) % nodes.length]!, b = nodes[(i * 104729 + 13) % nodes.length]!;
     if (a === b) continue;
-    graph.addEdgeWithKey(`x${k}`, a, b, { id: `x${k}`, grp: groups[k % groups.length]!, fog: a.startsWith('f') || b.startsWith('f'), sug: false, on: false });
+    graph.addEdgeWithKey(`x${k}`, a, b, { id: `x${k}`, grp: groups[k % groups.length]!, fog: a.startsWith('f') || b.startsWith('f'), sug: false, on: false, card: null });
     k += 1;
   }
   const sigma = createSigma(graph, container, () => palette, { nodeHovered: () => false, highlightOn: () => false });
+  // the heads end at their target's card border, as the adapter draws them (owner ruling B): the sweep pays for that search
+  const labels = labelsOf(sigma);
+  graph.updateEachEdgeAttributes((_id, a, _s, target) => (hasHead(a) ? { ...a, card: cardShape(graph.getNodeAttributes(target), labels) } : a));
   await renderQuiet(sigma, 200, 10_000);
   const camera = sigma.getCamera();
   /** One timed camera sweep: every frame's delta, from a fresh `last`. */
