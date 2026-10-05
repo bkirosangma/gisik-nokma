@@ -15,6 +15,7 @@ import { useIsPhone } from '../../../../src/use-is-phone.js';
 import { useProjectName } from '../../../../src/use-project-name.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../src/ticket-ref-callbacks.js';
+import { ticketSheetPath } from '../../../../src/ticket-location.js';
 
 export default function DraftsPage() {
   return (
@@ -28,7 +29,8 @@ export default function DraftsPage() {
  * The viewer's own drafts (drafts plan, Task 8, spec §12.2). The sheet opens HERE, in place, like My work's: the open
  * ticket is `?ticket=`, and its project is read off the draft's own row, never guessed. A `?ticket=` the list does not
  * hold mounts nothing: the locator would answer not-found for someone else's draft, and a draft is nobody's but its
- * author's.
+ * author's. So what the SHEET opens (its parent chip and ancestor crumbs) stays here only when it is a listed draft;
+ * any other id is a published ancestor, opened on its project's page (`openFromSheet`, FIX 1 F4, planner 10:35).
  */
 function DraftsScreen() {
   const router = useRouter();
@@ -75,6 +77,18 @@ function DraftsScreen() {
   const typeName = (typeId: string): string => types.data?.find((t) => t.id === typeId)?.name ?? typeId;
   const openTicket = (ticketId: string) => router.push(`/w/${workspaceId}/drafts?ticket=${ticketId}`, { scroll: false });
   const closeTicket = () => router.push(`/w/${workspaceId}/drafts`, { scroll: false });
+  /**
+   * The sheet's opener (its `Subtask of` chip and ancestor crumbs). A listed draft stays here, in place; any other id has
+   * no sheet on this page, so it opens on its project's page, which is leaving this one (so the default scroll). The
+   * ancestor's own project is not in the sheet's data (`ParentRef` is `{kind, id, title}`), and it is the draft's: a
+   * parent shares its child's project at every door (`packages/rule-engine/src/checks/hierarchy.ts:207`, on create and
+   * on publish through `checkParentPlacement`; `:379` on reparent), a ticket's `projectId` is set once
+   * (`packages/domain/src/ticket-state.ts:211`), and an epic is a parent's ancestor, so the same holds for it.
+   */
+  const openFromSheet = (ticketId: string, draftProjectId: string): void => {
+    if (drafts.data?.some((d) => d.ticketId === ticketId) === true) openTicket(ticketId);
+    else router.push(ticketSheetPath({ workspaceId, projectId: draftProjectId }, ticketId), { scroll: true });
+  };
 
   return (
     <main id="gn-main" className="gn-shell">
@@ -101,7 +115,8 @@ function DraftsScreen() {
           />
         )}
       </div>
-      {/* Every prop is one `my-work/page.tsx` passes to the same sheet, except `onDeleted`: Delete is disabled on a draft. */}
+      {/* Every prop is one `my-work/page.tsx` passes to the same sheet, except `onDeleted` (Delete is disabled on a draft)
+          and `onOpenTicket`, which is this page's own `openFromSheet`. */}
       {openTicketId !== null && openRow !== undefined && !expired ? (
         <TicketSheet
           {...peopleProps(people, workspaceId)}
@@ -124,7 +139,7 @@ function DraftsScreen() {
           onNavigate={(href) => router.push(href, { scroll: true })}
           uploadEvidence={(file: File) => uploadAttachmentHttp(file, openTicketId)}
           uploadAttachment={(file: File) => uploadAttachmentHttp(file, openTicketId)}
-          onOpenTicket={openTicket}
+          onOpenTicket={(ticketId) => openFromSheet(ticketId, openRow.projectId)}
           onDraftChanged={drafts.reload}
         />
       ) : null}
