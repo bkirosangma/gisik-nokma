@@ -187,7 +187,7 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     const { fake, fx } = setup({}, { failHop: 2 });
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("Couldn't load the next hop. Retry");
-    expect(fake.calls.length).toBeGreaterThan(0); // ring 1 was drawn before the failure
+    await waitFor(() => expect(fake.calls.length).toBeGreaterThan(0)); // ring 1 is drawn (the renderer loads async: the alert can come first)
     expect(refsOf(fake.last())).toEqual(expect.arrayContaining([T('t118'), T('t133'), T('t160')]));
     expect(count()).toBe('11 items within 2 hops'); // ring 1 still counted: the cache entry kept it
     expect(hopsOf(fx.log)).toEqual([1, 2]);
@@ -409,6 +409,61 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     rerender({ highlight: new Set([T('t160')]) });
     await waitFor(() => expect([...(fake.last().states.highlight ?? [])]).toEqual([T('t160')]));
     expect(fx.log.length).toBe(requests);
+  });
+
+  it('27.365 the bar, literal: names, the keys hint, Hops by click, a last workspace is kept; control: a phone folds it with a summary and has no hint', async () => {
+    const { fake, fx } = setup();
+    await drawn(fake, T('t126'));
+    const user = userEvent.setup();
+    expect(screen.getByRole('group', { name: 'Show links' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Semantic layer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Projects/ })).toHaveTextContent('All projects');
+    expect(document.querySelector('.gn-kg__keys')!.textContent).toBe('Keys: 1–4 hops, C center on the selected item, Esc back. Scroll or pinch to zoom, drag to pan, double-click an item to center on it.');
+    // Hops by click: Everything fetches to the end, 1 is served from the cache
+    await user.click(screen.getByRole('tab', { name: 'Everything' }));
+    await waitFor(() => expect(count()).toBe('31 items, everything connected'));
+    expect(hopsOf(fx.log)).toEqual([1, 2, 3, 4, 5]);
+    await user.click(screen.getByRole('tab', { name: '1' }));
+    await waitFor(() => expect(count()).toBe('11 items within 1 hop, 11 more in the fog'));
+    expect(hopsOf(fx.log)).toEqual([1, 2, 3, 4, 5]);
+    // the last workspace stays chosen
+    await user.click(screen.getByRole('button', { name: 'Remove Studio' }));
+    await waitFor(() => expect(fx.log.at(-1)!.workspaceIds).toEqual(['gn']));
+    const requests = fx.log.length;
+    await user.click(screen.getByRole('button', { name: 'Remove Gisik Nokma' }));
+    await settle();
+    expect(screen.getByRole('button', { name: 'Remove Gisik Nokma' })).toBeInTheDocument();
+    expect(fx.log.length).toBe(requests);
+    cleanup();
+    const p = setup({ config: 'phone' });
+    await drawn(p.fake, T('t125'));
+    const summary = () => document.querySelector('.gn-kg__fold > summary')!.textContent;
+    expect(summary()).toBe('Scope and linksGisik Nokma, Studio, all projects; 8 of 8 link types');
+    expect(document.querySelector('.gn-kg__keys')).toBeNull();
+    await user.click(screen.getByText('Scope and links'));
+    await user.click(screen.getByRole('button', { name: /^Blocks/ }));
+    expect(summary()).toBe('Scope and linksGisik Nokma, Studio, all projects; 7 of 8 link types');
+  });
+
+  it('27.366 picking a fogged item selects its clear neighbour and says why; outside the scope it says so; control: picking a clear item clears the sentence', async () => {
+    const { fake } = setup();
+    await drawn(fake, T('t126'));
+    const status = () => document.querySelector('.gn-kg__status')!.textContent;
+    act(() => fake.pick({ kind: 'node', ref: T('t126'), double: false }));
+    await waitFor(() => expect(status()).toBe('GN-126 is in the fog. Center on GN-125 to reach it.'));
+    expect(fake.last().states.selected).toBe(T('t125'));
+    act(() => fake.pick({ kind: 'node', ref: T('t160'), double: false }));
+    await waitFor(() => expect(status()).toBe(''));
+    expect(fake.last().states.selected).toBe(T('t160'));
+    // with Mobile web chosen, GN-133 (Workflows) is in the fog because it is outside the scope
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Projects/ }));
+    await user.click(await screen.findByRole('option', { name: 'Mobile web' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(count()).toBe('18 items within 2 hops, 7 more in the fog (5 outside the scope)'));
+    act(() => fake.pick({ kind: 'node', ref: T('t133'), double: false }));
+    await waitFor(() => expect(status()).toBe('GN-133 is outside the scope.'));
+    expect(fake.last().states.selected).toBe(T('t142'));
   });
 
   it('27.326 the count line, literal: two hops, a project chosen, a capped world, a phone; control: one hop is singular', async () => {

@@ -17,6 +17,8 @@ document.head.prepend(style);
 const params = new URLSearchParams(location.search);
 const config = (params.get('config') ?? 'desktop') as 'desktop' | 'phone' | 'home';
 const hl = params.get('hl');
+/** The host's default workspaces (`?ws=st` leaves GN-142's own out: its scope note shows). */
+const ws = (params.get('ws') ?? 'gn').split(',');
 fixtureDelay.ms = Number(params.get('delay') ?? 0);
 
 const SCOPE: ScopeChoices = {
@@ -50,7 +52,7 @@ createRoot(document.getElementById('root')!).render(
     config={config}
     source={{ ring: (q) => fixtureRing({ ...q, workspaceIds: [...q.workspaceIds], projectIds: [...q.projectIds], groups: [...q.groups] }) }}
     scope={SCOPE}
-    defaultWorkspaceIds={['gn']}
+    defaultWorkspaceIds={ws}
     highlight={hl === null ? null : new Set(hl.split(','))}
     onZones={(z) => (state.zones = z)}
     onOpen={() => undefined}
