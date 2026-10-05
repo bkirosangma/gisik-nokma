@@ -33,9 +33,14 @@ let db: TestDatabase;
 const WS = newUlid();
 const ACTOR = newUlid();
 const PROJECT = newUlid();
-const TICKET = newUlid();
-const TICKET_2 = newUlid();
-const TICKET_3 = newUlid();
+// SORTED: the pass folds due tickets in id order, and a plain `newUlid()` is not monotonic within a millisecond. TICKET
+// (whose fold reaches past the state-dropping publish) must be restated BEFORE TICKET_3 (whose early events precede
+// it), so the pass's memo is asked about an event below its horizon: a key that ignored the event's own position would
+// hand TICKET_3 the later epoch.
+const SORTED = [newUlid(), newUlid(), newUlid()].sort();
+const TICKET = SORTED[0]!;
+const TICKET_2 = SORTED[1]!;
+const TICKET_3 = SORTED[2]!;
 const TICKET_4 = newUlid();
 const TICKET_5 = newUlid();
 
@@ -199,6 +204,7 @@ describe('29.355 snapshot fold versions', () => {
 
     const calls: QueryCall[] = [];
     // The heads are one event past their snapshots, below `minEvents`: only staleness makes a ticket due.
+    expect([TICKET < TICKET_2, TICKET_2 < TICKET_3]).toEqual([true, true]); // precondition: the pass's order
     const { written } = await runSnapshotPass(recording(db.pool, calls), { minEvents: 20 });
     const byId = (a: { entityId: string }, b: { entityId: string }): number => (a.entityId < b.entityId ? -1 : 1);
     expect([...written].sort(byId)).toEqual([{ entityId: TICKET, seq: 3 }, { entityId: TICKET_3, seq: 4 }].sort(byId));
