@@ -36,6 +36,8 @@ const runDaemon = (
   new Promise((resolve) => {
     const child = spawn('pnpm', ['exec', 'tsx', 'src/ops/backup-daemon-main.ts'], {
       cwd: SERVER_DIR,
+      // Its own process group, so the hard stop below can end the WHOLE run (see there).
+      detached: true,
       env: {
         ...process.env,
         OBJECT_STORE: 'local',
@@ -61,7 +63,16 @@ const runDaemon = (
     const stopWhenScheduled = setInterval(() => {
       if (until(stdout, stderr)) child.kill('SIGTERM');
     }, 100);
-    const hardStop = setTimeout(() => child.kill('SIGKILL'), 30_000);
+    // The whole group, not `pnpm` alone: a SIGKILL to `pnpm` orphans its tsx grandchild, which keeps the stdout pipe open,
+    // so `close` never fired, the case died on vitest's timeout instead of its assertion, and the daemon ran on at ppid 1
+    // (four of them after wtg2 T7's mutation pass, 2026-10-06).
+    const hardStop = setTimeout(() => {
+      try {
+        process.kill(-(child.pid as number), 'SIGKILL');
+      } catch {
+        child.kill('SIGKILL');
+      }
+    }, 30_000);
     child.on('close', (code) => {
       clearInterval(stopWhenScheduled);
       clearTimeout(hardStop);
