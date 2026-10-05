@@ -37,6 +37,7 @@ import type {
   ListColumnId,
   ListRow,
   MyWorkView,
+  DraftRow,
   // The VIEW model, from `../view-types.js` and not from the domain: it is the
   // one with `source` on it, and `mapNoteSearchHits` is where `source` is made.
   NoteSearchHit,
@@ -2146,7 +2147,16 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // spreads them only when set); the VALUE is still policed.
     ...(record['outcome'] === undefined || record['outcome'] === null ? {} : { outcome: asString(record['outcome'], `${path}.outcome`) }),
     ...(record['passes'] === undefined ? {} : { passes: mapPasses(record['passes'], `${path}.passes`) }),
+    // Drafts T8, the SAME lesson a fifth time (13.603): `draft` reaches this body (G7 sends `ticketState.draft`) and a
+    // hand-enumerated mapper drops what it does not name. Strict when present: a draft with no author is not a draft.
+    ...(record['draft'] === undefined ? {} : { draft: mapDraftMarker(record['draft'], `${path}.draft`) }),
   };
+}
+
+/** `TicketState.draft` (drafts T1): `{ authorId, at }`, plus `discarded: true` once discarded (never served: a discarded draft is not read). */
+function mapDraftMarker(raw: unknown, path: string): { authorId: string; at: string } {
+  const marker = asRecord(raw, path);
+  return { authorId: asString(marker['authorId'], `${path}.authorId`), at: asString(marker['at'], `${path}.at`) };
 }
 
 /**
@@ -2301,8 +2311,9 @@ function mapTicketVisibility(raw: unknown, path: string): TicketVisibility {
 
 export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> = new Map()): TicketRead {
   const record = asRecord(raw, 'ticket');
+  const ticket = mapTicketState(record['ticketState'], 'ticket.ticketState');
   return {
-    ticket: mapTicketState(record['ticketState'], 'ticket.ticketState'),
+    ticket,
     title: asString(record['title'], 'ticket.title'),
     stateProvenance: mapProvenance(record['stateProvenance'], 'ticket.stateProvenance', roster),
     // Mapped exactly as the list's card maps it, including the `=== null` arm:
@@ -2335,7 +2346,28 @@ export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> 
     // same three answers the parent does and drops only the `proj_visibility`
     // row that mapper never read anyway.
     epic: mapParentRef(record['epic'], 'ticket.epic'),
+    // Drafts T8 (decision 1): the view's `draft` is the state's marker, not a second wire field.
+    ...(ticket.draft === undefined ? {} : { draft: true as const }),
   };
+}
+
+/** `GET /v1/workspaces/:id/drafts` → `DraftRow[]` (drafts T8). Named fields only: a key must never reach a draft row. */
+export function mapDraftRows(raw: unknown): DraftRow[] {
+  return asArray(asRecord(raw, 'drafts')['items'], 'drafts.items').map((entry, index) => {
+    const at = `drafts.items[${index}]`;
+    const row = asRecord(entry, at);
+    return {
+      ticketId: asString(row['ticketId'], `${at}.ticketId`),
+      projectId: asString(row['projectId'], `${at}.projectId`),
+      projectName: row['projectName'] === null ? null : asString(row['projectName'], `${at}.projectName`),
+      typeId: asString(row['typeId'], `${at}.typeId`),
+      title: asString(row['title'], `${at}.title`),
+      parentId: row['parentId'] === null ? null : asString(row['parentId'], `${at}.parentId`),
+      updatedAt: asString(row['updatedAt'], `${at}.updatedAt`),
+      attachmentCount: asNumber(row['attachmentCount'], `${at}.attachmentCount`),
+      pending: false,
+    };
+  });
 }
 
 /**

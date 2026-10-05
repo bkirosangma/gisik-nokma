@@ -1440,6 +1440,13 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       return (event.payload as { body?: unknown }).body ?? null;
     },
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
+    // Drafts T8 (decision 2): served from `listDrafts` (R22 keeps a draft off every other offline read), already
+    // newest first. The replica holds no project name and no attachment table, so both are `null`: "not known here".
+    getMyDrafts: async (workspaceId) =>
+      (await listDrafts(workspaceId)).map((d) => ({
+        ticketId: d.ticketId, projectId: d.projectId, projectName: null, typeId: d.typeId, title: d.title,
+        parentId: d.parentId, updatedAt: d.updatedAt, attachmentCount: null, pending: d.pending,
+      })),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>
       Promise.reject(new ReplicaGapError('getWorkspaceSettings', WORKSPACE_SETTINGS_ABSENCES)),

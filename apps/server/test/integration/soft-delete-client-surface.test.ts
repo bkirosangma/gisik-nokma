@@ -496,6 +496,8 @@ type AbsenceDecision =
   | 'getTicketTypes'
   | 'search'
   | 'getMyWork'
+  // Drafts T8 (28.151): the caller's own drafts.
+  | 'getMyDrafts'
   | 'getAttention'
   | 'getWorkspaceSettings'
   | 'getPreferences'
@@ -666,6 +668,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     why: 'trash Plan 3: answers kinds and ids from purged_entities and nothing else — no title, key or body can travel through it, and a soft delete is not a purge',
   },
   getMyWork: { verdict: 'excluded', carries: true },
+  getMyDrafts: {
+    verdict: 'excluded',
+    carries: false,
+    why: 'drafts T8: lists only the caller\'s own unpublished drafts, and a draft cannot be deleted (R7: `ticket.deleted` on a draft is refused `draft.not-allowed`), so the published, soft-deleted ticket this file plants can never reach it',
+  },
   getAttention: { verdict: 'excluded', carries: true },
   getWorkspaceSettings: { verdict: 'excluded', carries: false },
   getPreferences: { verdict: 'excluded', carries: false },
@@ -785,6 +792,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getTicketTypes: () => ds.getTicketTypes(workspaceId),
     search: () => ds.search(workspaceId, MARKER),
     getMyWork: () => ds.getMyWork(workspaceId),
+    getMyDrafts: () => ds.getMyDrafts(workspaceId),
     getAttention: () => ds.getAttention(workspaceId),
     getWorkspaceSettings: () => ds.getWorkspaceSettings(workspaceId),
     getPreferences: () => ds.getPreferences(workspaceId),
@@ -881,8 +889,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `getDeletedItems`; 25 until trash Plan 3 added `purgedAmong`; 26 until
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
   // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
-  // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`.
-  expect(MEMBERS).toHaveLength(30);
+  // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`; 30 until drafts T8 added
+  // `getMyDrafts`.
+  expect(MEMBERS).toHaveLength(31);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);
