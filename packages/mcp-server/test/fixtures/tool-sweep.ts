@@ -132,6 +132,15 @@ export const SWEEP: Record<string, SweepEntry> = {
   list_deleted: { args: {} },
   // trash end
   // graph begin (KG-D T2, T6)
+  graph_neighbours: {
+    args: { center: { kind: 'ticket', id: 't' }, hops: 1 },
+    session: { get: async (path) => (path === '/v1/me/workspaces' ? { workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }] } : { hop: 1, items: [], edges: [], frontier: [], truncated: false, cursor: null }) },
+  },
+  graph_path: { args: { from: { kind: 'ticket', id: 't' }, to: { kind: 'note', id: 'n' } }, session: { get: async () => ({ from: 'ticket:t', to: 'note:n', paths: [], items: [] }) } },
+  graph_trace: {
+    args: { from: { kind: 'ticket', id: 't' }, kind: 'blocks', direction: 'out' },
+    session: { get: async () => ({ from: 'ticket:t', kind: 'blocks', direction: 'out', chain: [], items: [], sentences: [] }) },
+  },
   similar: { args: { workspaceId: 'w', item: { kind: 'ticket', id: 't' } }, session: { get: async () => ({ workspaceId: 'w', item: { kind: 'ticket', id: 't' }, hits: [] }) } },
   // graph end
   // concept begin (KG-D T4, T5)
