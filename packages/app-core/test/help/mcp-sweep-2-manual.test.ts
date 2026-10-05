@@ -20,6 +20,11 @@ const can = (): string => {
   if (e === undefined) throw new Error('§16 has no "What your assistant can do"');
   return entryText(e).toLowerCase();
 };
+const connecting = (): string => {
+  const e: HelpEntry | undefined = section().entries.find((x) => x.title === 'What connecting does');
+  if (e === undefined) throw new Error('§16 has no "What connecting does"');
+  return entryText(e).toLowerCase().replace(/\s+/g, ' ');
+};
 
 describe('14.658 the manual names what sweep 2 added', () => {
   it('14.658 notes on a ticket, restoring a note version, closing several tickets, muting notifications, saved filters, and assigning by email with the guest warning', () => {
@@ -28,7 +33,15 @@ describe('14.658 the manual names what sweep 2 added', () => {
       // 'notes attached to it' and 'several tickets closed at once' follow Step 4's text verbatim (planner ruling 2026-10-04).
       'notes attached to it', 'earlier version', 'several tickets closed at once', 'how many', 'mute', 'saved filters',
       'by email address', 'asks you first', 'added as a guest', 'only that ticket',
+      // FIX 1 (reviewer A, RA-P3): the draft exception the lane added, true at assignee-email.ts:70-71.
+      'a draft is the exception', 'cannot be given to someone outside the workspace',
     ]) expect(text, phrase).toContain(phrase);
+    // FIX 1 (reviewer A, RA-P1): the "recorded under your name" bullet Step 4 rewrote — the guest grant is recorded, your own
+    // settings are not.
+    const conn = connecting();
+    for (const phrase of ['adding someone as a guest included', 'the exceptions are your own settings', 'changes a preference and leaves no history entry']) {
+      expect(conn, phrase).toContain(phrase);
+    }
     const found = (q: string) => {
       const r = searchHelp(HELP_CONTENT, q, 50);
       return r.kind === 'matches' && r.matches.some((m) => m.document === 'manual' && m.sectionId === SECTION_ID);
