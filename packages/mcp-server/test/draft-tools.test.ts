@@ -340,7 +340,7 @@ describe('28.138 the erasure set', () => {
 });
 
 describe('28.141 the registry', () => {
-  it('28.141 the module is the three tools in order, each described word for word, and allTools ends with them', () => {
+  it('28.141 the module is the three tools in order, each described word for word, and allTools lists them right after list_deleted', () => {
     const { session } = fake();
     const tools = draftTools(session);
     expect(tools.map((t) => t.name)).toEqual(['list_my_drafts', 'publish_draft', 'discard_draft']);
@@ -361,7 +361,11 @@ describe('28.141 the registry', () => {
         'confirm_name must be the draft\'s exact title; without it you get a preview of what would be erased and nothing changes. ' +
         'Only a draft can be discarded: use delete_ticket for a published ticket.',
     ]);
-    expect(allTools(session).map((t) => t.name).slice(-4)).toEqual(['list_deleted', 'list_my_drafts', 'publish_draft', 'discard_draft']);
+    // The flow block (Graph Part 5) follows the drafts block, so the drafts no longer END the list (29.377).
+    const names = allTools(session).map((t) => t.name);
+    const trash = names.indexOf('list_deleted');
+    expect(trash).toBeGreaterThan(0);
+    expect(names.slice(trash, trash + 5)).toEqual(['list_deleted', 'list_my_drafts', 'publish_draft', 'discard_draft', 'set_wait_for_all']);
   });
 });
 

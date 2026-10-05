@@ -63,6 +63,11 @@ export const TOOL_NAMES_BY_MODULE = {
     'list_my_drafts', 'publish_draft', 'discard_draft',
     // draft end
   ],
+  flow: [
+    // flow begin (wtg-part5 T1 to T5)
+    'set_wait_for_all',
+    // flow end
+  ],
 } satisfies Record<string, string[]>;
 
 export const TOOL_NAMES: string[] = Object.values(TOOL_NAMES_BY_MODULE).flat();

@@ -1,9 +1,11 @@
 import { z } from 'zod';
-import { draftNotAllowedReason, linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS, withheldLinkPayload, type TicketLinkKind } from '@gisik-nokma/domain';
+import { draftNotAllowedReason, estimateValueSchema, linkPayloadDirection, PRIORITIES, rankBetween, TICKET_LINK_KINDS, withheldLinkPayload, type TicketLinkKind } from '@gisik-nokma/domain';
 import { spliceDoc, type BodyEdit } from '@gisik-nokma/editor/markdown-doc';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import { markdownBody, MARKDOWN_SYNTAX_HELP } from './markdown-io.js';
+import { isDraftDetail } from './flow-seams.js';
+import { linkEvent, pickLink, relabelStored, type LinkEnd, type LinkRow } from './link-events.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
 import { readOrNotFound } from './reads.js';
@@ -18,14 +20,14 @@ export type TicketDetailWire = {
     workflowId: string;
     /** Present only on the author's own draft (drafts G7). */
     draft?: { authorId: string; at: string; discarded?: boolean };
+    typeId?: string; stateId?: string; stateCategory?: string; workflowVersion?: number; parentId?: string | null;
+    outcome?: string | null; links?: Array<{ kind: string; targetId: string; label?: string | null }>;
   };
   rollup?: { totalChildren?: number } | null;
 };
 const id = z.string().min(1);
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a day in YYYY-MM-DD form');
 const BUILT_IN = new Set(['title', 'description', 'priority', 'startDate', 'dueDate', 'estimate', 'reworkEstimate', 'waitForAll']);
-/** The wtg2 T4 built-ins have no update_ticket argument until Part 5, so "use the argument" would be false for them. Part 5 deletes this set. */
-const FLOW_BUILT_IN = new Set(['estimate', 'reworkEstimate', 'waitForAll']);
 const enc = encodeURIComponent;
 
 export const TICKET_NOT_FOUND = 'ticket not found or not visible to you';
@@ -43,16 +45,18 @@ const updateShape = {
   workspaceId: id, ticketId: id, title: z.string().min(1).optional(), markdown: z.string().optional(),
   mode: z.enum(['replace', 'append', 'replace_section']).optional(), section: z.string().optional(),
   priority: z.enum(PRIORITIES).optional(), startDate: day.nullable().optional(), dueDate: day.nullable().optional(),
+  estimate: estimateValueSchema.nullable().optional(), reworkEstimate: estimateValueSchema.nullable().optional(),
   fields: z.record(z.string().min(1), z.unknown()).optional(), parentId: id.nullable().optional(),
   addCollaborators: z.array(id).optional(), removeCollaborators: z.array(id).optional(),
   workflow: z.object({ toWorkflowId: id, toStateId: id }).optional(),
 };
 
-/**
- * The kinds `link_tickets` files. It has no label argument, so it cannot name a Decision's branch: `leads_to` stays
- * out until Part 5 of workflow-timeline-graphs adds one (wtg2 T2, case 29.126).
- */
-const LINK_TICKETS_KINDS = TICKET_LINK_KINDS.filter((k) => k !== 'leads_to') as ['blocks', 'relates', 'duplicates'];
+/** A `leads_to` branch label (Graph Part 2 LK-2: 1 to 60 characters, trimmed). */
+const label = z.string().trim().min(1).max(60).optional();
+const linkShape = {
+  workspaceId: id, ticketId: id, targetId: id,
+  kind: z.enum(TICKET_LINK_KINDS), action: z.enum(['add', 'remove', 'relabel']), label,
+};
 
 /** The other end of a link the server withheld from this caller, as a line's payload names it. */
 const HIDDEN_END = "a ticket you can't see";
@@ -159,7 +163,7 @@ export function ticketTools(session: Session): ToolDefinition[] {
       name: 'update_ticket',
       description:
         'Change a ticket in one go: title; description (markdown, mode "replace" (default) / "append" / "replace_section" with `section` = a heading\'s exact text); ' +
-        'priority P1–P3; startDate / dueDate (YYYY-MM-DD, null clears); custom `fields` by field id; parentId (null = top level); ' +
+        'priority P1–P3; startDate / dueDate (YYYY-MM-DD, null clears); estimate / reworkEstimate (whole days 1–365, null clears); custom `fields` by field id; parentId (null = top level); ' +
         `addCollaborators / removeCollaborators ("me" works); workflow { toWorkflowId, toStateId }. Every rule is the product's. ${MARKDOWN_SYNTAX_HELP}`,
       inputSchema: updateShape,
       handler: async (args) => {
@@ -168,9 +172,7 @@ export function ticketTools(session: Session): ToolDefinition[] {
         const ev = (type: string, payload: unknown) => envelopeFor(session, a.workspaceId, t, type, payload);
         const set = (fieldId: string, value: unknown) => ev('ticket.field_set', { fieldId, value });
         for (const key of Object.keys(a.fields ?? {})) {
-          if (BUILT_IN.has(key)) {
-            throw new Error(FLOW_BUILT_IN.has(key) ? `"${key}" is a built-in field and cannot be set through fields` : `"${key}" is a built-in field: use the ${key} argument`);
-          }
+          if (BUILT_IN.has(key)) throw new Error(`"${key}" is a built-in field: use ${key === 'waitForAll' ? 'the set_wait_for_all tool' : `the ${key} argument`}`);
         }
         const events = [];
         if (a.title !== undefined) events.push(set('title', a.title));
@@ -184,6 +186,8 @@ export function ticketTools(session: Session): ToolDefinition[] {
         if (a.priority !== undefined) events.push(set('priority', a.priority));
         if (a.startDate !== undefined) events.push(set('startDate', a.startDate === null ? null : { date: a.startDate }));
         if (a.dueDate !== undefined) events.push(set('dueDate', a.dueDate === null ? null : { date: a.dueDate }));
+        if (a.estimate !== undefined) events.push(set('estimate', a.estimate));
+        if (a.reworkEstimate !== undefined) events.push(set('reworkEstimate', a.reworkEstimate));
         for (const [fieldId, value] of Object.entries(a.fields ?? {})) events.push(set(fieldId, value));
         if (a.parentId !== undefined) events.push(ev('ticket.reparented', { newParentId: a.parentId }));
         for (const u of a.addCollaborators ?? []) events.push(ev('ticket.collaborator_added', { userId: me(u) }));
@@ -313,22 +317,40 @@ export function ticketTools(session: Session): ToolDefinition[] {
     {
       name: 'link_tickets',
       description:
-        'Add or remove a typed link between two tickets: kind "blocks" (ticketId blocks targetId), "relates" (either way) or "duplicates" ' +
-        '(ticketId duplicates the original, targetId). action "add" or "remove". Removing works from either end. Every rule is the product\'s.',
-      inputSchema: { workspaceId: id, ticketId: id, targetId: id, kind: z.enum(LINK_TICKETS_KINDS), action: z.enum(['add', 'remove']) },
+        'Add, remove or relabel a typed link between two tickets: kind "blocks" (ticketId blocks targetId), "relates" (either way), "duplicates" ' +
+        '(ticketId duplicates the original, targetId) or "leads_to" (ticketId leads to targetId: an arrow in the flow; a Decision\'s arrows each need a `label`, ' +
+        'the outcome that sends the flow that way, 1–60 characters). action "add", "remove" or "relabel" (leads_to only, with the new `label`). ' +
+        'Removing works from either end; if a loop stores both directions between two tickets, the one leaving ticketId is removed. ' +
+        'A link to or from one of your drafts lives on the draft and is private to you until it is published. Every rule is the product\'s.',
+      inputSchema: linkShape,
       handler: async (args) => {
-        const a = z.object({ workspaceId: id, ticketId: id, targetId: id, kind: z.enum(LINK_TICKETS_KINDS), action: z.enum(['add', 'remove']) }).parse(args);
+        const a = z.object(linkShape).parse(args);
+        if (a.label !== undefined && a.kind !== 'leads_to') throw new Error('label only applies to "leads_to" links');
+        if (a.action === 'remove' && a.label !== undefined) throw new Error('remove takes no label: it removes the link between the two tickets');
+        if (a.action === 'relabel' && (a.kind !== 'leads_to' || a.label === undefined)) throw new Error('relabel needs kind "leads_to" and the new label');
+        // Each end's draft flag decides the stream (Drafts R42): an end this caller cannot read is the uniform sentence.
+        const endOf = async (ticketId: string): Promise<LinkEnd> => ({ id: ticketId, draft: isDraftDetail(await readTicket(session, a.workspaceId, ticketId)) });
+        const linksOf = async (ticketId: string): Promise<LinkRow[]> =>
+          ((await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/tickets/${enc(ticketId)}/links`, 'ticket')) as { links: LinkRow[] }).links;
         if (a.action === 'add') {
-          return { result: await submitOne(session, envelopeFor(session, a.workspaceId, { kind: 'ticket', id: a.ticketId }, 'ticket.link_added', { kind: a.kind, targetId: a.targetId })) };
+          const [source, target] = await Promise.all([endOf(a.ticketId), endOf(a.targetId)]);
+          return { result: await submitOne(session, linkEvent(session, a.workspaceId, 'ticket.link_added', { kind: a.kind, source, target, label: a.label })) };
         }
-        // The stored source decides the stream (spec A §2.2): find the link as the app shows it.
-        const out = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/tickets/${enc(a.ticketId)}/links`, 'ticket')) as {
-          links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string } }>;
-        };
-        const found = out.links.find((l) => l.kind === a.kind && l.ticket.id === a.targetId);
+        const links = await linksOf(a.ticketId);
+        const found = pickLink(links, a.kind, a.targetId);
         if (found === undefined) throw new Error(`no "${a.kind}" link between ${a.ticketId} and ${a.targetId} that you can see`);
-        const [source, target] = found.direction === 'out' ? [a.ticketId, a.targetId] : [a.targetId, a.ticketId];
-        return { result: await submitOne(session, envelopeFor(session, a.workspaceId, { kind: 'ticket', id: source }, 'ticket.link_removed', { kind: a.kind, targetId: target })) };
+        // The stored source decides the stream (spec A §2.2): find the link as the app shows it.
+        const [sourceId, targetId] = found.direction === 'out' ? [a.ticketId, a.targetId] : [a.targetId, a.ticketId];
+        const [source, target] = await Promise.all([endOf(sourceId), endOf(targetId)]);
+        const stored = { kind: a.kind, source, target, label: found.label ?? undefined };
+        if (a.action === 'remove') return { result: await submitOne(session, linkEvent(session, a.workspaceId, 'ticket.link_removed', stored)) };
+        // The other branches are the stored SOURCE's outgoing labels, read from its own list when the call names the target end.
+        const sourceLinks = sourceId === a.ticketId ? links : await linksOf(sourceId);
+        const others = sourceLinks
+          .filter((l) => l.kind === 'leads_to' && l.direction === 'out' && l.ticket.id !== targetId)
+          .map((l) => l.label ?? '')
+          .filter((l) => l !== '');
+        return { results: await relabelStored(session, a.workspaceId, stored, others, a.label as string) };
       },
     },
   ];

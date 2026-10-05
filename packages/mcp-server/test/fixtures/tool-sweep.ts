@@ -144,4 +144,7 @@ export const SWEEP: Record<string, SweepEntry> = {
     session: { get: async (path) => (path.endsWith('/drafts') ? { items: [] } : DRAFT_DETAIL) },
   },
   // draft end
+  // flow begin (wtg-part5 T1 to T5)
+  set_wait_for_all: { args: { workspaceId: 'w', ticketId: 't', value: true } },
+  // flow end
 };
