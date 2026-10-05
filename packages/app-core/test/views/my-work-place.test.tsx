@@ -146,8 +146,17 @@ describe('30.037 MyWork with placeOf', () => {
     shared: [work('s-withheld', 'w-coast', 'p-secret', null)],
   };
 
-  it('30.037 every work card names its workspace, then its project (the card\'s own served name, or its id when withheld), › aria-hidden', () => {
-    const { container } = render(<MyWork view={view} placeOf={placeLookup(WORKSPACES)} onOpenTicket={() => {}} />);
+  /** The work card whose title button reads `title`. */
+  const cardTitled = (container: HTMLElement, title: string): Element => {
+    const card = Array.from(container.querySelectorAll('.gn-my-work__item')).find(
+      (candidate) => candidate.querySelector('.gn-my-work__title')?.textContent === title,
+    );
+    expect(card).toBeDefined();
+    return card as Element;
+  };
+
+  it('30.037 every work card names its workspace, then its project by the grouped headings\' own name (a withheld one is "Unknown project", never its id, and gains no id line), › aria-hidden; CONTROL: without placeOf the id line is 3.161\'s', () => {
+    const { container, rerender } = render(<MyWork view={view} placeOf={placeLookup(WORKSPACES)} onOpenTicket={() => {}} />);
     const cards = Array.from(container.querySelectorAll('.gn-my-work__item')).filter(
       (card) => card.querySelector('.gn-my-work__title') !== null && card.querySelector('.gn-my-work__place') !== null,
     );
@@ -158,11 +167,36 @@ describe('30.037 MyWork with placeOf', () => {
     expect(labels).toEqual([
       ['a-hills', { names: ['Garo Hills Logistics', 'Shop floor'], separator: '›', separatorHidden: true }],
       ['i-coast', { names: ['Coastal Freight', 'Dockside'], separator: '›', separatorHidden: true }],
-      // A withheld project name keeps the card's own id-only arm (case 7.108), now behind its workspace.
-      ['s-withheld', { names: ['Coastal Freight', 'p-secret'], separator: '›', separatorHidden: true }],
+      // A withheld project reads as its grouped heading does, never as its id (planner 22:09 P1).
+      ['s-withheld', { names: ['Coastal Freight', 'Unknown project'], separator: '›', separatorHidden: true }],
     ]);
     expect(container.querySelectorAll('h3, h4')).toHaveLength(0);
     expect(container.textContent ?? '').not.toMatch(/ · /);
+    // Nor does the flat card draw 3.161's id line beside its label (planner 22:26 (A)).
+    const flat = cardTitled(container, 's-withheld');
+    expect(flat.textContent ?? '').not.toContain('p-secret');
+    expect(flat.querySelectorAll('.gn-my-work__project--id')).toHaveLength(0);
+
+    // CONTROL: without placeOf the same card keeps its id-only project line (case 3.161, untouched).
+    rerender(<MyWork view={view} onOpenTicket={() => {}} />);
+    expect(cardTitled(container, 's-withheld').querySelector('.gn-my-work__project--id')?.textContent).toBe('p-secret');
+  });
+
+  it('30.037 when the served project name and the workspace list disagree, the flat label prints the list\'s (the grouped heading\'s); CONTROL: without placeOf the card prints the served one', () => {
+    const renamed: MyWorkView = {
+      assigned: [work('a-renamed', 'w-coast', 'p-dock', 'Dock (old name)')],
+      inTransit: [],
+      contested: [],
+      shared: [],
+    };
+    const { container, rerender } = render(<MyWork view={renamed} placeOf={placeLookup(WORKSPACES)} onOpenTicket={() => {}} />);
+    expect(parts(cardTitled(container, 'a-renamed').querySelector('.gn-my-work__place') as Element).names).toEqual([
+      'Coastal Freight',
+      'Dockside',
+    ]);
+    // CONTROL: the two sources really differ here, so the leg above can tell them apart.
+    rerender(<MyWork view={renamed} onOpenTicket={() => {}} />);
+    expect(cardTitled(container, 'a-renamed').querySelector('.gn-my-work__project')?.textContent).toBe('Dock (old name)');
   });
 
   it('30.037 absent placeOf, no card carries a place label and the project line is today\'s', () => {

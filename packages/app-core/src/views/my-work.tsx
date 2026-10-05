@@ -28,10 +28,10 @@ export type MyWorkProps = {
   groups?: MyWorkGroups;
   /**
    * The global page's FLAT arrangement (my-work-global T4, case 30.037): each work card names
-   * its workspace in front of its project line, because no heading says which workspace it is
-   * in. Only `workspaceName` is read: the project half stays the card's own line, the row's
-   * served `projectName` or its id when the name is withheld (case 7.108's arm). Absent, the
-   * cards are today's markup. `contested` rows carry no workspace and stay as they are.
+   * its workspace and its project, because no heading says where it lives. Both are the grouped
+   * headings' own names (`placeLookup`): a withheld project reads "Unknown project", never its
+   * id, and the card's own project line is not drawn (planner 22:09 P1, 22:26 (A)). Absent, the
+   * cards are today's markup, 3.161's id line included. `contested` rows have no workspace.
    */
   placeOf?: (item: WorkItem) => ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
@@ -272,7 +272,7 @@ function WorkItemCard({
   pending = false,
 }: {
   item: WorkItem;
-  /** The flat arrangement's workspace (T4); `null` draws today's project line alone. */
+  /** The flat arrangement's two names (T4, `placeLookup`); `null` draws today's project line alone. */
   place: ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
   pending?: boolean;
@@ -322,15 +322,17 @@ function WorkItemCard({
       {place === null ? (
         projectLine
       ) : (
-        // The workspace, the crumb separator the ticket sheet uses (aria-hidden), then the
-        // card's own project line: two names, never one string joined by a spaced middle dot
-        // (23.191; planner ruling 20:06 on T4's ⚑).
+        // The SAME two names the grouped headings print (`placeLookup`, planner 22:09 P1), with
+        // the crumb separator the ticket sheet uses between them (aria-hidden): two names, never
+        // one string joined by a spaced middle dot (23.191; ruling 20:06). The card's own project
+        // line is not drawn here, so a withheld project reads "Unknown project", as its heading
+        // does; 3.161's id line stays where `place` is null (ruling 22:26 (A)).
         <span className="gn-my-work__place">
           <span>{place.workspaceName}</span>
           <span className="gn-my-work__place-sep" aria-hidden="true">
             ›
           </span>
-          {projectLine}
+          <span>{place.projectName}</span>
         </span>
       )}
       <Chip tone={item.stateCategory} title={formatStateProvenance(item.stateName, item.stateProvenance)}>
