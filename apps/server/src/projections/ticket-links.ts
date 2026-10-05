@@ -8,7 +8,8 @@ import type { Projection } from './registry.js';
  * ticket: the one whose stream holds its events, or, for a link filed on a draft's stream, its `from` (drafts R42).
  * `proj_tickets.links` holds the same links as the folded `TicketState.links` of the ticket whose stream holds them
  * (the source's; a draft's for its from entries); this table is the queryable copy, read in both directions by the
- * graph's ring read (`read/graph-neighbours.ts`) and, from typed-links T4, by `read/ticket-links.ts`.
+ * graph's ring read (`read/graph-neighbours.ts`), from typed-links T4 by `read/ticket-links.ts`, and from wtg2 T12 by
+ * the flow read's ring walk over `leads_to` (`flow/read-flow.ts`).
  *
  * `link_added` inserts and `link_removed` deletes exactly that `(source, target, kind)`; the engine refuses a duplicate
  * before it reaches the ledger (typed-links T3), so the one key two events can share is a draft-side row and its re-file.

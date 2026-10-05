@@ -33,7 +33,7 @@ export function scanTerminalReaders(root: string, dirs: readonly string[]): Map<
 /** definition: authors or validates a workflow. invariant: "terminal" means finished, and a Not-taken ticket parked there IS finished (parent close, attention, sweeps, the board column). done-meaning: a count or sentence that means DONE; T17 makes each exclude a not-taken resolution. */
 type Reader = 'definition' | 'invariant' | 'done-meaning';
 export const TERMINAL_READERS: Record<string, Reader> = {
-  // definition (16)
+  // definition (17)
   'apps/server/src/routes/builder-reads.ts': 'definition',
   'apps/server/src/tools/wtg-preflight.ts': 'definition',
   'packages/app-core/src/workflow-builder/anchor-issues.ts': 'definition',
@@ -41,6 +41,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/app-core/src/workflow-builder/ui/builder-panels.tsx': 'definition',
   'packages/app-core/src/workflow-builder/ui/flow-graph.ts': 'definition',
   'packages/app-core/src/workflow-builder/ui/state-node.tsx': 'definition',
+  'packages/domain/src/flow/node.ts': 'definition',
   'packages/domain/src/simple-kanban.ts': 'definition',
   'packages/domain/src/validate-workflow.ts': 'definition',
   'packages/domain/src/workflow-helpers.ts': 'definition',

@@ -339,19 +339,25 @@ export async function boardAncestryFor(
 
 /**
  * `<workspace prefix><project prefix>-<number>` for a small set of ANCESTOR
- * tickets (parents, epics) — never the page's own cards, which
- * `read/ticket-cards.ts`'s `cardKeysFor` already keys. Both this function and
+ * tickets (parents, epics) — never a board or list page's own cards, which
+ * `read/ticket-cards.ts`'s `cardKeysFor` already keys. Three callers key
+ * tickets that are not ancestors, from the same bare rows: a link's other end
+ * (`read/ticket-links.ts`, `routes/ticket-history.ts`) and a flow's own
+ * tickets (`routes/flow.ts` `flowWire`, at most `FLOW_DEFAULT_CAP`). Both this function and
  * that one end at the same primitive, `composeCardKey`, so the composition
  * rule — three facts, one key, `null` when any is missing — is spelled once;
  * only the ROWS each starts from differ (a `ProjTicketRow` there, a bare
  * `{ticketId, projectId}` here, since an ancestor's full row was never read —
  * `ancestryCte` selects only what the walk itself needs).
  *
- * Scoped to ONE workspace, unlike `cardKeysFor`'s per-workspace batching: every
- * caller here already has a `boardAncestryFor` result, and that walk never
- * crosses a workspace boundary (`ancestryCte`'s `t.workspace_id = workspaceParam`
- * clause on both the seed and the recursive term) — so there is only ever one
- * workspace's prefix to read.
+ * Scoped to ONE workspace, unlike `cardKeysFor`'s per-workspace batching: the
+ * board already has a `boardAncestryFor` result, and that walk never crosses a
+ * workspace boundary (`ancestryCte`'s `t.workspace_id = workspaceParam` clause
+ * on both the seed and the recursive term); the links read and the flow walk
+ * (`flow/read-flow.ts`) admit only rows of the workspace in their path (a
+ * `t.workspace_id` clause in every statement), and the History route passes
+ * each row's own `workspace_id` — so there is only ever one workspace's prefix
+ * to read.
  */
 export async function keysForAncestors(
   db: Queryable,
