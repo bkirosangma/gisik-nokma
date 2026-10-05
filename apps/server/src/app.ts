@@ -45,6 +45,7 @@ import { registerPeopleRoutes } from './routes/people.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerFlowRoutes } from './routes/flow.js';
+import { createFlowPromoter } from './flow/promote.js';
 import { registerTicketLinkRoutes } from './routes/ticket-links.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerDraftRoutes } from './routes/drafts.js';
@@ -1210,6 +1211,16 @@ export function buildApp(
       unsubscribeDraftErasure();
     });
   }
+  // The auto-promotion listener (wtg Part 2, AP-5): a listener on the commit feed, fire-and-forget like the fan-out above.
+  // It files through the internal door, which an app holds only as the named capability `serverAppend`. Unlike the nudge
+  // and the erasure it is always registered: promotion is the product's behaviour on every assembled app, not an option.
+  const flowPromoter = createFlowPromoter({ pool: deps.pool, ingest: { ingestBatch: deps.serverAppend } });
+  const unsubscribeFlowPromoter = deps.ingest.onEventCommitted((event) => {
+    void flowPromoter.onCommitted(event);
+  });
+  app.addHook('onClose', () => {
+    unsubscribeFlowPromoter();
+  });
   // The attachment doors (Plan 7 Tasks 9 and 10) — upload and download. This
   // line is the whole of what was missing: the module was complete and tested
   // and reachable from nothing, so on the server this repo booted the

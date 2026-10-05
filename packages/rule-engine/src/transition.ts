@@ -10,6 +10,7 @@ import {
 import { getTicketState } from './checks/context-helpers.js';
 import { decisionOutcomeRequired } from './checks/decision.js';
 import { flowCauseForgery, flowExemptEdge } from './checks/flow-cause.js';
+import { refuse } from './checks/refusals.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import { evaluateTransitionRules } from './rules/index.js';
 import { resolveCurrentStateId } from './version-map.js';
@@ -109,6 +110,10 @@ export async function evaluateTicketTransitioned(
       reason: `Ticket ${ticket.id} sits in state "${resolved.unmappedStateId}", which no longer exists in version ${latest.version} and no state mapping covers it.`,
     };
   }
+  // AP-1 (wtg2 T13): a promotion is the universal Start edge and nothing else. Without this, a late or duplicate led-to move
+  // would ride a DECLARED edge (doing -> todo) and drag work in progress back. Keyed on the cause, so a person's own move is
+  // untouched; `flowCauseForgery` above has already refused a led-to cause from anyone but the flow actor.
+  if (payload.cause?.kind === 'led-to' && resolved.stateId !== BACKLOG_STATE_ID) return refuse('cause.led-to-not-backlog');
 
   const toState = statesWithBacklog(latest).find((state) => state.id === payload.to);
   if (toState === undefined) {
