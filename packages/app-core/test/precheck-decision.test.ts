@@ -32,6 +32,20 @@ function readyCache(ticket: Partial<TicketState> = {}, def: WorkflowDef = WF_ERR
   return cache;
 }
 
+const BRANCH = { kind: 'leads_to' as const, targetId: '01J9GNXT000000000000000001', label: 'Yes' };
+const CHILD = '01J9GCHD000000000000000000';
+/** An outcome-less Decision at Done with one visible branch; `children` vouches a child set, and none leaves it unvouched. */
+function decisionAtDone(children?: TicketState[]): ClientStateCache {
+  const cache = createClientStateCache();
+  cache.upsertTicket(ticketStateSeed({ id: TICKET, typeId: 'decision', stateId: 'done', stateCategory: 'terminal', links: [BRANCH] }));
+  cache.upsertWorkflowDef(WF_ERRAND);
+  if (children !== undefined) cache.markChildrenComplete(TICKET, children);
+  return cache;
+}
+function child(stateCategory: 'active' | 'terminal'): TicketState {
+  return ticketStateSeed({ id: CHILD, parentId: TICKET, stateId: stateCategory === 'terminal' ? 'done' : 'doing', stateCategory });
+}
+
 describe('29.141 the client mirror of the Decision rules', () => {
   it('29.141 a visible branch and no outcome previews outcome-required for the move and the close; no visible branch defers; an outcome passes', async () => {
     const link = { kind: 'leads_to' as const, targetId: '01J9GNXT000000000000000001', label: 'Yes' };
@@ -65,5 +79,18 @@ describe('29.141 the client mirror of the Decision rules', () => {
     expect(await precheckEvent(elsewhere, readyCache({ typeId: 'decision', links: [link] }))).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
     const malformed = make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.decided', payload: {} });
     expect(await precheckEvent(malformed, readyCache({ typeId: 'decision', links: [link] }))).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
+  });
+
+  // DC-5 runs after the open-child count on the client close, as in `checks/close.ts` (29.140 pins the engine's order).
+  it('29.141 a close still reports an open child first: the open-child refusal, not outcome-required', async () => {
+    // control: with the child done, the same Decision reaches DC-5
+    expect(await precheckEvent(closeTicket(), decisionAtDone([child('terminal')]))).toEqual({ kind: 'refused', rule: 'decision.outcome-required', reason: 'Choose an outcome before finishing this decision.' });
+    expect(await precheckEvent(closeTicket(), decisionAtDone([child('active')]))).toEqual({ kind: 'refused', rule: 'parent-terminal-with-open-children', reason: 'This ticket cannot be closed while 1 of its child tickets is still open.' });
+  });
+
+  it('29.141 a close over an unvouched child set defers before DC-5', async () => {
+    // control: the same Decision with a vouched-empty child set previews outcome-required, so the vouch is the only difference
+    expect(await precheckEvent(closeTicket(), decisionAtDone([]))).toEqual({ kind: 'refused', rule: 'decision.outcome-required', reason: 'Choose an outcome before finishing this decision.' });
+    expect(await precheckEvent(closeTicket(), decisionAtDone())).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
   });
 });

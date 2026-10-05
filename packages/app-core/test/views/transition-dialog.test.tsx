@@ -102,7 +102,7 @@ describe('3.71 transitionOptions — what the definition declares plus the unive
  * wildcard and an exact edge both reach one target it must resolve them the way
  * the engine does: `find(exact) ?? find('*')`
  * (`packages/rule-engine/src/transition.ts:127-128`), which `precheck.ts`'s
- * `needsMembership` already mirrors at :797-798.
+ * `needsMembership` already mirrors at :849-850.
  *
  * It did not. It kept the first matching edge in DECLARATION ORDER, so a
  * definition that happened to declare its wildcard first made the dialog
