@@ -104,7 +104,7 @@ const ME_WORKSPACES = {
 };
 const attentionPath = (ws: string, show: string) => `/v1/workspaces/${ws}/attention?show=${show}`;
 const attentionBody = (ws: string) => ({ workspaceId: ws, generatedAt: '2026-10-05T00:00:00.000Z', settings: { staleDays: 7 }, items: [{ ticketId: `t-${ws}` }] });
-const workBody = (ws: string) => ({ workspaceId: ws, groups: { open: [{ ticketId: `t-${ws}` }], active: [], terminal: [] }, projectNames: { p: 'P' }, stateNames: { [`t-${ws}`]: 'Open' } });
+const workBody = (ws: string) => ({ workspaceId: ws, groups: { open: [{ ticketId: `t-${ws}` }], active: [], terminal: [] }, projectNames: { [`p-${ws}`]: `P ${ws}` }, stateNames: { [`t-${ws}`]: 'Open' } });
 const LIVE = ['w1', 'w2', 'w4', 'w5'] as const;
 const NAMES: Record<string, string> = { w1: 'One', w2: 'Two', w4: 'Four', w5: 'Five' };
 
@@ -129,7 +129,7 @@ describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
     expect(g.asked).toEqual([attentionPath('w1', 'created,ws-admin')]);
   });
 
-  it('30.053 show is narrowed per workspace: a workspace the viewer may not ask is skipped, never 400ed', async () => {
+  it('30.053 show is narrowed per workspace: a workspace the viewer may not ask is skipped, never 400ed; named outright, the refusal is a sentence', async () => {
     const pages: Record<string, unknown> = {
       '/v1/me/workspaces': ME_WORKSPACES,
       [attentionPath('w1', 'ws-admin')]: attentionBody('w1'),
@@ -165,6 +165,26 @@ describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
       attentionPath('w4', 'created,assigned'),
       attentionPath('w5', 'created,assigned,ws-admin'),
     ]);
+    // Named outright, nothing is narrowed: the route's 400 `invalid_query` (a role the caller lacks THERE) is
+    // answered with a sentence that says what each value needs, carrying the route's error as its cause.
+    const refusal = new HttpError(400, { error: 'invalid_query' });
+    const named = fake({ [attentionPath('w2', 'ws-admin')]: refusal });
+    await expect(tool('get_attention', named.session).handler({ workspaceId: 'w2', show: ['ws-admin'] })).rejects.toMatchObject({
+      message:
+        "invalid_query: show was refused for this workspace. 'ws-admin' needs the owner or admin role in it, and 'project-admin' needs a project you run in it; leave out workspaceId to ask every workspace for only what it allows.",
+      cause: refusal,
+    });
+    expect(named.asked).toEqual([attentionPath('w2', 'ws-admin')]);
+    // CONTROL: any other 400, a 400 with no body, the same error under another status, and a 404 are not that refusal
+    for (const [other, message] of [
+      [new HttpError(400, { error: 'something_else' }), 'gisik-nokma answered 400'],
+      [new HttpError(400, null), 'gisik-nokma answered 400'],
+      [new HttpError(500, { error: 'invalid_query' }), 'gisik-nokma answered 500'],
+      [NOT_FOUND, 'workspace not found or not visible to you'],
+    ] as const) {
+      const g = fake({ [attentionPath('w2', 'ws-admin')]: other });
+      await expect(tool('get_attention', g.session).handler({ workspaceId: 'w2', show: ['ws-admin'] })).rejects.toMatchObject({ message });
+    }
   });
 
   it('30.054 show:[] and an unknown value are refused before any read', async () => {
@@ -195,7 +215,7 @@ describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
   it('30.057 the two descriptions, verbatim', () => {
     const f = fake();
     expect(tool('get_attention', f.session).description).toBe(
-      "What needs your attention: overdue, due soon, stale and blocked work. By default only tickets you created or that are assigned to you, across all your workspaces; pass show to include 'ws-admin' or 'project-admin' tickets, and workspaceId to limit it to one workspace.",
+      "What needs your attention: overdue, due soon, stale and blocked work. By default only tickets you created or that are assigned to you, across all your workspaces; pass show to include 'ws-admin' or 'project-admin' tickets, and workspaceId to limit it to one workspace. With a workspaceId, a show value your role there does not allow is refused; without one, each workspace is asked only for what it allows.",
     );
     expect(tool('my_work', f.session).description).toBe(
       'What is on your plate: the tickets assigned to you or that you collaborate on, across all your workspaces, grouped the way the My Work screen groups them; pass workspaceId to limit it to one workspace.',

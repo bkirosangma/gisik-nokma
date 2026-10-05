@@ -27,6 +27,18 @@ const attentionArgs = { workspaceId: id.optional(), show: showSchema.optional() 
 /** The `/my-work` page's default "Show" (spec D2): only tickets the caller created or is assigned. */
 const DEFAULT_SHOW: readonly AttentionShow[] = ['created', 'assigned'];
 
+/** The attention route answers a `show` value the caller's role in THAT workspace does not allow with
+ *  `400 { error: 'invalid_query' }` and names nothing (`read/attention-show.ts`). On its own that reaches an
+ *  assistant as "answered 400"; this says what each value needs and how to ask instead. The tool only ever
+ *  sends one string of known values, so a role is the one thing the route can refuse here. */
+const SHOW_REFUSED_SENTENCE =
+  "invalid_query: show was refused for this workspace. 'ws-admin' needs the owner or admin role in it, and " +
+  "'project-admin' needs a project you run in it; leave out workspaceId to ask every workspace for only what it allows.";
+
+function isInvalidQuery(body: unknown): boolean {
+  return typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'invalid_query';
+}
+
 /** One `/v1/me/workspaces` row, the fields the fan-out reads. `adminProjectIds` is absent on an older server. */
 type MyWorkspace = { workspaceId: string; name: string | null; role: string; archived: boolean; adminProjectIds?: string[] };
 
@@ -119,14 +131,24 @@ export function discoveryTools(session: Session): ToolDefinition[] {
     {
       name: 'get_attention',
       description:
-        "What needs your attention: overdue, due soon, stale and blocked work. By default only tickets you created or that are assigned to you, across all your workspaces; pass show to include 'ws-admin' or 'project-admin' tickets, and workspaceId to limit it to one workspace.",
+        "What needs your attention: overdue, due soon, stale and blocked work. By default only tickets you created or that are assigned to you, across all your workspaces; pass show to include 'ws-admin' or 'project-admin' tickets, and workspaceId to limit it to one workspace. With a workspaceId, a show value your role there does not allow is refused; without one, each workspace is asked only for what it allows.",
       inputSchema: attentionArgs,
       handler: async (args) => {
         const a = z.object(attentionArgs).parse(args);
         const show = a.show ?? DEFAULT_SHOW;
         const attention = (ws: string, part: readonly AttentionShow[]) => `/v1/workspaces/${enc(ws)}/attention?show=${showQuery(part)}`;
-        // One named workspace is asked for the whole selection: a role it lacks is the route's 400, said plainly.
-        if (a.workspaceId !== undefined) return readOrNotFound(session, attention(a.workspaceId, show), 'workspace');
+        // One named workspace is asked for the whole selection, never narrowed: a value the caller's role there
+        // does not allow is the route's 400, answered with the sentence that says what each value needs.
+        if (a.workspaceId !== undefined) {
+          try {
+            return await readOrNotFound(session, attention(a.workspaceId, show), 'workspace');
+          } catch (error) {
+            if (error instanceof HttpError && error.status === 400 && isInvalidQuery(error.body)) {
+              throw new Error(SHOW_REFUSED_SENTENCE, { cause: error });
+            }
+            throw error;
+          }
+        }
         const read = await eachLiveWorkspace(session, (workspace) => {
           const part = showForWorkspace(workspace, show);
           return part.length === 0 ? undefined : (session.get(attention(workspace.workspaceId, part)) as Promise<{ items: unknown[] }>);

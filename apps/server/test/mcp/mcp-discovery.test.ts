@@ -139,8 +139,12 @@ describe('30.5 the global my_work and get_attention through the hosted door (my-
     const ownerAdmin = await callTool(w.app, w.owner.token, 'get_attention', { show: ['ws-admin'] });
     expect(ownerAdmin.isError, ownerAdmin.text).toBe(false);
     expect(entry(ownerAdmin.json)).toEqual({ workspaceId: w.workspaceId, name: w.workspaceName, items: expect.any(Array) });
-    // and named outright, the member's ws-admin is the route's refusal, said plainly
-    expect((await callTool(w.app, w.member.token, 'get_attention', { workspaceId: w.workspaceId, show: ['ws-admin'] })).isError).toBe(true);
+    // and named outright, the member's ws-admin is the route's refusal, said in the sentence that says why
+    const named = await callTool(w.app, w.member.token, 'get_attention', { workspaceId: w.workspaceId, show: ['ws-admin'] });
+    expect(named.isError).toBe(true);
+    expect(named.text).toBe(
+      "invalid_query: show was refused for this workspace. 'ws-admin' needs the owner or admin role in it, and 'project-admin' needs a project you run in it; leave out workspaceId to ask every workspace for only what it allows.",
+    );
 
     // the stranger's global answer never names a workspace it is not in
     const stranger = await callTool(w.app, w.stranger.token, 'get_attention', {});
