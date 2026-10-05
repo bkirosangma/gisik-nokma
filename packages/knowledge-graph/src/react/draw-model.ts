@@ -30,7 +30,8 @@ export function buildDrawModel(store: GraphStore, z: Zones, o: DrawModelOptions)
   const res = z.walk;
   const ringOf = (id: string) => (z.fogSet.has(id) ? Math.max(res.dist.get(id) ?? 0, z.clearHop + 1) : res.dist.get(id) ?? 0);
   const positions = layoutRings(res, o.centre, cfg, ringOf);
-  const shown = [...z.clear, ...z.fog];
+  // Only what the store holds: before ring 1 answers (or when it fails) the walk still lists the centre, whose item the ring brings.
+  const shown = [...z.clear, ...z.fog].filter((ref) => store.items.has(ref));
   const shownSet = new Set(shown);
   const nodes: DrawNode[] = shown.map((ref) => {
     const it = store.items.get(ref)!;
@@ -48,7 +49,7 @@ export function buildDrawModel(store: GraphStore, z: Zones, o: DrawModelOptions)
   }
   const byRef = new Map(nodes.map((n) => [n.ref, n]));
   const fit = fitItemsFor(
-    z.clear.map((ref) => {
+    z.clear.filter((ref) => byRef.has(ref)).map((ref) => {
       const n = byRef.get(ref)!, p = positions.get(ref)!;
       return { x: p.x, y: p.y, kind: n.kind, label: n.lbl, sub: n.sub, center: n.center };
     }),

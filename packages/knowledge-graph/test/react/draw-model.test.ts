@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { emptyStore } from '../../src/engine/model.js';
 import { zones } from '../../src/engine/zones.js';
 import { buildDrawModel } from '../../src/react/draw-model.js';
 import { ALL_GROUPS, edge, item, N, storeOf, T } from '../engine/fixture.js';
@@ -17,7 +18,7 @@ const model = (center: string, selected: string | null, selectedEdge: string | n
   buildDrawModel(store, zonesAt(center), { config: 'desktop', centre: center, selected, selectedEdge, on: ALL_GROUPS });
 
 describe('buildDrawModel (`render`, knowledge-graph-sigma.html:915-948)', () => {
-  it('27.310 fog nodes are bare, a hop-1 note has its icon, a note CENTRE has none, fog edges are not counted, and the selected item lights only its own edges; control: an edge selected lights none', () => {
+  it('27.310 fog nodes are bare, a hop-1 note has its icon, a note CENTRE has none, fog edges are not counted, and the selected item lights only its own edges; control: an edge selected lights none; nothing the store does not hold is drawn', () => {
     const m = model(T('c'), T('a'));
     const fog = m.nodes.filter((n) => n.fog);
     expect(fog.map((n) => n.ref).sort()).toEqual([T('f1'), T('f2')]);
@@ -46,5 +47,10 @@ describe('buildDrawModel (`render`, knowledge-graph-sigma.html:915-948)', () => 
     // control: with an edge selected, no item's edges are lit
     const withEdge = model(T('c'), T('a'), `blocks|${T('c')}|${T('a')}`);
     expect(withEdge.edges.filter((e) => e.on)).toEqual([]);
+    // before ring 1 answers the walk lists the centre, but the store does not hold it yet: nothing is drawn, nothing throws
+    const none = emptyStore();
+    const early = buildDrawModel(none, zones(none, { center: T('c'), on: ALL_GROUPS, reach: 1, inScope: () => true, semantic: true }), { config: 'desktop', centre: T('c'), selected: T('c'), selectedEdge: null, on: ALL_GROUPS });
+    expect(early.nodes).toEqual([]);
+    expect(early.fit).toEqual([]);
   });
 });
