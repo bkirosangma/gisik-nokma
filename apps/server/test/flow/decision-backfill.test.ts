@@ -72,7 +72,10 @@ describe('29.143 the Decision backfill', () => {
   it('29.143 a second run adds nothing', async () => {
     const ws = newUlid();
     await seedLegacy(ws);
-    await backfillDecisionType({ pool: db.pool, ingest: door() });
+    await backfillDecisionType({ pool: db.pool, ingest: door(), now: () => new Date('2026-10-01T06:30:00.000Z') });
+    // The injected clock is the definition's claimed instant (the sweep's convention), not the wall clock.
+    const stamped = await db.pool.query<{ client_time: Date }>(`SELECT client_time FROM events WHERE workspace_id = $1 AND payload->>'id' = $2`, [ws, DECISION_TYPE_ID]);
+    expect(stamped.rows.map((row) => row.client_time.toISOString())).toEqual(['2026-10-01T06:30:00.000Z']);
     const again = await backfillDecisionType({ pool: db.pool, ingest: door() });
     expect(again).toEqual({ candidates: 0, defined: 0, refused: 0, alreadyHad: 1 });
     expect(await decisionEvents(ws)).toHaveLength(1);

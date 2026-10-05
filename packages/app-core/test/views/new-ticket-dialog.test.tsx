@@ -1104,6 +1104,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     expect(defaultRootTypeFor([...LADDER, decision])?.id).toBe('task');
     expect(defaultRootTypeFor([decision, ...LADDER])?.id).toBe('task'); // order independence
     expect(defaultRootTypeFor([decision])?.id).toBe('decision'); // control: legal, so the last resort
+    expect(defaultRootTypeFor([decision, { id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }])?.id).toBe('task'); // one other legal type is enough
     expect(defaultRootTypeFor([decision, { id: 'errand', name: 'Errand', rank: 3, workflowId: 'wf-errand' }, { id: 'chore', name: 'Chore', rank: 3, workflowId: 'wf-errand' }])?.id).toBe('chore'); // the id tie-break among the rest is unchanged
   });
 

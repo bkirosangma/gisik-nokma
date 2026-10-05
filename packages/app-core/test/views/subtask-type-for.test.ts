@@ -9,6 +9,7 @@ describe('29.144 subtaskTypeFor and the Decision seed', () => {
     // No `task` in this custom ladder, so rule 2 (shallowest legal, ties by id) decides: 'decision' < 'errand'.
     expect(subtaskTypeFor([def('story', 2), def('decision', 3), def('errand', 3), def('sub-task', 4)], 2)?.id).toBe('errand');
     expect(subtaskTypeFor([def('story', 2), def('decision', 3), def('sub-task', 4)], 2)?.id).toBe('sub-task');
+    expect(subtaskTypeFor([def('story', 2), def('decision', 3), def('errand', 3), def('chore', 3)], 2)?.id).toBe('chore'); // the id tie-break among the rest is unchanged
     expect(subtaskTypeFor([def('epic', 1), def('story', 2), def('task', 3), def('decision', 3), def('sub-task', 4)], 1)?.id).toBe('task'); // rule 1 unchanged
     expect(subtaskTypeFor([def('story', 2), def('decision', 3)], 2)?.id).toBe('decision'); // control: the last resort
   });
