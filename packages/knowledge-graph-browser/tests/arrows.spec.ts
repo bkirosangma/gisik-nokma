@@ -129,7 +129,7 @@ test('27.350 blocks and ref edges carry a visible head; a parent edge into the s
   expect(dot.head).toBeLessThan(300);
 });
 
-test('27.351 the head sits outside the border of the widest card (two rays, one through its far end) and of a chip at fit and at 2× zoom', async ({ page }) => {
+test('27.351 the head sits outside the border of the widest card (two rays, one through its far end), of a chip through its label\'s end, and of a chip at fit and at 2× zoom', async ({ page }) => {
   await openAdapter(page);
   // the centre card carries the longest subtitle the view draws (34 characters, `nodeSub`)
   await page.evaluate(() => window.__kg.setFixtureTitle('ticket:t142', 'W'.repeat(200)));
@@ -144,6 +144,11 @@ test('27.351 the head sits outside the border of the widest card (two rays, one 
   const end = await headProbe(page, 'blocks|ticket:t133|ticket:t142', { move: { 'ticket:t133': { x: Math.min(s.width - 20, t.x + 330), y: t.y + 25 } } });
   expectHead(end);
   expect(end.B).toBeGreaterThan(110);
+  // a right-label chip whose ray leaves through its label's RIGHT end: the note chip in the empty corner below left, its
+  // source right of it and a little lower (the box sits lower than the node: the subtitle hangs below the label)
+  const right = await headProbe(page, 'ref|note:n7|note:n1', { move: { 'note:n1': { x: 40, y: s.height - 80 }, 'note:n7': { x: 360, y: s.height - 67 } } });
+  expectHead(right);
+  expect(right.B).toBeGreaterThan(120); // past the label's end, not through the box's top or bottom (≤ 35 px from the centre)
   // a chip (a note: the icon is its dot) at fit, then at 2× zoom centred on it
   const fit = await headProbe(page, 'ref|note:n7|note:n1');
   expectHead(fit);
