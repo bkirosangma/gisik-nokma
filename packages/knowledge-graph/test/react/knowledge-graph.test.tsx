@@ -703,6 +703,28 @@ describe('KnowledgeGraph: the empty state and the scope note name their cause (K
     expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe("Every link type is turned off. Turn one on to see GN-9's links.");
     expect(screen.queryByText(carry)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
+    // the chips the bar SHOWS decide: the first chip alone on, then the last alone on, each reads the carry sentence; with the
+    // semantic layer off, Concepts leaves the bar while it is still on, so every chip shown is off: the every-link-type sentence
+    const only = async (name: RegExp) => {
+      for (const b of chips().filter((x) => x.getAttribute('aria-pressed') === 'true')) await someOn.click(b);
+      await someOn.click(screen.getByRole('button', { name }));
+      await settle();
+      expect(chips().filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent)).toEqual([expect.stringMatching(name)]);
+    };
+    try {
+      await only(/^Parent and subtasks/);
+      expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe(carry);
+      await only(/^Concepts/);
+      expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe(carry);
+      await someOn.click(screen.getByRole('tab', { name: 'Off' }));
+      await settle();
+      expect(screen.queryByRole('button', { name: /^Concepts/ })).toBeNull();
+      expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(CHIP_GROUPS.filter((g) => g !== 'concepts').map(() => 'false'));
+      expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe("Every link type is turned off. Turn one on to see GN-9's links.");
+      expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
+    } finally {
+      window.localStorage.clear(); // the Off tab persists 'off' (gn-kg-semantic)
+    }
   });
 
   it('27.662 a ticket centre with no links: Nothing is linked and Add link, with every chip on and with every chip off; control: the chips-off case does not say Nothing is linked', async () => {
