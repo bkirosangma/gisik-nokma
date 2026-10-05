@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests-cap.test.sh — `ctl run-tests --max-min`: the wall-clock cap on SLOT time (13.2320-13.2326 and 13.2328,
+# scripts/ctl/test/run-tests-cap.test.sh — `ctl run-tests --max-min`: the wall-clock cap on SLOT time (13.2320-13.2326, 13.2328 and 13.2329,
 # test-cases/13-deploy-and-ops.md); run by `ctl selftest`. Every case id starts its check's name.
 # The legs use the REAL clock and real processes (a cap is a timer: a fake clock would prove nothing about it), scaled by the verb's seams:
 # CTL_RUN_SECS_PER_MIN=1 (a "minute" of cap is 1 s, so `--max-min 2` takes the production path and prints `TIMEOUT after 2 min`) and
@@ -32,7 +32,7 @@ chmod +x "$FB"/*
 reset() { reap; rm -rf "$CTL_SEM_DIR" "$CTL_LOG_DIR"/* "$fx"/j.*; mkdir -p "$CTL_SEM_DIR"; }
 # bounded SECS CMD…: CMD under an alarm (perl: alarm survives exec); a verb that hangs dies by SIGALRM (rc 142), never the suite.
 bounded() { local s="$1"; shift; perl -e 'alarm shift; exec @ARGV' "$s" "$@"; }
-rt() { ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_RUN_SECS_PER_MIN=1 CTL_RUN_KILL_GRACE_SECS=1 CTL_DRY_RUN=0 bounded "${RT_ALARM:-40}" "$HERE/ctl" run-tests --repo "$repo" "$@" 2>&1 ); }
+rt() { ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_RUN_SECS_PER_MIN=1 CTL_RUN_KILL_GRACE_SECS="${RT_GRACE:-1}" CTL_DRY_RUN=0 bounded "${RT_ALARM:-40}" "$HERE/ctl" run-tests --repo "$repo" "$@" 2>&1 ); }
 lastlog() { ls -t "$CTL_LOG_DIR"/run-tests-*.log 2>/dev/null | head -1; }
 gone() { local st; st="$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')"; [ -z "$st" ] || [ "${st#Z}" != "$st" ]; }   # no process, or a zombie awaiting its reaper
 slots_left() { ls "$CTL_SEM_DIR" 2>/dev/null | grep -c '^slot-'; }
@@ -54,6 +54,12 @@ check "13.2320 a job that holds its slot past --max-min 2 (scaled: 2 s) is stopp
   '[ $rc -eq 124 ] && [ "$(tail -1 "$log")" = "TIMEOUT after 2 min" ] && printf "%s\n" "$out" | tail -1 | grep -q "^FAIL run-tests capx TIMEOUT after 2 min — its process group was stopped, slot released (rc=124" && [ "$(slots_left)" = 0 ] && [ -n "$spin" ] && gone "$spin" && [ -n "$leader" ] && gone "$leader" && [ -f "$fx/j.a.polite" ] && [ -n "$polite" ] && gone "$polite"'
 check "13.2320 …within the cap + the KILL grace + a margin (2 + 1 + 4 s of wall clock, the spinner needed the KILL), and the log header names the cap" \
   '[ $((t1 - t0)) -ge 3 ] && [ $((t1 - t0)) -le 7 ] && grep -qx "# cap 2 min of slot time (then TERM the group, KILL 1 s later, exit 124)" "$log"'
+
+# A job whose whole group exits on the TERM must not sit out the grace: the wait ends once the GROUP is empty (reviewer P11, a clause-drop of the
+# group-empty test survived every leg above, whose spinner always needs the KILL).
+reset; t0=$(now); op=$(RT_GRACE=10 rt --label politeall --max-min 2 -- sh -c 'echo $$ >> "$FXP"; trap "exit 0" TERM; while :; do sleep 0.2; done'); rp=$?; t1=$(now); lp=$(lastlog)
+check "13.2320 …a job whose whole group exits on the TERM ends the stop at once: under a 10 s grace it returns 124 + TIMEOUT within the 2 s cap + 5 s, never cap + grace (CONTROL: the cap fired, the log's last line is the TIMEOUT)" \
+  '[ $rp -eq 124 ] && [ "$(tail -1 "$lp")" = "TIMEOUT after 2 min" ] && [ $((t1 - t0)) -le 7 ]'
 
 # ---- 13.2321 under the cap the job's own exit code, and a job's OWN 124 prints no TIMEOUT ----
 # logtext: the run's whole log, read NOW (the next reset removes it; a grep of a missing file would make `! grep` pass on nothing)
@@ -92,8 +98,15 @@ dx=$(GISIK_RUN_MAX_MIN=7 rt --max-min 4 --dry-run -- true)
 check "13.2324 --dry-run names the cap: the default is 30 min, GISIK_RUN_MAX_MIN=20 names 20, an explicit --max-min 4 beats the env's 7, --max-min 08 is 8, --max-min 0 is 'no cap'" \
   'printf "%s" "$dd" | grep -q "; cap 30 min of slot time (then TERM the group, KILL 1 s later, exit 124)\$" && printf "%s" "$de" | grep -q "; cap 20 min of slot time" && printf "%s" "$dx" | grep -q "; cap 4 min of slot time" && printf "%s" "$dl" | grep -q "; cap 8 min of slot time" && printf "%s" "$dz" | grep -q "; no cap (--max-min 0)\$"'
 bad() { local o r; o=$("$@"); r=$?; [ $r -eq 64 ] && printf "%s\n" "$o" | tail -1 | grep -q "^FAIL run-tests $BADMSG"; }
-check "13.2324 refusals are exit 64 and run nothing: GISIK_RUN_MAX_MIN=0 (no cap only with an explicit flag), GISIK_RUN_MAX_MIN=abc, --max-min abc, --max-min -1, --max-min with no value" \
-  '( BADMSG="GISIK_RUN_MAX_MIN=0 is refused: no cap only with an explicit --max-min 0"; GISIK_RUN_MAX_MIN=0 bad rt --dry-run -- true ) && ( BADMSG="GISIK_RUN_MAX_MIN=abc is not a whole number"; GISIK_RUN_MAX_MIN=abc bad rt -- true ) && ( BADMSG="--max-min abc is not a whole number"; bad rt --max-min abc -- true ) && ( BADMSG="--max-min -1 is not a whole number"; bad rt --max-min -1 -- true ) && ( BADMSG="--max-min needs a value"; bad rt --max-min ) && [ -z "$(ls "$CTL_LOG_DIR")" ]'
+check "13.2324 refusals are exit 64 and run nothing: GISIK_RUN_MAX_MIN=0 (no cap only with an explicit flag), GISIK_RUN_MAX_MIN=abc, --max-min abc, --max-min '' (empty), --max-min -1, --max-min with no value" \
+  '( BADMSG="GISIK_RUN_MAX_MIN=0 is refused: no cap only with an explicit --max-min 0"; GISIK_RUN_MAX_MIN=0 bad rt --dry-run -- true ) && ( BADMSG="GISIK_RUN_MAX_MIN=abc is not a whole number"; GISIK_RUN_MAX_MIN=abc bad rt -- true ) && ( BADMSG="--max-min abc is not a whole number"; bad rt --max-min abc -- true ) && ( BADMSG="--max-min  is not a whole number"; bad rt --max-min "" -- true ) && ( BADMSG="--max-min -1 is not a whole number"; bad rt --max-min -1 -- true ) && ( BADMSG="--max-min needs a value"; bad rt --max-min ) && [ -z "$(ls "$CTL_LOG_DIR")" ]'
+
+# The seams' PRODUCTION defaults (every other leg sets both): a minute of cap is 60 s, the TERM→KILL grace 10 s (reviewer P11: /10 on either survived).
+TD=$(( 5000 + ($$ * 11 + RANDOM) % 4000 ))
+reset; ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=0 CTL_DRY_RUN=0 bounded 40 "$HERE/ctl" run-tests --repo "$repo" --label dflt --max-min "$TD" -- sh -c 'sleep 1; ps -axo command= | awk -v t="$1" '"'"'$NF == t && $1 != "awk"'"'"' | wc -l | tr -d " " > "$2.during"' x "$((TD * 60))" "$fx/j.d" > /dev/null 2>&1 ); during_dflt=$(cat "$fx/j.d.during" 2>/dev/null)
+dg=$( cd "$repo" && PATH="$FB:$PATH" CTL_DRY_RUN=0 bounded 40 "$HERE/ctl" run-tests --repo "$repo" --max-min 3 --dry-run -- true 2>&1 )
+check "13.2324 …with both seams unset (production): the timer sleeps --max-min × 60 s (one process whose last argument is N×60, seen from inside the job) and the grace is 10 s (the dry-run names 'KILL 10 s later')" \
+  '[ "$during_dflt" = 1 ] && printf "%s" "$dg" | grep -q "; cap 3 min of slot time (then TERM the group, KILL 10 s later, exit 124)\$"'
 
 # ---- 13.2325 the env default really caps a run, and an explicit 0 really is no cap ----
 reset; oe=$(GISIK_RUN_MAX_MIN=2 rt --label envcap -- sh "$fx/hung.sh" "$fx/j.e"); re=$?
@@ -119,6 +132,21 @@ done; sleep 0.3; after_stress=$(ntimers)
 check "13.2326 20 jobs that end at once (true, and 13.1752's self-TERM \`sh -c 'kill -TERM \$\$'\`) each return their own code (0 / 143) within 10 s and leave NO timer process behind" \
   '[ "$sbad" = 0 ] && [ "$after_stress" = 0 ]'
 
+# ---- 13.2329 the timer signals only while its parent is the verb (its getppid guard): a live process at the verb's pid that is NOT its parent gets nothing ----
+# A reused pid cannot be produced on demand, so the leg builds the same situation another way: a `perl` shim on PATH (this leg only) runs the
+# timer one process further down, so the pid the timer is told to signal (the verb, alive) is no longer its parent. The guard must then keep it
+# silent, and the job outlives its cap. Every other perl (the `bounded` alarm) is exec'd untouched. Mutant M18 (the guard dropped) is RED here.
+realperl=$(command -v perl); SB="$fx/shimbin"; mkdir -p "$SB"
+cat > "$SB/perl" <<SH
+#!/bin/bash
+case "\$*" in *USR1*) "$realperl" "\$@" & p=\$!; echo "\$p" >> "\$FXP"; echo "\$\$ \$PPID \$p" > "\$FXP.shim"; wait "\$p";; *) exec "$realperl" "\$@";; esac
+SH
+chmod +x "$SB/perl"
+reset; rm -f "$FXP.shim"; os=$(PATH="$SB:$PATH" rt --label shim --max-min 2 -- sh -c 'echo $$ >> "$FXP"; sleep 4; echo outlived-the-cap'); rs=$?; ls_=$(logtext)
+{ read -r shimpid shimppid perlpid < "$FXP.shim"; } 2>/dev/null
+check "13.2329 a timer whose parent is not the verb never signals it: with the timer run one process down (a PATH shim), a 4 s job under a 2 s cap runs to its end (rc 0, its output in the log, no TIMEOUT in log or output) (CONTROL: the shim really ran the timer: it recorded itself, its parent and the timer's pid)" \
+  '[ -n "${perlpid:-}" ] && [ -n "${shimpid:-}" ] && [ $rs -eq 0 ] && printf "%s\n" "$ls_" | grep -qx outlived-the-cap && ! printf "%s\n%s" "$ls_" "$os" | grep -q TIMEOUT'
+
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----
 cat > "$fx/rec-run-tests" <<'SH'
 #!/bin/sh
@@ -130,7 +158,7 @@ import importlib.util, sys
 spec = importlib.util.spec_from_file_location("mutate", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 m.slot_run("mutate-1-x.ts", sys.argv[2], ["true"], int(sys.argv[3]))' "$HERE/verbs/mutate.py" "$repo" "$1" > /dev/null 2>&1; cat "$fx/j.rec.$1" 2>/dev/null; }
 m600=$(margs 600); m1=$(margs 1); m659=$(margs 659)
-check "13.2328 ctl mutate's slot-run passes --max-min right after its label, above its watchdog cap + GRACE by ≥ 1 min: 600 s → 12, 659 s → 12, 1 s → 2 (so the watchdog's own stop always comes first)" \
+check "13.2328 ctl mutate's slot-run passes --max-min right after its label, above its watchdog cap + GRACE (3 s) by ≥ 58 s: 600 s → 12, 659 s → 12, 1 s → 2 (so the watchdog's own stop always comes first)" \
   'case "$m600" in "--label mutate-1-x.ts --max-min 12 -- "*) true;; *) false;; esac && case "$m659" in "--label mutate-1-x.ts --max-min 12 -- "*) true;; *) false;; esac && case "$m1" in "--label mutate-1-x.ts --max-min 2 -- "*) true;; *) false;; esac'
 
 reap
