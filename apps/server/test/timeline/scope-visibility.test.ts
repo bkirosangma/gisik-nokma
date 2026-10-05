@@ -164,6 +164,39 @@ describe('29.296 scope gate and visibility', () => {
   });
 });
 
+describe('29.296 the trash is not loaded: a deleted ticket and a deleted project\'s ticket are in no body', () => {
+  it('29.296 a deleted published ticket (a flow member) and a ticket of a deleted project leave index, chunk and tray; control: before, both are there', async () => {
+    const A = w.A.workspaceId;
+    const [Z, X, Y, U, p9] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+    const ev = (entity: { kind: 'ticket' | 'project'; id: string }, type: string, payload: Record<string, unknown>) =>
+      makeCommitted({ workspaceId: A, actorId: w.ama, entity, type, payload });
+    await applyCommitted(db.pool, [
+      ev({ kind: 'ticket', id: Z }, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Before the bin', startDate: { date: '2026-10-15' }, estimate: 1 }),
+      ev({ kind: 'ticket', id: X }, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Binned', estimate: 1 }),
+      ev({ kind: 'ticket', id: Z }, 'ticket.link_added', { kind: 'leads_to', targetId: X }),
+      ev({ kind: 'project', id: p9 }, 'project.created', { name: 'Binned project' }),
+      ev({ kind: 'project', id: p9 }, 'project.member_added', { userId: w.ama, projectAdmin: true }),
+      ev({ kind: 'ticket', id: Y }, 'ticket.created', { typeId: 'task', projectId: p9, parentId: null, title: 'In the binned project', startDate: { date: '2026-10-15' }, estimate: 1 }),
+      ev({ kind: 'ticket', id: U }, 'ticket.created', { typeId: 'task', projectId: p9, parentId: null, title: 'Undated in the binned project' }),
+    ]);
+    const bodies = async () => {
+      const scope = scopeOf([A]);
+      const readable = await readableWorkspaces(db.pool, w.ama, scope);
+      return JSON.stringify([
+        await readTimelineIndex(db.pool, readable, w.ama, scope, NOW),
+        await readTimelineChunk(db.pool, readable, w.ama, scope, NOW, { from: '2026-08-01', to: '2026-12-31' }),
+        await readTimelineTray(db.pool, readable, w.ama, scope, NOW),
+      ]);
+    };
+    const before = await bodies();
+    for (const id of [X, Y, U]) expect(before).toContain(id); // control: live, all three are drawn or trayed
+    await applyCommitted(db.pool, [ev({ kind: 'ticket', id: X }, 'ticket.deleted', {}), ev({ kind: 'project', id: p9 }, 'project.deleted', {})]);
+    const after = await bodies();
+    for (const id of [X, Y, U]) expect(after).not.toContain(id);
+    expect(after).toContain(Z); // control: its live predecessor is still read
+  });
+});
+
 describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
   // D is a Decision only ama sees. T (undated) is reached by D's labelled outcome; N was closed by the flow as D's branch not taken.
   // bo sees T and N, never D: no response he gets may carry D's id, though N's resolution and T's reachedBy point at it.
