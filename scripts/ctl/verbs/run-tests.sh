@@ -125,7 +125,8 @@ cd "$rundir" || exit 1
 # The cap's clock starts HERE, with the slot already held: a queue wait (up to CTL_SEM_MAX_WAIT, a gate first) never counts against it.
 # The USR1 trap makes `wait` return at once. The leader still un-reaped (kill -0) is what tells a cap stop from a job that ended in the same
 # instant: once `wait` has reaped it, its pid (and so its pgid) may belong to a new process group, which cap_stop must never signal. Only a
-# microsecond race reaches this guard (mutant M12 survives); it stays for the same reason as the timer's getppid guard: never outside the group.
+# microsecond race reaches this guard; 13.2349 freezes that race, so dropping the guard (mutant M12) is RED there (a TIMEOUT and rc 124 for a job that already
+# ended; reviewer C 2026-10-05). It stays for the same reason as the timer's getppid guard: never outside the group.
 # The residual (13.2349): the cap firing as the job ends. The kernel can reap the job inside `wait` while the USR1 is pending; bash then
 # longjmps out of `wait` before it records the status, so rc is 128+USR1 (158 on macOS), the job's own rc is gone for good (a second `wait`
 # returns 127), and the job is not alive, so no TIMEOUT either. The verb says so in the log ("CAP RACE") and keeps the 128+USR1: a false RED
