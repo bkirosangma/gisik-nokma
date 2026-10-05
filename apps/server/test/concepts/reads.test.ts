@@ -28,6 +28,7 @@ import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
 import { buildTestApp } from '../helpers/app.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedProject, seedTicket } from '../helpers/seed.js';
 import { NOTES_USERS, seedNotesFixture, type NotesFixture, type NotesUser } from '../helpers/notes-fixture.js';
 import { signInWithPhone } from '../helpers/session.js';
 
@@ -44,6 +45,9 @@ const C0 = newUlid();
 const CM = newUlid();
 const CD = newUlid();
 const CF = newUlid();
+const FW = newUlid(); // another workspace, holding CF and the foreign ticket FT and note FN
+const FT = newUlid();
+const FN = newUlid();
 
 const NOT_FOUND = '{"error":"not_found"}';
 const INVALID = { error: 'invalid_query' };
@@ -98,8 +102,12 @@ beforeAll(async () => {
     cev(CP, 'concept.linked', { otherId: C0, relation: 'broader' }),
     cev(CD, 'concept.created', { name: 'Gone' }),
     cev(CD, 'concept.deleted', {}),
-    makeCommitted({ workspaceId: newUlid(), actorId: world.ids.owner, entity: { kind: 'concept', id: CF }, type: 'concept.created', payload: { name: 'Elsewhere' } }),
+    makeCommitted({ workspaceId: FW, actorId: world.ids.owner, entity: { kind: 'concept', id: CF }, type: 'concept.created', payload: { name: 'Elsewhere' } }),
+    makeCommitted({ workspaceId: FW, actorId: world.ids.owner, entity: { kind: 'note', id: FN }, type: 'note.created', payload: { title: 'Elsewhere', homeProjectId: '', scope: { mode: 'workspace' } } }),
   ]);
+  const FP = newUlid();
+  await seedProject(db.pool, FW, FP);
+  await seedTicket(db.pool, { workspaceId: FW, ticketId: FT, projectId: FP, title: 'Elsewhere' });
 }, 120_000);
 afterAll(async () => {
   await app.close();
@@ -206,6 +214,17 @@ describe('27.470 the list by item', () => {
     expect([bad.statusCode, bad.json()]).toEqual([400, INVALID]);
     const twice = await get('memberIn', `/v1/workspaces/${world.WS}/concepts?item=ticket:${world.TP}&item=ticket:${world.TP}`);
     expect([twice.statusCode, twice.json()]).toEqual([400, INVALID]);
+    // The kind is the whole prefix and the id is not empty.
+    for (const ref of [`xticket:${world.TP}`, 'ticket:']) {
+      const res = await get('memberIn', `/v1/workspaces/${world.WS}/concepts?item=${ref}`);
+      expect([ref, res.statusCode, res.json()]).toEqual([ref, 400, INVALID]);
+    }
+    // An item of ANOTHER workspace is an absent item here, even for the owner (it may not be told the id exists).
+    expect(await answer('owner', `/v1/workspaces/${world.WS}/concepts?item=ticket:${FT}`)).toEqual(absent);
+    expect(await answer('owner', `/v1/workspaces/${world.WS}/concepts?item=note:${FN}`)).toEqual(absent);
+    // Control: the foreign ticket and note are live where they live.
+    const foreign = await db.pool.query('SELECT (SELECT count(*)::int FROM proj_tickets WHERE ticket_id = $1 AND workspace_id = $3) AS t, (SELECT count(*)::int FROM proj_notes WHERE note_id = $2 AND workspace_id = $3 AND deleted = FALSE) AS n', [FT, FN, FW]);
+    expect(foreign.rows).toEqual([{ t: 1, n: 1 }]);
   });
 });
 
@@ -320,6 +339,10 @@ describe('27.483 trash (Review Focus 3, at read time)', () => {
     expect(await owned()).toEqual({ listed: 0, count: 0, items: [] });
     expect(await listIds('guestListed')).not.toContain(C83);
     expect(await listIds('memberOut')).toContain(C83);
+    // The preview asks the same question: C83 counts as empty now (the five non-guests), not as two hidden-from-no-one items.
+    expect((await get('owner', `/v1/workspaces/${world.WS}/concepts/audience?conceptId=${C83}&add=note:${world.NOTES.nWorkspace}`)).json()).toEqual({
+      conceptId: C83, members: 7, before: 5, after: 5,
+    });
     // A trashed item is the absent item's 404 on `?item=`, even for the owner.
     expect(await answer('owner', `/v1/workspaces/${world.WS}/concepts?item=ticket:${TT}`)).toEqual(
       await answer('owner', `/v1/workspaces/${world.WS}/concepts?item=ticket:${newUlid()}`),
