@@ -94,6 +94,11 @@ describe('29.204 the flow moves over undeclared edges', () => {
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: notTaken }), overOpen)).toMatchObject({ rule: 'parent-terminal-with-open-children' });
     // control: led-to opens no edge. From Backlog, so a led-to-only-out-of-Backlog rule (spec AP-1) would not answer first.
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done', cause: ledTo }), ctx('backlog'))).toMatchObject({ rule: 'illegal-transition' });
+    // A DECLARED edge wins over the synthetic one and keeps its authored rules: the flow's reset over a declared
+    // `done -> todo` that requires a comment is refused for the comment (control: the same move with one passes).
+    const WF_RESET_DECLARED: PublishedWorkflowDef = { ...WF_STRICT, transitions: [...WF_STRICT.transitions, { from: 'done', to: 'todo', rules: [{ kind: 'require-comment' }] }] };
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened }), atDone(WF_RESET_DECLARED))).toMatchObject({ rule: 'require-comment' });
+    expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened, comment: { text: 'loop' } }), atDone(WF_RESET_DECLARED))).toEqual({ refused: false });
   });
 });
 
@@ -116,6 +121,10 @@ describe('29.362 the flow actor needs the cause', () => {
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'done' }), ctx('focus'))).toMatchObject({ rule: 'illegal-transition' });
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo' }), atDone())).toMatchObject({ rule: 'illegal-transition' });
     expect(await evaluateEvent(by(FLOW, 'ticket.transitioned', { to: 'todo', cause: reopened }), atDone())).toEqual({ refused: false }); // control
+    // Asked directly, a cause that is not a well-formed flow cause is no cause (the door's payload schema would refuse it first).
+    const todo = WF_STRICT.states.find((s) => s.id === 'todo')!;
+    expect(flowExemptEdge(by(FLOW, 'ticket.transitioned', { to: 'todo' }), WF_STRICT, 'done', todo, { kind: 'reopened-by-flow' })).toBeNull();
+    expect(flowExemptEdge(by(FLOW, 'ticket.transitioned', { to: 'todo' }), WF_STRICT, 'done', todo, reopened)).toEqual({ from: 'done', to: 'todo', rules: [] }); // control
   });
 });
 

@@ -68,6 +68,14 @@ describe('29.200 the flow causes', () => {
     expect(flowCauseSchema.safeParse({ ...notTaken, pass: 0 }).success).toBe(false);
     expect(flowCauseSchema.safeParse({ ...notTaken, pass: 1 }).success).toBe(true); // control: the boundary pass parses
     expect(flowCauseSchema.safeParse({ ...notTaken, decisionTicketId: 'nope' }).success).toBe(false);
+    // Every id member is a ULID, on each arm (control: the fixtures above parse with real ULIDs).
+    for (const key of ['decidedBy', 'decisionEventId'] as const) expect(flowCauseSchema.safeParse({ ...notTaken, [key]: 'nope' }).success, key).toBe(false);
+    for (const key of ['sourceTicketId', 'triggeredBy'] as const) expect(flowCauseSchema.safeParse({ ...ledTo, [key]: 'nope' }).success, key).toBe(false);
+    // The outcome and the label are non-empty: '' is refused, one character is the boundary that parses.
+    expect(flowCauseSchema.safeParse({ ...notTaken, outcome: '' }).success).toBe(false);
+    expect(flowCauseSchema.safeParse({ ...notTaken, outcome: 'Y' }).success).toBe(true);
+    expect(flowCauseSchema.safeParse({ ...ledTo, label: '' }).success).toBe(false);
+    expect(flowCauseSchema.safeParse({ ...ledTo, label: 'Y' }).success).toBe(true);
     expect(flowCauseSchema.safeParse({ kind: 'led-to', sourceTicketId: SRC }).success).toBe(false); // triggeredBy required
     expect(isFlowCause(ledTo)).toBe(true);
     expect(isFlowCause({ kind: 'reopened-for-child', childTicketId: SRC })).toBe(false); // control
