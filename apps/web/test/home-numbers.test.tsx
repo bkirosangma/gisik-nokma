@@ -109,7 +109,7 @@ describe('27.637 loading: six placeholders in the tiles’ own box', () => {
 
     // FIX 1 F4: ONE min-height at EVERY width (no media arm re-declares it), holding the padding, the value line, the
     // gap and TWO label lines at the phone density (a phone's third wraps "Due in 365 days"), and one label line at the
-    // desktop density (a sixth never wraps it: 3×2 at 64rem and below, 27.640). The browser reading is the review's.
+    // desktop density (six columns only above 64rem, 27.640, where the probe kept it on one line). The browser reading is the review's.
     expect(rulesNaming(CSS, '.gn-home__number').filter((r) => valueOf(r.body, 'min-height') !== null).map((r) => r.atRule)).toEqual([null]);
     const PHONE = '@media (max-width: 40rem)';
     const rem = (value: string | null | undefined): number => {
@@ -279,8 +279,9 @@ describe('27.639 one lit number at a time; Escape and a reload to 0 clear it', (
 });
 
 describe('27.640 the grid: one row of six on desktop, 3×2 at 64rem and below', () => {
-  // FIX 1 F4: 3×2 from 64rem down (the nav's own hand-over point), not 40rem: a sixth of anything narrower cannot hold
-  // "Due in 365 days" on one line, and the phone inherits the three.
+  // FIX 1 F4: 3×2 from 64rem down (the app's desktop line, the nav's own hand-over point), not 40rem: at tablet widths a
+  // sixth was too narrow (measured at 641 and 768px: the Due label wrapped, `Restricted` overflowed). The phone inherits
+  // the three.
   it('27.640 .gn-home__numbers declares six columns; its one 64rem rule declares three; control: the 40rem rule naming it declares no columns, and no other rule does', () => {
     expect(valueOf(ruleExactly(CSS, '.gn-home__numbers'), 'grid-template-columns')).toBe('repeat(6, minmax(0, 1fr))');
     expect(valueOf(ruleExactly(CSS, '.gn-home__numbers', '@media (max-width: 64rem)'), 'grid-template-columns')).toBe('repeat(3, minmax(0, 1fr))');

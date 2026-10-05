@@ -341,12 +341,12 @@ input, textarea, select { font-family: inherit; }
 .gn-home > .gn-page-title { margin: 0; }
 .gn-home__empty, .gn-home__refusal { display: grid; gap: 0.75rem; justify-items: start; }
 /* KG-E T3: numbers. One row of six on desktop, 3×2 at 64rem and below (spec E §2.2: "one row on desktop, or a 3×2 grid
-   on a phone"). 64rem is where the nav hands over to the bottom bar: a sixth of anything narrower cannot hold "Due in
-   365 days" on one line (FIX 1 F4, measured). The placeholders reuse `.gn-home__number`, and its ONE `min-height`, at
-   every width, holds the padding, the value line, the gap and TWO label lines at the phone density (27.637), so
-   loading and loaded share one box even where a phone's third wraps the label. Past due's warning is an inset 3px
-   edge in `--gn-warning`, a non-text boundary held to 3:1 on `surfaceRaised` (`CONTRAST_PAIRS`); the value ink stays
-   `--gn-text`. */
+   on a phone"). 64rem is the app's desktop line, where the nav hands over to the bottom bar; at tablet widths a sixth
+   is too narrow (FIX 1 F4, measured at 641 and 768px: the Due label wrapped and `Restricted` overflowed). The
+   placeholders reuse `.gn-home__number`, and its ONE `min-height`, at every width, holds the padding, the value line,
+   the gap and TWO label lines at the phone density (27.637), so loading and loaded share one box even where a phone's
+   third wraps the label. Past due's warning is an inset 3px edge in `--gn-warning`, a non-text boundary held to 3:1 on
+   `surfaceRaised` (`CONTRAST_PAIRS`); the value ink stays `--gn-text`. */
 .gn-home__numbers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.625rem; }
 .gn-home__number {
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; align-content: start; text-align: start; min-height: 4.75rem;
