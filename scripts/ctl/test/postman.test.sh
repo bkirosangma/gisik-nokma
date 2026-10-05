@@ -618,11 +618,13 @@ check "13.1969 lib ctl_cmd_is_claude: the version string, claude and node pass; 
 
 # ───────────────────────────── the paste-wait seams (P51) ─────────────────────────────
 SEAMS='CTL_PASTE_SETTLE_SECS|CTL_SUBMIT_WAIT_SECS|CTL_PROOF_POLL_SECS|FAKESEAT_TURN_SECS'
-seam_setters() { grep -rlE "($SEAMS)=|environ(\.setdefault\(|\[)[\"']($SEAMS)" "$1" 2>/dev/null | grep -vE '/test/|\.test\.' | sed "s|^$1/||" | sort | tr '\n' ' '; }   # DIR → its non-test files that SET a seam
+seam_files() { grep -rlE "($SEAMS):?=|environ(\.setdefault\(|\[)[\"']($SEAMS)" "$1" 2>/dev/null | sed "s|^$1/||" | sort | tr '\n' ' '; }   # DIR → every file under it that SETS a seam (VAR=, \${VAR:=}, os.environ), relative to DIR
+seam_setters() { seam_files "$1" | tr ' ' '\n' | grep -vE '^$|(^|/)test/|\.test\.' | tr '\n' ' '; }   # … minus the tests (filtered AFTER the DIR prefix is gone)
+seam_root="$(cd "$HERE/.." && pwd)"
 mkdir -p "$T/seamscan/test" "$T/seamscan/ctl"; printf 'export CTL_SUBMIT_WAIT_SECS=0\n' > "$T/seamscan/ctl/lib.sh"; printf 'import os\nos.environ["CTL_PROOF_POLL_SECS"] = "0"\n' > "$T/seamscan/a.py"
-printf 'env FAKESEAT_TURN_SECS=0 bash x\n' > "$T/seamscan/test/x.test.sh"; printf 'sleep "${CTL_PASTE_SETTLE_SECS:-1}"\n' > "$T/seamscan/reader.sh"
-check "13.2350 the paste-wait seams are set ONLY by tests: no file under scripts/ outside a test sets CTL_PASTE_SETTLE_SECS, CTL_SUBMIT_WAIT_SECS, CTL_PROOF_POLL_SECS or FAKESEAT_TURN_SECS; CONTROL in the same check: in a scratch tree a shell export and a python os.environ write ARE found, while a test file that sets one and a file that only reads one are not" \
-  '[ -z "$(seam_setters "$(cd "$HERE/.." && pwd)")" ] && [ "$(seam_setters "$T/seamscan")" = "a.py ctl/lib.sh " ]'
+printf 'env FAKESEAT_TURN_SECS=0 bash x\n' > "$T/seamscan/test/x.test.sh"; printf 'sleep "${CTL_PASTE_SETTLE_SECS:-1}"\n' > "$T/seamscan/reader.sh"; printf ': "${CTL_PROOF_POLL_SECS:=0}"\n' > "$T/seamscan/b.sh"
+check "13.2350 the paste-wait seams are set ONLY by tests: no file under scripts/ outside a test sets CTL_PASTE_SETTLE_SECS, CTL_SUBMIT_WAIT_SECS, CTL_PROOF_POLL_SECS or FAKESEAT_TURN_SECS; the same scan of scripts/ unfiltered DOES list ctl/test/postman.test.sh (the tree was read, with a pattern that matches a real setter); CONTROL in the same check: in a scratch tree a shell export, a \${VAR:=} default and a python os.environ write ARE found, while a test file that sets one and a file that only reads one are not" \
+  '[ -z "$(seam_setters "$seam_root")" ] && seam_files "$seam_root" | tr " " "\n" | grep -qx "ctl/test/postman.test.sh" && [ "$(seam_setters "$T/seamscan")" = "a.py b.sh ctl/lib.sh " ]'
 mkdir -p "$T/sleepshim"; printf '#!/bin/bash\necho "$1" >> "%s"\n' "$T/sleep.log" > "$T/sleepshim/sleep"; chmod +x "$T/sleepshim/sleep"
 lib_waits() { # [VAR=VALUE…] → the sleeps lib.sh's paste path asks for (one ctl_pane_deliver_line into the mute exec3, CTL_PROOF_TRIES=1: settle, submit, one proof poll), the suite's own seams UNSET, through a PATH sleep shim that records its argument and waits for nothing
   : > "$T/sleep.log"; ( unset CTL_PASTE_SETTLE_SECS CTL_SUBMIT_WAIT_SECS CTL_PROOF_POLL_SECS; for kv in "$@"; do export "$kv"; done
