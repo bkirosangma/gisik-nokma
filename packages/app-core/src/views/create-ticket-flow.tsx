@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { DRAFT_NO_OUTSIDERS_RULE, newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
 import { Button, PlusIcon } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -306,7 +306,7 @@ export function CreateTicketFlow({
     // R8 in the flow, before anything is sent: the outsider door would grant a membership as a side effect of a
     // private act.
     if (isDraft && draft.assigneeIsOutsider === true) {
-      setFailure({ headline: null, refusal: { rule: 'draft.no-outsiders', reason: DRAFT_NO_OUTSIDERS }, origin: 'instant' });
+      setFailure({ headline: null, refusal: { rule: DRAFT_NO_OUTSIDERS_RULE, reason: DRAFT_NO_OUTSIDERS }, origin: 'instant' });
       return;
     }
     const childEvent = make({

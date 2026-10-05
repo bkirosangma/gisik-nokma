@@ -21,7 +21,8 @@ export const DRAFT_VISIBILITY_DISCLOSURE = 'Only you can see this draft until yo
 export const DISCARD_QUESTION = "Discard this draft? It is erased and can't be recovered.";
 export const DISCARD_CONFIRM_LABEL = 'Discard draft';
 export const DISCARD_NOTES_LINE = 'Linked notes are kept and unlinked.';
-export const DRAFT_NO_OUTSIDERS = 'Publish the ticket before inviting someone from outside';
+// R8's sentence has ONE definition, in the domain (28.146's census in `packages/mcp-server/test/draft-tools.test.ts`).
+export { DRAFT_NO_OUTSIDERS_REASON as DRAFT_NO_OUTSIDERS } from '@gisik-nokma/domain';
 
 export const DRAFT_PENDING_LABEL = 'Waiting to sync';
 export const DRAFT_UNREACHED = 'Could not publish this draft. Check your connection and try again.';
