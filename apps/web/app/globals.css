@@ -340,7 +340,39 @@ input, textarea, select { font-family: inherit; }
 .gn-home { max-width: 73.75rem; margin: 0 auto; padding-top: 1.625rem; display: grid; gap: 1rem; }
 .gn-home > .gn-page-title { margin: 0; }
 .gn-home__empty, .gn-home__refusal { display: grid; gap: 0.75rem; justify-items: start; }
-/* KG-E T3: numbers */
+/* KG-E T3: numbers. One row of six on desktop, 3×2 at 64rem and below (spec E §2.2: "one row on desktop, or a 3×2 grid
+   on a phone"). 64rem is the app's desktop line, where the nav hands over to the bottom bar; at tablet widths a sixth
+   is too narrow (FIX 1 F4, measured at 641 and 768px: the Due label wrapped and `Restricted` overflowed). The
+   placeholders reuse `.gn-home__number`, and its ONE `min-height`, at every width, holds the padding, the value line,
+   the gap and TWO label lines at the phone density (27.637), so loading and loaded share one box even where a phone's
+   third wraps the label. Past due's warning is an inset 3px edge in `--gn-warning`, a non-text boundary held to 3:1 on
+   `surfaceRaised` (`CONTRAST_PAIRS`); the value ink stays `--gn-text`. */
+.gn-home__numbers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.625rem; }
+.gn-home__number {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; align-content: start; text-align: start; min-height: 4.75rem;
+  padding: 0.75rem 0.875rem; border: 0; border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift); color: var(--gn-text); cursor: pointer;
+}
+/* The bars stay inside the tile's ONE column (a zero-floor track, so `100%` is the content box, not the bar's own 5rem). */
+.gn-home__number > .gn-skeleton { max-width: 100%; }
+.gn-home__number:disabled { cursor: default; }
+.gn-home__number[aria-pressed='true'] { outline: 2px solid var(--gn-text); outline-offset: 0; }
+.gn-home__number:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-home__number-value { font-size: 1.75rem; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gn-home__number-label { font-size: 0.8125rem; line-height: 1.25; font-weight: 600; color: var(--gn-text-muted); }
+/* A withheld Members (a guest's `Restricted`) is a state, not a count: the word is set at the workspace card's
+   restricted size, muted, INSIDE the value's line box and on its baseline, so the tile keeps its height, its label
+   lines up with its neighbours', and the word fits a phone's third (FIX 1 F4). */
+.gn-home__number-withheld { font-size: 0.9375rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-home__number--warn { box-shadow: inset 3px 0 0 var(--gn-warning), var(--gn-shadow-lift); }
+@media (max-width: 64rem) {
+  .gn-home__numbers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .gn-home__numbers { gap: 0.375rem; }
+  .gn-home__number { padding: 0.5rem 0.625rem; }
+  .gn-home__number-value { font-size: 1.25rem; }
+}
 /* KG-E T4: graph */
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 

@@ -209,6 +209,10 @@ export function stubServices(
     // an invented blank and pass.
     getMyWork: unstubbed('getMyWork'),
     getAttention: unstubbed('getAttention'),
+    // UNSTUBBED, the same rule (Knowledge Graph E Task 3): six zeros would be this helper asserting the workspace is
+    // empty — a claim about the world. Home renders a rejection as its own refusal, so a case that never asked for the
+    // numbers is unaffected by it.
+    getHome: unstubbed('getHome'),
     // UNSTUBBED, same rule again (second wave Task 6). The settings screen's
     // whole job is to show what this workspace CHOSE, so a default here would
     // be this helper inventing a choice — `staleDays: 7` with

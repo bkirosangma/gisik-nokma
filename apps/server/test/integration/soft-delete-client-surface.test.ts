@@ -525,7 +525,9 @@ type AbsenceDecision =
   | 'purgedAmong'
   // Knowledge Graph B (27.142). A carrier: a comment on the child links the live
   // note and its snippet quotes the marker.
-  | 'getLinkedFrom';
+  | 'getLinkedFrom'
+  // Knowledge Graph E Task 3. Counts and ids only: no title or body travels through it.
+  | 'getHome';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -736,6 +738,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     carries: true,
     why: 'Knowledge Graph B: the live note is linked from a comment on the child, and the snippet quotes the marker. The read hides a source whose parent ticket is tombstoned (`LIVE_TICKET_WHERE` in `read/linked-from.ts`’s ticket arm), so after the delete the row, its snippet and its count are gone.',
   },
+  getHome: {
+    verdict: 'excluded',
+    carries: false,
+    why: 'Knowledge Graph E: six counts and their ids, no title, key or body, so the marker (a ticket TITLE) cannot reach it even before the delete. A tombstone leaves its counts and ids through `LIVE_TICKET_WHERE` in `routes/home.ts`, which 27.606 pins.',
+  },
 };
 
 /**
@@ -810,6 +817,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getDeletedItems: () => ds.getDeletedItems(),
     purgedAmong: () => ds.purgedAmong([childId]),
     getLinkedFrom: () => ds.getLinkedFrom(workspaceId, { kind: 'note', id: noteId }),
+    getHome: () => ds.getHome(workspaceId),
   };
 }
 
@@ -881,8 +889,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `getDeletedItems`; 25 until trash Plan 3 added `purgedAmong`; 26 until
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
   // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
-  // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`.
-  expect(MEMBERS).toHaveLength(30);
+  // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`; 30 until Knowledge Graph E
+  // Task 3 added `getHome`.
+  expect(MEMBERS).toHaveLength(31);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);
