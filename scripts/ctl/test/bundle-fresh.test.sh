@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/bundle-fresh.test.sh — ctl bundle-fresh (cases 13.2330–13.2341, test-cases/13-deploy-and-ops.md). Run by `ctl selftest`.
+# scripts/ctl/test/bundle-fresh.test.sh — ctl bundle-fresh (cases 13.2330–13.2343, test-cases/13-deploy-and-ops.md). Run by `ctl selftest`.
 # A scratch repo + bare origin holding the REAL apps/mobile/scripts/generate-editor-html.mjs (its paths are script-relative), so `--check` is the
 # real one; `pnpm` is a PATH stub whose `build:webview` writes the bundle html this case chose, and `pnpm` and `node` both record, at call time,
 # whether a slot of the PRIVATE semaphore (CTL_SEM_DIR) is held. The memory/swap probes are the run-tests suite's stubs; nothing live is read.
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"; CTL="$HERE/ctl"; fails=0
 . "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
-. "$HERE/lib.sh"
+. "$HERE/lib.sh"; . "$HERE/sem.sh"   # ctl_sem_lstart: a planted holder must read as live
 T="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$T"' EXIT
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
@@ -88,6 +88,10 @@ check "13.2340 bundle-fresh with no --base measures against origin/main: \`OK bu
   'reset; br nobase other/readme.txt; o="$(bf)" && [ "$(last "$o")" = "OK bundle-fresh SKIP (no domain/editor change) vs origin/main" ] && noslot'
 check "13.2341 bundle-fresh reads the branch's OWN diff (origin/<B>...HEAD, from the merge base): the base moved on with a packages/domain commit the branch lacks and the branch touched only other/ → SKIP, no slot; CONTROL in the same check: the same branch with a domain commit of its own runs" \
   'reset; $G checkout -q -f -B moved origin/release/kg && echo m >> "$W/packages/domain/src/a.ts" && $G commit -qam moved && $G push -q origin moved:refs/heads/release/moved && $G fetch -q origin && br onlyother other/readme.txt && o="$(bf --base release/moved)" && [ "$(last "$o")" = "OK bundle-fresh SKIP (no domain/editor change) vs origin/release/moved" ] && noslot && echo x >> "$W/packages/editor/src/b.ts" && $G commit -qam own && bf --base release/moved >/dev/null && [ -s "$st/pnpm.log" ]'
+check "13.2342 bundle-fresh: the bundle's own side triggers too — a diff touching only $GEN, and one touching only apps/mobile/scripts/generate-editor-html.mjs, each runs the build in a slot (a tip merge that resolved the generated file is a staleness risk)" \
+  'reset; br genonly "$GEN"; { o="$(bf --base release/kg)"; [ $? = 1 ]; } && inslot pnpm && reset && br scriptonly apps/mobile/scripts/generate-editor-html.mjs && { bf --base release/kg >/dev/null; true; } && inslot pnpm'
+check "13.2343 bundle-fresh with no slot free within CTL_SEM_MAX_WAIT: exit 75, \`FAIL bundle-fresh no slot — nothing was run\`, and pnpm never ran; CONTROL in the same check: the slot released, the same branch runs" \
+  'reset; br noslot packages/editor/src/b.ts; echo 1 > "$CTL_SEM_DIR/slots"; sleep 600 >/dev/null 2>&1 & sp=$!; mkdir -p "$CTL_SEM_DIR/slot-1"; printf "%s|%s|planted|0\n" "$sp" "$(ctl_sem_lstart "$sp")" > "$CTL_SEM_DIR/slot-1/holder"; o="$(CTL_SEM_MAX_WAIT=2 bf --base release/kg)"; rc=$?; kill "$sp"; wait "$sp" 2>/dev/null; rm -rf "$CTL_SEM_DIR/slot-1"; [ "$rc" = 75 ] && [ "$(last "$o")" = "FAIL bundle-fresh no slot — nothing was run" ] && [ ! -e "$st/pnpm.log" ] && bf --base release/kg >/dev/null && inslot pnpm'
 # The trigger set is copied into the verb by hand; this pins it against the REAL repo: every workspace package @gisik-nokma/editor depends on,
 # transitively, must be in it (a new editor dependency would be bundled without triggering the check).
 closure() { "$REAL_NODE" -e '
