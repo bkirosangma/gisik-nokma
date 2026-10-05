@@ -27,10 +27,16 @@ export type TimelineWorld = {
   t: Record<'dated' | 'mine' | 'collab' | 'other' | 'hidden' | 'step1' | 'step2' | 'draft' | 'fStart' | 'fDec' | 'fYes' | 'fNo' | 'bTask', string>;
 };
 
+/** A person's `"user"` row: Home's Members joins it (`visibleMemberIds`), so a membership alone is not a member there. */
+export async function insertUser(pool: Pool, id: string, name: string): Promise<void> {
+  await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1, $2, $3, true, now(), now())`, [id, name, `${id}@timeline.test`]);
+}
+
 export async function seedTimelineWorld(pool: Pool): Promise<TimelineWorld> {
   const ama = newUlid();
   const bo = newUlid();
   const cy = newUlid();
+  for (const [id, name] of [[ama, 'Ama'], [bo, 'Bo'], [cy, 'Cy']] as const) await insertUser(pool, id, name);
   const mk = async (owner: string, members: string[]): Promise<TWorkspace> => {
     const w: TWorkspace = { workspaceId: newUlid(), wf: `wf-${newUlid()}`, p1: newUlid(), p2: newUlid() };
     const ws = { workspaceId: w.workspaceId, actorId: owner };
