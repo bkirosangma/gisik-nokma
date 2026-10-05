@@ -971,8 +971,7 @@ The first tab, and where a new ticket starts its life. It lists the tickets that
 you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Those buttons move a
 ticket in the order of the whole backlog, not only within the group it is listed under, and they stay
 visible when the backlog is grouped; hover one and it says so. Each row also has a **Start** button that
-moves that ticket into its workflow. A ticket another one *leads to* does not wait for the button: once
-what leads to it is finished, the flow starts it, as **Flow**. Send it back here and it stays.
+moves that ticket into its workflow. A ticket another one *leads to* does not wait for the button: once what leads to it is finished, the flow starts it, as **Flow**. Send it back here and it stays.
 
 It does not leave closed tickets out, unlike the Calendar and the Timeline below. When it is empty it says
 so: *"Nothing in the backlog. Tickets you add land here."* — or, when the only thing it would have listed

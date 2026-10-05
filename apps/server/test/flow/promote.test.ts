@@ -16,7 +16,7 @@ import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createFlowPromoter, FLOW_SERVER_CAP, promoteTargets, retargetsOf, triggeredByOf, type FlowPromoteDeps } from '../../src/flow/promote.js';
 import { readFlow } from '../../src/flow/read-flow.js';
 import type { CommittedEventListener, IngestService } from '../../src/ingest/ingest-service.js';
-import { resetEntitySeqs } from '../helpers/apply.js';
+import { applyCommitted, makeCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp } from '../helpers/read-app.js';
 import {
@@ -220,6 +220,25 @@ describe('29.215 every AP-4 trigger re-evaluates the right target', () => {
     expect(await retargetsOf(db.pool, on('ticket.published', { projectId: PROJECT }))).toEqual([t]);
     expect(await retargetsOf(db.pool, on('ticket.restored', {}))).toEqual([t, u].sort()); // restored is both: its own and its outgoing
     expect(await retargetsOf(db.pool, on('ticket.closed', {}))).toEqual([u]); // control: a source-side event re-reads what t leads to
+  });
+
+  it('29.215 the re-target stays inside the event\'s workspace', async () => {
+    // a live Backlog ticket in another workspace, on its own workflow and type (entity ids are global, entity heads too)
+    const WS2 = '01J9GWS2000000000000000000';
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: WS2, actorId: PERSON, entity: { kind: 'workflow', id: 'wf-ws2' }, type: 'workflow.defined',
+        payload: { id: 'wf-ws2', version: 1, name: 'wf-ws2', initialStateId: 'todo', states: [{ id: 'todo', name: 'To do', category: 'open' }], transitions: [] } }),
+      makeCommitted({ workspaceId: WS2, actorId: PERSON, entity: { kind: 'ticket-type', id: 'ws2-task' }, type: 'ticket-type.defined',
+        payload: { id: 'ws2-task', name: 'ws2-task', icon: 'check', rank: 3, workflowId: 'wf-ws2', fields: [] } }),
+    ]);
+    const far = newUlid();
+    await step(db.pool, far, 'ticket.created', { typeId: 'ws2-task', projectId: PROJECT, parentId: null, title: 'far', start: 'backlog' }, PERSON, WS2);
+    const s = await finished();
+    // hand-built, never applied: no legal ledger links across workspaces, so only the query's own clause keeps far out
+    const linkInto = (workspaceId: string) =>
+      makeEnvelope({ type: 'ticket.link_added', workspaceId, entity: { kind: 'ticket', id: s }, payload: { kind: 'leads_to', targetId: far } });
+    expect(await retargetsOf(db.pool, linkInto(WS2))).toEqual([far]); // control: in its own workspace far is a live Backlog target
+    expect(await retargetsOf(db.pool, linkInto(WS))).toEqual([]);
   });
 });
 
