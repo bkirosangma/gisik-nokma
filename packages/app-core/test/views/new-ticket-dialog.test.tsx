@@ -1099,6 +1099,14 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     ).toBe('chore');
   });
 
+  it('29.144 the Decision seed ties task on rank 3 and sorts before it by id: never the default, still chosen when it is all there is', () => {
+    const decision = { id: 'decision', name: 'Decision', rank: 3, workflowId: 'wf-errand' };
+    expect(defaultRootTypeFor([...LADDER, decision])?.id).toBe('task');
+    expect(defaultRootTypeFor([decision, ...LADDER])?.id).toBe('task'); // order independence
+    expect(defaultRootTypeFor([decision])?.id).toBe('decision'); // control: legal, so the last resort
+    expect(defaultRootTypeFor([decision, { id: 'errand', name: 'Errand', rank: 3, workflowId: 'wf-errand' }, { id: 'chore', name: 'Chore', rank: 3, workflowId: 'wf-errand' }])?.id).toBe('chore'); // the id tie-break among the rest is unchanged
+  });
+
   it('PLANTED DEFECT: the control paints the everyday type, not rank 1, and the draft carries it', () => {
     const onCreate = vi.fn();
     render(
