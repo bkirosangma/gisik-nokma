@@ -8,6 +8,7 @@ import { Providers, type AppServices } from '../src/providers.js';
 import { clearMyWorkspacesCache } from '../src/use-my-workspaces.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices } from './helpers/stub-services.js';
+import type { TicketLocator } from '../src/ticket-location.js';
 
 /**
  * The GLOBAL My work page, `/my-work` (my-work-global T4, cases 30.036–30.046 and 30.050).
@@ -178,6 +179,10 @@ function mount(
     attention?: Record<string, AttentionItem[] | Error>;
     myWork?: Record<string, MyWorkView>;
     store?: Store;
+    /** Holds the preferences GET until it settles (the fan-out must wait for it). */
+    prefsGate?: Promise<void>;
+    /** The sheet's locator; absent leaves it unstubbed (a call rejects). */
+    locate?: TicketLocator['locate'];
   } = {},
 ): { services: AppServices; calls: Calls; store: Store } {
   const calls: Calls = { attention: [], myWork: [], puts: [], prefsGets: 0, getTicket: [] };
@@ -203,6 +208,7 @@ function mount(
     },
     getMyWorkPreferences: async () => {
       calls.prefsGets += 1;
+      if (opts.prefsGate !== undefined) await opts.prefsGate;
       if (store.fail !== null) throw store.fail;
       return store.doc ?? { show: ['created', 'assigned'], grouping: 'workspace-project' };
     },
@@ -222,7 +228,7 @@ function mount(
     getTicketComments: async () => [],
     getMembers: async () => [{ id: ME, name: 'Anselma Marak', role: 'owner' }],
     getTickets: async () => ({ projectId: P_MANGO, rows: [] }),
-  });
+  }, opts.locate === undefined ? {} : { ticketLocation: { locate: opts.locate } });
   services.cache = createClientStateCache();
   return { services, calls, store };
 }
@@ -242,6 +248,13 @@ function outline(): string[] {
   return Array.from(main.querySelectorAll('h2, h3, h4, .gn-attention__title, .gn-my-work__title')).map(
     (node) => `${node.tagName === 'BUTTON' ? '·' : node.tagName.toLowerCase()} ${node.textContent ?? ''}`,
   );
+}
+
+/** Gives any stray effect a turn, so an assertion about silence is not made too early. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
 }
 
 function showGroup(): HTMLElement {
@@ -296,6 +309,8 @@ describe('30.036 the global page, grouped by default', () => {
       'h2 My contested claims',
       'h2 Shared with me',
     ]);
+    // Grouped, the headings say where each row lives, so no row repeats it (Flat's labels are 30.037's).
+    expect(document.querySelectorAll('.gn-attention__place, .gn-my-work__place')).toHaveLength(0);
     expect(within(screen.getByRole('radiogroup', { name: 'Group' })).getByRole('radio', { name: 'By workspace and project' })).toHaveAttribute(
       'aria-checked',
       'true',
@@ -381,6 +396,35 @@ describe('30.038 the choices are the user\'s own document', () => {
     expect(screen.getByRole('radio', { name: 'Flat' })).toHaveAttribute('aria-checked', 'true');
     expect(outline()).not.toContain('h3 Alpha Works');
   });
+
+  it('30.038 the Group save carries the selection on screen, never the defaults', async () => {
+    const { services, calls } = mount({ store: { doc: { show: ['assigned'], grouping: 'workspace-project' }, fail: null } });
+    renderPage(services);
+    await screen.findByRole('button', { name: 'Count the stock' });
+    expect(pressed()).toEqual(['Assigned to me']);
+    await userEvent.click(screen.getByRole('radio', { name: 'Flat' }));
+    await waitFor(() => expect(calls.puts).toEqual([{ show: ['assigned'], grouping: 'flat' }]));
+  });
+
+  it('30.038 the fan-out waits for the document: with its GET held nothing is asked, then the stored selection is the first question', async () => {
+    let answer: () => void = () => undefined;
+    const prefsGate = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const { services, calls } = mount({ store: { doc: { show: ['created'], grouping: 'workspace-project' }, fail: null }, prefsGate });
+    renderPage(services);
+    await waitFor(() => expect(calls.prefsGets).toBe(1));
+    await settle();
+    // The workspace list has answered by now; the list alone does not start the fan-out.
+    expect(calls.attention).toEqual([]);
+    expect(calls.myWork).toEqual([]);
+    await act(async () => {
+      answer();
+    });
+    await screen.findByRole('button', { name: 'Count the stock' });
+    expect(calls.attention.map(([, show]) => show)).toEqual([['created'], ['created']]);
+    expect(calls.myWork.sort()).toEqual([W1, W2].sort());
+  });
 });
 
 describe('30.039 a preferences read that fails', () => {
@@ -421,11 +465,20 @@ describe('30.041 / 30.042 the deep link', () => {
   it('30.042 ?ticket=T with no ws, or a ws the viewer is not in, mounts no sheet and still renders the page', async () => {
     for (const params of [{ ticket: T_A1 }, { ticket: T_A1, ws: '01J9WSNOTMINE0000000000000' }] as Record<string, string>[]) {
       searchParams = new URLSearchParams(params);
-      const { services, calls } = mount();
+      // A locator that WOULD place the ticket, so only the page's own membership check keeps the sheet shut.
+      const located: Array<[string, string]> = [];
+      const { services, calls } = mount({
+        locate: async (workspaceId, ticketId) => {
+          located.push([workspaceId, ticketId]);
+          return { workspaceId, projectId: P_BANANA };
+        },
+      });
       const view = renderPage(services);
       await screen.findByRole('button', { name: 'Count the stock' });
+      await settle();
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(calls.getTicket).toEqual([]);
+      expect(located).toEqual([]);
       view.unmount();
       clearMyWorkspacesCache();
     }
@@ -482,6 +535,27 @@ describe('30.045 the chips a viewer is offered', () => {
       const view = renderPage(services);
       await screen.findByRole('button', { name: 'Count the stock' });
       expect(labels()).toEqual(expected);
+      view.unmount();
+      clearMyWorkspacesCache();
+    }
+  });
+
+  it('30.045 a stored chip the viewer is no longer offered is dropped, and the selection takes the chips\' order', async () => {
+    const member = [ALPHA, { ...BETA, role: 'member' as const }];
+    const arms: Array<[AttentionShow[], AttentionShow[]]> = [
+      // No longer an admin anywhere: the admin chip is gone, the rest of the selection stands.
+      [['assigned', 'ws-admin'], ['assigned']],
+      // Nothing left once it is dropped: the defaults (at least one chip is always selected).
+      [['ws-admin'], ['created', 'assigned']],
+      // Stored out of order: asked in the chips' order (the summary and the URL follow it).
+      [['assigned', 'created'], ['created', 'assigned']],
+    ];
+    for (const [stored, asked] of arms) {
+      const { services, calls } = mount({ workspaces: member, store: { doc: { show: stored, grouping: 'workspace-project' }, fail: null } });
+      const view = renderPage(services);
+      await screen.findByRole('button', { name: 'Count the stock' });
+      expect(calls.attention.map(([, show]) => show), `stored ${stored.join(',')}`).toEqual([asked, asked]);
+      expect(labels()).toEqual(['Created by me', 'Assigned to me']);
       view.unmount();
       clearMyWorkspacesCache();
     }
