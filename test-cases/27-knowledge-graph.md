@@ -157,6 +157,14 @@ Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpow
 - ✅ **27.154 — the manual's §15 "Linked from" paragraph describes the section (where it sits, what a row shows, comment rows open scrolled to the comment, only what you can see is listed and counted, Show all past twenty, absent when nothing links), and the old "no list … showing what else links to it" bullet is gone;** guarded by `check:help` keeping the generated help in step with the manual. (`packages/app-core/test/views/linked-from-section.test.tsx`)
 - 27.155–27.164 reserved, unused (T3).
 <!-- KG-B T4 -->
+- ❌ **27.165 — MCP `get_ticket` asks the references route third, after the detail and the typed links, as `references?target=ticket%3A<id>`, and adds ONE key, `linkedFrom`, leaving the server's body untouched (14.66's exact `toEqual` and path list).** (`packages/mcp-server/test/read-tools.test.ts`)
+- ❌ **27.166 — `get_ticket`'s `linkedFrom` is `{ total, items[{ sourceKind, sourceId, title, snippet }] }`: `total` is the route's (25 over a 2-row page, not the rows counted), `title` is `linkedFromSourceTitle` (`Note: Rulings`, `Comment on CCSO-9`), and no `parent`, `authorId`, `updatedAt` or `nextCursor` reaches the assistant.** (`packages/mcp-server/test/read-tools.test.ts`)
+- ❌ **27.167 — a 404 from the references read is `linkedFrom: { total: 0, items: [] }` and `get_ticket` still answers;** control: a 500 from it rejects with the HttpError's own `gisik-nokma answered 500`. (`packages/mcp-server/test/read-tools.test.ts`)
+- ❌ **27.168 — MCP `get_note` reads `linkedFrom` from the note's own workspace (`/v1/workspaces/<note.workspaceId>/references?target=note%3A<id>`, asked second), titled by `linkedFromSourceTitle` (`CCSO-2 Fridge`).** (`packages/mcp-server/test/note-tools.test.ts`)
+- ❌ **27.169 — through the hosted door, `get_ticket`'s `linkedFrom` equals the endpoint for the same viewer: the owner gets the private and the workspace note (total 2), the member only the workspace note (total 1), and the member's answer never holds the private note's words;** control: the owner's answer does. (`apps/server/test/mcp/mcp-linked-from.test.ts`)
+- ❌ **27.170 — the `get_ticket` tool description says what `linkedFrom` holds, word for word ("linkedFrom lists the first 20 tickets, notes and comments you can see that reference this ticket, …; total counts only those.").** (`packages/mcp-server/test/read-tools.test.ts`)
+- ❌ **27.171 — the `get_note` tool description says the same of a note, word for word.** (`packages/mcp-server/test/note-tools.test.ts`)
+- 27.172–27.179 reserved, unused (T4).
 
 ## 27.3 Knowledge Graph view (spec C, 27.200–27.349)
 
