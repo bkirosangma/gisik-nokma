@@ -1894,6 +1894,11 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'level2', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'level3', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'level4', bg: 'surfaceRaised', minimum: 3 },
+  /**
+   * Home's Past due edge (Knowledge Graph E Task 3, case 27.635): an inset 3px `warning` boundary on the tile's
+   * `surfaceRaised` (`.gn-home__number--warn`), a non-text mark. 13.1146 measured `warning` only on the well.
+   */
+  { fg: 'warning', bg: 'surfaceRaised', minimum: 3 },
   /** Knowledge Graph (case 27.257): the edge colours are non-text marks on the canvas; a concept's label sits on its pill. `fogDot` and `graphCardLine` are deliberately absent (27.259). */
   ...(['edgeStructure', 'edgeBlocks', 'edgeRelates', 'edgeDuplicates', 'edgeAttached', 'edgeReference', 'edgePeople', 'edgeConcept'] as const).flatMap((fg) => [
     { fg, bg: 'surface' as const, minimum: 3 },

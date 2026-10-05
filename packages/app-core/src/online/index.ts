@@ -97,6 +97,7 @@ export {
   listWorkspaceId,
   mapActors,
   mapAttention,
+  mapHome,
   mapBoardView,
   mapHistory,
   mapIngestResults,

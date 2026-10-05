@@ -90,6 +90,8 @@ export async function eraseRows(db: PoolClient, set: ErasureSet): Promise<void> 
     ['DELETE FROM proj_note_comments WHERE note_id = ANY($1::text[])', [N]],
     ['DELETE FROM proj_note_search WHERE note_id = ANY($1::text[])', [N]],
     ['DELETE FROM search_note_chunks WHERE note_id = ANY($1::text[])', [N]],
+    // KG-D T2: ticket and ticket-comment chunks, by the ticket (a comment row carries its ticket_id).
+    ['DELETE FROM search_item_chunks WHERE ticket_id = ANY($1::text[])', [T]],
     [
       `DELETE FROM proj_references
         WHERE (source_parent_kind = 'ticket' AND source_parent_id = ANY($1::text[]))

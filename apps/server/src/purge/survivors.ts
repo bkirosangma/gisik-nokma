@@ -99,6 +99,8 @@ export async function rederiveSurvivors(
     for (const event of await readEntityEvents(db, 'ticket', ticketId)) {
       await search.apply(event, db);
     }
+    // KG-D T2, as the note chunks below: the embed worker re-chunks the survivor with the purged label.
+    await db.query('DELETE FROM search_item_chunks WHERE ticket_id = $1', [ticketId]);
   }
 
   for (const noteId of survivors.noteIds) {

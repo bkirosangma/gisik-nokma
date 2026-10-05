@@ -315,8 +315,8 @@ async function main(): Promise<void> {
   //
   // `EMBED_WORKER_ENABLED=false` is the operator's escape from the model's
   // 130 MB: without this loop a box short on memory serves the whole product
-  // except `mode=meaning` search, which then answers from chunks that stop
-  // being refreshed rather than failing. The interval is ALSO the backfill and
+  // except `mode=meaning` search and `similar` (KG-D T2), which then answer
+  // from chunks that stop being refreshed rather than failing. The interval is ALSO the backfill and
   // the re-index after a model change, so a disabled worker means a database
   // that has never embedded anything stays that way until it is re-enabled.
   const embedWorker = config.embedWorkerEnabled

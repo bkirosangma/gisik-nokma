@@ -1,4 +1,4 @@
-import type { GroupRow, LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
+import type { GroupRow, HomeNumberKey, HomeResponse, LinkedFromPage, LinkedFromRow } from '@gisik-nokma/domain';
 import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, TICKET_LINK_KINDS, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
@@ -2573,6 +2573,32 @@ function mapContestedClaim(raw: unknown, path: string): ContestedClaim {
       actorId: asString(claim['actorId'], `${path}.claim.actorId`),
       clientTime: asString(claim['clientTime'], `${path}.claim.clientTime`),
       contestedAt: asString(claim['contestedAt'], `${path}.claim.contestedAt`),
+    },
+  };
+}
+
+/** `GET /v1/workspaces/:ws/home` → `HomeResponse`, every field checked (a missing number must not render as 0). */
+export function mapHome(raw: unknown): HomeResponse {
+  const record = asRecord(raw, 'home');
+  const counts = asRecord(record['counts'], 'home.counts');
+  const ids = asRecord(record['ids'], 'home.ids');
+  const idList = (key: HomeNumberKey): string[] =>
+    asArray(ids[key], `home.ids.${key}`).map((id, index) => asString(id, `home.ids.${key}[${index}]`));
+  return {
+    workspaceId: asString(record['workspaceId'], 'home.workspaceId'),
+    generatedAt: asString(record['generatedAt'], 'home.generatedAt'),
+    dueSoonDays: asNumber(record['dueSoonDays'], 'home.dueSoonDays'),
+    counts: {
+      tickets: asNumber(counts['tickets'], 'home.counts.tickets'),
+      open: asNumber(counts['open'], 'home.counts.open'),
+      pastDue: asNumber(counts['pastDue'], 'home.counts.pastDue'),
+      dueSoon: asNumber(counts['dueSoon'], 'home.counts.dueSoon'),
+      members: counts['members'] === null ? null : asNumber(counts['members'], 'home.counts.members'),
+      notes: asNumber(counts['notes'], 'home.counts.notes'),
+    },
+    ids: {
+      tickets: idList('tickets'), open: idList('open'), pastDue: idList('pastDue'),
+      dueSoon: idList('dueSoon'), members: idList('members'), notes: idList('notes'),
     },
   };
 }

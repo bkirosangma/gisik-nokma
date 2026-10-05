@@ -129,4 +129,7 @@ export const SWEEP: Record<string, SweepEntry> = {
   // trash begin (T13)
   list_deleted: { args: {} },
   // trash end
+  // graph begin (KG-D T2, T6)
+  similar: { args: { workspaceId: 'w', item: { kind: 'ticket', id: 't' } }, session: { get: async () => ({ workspaceId: 'w', item: { kind: 'ticket', id: 't' }, hits: [] }) } },
+  // graph end
 };
