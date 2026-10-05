@@ -102,10 +102,9 @@ export function markNoteAsNew(noteId: string): void {
  *
  * A ticket badge's plain click no longer navigates — it opens that ticket's
  * `TicketSheet` in place, over this page, through the SAME `?ticket=` shape
- * My work shipped first (`app/my-work/page.tsx` today, which adds `&ws=` because it
- * spans workspaces; the three decisions this shape makes are argued in
- * `test-cases/13-owner-requests-and-backlog.md`, "Opening a ticket from My Work opens
- * the sheet THERE", and this file inherits all three rather than re-arguing them). The open ticket's PROJECT comes from
+ * My work shipped first (`app/my-work/page.tsx`, plus `&ws=` there; the three decisions it makes are argued
+ * in `test-cases/13-owner-requests-and-backlog.md`, "Opening a ticket from My Work opens the sheet THERE",
+ * and this file inherits all three rather than re-arguing them). The open ticket's PROJECT comes from
  * `note.attachedTickets` when the ticket is one of this note's own — no
  * request — and from `TicketLocator` otherwise (a reload on a stale
  * `?ticket=` after a detach, or the sheet's own parent chip naming a ticket

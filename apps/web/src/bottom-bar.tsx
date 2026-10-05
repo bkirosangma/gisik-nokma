@@ -140,8 +140,6 @@ export function BottomBar({
   function resolve(id: BarDestination): { href: string; current: boolean; onClick?: () => void } {
     const d = DESTINATIONS[id];
     if (d.scope === 'global') {
-      // My work joined the global routes in my-work-global T4 (`/my-work`, spec D4). Like Notes it
-      // is lit on a segment-bounded prefix, the rule the top nav's `currentSection` uses for it.
       const path = id === 'notes' ? '/notes' : id === 'my-work' ? '/my-work' : '/inbox';
       return { href: path, current: id === 'inbox' ? pathname === path : isWithin(pathname, path) };
     }

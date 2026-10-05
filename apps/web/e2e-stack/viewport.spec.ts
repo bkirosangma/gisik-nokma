@@ -114,9 +114,13 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
   await signIn(page, OWNER_EMAIL);
 
   // My work is ONE global route now (`/my-work`, my-work-global T4), so the visit needs no id. The
-  // workspace read still runs first: `readWorkspaceId` is this file's "the seed or the session is
-  // wrong" refusal, and without a seeded workspace the page below would sweep an empty shell.
+  // workspace read still runs first: without a seeded workspace the page below would sweep an empty
+  // shell.
   await page.goto('/workspaces');
+  // `readWorkspaceId` carries the same "the seed or the session is wrong" refusal, and RETURNS a
+  // `string` — the inline version this replaces left the id `string | undefined`, which typechecks
+  // through a template literal and fails the moment it is passed to a typed function. Found by the
+  // gate, not by reading.
   await readWorkspaceId(page);
 
   await page.goto('/my-work', { waitUntil: 'networkidle' });
@@ -1310,7 +1314,7 @@ test('records non-text contrast across the signed-in surface, with a positive co
   } else {
     type Verdict = Pick<typeof measured, 'belowCount' | 'exemptions' | 'routes' | 'roster' | 'sanctionedWaivers'>;
     // Compared: the VERDICT, which the DB cannot move. `examined`, `totalClasses` and the above-3:1 roster follow the rows the
-    // stack holds (`.gn-attention__more` renders only past ATTENTION_CAP rows, attention-strip.tsx:174), so a fresh CI seed
+    // stack holds (`.gn-attention__more` renders only past ATTENTION_CAP rows, attention-strip.tsx:258), so a fresh CI seed
     // differs from the dev stack on data alone; their drift is reported below, never failed (F-11 FIX 1).
     const verdictOf = (m: Verdict) => ({
       belowCount: m.belowCount,

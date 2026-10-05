@@ -636,8 +636,7 @@ function InvitationBanner() {
         () => {
           // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
           bumpProjectsVersion();
-          // My work is global (my-work-global T4): the joined workspace is one of the ones it now covers.
-          router.push('/my-work');
+          router.push('/my-work'); // global since my-work-global T4: the joined workspace is one of the ones it covers
         },
         done,
       );
