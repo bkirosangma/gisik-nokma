@@ -3,6 +3,7 @@ import { statesWithBacklog, ticketClosedPayload, ticketReopenedPayload } from '@
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState } from './context-helpers.js';
+import { decisionOutcomeRequired } from './decision.js';
 import { flowCauseForgery } from './flow-cause.js';
 import { ACCEPT, refuse } from './refusals.js';
 
@@ -81,7 +82,8 @@ export async function checkTicketClosed(env: EventEnvelope, ctx: EngineContext):
     return refuse(REFUSAL_RULES.parentTerminal,
       `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`);
   }
-  return ACCEPT;
+  // DC-5 (wtg2 T6): a Decision with branches and no outcome is not closed either, after the open-child count.
+  return decisionOutcomeRequired(ticket) ?? ACCEPT;
 }
 
 export async function checkTicketReopened(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {

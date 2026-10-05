@@ -109,9 +109,6 @@ describe('29.140 DC-5: no finishing without an outcome', () => {
     expect(await evaluateEvent(taskWithBranch, world(['Yes'], on(NEXT, 'ticket.link_added', { kind: 'leads_to', targetId: NEXT2 })))).toEqual({ refused: false });
     // a cleared decision is outcome-less again
     expect(await evaluateEvent(move('done'), world(['Yes'], decided('Yes'), decided(null, 'Yes')))).toEqual(outcomeRequired);
-    // an INCOMING draft-side entry is not a branch: a draft Decision with only that entry finishes freely; with its own branch it does not
-    expect(await evaluateEvent(onTicket(DRAFT, 'ticket.transitioned', { to: 'done' }), draftWorld(false))).toEqual({ refused: false });
-    expect(await evaluateEvent(onTicket(DRAFT, 'ticket.transitioned', { to: 'done' }), draftWorld(true))).toEqual(outcomeRequired);
     // the parent-terminal invariant keeps its place in front
     const CHILD = '01J9GCHD000000000000000000'; // NEXT2 is already created by `world`
     const child = makeEnvelope({ type: 'ticket.created', entity: { kind: 'ticket', id: CHILD }, workspaceId: WS, payload: { typeId: 'task', projectId: PROJECT, parentId: D, title: 'child' } });
@@ -123,5 +120,9 @@ describe('29.140 DC-5: no finishing without an outcome', () => {
     expect(decisionOutcomeRequired(state)).toMatchObject({ rule: 'decision.outcome-required' });
     expect(decisionOutcomeRequired(state, true)).toBeNull();
     expect(decisionOutcomeRequired(state, false)).toMatchObject({ rule: 'decision.outcome-required' });
+    // an INCOMING draft-side entry (`from`) is not a branch. Only the pure function meets one: the doors never do, because
+    // the draft gate refuses every move and close of a draft first, and publishing drops those entries from the list.
+    const incoming = { kind: 'ticket', typeId: DECISION_TYPE_ID, links: [{ kind: 'leads_to', targetId: NEXT, from: NEXT2, label: 'Yes' }] } as never;
+    expect(decisionOutcomeRequired(incoming)).toBeNull();
   });
 });
