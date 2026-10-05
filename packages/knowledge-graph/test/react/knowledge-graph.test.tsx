@@ -464,6 +464,23 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     act(() => fake.pick({ kind: 'node', ref: T('t133'), double: false }));
     await waitFor(() => expect(status()).toBe('GN-133 is outside the scope.'));
     expect(fake.last().states.selected).toBe(T('t142'));
+    cleanup();
+    // the neighbour chosen must be CLEAR: f1's first edge (to f2, also fog) is listed before its edge to a (clear)
+    const it = (id: string, label: string) => item(id, { label, ws: 'gn', project: null });
+    const rel = (from: string, to: string): GraphEdgeView => ({ id: `relates|${from}|${to}`, kind: 'relates', from, to, snippet: null, addedBy: null, addedAt: null, origin: null, suggested: false });
+    const [c, a, f1, f2] = [it('c0', 'GN-1'), it('a0', 'GN-2'), it('f1', 'GN-3'), it('f2', 'GN-4')];
+    const order: GraphSource = {
+      ring: async (q) => {
+        const items = q.hops === 1 ? [a] : q.hops === 2 ? [f1, f2] : [];
+        const edges = q.hops === 1 ? [rel(c.ref, a.ref)] : q.hops === 2 ? [rel(f1.ref, f2.ref), rel(a.ref, f1.ref), rel(a.ref, f2.ref)] : [];
+        return { hop: q.hops, center: { ...c, hop: 0 }, items: items.map((x) => ({ ...x, hop: q.hops })), edges, frontier: items.map((x) => x.ref), truncated: false, cursor: null };
+      },
+    };
+    const o = setup({ centre: c.ref, hops: 1 }, { source: order });
+    await drawn(o.fake, f1.ref);
+    act(() => o.fake.pick({ kind: 'node', ref: f1.ref, double: false }));
+    await waitFor(() => expect(status()).toBe('GN-3 is in the fog. Center on GN-2 to reach it.'));
+    expect(o.fake.last().states.selected).toBe(a.ref);
   });
 
   it('27.326 the count line, literal: two hops, a project chosen, a capped world, a phone; control: one hop is singular', async () => {
