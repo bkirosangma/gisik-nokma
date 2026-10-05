@@ -9533,7 +9533,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
 /* ── MY WORK, GLOBAL: CONTROLS AND GROUPS (my-work-global T3, cases 30.034, 30.035, 30.020) ──
    The global page's "Show" chips and "Group" pair, and the workspace → project headings both of its sections draw when
-   grouped. Placed ABOVE "LOADING PLACEHOLDERS" on purpose: that block's readers slice from its marker to EOF (25.019).
+   grouped. Placed above the loading-placeholders block on purpose: its readers slice from its marker to EOF (25.019), so this
+   comment must not spell that marker either.
    Tokens only. */
 .gn-my-work-control {
   display: flex;
