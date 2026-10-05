@@ -168,6 +168,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   onPickRef.current = (e) => {
     if (e.kind === 'stage') return;
     if (e.kind === 'edge') {
+      keepView.current = true; // selecting a link keeps the zoom too (§3.5)
       setSelectedEdge(e.id);
       setStatus('');
       return;
@@ -184,8 +185,9 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   };
   /** The inspector's "Add <name> (n)" (`knowledge-graph-sigma.html:1064`): a project of a chosen workspace, or another workspace. */
   function addScope(key: ScopeKey) {
-    if ('projectId' in key) setProjectIds((ids) => (ids.includes(key.projectId) ? ids : [...ids, key.projectId]));
-    else setWorkspaceIds((ids) => (ids.includes(key.workspaceId) ? ids : [...ids, key.workspaceId]));
+    // never one already chosen: an Add is offered only for what the scope leaves out
+    if ('projectId' in key) setProjectIds((ids) => [...ids, key.projectId]);
+    else setWorkspaceIds((ids) => [...ids, key.workspaceId]);
     setStatus('');
   }
   // "Remove link" (spec A's `ticket.link_removed`, through the host): the cached store drops the edge, and Undo puts it back

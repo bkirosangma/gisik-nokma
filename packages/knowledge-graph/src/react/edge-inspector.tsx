@@ -72,11 +72,10 @@ export function EdgeInspector(p: EdgeInspectorProps) {
       setBusy(false);
     }
   }
-  async function restore() {
-    if (undo === null) return;
+  async function restore(putBack: () => Promise<void>) {
     setBusy(true);
     try {
-      await undo();
+      await putBack();
       setUndo(null);
       p.setStatus('Link restored.');
     } catch (e) {
@@ -120,7 +119,7 @@ export function EdgeInspector(p: EdgeInspectorProps) {
           </button>
         )}
         {undo !== null && (
-          <button type="button" className="gn-button gn-button--ghost" disabled={busy} onClick={() => void restore()}>
+          <button type="button" className="gn-button gn-button--ghost" disabled={busy} onClick={() => void restore(undo)}>
             Undo
           </button>
         )}

@@ -46,7 +46,7 @@ export function Inspector(p: InspectorProps) {
   const brings = isCentre ? 0 : fogNext(store, item.ref, p.on, zones.clearSet, p.inScope);
   const outs = outsideScope(store, item.ref, p.on, p.inScope, p.workspaceIds);
   const outTotal = outs.reduce((n, o) => n + o.refs.length, 0);
-  const steps = isCentre ? [] : pathTo(zones.walk, item.ref);
+  const steps = pathTo(zones.walk, item.ref); // the centre's is []
   const project = item.kind !== 'project' && item.projectId !== null ? p.scopeNames.project(item.projectId) : null;
   const home = item.kind === 'project' && item.workspaceId !== null ? p.scopeNames.workspace(item.workspaceId) : null;
   const addName = (key: ScopeKey) => ('projectId' in key ? p.scopeNames.project(key.projectId) : p.scopeNames.workspace(key.workspaceId)) ?? '';
@@ -61,7 +61,7 @@ export function Inspector(p: InspectorProps) {
       <h3 className="gn-kg-insp__title">{item.kind === 'ticket' ? item.title ?? item.label : item.label}</h3>
       {(item.category !== null || project !== null || home !== null) && (
         <div className="gn-kg-insp__meta">
-          {item.kind === 'ticket' && item.category !== null && (
+          {item.category !== null && (
             <span className="gn-kg-pill">
               <span className={`gn-kg-glyph gn-kg-glyph--dot gn-kg-glyph--${item.category}`} aria-hidden="true" />
               {CATEGORY_WORD[item.category]}

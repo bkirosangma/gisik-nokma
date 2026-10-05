@@ -49,7 +49,7 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
           const ring = await source.ring({ center: q.centre, hops: hop, workspaceIds: q.workspaceIds, projectIds: q.projectIds, groups: q.groups });
           // merged into the entry AS CACHED NOW: a link removed (`forget`) while this ring was out stays removed
           const base = cache.current.get(key) ?? entry;
-          entry = { store: mergeRing(base.store, ring), loaded: Math.max(base.loaded, hop) };
+          entry = { store: mergeRing(base.store, ring), loaded: hop };
           cache.current.set(key, entry); // cached even if stale: a later visit reuses it
         } catch {
           if (current.current === key) setFailed({ key, hop });
@@ -78,8 +78,7 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
     },
     forget: (edgeId: string) => {
       const e = cache.current.get(key);
-      const gone = e?.store.edges.get(edgeId);
-      if (e === undefined || gone === undefined) return;
+      if (e === undefined) return;
       const edges = new Map(e.store.edges);
       edges.delete(edgeId);
       const adj = new Map([...e.store.adj].map(([k, v]) => [k, v.filter((x) => x.edge.id !== edgeId)]));

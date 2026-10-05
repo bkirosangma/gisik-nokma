@@ -46,6 +46,7 @@ describe('the inspect model (spec C §3.5)', () => {
     // an edge whose far end the store does not hold (the server never sends a hidden item) is not listed
     const ghost = plus(store, [edge('relates', T('t142'), T('t999'))]);
     expect(directLinks(ghost, T('t142'), TYPED, all).map((x) => x.to)).toEqual([T('t133'), T('t160'), T('t139'), T('t151'), T('t149'), T('t118')]);
+    expect(outsideScope(ghost, T('t142'), TYPED, (r) => ghost.items.has(r), ['gn'])).toEqual([]); // nor does it lead out: there is nothing to add
     // control: Bolsrang's only group off empties his list
     expect(directLinks(store, P('pB'), DEFAULT, all).map((x) => x.to)).toEqual([T('t131')]);
     expect(directLinks(store, P('pB'), without('people'), all)).toEqual([]);
@@ -102,5 +103,6 @@ describe('the inspect model (spec C §3.5)', () => {
     expect(refs.map((r) => kindWord(at(r)))).toEqual(['GN-133', 'Note', 'Person', 'Concept', 'Workspace', 'Project']);
     expect(refs.map((r) => openLabel(at(r)))).toEqual(['Open ticket', 'Open note', 'Show their work', 'Open concept', 'Open workspace', 'Open board']);
     expect(refs.map((r) => longLabel(at(r)))).toEqual(['GN-133 Move sheet: workflows branch', 'Phone pass rulings', 'Ama Rangsa', 'Scroll position on phone sheets', 'Gisik Nokma', 'Mobile web']);
+    expect(longLabel(item('t1', { label: 'GN-1', title: null }))).toBe('GN-1'); // a ticket with no title is its key alone
   });
 });
