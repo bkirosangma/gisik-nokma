@@ -53,7 +53,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (17)
+  // invariant (18)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
