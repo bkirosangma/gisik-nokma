@@ -86,4 +86,10 @@ describe('29.378 estimate and reworkEstimate', () => {
     await expect(update.handler({ workspaceId: WS, ticketId: T, fields: { reworkEstimate: 3 } })).rejects.toThrow(/^"reworkEstimate" is a built-in field: use the reworkEstimate argument$/);
     expect(f.batches).toHaveLength(6);
   });
+
+  it('29.378 the two descriptions name the new arguments', () => {
+    const f = fakeFlow();
+    expect(find(ticketTools(f.session), 'update_ticket').description).toContain('; estimate / reworkEstimate (whole days 1–365, null clears); ');
+    expect(find(writeTools(f.session), 'create_ticket').description).toContain('`startDate` / `dueDate` (YYYY-MM-DD), `estimate` (whole days 1–365). ');
+  });
 });

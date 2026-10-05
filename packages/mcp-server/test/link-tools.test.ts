@@ -48,6 +48,8 @@ describe('29.375 link_tickets: leads_to, label, draft ends', () => {
     expect(f.gets, 'the remove was refused before any read').toEqual([]);
     await tool(f.session).handler({ ...base, ticketId: D, targetId: A, label: ` ${'x'.repeat(60)} ` }); // control: 60 after the trim
     expect(payload(f.batches[0]![0])['label']).toBe('x'.repeat(60));
+    await tool(f.session).handler({ ...base, ticketId: D, targetId: B, label: 'Y' }); // control: one character
+    expect(payload(f.batches[1]![0])['label']).toBe('Y');
   });
 
   it('29.375 a draft end files on the draft stream: from-form when the source is published, plain when the source is a draft', async () => {
@@ -118,7 +120,8 @@ describe('29.376 link_tickets: remove and relabel file on the stored source', ()
   });
 
   const relabel = { workspaceId: WS, kind: 'leads_to', action: 'relabel' } as const;
-  const DEC_LINKS = { links: [row('leads_to', 'out', A, 'Yes'), row('leads_to', 'out', B, 'No')] };
+  // D's own two branches, and an arrow INTO D whose label is another ticket's branch (it does not block D's labels)
+  const DEC_LINKS = { links: [row('leads_to', 'in', ulid('UPS'), 'Later'), row('leads_to', 'out', A, 'Yes'), row('leads_to', 'out', B, 'No')] };
 
   it('29.376 relabel is one batch [link_removed, link_added] after its pre-checks; control: a free label commits both', async () => {
     const f = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS });
@@ -138,6 +141,9 @@ describe('29.376 link_tickets: remove and relabel file on the stored source', ()
     await tool(f.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'yes' });
     expect(f.batches).toHaveLength(2);
     expect(payload(f.batches[1]![1])['label']).toBe('yes');
+    // an incoming arrow's label is not one of D's branches
+    await tool(f.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Later' });
+    expect(f.batches).toHaveLength(3);
     // from the TARGET end: the stored source (D) files, and the other branches are D's own, read from D's links (A's list has none)
     const fromEnd = fakeFlow({ ...ENDS, [`${tw}/${A}/links`]: { links: [row('leads_to', 'in', D, 'Yes')] }, [`${tw}/${D}/links`]: DEC_LINKS });
     await expect(tool(fromEnd.session).handler({ ...relabel, ticketId: A, targetId: D, label: 'NO' })).rejects.toThrow('already labelled "NO"');
@@ -159,6 +165,10 @@ describe('29.376 link_tickets: remove and relabel file on the stored source', ()
     const stuck = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS }, { results: (i) => (i === 0 ? [COMMITTED, refuse] : [refuse]) });
     await expect(tool(stuck.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Approved' }))
       .rejects.toThrow(/^event 1 refused by link\.label-duplicate: Another branch already has this label\. The previous link could NOT be put back: add it again with link_tickets \(action "add", label "Yes"\)\.$/);
+    // a put-back whose answer cannot be trusted is not claimed as put back
+    const unsure = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS }, { results: (i) => (i === 0 ? [COMMITTED, refuse] : []) });
+    await expect(tool(unsure.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Approved' })).rejects.toThrow('could NOT be put back');
+    expect(unsure.batches).toHaveLength(2);
     // an invalid add is spelled in its own words too
     const invalid = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS }, { results: (i) => (i === 0 ? [COMMITTED, { status: 'invalid', eventId: null, code: 'payload_invalid', message: 'label is too long' }] : undefined) });
     await expect(tool(invalid.session).handler({ ...relabel, ticketId: D, targetId: A, label: 'Approved' }))
