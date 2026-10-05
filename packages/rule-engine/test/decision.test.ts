@@ -47,6 +47,9 @@ describe('29.138 checkTicketDecided: whose it is to judge', () => {
     expect(await checkTicketDecided(on('01J9GGHO000000000000000000', 'ticket.decided', { outcome: 'Yes' }), world([]))).toEqual({ refused: true, rule: 'unknown-ticket', reason: 'This event records a decision on ticket 01J9GGHO000000000000000000, but no such ticket is known.' });
     const note = makeEnvelope({ type: 'ticket.decided', entity: { kind: 'note', id: D }, workspaceId: WS, payload: { outcome: 'Yes' } });
     expect(await checkTicketDecided(note, world([]))).toEqual({ refused: true, rule: 'malformed-payload', reason: 'This ticket.decided event does not point at a ticket; it points at a note.' });
+    // the kind is judged BEFORE the ticket lookup: a misfiled event whose id is no ticket still hears the kind, not unknown-ticket
+    const strayNote = makeEnvelope({ type: 'ticket.decided', entity: { kind: 'note', id: '01J9GGHO000000000000000000' }, workspaceId: WS, payload: { outcome: 'Yes' } });
+    expect(await checkTicketDecided(strayNote, world([]))).toEqual({ refused: true, rule: 'malformed-payload', reason: 'This ticket.decided event does not point at a ticket; it points at a note.' });
     const bad = await checkTicketDecided(on(D, 'ticket.decided', {}), world([]));
     expect(bad).toMatchObject({ refused: true, rule: 'malformed-payload' });
     expect(bad.refused && bad.reason.startsWith("This ticket.decided event's payload is malformed: at outcome")).toBe(true);
