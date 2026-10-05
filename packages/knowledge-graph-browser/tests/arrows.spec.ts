@@ -149,6 +149,11 @@ test('27.351 the head sits outside the border of the widest card (two rays, one 
   const right = await headProbe(page, 'ref|note:n7|note:n1', { move: { 'note:n1': { x: 40, y: s.height - 80 }, 'note:n7': { x: 360, y: s.height - 67 } } });
   expectHead(right);
   expect(right.B).toBeGreaterThan(120); // past the label's end, not through the box's top or bottom (≤ 35 px from the centre)
+  // a round chip (the note's icon makes its node a disc) on a 45° ray from its upper left: the label box starts at the node's
+  // centre, so only the padded disc bounds the card there, and a squarer node corner would leave the head off the disc
+  const diag = await headProbe(page, 'ref|note:n7|note:n1', { move: { 'note:n1': { x: 190, y: s.height - 64 }, 'note:n7': { x: 60, y: s.height - 194 } } });
+  expectHead(diag);
+  expect(diag.B).toBeLessThan(22); // the ray leaves through the disc, not the label box
   // a chip (a note: the icon is its dot) at fit, then at 2× zoom centred on it
   const fit = await headProbe(page, 'ref|note:n7|note:n1');
   expectHead(fit);
