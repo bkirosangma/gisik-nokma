@@ -122,8 +122,9 @@ cd "$rundir" || exit 1
 # behind a foreground child) and the whole group can be stopped; no pipe, so rc is the command's own. A job killed by a signal makes bash print
 # "Terminated" — silenced. stdin is /dev/null: a background group that read the terminal would be stopped.
 # The cap's clock starts HERE, with the slot already held: a queue wait (up to CTL_SEM_MAX_WAIT, a gate first) never counts against it.
-# The USR1 trap makes `wait` return at once. A fired cap is a TIMEOUT even when the job ended in the same instant: it did reach its cap (no
-# guard that only a microsecond race could reach, 13.2320's mutant run).
+# The USR1 trap makes `wait` return at once. The leader still un-reaped (kill -0) is what tells a cap stop from a job that ended in the same
+# instant: once `wait` has reaped it, its pid (and so its pgid) may belong to a new process group, which cap_stop must never signal. Only a
+# microsecond race reaches this guard (mutant M12 survives); it stays for the same reason as the timer's getppid guard: never outside the group.
 set -m
 "${cmd[@]}" >> "$log" 2>&1 < /dev/null &
 child=$!
@@ -133,7 +134,7 @@ if [ "$cap_secs" -gt 0 ]; then
 fi
 { wait "$child"; } 2>/dev/null; rc=$?
 timed_out=0
-if [ "$cap_fired" = 1 ]; then
+if [ "$cap_fired" = 1 ] && kill -0 "$child" 2>/dev/null; then
   timed_out=1; cap_stop; { wait "$child"; } 2>/dev/null; rc=124
   echo "TIMEOUT after $max_min min" >> "$log"
 fi
