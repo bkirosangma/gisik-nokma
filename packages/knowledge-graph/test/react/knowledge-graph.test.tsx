@@ -10,7 +10,7 @@ import { fakeRenderer } from './fake-renderer.js';
 import { fixtureSource, type FixtureOptions } from './fixture/fixture-source.js';
 
 /*
- * The view over a fake renderer (cases 27.313–27.324, 27.326). The source is a test-only copy of the browser harness's
+ * The view over a fake renderer (cases 27.313–27.326, 27.365–27.367). The source is a test-only copy of the browser harness's
  * fixture (the owner-approved mockup's world, centred on GN-142). Every count below is a LITERAL, read off the fixture by
  * an independent brute-force BFS over its raw edge table (roles/mut-out/kg-c-t7-view/oracle.py), never by `zones`.
  */
@@ -124,7 +124,7 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     expect(fx.log.length).toBe(requests);
   });
 
-  it('27.317 choosing a project re-requests with its id, and a centre outside it gets the scope note; control: clearing the projects removes the note', async () => {
+  it('27.317 choosing a project re-requests with its id, and a centre outside it gets the scope note; control: clearing the projects empties the note', async () => {
     const { fake, fx } = setup();
     await drawn(fake, T('t126'));
     const note = 'GN-142 is outside the projects you picked. It stays in the middle, and its links follow your scope.';
@@ -145,6 +145,35 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Gisik Nokma' }));
     await waitFor(() => expect(fx.log.at(-1)!).toMatchObject({ workspaceIds: ['st'], projectIds: [] }));
     expect(screen.queryByRole('button', { name: 'Remove Workflows' })).toBeNull();
+  });
+
+  it('27.367 jsdom: the scope note has ONE slot: empty with no project, the SAME element holds the note for Workflows and is emptied again; control: a phone has the empty slot after the count', async () => {
+    const { fake, fx } = setup();
+    await drawn(fake, T('t126'));
+    const note = 'GN-142 is outside the projects you picked. It stays in the middle, and its links follow your scope.';
+    const slot = document.querySelector('.gn-kg__scope-note');
+    expect(slot).not.toBeNull(); // in the bar before any note: the band is reserved, not added with the note
+    expect(slot!.textContent).toBe('');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Projects/ }));
+    await user.click(await screen.findByRole('option', { name: 'Workflows' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(fx.log.at(-1)!.projectIds).toEqual(['j_wf']));
+    await waitFor(() => expect(slot!.textContent).toBe(note));
+    expect(document.querySelectorAll('.gn-kg__scope-note')).toHaveLength(1);
+    expect(document.querySelector('.gn-kg__scope-note')).toBe(slot);
+    await user.click(screen.getByRole('button', { name: 'Remove Workflows' }));
+    await waitFor(() => expect(slot!.textContent).toBe(''));
+    expect(slot!.isConnected).toBe(true);
+    expect(document.querySelector('.gn-kg__scope-note')).toBe(slot);
+    cleanup();
+    // control: the phone keeps the same empty slot, right after the count (its CSS height is the browser half, 27.367)
+    const p = setup({ config: 'phone' });
+    await drawn(p.fake, T('t125'));
+    const phoneSlot = document.querySelector('.gn-kg__scope-note');
+    expect(phoneSlot).not.toBeNull();
+    expect(phoneSlot!.textContent).toBe('');
+    expect(phoneSlot!.previousElementSibling).toBe(document.querySelector('.gn-kg__count'));
   });
 
   it('27.318 Review Focus 2: two centre changes in quick succession draw only the second; a late answer for the first is never drawn', async () => {
@@ -225,6 +254,16 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     expect(hopsOf(late.fx.log)).toEqual([1, 2]);
     expect(refsOf(late.fake.last())).not.toContain(T('t125')); // GN-125 is hop 2: ring 2 has not answered
     expect(screen.queryByText('Loading the Knowledge Graph')).toBeNull();
+    // a config change (a phone/desktop switch) remounts the renderer, and the NEW one is fed the graph it missed: every ring in
+    // first, so the only draw left to come is the re-feed (the phone's one hop is already in the cache: no request)
+    await drawn(late.fake, T('t126'));
+    const n = late.fake.calls.length;
+    const requests = late.fx.log.length;
+    expect(n).toBeGreaterThanOrEqual(1);
+    late.rerender({ config: 'phone' });
+    await waitFor(() => expect(late.fake.calls.length).toBe(n + 1));
+    expect(late.fake.last().nodes.length).toBeGreaterThan(0);
+    expect(late.fx.log.length).toBe(requests);
   });
 
   it('27.321 an item with no links says so, and Add link hands the host the centre item; control: a note centre has the sentence and no button', async () => {
@@ -318,8 +357,8 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     expect(p.fx.log.some((q) => q.center === T('t133'))).toBe(false);
   });
 
-  it('27.323 the trail: t142 → t133 → t131 shows Back and three crumbs, and the first crumb goes back two steps; control: a new centre prop resets the trail', async () => {
-    const { fake, rerender } = setup();
+  it('27.323 the trail: t142 → t133 → t131 shows Back and three crumbs, a crumb past the loaded rings keeps its label, and the first crumb goes back two steps; control: a new centre prop resets the trail', async () => {
+    const { fake, fx, rerender } = setup();
     await drawn(fake, T('t126'));
     doubleClick(fake, T('t133'));
     await drawn(fake, T('t128'));
@@ -328,6 +367,21 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     const trail = () => [...document.querySelectorAll('.gn-kg__trail button')].map((b) => b.textContent);
     expect(trail()).toEqual(['‹ Back', 'GN-142', 'GN-133', 'GN-131']);
     expect(screen.getByRole('button', { name: 'Back to GN-133' })).toBeInTheDocument();
+    // a crumb whose item is past the rings now loaded keeps its label: at hops 1 GN-128 loads rings 1 and 2 only, and GN-142 is
+    // 3 hops from it (t128 → t131 → t133 → t142), so only the labels seen earlier can name the first crumb
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: '1' }));
+    doubleClick(fake, T('t128'));
+    await waitFor(() => expect(fake.last().nodes.some((nd) => nd.ref === T('t128') && nd.center) && refsOf(fake.last()).includes(T('t130'))).toBe(true));
+    await settle();
+    expect(fx.log.filter((q) => q.center === T('t128')).map((q) => q.hops)).toEqual([1, 2]); // the haystack: no ring 3 was loaded
+    expect(refsOf(fake.last())).not.toContain(T('t142'));
+    expect(trail()).toEqual(['‹ Back', 'GN-142', 'GN-133', 'GN-131', 'GN-128']);
+    expect(screen.getByRole('button', { name: 'Back to GN-131' })).toBeInTheDocument();
+    screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-128' }).focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(trail()).toEqual(['‹ Back', 'GN-142', 'GN-133', 'GN-131']));
+    await user.click(screen.getByRole('tab', { name: '2' }));
     // Esc (no host handler) goes back ONE step
     screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-131' }).focus();
     await userEvent.setup().keyboard('{Escape}');
@@ -401,6 +455,46 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     }
   });
 
+  it('27.325 jsdom: Off and a concept centre or selection (§6.4): a concept centre goes back to the host\'s centre and the trail empties; a ticket centre stays; a selected concept falls back to the centre', async () => {
+    const withoutConcepts = CHIP_GROUPS.filter((g) => g !== 'concepts');
+    window.localStorage.clear();
+    try {
+      const a = setup();
+      await drawn(a.fake, T('t126'));
+      doubleClick(a.fake, 'concept:c1');
+      // control: the concept IS the centre, with a trail back
+      await waitFor(() => expect(a.fx.log.at(-1)!.center).toBe('concept:c1'));
+      expect(screen.getByRole('button', { name: 'Back to GN-142' })).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('tab', { name: 'Off' }));
+      await waitFor(() => expect(a.fx.log.at(-1)).toMatchObject({ center: T('t142'), groups: withoutConcepts }));
+      expect(screen.queryByRole('button', { name: /^Back to/ })).toBeNull();
+      expect(document.querySelector('.gn-kg__trail')).toBeNull();
+      await waitFor(() => expect(a.fake.last().states.selected).toBe(T('t142')));
+      cleanup();
+      window.localStorage.clear();
+      // a ticket centre is not the layer's: it stays, and so does its trail
+      const b = setup();
+      await drawn(b.fake, T('t126'));
+      doubleClick(b.fake, T('t133'));
+      await waitFor(() => expect(b.fx.log.at(-1)!.center).toBe(T('t133')));
+      await userEvent.setup().click(screen.getByRole('tab', { name: 'Off' }));
+      await waitFor(() => expect(b.fx.log.at(-1)!.groups).toEqual(withoutConcepts));
+      expect(b.fx.log.at(-1)!.center).toBe(T('t133'));
+      expect(screen.getByRole('button', { name: 'Back to GN-142' })).toBeInTheDocument();
+      cleanup();
+      window.localStorage.clear();
+      // a selected concept goes with the layer: the selection falls back to the centre
+      const c = setup();
+      await drawn(c.fake, T('t126'));
+      act(() => c.fake.pick({ kind: 'node', ref: 'concept:c1', double: false }));
+      await waitFor(() => expect(c.fake.last().states.selected).toBe('concept:c1'));
+      await userEvent.setup().click(screen.getByRole('tab', { name: 'Off' }));
+      await waitFor(() => expect(c.fake.last().states.selected).toBe(T('t142')));
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+
   it('27.327 jsdom: a new highlight reaches the renderer with no new request; control: the first draw carries none', async () => {
     const { fake, fx, rerender } = setup();
     await drawn(fake, T('t126'));
@@ -411,7 +505,7 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     expect(fx.log.length).toBe(requests);
   });
 
-  it('27.365 the bar, literal: names, the keys hint, Hops by click, a last workspace is kept; control: a phone folds it with a summary and has no hint', async () => {
+  it('27.365 the bar, literal: names, the keys hint, Hops by click, a last workspace is kept; control: a phone folds it with a summary (the chips shown that are on) and has no hint', async () => {
     const { fake, fx } = setup();
     await drawn(fake, T('t126'));
     const user = userEvent.setup();
@@ -443,6 +537,15 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     await user.click(screen.getByText('Scope and links'));
     await user.click(screen.getByRole('button', { name: /^Blocks/ }));
     expect(summary()).toBe('Scope and linksGisik Nokma, Studio, all projects; 7 of 8 link types');
+    // the layer Off hides the Concepts chip, which stays on: the summary counts the chips SHOWN that are on
+    try {
+      await user.click(screen.getByRole('tab', { name: 'Off' }));
+      expect(summary()).toBe('Scope and linksGisik Nokma, Studio, all projects; 6 of 7 link types');
+      await user.click(screen.getByRole('tab', { name: 'On' }));
+      expect(summary()).toBe('Scope and linksGisik Nokma, Studio, all projects; 7 of 8 link types');
+    } finally {
+      window.localStorage.clear();
+    }
   });
 
   it('27.366 picking a fogged item selects its clear neighbour and says why; outside the scope it says so; control: picking a clear item clears the sentence', async () => {
