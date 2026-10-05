@@ -451,14 +451,14 @@ check "13.2266 the statics retry is THAT chunk's alone: with small.ts over the c
 PYS="$T/pyshim"; mkdir -p "$PYS"; REALPY="$(command -v python3)"
 printf '#!/bin/bash\ncase "$*" in *version_info*) echo "$FAKE_PYV";; *) exec "%s" "$@";; esac\n' "$REALPY" > "$PYS/python3"; chmod +x "$PYS/python3"
 pyfloor_ok() { local v out rc
-  for v in 3.10 3.9 2.7 x ''; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
+  for v in 3.10 3.9 2.7 2.12 x ''; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
     [ $rc -eq 2 ] && [ "$out" = "FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): $PYS/python3 is ${v:-not runnable}" ] || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
   for v in 3.11 3.14 4.0; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
     [ $rc -eq 0 ] && printf '%s\n' "$out" | tail -1 | grep -q "^OK mutate dry-run" || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
   if [ -x /usr/bin/python3 ] && ! /usr/bin/python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
     mkdir -p "$T/syspy"; ln -sf /usr/bin/python3 "$T/syspy/python3"; out="$(PATH="$T/syspy:$PATH" mut "$R1" --dry-run)"; rc=$?
     [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate needs python3 >= 3.11" || { echo "       (the real /usr/bin/python3: rc $rc)"; return 1; }; fi; }
-check "13.2267 the Python floor: python3 3.10, 3.9, 2.7, an unreadable version or none is exit 2 with 'FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): <path> is <version|not runnable>' as the ONLY output line (no shell error leaks, nothing runs); 3.11, 3.14 and 4.0 pass (the dry run completes); the real /usr/bin/python3, when it is below 3.11, is refused too" 'pyfloor_ok'
+check "13.2267 the Python floor: python3 3.10, 3.9, 2.7, 2.12 (a minor ≥ 11 under major 2), an unreadable version or none is exit 2 with 'FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): <path> is <version|not runnable>' as the ONLY output line (no shell error leaks, nothing runs); 3.11, 3.14 and 4.0 pass (the dry run completes); the real /usr/bin/python3, when it is below 3.11, is refused too" 'pyfloor_ok'
 
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"
