@@ -1,7 +1,9 @@
 import type { LedgerEvent } from '@gisik-nokma/domain';
 
 /**
- * Which committed events wake the embedding worker (spec §7.6, Plan 3 of 6).
+ * Which committed events wake the embedding worker (spec §7.6, Plan 3 of 6):
+ * `nudgesEmbedding` for notes, and since Knowledge Graph spec D Task 2 a second
+ * predicate, `nudgesItemEmbedding`, for tickets and ticket comments.
  *
  * ## Why this lives in its own module, and it is not tidiness
  *
@@ -22,9 +24,11 @@ import type { LedgerEvent } from '@gisik-nokma/domain';
  * `embed-worker.ts` re-exports it, so the name is still reachable from the
  * module that owns the loop.
  *
- * ## Which two, and which are deliberately not here
+ * ## Which two note events, and which are deliberately not here
  *
- * `note.created` and `note.body_set` are the plan's two, and the pair is the
+ * `note.created` and `note.body_set` are the notes plan's two for
+ * `nudgesEmbedding` (the ticket and comment events are `nudgesItemEmbedding`'s,
+ * below), and the pair is the
  * right pair: those are the events that put TEXT in the note. `note.created` is
  * included even though a new note's body is usually `EMPTY_NOTE_DOC`, because
  * its TITLE becomes searchable then — the worker's title fallback means a note
@@ -41,4 +45,19 @@ const NUDGE_EVENT_TYPES = new Set(['note.created', 'note.body_set']);
 
 export function nudgesEmbedding(event: LedgerEvent): boolean {
   return event.entity.kind === 'note' && NUDGE_EVENT_TYPES.has(event.type);
+}
+
+/**
+ * Knowledge Graph spec D §2: the events that change a ticket's or a ticket comment's embedded text, or whether
+ * it exists. A SEPARATE predicate, so `nudgesEmbedding` and 18.140 stay exactly as pinned. `ticket.field_set`
+ * is taken whole: the worker's hash, not this list, decides whether the text moved, and a nudge that finds
+ * nothing stale costs one query.
+ */
+const ITEM_NUDGE_TICKET_TYPES = new Set([
+  'ticket.created', 'ticket.field_set', 'ticket.deleted', 'ticket.restored',
+  'comment.added', 'comment.edited', 'comment.deleted',
+]);
+
+export function nudgesItemEmbedding(event: LedgerEvent): boolean {
+  return event.entity.kind === 'ticket' && ITEM_NUDGE_TICKET_TYPES.has(event.type);
 }

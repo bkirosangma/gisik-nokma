@@ -9,6 +9,7 @@ import {
   mapActorNames,
   mapActors,
   mapAttention,
+  mapHome,
   mapPurgedLookup,
   mapWorkspaceSettings,
   mapBoardView,
@@ -534,9 +535,9 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
 
     searchNotes: async (workspaceId, text, options) => {
       // `kinds=note` because the caller wants notes: leaving it out would ask
-      // the server to search tickets too, and `mode=meaning` would then return
-      // `hits: []` anyway — one wasted query on a path that runs after every
-      // typing pause.
+      // the server to search tickets too (by meaning as well since KG-D T2,
+      // `search_item_chunks`), a `hits` half this caller throws away — a
+      // wasted query on a path that runs after every typing pause.
       const params = new URLSearchParams({ workspaceId, q: text, kinds: 'note', mode: options.mode });
       if (options.authorId !== undefined) params.set('author', options.authorId);
       if (options.scopeMode !== undefined) params.set('scope', options.scopeMode);
@@ -588,6 +589,9 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       ]);
       return mapAttention(raw, contests, roster);
     },
+
+    /** One read, no roster: Home's numbers name no actor. */
+    getHome: async (workspaceId) => mapHome(await http.get(`/v1/workspaces/${workspaceId}/home`)),
 
     /**
      * The SAME route as `getAttention`, one key of it (second wave, Task 6).

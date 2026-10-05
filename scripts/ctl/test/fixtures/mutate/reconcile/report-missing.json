@@ -1,0 +1,74 @@
+{
+ "files": {
+  "src/calc.ts": {
+   "source": "// reconcile fixture (13.2204)\n// line 2\nexport const NEXT = LIMIT + (false ? 2000 : false ? 20 : 200);\nexport function over(n: number): boolean {\n  return n > LIMIT;\n}\n",
+   "mutants": [
+    {
+     "id": "BooleanLiteral30",
+     "mutatorName": "BooleanLiteral",
+     "location": {
+      "start": {
+       "line": 3,
+       "column": 30
+      },
+      "end": {
+       "line": 3,
+       "column": 35
+      }
+     },
+     "replacement": "true",
+     "status": "Survived"
+    },
+    {
+     "id": "ConditionalExpression30",
+     "mutatorName": "ConditionalExpression",
+     "location": {
+      "start": {
+       "line": 3,
+       "column": 30
+      },
+      "end": {
+       "line": 3,
+       "column": 35
+      }
+     },
+     "replacement": "false",
+     "status": "Survived"
+    },
+    {
+     "id": "EqualityOperator10",
+     "mutatorName": "EqualityOperator",
+     "location": {
+      "start": {
+       "line": 5,
+       "column": 10
+      },
+      "end": {
+       "line": 5,
+       "column": 19
+      }
+     },
+     "replacement": "n >= LIMIT",
+     "status": "Survived"
+    },
+    {
+     "id": "ArithmeticOperator21",
+     "mutatorName": "ArithmeticOperator",
+     "location": {
+      "start": {
+       "line": 3,
+       "column": 21
+      },
+      "end": {
+       "line": 3,
+       "column": 62
+      }
+     },
+     "replacement": "LIMIT - (false ? 2000 : false ? 20 : 200)",
+     "status": "Survived"
+    }
+   ]
+  }
+ },
+ "testFiles": {}
+}

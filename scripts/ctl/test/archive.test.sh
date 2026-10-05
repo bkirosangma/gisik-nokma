@@ -8,7 +8,7 @@ set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 V="$HERE/ctl"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 unset CTL_DRY_RUN
 NOW=$(date -j -f '%Y-%m-%d %H:%M:%S' '2026-10-03 12:00:00' +%s)
 TODAY=2026-10-03
@@ -146,4 +146,5 @@ check "13.2014 selftest.sh runs this suite as a live (uncommented) step; CONTROL
 check "13.2014 the verb deletes nothing: no rmtree, no os.remove, and its only unlinks are the temp file and a moved source (after os.link)" '! /usr/bin/grep -Eq "rmtree|os\.remove|shutil\.move|os\.rename\(" "$P" && [ "$(/usr/bin/grep -c "os\.unlink" "$P")" = 2 ] && /usr/bin/grep -q "os\.link(src, dst)" "$P" && ! /usr/bin/grep -Eq "(^|[^a-z_])rm( |$)" "$HERE/verbs/archive.sh"'
 check "13.2014 ctl archive is a verb the dispatcher knows (not 'unknown verb')" 'mk; "$V" archive --dry-run 2>&1 | tail -1 | grep -q "^OK archive dry-run"'
 
+ctl_test_only_end archive.test.sh
 [ "$fails" -eq 0 ] && echo "archive.test.sh: ok" || { echo "archive.test.sh: $fails FAILED"; exit 1; }

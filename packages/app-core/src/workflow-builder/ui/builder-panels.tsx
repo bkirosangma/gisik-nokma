@@ -18,7 +18,7 @@ const CATEGORY_TONE: Record<StateCategory, ChipTone> = { open: 'open', active: '
  * view would then move the whole page away from the canvas the user just clicked. Mirrors the
  * `@media (max-width: 64rem)` breakpoint in ui.css.
  */
-const STACKED_QUERY = '(max-width: 64rem)';
+export const STACKED_QUERY = '(max-width: 64rem)';
 
 /**
  * One disclosure row: a `<button aria-expanded aria-controls>` and, as its SIBLING, the body it controls.
