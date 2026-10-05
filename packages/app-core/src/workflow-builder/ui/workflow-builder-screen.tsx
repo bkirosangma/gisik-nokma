@@ -552,16 +552,15 @@ export function WorkflowBuilderScreen(props: {
               fullScreen={fullscreen ? null : { buttonRef: cornerFullScreenRef, onEnter: () => enterFullScreen('corner') }}
             />
           </section>
-          {fullscreen ? (
-            <FloatingPanel
-              open={panel.open}
-              tab={panel.tab}
-              onTab={(tab) => setPanel({ open: true, tab })}
-              onClose={closePanel}
-              phone={phone}
-              widthKey={`${storageKey}:panelWidth`}
-            />
-          ) : null}
+          {/* Opened only in full screen (the subscription's full-screen arm, the toolbar's badge), and closed by Exit. */}
+          <FloatingPanel
+            open={panel.open}
+            tab={panel.tab}
+            onTab={(tab) => setPanel({ open: true, tab })}
+            onClose={closePanel}
+            phone={phone}
+            widthKey={`${storageKey}:panelWidth`}
+          />
         </div>
       </div>
     </BuilderProvider>

@@ -202,14 +202,19 @@ describe('25.547 the floating toolbar: its order, the validator\'s count, and th
 
   it('25.547 the Issues badge counts validateWorkflowDef (two drafts, two counts)', async () => {
     const user = userEvent.setup();
-    const draftWith = (extraStates: number) => {
+    // One extra state, then the same plus a second To do → Doing: the counts differ, and the second differs from any count of
+    // states (a badge counting states, or added states, reads the same for both drafts).
+    const draftWith = (duplicateTransition: boolean) => {
       const store = createDraftStore(draftFromTemplate(kanban));
-      for (let at = 0; at < extraStates; at += 1) store.actions.addState();
+      store.actions.addState();
+      const first = store.getState().def.transitions[0]!;
+      if (duplicateTransition) store.actions.addTransition(first.from, first.to);
       store.actions.select({ kind: 'none' });
       return store.getState();
     };
-    const one = draftWith(1);
-    const two = draftWith(2);
+    const one = draftWith(false);
+    const two = draftWith(true);
+    expect(two.def.states.length).toBe(one.def.states.length);
     const a = validateWorkflowDef(one.def).length;
     const b = validateWorkflowDef(two.def).length;
     expect(a).toBeGreaterThan(0);
@@ -419,6 +424,18 @@ describe('25.549 the floating panel opens on a selection and on the Issues badge
     expect(within(panel()!).getByRole('textbox', { name: 'State name' })).toHaveValue('Doing');
     expect(container.querySelector('aside.workflow-builder-screen__left')).toHaveAttribute('data-open', 'false');
     expect(container.querySelector('.workflow-builder-screen__scrim')).toBeNull();
+  });
+
+  it('25.549 Exit with the panel open takes the panel with it, and re-entering does not bring it back', async () => {
+    const user = userEvent.setup();
+    const { header } = await renderBuilder();
+    await enterFullScreen(user, header);
+    await user.click(await screen.findByTestId('state-node-doing'));
+    expect(panel()).not.toBeNull();
+    await user.click(within(toolbar()).getByRole('button', { name: 'Exit full screen' }));
+    expect(panel()).toBeNull();
+    await enterFullScreen(user, header);
+    expect(panel()).toBeNull();
   });
 
   it('25.549 control: outside full screen the same click opens no Workflow panel, and on the desktop the drawer stays data-open="false" (21.176)', async () => {
