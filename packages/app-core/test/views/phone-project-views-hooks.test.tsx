@@ -165,5 +165,30 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
     expect(keysAt(390)).toEqual({ orientation: 'portrait', inside: 'GN-1234', outside: null });
     // CONTROL, same it: landscape keeps T9's decision on the bar's drawn LENGTH, so this short bar's key is outside it.
     expect(keysAt(1280)).toEqual({ orientation: 'landscape', inside: null, outside: 'GN-1234' });
+    // The PACKER reserves the same line: a second short bar starting the day after the first one ends shares its column in portrait,
+    // where the first one's key takes no room along time; in landscape the first one's key, drawn after its end, pushes it a row down.
+    const next: TicketState = { ...ticket, id: 't2', fields: { title: claim('The next one'), startDate: claim({ date: '2026-08-25' }), dueDate: claim({ date: '2026-08-26' }) } };
+    const rowsAt = (width: number) => {
+      // A height too, so the portrait scroller (time runs down) has days in view and mounts both bars.
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      const tall = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700);
+      try {
+        const { container } = render(
+          <TimelineView
+            tickets={[{ key: 'GN-1234', state: short, pendingFieldIds: [], customDateFields: [] }, { key: 'GN-1235', state: next, pendingFieldIds: [], customDateFields: [] }]}
+            today="2026-08-23"
+            userName={(id) => id}
+            onOpenTicket={vi.fn()}
+          />,
+        );
+        return [...container.querySelectorAll<HTMLElement>('.gn-timeline__row')].map((row) => [row.dataset['ticketId'], row.style.getPropertyValue('--row')]);
+      } finally {
+        tall.mockRestore();
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    expect(rowsAt(390)).toEqual([['t1', '0'], ['t2', '0']]);
+    expect(rowsAt(1280)).toEqual([['t1', '0'], ['t2', '1']]);
   });
 });

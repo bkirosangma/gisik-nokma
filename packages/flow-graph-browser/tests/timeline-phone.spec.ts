@@ -66,6 +66,8 @@ test('29.111 on a 390 px phone the view is portrait: time runs down, bars are 10
       first: [first.offsetLeft, first.offsetWidth],
       laneLeft: lane.offsetLeft - parseFloat(lane.style.getPropertyValue('--lane-offset')),
       laneColumns: lane.offsetWidth / 112,
+      // The surface is the gutter plus every lane, exactly: its right edge is the last lane's.
+      surfaceSlack: (document.querySelector('.gn-timeline__surface') as HTMLElement).offsetWidth - Math.max(...[...document.querySelectorAll<HTMLElement>('.gn-timeline__lane')].map((l) => l.offsetLeft + l.offsetWidth)),
     };
   });
   expect(box).not.toBeNull();
@@ -73,6 +75,7 @@ test('29.111 on a 390 px phone the view is portrait: time runs down, bars are 10
   expect(box!.first).toEqual([6, 100]);
   expect(box!.laneLeft).toBe(80);
   expect(Number.isInteger(box!.laneColumns) && box!.laneColumns >= 2).toBe(true);
+  expect(box!.surfaceSlack).toBe(0);
   // A key is a line down the column: every mounted bar at least a line tall shows its key INSIDE (the portrait packer reserved a
   // line for it, not the key's width), however short the bar is along time.
   const keys = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.gn-timeline__bar')].filter((b) => b.offsetHeight >= 16).map((b) => b.querySelector('.gn-timeline__key') !== null));
