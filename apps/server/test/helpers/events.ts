@@ -55,7 +55,7 @@ export function submittedWorkflowDefined(workspaceId: string): SubmittedEvent {
  * nothing to say about its rank.
  *
  * The entity id is a fresh ULID and the payload's `id` is the type key, exactly
- * as `foundingSequence` files the four built-ins: a non-membership `entity.id`
+ * as `foundingSequence` files the five built-ins: a non-membership `entity.id`
  * must match `ULID_REGEX` (`envelope.ts`), so the stable key can never be the
  * entity id. `proj_ticket_types` folds by the payload key, which is why that
  * table resolves last-definition-wins on the workspace stream position rather

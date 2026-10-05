@@ -41,6 +41,7 @@ import {
   ticketClosedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
+  ticketDecidedPayload,
   ticketDeletedPayload,
   ticketDiscardedPayload,
   ticketFieldSetPayload,
@@ -286,6 +287,9 @@ domainRegistry.register({
   entityKind: 'ticket',
   payloadSchema: ticketLinkRemovedPayload,
 });
+
+/** `ticket.decided` (Workflow and Timeline graphs DC-4): FOLDS into `outcome` and `passes`, so it is in `TICKET_EVENT_TYPES` and deliberately not backfilled below a snapshot. Whether the ticket is a Decision will be the engine's door (`checks/decision.ts`, wtg2 T6); until then no check refuses it on another type. */
+domainRegistry.register({ type: 'ticket.decided', version: 1, entityKind: 'ticket', payloadSchema: ticketDecidedPayload });
 
 /**
  * The draft pair (drafts spec §2.2): filed against the draft/ticket itself. Both FOLD (`TicketState.draft`),

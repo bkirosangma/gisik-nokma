@@ -90,6 +90,7 @@ export const NOT_A_REFERENCE_BODY: Readonly<Record<string, string>> = {
   'ticket.closed': 'no body',
   'ticket.reopened': 'no body',
   'ticket.ranked': 'a rank string',
+  'ticket.decided': "a Decision's outcome label and the ticket ids it asks the settle to close, not a document (wtg2 T5)",
   'ticket.discarded': 'the author\'s intent to erase a draft: empty, no document, and a draft wrote no row to remove (drafts T3, E1)',
   'ticket.deleted': 'trash: rows stay, reads hide them',
   'ticket.restored': 'trash: rows were never removed',

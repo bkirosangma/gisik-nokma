@@ -41,6 +41,7 @@ const VERBS: Readonly<Record<string, string>> = {
   'ticket.closed': 'closed',
   'ticket.reopened': 'reopened',
   'ticket.ranked': 'ranked',
+  'ticket.decided': 'decided', // workflow-timeline-graphs D-7: a draft cannot be decided
   'ticket.restored': 'restored',
   'ticket.workflow_rebound': 'moved to another workflow',
   'ticket.collaborator_added': 'shared with collaborators',

@@ -86,7 +86,7 @@ export async function checkTicketTypeDefined(
   // Name, icon and workflow binding of a built-in are an admin's to change
   // (Plan 8 decision 7); the RANK is the ladder itself. Custom types may
   // re-rank — the reparent cycle check is load-bearing for exactly that case
-  // (design decision 6) — but the four built-ins are the fixed points the ladder
+  // (design decision 6) — but the built-ins are the fixed points the ladder
   // hangs on, `DEEPEST_RANK` above all: it is 4 *because* the built-in
   // sub-task's rank is, so re-ranking `sub-task` to 3 releases every sub-task
   // from `hierarchy.deepest-rank-parent-required` while the builder still

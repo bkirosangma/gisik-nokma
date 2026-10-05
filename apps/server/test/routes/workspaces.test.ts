@@ -25,7 +25,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * The plan text's usability case reads `proj_ticket_types`. **That table does
  * not exist on this branch** — Plan 3 Chain B owns it (§8 position 3) — so the
- * four built-in type definitions are read from the LEDGER, which is where the
+ * five built-in type definitions are read from the LEDGER, which is where the
  * founding sequence actually put them. `proj_workflows` and `proj_memberships`
  * do exist and are read as themselves.
  *
@@ -114,7 +114,7 @@ describe('POST /v1/workspaces — the founding door', () => {
     expect(body).toEqual({ workspaceId: body.workspaceId });
   });
 
-  it('the founded workspace arrives usable — owner, a workflow, and all four built-in types bound to it', async () => {
+  it('the founded workspace arrives usable — owner, a workflow, and all five built-in types bound to it (29.134)', async () => {
     const { userId, headers } = await signedIn();
     const workspaceId = await found(headers);
 
@@ -146,12 +146,13 @@ describe('POST /v1/workspaces — the founding door', () => {
       'ticket-type.defined',
       'ticket-type.defined',
       'ticket-type.defined',
+      'ticket-type.defined',
       'membership.granted',
     ]);
     // `proj_ticket_types` does not exist on this branch, so the definitions are
     // read where the sequence put them.
-    const types = rows.slice(2, 6);
-    expect(types.map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task']);
+    const types = rows.slice(2, 7);
+    expect(types.map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task', 'decision']);
     for (const row of types) {
       expect(row.payload['workflowId']).toBe(workflowId);
     }
@@ -228,9 +229,9 @@ describe('POST /v1/workspaces — the founding door', () => {
 
     expect(res.statusCode).toBe(400);
     expect(await eventsAuthoredBy(attacker.userId)).toBe(0);
-    // The victim's workspace is untouched: still seven events, still one
+    // The victim's workspace is untouched: still eight events, still one
     // workspace-scope member, still the founder.
-    expect((await workspaceStream(victimWorkspace)).length).toBe(7);
+    expect((await workspaceStream(victimWorkspace)).length).toBe(8);
     const { rows } = await db.pool.query<{ user_id: string; role: string }>(
       `SELECT user_id, role FROM proj_memberships
         WHERE workspace_id = $1 AND scope_kind = 'workspace'`,
@@ -261,8 +262,8 @@ describe('POST /v1/workspaces — the founding door', () => {
     const second = await found(headers, 'Two');
 
     expect(first).not.toBe(second);
-    expect((await workspaceStream(first)).map((row) => row.type)).toHaveLength(7);
-    expect((await workspaceStream(second)).map((row) => row.type)).toHaveLength(7);
+    expect((await workspaceStream(first)).map((row) => row.type)).toHaveLength(8);
+    expect((await workspaceStream(second)).map((row) => row.type)).toHaveLength(8);
     expect((await workspaceStream(first))[0]?.payload['name']).toBe('One');
     expect((await workspaceStream(second))[0]?.payload['name']).toBe('Two');
   });
@@ -362,7 +363,7 @@ describe('POST /v1/workspaces — the founding door', () => {
     // context that can read the table is not the same thing as a table with the
     // type in it".
     const rows = await workspaceStream(workspaceId);
-    expect(rows.slice(2, 6).map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task']);
+    expect(rows.slice(2, 7).map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task', 'decision']);
 
     // And the create really resolved that type rather than committing past the
     // check: the projected row carries the workflow the founding sequence bound

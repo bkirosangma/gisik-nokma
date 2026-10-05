@@ -196,6 +196,16 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       const rank = str(payload, 'rank');
       return rank === null ? event.type : `Backlog rank set to ${rank}`;
     }
+    // A Decision's outcome (wtg2 T5, DC-4). The minimal arm the 3.183 census forces; T17 adds the pass suffix.
+    case 'ticket.decided': {
+      // Destructured rather than read through `str`: the views' import census (`board.test.tsx`) takes a quoted key
+      // spelled like the import keyword for a module specifier. Same reading as `str`: a non-empty string, else null.
+      const { outcome, from: seen } = payload;
+      const from = typeof seen === 'string' && seen !== '' ? seen : null;
+      if (outcome === null) return from === null ? 'Cleared the decision' : `Cleared the decision (was ${from})`;
+      if (typeof outcome !== 'string' || outcome === '') return event.type;
+      return from === null ? `Decided: ${outcome}` : `Decision revised: ${from} → ${outcome}`;
+    }
     // The flag events carry no payload at all — the envelope holds actor and
     // time, and the row beside this sentence already prints both.
     case 'ticket.closed':

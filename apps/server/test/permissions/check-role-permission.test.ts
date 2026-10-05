@@ -622,9 +622,9 @@ async function workspaceStream(workspaceId: string) {
 
 describe('the founding sequence — a new workspace can hold a ticket the moment it exists', () => {
   /**
-   * 6.24 — founding appends the default workflow, then the four built-in types naming it, then the founder’s owner grant — asserted in that ORDER, not merely as a set.
+   * 6.24 (amended by wtg2 T5, 29.134: five built-in types) — founding appends the default workflow, then the five built-in types naming it, then the founder’s owner grant — asserted in that ORDER, not merely as a set.
    */
-  it('appends the default workflow, then the four built-in types, then the grant — in that order', async () => {
+  it('appends the default workflow, then the five built-in types, then the grant — in that order', async () => {
     const workspaceId = newUlid();
     const founder = newUlid();
     expectCommitted(await ingestService().ingestBatch([founding(workspaceId, founder)]));
@@ -641,12 +641,13 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
       'ticket-type.defined',
       'ticket-type.defined',
       'ticket-type.defined',
+      'ticket-type.defined',
       'membership.granted',
     ]);
 
     const workflowId = rows[1]?.payload['id'] as string;
-    expect(rows.slice(2, 6).map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task']);
-    for (const row of rows.slice(2, 6)) {
+    expect(rows.slice(2, 7).map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task', 'decision']);
+    for (const row of rows.slice(2, 7)) {
       // Every type names the workflow defined one event earlier — the reason
       // the order cannot be rearranged for tidiness.
       expect(row.payload['workflowId']).toBe(workflowId);
@@ -696,14 +697,15 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     // Both of Plan 11's seed CLIs re-run by re-submitting the same
     // deterministic event id and counting `duplicate-event-id` as "already
     // present". Hooked to anything looser than `status === 'committed'`, every
-    // re-run would append a second workflow and four more type definitions,
+    // re-run would append a second workflow and five more type definitions,
     // and Plan 11's "re-run is a no-op" test would be a lie.
     // Mutation: change the hook's condition to `result.status !== 'refused'`
-    // and this goes from 7 to 13.
+    // and this goes from 8 to 15 (the duplicate is not appended; the second
+    // bootstrap is: a workflow, five types, a grant).
     const again = await ingest.ingestBatch([first]);
     expect(again[0]).toMatchObject({ status: 'invalid', code: 'duplicate-event-id' });
     expect((await workspaceStream(workspaceId)).length).toBe(after);
-    expect(after).toBe(7);
+    expect(after).toBe(8);
   });
 
   it('planted defect: a stranger cannot become owner by re-founding an existing workspace', async () => {
@@ -745,7 +747,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
       [workspaceId],
     );
     expect(rows).toEqual([{ user_id: founder, role: 'owner' }]);
-    expect((await workspaceStream(workspaceId)).length).toBe(7);
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
   });
 
   it('planted defect: "already exists" is a question about the WORKSPACE, not about one entity id', async () => {
@@ -754,7 +756,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     // entity — so a `proj_entity_heads` lookup keyed on the workspace id is a
     // near-miss that passes every other test in this file, where the two always
     // coincide. Here they do not, and the near-miss reports "no such workspace"
-    // for a workspace with a full seven-event ledger, re-opening the
+    // for a workspace with a full eight-event ledger, re-opening the
     // escalation.
     // Mutation: read `proj_entity_heads WHERE entity_kind = 'workspace' AND
     // entity_id = $1` instead of `events WHERE workspace_id = $1` in
@@ -767,7 +769,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
       entity: { kind: 'workspace', id: newUlid() },
     };
     expectCommitted(await ingest.ingestBatch([oddlyFiled]));
-    expect((await workspaceStream(workspaceId)).length).toBe(7);
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
 
     const stranger = newUlid();
     const attempt = founding(workspaceId, stranger);
@@ -785,7 +787,8 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     // carries its own condition: `workspaceSeq === 1`, which is the workspace's
     // own first event and cannot be forged by choosing a fresh entity.
     // Mutation: relax the condition to `result.status === 'committed'` alone
-    // (or to the per-entity `seq === 1`) and the stream below goes to 13.
+    // (or to the per-entity `seq === 1`) and the stream below grows by a second
+    // whole bootstrap.
     const ingest = ingestService();
     const workspaceId = newUlid();
     const founder = newUlid();
@@ -798,7 +801,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     // It COMMITS — the internal door trusts its caller, and this is an
     // ordinary append — but it founds nothing.
     expectCommitted(await ingest.ingestBatch([second]));
-    expect((await workspaceStream(workspaceId)).length).toBe(8);
+    expect((await workspaceStream(workspaceId)).length).toBe(9);
     const { rows } = await db.pool.query<{ user_id: string }>(
       `SELECT user_id FROM proj_memberships WHERE workspace_id = $1 AND scope_kind = 'workspace'`,
       [workspaceId],
@@ -834,7 +837,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
       rule: PERMISSION_ROLE_RULE,
       reason: WORKSPACE_ALREADY_FOUNDED_REASON,
     });
-    expect((await workspaceStream(workspaceId)).length).toBe(7);
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
 
     // POSITIVE CONTROL, in the same suite and the same door: the SAME person
     // founding a workspace that does not exist yet still commits, and still
@@ -843,7 +846,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     // path — passes this test.
     const fresh = newUlid();
     expectCommitted(await ingest.ingestClientBatch([founding(fresh, founder)], founder));
-    expect((await workspaceStream(fresh)).length).toBe(7);
+    expect((await workspaceStream(fresh)).length).toBe(8);
   });
 
   it('a REDELIVERED founding envelope — same event id, client door — is refused, not idempotently acked', async () => {
@@ -875,7 +878,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     const envelope = founding(workspaceId, founder);
 
     expectCommitted(await ingest.ingestClientBatch([envelope], founder));
-    expect((await workspaceStream(workspaceId)).length).toBe(7);
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
 
     // The redelivery. The founder now holds `owner`, so every earlier guard in
     // the gate passes on its own and the refusal can only be the new branch.
@@ -885,7 +888,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
       rule: PERMISSION_ROLE_RULE,
       reason: WORKSPACE_ALREADY_FOUNDED_REASON,
     });
-    expect((await workspaceStream(workspaceId)).length).toBe(7);
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
 
     // THE DISCRIMINATOR, and without it "refused" is equally consistent with an
     // id the gate never got to. The SAME envelope through the INTERNAL door —
@@ -898,7 +901,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
       status: 'invalid',
       code: 'duplicate-event-id',
     });
-    expect((await workspaceStream(workspaceId)).length).toBe(7);
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
   });
 
   it('founds through the CLIENT door too — the gate admits the founding and not the sequence', async () => {
@@ -917,6 +920,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     expect((await workspaceStream(workspaceId)).map((row) => row.type)).toEqual([
       'workspace.created',
       'workflow.defined',
+      'ticket-type.defined',
       'ticket-type.defined',
       'ticket-type.defined',
       'ticket-type.defined',

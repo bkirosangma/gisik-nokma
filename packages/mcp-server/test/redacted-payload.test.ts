@@ -35,3 +35,16 @@ describe("29.126 redactedPayload keeps a leads_to label on 'out' and drops it on
     }
   });
 });
+
+describe('29.137 redactedPayload and ticket.decided', () => {
+  it('29.137 keeps the outcome and from, phrases only a withheld closeStarted id; control: no closeStarted, untouched', () => {
+    const T = '01J9GTKB000000000000000000';
+    expect(redactedPayload('ticket.decided', 'e1', { outcome: 'Yes', from: 'No', closeStarted: [null, T] })).toEqual({
+      outcome: 'Yes',
+      from: 'No',
+      closeStarted: ["a ticket you can't see", T],
+    });
+    expect(redactedPayload('ticket.decided', 'e1', { outcome: null })).toEqual({ outcome: null });
+    expect(redactedPayload('ticket.decided', 'e1', { outcome: 'Yes', closeStarted: [T] })).toEqual({ outcome: 'Yes', closeStarted: [T] });
+  });
+});

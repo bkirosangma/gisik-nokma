@@ -57,6 +57,13 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       add('ticket', payload['targetId']);
       add('ticket', payload['from']);
       break;
+    case 'ticket.decided': {
+      // wtg2 T5 (PS-6): a decision naming an erased ticket among the started ones it asks the settle to close is refused
+      // at the door, the way a link to one is.
+      const ids = payload['closeStarted'];
+      if (Array.isArray(ids)) for (const id of ids) add('ticket', id);
+      break;
+    }
     case 'ticket.published':
       // Drafts T1: the publish names its project (the key query needs it); a purged project refuses it.
       add('project', payload['projectId']);

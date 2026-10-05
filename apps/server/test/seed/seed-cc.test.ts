@@ -161,12 +161,13 @@ describe('seedConvenienceCorner', () => {
     // its own record) + 23 dueDate + 18 transitions (the 5 `later` items sit in
     // the template's initial state and emit none).
     expect(report.committed).toBe(118);
-    // Plus the six the SERVER appends for itself: `bootstrapWorkspace`'s
-    // simple-Kanban workflow, the four built-in ticket types and the founder's
+    // Plus the seven the SERVER appends for itself: `bootstrapWorkspace`'s
+    // simple-Kanban workflow, the five built-in ticket types (the Decision
+    // since wtg2 T5) and the founder's
     // owner grant. They are not in the seed's results — the array is index-
     // aligned with what the seed submitted — but they are in the ledger, and
     // their presence is what makes the workspace usable at all.
-    expect(await eventCount()).toBe(118 + 6);
+    expect(await eventCount()).toBe(118 + 7);
     // THE DOOR, asserted directly and not as a side effect of a refusal. One
     // call, to the gated client door, carrying every one of the 118 events;
     // zero calls to the ungated internal door that was live on the same object

@@ -1,5 +1,5 @@
 /**
- * The sixteen-name icon vocabulary for ticket types — enough to name the four
+ * The seventeen-name icon vocabulary for ticket types — enough to name the five
  * built-in seeds and the kinds of work a small workspace invents beside them
  * (open question 12: growing it is one entry in the map below).
  *
@@ -10,7 +10,7 @@
  * stands: `lucide-react` appears in no package.json in the workspace and
  * `node_modules/lucide-react` does not exist, so the plan's import would not
  * resolve. Adding a runtime dependency to a workspace that carries no icon
- * library at all — for sixteen glyphs rendered at 16px — costs more than it
+ * library at all — for seventeen glyphs rendered at 16px — costs more than it
  * buys, so the vocabulary is stroke-path data and `TypeIcon` renders it. The
  * exported contract is unchanged: `TYPE_ICONS`, `TYPE_ICON_NAMES`,
  * `TypeIcon({ name, size? })`, unknown names falling back to the folder.
@@ -96,6 +96,8 @@ export const TYPE_ICONS = {
     { kind: 'path', d: 'M6 12h.01' },
     { kind: 'path', d: 'M18 12h.01' },
   ],
+  // The built-in Decision's glyph (workflow-timeline-graphs DC-1, wtg2 T5).
+  diamond: [{ kind: 'path', d: 'M12 2 22 12 12 22 2 12z' }],
 } as const satisfies Record<string, readonly IconShape[]>;
 
 export type TypeIconName = keyof typeof TYPE_ICONS;

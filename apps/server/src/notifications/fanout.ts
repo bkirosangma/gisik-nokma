@@ -413,6 +413,9 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           }
         } else if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
           // Spec A §7: links notify nobody. An explicit arm writes the decision where the next reader of this chain looks; case 27.007 pins that nobody is notified.
+        } else if (env.type === 'ticket.decided') {
+          // Outcomes notify nobody (workflow-timeline-graphs NT-4). An explicit arm writes the decision where the next
+          // reader of this chain looks; case 27.007's loop pins that nobody is notified.
         } else if (env.type === 'ticket.published') {
           await handlePublished(env);
         } else if (env.type === 'ticket.discarded') {

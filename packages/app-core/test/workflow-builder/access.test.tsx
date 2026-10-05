@@ -658,7 +658,7 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     // predicate's coverage to nothing.
     expect(requiredToggles).toHaveLength(2);
     const buttons = screen.queryAllByRole('button');
-    // Non-vacuity: sixteen icon choices ship at this sha, so an empty list here
+    // Non-vacuity: seventeen icon choices ship at this sha, so an empty list here
     // would mean the picker never rendered rather than that nothing escaped.
     expect(buttons.length).toBeGreaterThan(8);
     for (const button of buttons) {

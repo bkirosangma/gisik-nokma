@@ -75,7 +75,7 @@ export function createFakeDataSource(
     getNoteVersion: async () => null,
     getWorkflowDef: async () => null,
     // NOT `[]`, and this default is the one that is deliberately non-empty. Plan
-    // 4's bootstrap materialises the four built-ins as real
+    // 4's bootstrap materialises the built-ins as real
     // `ticket-type.defined` events in every workspace at creation, so a
     // workspace with no ticket types cannot exist and a fake answering one would
     // put every view under test in a world the product cannot produce. It is

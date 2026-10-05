@@ -59,7 +59,7 @@ export const INVALID_NAME_BODY = {
  * Founding still succeeds through the gate because `checkRolePermission` lets a
  * `workspace.created` past the membership check when the workspace has no
  * ledger — founding needs a session, not a membership — and the founding
- * SEQUENCE (the default workflow, the four built-in types, the founder's owner
+ * SEQUENCE (the default workflow, the five built-in types, the founder's owner
  * grant) is appended by `bootstrapWorkspace` through the internal door, from
  * inside the ingest path. This route knows nothing about that sequence,
  * deliberately: Plan 11's seed CLIs found workspaces through the same path, so

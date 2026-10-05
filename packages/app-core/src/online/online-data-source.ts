@@ -509,7 +509,7 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
      * "not a member of this workspace" (`door(..., 'members-only')`,
      * `builder-reads.ts:534`), and `[]` reads as "this workspace defines no
      * ticket types". That is not merely wrong, it is impossible — Plan 4's
-     * bootstrap materialises the four built-ins as real `ticket-type.defined`
+     * bootstrap materialises the built-ins as real `ticket-type.defined`
      * events in every workspace from its first moment — so an empty answer would
      * be a claim no real workspace could ever produce, handed to a New-ticket
      * dialog which would then offer NO types at all. Same argument as

@@ -454,7 +454,7 @@ describe('13.453 absence: the roster not yet read renders a sentence, never an i
 });
 
 describe('13.454 absence: a failed ticket-types read refuses, never falling back to the built-in ladder', () => {
-  it('says types could not be loaded rather than offering the four built-ins', async () => {
+  it('says types could not be loaded rather than offering the built-in ladder', async () => {
     render(
       <Providers
         services={servedBoard(twoCards, {
