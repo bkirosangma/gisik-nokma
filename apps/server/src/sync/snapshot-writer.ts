@@ -22,9 +22,12 @@ const DEFAULT_MIN_EVENTS = 20;
  * the DATABASE clock read immediately before that pass's due query, or `null` when the pass failed before reading it.
  * After the pass a stale row is not always a restate that failed. During a rolling deploy the OLD instance's writer
  * keeps running and writes rows stamped with the old fold (the column default), and one created after `dueAt` was
- * never in the pass's due set. So a stale row whose `created_at` is later than `dueAt` is still refused, and the next
- * interval pass restates it. One created at or before `dueAt` was due and its restate failed: it is served as stored
- * and named on `warn`, which the writer points at its own log. The clock is the database's because `created_at` is.
+ * never in the pass's due set. Its publish refresh also rewrites restated rows in place without a fold, and the
+ * database demotes that write (`write_token`, wtg2 fold-version writer token, ruling F): fold 1 and `created_at` the
+ * write's own clock, so the same rule meets it. So a stale row whose `created_at` is later than `dueAt` is still
+ * refused, and the next interval pass restates it. One created at or before `dueAt` was due and its restate failed: it
+ * is served as stored and named on `warn`, which the writer points at its own log. The clock is the database's
+ * because `created_at` is.
  *
  * In-process and per instance: each server process runs its own boot pass, and `deploy/do/app.yaml` runs one server
  * instance.

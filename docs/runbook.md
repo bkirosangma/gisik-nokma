@@ -53,6 +53,13 @@ done it logs `backfill proj_references: N entities in M ms` and writes a row to
 `projection_backfills`; later boots see that row and skip it. A crash or a redeploy mid-run
 leaves no row, and the next boot starts again from the beginning, which is safe. Nothing to run by hand.
 
+**Snapshot writes during the rolling overlap correct themselves (Workflow graph release).** The deploy that carries
+`1792100300000_snapshots-write-token.sql` adds a trigger that demotes any ticket snapshot the old instance rewrites while
+both run, so the bootstrap refuses it retryably and the next snapshot pass restates it. Nothing to run, and the trigger
+stays (it is harmless once every writer sets the token). Deploy at a low-traffic hour all the same: a workflow publish
+whose transaction straddles the new instance's boot pass can still leave one ticket's snapshot without its work periods
+until that ticket's next snapshot (the residual planner ruling F accepted).
+
 ## Deploy (first time)
 
 See `deploy/do/README.md`. DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving
