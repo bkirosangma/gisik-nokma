@@ -200,10 +200,17 @@ v="$3"; r="$FXP.b"
 echo $! >> "$FXP"
 SH
 chmod +x "$SB/perl"
-reset; rm -f "$FXP".b.*; obn=$(BASH_ENV="$fx/dbg.sh" REALPERL="$realperl" PATH="$SB:$PATH" RT_ALARM=20 rt --label benign --max-min 2 -- sh -c 'echo $$ >> "$FXP"; echo $$ > "$1.pid"; echo job-exits-7; exit 7' x "$FXP.b"); brc=$?; lbn=$(logtext)
-brec=$(cat "$FXP.b.rec" 2>/dev/null); batif=$(cat "$FXP.b.atif" 2>/dev/null)
+# benign RC LABEL: one benign-ordering run whose job exits RC; benign_kept RC LABEL: its rc kept, no CAP RACE / TIMEOUT, and the CONTROL.
+benign() { reset; rm -f "$FXP".b.*; obn=$(BASH_ENV="$fx/dbg.sh" REALPERL="$realperl" PATH="$SB:$PATH" RT_ALARM=20 rt --label "$2" --max-min 2 -- sh -c 'echo $$ >> "$FXP"; echo $$ > "$1.pid"; echo "job-exits-$2"; exit "$2"' x "$FXP.b" "$1"); brc=$?; lbn=$(logtext)
+  brec=$(cat "$FXP.b.rec" 2>/dev/null); batif=$(cat "$FXP.b.atif" 2>/dev/null); }
+benign_kept() { case "$brec" in "$1 /dev/null "*) false;; "$1 "*" gone 1"|"$1 "*" Z"*" 1") true;; *) false;; esac && [ "$batif" = "1 $1" ] && printf "%s\n" "$lbn" | grep -qx "job-exits-$1" && [ $brc -eq "$1" ] && printf "%s\n" "$obn" | grep -q "^FAIL run-tests $2 rc=$1 " && ! printf "%s\n%s" "$lbn" "$obn" | grep -q "CAP RACE\|TIMEOUT"; }
+benign 7 benign
 check "13.2355 the cap's USR1 landing just AFTER the verb's first wait returned the job's own 7 (the benign ordering) keeps that rc: rc 7 with 'FAIL … rc=7', no CAP RACE and no TIMEOUT in log or output (CONTROL: the verb held 7 when the worker sent the USR1 — its fd 2 off /dev/null, the job gone —, and at the if cap_fired was 1 with rc 7; the job's last line is in the log)" \
-  'case "$brec" in "7 /dev/null "*) false;; "7 "*" gone 1"|"7 "*" Z"*" 1") true;; *) false;; esac && [ "$batif" = "1 7" ] && printf "%s\n" "$lbn" | grep -qx job-exits-7 && [ $brc -eq 7 ] && printf "%s\n" "$obn" | grep -q "^FAIL run-tests benign rc=7 " && ! printf "%s\n%s" "$lbn" "$obn" | grep -q "CAP RACE\|TIMEOUT"'
+  'benign_kept 7 benign'
+# The rc test is an equality: one ABOVE 128+USR1 is a job's own rc too (a `-ge` in its place logs CAP RACE here and nowhere else).
+benign $((usr1rc + 1)) benign159
+check "13.2355 …and the same benign ordering with the job's own $((usr1rc + 1)), one above 128+USR1, keeps it with 'FAIL … rc=$((usr1rc + 1))', no CAP RACE and no TIMEOUT (the same CONTROL, with $((usr1rc + 1)))" \
+  'benign_kept $((usr1rc + 1)) benign159'
 # The arm's other clause: a job whose OWN rc is 128+USR1 under a cap that never fired logs nothing (with the rc test added, dropping
 # `cap_fired = 1` no longer shows on 13.2321's rc 0 / 1 / 124; only this rc reaches the arm).
 reset; oown=$(rt --label own158 --max-min 5 -- sh -c 'echo job-exits-own; exit "$1"' x "$usr1rc"); rown=$?; lown=$(logtext)
