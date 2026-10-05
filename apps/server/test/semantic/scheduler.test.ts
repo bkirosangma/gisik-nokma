@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
-import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
 import { buildApp } from '../../src/app.js';
 import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import { createAuth } from '../../src/auth/auth.js';
@@ -75,7 +75,7 @@ describe('27.491 the 200-change trigger', () => {
 
 describe('27.491 the nightly tick and the commit feed', () => {
   let db: TestDatabase;
-  const [A, B, C, D, E, F] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid(), newUlid()].sort() as [string, string, string, string, string, string];
+  const [A, B, C, D, E, F] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid(), newUlid()].sort() as [Ulid, Ulid, Ulid, Ulid, Ulid, Ulid];
   const actorId = newUlid();
   const lifecycle = (workspaceId: string, type: string): LedgerEvent =>
     makeCommitted({ workspaceId, actorId, entity: { kind: 'workspace', id: workspaceId }, type, payload: {} });

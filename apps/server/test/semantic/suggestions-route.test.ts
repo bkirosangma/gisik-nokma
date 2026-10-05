@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { domainRegistry, makeEnvelope, newUlid, type LedgerEvent, type SuggestionListResponse } from '@gisik-nokma/domain';
+import { domainRegistry, makeEnvelope, newUlid, type LedgerEvent, type SuggestionListResponse, type Ulid } from '@gisik-nokma/domain';
 import { checkPermission } from '../../src/permissions/check-permission.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
@@ -35,7 +35,7 @@ const NOT_FOUND = '{"error":"not_found"}';
 const UNKNOWN = { refused: true, rule: 'suggestion.unknown', reason: 'That suggestion does not exist or you cannot see it.' };
 const GUEST = { refused: true, rule: 'permission.concept', reason: 'Guests can read concepts but cannot change them.' };
 // S2's id sorts BEFORE S1's and its score is lower, so "highest score first" and "id order" disagree.
-const [S2, S1] = [newUlid(), newUlid()].sort() as [string, string];
+const [S2, S1] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
 const S3 = newUlid();
 const SF = newUlid(); // a suggestion of ANOTHER workspace
 const FW = newUlid();
@@ -208,7 +208,7 @@ describe('27.492 equal scores', () => {
     const [lowSig, highSig] = [...sets].sort((a, b) => (sig(a) < sig(b) ? -1 : 1)) as [ItemRef[], ItemRef[]];
     // Without the tie-break the two come in heap order or (through the unique index) signature order. Both are made
     // the REVERSE of id order: the higher id TB gets the lower signature and is written first.
-    const [TA, TB] = [newUlid(), newUlid()].sort() as [string, string];
+    const [TA, TB] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
     await cache(TB, lowSig, 0.3, 'i:mixed');
     await cache(TA, highSig, 0.3, 'i:mixed');
     const unsorted = await db.pool.query<{ id: string }>('SELECT id FROM sem_suggestions WHERE workspace_id = $1 AND score = $2::real', [world.WS, 0.3]);
