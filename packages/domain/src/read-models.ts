@@ -505,6 +505,11 @@ export type SearchResponse = {
   corrected?: string[];
 };
 
+/** Knowledge Graph spec D §5.1 `similar`: one nearest item, by meaning. `score` is cosine similarity (1 = same direction). */
+export type SimilarHit = { kind: 'ticket' | 'note'; id: string; title: string; score: number };
+/** `GET /v1/workspaces/:workspaceId/similar?item=<kind>:<id>&k=<1..20>`: the item asked about, and its nearest visible items. */
+export type SimilarResponse = { workspaceId: string; item: { kind: 'ticket' | 'note'; id: string }; hits: SimilarHit[] };
+
 export type MyWorkResponse = {
   workspaceId: string;
   groups: { open: TicketCard[]; active: TicketCard[]; terminal: TicketCard[] };

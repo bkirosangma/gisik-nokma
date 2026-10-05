@@ -1,4 +1,4 @@
-import type { FilterSpec, SearchHit } from '@gisik-nokma/domain';
+import type { FilterSpec, SearchHit, SimilarHit } from '@gisik-nokma/domain';
 import { foldSearchText } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
@@ -7,7 +7,7 @@ import { BLOCKED_STATES_CTE, compileFilterSpec } from './compile-filter.js';
 import { MEANING_CANDIDATES, MEANING_LIMIT, snippetOf } from './note-search.js';
 import { SqlParams } from './sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from './ticket-cards.js';
-import { LIVE_TICKET_WHERE, visibleTicketsWhere } from './visible-where.js';
+import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './visible-where.js';
 
 /**
  * Spec D §2 + §5.1: meaning search over tickets, from `search_item_chunks`. The nearest chunk PER TICKET
@@ -64,4 +64,60 @@ export async function meaningTicketHits(
     const matchedIn: SearchHit['matchedIn'] = row.item_kind === 'comment' ? 'comment' : row.chunk_index === 0 ? 'title' : 'description';
     return { card, snippet: snippetOf(row.chunk_text), matchedIn };
   });
+}
+
+/** Spec D §5.1's `similar k ≤ 20`. The route refuses a `k` outside 1–20; `similarItems` clamps to it as well. */
+export const SIMILAR_MAX_K = 20;
+
+/**
+ * Spec D §5.1 `similar`: the nearest visible items by meaning. An item's vector is the mean of its chunk vectors
+ * (§4.1 step 1); a ticket's includes its comments'. pgvector's `avg(vector)` is the mean, and `<=>` normalises,
+ * so the mean need not be re-normalised. The SOURCE's visibility is the route's question (404), not this one's,
+ * so `[]` (no chunks yet) and a 404 (not yours to see) stay different answers.
+ */
+export async function similarItems(
+  db: Queryable,
+  eff: EffectiveRole,
+  viewerId: string,
+  workspaceId: string,
+  item: { kind: 'ticket' | 'note'; id: string },
+  k: number,
+): Promise<SimilarHit[]> {
+  const sourceSql =
+    item.kind === 'ticket'
+      ? `SELECT avg(c.embedding)::text AS v FROM search_item_chunks c WHERE c.ticket_id = $1 AND c.workspace_id = $2 AND c.chunk_text <> ''`
+      : `SELECT avg(c.embedding)::text AS v FROM search_note_chunks c WHERE c.note_id = $1 AND c.workspace_id = $2`;
+  const source = await db.query<{ v: string | null }>(sourceSql, [item.id, workspaceId]);
+  const vector = source.rows[0]?.v ?? null;
+  if (vector === null) return [];
+  const params = new SqlParams();
+  const ws = params.add(workspaceId);
+  const src = params.add(vector);
+  const ticketVisible = visibleTicketsWhere(eff, viewerId, params);
+  const noteVisible = visibleNotesWhere(eff, viewerId, params);
+  const kindParam = params.add(item.kind);
+  const idParam = params.add(item.id);
+  const { rows } = await db.query<SimilarHit>(
+    `WITH items AS (
+       SELECT 'ticket'::text AS kind, t.ticket_id AS id, coalesce(t.fields->'title'->>'value', '') AS title, avg(c.embedding) AS v
+         FROM search_item_chunks c
+         JOIN proj_tickets t ON t.ticket_id = c.ticket_id
+         JOIN proj_visibility v ON v.ticket_id = t.ticket_id
+        WHERE c.workspace_id = ${ws} AND c.chunk_text <> '' AND ${LIVE_TICKET_WHERE} AND ${ticketVisible}
+          AND (c.item_kind = 'ticket' OR EXISTS (SELECT 1 FROM proj_ticket_comments k WHERE k.comment_id = c.item_id AND k.deleted_at IS NULL))
+        GROUP BY t.ticket_id, t.fields
+       UNION ALL
+       SELECT 'note'::text, n.note_id, n.title, avg(c.embedding)
+         FROM search_note_chunks c JOIN proj_notes n ON n.note_id = c.note_id
+        WHERE c.workspace_id = ${ws} AND n.deleted = FALSE AND ${noteVisible}
+        GROUP BY n.note_id, n.title
+     )
+     SELECT kind, id, title, 1 - (v <=> ${src}::vector) AS score
+       FROM items
+      WHERE NOT (kind = ${kindParam} AND id = ${idParam})
+      ORDER BY v <=> ${src}::vector, kind, id
+      LIMIT ${params.add(Math.min(Math.max(k, 1), SIMILAR_MAX_K))}`,
+    params.toArray(),
+  );
+  return rows.map((row) => ({ ...row, score: Number(row.score) }));
 }

@@ -24,6 +24,7 @@ import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerGroupRoutes } from './routes/groups.js';
+import { registerSimilarRoutes } from './routes/similar.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
@@ -1025,6 +1026,9 @@ export function buildApp(
   registerBuilderReadRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
   // The project-group tree (prefixes and groups Task 6): one flat read, owner/admin/member only.
   registerGroupRoutes(app, { pool: deps.pool }, requireSession);
+  // Knowledge Graph spec D §5.1 `similar` (KG-D T2): the nearest visible tickets and notes to one item by
+  // meaning, read from the embed worker's chunk caches. Same door as the group tree: a member read, 404 otherwise.
+  registerSimilarRoutes(app, { pool: deps.pool }, requireSession);
   // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
   // here. Board, list and the builder surface all take their scope from a path
   // parameter the door resolves; this one spans a whole workspace, so
