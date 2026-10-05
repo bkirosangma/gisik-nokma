@@ -106,15 +106,17 @@ export const BOOTSTRAP_BACKFILL_TYPES = [
   'claim.contested_resolved',
 ] as const;
 
-/**
- * A ticket's stored snapshot was written by an older fold and this process's boot restate pass has not settled yet
- * (`bootRestate` in `snapshot-writer.ts`; wtg2 fold-version bootstrap, ruling D). Both bootstrap routes answer it with
- * a 503, never the 404: the client's transport maps only a 404 to `TicketPullNotFound`, which drops an owed pull, and
- * any other failure leaves the pull owed for the next catch-up (`http-transport.ts`, `bootstrapTicket`).
- */
 /** The 503 body both bootstrap routes send for `SnapshotRestatePending`. */
 export const SNAPSHOT_RESTATE_PENDING = 'snapshot_restate_pending';
 
+/**
+ * Thrown by `bootstrapTicket`: a ticket's stored snapshot was written by an older fold and this process's boot
+ * restate pass has not settled yet (`bootRestate` in `snapshot-writer.ts`; wtg2 fold-version bootstrap, ruling D).
+ * Both bootstrap routes answer it with a 503, never the 404: the client's transport maps only a 404 to
+ * `TicketPullNotFound`, which drops an owed pull, and any other failure leaves the pull owed for the next catch-up
+ * (`http-transport.ts`, `bootstrapTicket`). Any OTHER error in those routes still reaches the app's error handler
+ * (a 500 and an alert; 29.405).
+ */
 export class SnapshotRestatePending extends Error {
   constructor(readonly ticketId: string) {
     super(`ticket ${ticketId}: its snapshot awaits the boot restate pass`);
@@ -233,8 +235,8 @@ export type BootstrapResponse = {
  * row throws `SnapshotRestatePending`, which both routes answer with a 503 and
  * the client's drain keeps owed; nothing is written on this read. After the pass
  * it can only be a restate that failed: it is served as stored and named on
- * `bootRestate.warn`. A row with no snapshot, at the current fold or from a
- * later one is served as before.
+ * `bootRestate.warn`. A ticket with no snapshot, or one whose row is at the
+ * current fold or from a later one, is served as before.
  */
 export async function bootstrapTicket(client: PoolClient, ticketId: string, sees: TargetSight): Promise<BootstrapTicket> {
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
