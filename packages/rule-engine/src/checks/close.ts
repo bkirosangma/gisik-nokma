@@ -38,7 +38,7 @@ import { ACCEPT, refuse } from './refusals.js';
  * And closing a Decision needs its outcome (wtg2 T6, spec DC-5): a Decision with at least one branch (an outgoing
  * `leads_to`) and no outcome is refused `decision.outcome-required`, after the open-child count, through
  * `decisionOutcomeRequired` (`checks/decision.ts`), the same function the transition door and the client mirror call.
- * The auto-close sweep's SELECT mirrors this refusal too.
+ * The flow's `branch-not-taken` close is exempt (PS-5). The auto-close sweep's SELECT mirrors this refusal too.
  *
  * Same shape as every other check's entity-kind guard (`transition.ts:42-48`,
  * `workflow-rebind.ts:44-50`, `fields.ts:90-96`): a misfiled kind is a
@@ -87,8 +87,9 @@ export async function checkTicketClosed(env: EventEnvelope, ctx: EngineContext):
     return refuse(REFUSAL_RULES.parentTerminal,
       `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`);
   }
-  // DC-5 (wtg2 T6): a Decision with branches and no outcome is not closed either, after the open-child count.
-  return decisionOutcomeRequired(ticket) ?? ACCEPT;
+  // DC-5 (wtg2 T6): a Decision with branches and no outcome is not closed either, after the open-child count. The
+  // flow's "Not taken" close is exempt (PS-5, 29.205); `flowCauseForgery` above has already proved its actor.
+  return decisionOutcomeRequired(ticket, parsed.data.cause?.kind === 'branch-not-taken') ?? ACCEPT;
 }
 
 export async function checkTicketReopened(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {

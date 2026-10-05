@@ -3878,7 +3878,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 - ⚙️ **Decision rules** (wtg2 T6; `packages/rule-engine/src/checks/decision.ts`, `apps/server/src/auto-close/sweep.ts`, `packages/app-core/src/precheck.ts`) — an outcome must be one of the branch labels and current; a Decision with branches cannot be finished or auto-closed without one, and the client precheck previews the same refusals (deferring when a branch may be hidden). Cases 29.138-29.142.
 <!-- wtg-part2-model T7 bullet -->
 <!-- wtg-part2-model T8 bullet -->
-- ⚙️ **Flow causes and the flow actor** (wtg2 T8; `packages/domain/src/flow/causes.ts`, `packages/rule-engine/src/checks/flow-cause.ts`) — led-to, reopened-by-flow and branch-not-taken causes; only the reserved Flow actor may write them (`cause.forged`, previewed by the client precheck, `packages/app-core/src/precheck.ts`); they unlock the loop-reset and not-taken moves no workflow declares. Cases 29.200-29.209, 29.361-29.363.
+- ⚙️ **Flow causes and the flow actor** (wtg2 T8; `packages/domain/src/flow/causes.ts`, `packages/rule-engine/src/checks/flow-cause.ts`) — led-to, reopened-by-flow and branch-not-taken causes; only the reserved Flow actor may write them (`cause.forged`, previewed by the client precheck, `packages/app-core/src/precheck.ts`); they unlock the loop-reset and not-taken moves no workflow declares, and `branch-not-taken` alone lifts a Decision's outcome rule (DC-5) at the transition and close doors. Cases 29.200-29.209, 29.361-29.363.
 <!-- wtg-part2-model T9 bullet -->
 <!-- wtg-part2-model T10 bullet -->
 <!-- wtg-part2-model T11 bullet -->
