@@ -279,7 +279,7 @@ describe('POST /v1/workspaces — the founding door', () => {
     // workspace, founded or not. Task 12 wired it, and the reserved text — "a
     // founded workspace accepts a ticket immediately" — is now the true one.
     //
-    // The discriminator survives the inversion, pointing the other way: the four
+    // The discriminator survives the inversion, pointing the other way: the five
     // type definitions in the ledger are the half Plan 4's founding sequence
     // owns, and the resolution of `task` against them is the half Task 12 owns.
     // A commit here needs both.

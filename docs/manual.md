@@ -45,7 +45,7 @@ that what you read here matches what you see.
 | **Workspace** | Your whole business. "Marak Design", "Robert's Plumbing". Everybody and everything sits inside one. |
 | **Project** | A bucket of work inside a workspace. "Shop operations". "Residential repairs". |
 | **Ticket** | One piece of work. |
-| **Epic / Story / Task / Sub-task** | The four built-in kinds of ticket, biggest to smallest. An admin can rename these. |
+| **Epic / Story / Task / Sub-task / Decision** | The five built-in kinds of ticket. Epic is the biggest and Sub-task the smallest; a Decision sits at the same level as a Task and stands for a choice between branches of work. An admin can rename these. |
 | **Workflow** | Your set of states that work moves through, and the allowed moves between them. |
 | **State** | One step in a workflow. Each state is a column on the board. |
 | **Transition** | One allowed move from one state to another. |
@@ -227,8 +227,8 @@ forgets your choice and follows your device, including its automatic day/night s
 You become the **owner** of that workspace. It also sets you up with:
 
 - A basic set of states for work to move through — a simple to-do / doing / done arrangement.
-- Four built-in kinds of ticket: **epic**, **story**, **task** and **sub-task**. Those names come from
-  software teams and may mean nothing to you. An admin can rename them (§12).
+- Five built-in kinds of ticket: **epic**, **story**, **task**, **sub-task** and **decision**. Those names
+  come from software teams and may mean nothing to you. An admin can rename them (§12).
 
 ### The project problem
 
@@ -1593,7 +1593,7 @@ has, and a **Built-in** badge on the four that came with the workspace.
 
 Each type you made yourself has a **Reorder** button opening a small menu — **Move up**, **Move down**
 and **Move to top** (the top of your own types). An item that cannot apply is greyed out and says why in
-words. The four built-in types have no Reorder button: they keep their rank, and your own types are
+words. The five built-in types have no Reorder button: they keep their rank, and your own types are
 ordered among themselves.
 
 ### Making a new type
@@ -1615,9 +1615,9 @@ you the consequence at the moment you are choosing.
 it is refused. Same if you try to give options to a field that is not a dropdown, or reuse a field
 name.
 
-### The built-in four
+### The built-in five
 
-You **can** rename epic, story, task and sub-task, change their icons, and change which workflow they
+You **can** rename epic, story, task, sub-task and decision, change their icons, and change which workflow they
 use. Do it — "Epic" and "Story" mean nothing in a plumbing business or a design studio.
 
 What you **cannot** change is where a built-in type sits in the hierarchy. The rank boxes are locked

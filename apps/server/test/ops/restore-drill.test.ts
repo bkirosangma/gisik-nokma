@@ -325,7 +325,7 @@ describe.skipIf(!DRILL_RUNNABLE)('the restore drill — disaster recovery throug
   /**
    * How many rows the seed ACTUALLY committed, measured against the source
    * database rather than assumed from the three submissions: ingest derives a
-   * companion set per workspace (a workflow, four ticket types, an owner
+   * companion set per workspace (a workflow, five ticket types, an owner
    * membership), so three `workspace.created` submissions are not three events
    * — case 13.13 measured the same surprise for the ledger export. Captured
    * here so the restored count is compared against a real number, and asserted
