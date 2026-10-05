@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,8 +13,8 @@ import { stubServices } from './helpers/stub-services.js';
 
 /**
  * 27.625–27.628 (Knowledge Graph spec E §2.2, decisions D-E4/D-E8): `/` is Home. Task 3 adds the numbers' read through
- * `HomeScreen` (27.626's 401, 27.628's `getHome` spy, 27.637–27.638's HomeBody arms); the tiles themselves are
- * `home-numbers.test.tsx`'s. This file renders `HomeScreen`
+ * `HomeScreen` (27.626's 401, 27.628's `getHome` spy, 27.637–27.639's HomeBody arms: its `failed`, its Retry and its
+ * press); the tiles themselves are `home-numbers.test.tsx`'s. This file renders `HomeScreen`
  * with the REAL `Providers` and a stub `DataSource` (the seam `page-refusals.test.tsx` uses), the nav's `auth-client`
  * mock made mutable so the ordering case can land the session AFTER the workspaces have answered.
  */
@@ -249,7 +250,7 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
   });
 });
 
-describe('27.637–27.638 the numbers through HomeScreen (Task 3)', () => {
+describe('27.637–27.639 the numbers through HomeScreen (Task 3)', () => {
   // H9a (p11)
   it('27.637 through HomeScreen: a pending getHome is the skeleton, not the failure', async () => {
     renderHome({
@@ -300,5 +301,45 @@ describe('27.637–27.638 the numbers through HomeScreen (Task 3)', () => {
     const labels = [...document.querySelectorAll('.gn-home__number-label')].map((el) => el.textContent);
     expect(labels[3]).toBe('Due in 3 days');
     expect([...document.querySelectorAll('.gn-home__number-value')].map((el) => el.textContent)).toEqual(['–', '–', '–', '–', '–', '–']);
+  });
+
+  // FIX 1 F1 (reviewer B's RB4): `HomeBody` hands the read's own `reload` to Retry. 27.638 in `home-numbers.test.tsx`
+  // wires `onRetry` itself, so only this leg reaches `HomeBody`'s prop.
+  it('27.638 through HomeScreen: Retry after a failed read asks again and draws the numbers', async () => {
+    const user = userEvent.setup();
+    let calls = 0;
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_f1' })],
+      getHome: async () => {
+        calls += 1;
+        if (calls === 1) throw new HttpError(500, '/v1/workspaces/ws_f1/home');
+        return { ...HOME, workspaceId: 'ws_f1' };
+      },
+    });
+    expect(await screen.findByText("Couldn't load the numbers.")).toBeInTheDocument();
+    expect(calls).toBe(1); // nothing asks again by itself: the second call below is the click's
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '12 Tickets' })).toBeEnabled());
+    expect(calls).toBe(2);
+    expect(screen.queryByText("Couldn't load the numbers.")).not.toBeInTheDocument();
+  });
+
+  // FIX 1 F2/F3 (reviewer B's RB5, RB6): `HomeBody` hands the highlight's `toggle` to the tiles and feeds the hook the
+  // read's data. 27.639's `Harness` in `home-numbers.test.tsx` wires both itself. Read synchronously after each click:
+  // with the hook fed `null`, its clear effect runs inside the click's act, so a wait would hide nothing.
+  it('27.639 through HomeScreen: a press lights the tile; control: pressing it again clears', async () => {
+    const user = userEvent.setup();
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_f2' })],
+      getHome: async () => ({ ...HOME, workspaceId: 'ws_f2' }),
+    });
+    const pastDue = await screen.findByRole('button', { name: '3 Past due' });
+    // The six tiles only: `AppNav` draws buttons of its own.
+    const pressed = () => [...document.querySelectorAll('button.gn-home__number')].map((b) => b.getAttribute('aria-pressed'));
+    expect(pressed()).toEqual(['false', 'false', 'false', 'false', 'false', 'false']);
+    await user.click(pastDue);
+    expect(pressed()).toEqual(['false', 'false', 'true', 'false', 'false', 'false']);
+    await user.click(pastDue);
+    expect(pressed()).toEqual(['false', 'false', 'false', 'false', 'false', 'false']);
   });
 });
