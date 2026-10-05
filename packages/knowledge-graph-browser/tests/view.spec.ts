@@ -2,8 +2,8 @@ import { devices, expect, test, type Page } from '@playwright/test';
 import { waitStill } from './helpers.js';
 
 /*
- * The VIEW on the real Sigma adapter (KG-C T7; cases 27.320 browser half, 27.325, 27.327–27.329): `harness/main.tsx`
- * renders `KnowledgeGraph` on the fixture, centred on GN-142, with the probe on. Every wait is for the camera to settle.
+ * The VIEW on the real Sigma adapter (KG-C T7; cases 27.320 browser half, 27.325, 27.327–27.329, 27.367 browser half, 27.368):
+ * `harness/main.tsx` renders `KnowledgeGraph` on the fixture, centred on GN-142, with the probe on. Every wait is for the camera to settle.
  */
 type Pt = { x: number; y: number };
 const errors: string[] = [];
@@ -30,6 +30,22 @@ const box = (page: Page, sel: string) => page.evaluate((s) => {
   const r = document.querySelector(s)!.getBoundingClientRect();
   return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
 }, sel);
+/** The canvas top while ring 1 is still out (`loading`: the skeleton is in the DOM), and again once the graph is still. */
+async function canvasTops(page: Page, query: string): Promise<{ loading: boolean; before: number; after: number }> {
+  await page.goto(`/index.html${query}`);
+  await page.waitForSelector('.gn-kg__canvas');
+  const loading = await page.evaluate(() => document.querySelector('.gn-kg__skeleton') !== null);
+  const before = (await box(page, '.gn-kg__canvas')).top;
+  await page.waitForFunction(() => window.__kgView?.probe !== null && window.__kgView?.zones !== null, null, { timeout: 60_000 });
+  await stillView(page);
+  return { loading, before, after: (await box(page, '.gn-kg__canvas')).top };
+}
+const noteSlot = (page: Page) => page.evaluate(() => {
+  const n = document.querySelector('.gn-kg__scope-note');
+  if (n === null) return null;
+  const cs = getComputedStyle(n);
+  return { text: n.textContent, height: n.getBoundingClientRect().height, bg: cs.backgroundColor, display: cs.display };
+});
 
 test('27.320 browser: the canvas keeps its box from the first paint (the skeleton still showing) to the settled graph: no layout shift', async ({ page }) => {
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -44,6 +60,50 @@ test('27.320 browser: the canvas keeps its box from the first paint (the skeleto
   expect(await page.evaluate(() => document.querySelector('.gn-kg__skeleton'))).toBeNull();
   expect(await box(page, '.gn-kg__canvas')).toEqual(before);
 });
+
+test('27.367 the scope note keeps a one-line slot: outside the scope the canvas does not move when the note arrives after ring 1; in scope the slot is there, empty, untinted and as tall; control: the note is 27.317\'s sentence', async ({ page }) => {
+  page.on('pageerror', (e) => errors.push(String(e)));
+  // ?ws=st leaves GN-142's own workspace out: the note can only come with ring 1, which carries the centre
+  const out = await canvasTops(page, '?ws=st&delay=500');
+  expect(out.loading).toBe(true); // read while ring 1 is still out, or both reads land after the note
+  const note = await noteSlot(page);
+  expect(note!.text).toBe('GN-142 is outside the projects you picked. It stays in the middle, and its links follow your scope.');
+  await expect(page.locator('.gn-kg__scope-note')).toBeVisible();
+  expect(out.after).toBe(out.before);
+  // in scope: the same band, reserved and empty, before and after ring 1
+  const inScope = await canvasTops(page, '?delay=500');
+  expect(inScope.loading).toBe(true);
+  expect(inScope.after).toBe(inScope.before);
+  expect(await noteSlot(page)).toEqual({ text: '', height: note!.height, bg: 'rgba(0, 0, 0, 0)', display: 'block' });
+});
+
+/** The controls row's lines (its items grouped by vertical centre: a flex line centres its items) and where the count sits. */
+const countPlace = (page: Page) => page.evaluate(() => {
+  const row = document.querySelector('.gn-kg__bar > .gn-kg__row')!;
+  const count = row.querySelector('.gn-kg__count')!;
+  const mid = (e: Element) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; };
+  const mids = [...row.children].map(mid).sort((a, b) => a - b);
+  const lines = mids.filter((m, i) => i === 0 || m - mids[i - 1]! > 2).length;
+  const onCountLine = [...row.children].filter((c) => Math.abs(mid(c) - mid(count)) <= 2).length;
+  const range = document.createRange();
+  range.selectNodeContents(count);
+  return { text: count.textContent, lines, last: mid(count) >= mids[mids.length - 1]! - 2, onCountLine, textRight: range.getBoundingClientRect().right, rowRight: row.getBoundingClientRect().right };
+});
+
+// planner 22:37 (B): the mockup's own count sits alone on the row's last line at these widths (its 381 px ticket count cannot follow the controls)
+for (const [width, lines] of [[1280, 2], [768, 3]] as const) {
+  test(`27.368 at ${width} px the count sits alone on the controls row's last line, right-aligned, the row ${lines} lines as the mockup's; the canvas does not move after ring 1`, async ({ page }) => {
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.setViewportSize({ width, height: 900 });
+    const t = await canvasTops(page, '?delay=500');
+    expect(t.loading).toBe(true);
+    expect(t.after).toBe(t.before);
+    const c = await countPlace(page);
+    expect(c.text).toBe('20 items within 2 hops, 8 more in the fog (2 outside the scope)'); // the mockup's own ticket count
+    expect({ lines: c.lines, last: c.last, onCountLine: c.onCountLine }).toEqual({ lines, last: true, onCountLine: 1 });
+    expect(Math.abs(c.textRight - c.rowRight)).toBeLessThanOrEqual(1);
+  });
+}
 
 const TAGS = ['tag|concept:c1|ticket:t142', 'tag|concept:c1|ticket:t151', 'tag|concept:c1|ticket:t139', 'tag|concept:c1|note:n2'];
 const conceptsDrawn = (page: Page) => page.evaluate((tags) => {
@@ -93,16 +153,18 @@ test('27.327 Home\'s highlight: lit items 1, the rest 0.25, edges 0.12, and a ho
   expect((await opacities(page)).t118).toBe(0.32);
 });
 
+// Pixel 7 minus defaultBrowserType, which a describe may not set (the project's SwiftShader Chromium stays)
+const { defaultBrowserType: _browser, ...pixel7 } = devices['Pixel 7'];
+
 test.describe('27.328 the phone (§5)', () => {
-  // Pixel 7 minus defaultBrowserType, which a describe may not set (the project's SwiftShader Chromium stays)
-  const { defaultBrowserType: _browser, ...pixel7 } = devices['Pixel 7'];
   test.use(pixel7);
   /** GN-142's ring 1 in the fixture's `gn` scope, read off its raw edge table (roles/mut-out/kg-c-t7-view/oracle.py). */
   const RING1 = ['concept:c1', 'note:n1', 'note:n2', 'person:pA', 'person:pT', 'ticket:t118', 'ticket:t133', 'ticket:t139', 'ticket:t149', 'ticket:t151', 'ticket:t160'];
 
   test('27.328 no sideways scroll, no Hops, the bar folds into Scope and links, N linked, one hop clear, the canvas keeps pinches, and a hop-1 label is a 32 px target', async ({ page }) => {
     await openView(page, '?config=phone');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    // the device's CSS width, a literal: under isMobile emulation `innerWidth` widens to the content, so it can never fail
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(412);
     await expect(page.getByRole('tablist', { name: 'Hops' })).toHaveCount(0);
     expect(await page.evaluate(() => document.querySelector('details.gn-kg__fold > summary')?.textContent?.startsWith('Scope and links'))).toBe(true);
     await expect(page.locator('.gn-kg__count')).toHaveText(/^\d+ linked/);
@@ -134,7 +196,38 @@ test.describe('27.328 the phone (§5)', () => {
     // the floor, so the floor alone cannot tell the two apart and the card's own height is pinned)
     expect(run).toBeGreaterThanOrEqual(38);
     expect(run).toBeLessThanOrEqual(40);
+    // the fold open: its pickers and chips still fit the screen
+    await page.locator('details.gn-kg__fold > summary').click();
+    await expect(page.locator('details.gn-kg__fold')).toHaveAttribute('open', '');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(412);
   });
+});
+
+test.describe('27.367 the note slot on a phone', () => {
+  test.use(pixel7);
+  test('27.367 phone: the empty note slot is shown and one line high (never collapsed), so the canvas does not move after ring 1', async ({ page }) => {
+    page.on('pageerror', (e) => errors.push(String(e)));
+    const t = await canvasTops(page, '?config=phone&delay=500');
+    expect(t.loading).toBe(true);
+    expect(t.after).toBe(t.before);
+    // 16 px of line + 6 px padding above and below, from the CSS alone (jsdom loads no stylesheet)
+    expect(await noteSlot(page)).toEqual({ text: '', height: 28, bg: 'rgba(0, 0, 0, 0)', display: 'block' });
+  });
+});
+
+test('27.328 a plain 360 px screen with both workspaces chosen (the longest summary): no sideways scroll and the fold inside the screen, closed and open', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await openView(page, '?config=phone&ws=gn,st');
+  const fit = () => page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, fold: document.querySelector('details.gn-kg__fold')!.getBoundingClientRect().right }));
+  expect(await page.evaluate(() => document.querySelector('.gn-kg__fold-summary')!.textContent)).toBe('Gisik Nokma, Studio, all projects; 8 of 8 link types');
+  const closed = await fit();
+  expect(closed.scroll).toBeLessThanOrEqual(360);
+  expect(closed.fold).toBeLessThanOrEqual(360);
+  await page.locator('details.gn-kg__fold > summary').click();
+  await expect(page.locator('details.gn-kg__fold')).toHaveAttribute('open', '');
+  const open = await fit();
+  expect(open.scroll).toBeLessThanOrEqual(360);
+  expect(open.fold).toBeLessThanOrEqual(360);
 });
 
 test('27.328 control: the desktop page shows the Hops control', async ({ page }) => {
@@ -145,10 +238,21 @@ test('27.328 control: the desktop page shows the Hops control', async ({ page })
 test('27.329 the edge tooltip: the sentence inside the canvas, clamped at the right edge, gone on leaving; control: it follows the pointer', async ({ page }) => {
   await openView(page);
   const tip = page.getByRole('tooltip');
-  const along = async (t: number) => {
-    const a = await pointOf(page, 'ticket:t133'), b = await pointOf(page, 'ticket:t142');
+  const alongEdge = async (from: string, to: string, t: number) => {
+    const a = await pointOf(page, from), b = await pointOf(page, to);
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
   };
+  const along = (t: number) => alongEdge('ticket:t133', 'ticket:t142', t);
+  /** Pans the edge's midpoint to page x `target` (the camera centre moves by the same px). */
+  const panEdgeTo = (from: string, to: string, target: number) => page.evaluate(({ from, to, target }) => {
+    const k = window.__kgView, p = k.probe!;
+    const s = document.querySelector('.gn-kg__stage')!.getBoundingClientRect();
+    const a = p.viewportOf(from)!, b = p.viewportOf(to)!;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const centre = { x: s.width / 2 + (mid.x - (target - s.left)), y: s.height / 2 };
+    const n = p.normalise(p.graphAt(centre.x, centre.y));
+    k.renderer!.setCamera({ ...p.camera(), x: n.x, y: n.y }, { instant: true });
+  }, { from, to, target });
   const m = await along(0.5);
   await page.mouse.move(m.x, m.y);
   await expect(tip).toHaveText('GN-133 blocks GN-142');
@@ -175,15 +279,7 @@ test('27.329 the edge tooltip: the sentence inside the canvas, clamped at the ri
   await page.mouse.move(m.x, canvas.top - 4);
   await expect(tip).toHaveCount(0);
   // pan the edge's midpoint to 20 px inside the canvas's right edge (camera centre moved by the same px), then hover it there
-  await page.evaluate(({ target }) => {
-    const k = window.__kgView, p = k.probe!;
-    const s = document.querySelector('.gn-kg__stage')!.getBoundingClientRect();
-    const a = p.viewportOf('ticket:t133')!, b = p.viewportOf('ticket:t142')!;
-    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    const centre = { x: s.width / 2 + (mid.x - (target - s.left)), y: s.height / 2 };
-    const n = p.normalise(p.graphAt(centre.x, centre.y));
-    k.renderer!.setCamera({ ...p.camera(), x: n.x, y: n.y }, { instant: true });
-  }, { target: canvas.right - 20 });
+  await panEdgeTo('ticket:t133', 'ticket:t142', canvas.right - 20);
   await stillView(page);
   const near = await along(0.5);
   expect(near.x).toBeGreaterThan(canvas.right - 30); // the precondition: the hover point IS near the right edge
@@ -192,4 +288,19 @@ test('27.329 the edge tooltip: the sentence inside the canvas, clamped at the ri
   await expect(tip).toHaveText('GN-133 blocks GN-142');
   const t3 = await box(page, '.gn-kg__tip');
   expect(t3.right).toBeLessThanOrEqual(canvas.right - 8);
+  // a sentence past the 320 px cap (the tip's max-width, 20rem): near the right edge the clamp uses the CAPPED width, exactly.
+  // The view measures against the mount (`.gn-kg__mount`, the image inside the canvas), so the expected left is read off it.
+  await panEdgeTo('concept:c1', 'ticket:t142', canvas.right - 20);
+  await stillView(page);
+  const far = await alongEdge('concept:c1', 'ticket:t142', 0.5);
+  const mount = await page.evaluate(() => {
+    const m = document.querySelector('.gn-kg__mount') as HTMLElement;
+    return { left: m.getBoundingClientRect().left, width: m.clientWidth };
+  });
+  expect(far.x - mount.left).toBeGreaterThan(mount.width - 342); // the precondition: x + 14 passes the clamp at width 320
+  await page.mouse.move(far.x, far.y);
+  await expect(tip).toHaveText('Scroll position on phone sheets includes GN-142'); // 47 characters: an estimate of 349 px, capped at 320
+  const left = await page.evaluate(() => Number(/translate\(([-\d.]+)px/.exec((document.querySelector('.gn-kg__tip') as HTMLElement).style.transform)![1]));
+  expect(left).toBe(mount.width - 320 - 8);
+  expect((await box(page, '.gn-kg__tip')).right).toBeLessThanOrEqual(canvas.right);
 });

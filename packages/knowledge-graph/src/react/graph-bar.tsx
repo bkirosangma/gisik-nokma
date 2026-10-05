@@ -1,5 +1,4 @@
 'use client';
-import type { ReactNode } from 'react';
 import { GROUP_LABEL, type GraphGroup } from '@gisik-nokma/domain';
 import { SegmentedControl, Select } from '@gisik-nokma/ui';
 import type { HopChoice, ScopeChoices } from './types.js';
@@ -93,11 +92,14 @@ export function GraphBar(props: GraphBarProps) {
       {props.count}
     </p>
   );
-  const note: ReactNode = props.scopeNote === null ? null : <p className="gn-kg__scope-note">{props.scopeNote}</p>;
+  // The note's slot is always there, one line high and empty while the centre is in scope, as the board's scope row is
+  // (`gn-project__scope-row`): the note arrives on its own after ring 1, so a slot that came with it would move the canvas
+  // (27.367, planner 2026-10-05). Only the text is conditional: the same node holds the note and the empty band.
+  const note = <p className="gn-kg__scope-note">{props.scopeNote}</p>;
 
   if (props.phone) {
     const picked = chosen.flatMap((w) => w.projects).filter((p) => props.projectIds.includes(p.id));
-    const summary = `${chosen.map((w) => w.name).join(', ')}, ${picked.length > 0 ? picked.map((p) => p.name).join(', ') : 'all projects'}; ${props.on.size} of ${props.groups.length} link types`;
+    const summary = `${chosen.map((w) => w.name).join(', ')}, ${picked.length > 0 ? picked.map((p) => p.name).join(', ') : 'all projects'}; ${props.groups.filter((g) => props.on.has(g)).length} of ${props.groups.length} link types`;
     return (
       <div className="gn-kg__bar">
         <details className="gn-kg__fold">
