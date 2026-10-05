@@ -133,17 +133,20 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, model, props.highlight]);
 
-  // `pick` (`:1036`): a fogged item selects its clear neighbour and says why
+  // `pick` (`:1036`): a fogged item selects its clear neighbour and says why. Selection keeps the zoom (§3.5) for the draw it
+  // causes, so `keepView` is set only for a selection that changes: the draw effect is what spends it, and one left set by a
+  // selection that draws nothing would keep the zoom on the next centre change (Back, a crumb, Center), which must be fitted.
   function pick(ref: string) {
-    keepView.current = true; // selection keeps the zoom (§3.5)
     if (!z.clearSet.has(ref)) {
       const via = (rings.store.adj.get(ref) ?? []).map((x) => x.to).find((t) => z.clearSet.has(t));
       if (via !== undefined) {
+        if (via !== selected) keepView.current = true;
         setSelected(via);
         setStatus(inScope(ref) ? `${label(ref)} is in the fog. Center on ${label(via)} to reach it.` : `${label(ref)} is outside the scope.`);
       }
       return;
     }
+    if (ref !== selected || selectedEdge !== null) keepView.current = true;
     setSelected(ref);
     setSelectedEdge(null);
     setStatus('');
@@ -168,7 +171,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   onPickRef.current = (e) => {
     if (e.kind === 'stage') return;
     if (e.kind === 'edge') {
-      keepView.current = true; // selecting a link keeps the zoom too (§3.5)
+      if (e.id !== selectedEdge) keepView.current = true; // selecting a link keeps the zoom too (§3.5), as `pick` does
       setSelectedEdge(e.id);
       setStatus('');
       return;
@@ -191,20 +194,20 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     setStatus('');
   }
   // "Remove link" (spec A's `ticket.link_removed`, through the host): the cached store drops the edge, and Undo puts it back
-  // through `mergeRing` with no refetch (planner ruling 2026-10-04). The camera stays where it is either way.
+  // through `mergeRing` with no refetch (planner ruling 2026-10-04). The camera stays where it is either way, when the change
+  // is drawn: if the view moved to another centre while the host answered, nothing is, so nothing is kept (the hook's bump
+  // renders after this line).
   const removeLink =
     props.onRemoveLink === undefined
       ? undefined
       : async (edge: GraphEdgeView) => {
           const done = await props.onRemoveLink!(edge);
-          keepView.current = true;
-          rings.forget(edge.id);
+          if (rings.forget(edge.id)) keepView.current = true;
           setRemovedEdge(edge);
           return {
             undo: async () => {
               await done.undo();
-              keepView.current = true;
-              rings.restore(edge);
+              if (rings.restore(edge)) keepView.current = true;
             },
           };
         };
@@ -217,7 +220,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       setTrail([]);
       setSelected(props.centre);
     } else if (!next && selected?.startsWith('concept:')) setSelected(centre);
-    keepView.current = true;
+    if (next !== semantic) keepView.current = true; // the segmented control answers a click on the chosen side too
   }
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest(OWNS_KEYS)) return;

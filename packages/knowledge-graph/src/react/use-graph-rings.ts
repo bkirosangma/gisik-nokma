@@ -14,11 +14,12 @@ export type RingState = {
   key: string;
   /**
    * "Remove link" (KG-C T8): drops the edge from THIS key's cached store. Nothing refetches a loaded entry, so without it the
-   * removed link stays drawn. Another key's entry (another centre or scope) keeps it until that key is fetched again.
+   * removed link stays drawn. Another key's entry (another centre or scope) keeps it until that key is fetched again. Answers
+   * whether THIS key is still the one shown: the view may have moved on while the host answered, and then nothing is drawn.
    */
-  forget: (edgeId: string) => void;
-  /** Undo (planner ruling 2026-10-04): puts the edge back through the door it first came in by, `mergeRing`. */
-  restore: (edge: GraphEdgeView) => void;
+  forget: (edgeId: string) => boolean;
+  /** Undo (planner ruling 2026-10-04): puts the edge back through the door it first came in by, `mergeRing`. Answers as `forget`. */
+  restore: (edge: GraphEdgeView) => boolean;
 };
 
 /**
@@ -78,21 +79,23 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
     },
     forget: (edgeId: string) => {
       const e = cache.current.get(key);
-      if (e === undefined) return;
+      if (e === undefined) return false;
       const edges = new Map(e.store.edges);
       edges.delete(edgeId);
       const adj = new Map([...e.store.adj].map(([k, v]) => [k, v.filter((x) => x.edge.id !== edgeId)]));
       cache.current.set(key, { ...e, store: { ...e.store, edges, adj } });
       bump((n) => n + 1);
+      return current.current === key;
     },
     restore: (edge: GraphEdgeView) => {
       const e = cache.current.get(key);
       const center = e?.store.items.get(q.centre); // seeded by the first ring (planner ruling Q1); a ring must carry it
-      if (e === undefined || center === undefined) return;
+      if (e === undefined || center === undefined) return false;
       // the add's own door; `exhausted` is kept, because an items-less ring would otherwise read as "the walk ended"
       const merged = mergeRing(e.store, { hop: e.store.rings, center, items: [], edges: [edge], frontier: [], truncated: false, cursor: null });
       cache.current.set(key, { ...e, store: { ...merged, exhausted: e.store.exhausted } });
       bump((n) => n + 1);
+      return current.current === key;
     },
   };
 }

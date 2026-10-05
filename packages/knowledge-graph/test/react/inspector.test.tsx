@@ -3,6 +3,7 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GRAPH_CHIP_ORDER, type GraphEdgeView, type GraphRingResponse } from '@gisik-nokma/domain';
 import { KnowledgeGraph } from '../../src/react/knowledge-graph.js';
+import { SEMANTIC_KEY } from '../../src/react/semantic-pref.js';
 import type { GraphRingQuery, GraphSource, KnowledgeGraphProps, ScopeChoices } from '../../src/react/types.js';
 import { item } from '../engine/fixture.js';
 import { fakeRenderer } from './fake-renderer.js';
@@ -51,6 +52,12 @@ const hint = () => insp().querySelector('.gn-kg-insp__hint')?.textContent ?? nul
 /** The inspector's action buttons (Center, Open, Remove link, Undo, Add …), not its link rows. */
 const buttons = () => [...insp().querySelectorAll('.gn-kg-insp__acts button')].map((b) => b.textContent);
 const RELATES = `relates|${T('t142')}|${T('t160')}`;
+const BLOCKS = `blocks|${T('t133')}|${T('t142')}`;
+/** The first draw from call `from` on whose centre is `ref` (GN-133's rings overlap GN-142's drawn items: the centre tells them apart). */
+const centred = (fake: ReturnType<typeof fakeRenderer>, from: number, ref: string) => fake.calls.slice(from).find((c) => c.nodes.find((x) => x.center)?.ref === ref);
+const list = () => screen.getByRole('region', { name: /^Linked to/ });
+const listNames = () => within(list()).getAllByRole('button').map((r) => r.querySelector('.gn-kg-links__name')!.textContent);
+const GN160 = 'GN-160 Board column jumps after a drag';
 
 afterEach(() => {
   titleOverride.clear();
@@ -346,6 +353,80 @@ describe('the edge inspector (spec C §3.5)', () => {
     selectEdge(fake, `ref|${N('n7')}|${N('n1')}`);
     expect(buttons()).toContain('Center on Fifteen chars…');
   });
+
+  it('27.334 a link selected twice still lets the next centre fit (keepView is consumed by its own draw)', async () => {
+    const { fake } = setup();
+    await drawn(fake, T('t126'));
+    selectEdge(fake, BLOCKS);
+    expect(fake.last().view.keepView).toBe(true); // control: selecting it keeps the zoom
+    const n = fake.calls.length;
+    selectEdge(fake, BLOCKS);
+    expect(fake.calls.length).toBe(n); // control: selecting it again draws nothing, so nothing spends what it would keep
+    await userEvent.setup().click(within(insp()).getByRole('button', { name: 'Center on GN-133' }));
+    await waitFor(() => expect(centred(fake, n, T('t133'))).toBeDefined());
+    expect(centred(fake, n, T('t133'))!.view.keepView).toBe(false); // the new centre is fitted
+  });
+
+  it('27.334 an item selected twice, or a fogged item whose clear neighbour is already selected, still lets the next centre fit; an item picked again after a link keeps the zoom', async () => {
+    const { fake } = setup();
+    await drawn(fake, T('t126'));
+    select(fake, T('t133'));
+    expect(fake.last().view.keepView).toBe(true); // control: selecting it keeps the zoom
+    let n = fake.calls.length;
+    select(fake, T('t133'));
+    expect(fake.calls.length).toBe(n); // control: selecting it again draws nothing
+    // the same item picked again after a link IS a new selection (the link's inspector gives way to the item's): it keeps the zoom
+    selectEdge(fake, BLOCKS);
+    n = fake.calls.length;
+    select(fake, T('t133'));
+    expect(fake.calls.length).toBe(n + 1);
+    expect(fake.last().states.selectedEdge).toBeNull();
+    expect(fake.last().view.keepView).toBe(true);
+    const user = userEvent.setup();
+    n = fake.calls.length;
+    select(fake, T('t133'));
+    expect(fake.calls.length).toBe(n);
+    await user.click(within(insp()).getByRole('button', { name: 'Center on GN-133' }));
+    await waitFor(() => expect(centred(fake, n, T('t133'))).toBeDefined());
+    expect(centred(fake, n, T('t133'))!.view.keepView).toBe(false);
+    cleanup();
+    // a fogged item selects its clear neighbour: GN-126 (in the fog at two hops) selects GN-125
+    const b = setup();
+    await drawn(b.fake, T('t126'));
+    select(b.fake, T('t126'));
+    expect(b.fake.last().states.selected).toBe(T('t125'));
+    expect(b.fake.last().view.keepView).toBe(true); // control: the selection moved, and the zoom is kept
+    n = b.fake.calls.length;
+    select(b.fake, T('t126'));
+    expect(b.fake.calls.length).toBe(n); // GN-125 is already the selection: nothing is drawn
+    await user.click(within(insp()).getByRole('button', { name: 'Center on GN-125' }));
+    await waitFor(() => expect(centred(b.fake, n, T('t125'))).toBeDefined());
+    expect(centred(b.fake, n, T('t125'))!.view.keepView).toBe(false);
+  });
+
+  it('27.334 the semantic layer chosen again keeps no zoom for later: the next centre is fitted; control: switching it keeps the zoom', async () => {
+    try {
+      const { fake, fx } = setup();
+      await drawn(fake, T('t126'));
+      const user = userEvent.setup();
+      let n = fake.calls.length;
+      await user.click(screen.getByRole('tab', { name: 'Off' }));
+      await waitFor(() => expect(fake.calls.length).toBeGreaterThan(n));
+      expect(fake.calls[n]!.view.keepView).toBe(true); // control: switching it keeps the zoom for the rings it brings
+      await waitFor(() => expect(fx.log.filter((q) => !q.groups.includes('concepts')).map((q) => q.hops)).toEqual([1, 2, 3]));
+      await settle();
+      select(fake, T('t133')); // drawn, and that draw spends its own keep
+      n = fake.calls.length;
+      await user.click(screen.getByRole('tab', { name: 'Off' })); // already Off: the control calls onChange anyway
+      await settle();
+      expect(fake.calls.length).toBe(n); // nothing changed, nothing is drawn
+      await user.click(within(insp()).getByRole('button', { name: 'Center on GN-133' }));
+      await waitFor(() => expect(centred(fake, n, T('t133'))).toBeDefined());
+      expect(centred(fake, n, T('t133'))!.view.keepView).toBe(false);
+    } finally {
+      window.localStorage.removeItem(SEMANTIC_KEY); // the next test opens On
+    }
+  });
 });
 
 describe('Remove link (spec C §3.5, spec A §2.3)', () => {
@@ -356,6 +437,9 @@ describe('Remove link (spec C §3.5, spec A §2.3)', () => {
     const { fake, fx } = setup({ onRemoveLink });
     await drawn(fake, T('t126'));
     expect(edgeIds(fake)).toContain(RELATES); // or "no such edge" below holds of a canvas that never drew it
+    // control: the walk reaches GN-160 by this link alone, and the list counts it (and GN-160's own n4 and c2)
+    expect(list().querySelector('h4')!.textContent).toBe('Linked to GN-142 22');
+    expect(listNames().filter((x) => x === GN160)).toHaveLength(1);
     selectEdge(fake, RELATES);
     const user = userEvent.setup();
     await user.click(within(insp()).getByRole('button', { name: 'Remove link' }));
@@ -363,6 +447,10 @@ describe('Remove link (spec C §3.5, spec A §2.3)', () => {
     expect(onRemoveLink.mock.calls[0]![0].id).toBe(RELATES);
     await waitFor(() => expect(status()).toBe('Link removed.'));
     expect(edgeIds(fake)).not.toContain(RELATES);
+    // the link left the WALK too, not only the drawn edges: GN-160, and the n4 and c2 only it reached, leave the list and the canvas
+    expect(list().querySelector('h4')!.textContent).toBe('Linked to GN-142 19');
+    expect(listNames()).not.toContain(GN160);
+    expect(refsOf(fake.last())).not.toContain(T('t160'));
     expect(fake.last().view.keepView).toBe(true); // the camera stays where it is
     expect(title()).toBe('GN-142 relates to GN-160'); // the inspector stays on the removed link, with Undo
     expect(within(insp()).queryByRole('button', { name: 'Remove link' })).toBeNull();
@@ -376,14 +464,67 @@ describe('Remove link (spec C §3.5, spec A §2.3)', () => {
     await act(async () => release());
     await waitFor(() => expect(status()).toBe('Link restored.'));
     expect(edgeIds(fake)).toContain(RELATES);
+    expect(list().querySelector('h4')!.textContent).toBe('Linked to GN-142 22'); // back in the walk, once
+    expect(listNames().filter((x) => x === GN160)).toHaveLength(1);
     expect(fake.last().view.keepView).toBe(true);
     await settle();
     expect(fx.log.length).toBe(before); // restored locally, through mergeRing, not refetched
     expect(within(insp()).getByRole('button', { name: 'Remove link' })).toHaveProperty('disabled', false);
+    // GN-142's own inspector: the restored link is one of its 11 direct links, listed once (the walk holds it once)
+    select(fake, T('t142'));
+    const direct = within(insp()).getByRole('heading', { level: 4, name: /^Direct links/ }).parentElement!;
+    expect(direct.querySelector('h4')!.textContent).toBe('Direct links 11');
+    expect([...direct.querySelectorAll('.gn-kg-links__name')].map((x) => x.textContent).filter((x) => x === GN160)).toHaveLength(1);
     // the restore did not mark the entry exhausted: three hops asks for ring 4
     screen.getByRole('img', { name: /Knowledge Graph of/ }).focus();
     await user.keyboard('3');
     await waitFor(() => expect(fx.log.filter((q) => q.center === T('t142')).map((q) => q.hops)).toEqual([1, 2, 3, 4]));
+  });
+
+  it('27.335 a removal, or an Undo, the host answers after the view moved to another centre keeps no zoom for later: Back is fitted; control: the change reached the old centre\'s rings', async () => {
+    const t133Rings = (fx: ReturnType<typeof fixtureSource>) => waitFor(() => expect(fx.log.filter((q) => q.center === T('t133')).map((q) => q.hops)).toEqual([1, 2, 3]));
+    const back = async (fake: ReturnType<typeof fakeRenderer>, n: number) => {
+      screen.getByRole('img', { name: /Knowledge Graph of/ }).focus();
+      await userEvent.setup().keyboard('{Escape}'); // Back to GN-142: its rings are cached, so this one draw is the centre's
+      await waitFor(() => expect(fake.calls.length).toBeGreaterThan(n));
+      expect(fake.calls[n]!.nodes.find((x) => x.center)?.ref).toBe(T('t142'));
+    };
+    let answer: () => void = () => {};
+    const onRemoveLink = vi.fn((_e: GraphEdgeView) => new Promise<{ undo: () => Promise<void> }>((r) => (answer = () => r({ undo: async () => {} }))));
+    const a = setup({ onRemoveLink });
+    await drawn(a.fake, T('t126'));
+    selectEdge(a.fake, RELATES);
+    const user = userEvent.setup();
+    await user.click(within(insp()).getByRole('button', { name: 'Remove link' }));
+    act(() => a.fake.pick({ kind: 'node', ref: T('t133'), double: true })); // the view moves on while the host answers
+    await t133Rings(a.fx);
+    await settle();
+    let n = a.fake.calls.length;
+    await act(async () => answer());
+    await settle();
+    expect(a.fake.calls.length).toBe(n); // GN-133 is drawn and its rings are unchanged: nothing is drawn, so nothing spends a keep
+    await back(a.fake, n);
+    expect(a.fake.calls[n]!.view.keepView).toBe(false); // the centre is fitted
+    expect(edgeIds(a.fake)).not.toContain(RELATES); // control: the removal reached GN-142's cached rings
+    cleanup();
+    // the same for an Undo the host answers after the view moved on
+    let undone: () => void = () => {};
+    const b = setup({ onRemoveLink: async () => ({ undo: () => new Promise<void>((r) => (undone = r)) }) });
+    await drawn(b.fake, T('t126'));
+    selectEdge(b.fake, RELATES);
+    await user.click(within(insp()).getByRole('button', { name: 'Remove link' }));
+    await waitFor(() => expect(status()).toBe('Link removed.'));
+    await user.click(within(insp()).getByRole('button', { name: 'Undo' }));
+    act(() => b.fake.pick({ kind: 'node', ref: T('t133'), double: true }));
+    await t133Rings(b.fx);
+    await settle();
+    n = b.fake.calls.length;
+    await act(async () => undone());
+    await settle();
+    expect(b.fake.calls.length).toBe(n);
+    await back(b.fake, n);
+    expect(b.fake.calls[n]!.view.keepView).toBe(false);
+    expect(edgeIds(b.fake)).toContain(RELATES); // control: the Undo reached GN-142's cached rings
   });
 
   it('27.335 a refusal shows the server\'s sentence and the link stays; a removal while a ring is still out stays removed when it lands', async () => {
