@@ -50,8 +50,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // src/ left both invisible, so a NEXT_PUBLIC_ variable baked into the browser
 // bundle from a page could ship undocumented. The walker already skips
 // node_modules, dist, .next, *.test.* and *.spec.* files (Playwright specs
-// are tests, and their titles are prose that D3 reads as config keys), so widening this costs one
-// config file and covers the whole app.
+// are tests, and their titles are prose that D3 reads as config keys), so
+// widening this costs one config file and covers the whole app.
 // 'apps/mobile' and 'apps/desktop' added 2026-09-07 (pre-launch checklist item
 // 4, "no secrets stored in the frontend"). The reason is the one already given
 // just above for widening to 'apps/web': a variable BAKED INTO A CLIENT BUNDLE
