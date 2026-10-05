@@ -15,6 +15,7 @@ import { SWEEP } from './fixtures/tool-sweep.js';
  */
 
 const NEW_TOOL_HINT = 'A new MCP tool must be classified in packages/mcp-server/src/tools/write-audit.ts (spec D §7 case 8, D2).';
+const EVENTS_HINT = 'its row in packages/mcp-server/src/tools/write-audit.ts must declare exactly the event types this block posts (D2).';
 
 const COMMITTED = { status: 'committed', eventId: 'e', seq: 1, serverTime: '2026-09-08T00:00:00.000Z' };
 
@@ -142,7 +143,7 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
         seen.push(...block.tools);
         if (block.tools.some((name) => MCP_READ_ONLY_TOOLS.includes(name))) continue;
         const declared = [...new Set(block.tools.flatMap((name) => MCP_WRITE_AUDIT[name]?.events ?? []))].sort();
-        expect(block.events, `${file} ${block.tools.join(' + ')}: ${NEW_TOOL_HINT}`).toEqual(declared);
+        expect(block.events, `${file} ${block.tools.join(' + ')}: ${EVENTS_HINT}`).toEqual(declared);
       }
     }
     expect(seen.sort(), 'every registered tool has exactly one block').toEqual([...tools].sort());
