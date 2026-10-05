@@ -340,7 +340,26 @@ input, textarea, select { font-family: inherit; }
 .gn-home { max-width: 73.75rem; margin: 0 auto; padding-top: 1.625rem; display: grid; gap: 1rem; }
 .gn-home > .gn-page-title { margin: 0; }
 .gn-home__empty, .gn-home__refusal { display: grid; gap: 0.75rem; justify-items: start; }
-/* KG-E T3: numbers */
+/* KG-E T3: numbers. One row of six, 3×2 below 40rem (spec E §2.2). The placeholders reuse `.gn-home__number`, so
+   loading and loaded share one box (27.637). Past due's warning is an inset 3px edge in `--gn-warning`, a non-text
+   boundary held to 3:1 on `surfaceRaised` (`CONTRAST_PAIRS`); the value ink stays `--gn-text`. */
+.gn-home__numbers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.625rem; }
+.gn-home__number {
+  display: grid; gap: 0.125rem; align-content: start; text-align: start; min-height: 4.75rem;
+  padding: 0.75rem 0.875rem; border: 0; border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift); color: var(--gn-text); cursor: pointer;
+}
+.gn-home__number:disabled { cursor: default; }
+.gn-home__number[aria-pressed='true'] { outline: 2px solid var(--gn-text); outline-offset: 0; }
+.gn-home__number:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-home__number-value { font-size: 1.75rem; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gn-home__number-label { font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-home__number--warn { box-shadow: inset 3px 0 0 var(--gn-warning), var(--gn-shadow-lift); }
+@media (max-width: 40rem) {
+  .gn-home__numbers { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.375rem; }
+  .gn-home__number { min-height: 3.875rem; padding: 0.5rem 0.625rem; }
+  .gn-home__number-value { font-size: 1.25rem; }
+}
 /* KG-E T4: graph */
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 
