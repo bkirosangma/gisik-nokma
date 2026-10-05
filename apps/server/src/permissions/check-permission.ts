@@ -1370,10 +1370,12 @@ async function namedPersonRefusal(
 /**
  * Who created this ticket, read from the LEDGER rather than from a projection.
  *
- * There is no projection to read it from: `proj_tickets` does not exist on this
- * branch (Plan 3 Task 12 owns it) and `proj_visibility` has no creator column.
- * Inventing one here would be a second, competing definition of another plan's
- * head state — the same thing Task 8 refused to do for a ticket's title.
+ * When this was written there was no projection to read it from. Since
+ * my-work-global T1 (2026-10-05) `proj_tickets.created_by` carries the same
+ * value — derived from exactly the row below, by the projection and by its
+ * migration's backfill — for the attention strip's `show=created` filter. This
+ * check keeps reading the ledger, the primary source, rather than depending on
+ * a projection being current at the door.
  *
  * The ledger is not a fallback, it is the primary source: `events.actor_id` on
  * the `ticket.created` row IS the creatorship claim, and every projection that

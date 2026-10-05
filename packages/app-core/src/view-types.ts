@@ -185,6 +185,7 @@ export type WorkspaceRef = {
    */
   prefix: string;
   role: string;
+  adminProjectIds?: string[];
   /**
    * Trash series, Plan 1 Task 5 (spec T8). **REQUIRED, never optional**: a
    * construction site that forgets it must fail to compile, the same

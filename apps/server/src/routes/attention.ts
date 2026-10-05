@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type {
   AttentionItem,
   AttentionResponse,
+  AttentionShow,
   PublishedWorkflowDef,
   TicketCard,
 } from '@gisik-nokma/domain';
@@ -9,6 +10,7 @@ import { istDayBounds, istDayOf, statesWithBacklog } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkspaceSettings } from '../projections/workspace-settings.js';
+import { adminProjectIdsOf, parseShow } from '../read/attention-show.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import {
@@ -166,6 +168,22 @@ function istDaysBetween(fromDay: string, toDay: string): number {
  * `claim.contested` events exist (coordination amendment 16). `AttentionItem` is
  * a discriminated union precisely so that arm can arrive without reshaping the
  * three here.
+ *
+ * ## `show`: whose tickets (my-work-global T1, spec D2)
+ *
+ * `show` narrows the visible set to the viewer's own business before any bucket
+ * runs: one more conjunct beside `visibleTicketsWhere`, an `OR` of the selected
+ * arms (`AttentionShow`'s docblock lists them). One `OR` in one query, so a
+ * ticket the viewer both created and is assigned to is ONE row and ONE item —
+ * never the union of two lists. Every arm sits INSIDE the visibility conjunct,
+ * so no arm can show a ticket the viewer may not see.
+ *
+ * `undefined` adds nothing: the answer is the all-visible strip this route has
+ * always served, which the online client's `getWorkspaceSettings` still reads
+ * its thresholds from. The arms' refusals (a role the viewer does not hold here)
+ * are the route's, through `parseShow`; `ws-admin` is `TRUE` because reaching
+ * this function with it means the route already found the viewer `owner` or
+ * `admin` in THIS workspace.
  */
 export async function readAttention(
   db: Queryable,
@@ -173,6 +191,7 @@ export async function readAttention(
   viewerId: string,
   workspaceId: string,
   now: Date,
+  show?: ReadonlySet<AttentionShow>,
 ): Promise<AttentionResponse> {
   const settings = await getWorkspaceSettings(db, workspaceId);
 
@@ -191,6 +210,17 @@ export async function readAttention(
     // two conjuncts, never folded into the visibility predicate.
     LIVE_TICKET_WHERE,
   ];
+  if (show !== undefined) {
+    const arms: string[] = [];
+    if (show.has('created')) arms.push(`t.created_by = ${params.add(viewerId)}`);
+    if (show.has('assigned')) arms.push(`t.assignee_id = ${params.add(viewerId)}`);
+    if (show.has('ws-admin')) arms.push('TRUE');
+    if (show.has('project-admin')) {
+      const ids = adminProjectIdsOf(eff);
+      arms.push(ids.length === 0 ? 'FALSE' : `t.project_id = ANY(${params.add(ids)}::text[])`);
+    }
+    where.push(`(${arms.join(' OR ')})`);
+  }
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}
        FROM proj_tickets t
@@ -388,9 +418,14 @@ function stateNameOf(defs: Map<string, PublishedWorkflowDef>, card: TicketCard):
  *    business knowing it does.
  * 3. A member who may see nothing gets **200 with an empty `items`** (7.120).
  *    The emptiness is the visibility predicate answering, not the door.
+ * 4. A malformed `?show=`, or one naming a role the viewer does not hold in
+ *    this workspace, is **400 `{error:'invalid_query'}`** (my-work-global T1,
+ *    cases 30.006–30.008; `read/attention-show.ts` is the one parse). It is read
+ *    AFTER `requireMember`, because the role refusals need this workspace's
+ *    `eff`, so a stranger still gets the 404 above whatever `show` says.
  *
- * There is no 400 cell: `workspaceId` is a PATH segment, so a request that omits
- * it does not match this route at all.
+ * `workspaceId` itself has no 400 cell: it is a PATH segment, so a request that
+ * omits it does not match this route at all.
  *
  * ## `requireSession` by parameter, and `now` by dependency
  *
@@ -416,7 +451,7 @@ export function registerAttentionRoutes(
   requireSession: preHandlerHookHandler,
 ): void {
   const now = deps.now ?? ((): Date => new Date());
-  app.get<{ Params: { workspaceId: string } }>(
+  app.get<{ Params: { workspaceId: string }; Querystring: { show?: unknown } }>(
     '/v1/workspaces/:workspaceId/attention',
     { preHandler: requireSession },
     async (request, reply) => {
@@ -427,8 +462,12 @@ export function registerAttentionRoutes(
       if (eff === null) {
         return reply.status(404).send(READ_NOT_FOUND_BODY);
       }
+      const parsed = parseShow(request.query, eff);
+      if (!parsed.ok) {
+        return reply.status(400).send({ error: 'invalid_query' });
+      }
 
-      return readAttention(deps.pool, eff, viewerId, workspaceId, now());
+      return readAttention(deps.pool, eff, viewerId, workspaceId, now(), parsed.show);
     },
   );
 }
