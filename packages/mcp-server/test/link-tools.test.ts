@@ -120,8 +120,9 @@ describe('29.376 link_tickets: remove and relabel file on the stored source', ()
   });
 
   const relabel = { workspaceId: WS, kind: 'leads_to', action: 'relabel' } as const;
-  // D's own two branches, and an arrow INTO D whose label is another ticket's branch (it does not block D's labels)
-  const DEC_LINKS = { links: [row('leads_to', 'in', ulid('UPS'), 'Later'), row('leads_to', 'out', A, 'Yes'), row('leads_to', 'out', B, 'No')] };
+  // D's own two branches, an arrow INTO D whose label is another ticket's branch (it does not block D's labels), and an
+  // unlabelled outgoing link (no label to compare)
+  const DEC_LINKS = { links: [row('leads_to', 'in', ulid('UPS'), 'Later'), row('leads_to', 'out', A, 'Yes'), row('relates', 'out', ulid('REL')), row('leads_to', 'out', B, 'No')] };
 
   it('29.376 relabel is one batch [link_removed, link_added] after its pre-checks; control: a free label commits both', async () => {
     const f = fakeFlow({ ...ENDS, [`${tw}/${D}/links`]: DEC_LINKS });

@@ -327,7 +327,8 @@ export function ticketTools(session: Session): ToolDefinition[] {
         const a = z.object(linkShape).parse(args);
         if (a.label !== undefined && a.kind !== 'leads_to') throw new Error('label only applies to "leads_to" links');
         if (a.action === 'remove' && a.label !== undefined) throw new Error('remove takes no label: it removes the link between the two tickets');
-        if (a.action === 'relabel' && (a.kind !== 'leads_to' || a.label === undefined)) throw new Error('relabel needs kind "leads_to" and the new label');
+        // A label already means kind "leads_to" (the first guard), so a relabel needs only the label to be there.
+        if (a.action === 'relabel' && a.label === undefined) throw new Error('relabel needs kind "leads_to" and the new label');
         // Each end's draft flag decides the stream (Drafts R42): an end this caller cannot read is the uniform sentence.
         const endOf = async (ticketId: string): Promise<LinkEnd> => ({ id: ticketId, draft: isDraftDetail(await readTicket(session, a.workspaceId, ticketId)) });
         const linksOf = async (ticketId: string): Promise<LinkRow[]> =>
@@ -345,11 +346,11 @@ export function ticketTools(session: Session): ToolDefinition[] {
         const stored = { kind: a.kind, source, target, label: found.label ?? undefined };
         if (a.action === 'remove') return { result: await submitOne(session, linkEvent(session, a.workspaceId, 'ticket.link_removed', stored)) };
         // The other branches are the stored SOURCE's outgoing labels, read from its own list when the call names the target end.
+        // Only a `leads_to` row carries a label (Graph Part 2 LK-2), so the labelled outgoing rows are exactly those branches.
         const sourceLinks = sourceId === a.ticketId ? links : await linksOf(sourceId);
         const others = sourceLinks
-          .filter((l) => l.kind === 'leads_to' && l.direction === 'out' && l.ticket.id !== targetId)
-          .map((l) => l.label ?? '')
-          .filter((l) => l !== '');
+          .filter((l) => l.direction === 'out' && l.ticket.id !== targetId)
+          .flatMap((l) => (l.label === undefined || l.label === null ? [] : [l.label]));
         return { results: await relabelStored(session, a.workspaceId, stored, others, a.label as string) };
       },
     },
