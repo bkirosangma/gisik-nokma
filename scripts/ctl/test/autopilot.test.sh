@@ -10,7 +10,7 @@ CTL="$HERE/ctl"
 AP="${CTL_AUTOPILOT_PY:-$HERE/verbs/autopilot.py}"
 fails=0
 grep() { /usr/bin/grep "$@"; }   # never the PATH grep (ugrep here: different -E / BRE semantics; a negated check must not pass on its error)
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); [ -z "${AP_DEBUG:-}" ] || printf '%s\n' "${out:-}" | sed 's/^/    | /'; fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 T="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 G() { /usr/bin/git -C "$T/repo" "$@"; }
 export TZ=UTC
@@ -435,4 +435,5 @@ loop_lock() { world; mkdir -p "$T/logs/autopilot.lock.d"; sleep 30 & local p=$!;
   grep -q "WARN autopilot stale lock of dead pid $p taken over" "$T/loop.out" && grep -q "OK autopilot pass" "$T/loop.out"; }
 check "13.2125 ONE loop at a time (mkdir lock + pid, no flock on macOS): \`run\` refuses while the lock's pid is alive; CONTROL in the same check: once that pid is dead the lock is taken over (WARN) and passes run" 'loop_lock'
 
+ctl_test_only_end autopilot.test.sh
 [ "$fails" -eq 0 ] && { echo "autopilot tests: all ok"; exit 0; } || { echo "autopilot tests: $fails FAILED"; exit 1; }

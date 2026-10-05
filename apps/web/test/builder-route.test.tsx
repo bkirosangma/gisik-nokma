@@ -339,7 +339,12 @@ describe('13.1156 the builder page has one main and a shrinkable name field', ()
 
   it('13.1156 the name field declares all three shrink properties', () => {
     const css = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
-    const body = /\.workflow-builder-screen__name\s*\{([^}]*)\}/.exec(css);
+    // AMENDED 2026-10-05 (G-9 T5 FIX 1): anchored to a line start, so the read is the TOP-LEVEL rule. Unanchored, the first match
+    // became the full-screen toolbar's `.gn-wf-toolbar .workflow-builder-screen__name { width: 12rem; … }`, which is not this rule.
+    const tops = [...css.matchAll(/^\.workflow-builder-screen__name\s*\{([^}]*)\}/gm)];
+    // control: exactly one top-level rule, so the read below is that rule and not a miss or the first of two
+    expect(tops, 'top-level rules for .workflow-builder-screen__name').toHaveLength(1);
+    const body = tops[0] ?? null;
     expect(body, 'no rule for .workflow-builder-screen__name').not.toBeNull();
     // All three, because none alone is the fix: `width: 100%` without
     // `min-width: 0` is floored by the input's intrinsic size, and

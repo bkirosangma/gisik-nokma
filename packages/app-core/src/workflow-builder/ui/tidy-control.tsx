@@ -105,9 +105,10 @@ function tidyUndoOf(store: DraftStore): TidyUndo {
  * button goes on the first position change that is not a Tidy (a drag, a nudge, an add): it would otherwise restore
  * a layout the author has since moved away from. `sizes` is the caller's measured node sizes, read when Tidy is
  * pressed (the canvas corner passes React Flow's, the header the screen's canvas api); omitted, every box is the
- * unmeasured fallback. Only the control that was pressed shows "Undo tidy". No other undo exists (spec §3.5).
+ * unmeasured fallback. Only the control that was pressed shows "Undo tidy". No other undo exists (spec §3.5). `role="menuitem"`
+ * when the full-screen toolbar's More menu holds it (G-9 T5); the guard and the shared offer are the same in every place.
  */
-export function TidyControl(props: { sizes?: () => NodeSizes }) {
+export function TidyControl(props: { sizes?: () => NodeSizes; role?: 'menuitem' }) {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
   const tidyUndo = tidyUndoOf(store);
@@ -122,11 +123,11 @@ export function TidyControl(props: { sizes?: () => NodeSizes }) {
 
   return (
     <span className="gn-tidy">
-      <Button className="gn-tidy__tidy" onClick={() => tidyUndo.tidy(self.current, props.sizes?.() ?? {})}>
+      <Button className="gn-tidy__tidy" role={props.role} onClick={() => tidyUndo.tidy(self.current, props.sizes?.() ?? {})}>
         Tidy
       </Button>
       {offer?.owner !== self.current ? null : (
-        <Button className="gn-tidy__undo" onClick={tidyUndo.undo}>
+        <Button className="gn-tidy__undo" role={props.role} onClick={tidyUndo.undo}>
           Undo tidy
         </Button>
       )}

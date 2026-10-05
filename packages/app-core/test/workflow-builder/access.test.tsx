@@ -96,6 +96,23 @@ function renderBuilder(session: BuilderSession, gateway = createFakeGateway()) {
  * point of the count assertions below is that a control added later is caught
  * by them, and a hand-maintained name list would silently stop covering it.
  */
+/**
+ * G-9 T5 FIX 1 (F4): what the "only jumps" sweeps look at: every button AND every tab. A segmented control's items are
+ * `role="tab"` buttons, so a button-only query never saw them, and the page-wide `gn-segmented__item` allowance the sweeps carried
+ * admitted nothing at all.
+ */
+function sweptControls(): HTMLElement[] {
+  return [...screen.queryAllByRole('button'), ...screen.queryAllByRole('tab')];
+}
+
+/**
+ * The floating panel's tabs only switch what the panel shows, so the member sweep lets them through, but only THEM: a segmented
+ * item counts as a panel tab when it sits inside `.gn-wf-panel__tabs`, so an authoring segmented control elsewhere fails the sweep.
+ */
+function isPanelTab(button: HTMLElement): boolean {
+  return button.className.includes('gn-segmented__item') && button.closest('.gn-wf-panel__tabs') !== null;
+}
+
 function valueControls(): HTMLElement[] {
   return [
     ...screen.queryAllByRole('textbox'),
@@ -175,7 +192,9 @@ describe('read-only workflow views for non-admins', () => {
     expect(
       screen.queryByText('Could not load workspace people and types. Reload to try again.'),
     ).not.toBeInTheDocument();
-    for (const button of screen.queryAllByRole('button')) {
+    // AMENDED 2026-10-05 (G-9 T5 FIX 1, F4): tabs too. A segmented control's items are `role="tab"` buttons, which
+    // `queryAllByRole('button')` never returns, so an authoring segmented control would have passed this sweep unseen.
+    for (const button of sweptControls()) {
       // The canvas Category pickers (Select, Phase 2 Wave B Task 1) are real
       // <button> elements too, but they're a value-bearing control, not a
       // navigation jump or an authoring action. This test never calls
@@ -189,7 +208,10 @@ describe('read-only workflow views for non-admins', () => {
       // 21.170: the phone Panels / Done buttons only open and close the sheet that holds those rows — navigation too.
       // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
       // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
-      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit/);
+      // AMENDED 2026-10-05 (G-9 T5): the full-screen controls only change what is shown (see the member sweep below).
+      // AMENDED 2026-10-05 (G-9 T5 FIX 1): no segmented item (no tab) here: this sweep never opens the floating panel, the only place
+      // one may stand (see `isPanelTab`), so any segmented control reaching a guest's screen fails.
+      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close/);
     }
     expect(gateway.submitted).toEqual([]);
   });
@@ -380,7 +402,8 @@ describe('no authoring action is reachable by any path the builder screen offers
     await screen.findByTestId('state-node-later');
 
     function everyButtonIsAJump(): void {
-      for (const button of screen.queryAllByRole('button')) {
+      // AMENDED 2026-10-05 (G-9 T5 FIX 1, F4): tabs too (see the guest sweep), so the panel's tabs are swept, as tabs.
+      for (const button of sweptControls()) {
         // Same as the guest test above: a Select trigger (Category, one per
         // canvas node) is a value-bearing control, not a jump or an
         // authoring action — assert disabled rather than only skip, so an
@@ -393,7 +416,12 @@ describe('no authoring action is reachable by any path the builder screen offers
         // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
         // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
         // 23.175: the canvas's "Fit to screen" only moves the viewport — a view control, not an authoring action.
-        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit/);
+        // AMENDED 2026-10-05 (G-9 T5, 25.552): Full screen (header, and the corner's on the Fit class), and inside it the toolbar's
+        // zoom steps, Issues badge and Exit, the panel's tabs and its × only change what is shown. The sweep presses Full screen,
+        // so everything after it runs IN full screen, where the left column and the floating panel both hold the inspectors.
+        // AMENDED 2026-10-05 (G-9 T5 FIX 1): a segmented item passes only as one of the panel's tabs (`isPanelTab`), not page-wide.
+        if (isPanelTab(button)) continue;
+        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit|workflow-builder-screen__fullscreen|gn-wf-toolbar__(zoom-step|issues|exit)|gn-wf-panel__close/);
       }
     }
 
@@ -412,10 +440,15 @@ describe('no authoring action is reachable by any path the builder screen offers
     // StateInspector) — the two other ways a button could appear after the
     // first paint.
     await user.click(await screen.findByTestId('transition-label-8'));
-    expect(screen.getByText('From In progress to Done')).toBeInTheDocument();
+    expect(screen.getAllByText('From In progress to Done').length).toBeGreaterThan(0);
     everyButtonIsAJump();
     await user.click(await screen.findByTestId('state-node-waiting'));
-    expect(screen.getByRole('textbox', { name: 'State name' })).toBeDisabled();
+    const stateNames = screen.getAllByRole('textbox', { name: 'State name' });
+    expect(stateNames.length).toBeGreaterThan(0);
+    for (const field of stateNames) expect(field).toBeDisabled();
+    // the sweep ran in full screen, and the floating panel is the one place both inspectors appeared
+    expect(screen.getByRole('region', { name: 'Workflow editor, full screen' })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Workflow panel' })).getByRole('textbox', { name: 'State name' })).toBeDisabled();
     everyButtonIsAJump();
   }, SWEEP_TIMEOUT_MS);
 
