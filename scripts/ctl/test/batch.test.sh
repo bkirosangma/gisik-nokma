@@ -298,6 +298,9 @@ check "13.2297 a FIX inside a parenthesis is no FIX: CONTROL — task/<x> <sha> 
 check "13.2297 a FIX token is WHOLE and upper case: CONTROL — task/<x> <sha> PREFIX …, … FIXED in <sha> …, … FIX-ups … and … READY, no fix needed … refuse nothing (a word character, or a - not before digits, is no boundary); task/<x> <sha> HELD-FOR-FIX-2 (…) (queue line 472: - before FIX is one) refuses #11" \
   'mk && fixq "task/a $(s8 task/a) PREFIX noted (13.2297 control)" "task/a $(s8 task/a) FIXED in $(s8 task/c) (13.2297 control)" "task/a $(s8 task/a) FIX-ups queued (13.2297 control)" "task/a $(s8 task/a) READY, no fix needed (13.2297 control)" && [ $rc -eq 0 ] \
    && fixq "task/a $(s8 task/a) HELD-FOR-FIX-2 (fix 1 content ok; planner FIX 2 pending) reviewer B" && refused11 3 "task/a $(s8 task/a) HELD-FOR-FIX-2 (fix 1"'
+check "13.2297 FIX spelling task/<x> <sha> FIX-<n> with a two-digit round (FIX-12; no live line has one yet: a FIX-<n> token takes any number of digits) after the READY refuses #11; CONTROL — the same spelling naming task/ab and another sha does not" \
+  'mk && fixq "task/ab $(s8 task/c) FIX-12 (twelfth round) reviewer B" && [ $rc -eq 0 ] \
+   && fixq "task/a $(s8 task/a) FIX-12 (twelfth round) reviewer B" && refused11 3 "task/a $(s8 task/a) FIX-12 (twelfth round) reviewer B\""'
 check "13.2297 an admitting READY is no FIX line, even with a FIX token before its parenthesis: CONTROL — READY task/c <sha> FIX-1 delta re-check (needs task/a …) refuses nothing; the same line with no admitting verdict (task/c <sha> FIX-1 …) is a FIX, and it refuses #11, the PR it names" \
   'mk && fixq "READY task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)" && [ $rc -eq 0 ] \
    && fixq "task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)" && refused11 3 "task/c $(s8 task/c) FIX-1 delta re-check (needs task/a merged first)\""'
