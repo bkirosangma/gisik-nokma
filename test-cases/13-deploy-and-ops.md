@@ -859,7 +859,7 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed; a dead pid whose recorded start time is empty is stale too. A live pid with another start time is the ONLY stale slot in one arm (slot-1 genuinely live: the run starts at once, slot-2 becomes the verb's, slot-1 is untouched; control: both live → waits), and a LIVE holder is never reclaimed because the waiter's `TZ` / locale renders its start time differently.
 - 13.1767 🧪 Two real processes racing for one slot, with a stale slot to reclaim, never overlap.
 - 13.1768 🧪 The slot is released when the command fails and when the verb is terminated (the verb exits within 12 s of a SIGTERM, not when a 300 s command ends), and the wrapped command AND what it spawned die with the verb (a process-group stop — no orphaned vitest workers).
-- 13.1769 🧪 Every run appends its queue wait to `waits.tsv` (time, label, seconds, reason, slots).
+- 13.1769 🧪 Every run appends its queue wait to `waits.tsv` (time, label, seconds, reason, slots; the 6th column, probe seconds, is 13.2317).
 - 13.1770 🧪 A queue wait past `CTL_SEM_MAX_WAIT` exits 75, runs nothing and says `no slot after`.
 - 13.1771 🧪 `--dry-run` prints the plan, takes no slot, runs nothing, exits 0.
 - 13.1772 🧪 `ctl gate` writes its priority marker only around the real gate run (not on `--dry-run`), removes it on green, red and exit, and does it from `verbs/gate.sh` (the gate-lock scripts are untouched).
@@ -885,6 +885,17 @@ Block `13.2270`–`13.2279` for `task/ctl-sem-gate-slots-file` (planner 2026-10-
 - 13.2274 🧪 The file is re-read on every poll: rewritten from 1 to 2 while a run waits behind one held slot and a live gate, that run is granted at the next poll with no restart.
 - 13.2275 🧪 `ctl run-tests --dry-run` names the cap from the file: file `3` names 3, env `0` over file `3` names 0, file `abc` names 1.
 - 13.2276 🧪 No `gate-slots` file (the normal state) prints no read error: with `CTL_SEM_GATE_SLOTS` unset, one slot held and a live gate, the run waits (reason `gate`) until the holder exits and its `2>&1` output holds no `No such file` line on any poll; `--dry-run` holds none either. CONTROL — the same output carries the `queue wait: 20s (waited for: gate)` line (and the dry-run names cap 1), so an empty capture cannot pass.
+
+Block `13.2310`–`13.2319` for `task/ctl-sem-handoff` (planner 2026-10-05, P48: every grant paid a 3 s swap probe, and a freed slot sat empty up to 5 s until the next poll; a shared swap verdict and a 1 s poll). The fake clock is in integer seconds, and `CTL_SEM_POLL_SECS`, `CTL_SEM_SAMPLE_SECS` and `CTL_SEM_SWAP_TTL` are UNSET, so the defaults (1 s, 3 s, 10 s) are what is measured.
+
+- 13.2310 🧪 A fresh `ok` verdict in `swap.verdict` is reused: the grant takes zero sleeps (the fake clock does not move) and leaves the verdict alone. CONTROL — with no verdict on file the grant samples once (one 3 s sleep) and writes `1003 ok`.
+- 13.2311 🧪 A verdict 11 s old is stale: exactly one sample (one 3 s sleep), and the verdict is rewritten. At exactly 10 s old (the TTL) it is still reused.
+- 13.2312 🧪 A fresh `high` verdict blocks the way a sampled one does, with swap-in actually quiet: no grant while it is fresh (1 s polls, no sample); at 11 s one sample finds swap-in calm and grants — queue wait 11 s, reason `swap`, probe 3.
+- 13.2313 🧪 A new sample keeps the two-window rule: two consecutive high windows write `high` and block, and the NEXT waiter is blocked by that verdict without sampling; one high window then a quiet one writes `ok` and grants at 0 s with probe 6.
+- 13.2314 🧪 `CTL_SEM_SWAP_TTL` sets the age limit (3 makes a 5 s old verdict stale); a non-numeric TTL falls back to 10. A verdict stamped in the future, one with a non-numeric stamp (`x`, `+1000`) and one with an unknown word is no verdict: one sample, no block.
+- 13.2315 🧪 The default poll is 1 s: with both slots full and one freed at the next fake second (the integer clock's stand-in for t+0.5), the waiter is granted at the next poll — queue wait exactly 1 s, reason `slots`.
+- 13.2316 🧪 Real clock, default knobs: the only slot is held by a live pid killed at t+0.5, with a fresh `ok` verdict on file. The waiter finishes between t+0.5 and t+3, where a 5 s poll or a missed verdict's 3 s sample would not.
+- 13.2317 🧪 Every `waits.tsv` row has 6 tab-separated columns. The 6th is the grant poll's probe seconds: 0 on a reused verdict, 3 on a sampled grant, whose queue wait stays 0.
 
 ## Playwright ports: the gate on 3291 / 3292, every other browser run on a free port (`task/ctl-pw-ports`, planner P35 2026-10-05: gates #1 and #2 went RED on "localhost:3191 already used")
 
