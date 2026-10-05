@@ -135,6 +135,8 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 - **Gisik Nokma** — the logo at the far left. It takes you to **Home**: your workspace's numbers and its Knowledge Graph.
 - **Workspaces** — the list of every workspace you are in.
 - **My work** — the tickets assigned to you.
+- **Drafts** — the tickets you saved as drafts in this workspace, with how many there are. Only you can
+  see them (§5).
 - **Members** — the people in this workspace, and what they are.
 - **Settings** — this workspace's own screens: its ticket types, its workflows, its project groups,
   and the workspace itself (§11 and §12).
@@ -149,7 +151,7 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 - **Your avatar** — the round button with your initial on it, opening a menu with **Help**, **Account**
   and **Sign out**.
 
-**My work, Members and Settings appear only once a workspace is open**, and the workspace's name and its
+**My work, Drafts, Members and Settings appear only once a workspace is open**, and the workspace's name and its
 last project appear only once that name has arrived. With no workspace open the bar says so — *"No
 workspace selected. Pick one to reach its board, members and settings."* **Signed out there is no
 avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
@@ -526,6 +528,15 @@ settings are kept for about a month in case they come back.
    - **Assignee** — who the ticket is on, or leave it unassigned.
 4. Press **Create ticket**. On a phone the button stays at the bottom of the window while you scroll the
    form, and under it a short line says what is still missing (for example, that the ticket needs a title).
+   Or press **Save as draft** beside it, to keep the ticket to yourself until it is ready (below).
+
+**Saving a draft.** **Save as draft** keeps the ticket private: only you can see it, it has no number yet, and
+it starts in the backlog. A **Draft saved** message offers **Open**. Your drafts are listed on **Drafts** in the
+top bar, where each one can be opened, published or discarded. A draft's own page shows a **Draft** label where
+the number goes and a banner that says *"Only you can see this draft."*, with **Publish** and **Discard**.
+History and comments are not offered yet, and **Move** and **Delete** say *"Available after you publish"*.
+**Publish** makes it an ordinary ticket with a number, last in the backlog. **Discard** first says what will be
+erased with it (its sub-drafts and uploaded files; linked notes are kept), and then erases it.
 
 **On the title:** a blank title, or one that is only spaces, is refused. But extra spaces around real
 words are kept exactly as you typed them, so check what you typed if you are fussy about tidiness.

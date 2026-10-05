@@ -28,7 +28,8 @@ import { useWorkspaceLookup } from "./use-workspace-name.js";
  * (`workspaceId` undefined — `/workspaces`, `/inbox`, `/help`, `/account`,
  * `/settings`, `/mcp/*`) only the four ALWAYS items render (Workspaces, Inbox,
  * Help, Account) plus a scope note. With one, the workspace's own served name,
- * My work, Members and Settings join them.
+ * My work, Drafts (drafts T8, with the viewer's own draft count), Members and
+ * Settings join them.
  *
  * ## There is NO Board item, and the `projectId` prop went with it (Round 23,
  * ## owner: "the board on the nav bar doesn't work. lets remove it")
