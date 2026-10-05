@@ -191,7 +191,7 @@ describe('30.037 MyWork with placeOf', () => {
     };
     const { container, rerender } = render(<MyWork view={renamed} placeOf={placeLookup(WORKSPACES)} onOpenTicket={() => {}} />);
     const place = cardTitled(container, 'a-renamed').querySelector('.gn-my-work__place');
-    // No label at all is its own failure here, never a TypeError inside `parts`.
+    // No label at all is its own failure here, not a crash inside `parts`.
     expect(place).not.toBeNull();
     expect(parts(place as Element).names).toEqual(['Coastal Freight', 'Dockside']);
     // CONTROL: the two sources really differ here, so the leg above can tell them apart.
