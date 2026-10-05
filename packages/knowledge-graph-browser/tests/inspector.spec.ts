@@ -232,7 +232,7 @@ test('27.660 one column (920, 768 and 360 wide) and a phone keep canvas, inspect
     await openView(page, '?config=phone');
     expect(await placement(page)).toEqual(STACKED);
     const a = await pageBox(page, '.gn-kg-insp'), l = await pageBox(page, '.gn-kg-list');
-    expect(l.top).toBeGreaterThanOrEqual(a.bottom);
+    expect(l.top - a.bottom).toBeCloseTo(10, 1); // the card's own gap, as before: the one-column keys-line rule is not a phone's
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   }
 });
