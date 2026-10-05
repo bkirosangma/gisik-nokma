@@ -129,7 +129,7 @@ In `tickets.ts`, `upsertTicket` gains a `createdBy: string | null` argument, ins
 | 30.006 | `show=ws-admin` on W1 | all W1 qualifying tickets. On W2 (V is a member) → **400 `{error:'invalid_query'}`**, because the viewer does not hold that role there. The UI never offers it, and refusing beats silently widening. |
 | 30.007 | `show=project-admin` on W1 | {tp} only (not tw) |
 | 30.008 | `show=` (empty), `show=bogus`, a repeated `show` param | 400 `invalid_query` |
-| 30.009 | `show=created` for a ticket V created but can NO LONGER see (moved to a project V is not on, with W1 role `member`; build that rig in W2) | absent, because visibility bounds every arm |
+| 30.009 | `show=created` for a W2 ticket V created that is hidden from V by an explicit `visibility.set` to [U] (rule A puts a member on every live project, and `visibleTicketsWhere` has no creator arm; AMEND 16:3x) | absent, because visibility bounds every arm. **Control, same `it()`:** another V-created W2 ticket without the restriction IS returned |
 | 30.010 | `getWorkspaceSettings` reuse (the online client reads settings from this body) | the no-`show` request still carries `settings`, the regression control |
 
 Implementation in `readAttention`:
@@ -154,7 +154,16 @@ Route parsing: `show` must be a single string. Split it on `,`; every value must
   - **30.011:** the row for W1 carries `adminProjectIds: [P1]`; the row for W2 carries `[]`.
   - **30.012:** an owner with no explicit project rows → `[]` (implicit `projectAdmin:false`, per `effective-role.ts:180-187`).
 
-  Build the field from the `eff` that `workspaces.ts:206` already resolves: `[...eff.projects].filter(([, p]) => p.projectAdmin).map(([id]) => id).sort()`. Add `adminProjectIds: string[]` to the response type and to app-core's `WorkspaceRef` (`view-types.ts:172-221`) and its mapper. That one app-core line is a field add, so T3 can rely on it.
+  Build the field from the `eff` that `workspaces.ts:206` already resolves: `[...eff.projects].filter(([, p]) => p.projectAdmin).map(([id]) => id).sort()`. The SERVER response type carries it as required (`adminProjectIds: string[]`). App-core's `WorkspaceRef` (`view-types.ts:172-221`) gets the line `  adminProjectIds?: string[];` directly under `role`. It is OPTIONAL (AMEND 16:3x, owner priority): a required field breaks about 65 typecheck sites in web, and that churn would also conflict when KG/WG later merge main. T1 owns `mappers.ts` and makes the mapper ALWAYS set it (`raw.adminProjectIds ?? []`). **30.012b** pins the mapper: a row with `[P1]` → `[P1]`, and a row without the field → `[]`. Every consumer reads `(w.adminProjectIds ?? [])`; TypeScript forces it, because the field is optional. T1 edits no web literal.
+
+- [ ] **Step 4b: `show` on `GET /v1/contests` (AMEND 16:3x).** The strip appends every visible open contest (`mapAttention`), so without this an owner on the default filter still sees every contest in every workspace. That contradicts the owner's request.
+  - Move the `show` parsing and its 400 refusals (Step 3) into one shared module, e.g. `apps/server/src/read/attention-show.ts`, exporting `parseShow(query, eff)` and `ticketMatchesShow(row, show, viewerId, eff)`. The attention route and the contests route (`sync/contests-route.ts:213`) both use it.
+  - The contests route filters its rows by the joined `proj_tickets` row (`created_by`, `assignee_id`, `project_id`) when `show` is given. With no `show`, the answer is unchanged.
+  - **30.059:** `show=created,assigned` returns only the contests on tickets V created or is assigned to. **Control, same `it()`:** with no `show`, all contests are returned.
+  - **30.060:** `show=ws-admin` on the W2 rig (V is a member there) → 400 `invalid_query`.
+  - **30.061:** `show=project-admin` → only the contests on P1's tickets.
+  - **Kills:** the contests route ignores `show` → 30.059; the per-row test drops the assigned arm → 30.059.
+  - **T3 consumes this:** `getAttention(ws, show)` passes `show` to BOTH URLs.
 
 - [ ] **Step 5: Kills** (a driver in `roles/mut-out/mwg-t1/`; each mutant RED by the named case, controls GREEN before and after):
   - drop the `created` arm → 30.004/30.005;
@@ -251,7 +260,7 @@ DROP TABLE IF EXISTS user_my_work_preferences;
 - Modify: `packages/app-core/src/data-source.ts` (`getAttention` `:419`, preferences block `:450-452`)
 - Modify: `packages/app-core/src/online/online-data-source.ts` (`getAttention` `:570-577`; add the two preference calls)
 - Modify: `packages/app-core/src/online/mappers.ts` (`mapAttention` `:2582`, `mapAttentionItem` `:2691`: carry `workspaceId`)
-- Modify: `packages/app-core/src/view-types.ts` (`AttentionItem` `:880-887` gains `workspaceId: string`; `WorkspaceRef` gains the line `  adminProjectIds: string[];` directly under its `role` line, BYTE-IDENTICAL to T1's line so the tipmerge is clean (prove it with `git merge-tree` before the REVIEW); the mapper half belongs to T1 alone, and T3's tests build `WorkspaceRef` values directly)
+- Modify: `packages/app-core/src/view-types.ts` (`AttentionItem` `:880-887` gains `workspaceId: string`; `WorkspaceRef` gains the line `  adminProjectIds?: string[];` directly under its `role` line (OPTIONAL, AMEND 16:3x: required would break about 65 literals in web alone), BYTE-IDENTICAL to T1's line so the tipmerge is clean (prove it with `git merge-tree` before the REVIEW); the mapper half belongs to T1 alone, and T3's tests build `WorkspaceRef` values directly)
 - Modify: `packages/app-core/src/replica/replica-data-source.ts` (the new preference methods → ReplicaGapError, same as `getAttention`)
 - Create: `packages/app-core/src/views/my-work-global.ts` (pure: `groupByWorkspaceProject`, `showOptionsFor`)
 - Create: `packages/app-core/src/views/use-global-my-work.ts` (hook)
@@ -276,12 +285,12 @@ export function groupByWorkspaceProject<T extends { workspaceId: string; project
   items: readonly T[], workspaces: readonly WorkspaceRef[]): WorkspaceGroup<T>[];
 // order: workspace name (localeCompare, 'en', sensitivity base), then project name; items keep their INPUT order (bucket order)
 export function showOptionsFor(workspaces: readonly WorkspaceRef[]): AttentionShow[];
-// always ['created','assigned']; + 'ws-admin' if any role owner|admin; + 'project-admin' if any adminProjectIds.length > 0
+// always ['created','assigned']; + 'ws-admin' if any role owner|admin; + 'project-admin' if any (adminProjectIds ?? []).length > 0
 
 // views/use-global-my-work.ts
 export function useGlobalMyWork(source: DataSource, workspaces: readonly WorkspaceRef[], show: readonly AttentionShow[]): {
   attention: { data: AttentionItem[] | null; error: unknown; byWorkspace: Record<string, unknown> };
-  myWork: { data: WorkItem[] | null; error: unknown };
+  myWork: { data: MyWorkView | null; error: unknown }; // AMEND 16:3x: the per-workspace MyWorkView merged per section; contested stays flat (ContestedClaim has no workspace/project)
 };
 // one live query per NON-ARCHIVED workspace; per workspace, `show` is INTERSECTED with what that workspace allows
 // (ws-admin only where role is owner|admin; project-admin only where adminProjectIds non-empty; if the intersection is empty, skip the workspace).
@@ -318,7 +327,9 @@ export function useGlobalMyWork(source: DataSource, workspaces: readonly Workspa
 
   Use the existing neo chip and segmented styles in `ui.css`. Any new CSS block goes ABOVE the "LOADING PLACEHOLDERS" block (the 25.019 trap).
 
-- [ ] **Step 5: grouped rendering.** `AttentionStrip` and `MyWork` accept an optional `groups?: WorkspaceGroup<…>[]`. Given it, they render `<h2>` workspace and `<h3>` project headings with each group's items. Without it, they render as today. The tests for both arms live under case 30.020 (grouped: headings in the pinned order; ungrouped: today's markup, unchanged).
+- [ ] **Step 5: grouped rendering (AMEND 16:3x).**
+  - `AttentionStrip` accepts `groups?: WorkspaceGroup<AttentionItem>[]` and renders `<h2>` workspace and `<h3>` project headings. `ATTENTION_CAP` still holds: the strongest 5 rows across all groups, drawn under their own headings.
+  - `MyWork` accepts `groups?: { assigned, inTransit, shared: WorkspaceGroup<WorkItem>[] }` and renders `<h3>` workspace and `<h4>` project headings inside its existing `<h2>` sections. Contested stays flat. Without it, they render as today. The tests for both arms live under case 30.020 (grouped: headings in the pinned order; ungrouped: today's markup, unchanged).
 
 - [ ] **Step 6: Kills.**
   - `groupByWorkspaceProject` sort removed → 30.019;
