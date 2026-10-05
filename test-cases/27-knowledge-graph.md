@@ -299,13 +299,6 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 <!-- KG-C T8 -->
 <!-- KG-C T9 -->
 
-### 27.3.3 The centre on every ring (`task/kg-c-t7-view`, planner ruling Q1 2026-10-05)
-
-The route never answered `hops=0`, and a ring is the items at exactly `hops` steps, so no answer held the centre itself: a view could not label it, nor a centre with no links at all. Every answer now carries `center`.
-
-- ✅ **27.363 — the centre on ring 1 and on an empty ring:** `center` equals the same ticket as a ring item gives it (keyed, `hop` 0, `out` false), on ring 1 and on an empty ring past the end, and is never in `items`; control: a guest who sees only their own ticket gets the same keyed centre as the owner on ring 1 and on an empty ring, never the title-labelled raw form (`apps/server/test/graph/neighbours.test.ts`)
-- ✅ **27.364 — the centre seeds the store:** an empty ring 1 leaves the store holding only its centre, with its label, and still marks the end; control: a later answer with another label keeps the first copy (`packages/knowledge-graph/test/engine/model.test.ts`)
-
 ### 27.3.1 The harness port (`task/ctl-pw-ports`, planner P35 2026-10-05)
 
 - ✅ **27.360 — `KG_PW_PORT` moves the harness:** with it set, the RESOLVED `playwright.config.ts` (read in a fresh node, so a config that ignored the variable cannot pass) has the webServer url, the base url and the vite `--port … --strictPort` on that port (`packages/knowledge-graph-browser/tests/port.spec.ts`)
@@ -322,6 +315,13 @@ A directed edge (`blocks`, `ref`) ends at its TARGET's card border, its head dra
 - ✅ **27.353 — regression control:** all 34 layout positions equal the clean tree's (KG 38366a4e) to 2 decimals; the node and edge `size/opacity` censuses at rest and on hovering GN-133 equal the clean tree's (the same three edges lit, 23 nodes dimmed); every node's centre hits a node. The named change: a directed edge's segment under its target card is no longer drawn, so no longer hit (on the clean tree a 4 px grid differed at 37 of 5,758 points, all on `blocks`/`ref` edges). The test reads the `ref` edge into the centre card as not hit at 0.45, 0.6 and 0.8 × B (the clean tree hit it at all three), hit 15 px outside B, and a hover on its head reports the edge. CONTROL (the mirror): an undirected edge still runs to its target's centre, so `parent` GN-142→GN-151 is still hit 6, 8 and 10 px from GN-151's centre, inside its chip. Mutations: a card on every edge → RED (the mirror only); `hitAt` reporting nothing → RED (`packages/knowledge-graph-browser/tests/arrows.spec.ts`, `probe.hitAt`)
 - ✅ **27.354 — the card in px (unit):** `cardShape` with 7 px-a-character labels and Sigma's 5 px label margin gives a right-label chip's node square and label box, the box growing by the subtitle and Sigma's 2 px attachment gap, the centre card's box centred on it (label over), a note's square corners and a compact chip's 4 px padding; no card at dot or fog level, or for a person at rest; a label-less card has a zero box. `hasHead` is true for `blocks` and `ref` only, never in the fog. Mutations: each clause of `hasHead` dropped, no null card at dot/fog/person, the `over` branch, the subtitle, its offset, the label margin, Sigma's attachment gap ×10, the box padding, the node's corner floor, its square corners, the label-less zero box → RED (`packages/knowledge-graph/test/card-box.test.ts`)
 - ✅ **27.355 — a dot target keeps Sigma's clamp:** with the target patched to dot level (no card), the border the probe finds is the dot's (B < 6) and the head passes. Mutations: a card for a dot target → RED (`packages/knowledge-graph-browser/tests/arrows.spec.ts`)
+
+### 27.3.3 The centre on every ring (`task/kg-c-t7-view`, planner ruling Q1 2026-10-05)
+
+The route never answered `hops=0`, and a ring is the items at exactly `hops` steps, so no answer held the centre itself: a view could not label it, nor a centre with no links at all. Every answer now carries `center`.
+
+- ✅ **27.363 — the centre on ring 1 and on an empty ring:** `center` equals the same ticket as a ring item gives it (keyed, `hop` 0, `out` false), on ring 1 and on an empty ring past the end, and is never in `items`; control: a guest who sees only their own ticket gets the same keyed centre as the owner on ring 1 and on an empty ring, never the title-labelled raw form (`apps/server/test/graph/neighbours.test.ts`)
+- ✅ **27.364 — the centre seeds the store:** an empty ring 1 leaves the store holding only its centre, with its label, and still marks the end; control: a later answer with another label keeps the first copy (`packages/knowledge-graph/test/engine/model.test.ts`)
 
 ## 27.4 MCP graph query and semantic layer (spec D, 27.400–27.549)
 
