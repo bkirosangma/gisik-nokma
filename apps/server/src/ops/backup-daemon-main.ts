@@ -8,6 +8,7 @@ import { createObjectStoreFromEnv } from '../attachments/store-config.js';
 import { runAutoCloseSweep } from '../auto-close/sweep.js';
 import { ConfigError } from '../config.js';
 import { createPool } from '../db.js';
+import { flowSweepIntervalMs, runFlowSweep } from '../flow/sweep.js';
 import { createIngestService } from '../ingest/ingest-service.js';
 import { runNotificationSweep } from '../notifications/sweep.js';
 import { requireExplicitObjectStore, runPurgeSweep } from '../purge/sweep.js';
@@ -15,6 +16,7 @@ import { buildProjectionRegistry } from '../projections/index.js';
 import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
 import { optionalDatabaseCaCert } from './backup-env.js';
+import { registerDaemonListeners } from './daemon-listeners.js';
 import { runExpiredSessionSweep, sessionSweepIntervalMs as readSessionSweepIntervalMs } from './expired-sessions.js';
 import { exportLedger } from './export-ledger.js';
 import { s3SinkFromEnv, s3TargetFromEnv } from './object-sink.js';
@@ -181,6 +183,10 @@ async function main(): Promise<void> {
       : rawAutoCloseInterval,
   );
 
+  // The flow sweep (wtg2 T14, AP-5): the same read-once, validate-on-every-call shape and empty-means-unset
+  // handling as the sweeps around it, default five minutes (`DEFAULT_FLOW_SWEEP_INTERVAL_MS`, `flow/sweep.ts`).
+  const flowSweepEveryMs = flowSweepIntervalMs(process.env.FLOW_SWEEP_INTERVAL_MS);
+
   // The permanent-delete sweep (trash series Plan 2, spec §5.1): the same
   // read-once, validate-on-every-call shape and empty-means-unset handling as
   // the two sweeps above, default one hour.
@@ -204,6 +210,10 @@ async function main(): Promise<void> {
     evaluate: evaluateEvent,
     projections,
   });
+  // This process files events too (the flow sweep's promotions, auto-close) through an ingest no server listener
+  // sees, so the notification fan-out is registered on it (wtg2 T14, NT-1). The unsubscribe is discarded: the
+  // process ends with the pool (`shutdown` below).
+  registerDaemonListeners(ingest, { pool, transports: [notificationTransport] });
 
   const scheduledJobs: ScheduledJob[] = [
     // The three schedule values below are NOT validated here, and that is the
@@ -307,6 +317,15 @@ async function main(): Promise<void> {
         await runExpiredSessionSweep(pool, new Date(), (entry) => console.log(JSON.stringify(entry)));
       },
       delayMs: () => requirePositiveIntervalMs(sessionSweepIntervalMs, 'SESSION_SWEEP_INTERVAL_MS'),
+    },
+    {
+      // wtg2 T14 (AP-5): promotes what the server's listener missed, through this process's ingest. LAST in the list.
+      name: 'flow',
+      run: async (): Promise<void> => {
+        const report = await runFlowSweep({ pool, ingest });
+        console.log(JSON.stringify({ msg: 'flow sweep complete', promoted: report.promoted, settled: report.settled, refused: report.refused }));
+      },
+      delayMs: () => requirePositiveIntervalMs(flowSweepEveryMs, 'FLOW_SWEEP_INTERVAL_MS'),
     },
   ];
 
