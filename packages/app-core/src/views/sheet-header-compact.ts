@@ -461,16 +461,23 @@ export function useSheetHeaderCompact(
 
   // An overlay closes on an outside tap and on Escape. Capture phase: `Sheet`'s own document Escape
   // listener honours `defaultPrevented`, so this one runs first and consumes the key.
+  // sheet-peek-escape-race (planner 2026-10-05): the listeners live only while an overlay is OPEN (not while it animates out, when there
+  // is nothing left to consume a key), and `onKey` retires the moment it closes the overlay: the passive cleanup that removes it can run
+  // well after the overlay left the DOM, and a quick second Escape in that gap must reach `Sheet` (25.443). Keyed on open, not on
+  // non-null, so an overlay reopened while it animates out gets a fresh, live listener (25.444).
+  const peekOpen = peek !== null && !peek.closing;
   useEffect(() => {
-    if (peek === null) return undefined;
+    if (!peekOpen) return undefined;
     // The Move dialog opens over the sheet while the title overlay may still be open under it: what happens INSIDE another dialog is
     // that dialog's own (its Escape closes it first, and a press in it is not an outside tap that would turn Move inert).
     const inOtherDialog = (target: EventTarget | null): boolean => {
       const dialog = target instanceof Element ? target.closest('[role="dialog"]') : null;
       return dialog !== null && !dialog.classList.contains('gn-sheet');
     };
+    let live = true;
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape' || inOtherDialog(event.target)) return;
+      if (!live || event.key !== 'Escape' || inOtherDialog(event.target)) return;
+      live = false;
       event.preventDefault();
       closePeek();
     };
@@ -491,7 +498,7 @@ export function useSheetHeaderCompact(
       document.removeEventListener('keydown', onKey, true);
       document.removeEventListener('pointerdown', onPointer, true);
     };
-  }, [peek === null, closePeek]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [peekOpen, closePeek]);
 
   // The overlay kind on the panel (CSS places Move beside the full title while it is open) and the
   // collapsed middle crumbs, which are out of the tab order while compact.

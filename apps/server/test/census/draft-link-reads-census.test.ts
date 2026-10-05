@@ -7,6 +7,7 @@ const SRC = fileURLToPath(new URL('../../src', import.meta.url));
 
 /** Every file under `apps/server/src` that names the link table, and why it may. A reader of the table must answer for drafts (R41, R42). */
 const READERS: Record<string, string> = {
+  'flow/read-flow.ts': "the flow read (wtg2 T12): the ring statement walks leads_to only, and an end is admitted through LIVE_TICKET_WHERE and visibleTicketsWhere or as the viewer's own draft (listMyDrafts); the closing statement keeps a link only when both ends were admitted, so no edge to someone else's draft (29.188)",
   'projections/ticket-links.ts': 'writes the table, keyed by from ?? entity (drafts R42)',
   'projections/tickets.ts': "a docblock naming the table as the queryable copy of TicketState.links; it reads nothing from it",
   'purge/erasure.ts': 'deletes the rows naming an erased ticket, either end (28.102)',

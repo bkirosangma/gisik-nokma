@@ -18,7 +18,7 @@ describe('migrateLocal', () => {
       // TABLE rather than a column on `snapshots` because `migrateLocal` runs
       // `CREATE TABLE IF NOT EXISTS` and nothing else — there is no `ALTER`
       // path, and `LOCAL_SCHEMA_VERSION` was written into `meta` and never read
-      // back (its one reader since version 5, `createReplica`'s re-pull, converges
+      // back (its one reader since version 5, `createReplica`, re-pulls
       // state, not columns) — so a new column would work on a fresh device and throw
       // `no such column` on every existing one. An exact `toEqual` here is what
       // made that decision visible instead of silent.

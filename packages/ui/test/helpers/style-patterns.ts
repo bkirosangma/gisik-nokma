@@ -175,6 +175,7 @@ export const SCREEN_OWNERS: Record<string, string> = {
   'apps/web/app/w/[workspaceId]/page.tsx': 'B13',
   'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx': 'A5-A7, B5-B8',
   'apps/web/app/w/[workspaceId]/my-work/page.tsx': 'B10',
+  'apps/web/app/w/[workspaceId]/drafts/page.tsx': 'drafts T8', // the viewer's own drafts (28.178); styled by T8's DRAFTS block
   'apps/web/app/w/[workspaceId]/members/page.tsx': 'B12',
   'apps/web/app/w/[workspaceId]/settings/workflows/page.tsx': 'B16',
   'apps/web/app/w/[workspaceId]/settings/workflows/new/page.tsx': 'B16',
@@ -213,6 +214,7 @@ export const PHONE_OWNERS: Record<string, string> = {
   'apps/web/app/notes/page.tsx': 'T9',
   'apps/web/app/notes/[noteId]/page.tsx': 'T9',
   'apps/web/app/w/[workspaceId]/my-work/page.tsx': 'T9',
+  'apps/web/app/w/[workspaceId]/drafts/page.tsx': 'drafts T8', // the 40rem row arm and the phone row menu (28.166, 28.179)
   'apps/web/app/account/page.tsx': 'T10',
   'apps/web/app/settings/page.tsx': 'T10',
   'apps/web/app/mcp/tokens/page.tsx': 'T10',

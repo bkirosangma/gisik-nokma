@@ -192,7 +192,8 @@ function useKeyMeasure(): KeyMeasure {
 /**
  * TV-11: the panel fills the height under the filters. Measured, not guessed: the panel's top edge to the bottom of the window,
  * re-read when the window resizes (a phone rotating, a keyboard opening). A flex parent cannot do this alone because the
- * project page's filter bar and the panel are siblings of unknown heights inside a scrolling page.
+ * project page's filter bar and the panel are siblings of unknown heights inside a scrolling page. The height it sets holds in
+ * any flex parent: `.gn-timeline` is `flex-shrink: 0` (ui.css; a fixed-height flex column shrank it, T10's 29.040).
  */
 function useFillHeight(ref: RefObject<HTMLElement | null>): void {
   useLayoutEffect(() => {

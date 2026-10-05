@@ -56,6 +56,19 @@ import { LinkedFromSection, linkedFromHref } from './linked-from-section.js';
 import { ReopenDialog } from './reopen-dialog.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
+import { DiscardDraftDialog } from './discard-draft-dialog.js';
+import { discardCounts, discardDraft, publishDraft, type DiscardCounts, type DraftOutcome } from './draft-actions.js';
+import {
+  DRAFT_BANNER,
+  DRAFT_COUNTS_UNREADABLE,
+  DRAFT_DISABLED_REASON,
+  DRAFT_DISCARD_LABEL,
+  DRAFT_PENDING_CHILD_NOTE,
+  DRAFT_PENDING_LABEL,
+  DRAFT_PILL_LABEL,
+  DRAFT_PUBLISH_LABEL,
+  DRAFT_VISIBILITY_DISCLOSURE,
+} from './drafts-copy.js';
 import { useOptimisticTicket, type OverlayField, type TicketOverlay } from './optimistic-ticket.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 import { usePhoneBoard } from './use-phone-board.js';
@@ -404,6 +417,8 @@ export type TicketSheetProps = {
    * arguments is unaffected.
    */
   onDeleted?: (ticketId: string, name: string, outcome: { permanent: boolean }) => void;
+  /** Drafts T8: the draft was published or discarded (committed, or queued offline). The host re-reads whatever lists it keeps. */
+  onDraftChanged?: () => void;
   /**
    * The two names the breadcrumb above the title shows — the workspace's and
    * the project's — supplied by the host, which already holds both.
@@ -735,6 +750,7 @@ export function TicketSheet({
   canSetVisibility = true,
   onOpenTicket,
   onDeleted,
+  onDraftChanged,
   workspaceName,
   projectName,
   workspaceHref,
@@ -744,7 +760,7 @@ export function TicketSheet({
   assignOutsider,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
-  const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
+  const [tabChosen, setTab] = useState<'details' | 'history' | 'attachments'>('details');
   // Unit 5(b), owner: "I thought we already made the attachment feature but
   // i dont see where we can attach files in our build" — the Attachments
   // tab's own "Attach a file" (prototype `addFile`, `desktop.dc.html:1363-
@@ -987,6 +1003,20 @@ export function TicketSheet({
   const read = useLiveQuery(dataSource, workspaceId, ticketId, () => dataSource.query.getTicket(workspaceId, ticketId), {
     cacheKey: `ticket:${ticketId}`,
   });
+  // Drafts T8: hooks cannot follow the early returns below, so the draft flag the tab effect needs is read here. A
+  // draft has no History tab (spec §12.3), so a sheet that had it open returns to Details when the read says draft.
+  // The shown tab is derived, so no frame draws a tablist with nothing selected; the effect then forgets the choice,
+  // so a publish does not bring History back unasked.
+  const readIsDraft = read.data?.draft === true;
+  const tab = readIsDraft && tabChosen === 'history' ? 'details' : tabChosen;
+  useEffect(() => {
+    if (readIsDraft && tabChosen === 'history') setTab('details');
+  }, [readIsDraft, tabChosen]);
+  /** The Discard confirm's counts, read when Discard is pressed (decision 9); `null` while the confirm is closed. */
+  const [discardAsk, setDiscardAsk] = useState<DiscardCounts | null>(null);
+  /** A draft action's answer that is not a server refusal: the unreached sentence, the unread counts, a queued publish. */
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
   // Every edit is shown at once and rolled back honestly (smoothness T7, spec S5; `optimistic-ticket.ts`).
   // `read` stays the DATA (the workflow, the subtasks and the reloads below ask it); what is DRAWN is `optimistic.ticket`.
   const optimistic = useOptimisticTicket(read, ticketId);
@@ -1168,7 +1198,10 @@ export function TicketSheet({
     const current = read.data?.ticket ?? null;
     if (current === null) return [];
     const page = await dataSource.query.getTickets(current.projectId, {}, 'flat');
-    return page.rows.filter((row) => row.parentId === ticketId);
+    // Drafts T8 (AMEND-drafts-t8-pending-children): a draft's pending children are rows of the SAME page, kept
+    // here and split off below, so drawing them asks the server nothing new.
+    const pending = current.pendingChildren ?? [];
+    return page.rows.filter((row) => row.parentId === ticketId || pending.includes(row.ticketId));
   });
   /**
    * The workspace's ticket type ladder (door G, 2026-09-19) — read ONLY to put a
@@ -2465,6 +2498,52 @@ export function TicketSheet({
 
   const state = ticketRead.ticket;
   /**
+   * Drafts T8: a draft (its author's own; nobody else is served one) has a pill where the key goes, a banner with
+   * Publish and Discard, no History tab and no comments, and Move and Delete disabled (decision 8).
+   */
+  const isDraft = ticketRead.draft === true;
+  /** Publish and Discard answer the same way: a refusal in the refusal slot, anything unanswered or queued said in the banner. */
+  const afterDraftAction = (outcome: DraftOutcome, onDone: () => void): void => {
+    if (outcome.status === 'refused') setServerRefusal({ rule: outcome.rule, reason: outcome.reason });
+    else if (outcome.status === 'unreachable') setDraftNotice(outcome.message);
+    else {
+      // Decision 4: a queued claim leaves the draft a draft until the server answers; the pill stays, said here.
+      if (outcome.status === 'queued') setDraftNotice(DRAFT_PENDING_LABEL);
+      onDone();
+      onDraftChanged?.();
+    }
+  };
+  const publishThisDraft = async (): Promise<void> => {
+    setServerRefusal(null);
+    setDraftNotice(null);
+    setDraftBusy(true);
+    const outcome = await publishDraft(dataSource, make, { workspaceId, ticketId, projectId: state.projectId });
+    setDraftBusy(false);
+    afterDraftAction(outcome, () => {
+      read.reload();
+      history.reload();
+      // Publishing files the pending children's parent, so the sub-items list changes too (28.197).
+      subtasks.reload();
+    });
+  };
+  const askDiscard = async (): Promise<void> => {
+    setServerRefusal(null);
+    setDraftNotice(null);
+    try {
+      setDiscardAsk(discardCounts(await dataSource.query.getMyDrafts(workspaceId), ticketId));
+    } catch {
+      // Decision 9: the count is not guessed as zero; nothing opens.
+      setDraftNotice(DRAFT_COUNTS_UNREADABLE);
+    }
+  };
+  const confirmDiscardThisDraft = async (): Promise<void> => {
+    setDiscardAsk(null);
+    setDraftBusy(true);
+    const outcome = await discardDraft(dataSource, make, { workspaceId, ticketId, projectId: state.projectId });
+    setDraftBusy(false);
+    afterDraftAction(outcome, onClose);
+  };
+  /**
    * Door G, 2026-09-19 — PRIORITY, DUE, START and TYPE as rows that are always
    * drawn.
    *
@@ -2602,7 +2681,15 @@ export function TicketSheet({
    * the model.
    */
   const subtasksUnread = subtasks.data === null;
-  const subtaskRows = subtasks.data ?? [];
+  const subtaskRows = (subtasks.data ?? []).filter((row) => row.parentId === ticketId);
+  /**
+   * Drafts T8 (AMEND-drafts-t8-pending-children): the published tickets placed under this draft, held on its own
+   * stream (`pendingChildren`, drafts T6) until it is published. Listed after its own children, in the page's order,
+   * with `Joins when published`; they are not children yet, so they stay out of the reconciliation's count. Publishing
+   * clears `pendingChildren` and files their parent, so they come back as ordinary rows above.
+   */
+  const pendingChildIds = state.pendingChildren ?? [];
+  const pendingChildRows = (subtasks.data ?? []).filter((row) => row.parentId !== ticketId && pendingChildIds.includes(row.ticketId));
   const subtaskExpected =
     ticketRead.rollup === null
       ? 0
@@ -2717,7 +2804,9 @@ export function TicketSheet({
           projectId: state.projectId,
           parentId: ticketId,
           title: newSubtaskTitle,
-          start: 'focus',
+          // Drafts T8 (planner ruling A): a child of a draft is the author's own draft (R3), born in Backlog on its own
+          // stream, so the draft parent's sheet lists it and nothing public names the draft.
+          ...(isDraft ? { draft: true as const, start: 'backlog' as const } : { start: 'focus' as const }),
         },
       });
       // The create flow's guarded door (`submitChildEvent`), not a bare
@@ -3140,7 +3229,13 @@ export function TicketSheet({
    * license it: that rule is for a SERVED withheld name, and this absence is a
    * derivation this read could not complete.
    */
-  const lastCrumb = ticketRead.key ?? ticketRead.title;
+  //
+  // Drafts T8: a draft has no key, so the pill stands where the key goes and the title is not repeated in the crumb.
+  const lastCrumb: ReactNode = isDraft ? <span className="gn-draft-pill">{DRAFT_PILL_LABEL}</span> : (ticketRead.key ?? ticketRead.title);
+  // Drafts T8 (decision 8): what a draft cannot do is disabled, not removed, and says why; the id is once in the document, on
+  // the footer's copy (mounted on every tab, unlike the state row's), and all three controls point at that copy.
+  const draftReasonId = `draft-reason-${ticketId}`;
+  const draftDescribedBy = isDraft ? draftReasonId : undefined;
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
   // 2026-09-17); every reader spells the same `?? null`.
   const closed = state.closed ?? null;
@@ -3675,7 +3770,8 @@ export function TicketSheet({
           className="gn-sheet__move"
           aria-label="Move this ticket"
           onClick={openMove}
-          disabled={closed !== null}
+          disabled={closed !== null || isDraft}
+          aria-describedby={draftDescribedBy}
           inert={compactHeader.moveInert}
         >
           Move
@@ -3863,10 +3959,27 @@ export function TicketSheet({
           2026-09-22** (spec decision 5 — *"add the Attachments tab"*). So the
           tab is BUILT rather than assumed, and `16.81`'s count moved 2 → 3 in
           the same change. */}
+      {isDraft ? (
+        <div className="gn-draft-banner" role="group" aria-label={DRAFT_PILL_LABEL}>
+          <p className="gn-draft-banner__text">{DRAFT_BANNER}</p>
+          <Button variant="primary" disabled={submitting || draftBusy} onClick={() => void publishThisDraft()}>
+            {DRAFT_PUBLISH_LABEL}
+          </Button>
+          <Button disabled={submitting || draftBusy} onClick={() => void askDiscard()}>
+            {DRAFT_DISCARD_LABEL}
+          </Button>
+          {draftNotice === null ? null : (
+            <p role="alert" className="gn-drafts__alert">
+              {draftNotice}
+            </p>
+          )}
+        </div>
+      ) : null}
       <SegmentedControl
         options={[
           { value: 'details', label: 'Details' },
-          { value: 'history', label: 'History' },
+          // Drafts T8: History is not a tab on a draft (spec §12.3).
+          ...(isDraft ? [] : [{ value: 'history' as const, label: 'History' }]),
           { value: 'attachments', label: 'Attachments' },
         ]}
         value={tab}
@@ -4000,11 +4113,16 @@ export function TicketSheet({
                     naming a fact that has nothing to do with the move being
                     attempted.
                   */}
-                  <Button onClick={openMove} disabled={closed !== null}>
+                  <Button onClick={openMove} disabled={closed !== null || isDraft} aria-describedby={draftDescribedBy}>
                     Move…
                   </Button>
                   {closed !== null ? (
                     <span className="gn-sheet__closed-note">Closed. Reopen it first</span>
+                  ) : null}
+                  {isDraft ? (
+                    <span className="gn-draft-reason">
+                      {DRAFT_DISABLED_REASON}
+                    </span>
                   ) : null}
                 </div>
               </dd>
@@ -4274,6 +4392,11 @@ export function TicketSheet({
                   suite is a test-design decision this correction does not take: *owner,
                   whoever next touches either file.*
                 */}
+                {isDraft ? (
+                  // Spec R17 and R7 (planner ruling 2026-10-04, follow-up): a draft's audience is its author alone,
+                  // and the server refuses `visibility.set` on it, so the block is replaced rather than offered.
+                  <p className="gn-draft-reason">{DRAFT_VISIBILITY_DISCLOSURE}</p>
+                ) : (
                 <VisibilityEditor
                   dataSource={dataSource}
                   workspaceId={workspaceId}
@@ -4288,6 +4411,7 @@ export function TicketSheet({
                     history.reload();
                   }}
                 />
+                )}
               </dd>
             </div>
             {Object.entries(state.fields)
@@ -4358,6 +4482,7 @@ export function TicketSheet({
             ticketId={ticketId}
             canEdit={editorSlot !== undefined}
             make={make}
+            isDraft={isDraft}
             links={links}
             {...(queryTickets === undefined ? {} : { queryTickets })}
             {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
@@ -4441,7 +4566,7 @@ export function TicketSheet({
               >
                 {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read, so this list is not shown rather than shown short.`}
               </p>
-            ) : subtaskRows.length === 0 ? (
+            ) : subtaskRows.length === 0 && pendingChildRows.length === 0 ? (
               <p className="gn-ticket-sheet__subtasks-empty" data-testid="sheet-subtasks-empty">
                 No subtasks. A subtask is a ticket of its own: it gets a state, an assignee, a date
                 and a history.
@@ -4496,6 +4621,26 @@ export function TicketSheet({
                           ? `, ${row.typeId}`
                           : `, ${row.typeId}, Due ${formatDate(row.dueDate.date)}`}
                       </span>
+                    </span>
+                  </li>
+                ))}
+                {pendingChildRows.map((row) => (
+                  <li
+                    key={row.ticketId}
+                    data-testid={`subtask-pending-${row.ticketId}`}
+                    className="gn-ticket-sheet__subtask-card gn-ticket-sheet__subtask-card--pending"
+                  >
+                    {/* The key and the title share one line, the key first, with a TEXT space between them (two
+                        adjacent spans are one run of glyphs; see the card above). The card is a flex column, so the
+                        pair needs this inline wrapper or the key would take a line of its own. */}
+                    <span className="gn-ticket-sheet__subtask-head">
+                      {row.key === null ? null : <span className="gn-ticket-sheet__subtask-key">{row.key}</span>}
+                      {row.key === null ? null : ' '}
+                      <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    </span>
+                    <span className="gn-ticket-sheet__subtask-meta">
+                      <Chip tone={row.stateCategory}>{row.stateName}</Chip>
+                      <span className="gn-ticket-sheet__subtask-pending">{DRAFT_PENDING_CHILD_NOTE}</span>
                     </span>
                   </li>
                 ))}
@@ -4652,6 +4797,8 @@ export function TicketSheet({
             transient read failed, which is the more common case and the more
             expensive mistake.
           */}
+          {/* Drafts T8: comments open after publish (R61), so a draft offers no thread and no composer. */}
+          {isDraft ? null : (
           <CommentsThread
             // V4 — `comments.data` VERBATIM, never `?? []`. The collapse was
             // here, at the boundary, and it is what turned a read still in
@@ -4704,6 +4851,7 @@ export function TicketSheet({
               )
             }
           />
+          )}
           {/*
             Refusals from notes a posted comment TRIED to attach (spec §14.3,
             D27–D28) — the comment itself always stands; this only reports what
@@ -4838,11 +4986,13 @@ export function TicketSheet({
         <button
           type="button"
           className="gn-ticket-sheet__delete"
-          disabled={submitting}
+          disabled={submitting || isDraft}
+          aria-describedby={draftDescribedBy}
           onClick={() => setConfirmingDelete(true)}
         >
           Delete
         </button>
+        {isDraft ? <span id={draftReasonId} className="gn-draft-reason">{DRAFT_DISABLED_REASON}</span> : null}
       </footer>
 
       {/*
@@ -4873,6 +5023,15 @@ export function TicketSheet({
           }}
         />
       ) : null}
+      {discardAsk === null ? null : (
+        <DiscardDraftDialog
+          open
+          title={ticketRead.title}
+          counts={discardAsk}
+          onCancel={() => setDiscardAsk(null)}
+          onConfirm={() => void confirmDiscardThisDraft()}
+        />
+      )}
       <DeleteDialog
         open={confirmingDelete}
         kind="ticket"

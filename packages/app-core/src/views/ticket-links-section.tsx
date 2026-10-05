@@ -36,6 +36,8 @@ export type TicketLinksSectionProps = {
   ticketId: string;
   canEdit: boolean;
   make: MakeSubmitted;
+  /** Drafts T8 (planner ruling A): this sheet is a draft's, so a link stored on the OTHER ticket is filed here. */
+  isDraft: boolean;
   /** The `<ticketId>:links` live query, lifted to `TicketSheet` the way the notes query is. */
   links: LiveQueryResult<TicketLinkView[]>;
   queryTickets?: (query: string) => Promise<TicketHit[]>;
@@ -44,7 +46,11 @@ export type TicketLinksSectionProps = {
   precheck?: (event: SubmittedEvent) => Promise<PrecheckResult>;
 };
 
-/** The event a choice or a row files, on the STORED source's stream (spec A §2.2). */
+/**
+ * The event a choice or a row files, on the STORED source's stream (spec A §2.2) — except on a draft's sheet, where a
+ * link whose stored source is the OTHER ticket is filed on THIS draft's stream with `from` (planner ruling A, spec
+ * R42): no public stream names a draft (owner ruling O1). A draft's outgoing link is on its own stream already.
+ */
 function eventFor(
   make: MakeSubmitted,
   workspaceId: string,
@@ -53,7 +59,9 @@ function eventFor(
   kind: TicketLinkKind,
   onOther: boolean,
   type: 'ticket.link_added' | 'ticket.link_removed',
+  isDraft: boolean,
 ): SubmittedEvent {
+  if (isDraft && onOther) return make({ workspaceId, entity: { kind: 'ticket', id: thisId }, type, payload: { kind, targetId: thisId, from: otherId } });
   const [source, target] = onOther ? [otherId, thisId] : [thisId, otherId];
   return make({ workspaceId, entity: { kind: 'ticket', id: source }, type, payload: { kind, targetId: target } });
 }
@@ -70,6 +78,7 @@ export function TicketLinksSection({
   ticketId,
   canEdit,
   make,
+  isDraft,
   links,
   queryTickets,
   resolveTicketHref,
@@ -145,7 +154,7 @@ export function TicketLinksSection({
       ticket: { id: hit.ticketId, projectId: hit.projectId, key: hit.key, title: hit.title, stateCategory: 'open' },
     };
     setPending(optimistic);
-    const event = eventFor(make, workspaceId, ticketId, hit.ticketId, picked.kind, picked.onOther, 'ticket.link_added');
+    const event = eventFor(make, workspaceId, ticketId, hit.ticketId, picked.kind, picked.onOther, 'ticket.link_added', isDraft);
     if (await file(event, `link_added:${picked.kind}:${hit.ticketId}`)) {
       setToast({ message: `Linked: ${readingOf(optimistic)} ${hit.key}`, undo: null });
     }
@@ -154,17 +163,18 @@ export function TicketLinksSection({
   async function remove(l: TicketLinkView): Promise<void> {
     setRefusal(null);
     const onOther = l.direction === 'in';
-    const event = eventFor(make, workspaceId, ticketId, l.ticket.id, l.kind, onOther, 'ticket.link_removed');
+    const event = eventFor(make, workspaceId, ticketId, l.ticket.id, l.kind, onOther, 'ticket.link_removed', isDraft);
     if (await file(event, `link_removed:${l.kind}:${l.ticket.id}`)) {
       // The Undo is built now, at click time, and filed through the same guard.
-      const undo = eventFor(make, workspaceId, ticketId, l.ticket.id, l.kind, onOther, 'ticket.link_added');
+      const undo = eventFor(make, workspaceId, ticketId, l.ticket.id, l.kind, onOther, 'ticket.link_added', isDraft);
       setToast({ message: `Removed link: ${readingOf(l)} ${l.ticket.key ?? l.ticket.title}`, undo });
     }
   }
 
   async function undoRemove(undo: SubmittedEvent): Promise<void> {
-    const target = (undo.payload as { targetId: string }).targetId;
-    const other = undo.entity.id === ticketId ? target : undo.entity.id;
+    const { targetId: target, from } = undo.payload as { targetId: string; from?: string };
+    // A draft-side undo names the other ticket in `from` (its stream and target are both this draft).
+    const other = from ?? (undo.entity.id === ticketId ? target : undo.entity.id);
     const kind = (undo.payload as { kind: TicketLinkKind }).kind;
     if (await file(undo, `link_added:${kind}:${other}`)) setToast(null);
   }

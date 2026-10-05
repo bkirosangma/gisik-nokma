@@ -834,6 +834,49 @@ describe('13.1167 a parent promoted into terminal by a republish is not swept wh
   });
 });
 
+/**
+ * 29.142 — DC-5's mirror (wtg2 T6): `checks/decision.ts` refuses closing a Decision with a `leads_to` branch and no
+ * outcome, so the sweep must not select one (no envelope, no nightly `refused`), including one whose outcome was cleared
+ * after it finished. The controls ride the same run: the same Decision with an outcome, one with no branches, and a Task
+ * with a branch of its own (so the Task is a candidate only because of the type test).
+ */
+describe('29.142 an outcome-less Decision with branches is not swept', () => {
+  async function seedDecision(ws: string, o: { branches: boolean; outcome: 'none' | 'set' | 'cleared' }): Promise<string> {
+    const id = newUlid();
+    const next = o.branches ? await seedTicket({ workspaceId: ws, enteredAt: '2026-09-17T00:00:00.000Z', state: 'doing' }) : null;
+    const at = (type: string, payload: unknown, serverTime: string) =>
+      makeCommitted({ workspaceId: ws, actorId: HUMAN, entity: { kind: 'ticket', id }, type, payload, serverTime });
+    await applyCommitted(db.pool, [
+      at('ticket.created', { typeId: 'decision', projectId: PROJECT, parentId: null, title: 'Go ahead?', start: 'focus' }, '2026-08-01T00:00:00.000Z'),
+      ...(next === null ? [] : [at('ticket.link_added', { kind: 'leads_to', targetId: next, label: 'Yes' }, '2026-08-01T00:01:00.000Z')]),
+      at('ticket.transitioned', { to: 'doing' }, '2026-08-01T00:05:00.000Z'),
+      at('ticket.transitioned', { to: 'done' }, '2026-08-02T00:00:00.000Z'),
+      ...(o.outcome === 'none' ? [] : [at('ticket.decided', { outcome: 'Yes' }, '2026-08-02T00:01:00.000Z')]),
+      ...(o.outcome === 'cleared' ? [at('ticket.decided', { outcome: null, from: 'Yes' }, '2026-08-02T00:02:00.000Z')] : []),
+    ]);
+    return id;
+  }
+
+  it('29.142 an outcome-less Decision with branches is not a candidate (nor is a cleared one); the controls are', async () => {
+    const ws = newUlid();
+    await seedWorkflowAndType(ws);
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: ws, actorId: HUMAN, entity: { kind: 'ticket-type', id: 'decision' }, type: 'ticket-type.defined', payload: { id: 'decision', name: 'Decision', icon: 'diamond', rank: 1, workflowId: WF, fields: [] } })]);
+    await seedAutoClose(ws, DAYS);
+    const bare = await seedDecision(ws, { branches: true, outcome: 'none' });
+    const cleared = await seedDecision(ws, { branches: true, outcome: 'cleared' });
+    const chosen = await seedDecision(ws, { branches: true, outcome: 'set' });
+    const free = await seedDecision(ws, { branches: false, outcome: 'none' });
+    const task = await seedTicket({ workspaceId: ws, enteredAt: '2026-08-02T00:00:00.000Z' });
+    // the Task control gets a branch of its own, so it is a candidate only because of `t.type_id = $3`
+    const tail = await seedTicket({ workspaceId: ws, enteredAt: '2026-09-17T00:00:00.000Z', state: 'doing' });
+    await applyCommitted(db.pool, [makeCommitted({ workspaceId: ws, actorId: HUMAN, entity: { kind: 'ticket', id: task }, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: tail }, serverTime: '2026-08-02T00:00:30.000Z' })]);
+    expect(await sweep()).toEqual({ workspacesOn: 1, candidates: 3, closed: 3, refused: 0 });
+    for (const id of [chosen, free, task]) expect(await closedAt(id)).not.toBeNull();
+    for (const id of [bare, cleared]) expect(await closedAt(id)).toBeNull();
+    for (const id of [bare, cleared]) expect(await closedEvents(id)).toHaveLength(0);
+  });
+});
+
 describe('28.096 a draft child is not open work for the sweep (drafts spec)', () => {
   it('closes a terminal parent whose only child is a draft, and still holds back one with a published open child beside a draft', async () => {
     const ws = newUlid();

@@ -281,6 +281,8 @@ describe('AppNav — the mounts, not the components', () => {
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
+        // Drafts T8 (spec §12.2): the viewer's own drafts, right of My work.
+        '/w/ws_1/drafts',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
         // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
@@ -342,6 +344,8 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1',
         '/w/ws_1/p/p_beta',
         '/w/ws_1/my-work',
+        // Drafts T8 (spec §12.2): the viewer's own drafts, right of My work.
+        '/w/ws_1/drafts',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
         // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
@@ -366,6 +370,8 @@ describe('AppNav — the mounts, not the components', () => {
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
+        // Drafts T8 (spec §12.2): the viewer's own drafts, right of My work.
+        '/w/ws_1/drafts',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
         // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
@@ -1181,6 +1187,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
     // this table, so a stale row here would fail as "nav does not render it"
     // rather than sitting unnoticed.
     ['/w/ws_1/my-work', 'app/w/[workspaceId]/my-work/page.tsx'],
+    ['/w/ws_1/drafts', 'app/w/[workspaceId]/drafts/page.tsx'],
     ['/notes', 'app/notes/page.tsx'],
     ['/inbox', 'app/inbox/page.tsx'],
     ['/w/ws_1/members', 'app/w/[workspaceId]/members/page.tsx'],

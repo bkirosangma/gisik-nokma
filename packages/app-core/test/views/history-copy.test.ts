@@ -417,6 +417,18 @@ describe('28.006 draft history sentences', () => {
   });
 });
 
+/** Case 28.176 (drafts T8; planner ruling 2026-10-04: trimmed to the one leg 28.006 lacks). */
+describe('28.176 draft history copy', () => {
+  // The `draft: true` line is the CONTROL, first and in the same `it`: without it the leg also passes on a renderer
+  // that never says "Drafted".
+  it('28.176 a draft flag that is not exactly true reads the old sentence', () => {
+    const typeName = (id: string): string => (id === 'task' ? 'Task' : id);
+    const created = (payload: Record<string, unknown>): TicketHistoryEvent => ({ ...eventOf('ticket.created'), payload });
+    expect(describeEvent(created({ typeId: 'task', draft: true }), { typeName })).toBe('Drafted as Task');
+    expect(describeEvent(created({ typeId: 'task', draft: 'yes' }), { typeName })).toBe('Created as Task');
+  });
+});
+
 describe('29.137 ticket.decided in History', () => {
   it('29.137 Decided, revised and cleared read as sentences; an empty or unreadable payload falls back to the wire name', () => {
     const said = (payload: Record<string, unknown>) => describeEvent({ ...eventOf('ticket.decided'), payload });
