@@ -64,12 +64,18 @@ describe('29.360 schema 5 re-pull', () => {
     const { storage, replica } = await freshReplica();
     const A = newUlid();
     const B = newUlid();
-    await apply(replica, [ticketCreated(A), ticketCreated(B)]);
+    const C = newUlid();
+    await apply(replica, [ticketCreated(A), ticketCreated(B), ticketCreated(C)]);
     expect(await replica.listPendingPulls(WS)).toEqual([]);
+    // The second workspace's ticket: each pull is owed under the ticket's OWN workspace.
+    const WS2 = newUlid();
+    await storage.run('UPDATE tickets SET workspace_id = ? WHERE ticket_id = ?', [WS2, C]);
     await storage.run("UPDATE meta SET value = '4' WHERE key = 'schema_version'", []);
     const reopened = await createReplica({ storage });
     expect((await reopened.listPendingPulls(WS)).map((t) => t.id).sort()).toEqual([A, B].sort());
+    expect((await reopened.listPendingPulls(WS2)).map((t) => t.id)).toEqual([C]);
     for (const id of [A, B]) await reopened.clearPendingPull(WS, id);
+    await reopened.clearPendingPull(WS2, C);
     expect(await (await createReplica({ storage })).listPendingPulls(WS)).toEqual([]); // control
     const held = (await reopened.getTicket(A))!.confirmed!;
     await reopened.loadTicketBootstrap({

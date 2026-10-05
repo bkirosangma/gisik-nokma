@@ -37,6 +37,7 @@ const TICKET = newUlid();
 const TICKET_2 = newUlid();
 const TICKET_3 = newUlid();
 const TICKET_4 = newUlid();
+const TICKET_5 = newUlid();
 
 const S0 = '2026-09-01T10:00:00.000Z';
 const S1 = '2026-09-02T10:00:00.000Z';
@@ -273,5 +274,19 @@ describe('29.355 snapshot fold versions', () => {
       stop();
     }
     expect(logged).toEqual([]);
+  });
+
+  it('29.355 a stale snapshot AT the head is restated in place: its own seq, the current fold version, then due no more', async () => {
+    // The common row at a deploy: a snapshot taken at the head, no event since, so the restate lands on the seq the
+    // stale row already holds (`overwriteSnapshot`, not the plain insert).
+    await seed([created(TICKET_5, 'snap-task', S1), to(TICKET_5, 'doing', S2), to(TICKET_5, 'done', S3)]);
+    await plant(TICKET_5, 3, await foldPrefix(TICKET_5, 3, await buildLedgerDeps(db.pool, WS)), true);
+    const stale = await readLatestSnapshot(db.pool, 'ticket', TICKET_5);
+    expect([stale?.seq, stale?.foldVersion, 'periods' in (stale?.state ?? {})]).toEqual([3, 1, false]); // precondition
+    const { written } = await runSnapshotPass(db.pool, { minEvents: 20 });
+    expect(written).toEqual([{ entityId: TICKET_5, seq: 3 }]);
+    const restated = await readLatestSnapshot(db.pool, 'ticket', TICKET_5);
+    expect([restated?.seq, restated?.foldVersion, restated?.state['periods']]).toEqual([3, 2, [{ start: S2, end: S3, pass: 1 }]]);
+    expect((await runSnapshotPass(db.pool, { minEvents: 20 })).written).toEqual([]);
   });
 });

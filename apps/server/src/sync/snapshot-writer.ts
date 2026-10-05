@@ -209,7 +209,7 @@ type Due = { workspaceId: string; entityId: string };
  * - **`deps` here resolve the NEWEST definitions, and that is safe only because
  *   of the publish door.** (A STALE snapshot is the exception: its restate
  *   folds the whole history with the definitions in force at each event,
- *   `depsAsOfEvent`, planner ruling 2026-10-04 Q9; see `foldTicketHead`.) `buildLedgerDeps` with no bound answers at the
+ *   `memoizedDepsAsOfEvent`, planner ruling A of 2026-10-05 on Q9; see `foldTicketHead`.) `buildLedgerDeps` with no bound answers at the
  *   latest workflow version, so folding a tail that spans a state-dropping
  *   publish throws `applyTicketEvent: workflow "…" has no state "…"` — measured,
  *   not feared. What removes the span is `snapshot-refresh.ts`: every publish

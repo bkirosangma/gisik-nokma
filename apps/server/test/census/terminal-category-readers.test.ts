@@ -50,7 +50,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (14)
+  // invariant (16)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
@@ -61,6 +61,10 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/app-core/src/precheck.ts': 'invariant',
   'packages/app-core/src/views/board.tsx': 'invariant',
   'packages/app-core/src/views/ticket-sheet.tsx': 'invariant',
+  // wtg2 T9: a move into a terminal state ENDS the open work period, and terminal to terminal opens none (WP-1); a
+  // Not-taken move folds no period at all (PS-8), so the fold never reads a not-taken ticket's terminal as work done.
+  'packages/domain/src/flow/periods.ts': 'invariant',
+  'packages/domain/src/ticket-state.ts': 'invariant',
   'packages/rule-engine/src/checks/close.ts': 'invariant',
   // wtg2 T8: the flow parks a Not-taken ticket in the FIRST terminal state and never passes over a finished one (PS-8, PS-11).
   'packages/rule-engine/src/checks/flow-cause.ts': 'invariant',

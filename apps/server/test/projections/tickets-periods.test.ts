@@ -144,6 +144,12 @@ describe('29.170 the migration and the rebuild', () => {
       { column_name: 'rounds', column_default: '1', is_nullable: 'NO' },
       { column_name: 'started_at', column_default: null, is_nullable: 'YES' },
     ]);
+    // The snapshot fold version: every row the migration finds is a version-1 row, which the snapshot pass restates.
+    const { rows: fold } = await db.pool.query(
+      `SELECT column_default, is_nullable FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'snapshots' AND column_name = 'fold_version'`,
+    );
+    expect(fold).toEqual([{ column_default: '1', is_nullable: 'NO' }]);
 
     const { typeId } = await world();
     const A = newUlid();
@@ -151,6 +157,8 @@ describe('29.170 the migration and the rebuild', () => {
     const periods = [{ start: at(2), end: at(3), pass: 1 }, { start: at(4), end: null, pass: 1 }];
     // Control: a ticket created after the migration carries its periods with no rebuild.
     expect((await rowFor(A)).periods).toEqual(periods);
+    // A round is never below 1 (the column's CHECK).
+    await expect(db.pool.query('UPDATE proj_tickets SET rounds = 0 WHERE ticket_id = $1', [A])).rejects.toThrow(/violates check constraint/);
 
     // A row as the migration leaves a pre-existing ticket: the defaults, nothing derived.
     await db.pool.query(`UPDATE proj_tickets SET periods = '[]', started_at = NULL, ended_at = NULL WHERE ticket_id = $1`, [A]);

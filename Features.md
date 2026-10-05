@@ -2220,7 +2220,8 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   entity forever. *Retention is unowned.* Retention is NOT how a stale snapshot is invalidated, and the
   distinction is worth keeping straight: `readLatestSnapshot` is `ORDER BY seq DESC LIMIT 1`, so a
   higher-seq row supersedes for every reader — a `DELETE` would buy nothing but a longer replay. The
-  writer's deps also resolve the NEWEST definitions, which is safe only because the publish door below
+  writer's deps also resolve the NEWEST definitions (except the restate of a STALE, pre-periods snapshot, which
+  folds each event with the definitions in force at it, wtg2 T9), which is safe only because the publish door below
   re-snapshots at head and so removes any tail that spans a version boundary; a ticket that door SKIPS
   is exactly one this pass can still throw on, and the interval wrapper logs and swallows that.
   `apps/server/src/sync/snapshot-writer.ts`
@@ -3881,7 +3882,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part2-model T9 bullet -->
 - ✅ **Actual start and end dates** (wtg2 T9; `packages/domain/src/flow/derive.ts`, `packages/domain/src/ticket-state.ts`) — a ticket's actual start and end dates, derived from its work periods, past and reopened: the first period's start and the last period's end (none while the last period is open); `hasStarted` reads an open last period, `ticketRound` the round, `resolutionOf` a not-taken close. Cases 29.167-29.168.
 - ⚙️ **Work periods and rounds** (wtg2 T9; `packages/domain/src/flow/periods.ts`, `apps/server/src/projections/tickets.ts`, `apps/server/migrations/1792100200000_proj-tickets-periods.sql`) — folded by the shared reducer (a period opens on the first move into an active or terminal state and closes on terminal or Backlog; a not-taken move opens none; `rounds` counts the flow's loop resets) and projected to `proj_tickets` (`started_at`, `ended_at`, `periods`, `rounds`, `closed_cause`). Cases 29.169-29.170, 29.350-29.353, 29.359.
-- ⚙️ **Snapshot fold versions and the replica's re-pull on schema 5** (wtg2 T9; `apps/server/src/ledger/snapshot-store.ts`, `apps/server/src/sync/snapshot-writer.ts`, `packages/sync-client/src/replica/replica.ts`, `packages/sync-client/src/precheck/local-context.ts`) — a snapshot written before work periods (`fold_version` 1) is restated from its full history by the snapshot pass, folding each event with the definitions in force at it; a replica opening at local schema 5 owes a pull for every ticket it holds; a pending event leaves the confirmed periods alone. Cases 29.354-29.355, 29.360.
+- ⚙️ **Snapshot fold versions and the replica's re-pull on schema 5** (wtg2 T9; `apps/server/src/ledger/snapshot-store.ts`, `apps/server/src/sync/snapshot-writer.ts`, `apps/server/src/sync/ledger-deps.ts`, `packages/sync-client/src/replica/replica.ts`, `packages/sync-client/src/precheck/local-context.ts`) — a snapshot written before work periods (`fold_version` 1) is restated from its full history by the snapshot pass, folding each event with the definitions in force at it, read from the ledger (`memoizedDepsAsOfEvent`: one load per definition change per pass), and in place when it sits at the head; the server starts the writer with an immediate first pass, so a deploy restates without waiting an interval; a replica opening at local schema 5 owes a pull for every ticket it holds; a pending event leaves the confirmed periods alone. Cases 29.354-29.355, 29.360.
 <!-- wtg-part2-model T10 bullet -->
 <!-- wtg-part2-model T11 bullet -->
 <!-- wtg-part2-model T12 bullet -->

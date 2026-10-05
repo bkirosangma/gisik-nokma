@@ -86,6 +86,9 @@ describe('29.350 / 29.351 periods', () => {
     const rebound = fold([created(1), ev('ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'working' }, 2)]);
     expect(rebound.periods).toEqual([{ start: T(2), end: null, pass: 1 }]);
     expect('periods' in fold([created(1), ev('ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'new' }, 2)])).toBe(false);
+    // A rebound from a terminal state into another terminal one opens nothing either.
+    const shut = fold([created(1), to('doing', 2), to('done', 3), ev('ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'shut' }, 4)]);
+    expect(shut.periods).toEqual([{ start: T(2), end: T(3), pass: 1 }]);
   });
 });
 
@@ -107,6 +110,10 @@ describe('29.352 rounds', () => {
     expect('rounds' in fold([...closedAt4, ev('ticket.reopened', {}, 5), to('doing', 6)])).toBe(false); // control: a person's reopen
     const eager = fold([created(1, { typeId: 'eager' }), to('done', 2), to('doing', 3, RESET)]); // initial state is active
     expect(eager.periods?.[1]).toEqual({ start: T(3), end: null, pass: 2 });
+    // A rebound in round 2 opens its period with pass 2, as a move does.
+    const rebound = fold([...closedAt4, ev('ticket.reopened', { cause: RESET }, 5), to('todo', 6, RESET),
+      ev('ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'working' }, 7)]);
+    expect(rebound.periods?.[1]).toEqual({ start: T(7), end: null, pass: 2 });
   });
 });
 
@@ -121,6 +128,7 @@ describe('29.353 not taken', () => {
     expect(resolutionOf(plain)).toBeNull();
     // `notTakenOf` reads only a well-formed branch-not-taken cause: another flow kind, or the kind without its fields, is none.
     expect([notTakenOf(RESET), notTakenOf({ kind: 'branch-not-taken' }), notTakenOf(null)]).toEqual([null, null, null]);
-    expect(notTakenOf(NOT_TAKEN)).toEqual({ kind: 'not-taken', decisionTicketId: DECISION, outcome: 'Yes', pass: 1 }); // control
+    // Control: a well-formed cause gives its OWN outcome and pass (not the fixture's 'Yes' and 1).
+    expect(notTakenOf({ ...NOT_TAKEN, outcome: 'Later', pass: 2 })).toEqual({ kind: 'not-taken', decisionTicketId: DECISION, outcome: 'Later', pass: 2 });
   });
 });
