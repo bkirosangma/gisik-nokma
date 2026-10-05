@@ -125,7 +125,9 @@ describe('29.187 a hidden ticket is a hole', () => {
     expect(owner.reached).toBe(3);
 
     // TE is readable by the member but sits behind the hole: seeded from TE the member reaches TE alone
-    expect(nodeIds(await readFlow(db.pool, { workspaceId: WS, seedId: TE, viewerId: MEMBER }))).toEqual([TE]);
+    const fromTe = await readFlow(db.pool, { workspaceId: WS, seedId: TE, viewerId: MEMBER });
+    // HI -> TE (with its label) and SH -> TE (blocks) are stored, but the first comes from the hole: no edge, no count
+    expect([nodeIds(fromTe), fromTe.edges, fromTe.reached]).toEqual([[TE], [], 1]);
     // a hidden ticket as the seed is the empty read (the route turns it into a 404)
     expect(await readFlow(db.pool, { workspaceId: WS, seedId: HI, viewerId: MEMBER })).toEqual({ nodes: [], edges: [], truncated: false, reached: 0 });
     // a signed-in person who is not in the workspace reads nothing
