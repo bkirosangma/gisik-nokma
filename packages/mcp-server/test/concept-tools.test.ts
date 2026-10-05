@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainRegistry, parseEvent } from '@gisik-nokma/domain';
+import { CONCEPT_SUMMARY_MAX, domainRegistry, parseEvent } from '@gisik-nokma/domain';
 import { HttpError } from '../src/http-client.js';
 import type { Session } from '../src/session.js';
 import { conceptTools } from '../src/tools/concept-tools.js';
@@ -205,6 +205,20 @@ describe('27.475 manage_concept', () => {
       /^event 2 refused by concept\.merge-incomplete: One item in this concept is not yet in the concept it merges into\. Add it there first\.$/,
     );
   });
+
+  it('27.475 a summary over 2000 characters is refused before anything is read or posted; control: exactly 2000 posts', async () => {
+    // The tool's own bound, pinned as a literal (reviewer B P11 X4: max 2000 → 20000 survived); the domain agrees.
+    expect(CONCEPT_SUMMARY_MAX).toBe(2000);
+    const f = fake();
+    const manage = tool('manage_concept', f.session);
+    await expect(manage.handler({ action: 'describe', conceptId: C, summary: 'x'.repeat(2001) })).rejects.toThrowError();
+    await expect(manage.handler({ action: 'create', workspaceId: WS, name: 'Ledgers', summary: 'x'.repeat(2001) })).rejects.toThrowError();
+    expect([f.gets, f.batches]).toEqual([[], []]);
+    // Control, same it: at the cap it posts, and the domain accepts the event.
+    await manage.handler({ action: 'describe', conceptId: C, summary: 'x'.repeat(2000) });
+    expect(f.batches.map((batch) => batch.map((event) => event['type']))).toEqual([['concept.described']]);
+    accepted(f.batches[0]?.[0]);
+  });
 });
 
 describe('27.476 tag_items that narrows the audience (Review Focus 5)', () => {
@@ -262,6 +276,20 @@ describe('27.477 tag_items without narrowing, remove, refusals', () => {
       /^concept or item not found or not visible to you$/,
     );
     expect(hidden.batches).toEqual([]);
+  });
+
+  it('27.477 tag_items takes 1 to 50 items: none, or 51, is refused before anything is read or posted; control: exactly 50 posts one batch', async () => {
+    // Reviewer B P11 X2 (max 50 → 500) and X5 (min 1 → 0) survived without this leg. `remove`, so no audience is read.
+    const items = (n: number) => Array.from({ length: n }, (_, i) => ({ kind: 'ticket' as const, id: `t${String(i)}` }));
+    const f = fake();
+    const tag = tool('tag_items', f.session);
+    await expect(tag.handler({ conceptId: C, action: 'remove', items: [] })).rejects.toThrowError();
+    await expect(tag.handler({ conceptId: C, action: 'remove', items: items(51) })).rejects.toThrowError();
+    expect([f.gets, f.batches]).toEqual([[], []]);
+    // Control, same it: at the cap it reads the concept and posts all fifty in ONE batch.
+    await tag.handler({ conceptId: C, action: 'remove', items: items(50) });
+    expect(f.gets).toEqual([`/v1/concepts/${C}`]);
+    expect(f.batches.map((batch) => batch.length)).toEqual([50]);
   });
 });
 
