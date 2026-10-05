@@ -43,7 +43,7 @@ import { useNoteAutosave } from './use-note-autosave.js';
 
 /**
  * What a ticket the locator will not place is told — the same frozen
- * sentence `app/w/[workspaceId]/my-work/page.tsx` uses for its own
+ * sentence `app/my-work/page.tsx` uses for its own
  * unplaceable tickets, and for the same reason: a 404 that could mean "gone"
  * or "not yours" must not guess which of the two it was.
  */
@@ -102,9 +102,10 @@ export function markNoteAsNew(noteId: string): void {
  *
  * A ticket badge's plain click no longer navigates — it opens that ticket's
  * `TicketSheet` in place, over this page, through the SAME `?ticket=` shape
- * `app/w/[workspaceId]/my-work/page.tsx` already ships (its own docblock
- * argues the three decisions this shape makes; this file inherits all three
- * rather than re-arguing them). The open ticket's PROJECT comes from
+ * My work shipped first (`app/my-work/page.tsx` today, which adds `&ws=` because it
+ * spans workspaces; the three decisions this shape makes are argued in
+ * `test-cases/13-owner-requests-and-backlog.md`, "Opening a ticket from My Work opens
+ * the sheet THERE", and this file inherits all three rather than re-arguing them). The open ticket's PROJECT comes from
  * `note.attachedTickets` when the ticket is one of this note's own — no
  * request — and from `TicketLocator` otherwise (a reload on a stale
  * `?ticket=` after a detach, or the sheet's own parent chip naming a ticket
@@ -136,7 +137,7 @@ function NoteDocumentBody({
   const user = useCurrentUser();
   /**
    * `useSessionStatus`, not `useCurrentUser`, for the reason
-   * `app/w/[workspaceId]/my-work/page.tsx`'s own mount states: this value
+   * `app/my-work/page.tsx`'s own mount states: this value
    * reaches a WRITE — `TicketSheet` builds submitted events from
    * `currentUserId`, and `useCurrentUser()` answers `null` both while the
    * session request is in flight and when nobody is signed in.
@@ -858,8 +859,8 @@ function NoteDocumentBody({
         THE TICKET SHEET, ON THE PAGE THE CLICK HAPPENED ON.
 
         Gated on the param, on the ticket having a project, and on the
-        session — the third for the reason `app/w/[workspaceId]/my-work/
-        page.tsx`'s own mount states: a sheet that would write with an ended
+        session — the third for the reason `app/my-work/page.tsx`'s own
+        mount states: a sheet that would write with an ended
         session is a refusal the reader has to read twice.
       */}
       {openTicketId !== null && openTicketProjectId !== null && session.kind === 'signed-in' ? (

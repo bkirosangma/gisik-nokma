@@ -4,7 +4,7 @@ import { Card, Chip } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import type { ContestedClaim, MyWorkView, WorkItem } from '../view-types.js';
-import type { WorkspaceGroup } from './my-work-global.js';
+import type { ItemPlace, WorkspaceGroup } from './my-work-global.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 
 /**
@@ -26,6 +26,14 @@ export type MyWorkProps = {
    * level below it, never a sibling. Each section's emptiness still reads off `view`.
    */
   groups?: MyWorkGroups;
+  /**
+   * The global page's FLAT arrangement (my-work-global T4, case 30.037): each work card names
+   * its workspace in front of its project line, because no heading says which workspace it is
+   * in. Only `workspaceName` is read: the project half stays the card's own line, the row's
+   * served `projectName` or its id when the name is withheld (case 7.108's arm). Absent, the
+   * cards are today's markup. `contested` rows carry no workspace and stay as they are.
+   */
+  placeOf?: (item: WorkItem) => ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
   /**
    * What to call the claimant of a contested claim (a refused claim carries no
@@ -40,16 +48,24 @@ const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
 function WorkItems({
   items,
   groups,
+  placeOf,
   onOpenTicket,
   pending = false,
 }: {
   items: WorkItem[];
   groups: WorkspaceGroup<WorkItem>[] | undefined;
+  placeOf: ((item: WorkItem) => ItemPlace | null) | undefined;
   onOpenTicket: (ticketId: string) => void;
   pending?: boolean;
 }) {
   const card = (item: WorkItem) => (
-    <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} pending={pending} />
+    <WorkItemCard
+      key={item.ticketId}
+      item={item}
+      place={placeOf === undefined ? null : placeOf(item)}
+      onOpenTicket={onOpenTicket}
+      pending={pending}
+    />
   );
   if (groups === undefined) return <>{items.map(card)}</>;
   return (
@@ -127,7 +143,7 @@ function WorkItems({
  * fourth kind; a section heading inside a view the user opened on purpose is
  * not read as an all-clear about the product.
  */
-export function MyWork({ view, groups, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
+export function MyWork({ view, groups, placeOf, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
   return (
     <div className="gn-my-work">
       <section role="region" aria-label="Assigned to me" className="gn-my-work__section">
@@ -135,7 +151,7 @@ export function MyWork({ view, groups, onOpenTicket, actorLabelOf = unnamedActor
         {view.assigned.length === 0 ? (
           <p className="gn-my-work__empty">Nothing assigned to you.</p>
         ) : (
-          <WorkItems items={view.assigned} groups={groups?.assigned} onOpenTicket={onOpenTicket} />
+          <WorkItems items={view.assigned} groups={groups?.assigned} placeOf={placeOf} onOpenTicket={onOpenTicket} />
         )}
       </section>
 
@@ -144,7 +160,13 @@ export function MyWork({ view, groups, onOpenTicket, actorLabelOf = unnamedActor
         {view.inTransit.length === 0 ? (
           <p className="gn-my-work__empty">No claims in transit.</p>
         ) : (
-          <WorkItems items={view.inTransit} groups={groups?.inTransit} onOpenTicket={onOpenTicket} pending />
+          <WorkItems
+            items={view.inTransit}
+            groups={groups?.inTransit}
+            placeOf={placeOf}
+            onOpenTicket={onOpenTicket}
+            pending
+          />
         )}
       </section>
 
@@ -177,7 +199,7 @@ export function MyWork({ view, groups, onOpenTicket, actorLabelOf = unnamedActor
         {view.shared.length === 0 ? (
           <p className="gn-my-work__empty">Nothing has been shared with you.</p>
         ) : (
-          <WorkItems items={view.shared} groups={groups?.shared} onOpenTicket={onOpenTicket} />
+          <WorkItems items={view.shared} groups={groups?.shared} placeOf={placeOf} onOpenTicket={onOpenTicket} />
         )}
       </section>
     </div>
@@ -245,13 +267,27 @@ function ContestedCard({
  */
 function WorkItemCard({
   item,
+  place,
   onOpenTicket,
   pending = false,
 }: {
   item: WorkItem;
+  /** The flat arrangement's workspace (T4); `null` draws today's project line alone. */
+  place: ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
   pending?: boolean;
 }) {
+  const projectLine =
+    item.projectName !== null ? (
+      <span className="gn-my-work__project">{item.projectName}</span>
+    ) : (
+      <span
+        className="gn-my-work__project gn-my-work__project--id"
+        title="You have not been told this project’s name."
+      >
+        {item.projectId}
+      </span>
+    );
   return (
     <Card className="gn-my-work__item">
       <button
@@ -283,14 +319,18 @@ function WorkItemCard({
         for. Removed, and recorded here because the comment justifying it read
         as measured and was not.
       */}
-      {item.projectName !== null ? (
-        <span className="gn-my-work__project">{item.projectName}</span>
+      {place === null ? (
+        projectLine
       ) : (
-        <span
-          className="gn-my-work__project gn-my-work__project--id"
-          title="You have not been told this project’s name."
-        >
-          {item.projectId}
+        // The workspace, the crumb separator the ticket sheet uses (aria-hidden), then the
+        // card's own project line: two names, never one string joined by a spaced middle dot
+        // (23.191; planner ruling 20:06 on T4's ⚑).
+        <span className="gn-my-work__place">
+          <span>{place.workspaceName}</span>
+          <span className="gn-my-work__place-sep" aria-hidden="true">
+            ›
+          </span>
+          {projectLine}
         </span>
       )}
       <Chip tone={item.stateCategory} title={formatStateProvenance(item.stateName, item.stateProvenance)}>

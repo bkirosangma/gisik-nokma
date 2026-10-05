@@ -2,6 +2,7 @@
 import { Card, Skeleton, SkeletonRegion, Table, type TableColumn } from '@gisik-nokma/ui';
 import type { ProjectTab } from '../use-last-project.js';
 import { AppNavSkeleton } from './app-nav-skeleton.js';
+import { AttentionBandSkeleton, MyWorkSkeleton } from './screen-skeletons.js';
 
 /**
  * Route shells (smoothness T5, spec D5/S1; amendment S-R1). Each is the page's OWN outer container (`main.gn-shell` and its
@@ -110,6 +111,24 @@ export function ListPageShell({ title, rows = 6, wide = false }: { title: string
           <Skeleton shape="block" height="3rem" rows={rows} />
         </div>
       </SkeletonRegion>
+    </main>
+  );
+}
+
+/**
+ * The global My work page while its segment loads (my-work-global T4): the shell, a title
+ * block, then the SAME band and section skeletons the page draws while its reads are out, so
+ * the route's wireframe and the page's own pending state are one shape.
+ */
+export function MyWorkPageShell() {
+  return (
+    <main id="gn-main" className="gn-shell gn-shell--skeleton" aria-busy="true">
+      <AppNavSkeleton />
+      <Skeleton className="gn-page-title" width="12rem" height="var(--gn-title-page-size)" />
+      <div className="gn-shell__main">
+        <AttentionBandSkeleton />
+        <MyWorkSkeleton />
+      </div>
     </main>
   );
 }

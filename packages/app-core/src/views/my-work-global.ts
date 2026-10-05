@@ -18,6 +18,14 @@ export const UNKNOWN_PROJECT_NAME = 'Unknown project';
 const byName = (a: string, b: string): number => a.localeCompare(b, 'en', { sensitivity: 'base' });
 
 /**
+ * A project's name for this viewer, the ONE rule both arrangements of the page print: the
+ * grouped headings and the flat place label (T4, case 30.037). Absent from the workspace's
+ * `projects`, it is "Unknown project" — never the id, which is not a name.
+ */
+const projectNameIn = (workspace: WorkspaceRef, projectId: string): string =>
+  workspace.projects.find((project) => project.id === projectId)?.name ?? UNKNOWN_PROJECT_NAME;
+
+/**
  * Groups items under their workspace, then their project.
  *
  * - **Order:** workspaces by name, then projects by name — both case-insensitive
@@ -55,20 +63,42 @@ export function groupByWorkspaceProject<T extends { workspaceId: string; project
   }
   return [...groups.values()]
     .map(({ workspace, projects }) => {
-      const names = new Map(workspace.projects.map((project) => [project.id, project.name]));
       return {
         workspaceId: workspace.id,
         workspaceName: workspace.name,
         projects: [...projects.entries()]
           .map(([projectId, projectItems]) => ({
             projectId,
-            projectName: names.get(projectId) ?? UNKNOWN_PROJECT_NAME,
+            projectName: projectNameIn(workspace, projectId),
             items: projectItems,
           }))
           .sort((a, b) => byName(a.projectName, b.projectName) || byName(a.projectId, b.projectId)),
       };
     })
     .sort((a, b) => byName(a.workspaceName, b.workspaceName) || byName(a.workspaceId, b.workspaceId));
+}
+
+/** Where an item lives, by name: the FLAT arrangement's per-row label (my-work-global T4). */
+export interface ItemPlace {
+  workspaceName: string;
+  projectName: string;
+}
+
+/**
+ * The flat arrangement's label source (T4, case 30.037): with no headings, each row says which
+ * workspace and project it is in. The names follow `groupByWorkspaceProject`'s rules exactly
+ * (`projectNameIn`), so switching between the two arrangements never renames anything; an item
+ * whose workspace is not in the list is `null` — no label, never a heading's "undefined".
+ */
+export function placeLookup(
+  workspaces: readonly WorkspaceRef[],
+): (item: { workspaceId: string; projectId: string }) => ItemPlace | null {
+  const known = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
+  return (item) => {
+    const workspace = known.get(item.workspaceId);
+    if (workspace === undefined) return null;
+    return { workspaceName: workspace.name, projectName: projectNameIn(workspace, item.projectId) };
+  };
 }
 
 const runsWorkspace = (workspace: WorkspaceRef): boolean => workspace.role === 'owner' || workspace.role === 'admin';

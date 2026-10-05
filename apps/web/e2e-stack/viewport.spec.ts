@@ -113,17 +113,13 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
   await page.setViewportSize(PHONE);
   await signIn(page, OWNER_EMAIL);
 
-  // Reach a workspace-scoped route from the seeded world rather than hardcoding
-  // an id: the seed's ULIDs are not stable across a reseed, and a hardcoded id
-  // would fail as a 404 that looks like a layout pass.
+  // My work is ONE global route now (`/my-work`, my-work-global T4), so the visit needs no id. The
+  // workspace read still runs first: `readWorkspaceId` is this file's "the seed or the session is
+  // wrong" refusal, and without a seeded workspace the page below would sweep an empty shell.
   await page.goto('/workspaces');
-  // `readWorkspaceId` carries the same "the seed or the session is wrong" refusal, and RETURNS a
-  // `string` — the inline version this replaces left the id `string | undefined`, which typechecks
-  // through a template literal and fails the moment it is passed to a typed function. Found by the
-  // gate, not by reading.
-  const workspaceId = await readWorkspaceId(page);
+  await readWorkspaceId(page);
 
-  await page.goto(`/w/${workspaceId}/my-work`, { waitUntil: 'networkidle' });
+  await page.goto('/my-work', { waitUntil: 'networkidle' });
 
   // ── The instrument proves itself before it is believed.
   const innerWidth = await page.evaluate(() => window.innerWidth);
@@ -564,7 +560,7 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
   };
 
   const routes: { path: string; key: string; reach?: () => Promise<void> }[] = [
-    { path: `/w/${workspaceId}/my-work`, key: 'stack-phone-390|/my-work' },
+    { path: '/my-work', key: 'stack-phone-390|/my-work' },
     { path: projectHref, key: 'stack-phone-390|/p/:projectId' },
     /* P34: the four views that are NOT the default. Keys carry the view name so
        each one's numbers are its own — the same reason the tap-target and
@@ -1155,7 +1151,7 @@ test('records non-text contrast across the signed-in surface, with a positive co
   const projectHref = await seededProjectHref(page, workspaceId);
 
   const routes = [
-    { path: `/w/${workspaceId}/my-work`, key: '/my-work' },
+    { path: '/my-work', key: '/my-work' },
     { path: projectHref, key: '/p/:projectId' },
     { path: `/w/${workspaceId}/members`, key: '/members' },
     { path: `/w/${workspaceId}/settings/ticket-types`, key: '/settings/ticket-types' },

@@ -3,7 +3,7 @@ import { Button, Chip, type ChipTone } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
 import type { AttentionItem, AttentionKind } from '../view-types.js';
-import type { WorkspaceGroup } from './my-work-global.js';
+import type { ItemPlace, WorkspaceGroup } from './my-work-global.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 
 /**
@@ -71,8 +71,32 @@ export type AttentionStripProps = {
    * from the GROUPS (`items` is not read). Absent, the strip is today's flat list.
    */
   groups?: WorkspaceGroup<AttentionItem>[];
+  /**
+   * The global page's FLAT arrangement (my-work-global T4, case 30.037): with no heading to
+   * say where a row lives, each row names its workspace and project (`placeLookup`). A row it
+   * answers `null` for gets no label. Absent, the rows are today's markup.
+   */
+  placeOf?: (item: AttentionItem) => ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
 };
+
+/**
+ * Where a row lives, as two names with the ticket sheet's crumb separator between them
+ * (`ticket-sheet.tsx`'s `gn-ticket-sheet__crumb-sep`), hidden from assistive technology, which
+ * reads the two names on their own. Never one string joined by a spaced middle dot: 23.191
+ * bans that from UI copy (planner ruling 20:06 on T4's ⚑).
+ */
+function PlaceLabel({ place }: { place: ItemPlace }) {
+  return (
+    <span className="gn-attention__place">
+      <span>{place.workspaceName}</span>
+      <span className="gn-attention__place-sep" aria-hidden="true">
+        ›
+      </span>
+      <span>{place.projectName}</span>
+    </span>
+  );
+}
 
 /**
  * The shown rows, filed under their groups. Each project keeps the rows that are both SHOWN
@@ -142,7 +166,7 @@ function fileUnderGroups(groups: WorkspaceGroup<AttentionItem>[], shown: Attenti
  * drops a project or workspace left with no shown row, so no heading of its
  * outlives its rows either.
  */
-export function AttentionStrip({ items, groups, onOpenTicket }: AttentionStripProps) {
+export function AttentionStrip({ items, groups, placeOf, onOpenTicket }: AttentionStripProps) {
   const [showAll, setShowAll] = useState(false);
   const listId = useId();
   const source = groups === undefined ? items : groups.flatMap((group) => group.projects.flatMap((project) => project.items));
@@ -153,24 +177,28 @@ export function AttentionStrip({ items, groups, onOpenTicket }: AttentionStripPr
   // in "Zeta" behind a due-soon one in "Alpha" (planner ruling, 2026-10-05).
   const rows = orderAttention(source);
   const shown = showAll ? rows : rows.slice(0, ATTENTION_CAP);
-  const row = (item: AttentionItem) => (
-    <li key={item.ticketId} className="gn-attention__item">
-      <button
-        type="button"
-        className="gn-attention__title"
-        onClick={() => onOpenTicket(item.ticketId)}
-      >
-        {item.title}
-      </button>
-      <Chip tone={KIND_TONE[item.kind]}>{KIND_LABEL[item.kind]}</Chip>
-      <span className="gn-attention__reason">{item.reason}</span>
-      {item.claim !== null ? (
-        <span className="gn-attention__claim">
-          {`claimed by ${actorLabel(item.claim.actorId, item.claim.actorName)} on ${formatDate(item.claim.serverTime)}`}
-        </span>
-      ) : null}
-    </li>
-  );
+  const row = (item: AttentionItem) => {
+    const place = placeOf === undefined ? null : placeOf(item);
+    return (
+      <li key={item.ticketId} className="gn-attention__item">
+        <button
+          type="button"
+          className="gn-attention__title"
+          onClick={() => onOpenTicket(item.ticketId)}
+        >
+          {item.title}
+        </button>
+        {place !== null ? <PlaceLabel place={place} /> : null}
+        <Chip tone={KIND_TONE[item.kind]}>{KIND_LABEL[item.kind]}</Chip>
+        <span className="gn-attention__reason">{item.reason}</span>
+        {item.claim !== null ? (
+          <span className="gn-attention__claim">
+            {`claimed by ${actorLabel(item.claim.actorId, item.claim.actorName)} on ${formatDate(item.claim.serverTime)}`}
+          </span>
+        ) : null}
+      </li>
+    );
+  };
   return (
     /* The accessible name is the visible heading, character for character.
        WCAG 2.5.3 fails on a visible label that its accessible name does not

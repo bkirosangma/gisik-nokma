@@ -633,10 +633,11 @@ function InvitationBanner() {
     };
     if (action === 'accept') {
       void myInvitations.accept(invitation.inviteId).then(
-        ({ workspaceId }) => {
+        () => {
           // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
           bumpProjectsVersion();
-          router.push(`/w/${workspaceId}/my-work`);
+          // My work is global (my-work-global T4): the joined workspace is one of the ones it now covers.
+          router.push('/my-work');
         },
         done,
       );

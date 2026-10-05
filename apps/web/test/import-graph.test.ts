@@ -70,7 +70,8 @@ describe('route import graphs (spec D6, S9; audit SM-04)', () => {
     }
     const project = [...staticGraph(join(WEB, 'app/w/[workspaceId]/p/[projectId]/page.tsx'))];
     expect(reachesEditor(project)).toEqual([]);
-    const myWork = [...staticGraph(join(WEB, 'app/w/[workspaceId]/my-work/page.tsx'))];
+    // The global My work page (my-work-global T4) is the one that mounts the sheet now; the old route only redirects.
+    const myWork = [...staticGraph(join(WEB, 'app/my-work/page.tsx'))];
     expect(reachesEditor(myWork)).toEqual([]);
     // Control, in the same it(): the walk CAN see the editor — the slot module reaches it, dynamically, so a
     // static walk from the slot's own importer still stops at the `import()`; and a file that imports the

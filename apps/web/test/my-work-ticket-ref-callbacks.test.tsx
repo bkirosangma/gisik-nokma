@@ -10,7 +10,8 @@ import { stubServices } from './helpers/stub-services.js';
  * 18.287 — a final-review finding (2026-09-23): the project page's
  * `TicketSheet` mount supplies `queryTickets`/`resolveTicketHref` (Plan 7
  * Task 4, case 18.274), but My work's own mount
- * (`app/w/[workspaceId]/my-work/page.tsx`) never did — so a `:ticket` picker
+ * (then `app/w/[workspaceId]/my-work/page.tsx`, now the global `app/my-work/page.tsx`)
+ * never did — so a `:ticket` picker
  * opened from a comment or description on THIS page falsely reported "No
  * tickets match" instead of searching, and a `ticketRef` chip in a rendered
  * comment here rendered as a plain span instead of a link. My work spans
@@ -33,11 +34,11 @@ vi.mock('@gisik-nokma/editor', async (importOriginal) => {
 });
 
 const push = vi.fn();
-let searchParams = new URLSearchParams({ ticket: 'TICKET' });
+let searchParams = new URLSearchParams({ ticket: 'TICKET', ws: 'WS' });
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: 'WS' }),
-  usePathname: () => '/w/WS/my-work',
+  usePathname: () => '/my-work',
   useSearchParams: () => searchParams,
 }));
 
@@ -48,7 +49,7 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import MyWorkPage from '../app/w/[workspaceId]/my-work/page.js';
+import MyWorkPage from '../app/my-work/page.js';
 
 const WORKSPACE = 'WS';
 const PROJECT = 'PROJECT';
@@ -146,7 +147,7 @@ function mount(): { services: AppServices } {
 describe('18.287 My work supplies queryTickets/resolveTicketHref to the open ticket’s sheet', () => {
   it('18.287 both EditorSlot mounts get a working queryTickets and resolveTicketHref, keyed on the OPEN TICKET’s own project', async () => {
     capturedSlotProps = [];
-    searchParams = new URLSearchParams({ ticket: TICKET });
+    searchParams = new URLSearchParams({ ticket: TICKET, ws: WORKSPACE });
     const { services } = mount();
     const search = vi.fn(async (_workspaceId: string, _text: string) => [
       { ticketId: TICKET, projectId: PROJECT, title: 'Renew the trade licence', snippet: '', matchedIn: 'title' as const, key: 'SF-1' },
