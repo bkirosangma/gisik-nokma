@@ -27,9 +27,9 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  *
  * **The exact edge supplies the rules, and declaration order does not matter.**
  * That is not a preference — it is what the engine does, and this function's
- * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:124-125`
+ * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:126-127`
  * resolves `find(exact) ?? find('*')`, and `precheck.ts`'s `needsMembership`
- * already mirrors it at :467-473. This is the third copy of one rule.
+ * already mirrors it at :797-798. This is the third copy of one rule.
  *
  * This paragraph used to say the target *"keeps the FIRST edge's rules, in
  * declaration order, rather than merging two rule sets into one that no

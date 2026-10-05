@@ -451,7 +451,7 @@ export const ticketDecidedPayload = z
  * > "This is why the product says \"deleted\" rather than \"erased\"."
  *
  * The envelope carries the actor and the instant — the payload says nothing,
- * exactly as `ticket.closed` does, and for the same reason: there is nothing
+ * exactly as a person's `ticket.closed` does, and for the same reason: there is nothing
  * here for a client to assert. `restored` is the name of the undo because the
  * product already pairs `project.archived` with `project.restored`
  * (`events/membership.ts`); a second word for the same act would be a second
