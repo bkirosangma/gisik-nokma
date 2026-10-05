@@ -584,6 +584,11 @@ describe('29.203 precheckEvent refuses a forged flow cause first, as the engine 
     expect(await precheckEvent(caused('ticket.closed', notTaken), empty)).toEqual(FORGED);
     expect(await precheckEvent(caused('ticket.reopened', reset), empty)).toEqual(FORGED);
     expect(await precheckEvent(transitionTo('todo', { cause: reset }), empty)).toEqual(FORGED);
+    // A malformed payload is malformed before it is forged: the engine parses first, so a flow cause riding a bad
+    // payload previews the engine's malformed-payload (transition) or defers (close), never cause.forged.
+    expect(await precheckEvent(transitionTo(7 as never, { cause: reset }), terminal)).toMatchObject({ rule: REFUSAL_RULES.malformedPayload });
+    const extra = make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.closed', payload: { cause: notTaken, extra: 1 } });
+    expect(await precheckEvent(extra, terminal)).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
   });
 });
 
