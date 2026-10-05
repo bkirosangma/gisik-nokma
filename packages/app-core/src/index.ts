@@ -460,3 +460,18 @@ export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
 export { DeleteDialog, type DeleteDialogProps } from './views/delete-dialog.js';
 export { DeletedItemsSection, type DeletedItemsSectionProps } from './account/deleted-items-section.js';
 export { DeletedItemsFromCache, cachedDeletedItemsOf } from './deleted-items-from-cache.js';
+
+// Drafts plan, Task 8: the app's draft surfaces (Save as draft, the Drafts page, the sheet's Publish and Discard).
+export * from './views/drafts-copy.js';
+export { DraftSavedToast } from './views/draft-saved-toast.js';
+export { addPendingDraft, mergeDrafts, pendingDraftsOf, removePendingDraft, useMyDrafts } from './views/draft-optimism.js';
+export {
+  discardCounts,
+  discardDraft,
+  publishDraft,
+  publishEvents,
+  subDraftsOf,
+  visibleBacklogRows,
+  type DiscardCounts,
+  type DraftOutcome,
+} from './views/draft-actions.js';
