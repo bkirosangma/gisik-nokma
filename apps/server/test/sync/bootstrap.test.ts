@@ -1295,7 +1295,7 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
   const refusalOf = (ticketId: string) =>
     withClient(async (client) => bootstrapTicket(client, ticketId, targetSight(client, memberId)).catch((err: unknown) => err));
 
-  it('29.406 after the boot pass, a stale row created after its dueAt is refused (SnapshotRestatePending, both bootstrap routes 503); control: the same row created before dueAt is served as stored with one warning; and a row an old instance writes during a real pass, after its due query, is refused', async () => {
+  it('29.406 after the boot pass, a stale row created after its dueAt is refused (SnapshotRestatePending, both bootstrap routes 503); control: the same row created before dueAt is served as stored with one warning; a row an old instance writes during a real pass, after its due query, is refused; and interval passes settling after the boot pass leave its dueAt standing', async () => {
     const world = await fvWorkspace();
     const { ticketId } = await fvTicket(world, null);
     const dueAt = new Date((await db.pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t.getTime() - 60_000);
@@ -1342,6 +1342,9 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
             const result = await (pool.query as (...a: unknown[]) => Promise<unknown>).apply(pool, args);
             if (typeof args[0] === 'string' && args[0].includes('FROM events e') && planted === 0) {
               planted += 1;
+              // A margin past the clock read: without it the row lands 1-2 ms after dueAt (measured), and a gap under
+              // a millisecond truncates to equal and is served. The order, not the margin, is what this leg pins.
+              await pool.query('SELECT pg_sleep(0.02)');
               await fvPlant(world, late.ticketId, TICKET_FOLD_VERSION - 1);
             }
             return result;
@@ -1362,9 +1365,52 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
     const row = await readLatestSnapshot(db.pool, 'ticket', late.ticketId);
     expect(row?.foldVersion).toBe(TICKET_FOLD_VERSION - 1);
     expect(row!.createdAt.getTime()).toBeGreaterThan(realDueAt.getTime());
+
+    // The instant is the BOOT pass's: interval passes that settle after it read no clock and publish nothing, so once
+    // they have run a row created after it is still refused.
+    bootRestate.complete = false;
+    bootRestate.dueAt = null;
+    let dueQueries = 0;
+    const ticking = new Proxy(db.pool, {
+      get(pool, prop) {
+        if (prop === 'query') {
+          return async (...args: unknown[]): Promise<unknown> => {
+            if (typeof args[0] === 'string' && args[0].includes('FROM events e')) dueQueries += 1;
+            return (pool.query as (...a: unknown[]) => Promise<unknown>).apply(pool, args);
+          };
+        }
+        const value = Reflect.get(pool, prop) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(pool) : value;
+      },
+    });
+    const tickLog: string[] = [];
+    const stopTicking = startSnapshotWriter(ticking, { intervalMs: 20, minEvents: STALE_ONLY, immediate: true, log: (msg) => tickLog.push(msg) });
+    let bootDueAt: Date | null = null;
+    try {
+      await vi.waitFor(() => {
+        expect(bootRestate.complete).toBe(true);
+      }, { timeout: 20_000 });
+      bootDueAt = bootRestate.dueAt;
+      const atSettle = dueQueries;
+      // Two more passes started after the boot pass settled.
+      await vi.waitFor(() => {
+        expect(dueQueries).toBeGreaterThanOrEqual(atSettle + 2);
+      }, { timeout: 10_000, interval: 20 });
+    } finally {
+      stopTicking();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300)); // the later passes in flight settle
+    collectWarnings();
+    expect(tickLog).toEqual([]);
+    expect(bootDueAt).toBeInstanceOf(Date);
+    expect(bootRestate.dueAt).toBe(bootDueAt);
+    const afterBoot = await fvTicket(world, null);
+    await fvPlant(world, afterBoot.ticketId, TICKET_FOLD_VERSION - 1, shift(bootDueAt!, 1_000));
+    expect(await refusalOf(afterBoot.ticketId)).toBeInstanceOf(SnapshotRestatePending);
+    expect(warnings).toEqual([]);
   });
 
-  it('29.407 a stale row created exactly at dueAt is served as stored (the refusal is strictly later)', async () => {
+  it('29.407 a stale row created exactly at dueAt is served as stored (the refusal is strictly later: a millisecond after it is refused)', async () => {
     const world = await fvWorkspace();
     const { ticketId } = await fvTicket(world, null);
     const dueAt = new Date((await db.pool.query<{ t: Date }>('SELECT now() AS t')).rows[0]!.t.getTime() - 60_000);
@@ -1376,6 +1422,12 @@ describe('29.406-29.409 a stale row written after the boot pass read its due set
     await withClient(async (client) => {
       expect((await bootstrapTicket(client, ticketId, targetSight(client, memberId))).snapshot?.seq).toBe(FV_CUT);
     });
+    expect(warnings).toEqual([staleServedWarning(ticketId)]);
+
+    // A millisecond later is refused: the refusal starts at the first instant after dueAt, not at some tolerance past it.
+    await setCreatedAt(ticketId, shift(dueAt, 1));
+    expect((await readLatestSnapshot(db.pool, 'ticket', ticketId))?.createdAt.getTime()).toBe(dueAt.getTime() + 1);
+    expect(await refusalOf(ticketId)).toBeInstanceOf(SnapshotRestatePending);
     expect(warnings).toEqual([staleServedWarning(ticketId)]);
   });
 
