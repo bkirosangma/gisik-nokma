@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { displayName } from './display-name.js';
+import { flowCauseSchema } from './flow/causes.js';
 
 export const stateCategorySchema = z.enum(['open', 'active', 'terminal']);
 export type StateCategory = z.infer<typeof stateCategorySchema>;
@@ -202,8 +203,11 @@ export const ticketTransitionedPayloadSchema = z.object({
   comment: z.object({ text: z.string() }).optional(),
   evidenceAttachmentId: z.string().optional(),
   // Owner decision (2026-08-20, coordination doc): provenance for a parent
-  // reopened because it acquired live work — the engine treats cause as opaque
-  // (no rule reads it); boards render "reopened — live work added" from it.
-  cause: z.object({ kind: z.literal('reopened-for-child'), childTicketId: z.string() }).optional(),
+  // reopened because it acquired live work; boards render "reopened, live work
+  // added" from it. Opaque to rules EXCEPT the three flow kinds (wtg2 T8,
+  // `flow/causes.ts`), which `rule-engine/src/checks/flow-cause.ts` polices: only
+  // the flow actor may file one, and two of them unlock undeclared moves (PS-11).
+  // A plain `z.union`: the old arm is not strict, the flow arms are.
+  cause: z.union([z.object({ kind: z.literal('reopened-for-child'), childTicketId: z.string() }), flowCauseSchema]).optional(),
 });
 export type TicketTransitionedPayload = z.infer<typeof ticketTransitionedPayloadSchema>;
