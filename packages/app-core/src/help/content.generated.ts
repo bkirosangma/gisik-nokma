@@ -11404,6 +11404,24 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
+                      "text": "Drafts."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Ask for a ticket as a "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "draft"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": only you can see it, it has no key yet, and it appears on your Drafts page. The assistant can list your drafts, publish one (it gets its key and joins the end of the project's Backlog) and discard one. Before it discards anything it shows what would be erased, the draft, its sub-drafts and the files attached to them, and waits until it is given the draft's exact title."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
                       "text": "Your work and your inbox."
                     },
                     {
@@ -11453,7 +11471,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased."
+                    "text": " on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased. Discarding a draft is the one exception: a draft was never shared, so it is erased at once and cannot be recovered, which is why the assistant asks you to repeat its title first."
                   }
                 ]
               },

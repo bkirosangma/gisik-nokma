@@ -56,6 +56,14 @@ export function draftAllows(type: string): boolean {
   return ALLOWED.has(type) || EXEMPT.has(type);
 }
 
+/**
+ * Drafts spec R8: a draft is private to its author, so there is nobody from outside to bring in to see it. The ONE definition:
+ * the server's refusal (`apps/server/src/routes/people.ts`) and the MCP preview that warns of it (`packages/mcp-server/src/tools/assignee-email.ts`,
+ * drafts T7, planner ruling 2026-10-04) both read these, so the two cannot drift (case 28.146 counts the sentence's definitions).
+ */
+export const DRAFT_NO_OUTSIDERS_RULE = 'draft.no-outsiders';
+export const DRAFT_NO_OUTSIDERS_REASON = 'Publish the ticket before inviting someone from outside';
+
 /** The sentence for a refused type: names the way out (spec §3.3, R7). Total: any type gets a sentence. */
 export function draftNotAllowedReason(type: string): string {
   if (type === 'ticket.deleted') return 'A draft cannot be deleted. Discard it instead.';

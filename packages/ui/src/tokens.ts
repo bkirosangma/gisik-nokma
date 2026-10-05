@@ -1973,7 +1973,7 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'border', bg: 'surfaceWell', minimum: 3 },
   /**
    * UX fixes T1 (owner rulings U5 and U8, 2026-10-02; cases 23.001, 23.006, 23.007, 23.009). Eight rows, so the
-   * roster was 52 (now 70 with the Knowledge Graph's 18, 27.257).
+   * roster was 52 (now 74: the weekend tint's one, 29.104, WTG4 T2's three, 29.303, and the Knowledge Graph's 18, 27.257).
    *
    * - The neo field RING (`fieldRim`, a non-text boundary, 3:1) on the four grounds a field sits on. **RETIRED by HK-4
    *   (2026-10-02, 24.121): the four rows are gone with the role, so the roster is 52 until the Knowledge Graph rows (27.257).** Neo's field boundary is the shadow's
