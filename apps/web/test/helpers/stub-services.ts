@@ -216,6 +216,7 @@ export function stubServices(
     // and the case asserting "renders the current values" would pass without
     // the server being asked anything.
     getWorkspaceSettings: unstubbed('getWorkspaceSettings'),
+    getMyDrafts: async () => [],
     getPreferences: async () => EMPTY_PREFERENCES,
     putPreferences: async () => undefined,
     ...overrides,

@@ -8,6 +8,7 @@ import {
   type EventEnvelope,
 } from '@gisik-nokma/domain';
 import { getTicketState } from './checks/context-helpers.js';
+import { decisionOutcomeRequired } from './checks/decision.js';
 import { flowCauseForgery, flowExemptEdge } from './checks/flow-cause.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import { evaluateTransitionRules } from './rules/index.js';
@@ -170,6 +171,12 @@ export async function evaluateTicketTransitioned(
         reason: `This ticket cannot enter "${toState.name}" while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`,
       };
     }
+    // DC-5 (wtg2 T6, `checks/decision.ts`): a Decision with branches and no outcome is not finished. After the parent
+    // invariant, which no definition can switch off, so an open child is still reported first. The flow's "Not taken"
+    // (`branch-not-taken`, PS-5; wtg2 T8 Step 7) is the one exemption, and `flowCauseForgery` above has already refused it
+    // from anyone but the flow actor, so the cause is trusted here (29.205).
+    const outcomeRequired = decisionOutcomeRequired(ticket, payload.cause?.kind === 'branch-not-taken');
+    if (outcomeRequired !== null) return outcomeRequired;
   }
 
   // The child's side. Live work arriving under a finished parent is what

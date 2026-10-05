@@ -50,5 +50,5 @@ export * from './notification-preferences.js';
 export * from './events/lifecycle-events.js';
 export * from './lifecycle.js';
 export * from './purge.js';
-export * from './flow/causes.js';
+export * from './flow/index.js';
 export * from './draft.js';

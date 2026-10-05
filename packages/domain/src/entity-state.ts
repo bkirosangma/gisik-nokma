@@ -1,6 +1,7 @@
 import type { TicketLinkKind } from './events/ticket-events.js';
 import type { StateCategory } from './workflow.js';
 import type { FlowCause } from './flow/causes.js';
+import type { WorkPeriod } from './flow/derive.js';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
 
@@ -47,8 +48,8 @@ export type TicketState = {
    * `state.closed ?? null`. The wire types carry it required.
    *
    * `cause` is the flow's `branch-not-taken` close cause (wtg2 T8, PS-5), present only on such a close; the reducer
-   * stores it and `ticket.reopened` drops it with the flag. Reducer-only for now: `rowToTicketState` rebuilds `closed`
-   * from `closed_at` / `closed_by`, which hold no cause.
+   * stores it and `ticket.reopened` drops it with the flag. The server projects it to `proj_tickets.closed_cause` and
+   * `rowToTicketState` reads it back onto `closed` (wtg2 T9); `resolutionOf` (`flow/derive.ts`) reads it as "not taken".
    */
   closed?: { actorId: string; at: string; cause?: FlowCause } | null;
   /**
@@ -131,6 +132,10 @@ export type TicketState = {
    * reducer drops the key with the last link, so the two shapes agree.
    */
   links?: TicketLink[];
+  /** Work periods (WP-1), oldest first; ABSENT when the ticket never started. Derived dates: `flow/derive.ts`. */
+  periods?: WorkPeriod[];
+  /** 1 plus the flow resets (`reopened-by-flow` transitions) filed on this ticket; ABSENT = 1. */
+  rounds?: number;
   /** A Decision's CURRENT outcome (DC-4/PS-2). ABSENT when none: never decided, cleared, or released by a loop reset. */
   outcome?: string;
   /** A Decision's pass records, oldest first (PS-2). ABSENT until the first choice; the reducer, `rowToTicketState` and the replica all agree. */

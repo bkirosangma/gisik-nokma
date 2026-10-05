@@ -787,6 +787,10 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
     }).ticketState.transitions;
     expect(transitions).toHaveLength(1);
     expect(typeof transitions[0]?.['seq']).toBe('number');
+    // The work period the move into Doing opened (wtg2 T9, WP-1) starts at that move's server clock, the instant
+    // `stateProvenance` names; carried across like the seq, after asserting it IS that instant.
+    const moved = body as unknown as { ticketState: { periods?: Array<Record<string, unknown>> }; stateProvenance: { serverTime: string } };
+    expect(moved.ticketState.periods?.[0]?.['start']).toBe(moved.stateProvenance.serverTime);
 
     expect(freezeClocks(body)).toEqual({
       ticket: {
@@ -862,6 +866,9 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         // the dual-client rig compares reducers and the wire against one
         // another.
         deleted: null,
+        // wtg2 T9: the child is in Doing, so its one work period is open. `rounds` is absent (no flow reset), the
+        // reducer's shape, which `rowToTicketState` reads back.
+        periods: [{ start: moved.stateProvenance.serverTime, end: null, pass: 1 }],
       },
       title: 'Count the crates',
       stateProvenance: {
