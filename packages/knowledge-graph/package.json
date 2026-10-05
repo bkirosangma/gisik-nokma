@@ -14,6 +14,10 @@
       "types": "./dist/render/sigma/stress-scene.d.ts",
       "default": "./dist/render/sigma/stress-scene.js"
     },
+    "./sigma": {
+      "types": "./dist/render/sigma/adapter.d.ts",
+      "default": "./dist/render/sigma/adapter.js"
+    },
     "./ids": {
       "types": "./dist/ids.d.ts",
       "default": "./dist/ids.js"

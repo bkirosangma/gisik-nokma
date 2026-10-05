@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Graph adapter harness</title>
+<style>
+  /* Harness-only layout. The product's canvas CSS is Task 7's `/* KG: T7 view+bar */` block in ui.css. */
+  html, body { margin: 0; background: var(--gn-surface); color: var(--gn-text); }
+  body { min-height: 200vh; } /* a wheel that leaked would scroll the page (27.272) */
+  .gn-kg__mount { position: relative; width: 100vw; height: 70vh; overflow: hidden; }
+  .gn-kg__stage, .gn-kg__rings { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .gn-kg__rings { pointer-events: none; overflow: visible; }
+  .gn-kg__ring { fill: none; stroke: var(--gn-graph-card-line); stroke-width: 1; }
+  .gn-kg__ring-label { fill: var(--gn-text-subtle); font: 11px -apple-system, BlinkMacSystemFont, Helvetica, sans-serif; }
+  .gn-kg__fog-band { fill: color-mix(in srgb, var(--gn-fog-dot) 18%, transparent); stroke: none; }
+</style>
+</head>
+<body>
+<div id="mount" class="gn-kg__mount" data-kg-probe></div>
+<p id="below">Below the graph: a wheel here scrolls the page.</p>
+<script type="module" src="./adapter.ts"></script>
+</body>
+</html>

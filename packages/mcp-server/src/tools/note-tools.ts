@@ -6,7 +6,7 @@ import type { Session } from '../session.js';
 import { bodyAsMarkdown, markdownBody, MARKDOWN_SYNTAX_HELP } from './markdown-io.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
-import { page, pageArgs } from './reads.js';
+import { page, pageArgs, readLinkedFrom } from './reads.js';
 import { envelopeFor, submitBatch, submitOne } from './submit.js';
 
 /** The `{ note }` of `GET /v1/notes/:id` (`routes/notes.ts`). */
@@ -91,12 +91,16 @@ export function noteTools(session: Session): ToolDefinition[] {
       name: 'get_note',
       description:
         'Read one note: title, scope, where it is filed, attached tickets, the image attachments its body shows, and its body as Markdown ' +
-        '(`lossy` names anything Markdown cannot show; replacing the whole body would drop it).',
+        '(`lossy` names anything Markdown cannot show; replacing the whole body would drop it). ' +
+        'linkedFrom lists the first 20 tickets, notes and comments you can see that reference this note, with the sentence each sits in ' +
+        '(the reference marked [[…]]); total counts only those.',
       inputSchema: { noteId: id },
       handler: async (args) => {
         const note = await readNote(session, z.object({ noteId: id }).parse(args).noteId);
         const { body, ...meta } = note;
-        return { ...meta, ...bodyAsMarkdown(body), images: collectImageAttachmentIds(body) };
+        // The note's OWN workspace: get_note takes no workspaceId, and the references route is per workspace.
+        const linkedFrom = await readLinkedFrom(session, note.workspaceId, { kind: 'note', id: note.noteId });
+        return { ...meta, ...bodyAsMarkdown(body), images: collectImageAttachmentIds(body), linkedFrom };
       },
     },
     {

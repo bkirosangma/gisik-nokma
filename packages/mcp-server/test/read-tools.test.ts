@@ -26,6 +26,38 @@ function sessionRecording(answer: unknown, byPath: Record<string, unknown> = {})
   return { session, paths };
 }
 
+/** A route matches its exact path or `path?…`; anything else is a 404, as the server answers. */
+function sessionRouting(routes: Record<string, unknown>): { session: Session; paths: string[] } {
+  const paths: string[] = [];
+  const session: Session = {
+    userId: () => '01J0USER0000000000000000AA',
+    get: async (path) => {
+      paths.push(path);
+      const hit = Object.keys(routes).filter((k) => path === k || path.startsWith(`${k}?`)).sort((a, b) => b.length - a.length)[0];
+      if (hit === undefined) throw new HttpError(404, { error: 'not_found' });
+      return routes[hit];
+    },
+    post: async () => { throw new Error('not a read'); },
+    ...NO_TRANSFER,
+    postEvents: async () => { throw new Error('not a read'); },
+  };
+  return { session, paths };
+}
+
+/** The two reads `get_ticket` makes beside the detail (typed-links T4, then KG-B T4), each answering "nothing". */
+const LINKS_PATH = '/v1/workspaces/w1/tickets/t1/links';
+const REFS_PATH = '/v1/workspaces/w1/references?target=ticket%3At1';
+const NOTHING_BESIDE = { [LINKS_PATH]: { links: [] }, [REFS_PATH]: { total: 0, items: [], nextCursor: null } };
+// total 25 over a 2-row page: the tool must pass the route's TOTAL through, not count the rows it got
+// (with total = 2 the mutant `total: page.items.length` would pass).
+const LINKED = {
+  total: 25, nextCursor: '99',
+  items: [
+    { sourceKind: 'note', sourceId: 'n1', authorId: 'u1', snippet: 'see [[CCSO-4 Chiller]]', updatedAt: '2026-10-03T10:00:00.000Z', parent: { kind: 'note', noteId: 'n1', title: 'Rulings' } },
+    { sourceKind: 'comment', sourceId: 'c1', authorId: 'u1', snippet: '[[CCSO-4 Chiller]] again', updatedAt: '2026-10-03T09:00:00.000Z', parent: { kind: 'ticket', ticketId: 't2', projectId: 'p1', key: 'CCSO-9', title: 'Pump', stateCategory: 'open' } },
+  ],
+};
+
 function tool(name: string, session: Session) {
   const found = readTools(session).find((t) => t.name === name);
   if (found === undefined) throw new Error(`no tool named ${name}`);
@@ -123,16 +155,18 @@ describe('the read tools', () => {
     expect(paths).toEqual([`/v1/projects/p1/tickets?${expected.toString()}`]);
   });
 
-  it('14.66 get_ticket passes both casings through untouched', async () => {
+  it('14.66 get_ticket passes both casings through untouched; 27.165 it asks the references route third, after the links', async () => {
     const body = {
       ticket: { ticket_id: 't1', workspace_id: 'w1', project_id: 'p1', parent_id: null, own_mode: 'inherit', resolved_mode: 'project', seq: 3 },
       ticketState: { kind: 'ticket', id: 't1', assigneeId: null, collaboratorIds: [] },
       title: 'A ticket', stateProvenance: null, parent: null, rollup: null,
     };
-    const { session, paths } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
-    // T9 adds ONE key (`description`, as Markdown) and typed links T4 one more (`links`); everything else is the server's, untouched.
-    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] }, links: [] });
-    expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', '/v1/workspaces/w1/tickets/t1/links']);
+    const { session, paths } = sessionRecording(body, NOTHING_BESIDE);
+    // T9 adds ONE key (`description`, as Markdown), typed links T4 one more (`links`) and KG-B T4 one more (`linkedFrom`); everything else is the server's, untouched.
+    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({
+      ...body, description: { markdown: '', lossy: [] }, links: [], linkedFrom: { total: 0, items: [] },
+    });
+    expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1', LINKS_PATH, REFS_PATH]);
     // The mixed casing is the SERVER's contract. Normalising it here would be
     // this package inventing a shape, which is exactly what the spec forbids.
   });
@@ -143,7 +177,7 @@ describe('the read tools', () => {
       key: 'CCSO-4', title: 'Chiller', rollup: null,
       ticketState: { kind: 'ticket', id: 't1', assigneeId: 'u1', fields: { description: { value: doc }, priority: { value: 'P2' } } },
     };
-    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
+    const { session } = sessionRecording(body, NOTHING_BESIDE);
     const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & {
       ticketState: { fields: Record<string, unknown>; assigneeId: string };
     };
@@ -160,16 +194,16 @@ describe('the read tools', () => {
       ticketState: { kind: 'ticket', id: 't1', fields: {}, links: [{ kind: 'blocks', targetId: 'b1' }] },
     };
     const row = { kind: 'blocks', direction: 'out', ticket: { id: 'b1', projectId: 'p1', key: 'CCSO-5', title: 'Ice maker', stateCategory: 'open' } };
-    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: [row] } });
+    const { session } = sessionRecording(body, { ...NOTHING_BESIDE, [LINKS_PATH]: { links: [row] } });
     const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & { ticketState: Record<string, unknown> };
     expect(out['links']).toEqual([{ kind: 'blocks', direction: 'out', ticket: { id: 'b1', key: 'CCSO-5', title: 'Ice maker' } }]);
     expect('links' in out.ticketState).toBe(false); // one representation
     expect(out.ticketState['id']).toBe('t1'); // control: the rest of the state is served
-    const none = sessionRecording({ ...body, ticketState: { kind: 'ticket', id: 't1', fields: {} } }, { '/v1/workspaces/w1/tickets/t1/links': { links: [] } });
+    const none = sessionRecording({ ...body, ticketState: { kind: 'ticket', id: 't1', fields: {} } }, NOTHING_BESIDE);
     expect(((await tool('get_ticket', none.session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown>)['links']).toEqual([]);
     // The detail answers and the links read 404s (visibility changed between the two reads): the uniform sentence, never the raw HTTP error.
     // The detail must answer here: 14.458 404s every path, so its detail read throws first and the links read is never reached.
-    const linksPath = '/v1/workspaces/w1/tickets/t1/links';
+    const linksPath = LINKS_PATH;
     const raced = sessionRecording(body);
     const linksGone: Session = {
       ...raced.session,
@@ -181,6 +215,40 @@ describe('the read tools', () => {
     };
     await expect(tool('get_ticket', linksGone).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow(/^ticket not found or not visible to you$/);
     expect(raced.paths).toEqual(['/v1/workspaces/w1/tickets/t1', linksPath]); // the detail answered; the 404 is the links read's
+  });
+
+  it('27.166 get_ticket answers linkedFrom { total, items[{ sourceKind, sourceId, title, snippet }] } — no parent object, no authorId, no cursor', async () => {
+    const { session } = sessionRouting({ '/v1/workspaces/w1/tickets/t1': { key: 'CCSO-4', title: 'Chiller', ticketState: { fields: {} } }, [LINKS_PATH]: { links: [] }, '/v1/workspaces/w1/references': LINKED });
+    const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as { linkedFrom: unknown };
+    expect(out.linkedFrom).toEqual({
+      total: 25,
+      items: [
+        { sourceKind: 'note', sourceId: 'n1', title: 'Note: Rulings', snippet: 'see [[CCSO-4 Chiller]]' },
+        { sourceKind: 'comment', sourceId: 'c1', title: 'Comment on CCSO-9', snippet: '[[CCSO-4 Chiller]] again' },
+      ],
+    });
+  });
+
+  it('27.167 a refused references read does not fail get_ticket: linkedFrom is the empty answer; a 500 still throws (control)', async () => {
+    const detail = { key: 'CCSO-4', title: 'Chiller', ticketState: { fields: {} } };
+    const { session, paths } = sessionRouting({ '/v1/workspaces/w1/tickets/t1': detail, [LINKS_PATH]: { links: [] } });
+    expect(((await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as { linkedFrom: unknown }).linkedFrom).toEqual({ total: 0, items: [] });
+    expect(paths, 'the 404 was the references read').toEqual(['/v1/workspaces/w1/tickets/t1', LINKS_PATH, REFS_PATH]);
+    const failing: Session = {
+      ...session,
+      get: async (path: string) => {
+        if (path.includes('/references')) throw new HttpError(500, { error: 'boom' });
+        return path === LINKS_PATH ? { links: [] } : detail;
+      },
+    };
+    // The HttpError's own message, so the rejection is the 500 rethrown and not, say, a TypeError on a missing body.
+    await expect(tool('get_ticket', failing).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow('gisik-nokma answered 500');
+  });
+
+  it('27.170 the get_ticket description says what linkedFrom holds', () => {
+    expect(tool('get_ticket', sessionRouting({}).session).description).toContain(
+      'linkedFrom lists the first 20 tickets, notes and comments you can see that reference this ticket, with the sentence each sits in (the reference marked [[…]]); total counts only those.',
+    );
   });
 
   it('14.458 get_ticket maps a 404 to the uniform sentence', async () => {
