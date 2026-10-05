@@ -231,8 +231,8 @@ test('29.042 a mouse drag pans as far as the pointer moves while the button is d
   await page.mouse.down();
   await page.mouse.move(box.x + 500, box.y + 250, { steps: 8 });
   // read with the button still DOWN: momentum starts only on pointerup, so here the pan is exactly the pointer's travel (the
-  // bound after release alone would pass a drag that panned 10x the pointer). Two frames first: Chromium hands pointermove
-  // to the page on animation frames.
+  // bound after release alone would pass a drag that panned 10x the pointer). The two frames first are a guard only: the leg
+  // was as green without them (FIX 1 probe W1).
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const held = (await state(page)).scrollLeft - before.scrollLeft;
   await page.mouse.up();
