@@ -54,6 +54,7 @@ const placement = (page: Page) =>
     };
     return { aside: at('.gn-kg-insp'), below: at('.gn-kg__below') };
   });
+const DESKTOP = { aside: 'auto / auto, 1 / span 2', below: '1 / auto, 2 / auto' };
 const STACKED = { aside: 'auto / auto, auto / auto', below: 'auto / auto, auto / auto' };
 const rowHeights = (page: Page) => page.locator('.gn-kg-insp .gn-kg-links__row').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
 
@@ -163,7 +164,7 @@ test('27.338 a phone: the inspector is a card under the canvas, full width, in a
   expect(a.width).toBe(c.width);
 });
 
-test('27.339 a desktop: the keys line and the list sit under the canvas, in its column, and the inspector beside them never moves the list; control: Phone pass rulings\' inspector runs past the canvas, GN-133\'s does not', async ({ page }) => {
+test('27.660 a desktop: the keys line and the list sit under the canvas, in its column, and the inspector beside them never moves the list; control: Phone pass rulings\' inspector runs past the canvas, GN-133\'s does not', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openView(page);
   const canvas = await pageBox(page, '.gn-kg__canvas');
@@ -181,10 +182,10 @@ test('27.339 a desktop: the keys line and the list sit under the canvas, in its 
   expect(short.keys.top).toBeCloseTo(canvas.bottom + 10, 1);
   expect(short.head.top).toBeCloseTo(short.keys.bottom + 10, 1);
   expect([short.list.left, short.list.width]).toEqual([canvas.left, canvas.width]);
-  expect(await placement(page)).toEqual({ aside: 'auto / auto, 1 / span 2', below: '1 / auto, 2 / auto' });
+  expect(await placement(page)).toEqual(DESKTOP);
 });
 
-test('27.339 a short list: GN-149 at one hop lists GN-142 alone, and GN-142\'s inspector, longer than the canvas and the list together, does not move it', async ({ page }) => {
+test('27.660 a short list: GN-149 at one hop lists GN-142 alone, and GN-142\'s inspector, longer than the canvas and the list together, does not move it', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openView(page);
   const mount = page.locator('.gn-kg__mount');
@@ -204,7 +205,13 @@ test('27.339 a short list: GN-149 at one hop lists GN-142 alone, and GN-142\'s i
   expect((await pageBox(page, '.gn-kg-list__head')).top).toBe(head.top); // row 2 takes it: the canvas's row, and the list, stay
 });
 
-test('27.339 one column (768 and 360 wide) and a phone keep canvas, inspector, keys line, list in that order, with no sideways scroll; control: the two-column placement is gone there', async ({ page }) => {
+test('27.660 one column (920, 768 and 360 wide) and a phone keep canvas, inspector, keys line, list in that order, with no sideways scroll; control: 921 wide is two columns', async ({ page }) => {
+  // the boundary: 921 px wide places the list in the canvas's column, 920 stacks
+  await page.setViewportSize({ width: 921, height: 800 });
+  await openView(page);
+  expect(await placement(page)).toEqual(DESKTOP);
+  await page.setViewportSize({ width: 920, height: 800 });
+  await expect.poll(() => placement(page)).toEqual(STACKED);
   for (const [width, height] of [[768, 1024], [360, 780]] as const) {
     await page.setViewportSize({ width, height });
     await openView(page);
