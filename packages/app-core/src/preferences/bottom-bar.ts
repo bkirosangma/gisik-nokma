@@ -23,7 +23,7 @@
  * a destination with no route, into the bar.
  */
 
-/** Everything a slot can hold. The scoped ones (all but `notes` and `inbox`) need a workspace to resolve. */
+/** Everything a slot can hold. The scoped ones (all but `notes`, `inbox` and `my-work`) need a workspace to resolve. */
 export type BarDestination =
   | 'board'
   | 'my-work'

@@ -55,7 +55,7 @@ const ALLOWED_DOUBLES: Record<string, { count: number; why: string }> = {
   },
 };
 /** Routes that never paint: they redirect. */
-const REDIRECTS = ['apps/web/app/page.tsx'];
+const REDIRECTS = ['apps/web/app/page.tsx', 'apps/web/app/w/[workspaceId]/my-work/page.tsx'];
 
 /** A heading element at level 1, written literally or chosen by a `heading = 'h1'` default. */
 const H1 = /<h1\b|heading\s*=\s*'h1'|<h1>/g;
