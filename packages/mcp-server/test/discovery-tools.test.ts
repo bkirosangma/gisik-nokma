@@ -91,7 +91,7 @@ describe('14.481 my_work and get_attention', () => {
  * `/v1/me/workspaces` read, archived workspaces skipped, then one read per workspace — and `get_attention`
  * takes `show` (default created + assigned), narrowed per workspace to what the viewer may ask there.
  * Rig: w1 the viewer OWNS; w2 a plain membership where the viewer runs a project; w3 archived; w4 a plain
- * membership whose row carries no `adminProjectIds` key at all (an older server).
+ * membership whose row carries no `adminProjectIds` key at all (an older server); w5 one the viewer ADMINS.
  */
 const ME_WORKSPACES = {
   workspaces: [
@@ -99,13 +99,14 @@ const ME_WORKSPACES = {
     { workspaceId: 'w2', name: 'Two', prefix: 'TWO', role: 'member', adminProjectIds: ['p2'], archived: false },
     { workspaceId: 'w3', name: 'Three', prefix: 'THR', role: 'owner', adminProjectIds: ['p3'], archived: true },
     { workspaceId: 'w4', name: 'Four', prefix: 'FOU', role: 'member', archived: false },
+    { workspaceId: 'w5', name: 'Five', prefix: 'FIV', role: 'admin', adminProjectIds: [], archived: false },
   ],
 };
 const attentionPath = (ws: string, show: string) => `/v1/workspaces/${ws}/attention?show=${show}`;
 const attentionBody = (ws: string) => ({ workspaceId: ws, generatedAt: '2026-10-05T00:00:00.000Z', settings: { staleDays: 7 }, items: [{ ticketId: `t-${ws}` }] });
 const workBody = (ws: string) => ({ workspaceId: ws, groups: { open: [{ ticketId: `t-${ws}` }], active: [], terminal: [] }, projectNames: { p: 'P' }, stateNames: { [`t-${ws}`]: 'Open' } });
-const LIVE = ['w1', 'w2', 'w4'] as const;
-const NAMES: Record<string, string> = { w1: 'One', w2: 'Two', w4: 'Four' };
+const LIVE = ['w1', 'w2', 'w4', 'w5'] as const;
+const NAMES: Record<string, string> = { w1: 'One', w2: 'Two', w4: 'Four', w5: 'Five' };
 
 describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
   it('30.051 get_attention with no arguments: one workspace list, then each live workspace with show=created,assigned', async () => {
@@ -129,12 +130,21 @@ describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
   });
 
   it('30.053 show is narrowed per workspace: a workspace the viewer may not ask is skipped, never 400ed', async () => {
-    const pages: Record<string, unknown> = { '/v1/me/workspaces': ME_WORKSPACES, [attentionPath('w1', 'ws-admin')]: attentionBody('w1') };
+    const pages: Record<string, unknown> = {
+      '/v1/me/workspaces': ME_WORKSPACES,
+      [attentionPath('w1', 'ws-admin')]: attentionBody('w1'),
+      [attentionPath('w5', 'ws-admin')]: attentionBody('w5'),
+    };
     const f = fake(pages);
-    // ws-admin: only w1 (owner) may be asked; w2 and w4 (member) are neither requested nor listed
-    expect(await tool('get_attention', f.session).handler({ show: ['ws-admin'] })).toEqual({ workspaces: [{ workspaceId: 'w1', name: 'One', items: [{ ticketId: 't-w1' }] }] });
-    expect(f.asked).toEqual(['/v1/me/workspaces', attentionPath('w1', 'ws-admin')]);
-    // project-admin: only w2 (runs p2); w1 (owner, no admin project) and w4 (no key) are skipped
+    // ws-admin: only w1 (owner) and w5 (admin) may be asked; w2 and w4 (member) are neither requested nor listed
+    expect(await tool('get_attention', f.session).handler({ show: ['ws-admin'] })).toEqual({
+      workspaces: [
+        { workspaceId: 'w1', name: 'One', items: [{ ticketId: 't-w1' }] },
+        { workspaceId: 'w5', name: 'Five', items: [{ ticketId: 't-w5' }] },
+      ],
+    });
+    expect(f.asked).toEqual(['/v1/me/workspaces', attentionPath('w1', 'ws-admin'), attentionPath('w5', 'ws-admin')]);
+    // project-admin: only w2 (runs p2); w1 and w5 (no admin project) and w4 (no key) are skipped
     const p = fake({ '/v1/me/workspaces': ME_WORKSPACES, [attentionPath('w2', 'project-admin')]: attentionBody('w2') });
     expect(await tool('get_attention', p.session).handler({ show: ['project-admin'] })).toEqual({ workspaces: [{ workspaceId: 'w2', name: 'Two', items: [{ ticketId: 't-w2' }] }] });
     expect(p.asked).toEqual(['/v1/me/workspaces', attentionPath('w2', 'project-admin')]);
@@ -144,10 +154,17 @@ describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
       [attentionPath('w1', 'created,assigned,ws-admin')]: attentionBody('w1'),
       [attentionPath('w2', 'created,assigned,project-admin')]: attentionBody('w2'),
       [attentionPath('w4', 'created,assigned')]: attentionBody('w4'),
+      [attentionPath('w5', 'created,assigned,ws-admin')]: attentionBody('w5'),
     });
     const out = (await tool('get_attention', all.session).handler({ show: ['project-admin', 'ws-admin', 'assigned', 'created'] })) as { workspaces: Array<{ workspaceId: string }> };
-    expect(out.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w2', 'w4']);
-    expect(all.asked).toEqual(['/v1/me/workspaces', attentionPath('w1', 'created,assigned,ws-admin'), attentionPath('w2', 'created,assigned,project-admin'), attentionPath('w4', 'created,assigned')]);
+    expect(out.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w2', 'w4', 'w5']);
+    expect(all.asked).toEqual([
+      '/v1/me/workspaces',
+      attentionPath('w1', 'created,assigned,ws-admin'),
+      attentionPath('w2', 'created,assigned,project-admin'),
+      attentionPath('w4', 'created,assigned'),
+      attentionPath('w5', 'created,assigned,ws-admin'),
+    ]);
   });
 
   it('30.054 show:[] and an unknown value are refused before any read', async () => {
@@ -193,9 +210,9 @@ describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
     }
     const f = fake(pages);
     const att = (await tool('get_attention', f.session).handler({})) as { workspaces: Array<{ workspaceId: string }> };
-    expect(att.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w4']);
+    expect(att.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w4', 'w5']);
     const work = (await tool('my_work', f.session).handler({})) as { workspaces: Array<{ workspaceId: string }> };
-    expect(work.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w4']);
+    expect(work.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w4', 'w5']);
     // CONTROL: a 500 is not a missing workspace — the tool fails rather than hide it
     const boom = new HttpError(500, { error: 'internal' });
     const g = fake({ ...pages, [attentionPath('w2', 'created,assigned')]: boom, '/v1/me/work?workspaceId=w2': boom });
