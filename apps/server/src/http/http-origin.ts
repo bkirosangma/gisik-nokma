@@ -212,7 +212,7 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   '/v1/me/invitations/:inviteId/accept', // membership-granting, cookie-authenticated
   '/v1/me/invitations/:inviteId/decline',
   // My work preferences (my-work-global plan, Task 2): a per-user write, the
-  // same category as notification preferences two lines up.
+  // same category as the notification preferences row above.
   '/v1/me/my-work-preferences',
   // Access plan Task 6 (case 6.216). The lookup answers "does this address have
   // an account"; the outsider door GRANTS a workspace role. Both are
