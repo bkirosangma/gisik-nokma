@@ -156,6 +156,43 @@ describe('useGlobalMyWork', () => {
     expect(attentionCalls[1]).toEqual(['w-live', ['created', 'assigned']]);
   });
 
+  it('30.031 an EVENT frame re-asks too, the commonest live frame; a scope-revoked frame does not (control)', async () => {
+    const { source, attentionCalls, myWorkCalls } = recordingSource();
+    const { result } = renderHook(() => useGlobalMyWork(source, [workspace('w-live')], ['created', 'assigned']));
+    await waitFor(() => expect(result.current.attention.data).not.toBeNull());
+    expect(attentionCalls).toHaveLength(1);
+    // CONTROL: a frame the live queries do not refetch on asks nothing, even after the
+    // 200 ms debounce has long passed.
+    act(() => source.pushStreamItem({ type: 'scope-revoked', workspaceId: 'w-live' } as never));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
+    expect(attentionCalls).toHaveLength(1);
+    act(() => source.pushStreamItem({ type: 'event', workspaceId: 'w-live', envelope: {} } as never));
+    await waitFor(() => expect(attentionCalls).toHaveLength(2));
+    expect(myWorkCalls).toEqual(['w-live', 'w-live']);
+  });
+
+  it('30.031 unmounting closes every stream subscription it opened', () => {
+    const { source } = recordingSource();
+    const open = new Set<object>();
+    const subscribe = source.subscribe.bind(source);
+    source.subscribe = (workspaceId, afterSeq, cb) => {
+      const token = {};
+      open.add(token);
+      const stop = subscribe(workspaceId, afterSeq, cb);
+      return () => {
+        open.delete(token);
+        stop();
+      };
+    };
+    const { unmount } = renderHook(() =>
+      useGlobalMyWork(source, [workspace('w1'), workspace('w2')], ['created', 'assigned']),
+    );
+    // CONTROL: one open subscription per live workspace while mounted.
+    expect(open.size).toBe(2);
+    unmount();
+    expect(open.size).toBe(0);
+  });
+
   it('30.031 live re-asks are ordered by ISSUE: an older read answering after a newer one never overwrites it', async () => {
     // Each attention read waits on its own gate, so the test decides the arrival order.
     const gates: Array<(items: AttentionItem[]) => void> = [];
@@ -229,5 +266,22 @@ describe('useGlobalMyWork', () => {
     const after = seen.slice(before);
     expect(after[0]).toBeNull();
     for (const answer of after) expect(answer === null || answer.join() === 'w1:created').toBe(true);
+  });
+
+  it('30.033 settled is false while the question is out, true once answered, and false again for a new show', async () => {
+    const { source } = recordingSource();
+    const { result, rerender } = renderHook(
+      ({ show }: { show: AttentionShow[] }) => useGlobalMyWork(source, [workspace('w1')], show),
+      { initialProps: { show: ['created', 'assigned'] } },
+    );
+    expect([result.current.attention.settled, result.current.myWork.settled]).toEqual([false, false]);
+    await waitFor(() => expect(result.current.attention.settled).toBe(true));
+    expect(result.current.myWork.settled).toBe(true);
+    expect(ids(result.current.attention.data)).toEqual(['w1:created+assigned']);
+
+    rerender({ show: ['created'] });
+    expect(result.current.attention.settled).toBe(false);
+    await waitFor(() => expect(result.current.attention.settled).toBe(true));
+    expect(ids(result.current.attention.data)).toEqual(['w1:created']);
   });
 });
