@@ -343,14 +343,14 @@ export function ticketTools(session: Session): ToolDefinition[] {
         // The stored source decides the stream (spec A §2.2): find the link as the app shows it.
         const [sourceId, targetId] = found.direction === 'out' ? [a.ticketId, a.targetId] : [a.targetId, a.ticketId];
         const [source, target] = await Promise.all([endOf(sourceId), endOf(targetId)]);
-        const stored = { kind: a.kind, source, target, label: found.label ?? undefined };
+        const stored = { kind: a.kind, source, target, label: found.label };
         if (a.action === 'remove') return { result: await submitOne(session, linkEvent(session, a.workspaceId, 'ticket.link_removed', stored)) };
         // The other branches are the stored SOURCE's outgoing labels, read from its own list when the call names the target end.
         // Only a `leads_to` row carries a label (Graph Part 2 LK-2), so the labelled outgoing rows are exactly those branches.
         const sourceLinks = sourceId === a.ticketId ? links : await linksOf(sourceId);
         const others = sourceLinks
           .filter((l) => l.direction === 'out' && l.ticket.id !== targetId)
-          .flatMap((l) => (l.label === undefined || l.label === null ? [] : [l.label]));
+          .flatMap((l) => (l.label === undefined ? [] : [l.label]));
         return { results: await relabelStored(session, a.workspaceId, stored, others, a.label as string) };
       },
     },

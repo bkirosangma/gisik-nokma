@@ -2,8 +2,8 @@ import type { SubmittedEvent, TicketLinkKind } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import { envelopeFor, resultError, submitBatchByIndex, type EventResult } from './submit.js';
 
-/** One row of `GET …/tickets/:id/links` (typed-links T4; `label` from Graph Part 2, absent when the link has none). */
-export type LinkRow = { kind: string; direction: 'out' | 'in'; label?: string | null; ticket: { id: string; key?: string | null; title?: string | null } };
+/** One row of `GET …/tickets/:id/links` (typed-links T4; `label` from Graph Part 2, no key when the link has none, 29.126). */
+export type LinkRow = { kind: string; direction: 'out' | 'in'; label?: string; ticket: { id: string; key?: string | null; title?: string | null } };
 export type LinkEnd = { id: string; draft: boolean };
 export type LinkSpec = { kind: TicketLinkKind; source: LinkEnd; target: LinkEnd; label?: string | undefined };
 
