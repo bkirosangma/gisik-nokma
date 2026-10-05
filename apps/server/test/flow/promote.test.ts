@@ -82,9 +82,11 @@ const finished = () => addTicket(db.pool, { start: 'focus', moves: ['doing', 'do
 const working = () => addTicket(db.pool, { start: 'focus', moves: ['doing'] });
 const wait = async (t: string) => step(db.pool, t, 'ticket.field_set', { fieldId: 'waitForAll', value: true });
 /** `n` fresh Backlog tickets in ascending id (`newUlid` is not ordered within a millisecond), one after another. */
-async function sortedBacklog(n: number): Promise<string[]> {
+async function sortedBacklog(n: 2, typeId?: string): Promise<[string, string]>;
+async function sortedBacklog(n: 3, typeId?: string): Promise<[string, string, string]>;
+async function sortedBacklog(n: number, typeId = TASK): Promise<string[]> {
   const out: string[] = [];
-  for (let i = 0; i < n; i += 1) out.push(await addTicket(db.pool));
+  for (let i = 0; i < n; i += 1) out.push(await addTicket(db.pool, { typeId }));
   return out.sort();
 }
 const refusingAll = {
@@ -101,6 +103,8 @@ describe('29.214 the committed finish files one led-to move', () => {
     const x = await finished();
     const u = await addTicket(db.pool);
     await lead(db.pool, x, u);
+    // and s BLOCKS u: only a leads_to link out of the finished source re-targets
+    await step(db.pool, s, 'ticket.link_added', { kind: 'blocks', targetId: u });
     const linkT = await lead(db.pool, s, t);
     const linkK = await lead(db.pool, s, k);
     const p = promoter({ now: () => new Date(NOW) });
@@ -284,6 +288,14 @@ describe('29.218 a terminal initial state', () => {
     expect(await stateOf(db.pool, t)).toBe('todo');
     expect(logs).toEqual([`flow promotion skipped for ticket ${shipped}: the initial state shipped of its workflow is terminal`]);
     expect(logs.filter((l) => /initial state .* terminal/.test(l))).toHaveLength(1);
+    // the second element: two such targets in one flow are BOTH skipped
+    const s2 = await finished();
+    const [sh1, sh2] = await sortedBacklog(2, SHIPPED_TASK);
+    await lead(db.pool, s2, sh1);
+    await lead(db.pool, s2, sh2);
+    expect(await promoteTargets(deps(), WS, [sh2, sh1])).toEqual({ promoted: 0, refused: 0, skipped: 2 });
+    expect([await stateOf(db.pool, sh1), await stateOf(db.pool, sh2)]).toEqual(['backlog', 'backlog']);
+    expect(logs.slice(1)).toEqual([sh1, sh2].map((id) => `flow promotion skipped for ticket ${id}: the initial state shipped of its workflow is terminal`));
   });
 });
 
