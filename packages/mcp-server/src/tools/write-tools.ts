@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PRIORITIES, newUlid } from '@gisik-nokma/domain';
+import { PRIORITIES, estimateValueSchema, newUlid } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
 import { MARKDOWN_SYNTAX_HELP, markdownBody, parentOf } from './markdown-io.js';
@@ -22,6 +22,7 @@ const birthShape = {
   stateId: z.string().min(1).optional(),
   startDate: day.optional(),
   dueDate: day.optional(),
+  estimate: estimateValueSchema.optional(),
 };
 
 /** The domain's refusal for a draft born in focus (`ticket.created`'s refine), held here because the domain does not export the text; 28.131 pins the two to each other. */
@@ -37,7 +38,7 @@ export function writeTools(session: Session): ToolDefinition[] {
         'workflow, the initial state and every rule are the product\'s, not this tool\'s. `start` ' +
         'chooses where it is born: `\'backlog\'` (the default) or `\'focus\'`. Optional: `markdown` (the description), ' +
         '`priority` (P1–P3), `assigneeId` ("me" is you), `stateId` (the status it starts in; the ticket then starts in focus, ' +
-        'so do not combine it with start "backlog"), `startDate` / `dueDate` (YYYY-MM-DD). ' +
+        'so do not combine it with start "backlog"), `startDate` / `dueDate` (YYYY-MM-DD), `estimate` (whole days 1–365). ' +
         '`draft: true` makes a private draft instead: it is born in the backlog, so pass no `stateId` and no start "focus". ' +
         'A draft is private to you until publish_draft. It has no key. ' +
         'To assign someone by their email address instead, pass assignee_email (and no assigneeId): the first call looks the address up and answers a PREVIEW naming the person and saying whether they are already in the workspace or WILL BE ADDED AS A GUEST (who would then see only this ticket) - no ticket is created; repeat the call with confirm_assignee set to that person\'s userId to create it. ' + MARKDOWN_SYNTAX_HELP,
@@ -117,6 +118,7 @@ export function writeTools(session: Session): ToolDefinition[] {
           ...(a.stateId === undefined ? {} : { stateId: a.stateId }),
           ...(a.startDate === undefined ? {} : { startDate: { date: a.startDate } }),
           ...(a.dueDate === undefined ? {} : { dueDate: { date: a.dueDate } }),
+          ...(a.estimate === undefined ? {} : { estimate: a.estimate }),
         });
         const committed = person === undefined ? await submitOne(session, event) : await submitForAssignee(session, a.workspaceId, person, event);
         // A draft has no key until publish_draft: say so, so an assistant does not go looking for one.

@@ -1,12 +1,13 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
-import type { LedgerEvent, TicketState, WorkspaceRole } from '@gisik-nokma/domain';
+import { TICKET_FOLD_VERSION, type LedgerEvent, type TicketState, type WorkspaceRole } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { canOpen, noteEventVisibleTo } from '../visibility/can-open.js';
 import { targetSight, withholdEvent, withholdLinks, type TargetSight } from '../visibility/withhold-link-targets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
+import { bootRestate } from './snapshot-writer.js';
 import { readStreamSeq } from './stream-seq.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { ServerAppend } from '../routes/invites.js';
@@ -104,6 +105,24 @@ export const BOOTSTRAP_BACKFILL_TYPES = [
   'claim.contested',
   'claim.contested_resolved',
 ] as const;
+
+/** The 503 body both bootstrap routes send for `SnapshotRestatePending`. */
+export const SNAPSHOT_RESTATE_PENDING = 'snapshot_restate_pending';
+
+/**
+ * Thrown by `bootstrapTicket`: a ticket's stored snapshot was written by an older fold and this process's boot
+ * restate pass has not settled yet (`bootRestate` in `snapshot-writer.ts`; wtg2 fold-version bootstrap, ruling D).
+ * Both bootstrap routes answer it with a 503, never the 404: the client's transport maps only a 404 to
+ * `TicketPullNotFound`, which drops an owed pull, and any other failure leaves the pull owed for the next catch-up
+ * (`http-transport.ts`, `bootstrapTicket`). Any OTHER error in those routes still reaches the app's error handler
+ * (a 500 and an alert; 29.405).
+ */
+export class SnapshotRestatePending extends Error {
+  constructor(readonly ticketId: string) {
+    super(`ticket ${ticketId}: its snapshot awaits the boot restate pass`);
+    this.name = 'SnapshotRestatePending';
+  }
+}
 
 export type BootstrapTicket = {
   ticketId: string;
@@ -205,9 +224,32 @@ export type BootstrapResponse = {
  * caller's `targetSight`, and a link whose target that viewer cannot see is
  * withheld from the snapshot's `state.links` (`withholdLinks`) and from every
  * event, the backfilled contests included (`withholdEvent`).
+ *
+ * **A snapshot from an older fold waits for the boot restate pass** (wtg2
+ * fold-version bootstrap, planner ruling D of 2026-10-05). A row whose
+ * `foldVersion` is below `TICKET_FOLD_VERSION` lacks members the current fold
+ * derives, and a device that loads it as its baseline keeps it: at local schema 5
+ * it owes no further pull, and a `null` snapshot would not help it either,
+ * because the replica resumes from its OWN stored baseline when none arrives.
+ * So until this process's boot pass has settled (`bootRestate.complete`) such a
+ * row throws `SnapshotRestatePending`, which both routes answer with a 503 and
+ * the client's drain keeps owed; nothing is written on this read. After the pass
+ * it can only be a restate that failed: it is served as stored and named on
+ * `bootRestate.warn`. A ticket with no snapshot, or one whose row is at the
+ * current fold or from a later one, is served as before.
  */
 export async function bootstrapTicket(client: PoolClient, ticketId: string, sees: TargetSight): Promise<BootstrapTicket> {
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
+  // wtg2 fold-version bootstrap (planner ruling D, 2026-10-05): a row written by an older fold lacks members the
+  // current fold derives (work periods since T9). Until the boot restate pass has settled it is refused, retryably, so
+  // the client's pull stays owed and lands on the restated row; after the pass such a row is a restate that failed, and
+  // it is served as stored, with a warning, rather than leaving the ticket unreadable.
+  if (snapshot !== null && snapshot.foldVersion < TICKET_FOLD_VERSION) {
+    if (!bootRestate.complete) throw new SnapshotRestatePending(ticketId);
+    bootRestate.warn(
+      `bootstrap: ticket ${ticketId} is served a snapshot from fold ${snapshot.foldVersion} (current ${TICKET_FOLD_VERSION}): its restate failed`,
+    );
+  }
   const all = await readEntityEvents(client, 'ticket', ticketId);
   const snapSeq = snapshot?.seq ?? 0;
   const backfill: readonly string[] = BOOTSTRAP_BACKFILL_TYPES;
@@ -455,6 +497,8 @@ export function registerSyncRoutes(
         return body;
       } catch (err) {
         await client.query('ROLLBACK');
+        // Answered here, not thrown: the app's error handler turns every 5xx into a 500 and an alert.
+        if (err instanceof SnapshotRestatePending) return await reply.code(503).send({ error: SNAPSHOT_RESTATE_PENDING });
         throw err;
       } finally {
         client.release();
@@ -575,6 +619,8 @@ export function registerSyncRoutes(
           // The original error is the one worth throwing; a failed ROLLBACK
           // (e.g. the connection already died) must not mask it.
         }
+        // One stale ticket refuses the whole cut (ruling D): a partial bootstrap is not a consistent one.
+        if (err instanceof SnapshotRestatePending) return await reply.code(503).send({ error: SNAPSHOT_RESTATE_PENDING });
         throw err;
       } finally {
         client.release();

@@ -6443,7 +6443,31 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " switch (or Ctrl and scroll, or a pinch) to zoom about the spot you point at. The arrow keys move a week at a time. A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by. A thin line marks today. Tickets that share a day are stacked in rows, and each bar shows its ticket's key."
+                    "text": " switch (or Ctrl and scroll, or a pinch) to zoom about the spot you point at. The arrow keys move a week at a time. A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by. A thin line marks today. Tickets that share a day are stacked in rows, and each bar shows its ticket's key. On a phone the chart turns so that time runs down the page. Scroll to a stretch with nothing on it and a pill reads "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Nothing in view\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Jump to the previous bar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Jump to the next bar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
                   }
                 ]
               },
@@ -15941,7 +15965,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The Calendar is a month grid; the Timeline is the same idea stretched sideways as one continuous chart you scroll and zoom, with no pages. Both draw a bar only when a ticket has "
+                    "text": "The Calendar is a month grid; the Timeline is the same idea stretched sideways as one continuous chart you scroll and zoom, with no pages (on a phone it turns so that time runs down the page). Both draw a bar only when a ticket has "
                   },
                   {
                     "kind": "bold",

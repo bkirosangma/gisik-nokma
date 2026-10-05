@@ -108,11 +108,12 @@ describe('MCP tickets through the hosted door', () => {
       { tool: 'get_ticket_history', args: (x) => ({ ticketId: x.ticketId }), stranger: TICKET_GONE, allowed: { caller: 'member' } },
       { tool: 'rank_ticket', args: t({ after: w.secondTicketId }), stranger: TICKET_GONE }, // the rank arithmetic is 14.455's
       { tool: 'get_ticket', args: t(), stranger: TICKET_GONE, allowed: { caller: 'member' } },
-      // 27.060 (typed-links T4): the server's gate decides; a member who sees both ends links them.
+      // 27.060 (typed-links T4): the server's gate decides; a member who sees both ends links them. Since Graph Part 5 T1
+      // (29.375) the tool reads both ends first (a draft end changes the stream), so a stranger meets the uniform read sentence.
       {
         tool: 'link_tickets',
         args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, targetId: x.secondTicketId, kind: 'relates', action: 'add' }),
-        stranger: `refused by ${PERMISSION_ROLE_RULE}: ${NOT_A_MEMBER_REASON}`,
+        stranger: TICKET_GONE,
         allowed: { caller: 'member', eventType: 'ticket.link_added' },
       },
     ]);
