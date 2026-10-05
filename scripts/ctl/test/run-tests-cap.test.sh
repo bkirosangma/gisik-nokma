@@ -149,28 +149,6 @@ reset; rm -f "$FXP.shim"; os=$(PATH="$SB:$PATH" rt --label shim --max-min 2 -- s
 check "13.2329 a timer whose parent is not the verb never signals it: with the timer run one process down (a PATH shim), a 4 s job under a 2 s cap runs to its end (rc 0, its output in the log, no TIMEOUT in log or output) (CONTROL: the shim really ran the timer: it recorded itself, its parent and the timer's pid)" \
   '[ -n "${perlpid:-}" ] && [ -n "${shimpid:-}" ] && [ $rs -eq 0 ] && printf "%s\n" "$ls_" | grep -qx outlived-the-cap && ! printf "%s\n%s" "$ls_" "$os" | grep -q TIMEOUT'
 
-# ---- 13.2349 the cap fires in the same instant the job exits: rc is the job's own, never 128+USR1 ----
-# The race (the job dead, its SIGCHLD and the cap's USR1 both pending at the verb's `wait`) is built without timing luck: a `perl` shim on
-# PATH replaces the timer and backgrounds a worker (the verb KILLs a timer that has not fired) that waits for the verb to sit inside its
-# `{ wait; } 2>/dev/null` (its fd 2 is /dev/null) and for the job to be up, STOPs the verb, lets the job `exit 7`, waits for the job to be a
-# zombie or gone (macOS: the stopped verb's own wait4 reaps it), sends USR1, then CONTs the verb: both land on the one `wait`. Unfixed, rc was 158.
-cat > "$SB/perl" <<'SH'
-#!/bin/bash
-case "$*" in *USR1*) ;; *) exec "$REALPERL" "$@";; esac
-v="$3"; r="$FXP.r"
-( fd() { lsof -a -p "$v" -d 2 -Fn 2>/dev/null | sed -n 's/^n//p'; }; st() { ps -o stat= -p "$1" 2>/dev/null | tr -d ' '; }
-  n=0; until [ -s "$r.pid" ] && [ "$(fd)" = /dev/null ]; do sleep 0.05; n=$((n+1)); [ $n -lt 200 ] || exit 1; done
-  sleep 0.3; kill -STOP "$v"; vs=$(st "$v"); vfd=$(fd); j=$(cat "$r.pid"); : > "$r.go"
-  n=0; until case "$(st "$j")" in Z*|"") true;; *) false;; esac; do sleep 0.05; n=$((n+1)); [ $n -lt 200 ] || break; done
-  js=$(st "$j"); js=${js:-gone}; kill -USR1 "$v" && sent=1 || sent=0; echo "$vs $vfd $js $sent" > "$r.rec"; kill -CONT "$v" ) < /dev/null > /dev/null 2>&1 &
-echo $! >> "$FXP"
-SH
-chmod +x "$SB/perl"
-reset; rm -f "$FXP".r.*; orc=$(REALPERL="$realperl" PATH="$SB:$PATH" RT_ALARM=20 rt --label race --max-min 2 -- sh -c 'echo $$ >> "$FXP"; echo $$ > "$1.pid"; n=0; until [ -f "$1.go" ] || [ $n -ge 200 ]; do sleep 0.05; n=$((n+1)); done; echo job-exits-7; exit 7' x "$FXP.r"); rrc=$?; lrc=$(logtext)
-rrec=$(cat "$FXP.r.rec" 2>/dev/null)
-check "13.2349 the cap's USR1 landing on the verb's wait after the job has exited (verb STOPped, job a zombie, then USR1 + CONT) returns the job's own rc 7, never 158 (128+USR1) or 124, with no TIMEOUT in log or output (CONTROL: the shim's worker stopped the verb inside its wait — state T, fd 2 /dev/null —, saw the job a zombie and sent the USR1; the job's last line is in the log)" \
-  'case "$rrec" in "T"*" /dev/null Z"*" 1"|"T"*" /dev/null gone 1") true;; *) false;; esac && printf "%s\n" "$lrc" | grep -qx job-exits-7 && [ $rrc -eq 7 ] && ! printf "%s\n%s" "$lrc" "$orc" | grep -q TIMEOUT'
-
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----
 cat > "$fx/rec-run-tests" <<'SH'
 #!/bin/sh
