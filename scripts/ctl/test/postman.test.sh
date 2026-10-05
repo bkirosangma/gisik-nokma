@@ -13,7 +13,7 @@ mkdir -p "$R" "$L"; : > "$N"
 export CTL_POSTMAN_ROOT="$R" CTL_LOG_DIR="$L" CTL_POSTMAN_NOTES="$N" CTL_TMUX_SESSION="$S" CTL_PROOF_TRIES=4 CTL_POSTMAN_CMD_RE='^(bash|cat)$'
 # P51: lib.sh's paste waits (1 s settle, 2 s submit, 1 s per proof poll) are seams; a fake seat answers in milliseconds, so this suite (and
 # ONLY this suite — 13.2350) scales them, and the fake seat's 3 s turn with them. The live defaults are pinned by 13.2351.
-export CTL_PASTE_SETTLE_SECS=0.1 CTL_SUBMIT_WAIT_SECS=0.3 CTL_PROOF_POLL_SECS=0.1 FAKESEAT_TURN_SECS=0.2
+export CTL_PASTE_SETTLE_SECS=0.05 CTL_SUBMIT_WAIT_SECS=0.2 CTL_PROOF_POLL_SECS=0.05 FAKESEAT_TURN_SECS=0.1
 unset TMUX_PANE
 NOW=1790000000
 pm() { CTL_POSTMAN_NOW="$NOW" "$CTL" "$@"; }
