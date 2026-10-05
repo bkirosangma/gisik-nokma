@@ -6,6 +6,7 @@ import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { readActorNames, readActorNamesForGuest } from '../routes/builder-reads.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
+import { visibleConceptIds } from './concepts.js';
 import { requireMember } from './membership.js';
 import { NOTE_PROJECT_LIVE_WHERE } from './notes.js';
 import { SqlParams } from './sql-params.js';
@@ -21,7 +22,8 @@ import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './vis
  * ## Visibility is decided per WORKSPACE, by the predicates every other read uses
  *
  * A ring can span workspaces (a person connects them), so each item is resolved in its own workspace with the viewer's
- * effective role THERE (`requireMember`), through `visibleTicketsWhere` / `visibleNotesWhere` / `visibleProjects`.
+ * effective role THERE (`requireMember`), through `visibleTicketsWhere` / `visibleNotesWhere` / `visibleProjects`, and a
+ * concept through `visibleConceptIds` (spec D's D4).
  * Nothing here restates who may see what.
  *
  * ## An item the viewer cannot see is never returned, never walked THROUGH, and no edge into it is returned
@@ -150,7 +152,23 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
       const ref = graphRef('person', userId);
       out.set(ref, { ref, kind: 'person', id: userId, workspaceId: null, projectId: null, label: name, title: null, category: null, suggested: false });
     }
-    return out; // concepts: spec D adds a resolver; until then none resolve
+    // Spec D §6 (KG-D Task 6): a concept is drawn only for a reader who sees it, which `visibleConceptIds` decides (D4: every
+    // live item visible, an empty concept for non-guests only; a deleted concept for nobody), and nothing here restates.
+    // Model suggestions join this arm once Task 5's `sem_suggestions` lands (case 27.507).
+    for (const [workspaceId, conceptIds] of await groupByWorkspace('proj_concepts', 'concept_id', ids.concept)) {
+      const eff = await roleIn(workspaceId);
+      if (eff === null) continue;
+      const visible = await visibleConceptIds(db, eff, viewerId, workspaceId, conceptIds);
+      const { rows } = await db.query<{ concept_id: string; name: string; summary: string }>(
+        'SELECT concept_id, name, summary FROM proj_concepts WHERE concept_id = ANY ($1::text[])',
+        [[...visible]],
+      );
+      for (const row of rows) {
+        const ref = graphRef('concept', row.concept_id);
+        out.set(ref, { ref, kind: 'concept', id: row.concept_id, workspaceId, projectId: null, label: row.name, title: row.summary === '' ? null : row.summary, category: null, suggested: false });
+      }
+    }
+    return out;
   }
 
   /** The card keys of the tickets a response returns: ONE `cardKeysFor` call per read. */
@@ -173,7 +191,7 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
     const parsed = parseGraphRef(ref);
     if (parsed !== null) ids[parsed.kind].push(parsed.id);
   }
-  const t = ids.ticket, n = ids.note, p = ids.person, pr = ids.project, w = ids.workspace;
+  const t = ids.ticket, n = ids.note, p = ids.person, pr = ids.project, w = ids.workspace, c = ids.concept;
   const edges = new Map<string, RawEdge>();
   const add = (kind: GraphEdgeKind, from: string, to: string, extra: Partial<RawEdge> = {}) => {
     const id = edgeId(kind, from, to);
@@ -247,6 +265,14 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
         `SELECT project_id, workspace_id FROM proj_projects WHERE project_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} workspace_id = ANY ($2::text[])`, [pr, w]);
       for (const r of rows) add('in', graphRef('workspace', r.workspace_id), graphRef('project', r.project_id));
     }
+  }
+  // Spec D §6: a concept's tags, from the item side (a ticket or note in the frontier) and from the concept side (a concept in it).
+  if (groups.has('concepts') && (t.length > 0 || n.length > 0 || c.length > 0)) {
+    const { rows } = await db.query<{ concept_id: string; item_kind: 'ticket' | 'note'; item_id: string; tagged_by: string; tagged_at: Date; origin: string }>(
+      `SELECT concept_id, item_kind, item_id, tagged_by, tagged_at, origin FROM proj_concept_items
+        WHERE ((item_kind = 'ticket' AND item_id = ANY ($1::text[])) OR (item_kind = 'note' AND item_id = ANY ($2::text[])))
+              ${within ? 'AND' : 'OR'} concept_id = ANY ($3::text[])`, [t, n, c]);
+    for (const r of rows) add('tag', graphRef('concept', r.concept_id), graphRef(r.item_kind, r.item_id), { addedById: r.tagged_by, addedAt: r.tagged_at, origin: r.origin });
   }
   return [...edges.values()];
 }

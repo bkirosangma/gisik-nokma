@@ -62,9 +62,9 @@ export type GraphItemView = {
   workspaceId: string | null;
   /** null for a workspace-level note, a workspace, a person or a concept. */
   projectId: string | null;
-  /** The ticket key, a note's title, a person's display name, a project's or workspace's name. */
+  /** The ticket key, a note's title, a person's display name, a project's, workspace's or concept's name. */
   label: string;
-  /** A ticket's or note's title; null otherwise. */
+  /** A ticket's or note's title, or a concept's summary (null when it has none); null otherwise. */
   title: string | null;
   category: StateCategory | null;
   hop: number;
