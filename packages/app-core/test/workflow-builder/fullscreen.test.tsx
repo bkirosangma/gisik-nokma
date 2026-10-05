@@ -100,6 +100,43 @@ async function pickToDo(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
 }
 
+/**
+ * G-9 T5 FIX 2: the same version 2 with QA between Review and Done, and the draft removes BOTH, so the mapping has two rows and one
+ * pick cannot stand in for the whole map (with `droppingReview()`'s one row, a remount seeded from the last pick alone looked whole).
+ */
+function droppingReviewAndQa() {
+  const workflowId = newUlid();
+  const published: PublishedWorkflowDef = {
+    id: workflowId,
+    version: 2,
+    name: 'Kanban',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'review', name: 'Review', category: 'active' },
+      { id: 'qa', name: 'QA', category: 'active' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [
+      { from: 'todo', to: 'review', rules: [] },
+      { from: 'review', to: 'qa', rules: [] },
+      { from: 'qa', to: 'done', rules: [] },
+      { from: 'done', to: 'todo', rules: [] },
+    ],
+  };
+  const store = createDraftStore(draftFromPublished(published));
+  store.actions.addTransition('todo', 'done'); // keep the graph sound without Review and QA
+  store.actions.removeState('review');
+  store.actions.removeState('qa');
+  store.actions.select({ kind: 'none' });
+  return { workflowId, initialDraft: store.getState() };
+}
+const qaTarget = () => within(mappingDialog()!).getByRole('button', { name: /Send tickets from QA to/ });
+async function pickQaDone(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(qaTarget());
+  await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+}
+
 describe('25.545 entering and leaving full screen moves focus', () => {
   it('25.545 the header button turns on data-fullscreen, the region role and its label, and focuses the name; Exit returns focus to the button that entered (header, then the canvas corner)', async () => {
     const user = userEvent.setup();
@@ -213,6 +250,42 @@ describe('25.545 entering and leaving full screen moves focus', () => {
       { review: 'todo' },
       { review: 'todo' },
     ]);
+  });
+
+  // G-9 T5 FIX 2 (reviewer A's A1b): every fixture above drops ONE state, so a remount seeded from the last pick alone passed them.
+  // Two dropped states sent to two different places: the toggle must keep the whole map, both ways, and publish it.
+  it('25.545 with two dropped states the toggle keeps both picks: the title row\'s dialog shows each, full screen again shows each, and the publish sends both', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReviewAndQa();
+    const gateway = createFakeGateway({ occupancy: { [workflowId]: { review: 4, qa: 2 } } });
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    const confirm = () => within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' });
+    await enterFullScreen(user, header);
+    await user.click(within(toolbar()).getByRole('button', { name: 'Publish' }));
+    await pickToDo(user);
+    await pickQaDone(user);
+    // control, before the toggle: the toolbar's dialog has two rows and shows both picks, so the map is complete
+    expect(toolbar().contains(mappingDialog())).toBe(true);
+    expect(within(mappingDialog()!).getAllByRole('listitem')).toHaveLength(2);
+    expect(reviewTarget()).toHaveTextContent('To do');
+    expect(qaTarget()).toHaveTextContent('Done');
+    expect(confirm()).toBeEnabled();
+
+    await user.click(within(toolbar()).getByRole('button', { name: 'Exit full screen' }));
+    expect(root).toHaveAttribute('data-fullscreen', 'false');
+    expect(header.querySelector('.workflow-builder-screen__title-row')!.contains(mappingDialog())).toBe(true);
+    expect(reviewTarget()).toHaveTextContent('To do');
+    expect(qaTarget()).toHaveTextContent('Done');
+    expect(confirm()).toBeEnabled();
+
+    await enterFullScreen(user, header);
+    expect(toolbar().contains(mappingDialog())).toBe(true);
+    expect(reviewTarget()).toHaveTextContent('To do');
+    expect(qaTarget()).toHaveTextContent('Done');
+    await user.click(confirm());
+    expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
+    expect(gateway.submitted).toHaveLength(1);
+    expect((gateway.submitted[0]!.payload as PublishedWorkflowDef).stateMapping).toEqual({ review: 'todo', qa: 'done' });
   });
 });
 
@@ -668,6 +741,45 @@ describe('25.548 the Escape ladder: innermost first, one layer per press', () =>
     });
     expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
     expect(mappingDialog()).toBeNull();
+  });
+
+  // G-9 T5 FIX 2 (reviewer A's A2): Cancel rests only on the wire, so on an outcome the dialog shows it is live again, and Escape there
+  // is its Cancel too. `invalid` is the outcome that keeps its own phase (a refusal goes back to `mapping` with the refusal on it).
+  it('25.548 on the unreadable-claim outcome the mapping\'s Cancel is live again, so one Escape is its Cancel: the dialog closes, full screen stays, focus is back on Publish, and the key is marked', async () => {
+    const user = userEvent.setup();
+    const { workflowId, initialDraft } = droppingReview();
+    const message = 'The event type workflow.defined is not registered.';
+    const gateway = createFakeGateway({
+      occupancy: { [workflowId]: { review: 4 } },
+      submitResults: [{ status: 'invalid', eventId: null, code: 'unknown-event-type', message }],
+    });
+    const { root, header } = await renderBuilder({ initialDraft, gateway });
+    await enterFullScreen(user, header);
+    const publish = () => within(toolbar()).getByRole('button', { name: 'Publish' });
+    await user.click(publish());
+    await pickToDo(user);
+    await user.click(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' }));
+    // control: the dialog shows the unreadable-claim outcome (the `invalid` phase, not `mapping`), and its Cancel is enabled
+    expect(await within(mappingDialog()!).findByText(message)).toBeInTheDocument();
+    expect(within(mappingDialog()!).getByText('The server could not read this claim.')).toBeInTheDocument();
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    // focus is inside the dialog: still on the confirm button the click focused, enabled again now that the verdict is in
+    expect(within(mappingDialog()!).getByRole('button', { name: 'Publish with this mapping' })).toHaveFocus();
+    const seen: boolean[] = [];
+    const spy = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') seen.push(event.defaultPrevented);
+    };
+    document.addEventListener('keydown', spy);
+    try {
+      await user.keyboard('{Escape}');
+    } finally {
+      document.removeEventListener('keydown', spy);
+    }
+    expect(mappingDialog()).toBeNull();
+    expect(root).toHaveAttribute('data-fullscreen', 'true');
+    expect(publish()).toHaveFocus();
+    expect(seen).toEqual([true]);
+    expect(gateway.submitted).toHaveLength(1);
   });
 });
 
