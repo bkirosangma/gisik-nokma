@@ -109,6 +109,7 @@ export {
   type EditorSlotUpload,
 } from './views/editor-slot.js';
 export { HistoryList } from './views/history-list.js';
+export { describeEvent, HISTORY_RENDERED_TYPES, type HistoryCopyContext } from './views/history-copy.js';
 export {
   AttachmentList,
   type AttachmentListEntry,

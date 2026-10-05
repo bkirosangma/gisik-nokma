@@ -1,4 +1,4 @@
-import { linkReading, TICKET_LINK_KINDS, type TicketLinkKind } from '@gisik-nokma/domain';
+import { CONCEPT_EVENT_TYPES, linkReading, TICKET_LINK_KINDS, type TicketLinkKind } from '@gisik-nokma/domain';
 import { actorLabel, formatDate } from '../provenance.js';
 import type { TicketHistoryEvent } from '../view-types.js';
 
@@ -292,3 +292,18 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       return event.type;
   }
 }
+
+/**
+ * Every type `describeEvent` has an arm for, in switch order (KG-D T7). The D2 audit reads it to judge each MCP
+ * write tool's `history` leg (`apps/server/test/mcp/d2-audit.test.ts`, 27.517). It is DATA copied from the switch,
+ * so 27.517's app half (`test/history-rendered.test.ts`) holds it to the switch's case labels both ways.
+ */
+export const HISTORY_RENDERED_TYPES: readonly string[] = [
+  'ticket.created', 'ticket.field_set', 'ticket.transitioned', 'visibility.set', 'ticket.assigned',
+  'ticket.collaborator_added', 'ticket.collaborator_removed', 'ticket.workflow_rebound', 'ticket.reparented',
+  'ticket.ranked', 'ticket.closed', 'ticket.reopened', 'ticket.deleted', 'ticket.restored',
+  'comment.added', 'comment.edited', 'comment.deleted', 'attachment.added',
+  'ticket.link_added', 'ticket.link_removed',
+  'claim.contested', 'claim.contested_resolved',
+  ...CONCEPT_EVENT_TYPES, 'workspace.concept_suggestion_rejected',
+];
