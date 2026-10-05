@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import { CalendarView } from '../../src/calendar/calendar-view.js';
@@ -135,6 +135,7 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
     };
     expect(orientationAt(390)).toBe('portrait');
     expect(orientationAt(639)).toBe('portrait');
+    expect(orientationAt(1)).toBe('portrait'); // the narrowest measured panel: only 0 (no layout yet) reads as landscape
     // CONTROLS, same it: the edge, a desktop width and no layout at all are landscape.
     expect(orientationAt(640)).toBe('landscape');
     expect(orientationAt(1280)).toBe('landscape');
@@ -190,5 +191,56 @@ describe('29.107 the Timeline carries the classes its scroller and its portrait 
     };
     expect(rowsAt(390)).toEqual([['t1', '0'], ['t2', '0']]);
     expect(rowsAt(1280)).toEqual([['t1', '0'], ['t2', '1']]);
+  });
+
+  it('29.110 in portrait a bar with no key (an offline ticket, no prefix yet) reserves no line, so the next bar shares its column; control: the same bars with keys', async () => {
+    // At Month (8 px a day) a one-day bar is drawn 12 px tall (MIN_BAR_PX), shorter than a 16 px key line, so a KEYED bar's key
+    // sits after its end and the packer reserves it (to day 23 + 3); the second bar, two days on, takes the next column. A keyless
+    // bar has no line to reserve: its footprint is its own two drawn days, and the second bar shares its column.
+    const day = (id: string, date: string): TicketState => ({ ...ticket, id, fields: { title: claim(id), startDate: claim({ date }), dueDate: claim({ date }) } });
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+    const rowsAtMonth = async (keys: readonly [string | null, string | null]) => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
+      const tall = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700);
+      try {
+        const { container } = render(
+          <TimelineView
+            tickets={[
+              { key: keys[0], state: day('t1', '2026-08-23'), pendingFieldIds: [], customDateFields: [] },
+              { key: keys[1], state: day('t2', '2026-08-25'), pendingFieldIds: [], customDateFields: [] },
+            ]}
+            today="2026-08-23"
+            userName={(id) => id}
+            onOpenTicket={vi.fn()}
+          />,
+        );
+        // Reduced motion makes the zoom instant: the frame lands once Month is marked.
+        const zoom = within(container).getByRole('radiogroup', { name: 'Timeline zoom' });
+        fireEvent.click(within(zoom).getByRole('radio', { name: 'Month' }));
+        await waitFor(() => expect(within(zoom).getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true'));
+        return {
+          orientation: container.querySelector('.gn-timeline')?.getAttribute('data-orientation'),
+          rows: [...container.querySelectorAll<HTMLElement>('.gn-timeline__row')].map((row) => [row.dataset['ticketId'], row.style.getPropertyValue('--row')]),
+        };
+      } finally {
+        tall.mockRestore();
+        spy.mockRestore();
+        cleanup();
+      }
+    };
+    try {
+      // CONTROL first: keyed, the first bar's key line pushes the second bar a column over (the leg CAN fail).
+      expect(await rowsAtMonth(['GN-1', 'GN-2'])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '1']] });
+      expect(await rowsAtMonth([null, null])).toEqual({ orientation: 'portrait', rows: [['t1', '0'], ['t2', '0']] });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

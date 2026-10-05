@@ -371,6 +371,8 @@ export function TimelineView(props: TimelineViewProps) {
   const [unmeasured, setUnmeasured] = useState(false);
   const [nothingInView, setNothingInView] = useState(false);
   const visibleRef = useRef<DayRange>({ start: 0, end: 0 });
+  /** Re-runs the adapter's frame handler on its last frame: the rows changed with no scroll (see the effect after the adapter). */
+  const refreshRef = useRef<(() => void) | null>(null);
   const bandRef = useRef(band);
   bandRef.current = band;
   const allRows = useMemo(() => model.groups.flatMap((group) => group.rows), [model.groups]);
@@ -411,7 +413,9 @@ export function TimelineView(props: TimelineViewProps) {
     adapter.animateTo({ offset: stateRef.current.anchorDay + 0.5 - adapter.viewportDays() / 2 }, { instant: true });
     // Only the scale and the moving flag are this view's business; the first call below builds just those two (a whole
     // Frame literal would name the motion fields, and 11.180's reporting-scope guard scans this file for that vocabulary).
+    let last: Pick<Frame, 'scale' | 'moving'> = { scale: adapter.scale(), moving: false };
     const refresh = (frame: Pick<Frame, 'scale' | 'moving'>): void => {
+      last = frame;
       const levels = axisLevels(frame.scale);
       canvas.style.setProperty('--tl-fade-days', String(levels.dayNumbers));
       canvas.style.setProperty('--tl-fade-weeks', String(crossFade(frame.scale, 16)));
@@ -432,13 +436,22 @@ export function TimelineView(props: TimelineViewProps) {
     };
     const off = adapter.onFrame(refresh);
     if (width > 0) setBand(mountRange(adapter.visibleRange())); // PR-5 from the first measured frame; the 54-day guess is only transitional (planner ruling 2026-10-04)
-    refresh({ scale: adapter.scale(), moving: false });
+    refreshRef.current = () => refresh(last);
+    refresh(last);
     return () => {
       off();
       adapter.destroy();
       adapterRef.current = null;
+      refreshRef.current = null;
     };
   }, [portrait]);
+
+  // 29.108: the Nothing-in-view verdict is about the rows too. A bar can arrive in view, or the last one in view leave, with no
+  // scroll (another member's edit, a deleted ticket), and only a frame refreshes the verdict, so the rows changing replays the
+  // last frame through the same handler: one predicate, at one site.
+  useLayoutEffect(() => {
+    refreshRef.current?.();
+  }, [allRows]);
 
   // The first day of the surface moved (data arrived to the left): keep the same day at the viewport edge.
   useLayoutEffect(() => {

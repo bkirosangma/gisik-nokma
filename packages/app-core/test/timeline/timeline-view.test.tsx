@@ -1316,4 +1316,50 @@ describe('29.108 Nothing in view, and the jumps that glide to the next or previo
     renderTimeline([bar('Far ahead', '2027-08-23', '2027-08-27')]);
     expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
   });
+
+  it('29.108 the verdict follows the DATA, not only the scroll: a bar that arrives in view lowers the pill and the last bar in view leaving raises it, with no scroll between (control: the verdict before each change)', () => {
+    // Both outer bars bracket the added one, so the surface's first and last days never move: no rebase frame refreshes the view
+    // on its own, and only the rows changing can bring the verdict up to date. `rerender` keeps the mounted view (a fresh render
+    // would re-run the adapter and refresh anyway).
+    const early = bar('Early', '2026-08-01', '2026-08-05');
+    const late = bar('Late', '2026-09-10', '2026-09-15');
+    const arriving = bar('Arrives today', '2026-08-22', '2026-08-24');
+    const at = (tickets: TicketDatesInput[]) => <TimelineView tickets={tickets} today={TODAY} userName={userName} onOpenTicket={vi.fn()} />;
+    const view = render(at([early, late]));
+    // CONTROL, before: nothing touches today, the pill is up.
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
+    view.rerender(at([early, arriving, late]));
+    expect(screen.getByRole('button', { name: 'Arrives today' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+    // ...and back: the bar in view leaves (its dates moved, or it was deleted), so the pill rises again.
+    view.rerender(at([early, late]));
+    expect(screen.queryByRole('button', { name: 'Arrives today' })).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing in view');
+  });
+
+  it('29.108 re-reading the verdict on a data change replays the view\'s LAST frame: a zoom the view settled at is kept (control: Month is marked before the change)', async () => {
+    // Reduced motion makes the zoom instant, so the frame lands once Month is marked.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+    try {
+      const early = bar('Early', '2026-08-01', '2026-08-05');
+      const late = bar('Late', '2026-09-10', '2026-09-15');
+      const at = (tickets: TicketDatesInput[]) => <TimelineView tickets={tickets} today={TODAY} userName={userName} onOpenTicket={vi.fn()} />;
+      const view = render(at([early, late]));
+      const zoom = screen.getByRole('radiogroup', { name: 'Timeline zoom' });
+      fireEvent.click(within(zoom).getByRole('radio', { name: 'Month' }));
+      await waitFor(() => expect(within(zoom).getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true'));
+      view.rerender(at([early, bar('Arrives today', '2026-08-22', '2026-08-24'), late]));
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(within(zoom).getByRole('radio', { name: 'Month' })).toHaveAttribute('aria-checked', 'true');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
