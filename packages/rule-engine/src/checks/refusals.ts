@@ -115,10 +115,33 @@ export const REFUSALS = {
    * `checks/flow-cause.ts` raises it at the transition, close and reopen doors, before any other rule.
    */
   'cause.forged': 'Only the flow can record that a ticket was led here, reopened or passed over by a decision.',
+  /**
+   * A Decision's outcome rules (wtg2 T6, spec DC-4 and DC-5; `checks/decision.ts`). The other three `decision.*` reasons
+   * are built (`unknownOutcomeRefusal`, `sameOutcomeRefusal`, `staleFromRefusal`) because they name labels.
+   */
+  'decision.not-a-decision': 'This ticket is not a Decision, so it has no outcome to choose.',
+  'decision.outcome-required': 'Choose an outcome before finishing this decision.',
 } as const;
 
 export function rankRefusal(childTypeName: string, parentTypeName: string): string {
   return `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.`;
+}
+
+/** `ticket.decided` names a label the Decision does not have. Built, like `rankRefusal`, because it names the labels. */
+export function unknownOutcomeRefusal(outcome: string, labels: readonly string[]): string {
+  return labels.length === 0
+    ? 'This decision has no outcomes yet. Link it to the next steps, with a label on each, first.'
+    : `"${outcome}" is not one of this decision's outcomes: ${labels.map((label) => `"${label}"`).join(', ')}.`;
+}
+
+/** `ticket.decided` would change nothing: the same outcome again, or a clear of a decision that is not set. */
+export function sameOutcomeRefusal(current: string | null): string {
+  return current === null ? 'There is no decision to clear.' : `The decision is already ${current}.`;
+}
+
+/** DC-4's sentence, with the third reading it needs: the decision was cleared while the sender looked at an outcome. */
+export function staleFromRefusal(current: string | null): string {
+  return current === null ? 'The decision was cleared since you looked.' : `The decision changed to ${current} since you looked.`;
 }
 
 /** `"<from>" already <reading> "<to>".`: titles, because the engine holds no ticket keys. */

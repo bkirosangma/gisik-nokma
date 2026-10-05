@@ -8,6 +8,7 @@ import { checkTicketTypeDefined } from './checks/ticket-type.js';
 import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import { checkTicketClosed, checkTicketReopened } from './checks/close.js';
 import { checkTicketRanked } from './checks/rank.js';
+import { checkTicketDecided } from './checks/decision.js';
 import { checkTicketLink } from './checks/links.js';
 import { checkTicketDeleted, checkTicketLive, checkTicketRestored } from './checks/deletion.js';
 import { checkTicketDiscarded, checkTicketDraftGate, checkTicketPublished } from './checks/drafts.js';
@@ -88,6 +89,9 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
     case 'ticket.link_added':
     case 'ticket.link_removed':
       return checkTicketLink(env, ctx);
+    // A Decision's outcome (wtg2 T6, spec DC-4): the type, stale-from and outcome rules.
+    case 'ticket.decided':
+      return checkTicketDecided(env, ctx);
     default:
       return { refused: false };
   }
