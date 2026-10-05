@@ -617,7 +617,7 @@ knowledge-graph-view	7	todo	-	-	not started (waits for T5)
 knowledge-graph-view	8	todo	-	-	not started (waits for T7)
 knowledge-graph-view	9	todo	-	-	not started (waits for T6 + T8)
 mcp-graph-semantic-layer	1	todo	-	-	not started (measure first; needs plan A T1 catalogue)
-mcp-graph-semantic-layer	2	todo	-	-	not started (beside T1, T3)
+mcp-graph-semantic-layer	2	in-flight	-	-	task/kg-d-t2-embeddings (lane 3): ticket + comment embeddings, meaning search over tickets, similar
 mcp-graph-semantic-layer	3	todo	-	-	not started (beside T1, T2)
 mcp-graph-semantic-layer	4	todo	-	-	not started (waits for T3)
 mcp-graph-semantic-layer	5	todo	-	-	not started (waits for T1 bars PASSED, T2, T4)
