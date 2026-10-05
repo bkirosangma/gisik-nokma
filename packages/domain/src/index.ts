@@ -32,6 +32,7 @@ export * from './note-state.js';
 export * from './events/membership.js';
 export * from './events/groups.js';
 export * from './events/concept-events.js';
+export * from './concepts.js';
 export * from './events/visibility.js';
 export * from './events/invites.js';
 export * from './events/contest-events.js';
