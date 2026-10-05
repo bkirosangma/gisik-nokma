@@ -145,6 +145,11 @@ describe('27.491 the nightly tick and the commit feed', () => {
       now = new Date('2026-10-06T20:40:00Z'); // 02:10 IST, 2026-10-07
       await scheduler.tick();
       expect(runs.slice(4).sort()).toEqual([A, B, E, F]);
+      const advanced = await db.pool.query<{ d: string }>(`SELECT DISTINCT to_char(last_nightly_ist_date, 'YYYY-MM-DD') AS d FROM sem_job_state`);
+      expect(advanced.rows).toEqual([{ d: '2026-10-07' }]); // the state moved on, so 02:40 that date runs none
+      now = new Date('2026-10-06T21:10:00Z'); // 02:40 IST, 2026-10-07
+      await scheduler.tick();
+      expect(runs).toHaveLength(8);
       expect(runs).not.toContain(C);
       expect(runs).not.toContain(D);
     } finally {
@@ -152,12 +157,14 @@ describe('27.491 the nightly tick and the commit feed', () => {
     }
   });
 
-  it('27.491 a failing job is logged and the next workspace still runs; a tick whose query fails is logged and does not throw', async () => {
+  it('27.491 a failing job is logged and the next workspace still runs, each run on the scheduler clock; a tick whose query fails is logged and does not throw', async () => {
     const logs: string[] = [];
     const runs: string[] = [];
     await db.pool.query('DELETE FROM sem_job_state');
     const now = new Date('2026-10-05T20:40:00Z'); // 02:10 IST
+    const clocks: Array<number | undefined> = [];
     const failingA: RunJob = async (pool, workspaceId, options) => {
+      clocks.push(options?.now?.getTime());
       if (workspaceId === A) throw new Error('job boom');
       return spyJob(runs)(pool, workspaceId, options);
     };
@@ -165,6 +172,7 @@ describe('27.491 the nightly tick and the commit feed', () => {
     await scheduler.tick();
     scheduler.stop();
     expect(runs).toEqual([B, E, F]);
+    expect(clocks, 'each run is handed the scheduler clock').toEqual([now.getTime(), now.getTime(), now.getTime(), now.getTime()]);
     expect(logs).toEqual([`suggestion job failed for ${A}: Error: job boom`]);
 
     const broken = startSuggestionScheduler(failingPool, { runJob: spyJob(runs), now: () => now, log: (msg) => logs.push(msg) });

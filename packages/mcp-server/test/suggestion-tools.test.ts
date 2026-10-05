@@ -99,9 +99,18 @@ describe('27.498 review_suggestions and resolve_suggestion', () => {
     await expect(tool('review_suggestions', f.session).handler({ workspaceId: '01J0WS000000000000000000ZZ' })).rejects.toThrowError(
       /^workspace not found or not visible to you$/,
     );
-    // Control: an accept without a name is refused before anything is posted.
+    // Control: an accept without a name is refused before anything is posted, as an empty name and a summary past 2000 are.
     await expect(tool('resolve_suggestion', f.session).handler({ workspaceId: WS, suggestionId: S.id, action: 'accept' })).rejects.toThrowError(/^accept needs name$/);
+    await expect(tool('resolve_suggestion', f.session).handler({ workspaceId: WS, suggestionId: S.id, action: 'accept', name: '' })).rejects.toThrowError(/too_small/);
+    await expect(
+      tool('resolve_suggestion', f.session).handler({ workspaceId: WS, suggestionId: S.id, action: 'accept', name: 'Licences', summary: 'x'.repeat(2001) }),
+    ).rejects.toThrowError(/too_big/);
     expect(f.batches).toHaveLength(2);
+
+    // A summary (2000 is the bound) rides on the create.
+    await tool('resolve_suggestion', f.session).handler({ workspaceId: WS, suggestionId: S.id, action: 'accept', name: 'Licences', summary: 'x'.repeat(2000) });
+    expect(f.batches[2]?.[0]?.['payload']).toEqual({ name: 'Licences', fromSuggestion: S.id, summary: 'x'.repeat(2000) });
+    accepted(f.batches[2]?.[0]);
   });
 
   it('27.498 the batch is not atomic: a refused tag at index 2 throws its index while the concept stays made, and the description says so', async () => {
