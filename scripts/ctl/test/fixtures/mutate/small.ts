@@ -1,0 +1,12 @@
+export const s1 = (a: number, b: number): boolean => a + b > 1 && a - b < 2;
+export const s2 = (a: number, b: number): boolean => a + b > 2 && a - b < 2;
+export const s3 = (a: number, b: number): boolean => a + b > 3 && a - b < 2;
+export const s4 = (a: number, b: number): boolean => a + b > 4 && a - b < 2;
+export const s5 = (a: number, b: number): boolean => a + b > 5 && a - b < 2;
+export const s6 = (a: number, b: number): boolean => a + b > 6 && a - b < 2;
+export const s7 = (a: number, b: number): boolean => a + b > 7 && a - b < 2;
+export const s8 = (a: number, b: number): boolean => a + b > 8 && a - b < 2;
+export const s9 = (a: number, b: number): boolean => a + b > 9 && a - b < 2;
+export const s10 = (a: number, b: number): boolean => a + b > 10 && a - b < 2;
+export const s11 = (a: number, b: number): boolean => a + b > 11 && a - b < 2;
+export const s12 = (a: number, b: number): boolean => a + b > 12 && a - b < 2;

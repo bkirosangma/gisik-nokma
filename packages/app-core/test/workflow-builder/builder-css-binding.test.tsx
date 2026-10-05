@@ -367,8 +367,10 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
     // `__add-state`, and with the rule working it must name exactly that class.
     const { rendered, exempt } = await collectClasses();
     // `__panels` and `__panels-done` are the phone Panels sheet's two `Button`s (21.170) — shared-component elements too.
+    // AMENDED 2026-10-05 (G-9 T5, 25.545): so is the header's "Full screen" `Button`, `__fullscreen`.
     expect(exempt).toEqual([
       'workflow-builder-screen__add-state',
+      'workflow-builder-screen__fullscreen',
       'workflow-builder-screen__panels',
       'workflow-builder-screen__panels-done',
     ]);

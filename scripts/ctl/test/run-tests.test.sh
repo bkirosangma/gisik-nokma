@@ -8,7 +8,7 @@ set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib.sh"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+. "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 
 fx=$(cd "$(mktemp -d)" && pwd -P)
 cleanup() { while read -r p; do kill "$p" 2>/dev/null; done < "$fx/pids" 2>/dev/null; rm -rf "$fx"; }
@@ -365,4 +365,5 @@ check "13.2286 …and a pass-through is not hashed: the task hash is the same un
 unset CTL_PW_PORT_BASE
 
 rm -rf "$bare" "$gr"
+ctl_test_only_end run-tests.test.sh
 [ "$fails" -eq 0 ] && echo "run-tests.test.sh: ok" || { echo "run-tests.test.sh: $fails FAILED"; exit 1; }
