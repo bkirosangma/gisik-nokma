@@ -1549,6 +1549,19 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
       // half of every key in the workspace.
       prefix: asString(workspace['prefix'], `${path}.prefix`),
       role: asString(workspace['role'], `${path}.role`),
+      // My-work-global T1 (case 30.012b). The projects this caller administers
+      // in this workspace, which decide whether the "Projects I run" chip is
+      // offered. ALWAYS SET here, `[]` when the wire row has no key: the type
+      // makes it optional only so the ~65 hand-built `WorkspaceRef` literals in
+      // web need no edit (plan AMEND 16:26), while every row that came through
+      // this mapper carries it. A present key is read strictly — an array of
+      // strings or a refusal — because a malformed one is a server bug, not "none".
+      adminProjectIds:
+        workspace['adminProjectIds'] === undefined
+          ? []
+          : asArray(workspace['adminProjectIds'], `${path}.adminProjectIds`).map((projectId, idIndex) =>
+              asString(projectId, `${path}.adminProjectIds[${idIndex}]`),
+            ),
       // Trash series, Plan 1 Task 5 (spec T8). REQUIRED, not `withheldOrNumber`-
       // style optional — same reasoning `nameRestrictedProjectCount` gives
       // below and the sibling `project.archived` mapping gives two screens
