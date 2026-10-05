@@ -323,6 +323,10 @@ describe('the phone sheet', () => {
     await waitFor(() => expect(overlay()).toBeNull());
   });
 
+  // A close runs out a PEEK_CLOSE_MS timer before the card leaves the DOM; under load that crosses waitFor's 1 s default, so the waits
+  // for it take `settled()`'s budget (the 25.425 load run, 2026-10-05: 1 of 20 red at its toggle-shut wait, the card still `closing`).
+  const CLOSED = { timeout: 4_000 };
+
   // sheet-peek-escape-race: the listener that consumes Escape is removed by a PASSIVE effect cleanup, which can run well after the
   // overlay left the DOM; and while the overlay animates out (`closing`, PEEK_CLOSE_MS) nothing is open to consume a key. A quick
   // second Escape in either window must reach `Sheet`.
@@ -346,7 +350,7 @@ describe('the phone sheet', () => {
     act(() => {
       escape();
     });
-    await waitFor(() => expect(overlay()).toBeNull());
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
     expect(onClose).not.toHaveBeenCalled();
 
     // Two Escapes before React renders or runs an effect: the first collapses the overlay, the second closes the sheet.
@@ -357,7 +361,7 @@ describe('the phone sheet', () => {
       escape();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(overlay()).toBeNull());
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
 
     // The closing window: the first Escape's render and effects have run, the overlay is still animating out, and a second Escape
     // closes the sheet. Control: the overlay is still in the DOM, `closing`, when the second one lands.
@@ -368,7 +372,7 @@ describe('the phone sheet', () => {
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(overlay()).toBeNull());
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
   });
 
   it('25.444 an overlay reopened while it animates out takes its Escape again: it collapses and the sheet stays open', async () => {
@@ -390,7 +394,7 @@ describe('the phone sheet', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(overlay()).toHaveAttribute('data-state', 'closing');
     expect(onClose).not.toHaveBeenCalled();
-    await waitFor(() => expect(overlay()).toBeNull());
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
     expect(onClose).not.toHaveBeenCalled();
   });
 
