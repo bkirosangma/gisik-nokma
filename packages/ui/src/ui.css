@@ -5980,6 +5980,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   display: flex;
   flex-direction: column;
   min-height: 20rem; /* 320 px (TG-13); the view sets its own height to fill the space under the filters */
+  flex-shrink: 0; /* the view MEASURES that height (TV-11): a fixed-height flex parent must not shrink it back (29.040) */
   background: var(--gn-surface);
   color: var(--gn-text);
   font: inherit;

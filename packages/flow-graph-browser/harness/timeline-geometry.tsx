@@ -4,7 +4,7 @@ import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import '@gisik-nokma/ui/ui.css';
 
 /**
- * `timeline.html`: the product's own Timeline view over a fixed geometry seed, for the real-browser layout cases (29.089).
+ * `timeline-geometry.html`: the product's own Timeline view over a fixed geometry seed, for the real-browser layout cases (29.089).
  * Not a stress page: the stress page's 2,000-ticket scene and its recorded numbers stay as they are. The seed is a draft row
  * (KEYLESS one-day bars on twelve adjacent days, the shape ERRATA E11 found overlapping at the Month preset) and eight keyed
  * one-day bars three days apart, whose keys are drawn outside them at Month.

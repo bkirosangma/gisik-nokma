@@ -49,6 +49,9 @@ describe('29.106 the Timeline stylesheet is the continuous canvas: one scroller,
     expect(valueOf(long, 'display')).toBe('block');
     // The minimum height (TG-13) and the weekend tile (seven days of the packing scale).
     expect(valueOf(ruleExactly(ui, '.gn-timeline'), 'min-height')).toBe('20rem');
+    // The view MEASURES its height (TV-11, `useFillHeight`), so a flex parent of fixed height must not shrink it back: in the T10
+    // harness (an 80vh flex-column host, 29.040) the shrinkable panel ended 144 px above the window instead of 16.
+    expect(valueOf(ruleExactly(ui, '.gn-timeline'), 'flex-shrink')).toBe('0');
     expect(valueOf(ruleExactly(ui, ['.gn-timeline__surface', '.gn-timeline__axis']), 'background-size')).toBe('calc(var(--tl-ppd) * 7px) 100%');
     // The surface fills the canvas even when the lanes are short, so the weekend tint and the today line run to the bottom of
     // the chart rather than stopping under the last row (measured in the T1 harness at 60 bars: they stopped 550 px short).
