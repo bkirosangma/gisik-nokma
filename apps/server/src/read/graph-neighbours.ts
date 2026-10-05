@@ -287,8 +287,10 @@ export async function readGraphRing(db: Queryable, viewerId: string, req: GraphR
     frontier = next.filter((ref) => inGraphScope(known.get(ref)!, req)); // never walk past an out-of-scope item
     if (hop < req.hops && frontier.length === 0) ring = [];
   }
+  const centerResolved = known.get(centerRef)!;
+  const centerOf = (keys: ReadonlyMap<string, string | null>): GraphItemView => ({ ...centerResolved, label: keys.get(centerResolved.id) ?? centerResolved.label, hop: 0, out: !inGraphScope(centerResolved, req) });
   if (dist.size === 1 || ring.length === 0 || ![...dist.values()].includes(req.hops)) {
-    return { hop: req.hops, items: [], edges: [], frontier: [], truncated: false, cursor: null };
+    return { hop: req.hops, center: centerOf(await vis.keysFor([centerResolved])), items: [], edges: [], frontier: [], truncated: false, cursor: null };
   }
 
   const ordered = ring.map((ref) => ({ ref, rank: rank.get(ref) ?? 0 })).sort(compareRingEntries).map((entry) => entry.ref);
@@ -312,9 +314,9 @@ export async function readGraphRing(db: Queryable, viewerId: string, req: GraphR
     });
   }
   edges.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  // A ticket's card key is only DISPLAYED for the page that is returned, and `cardKeysFor` scans the workspace's creations per call, so the walk's
-  // resolves skip it (label = title) and the page asks ONCE (27.210).
-  const pageKeys = await vis.keysFor(page.map((ref) => known.get(ref)!));
+  // A ticket's card key is only DISPLAYED for the page that is returned (and the centre), and `cardKeysFor` scans the workspace's creations per
+  // call, so the walk's resolves skip it (label = title) and the page asks ONCE, the centre with it (27.210, 27.363).
+  const pageKeys = await vis.keysFor([centerResolved, ...page.map((ref) => known.get(ref)!)]);
   const items: GraphItemView[] = page.map((ref) => {
     const item = known.get(ref)!;
     return { ...item, label: pageKeys.get(item.id) ?? item.label, hop: req.hops, out: !inGraphScope(item, req) };
@@ -322,6 +324,7 @@ export async function readGraphRing(db: Queryable, viewerId: string, req: GraphR
   const truncated = ordered.length > req.offset + size;
   return {
     hop: req.hops,
+    center: centerOf(pageKeys),
     items,
     edges,
     frontier: items.filter((item) => !item.out).map((item) => item.ref),

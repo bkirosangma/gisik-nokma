@@ -29,7 +29,7 @@ type Scene = { nodes: DrawNode[]; edges: DrawEdge[]; positions: Map<string, { x:
 /** The rings around `center`, fetched one hop at a time from the fixture's stand-in for the endpoint. */
 async function load(center: string): Promise<GraphStore> {
   const self = fixtureItems().find((i) => i.ref === center)!;
-  let store = mergeRing(emptyStore(), { hop: 0, items: [self], edges: [], frontier: [center], truncated: false, cursor: null });
+  let store = mergeRing(emptyStore(), { hop: 0, center: self, items: [self], edges: [], frontier: [center], truncated: false, cursor: null });
   for (let hop = 1; hop <= REACH + 1; hop += 1) store = mergeRing(store, await fixtureRing({ center, hops: hop, ...SCOPE, groups: [...GRAPH_GROUPS] }));
   return store;
 }

@@ -16,9 +16,9 @@ export function item(id: string, spec: ItemSpec = {}): GraphItemView {
 export function edge(kind: GraphEdgeKind, from: string, to: string, extra: Partial<GraphEdgeView> = {}): GraphEdgeView {
   return { id: `${kind}|${from}|${to}`, kind, from, to, snippet: null, addedBy: null, addedAt: null, origin: null, suggested: false, ...extra };
 }
-/** One "ring" holding everything: the engine never needs the server's ring split to walk. */
+/** One "ring" holding everything: the engine never needs the server's ring split to walk. Its `center` is the first item (already in `items`). */
 export function storeOf(items: GraphItemView[], edges: GraphEdgeView[]): GraphStore {
-  const ring: GraphRingResponse = { hop: 1, items, edges, frontier: items.map((i) => i.ref), truncated: false, cursor: null };
+  const ring: GraphRingResponse = { hop: 1, center: items[0]!, items, edges, frontier: items.map((i) => i.ref), truncated: false, cursor: null };
   return mergeRing(emptyStore(), ring);
 }
 export const T = (id: string) => graphRef('ticket', id);

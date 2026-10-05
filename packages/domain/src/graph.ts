@@ -93,6 +93,12 @@ export type GraphEdgeView = {
 
 export type GraphRingResponse = {
   hop: number;
+  /**
+   * The centre itself, keyed and visibility-resolved like a ring item (`hop` 0), on EVERY answer, an empty ring
+   * included (planner ruling Q1, 2026-10-05). It is NOT in `items`: a ring is the items at exactly `hop` steps
+   * (27.302). The view seeds its store from it, so a centre with no links still has its label.
+   */
+  center: GraphItemView;
   items: GraphItemView[];
   edges: GraphEdgeView[];
   /** The refs in this page that may be walked from (in scope). */
