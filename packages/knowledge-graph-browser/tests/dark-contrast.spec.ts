@@ -181,7 +181,7 @@ test('27.666 control (hig light, neo light): the pill and the phone well have no
   }
 });
 
-for (const arm of [DARK[1]!, DARK[2]!]) {
+for (const arm of DARK) {
   test(`27.667 dark (${arm.name}): a hovered selected row keeps its accent bar and its selected fill; control: hovering an unselected row changes its fill`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openArm(page, arm);
