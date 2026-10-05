@@ -3,14 +3,17 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import { scheduleReload, type WorkspaceRef } from '@gisik-nokma/app-core';
+import type { HomeResponse } from '@gisik-nokma/domain';
 import { HttpError } from '@gisik-nokma/app-core/online';
 import { Providers, resetLastKnownUser } from '../src/providers.js';
 import { EXPIRED_SESSION_COPY, signInWithNext } from '../src/expired-session.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * 27.625–27.628 (Knowledge Graph spec E §2.2, decisions D-E4/D-E8): `/` is Home. This file renders `HomeScreen`
+ * 27.625–27.628 (Knowledge Graph spec E §2.2, decisions D-E4/D-E8): `/` is Home. Task 3 adds the numbers' read through
+ * `HomeScreen` (27.626's 401, 27.628's `getHome` spy, 27.637–27.638's HomeBody arms); the tiles themselves are
+ * `home-numbers.test.tsx`'s. This file renders `HomeScreen`
  * with the REAL `Providers` and a stub `DataSource` (the seam `page-refusals.test.tsx` uses), the nav's `auth-client`
  * mock made mutable so the ordering case can land the session AFTER the workspaces have answered.
  */
@@ -56,6 +59,14 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
 }
 
 const NOTIFICATIONS = { notifications: { unreadCount: async () => 0 } };
+/** Home's numbers (Task 3). Each case below that answers one uses a workspace id of its own: the read cache is module state. */
+const HOME: HomeResponse = {
+  workspaceId: 'ws_1',
+  generatedAt: '2026-10-05T04:30:00.000Z',
+  dueSoonDays: 3,
+  counts: { tickets: 12, open: 9, pastDue: 3, dueSoon: 2, members: 5, notes: 4 },
+  ids: { tickets: ['t_all'], open: ['t_open'], pastDue: ['t_pd'], dueSoon: ['t_ds'], members: ['u_1'], notes: ['n_1'] },
+};
 const KIRO = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
 
 function remember(workspaceId: string): void {
@@ -110,6 +121,27 @@ describe('27.626 signed out: Home sends the viewer to sign in and brings them ba
     renderHome({ getMyWorkspaces: () => Promise.reject(new HttpError(500, '/v1/me/workspaces')) });
     expect(await screen.findByText("Couldn't load your workspaces.")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByText(EXPIRED_SESSION_COPY)).not.toBeInTheDocument();
+  });
+
+  // H11 (p11) + Q2 (planner ruling 14:44): the numbers' read is lifted into HomeScreen's expired-session check.
+  it('27.626 a 401 from getHome pushes signInWithNext("/") with no numbers refusal beside the notice; control: a 500 does not push and shows the refusal', async () => {
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_h11' })],
+      getHome: () => Promise.reject(new HttpError(401, '/v1/workspaces/ws_h11/home')),
+    });
+    await waitFor(() => expect(push).toHaveBeenCalledWith(signInWithNext('/')));
+    expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load the numbers.")).not.toBeInTheDocument();
+
+    cleanup();
+    push.mockClear();
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_h11b' })],
+      getHome: () => Promise.reject(new HttpError(500, '/v1/workspaces/ws_h11b/home')),
+    });
+    expect(await screen.findByText("Couldn't load the numbers.")).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByText(EXPIRED_SESSION_COPY)).not.toBeInTheDocument();
   });
@@ -168,7 +200,9 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
     remember('ws_2');
     mockSessionUser = null;
     mockPending = true;
-    const services = stubServices({ getMyWorkspaces: async () => [ws1, ws2] }, NOTIFICATIONS);
+    // Task 3: the numbers' read is asked only for the workspace Home settles on.
+    const getHome = vi.fn(async (workspaceId: string): Promise<HomeResponse> => ({ ...HOME, workspaceId }));
+    const services = stubServices({ getMyWorkspaces: async () => [ws1, ws2], getHome }, NOTIFICATIONS);
     // A FRESH element per render: re-rendering the same element object would let React bail out, and the mocked
     // session (an external store here) would never be read again.
     const tree = () => (
@@ -198,6 +232,7 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
       await Promise.resolve();
     });
     expect(h1.textContent).toBe('Home');
+    expect(getHome).not.toHaveBeenCalled();
 
     // The session lands.
     mockSessionUser = KIRO;
@@ -209,5 +244,61 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
     // Control: the observer DID record a change, "Home" being the text the h1 held before ws_2's name.
     expect([...seen]).toContain('Home');
     expect([...seen]).not.toContain('First Workspace');
+    await waitFor(() => expect(getHome).toHaveBeenCalledWith('ws_2'));
+    expect(new Set(getHome.mock.calls.map(([id]) => id))).toEqual(new Set(['ws_2']));
+  });
+});
+
+describe('27.637–27.638 the numbers through HomeScreen (Task 3)', () => {
+  // H9a (p11)
+  it('27.637 through HomeScreen: a pending getHome is the skeleton, not the failure', async () => {
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_h9a' })],
+      getHome: () => new Promise<HomeResponse>(() => undefined),
+    });
+    expect(await screen.findByText('Loading the numbers')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load the numbers.")).not.toBeInTheDocument();
+  });
+
+  // H9b (p11)
+  it('27.638 through HomeScreen: a reload that fails after an answer keeps the numbers', async () => {
+    let calls = 0;
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_h9b' })],
+      getHome: async () => {
+        calls += 1;
+        if (calls === 1) return { ...HOME, workspaceId: 'ws_h9b' };
+        throw new Error('boom');
+      },
+    });
+    expect(await screen.findByRole('button', { name: '12 Tickets' })).toBeEnabled();
+    act(() => scheduleReload('ws_h9b', 0));
+    await waitFor(() => expect(calls).toBe(2));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    }); // let the rejection land
+    expect(screen.getByRole('button', { name: '12 Tickets' })).toBeEnabled();
+    expect(screen.queryByText("Couldn't load the numbers.")).not.toBeInTheDocument();
+  });
+
+  // Planner ruling 2026-10-04 Q2, the HomeBody side of "last known" (AMEND p11 "The Q2 arm": reachable).
+  it('27.638 through HomeScreen: a read that fails after a cached answer keeps that answer\'s window on the Due label', async () => {
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_q2' })],
+      getHome: async () => ({ ...HOME, workspaceId: 'ws_q2', dueSoonDays: 3 }),
+    });
+    expect(await screen.findByRole('button', { name: '2 Due in 3 days' })).toBeEnabled();
+
+    // Remount: the cached `home:ws_q2` answer is served first (and its window stored), then the read rejects, the
+    // stale answer is withdrawn (`data` null) and the load has failed.
+    cleanup();
+    renderHome({
+      getMyWorkspaces: async () => [workspace({ id: 'ws_q2' })],
+      getHome: () => Promise.reject(new HttpError(500, '/v1/workspaces/ws_q2/home')),
+    });
+    expect(await screen.findByText("Couldn't load the numbers.")).toBeInTheDocument();
+    const labels = [...document.querySelectorAll('.gn-home__number-label')].map((el) => el.textContent);
+    expect(labels[3]).toBe('Due in 3 days');
+    expect([...document.querySelectorAll('.gn-home__number-value')].map((el) => el.textContent)).toEqual(['–', '–', '–', '–', '–', '–']);
   });
 });
