@@ -1211,6 +1211,11 @@ since 10 Jul, past the 7-day staleness threshold."* or *"due 5 Oct (in 4 days)"*
 nothing. That is deliberate — an empty box headed "Needs your attention" reads like an all-clear you did
 not earn. A blank space there is the normal way of saying "nothing needs you right now".
 
+**On the website's My work page, one line takes the strip's place instead:** *"Nothing needs your attention for"*
+and the chips you have selected. It answers for those chips only, never for everything you could see, and
+**it is left out whenever a workspace could not say what needs your attention**: that workspace's refusal shows
+instead, so a failure never reads as an all-clear.
+
 **Changing the thresholds:** if you are the owner or an admin you can change both numbers — how long
 "sitting too long" is, and how far ahead "due soon" looks. Both default to seven days, and if nobody
 has set them the screen says nobody set them rather than pretending seven was a choice. Blocked is not

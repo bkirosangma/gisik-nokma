@@ -848,7 +848,9 @@ thing and says so, rather than marking some of them.
 **My "Needs your attention" strip isn't showing.**
 If nothing needs attention, the strip does not appear at all — no box, no "all caught up" message,
 nothing. That is deliberate: an empty box headed "Needs your attention" reads like an all-clear you did not
-earn. A blank space there is the normal way of saying "nothing needs you right now".
+earn. A blank space there is the normal way of saying "nothing needs you right now". On the website's My work
+page one line takes its place, *"Nothing needs your attention for"* and the chips you have selected, and it is
+left out whenever a workspace could not say what needs your attention (its refusal shows instead).
 
 **The strip only shows five rows. Where's the rest?**
 Each ticket appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and
