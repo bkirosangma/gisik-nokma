@@ -184,6 +184,16 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
 
 const edgeId = (kind: GraphEdgeKind, from: string, to: string) => `${kind}|${from}|${to}`;
 
+/** A raw edge as every graph read answers it (the ring, `graph/path`): the author's display NAME, never an id, and an ISO date. */
+export async function graphEdgeView(vis: ReturnType<typeof createGraphVisibility>, edge: RawEdge): Promise<GraphEdgeView> {
+  return {
+    id: edge.id, kind: edge.kind, from: edge.from, to: edge.to, snippet: edge.snippet,
+    addedBy: edge.addedById === null ? null : await vis.nameOf(edge.addedById),
+    addedAt: edge.addedAt === null ? null : edge.addedAt.toISOString(),
+    origin: edge.origin, suggested: false,
+  };
+}
+
 /** Every edge touching `frontier` in the enabled groups, UNFILTERED by visibility: the caller keeps an edge only when both ends resolved. */
 async function expand(db: Queryable, frontier: readonly string[], groups: ReadonlySet<GraphGroup>, within = false): Promise<RawEdge[]> {
   const ids: Record<GraphItemKind, string[]> = { ticket: [], note: [], person: [], project: [], workspace: [], concept: [] };
@@ -276,6 +286,8 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
   }
   return [...edges.values()];
 }
+/** `expand`, for spec D's path read (`read/graph-path.ts`), which walks layer by layer and needs every layer's edges. */
+export { expand as expandGraph };
 
 export async function readGraphRing(db: Queryable, viewerId: string, req: GraphRingRequest): Promise<GraphRingResponse | null> {
   const vis = createGraphVisibility(db, viewerId);
@@ -330,12 +342,7 @@ export async function readGraphRing(db: Queryable, viewerId: string, req: GraphR
   for (const edge of raw) {
     if (seen.has(edge.id)) continue;
     seen.add(edge.id);
-    edges.push({
-      id: edge.id, kind: edge.kind, from: edge.from, to: edge.to, snippet: edge.snippet,
-      addedBy: edge.addedById === null ? null : await vis.nameOf(edge.addedById),
-      addedAt: edge.addedAt === null ? null : edge.addedAt.toISOString(),
-      origin: edge.origin, suggested: false,
-    });
+    edges.push(await graphEdgeView(vis, edge));
   }
   edges.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   // A ticket's card key is only DISPLAYED for the page that is returned, and `cardKeysFor` scans the workspace's creations per call, so the walk's
