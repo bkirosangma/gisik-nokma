@@ -728,7 +728,7 @@ describe('13.604 the close/reopen and rank refusal reasons agree, engine and pre
    * expression while the degraded fallback stood beside it unpinned.
    *
    * This row exists because an independent reviewer proved the gap rather than
-   * argued it: replacing the precheck's fallback (`precheck.ts:383`) with a
+   * argued it: replacing the precheck's fallback (`precheck.ts:393`) with a
    * different string left all forty cases in this file GREEN, while the same
    * mutation in the engine's mirror (`checks/rank.ts:58`) killed its own case
    * (mutations E and F, 2026-09-18). A reason string a user can be shown with

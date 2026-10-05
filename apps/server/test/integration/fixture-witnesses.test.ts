@@ -1285,7 +1285,7 @@ describe('the onboarding gateways and the refusal vocabulary, against real route
  *    belong to no exported constant at all.
  * 2. **The wire value against a SECOND, INDEPENDENTLY-OWNED constant.** This is
  *    the strongest form in the file, and 7.238 is the one case that has it:
- *    `PARENT_TERMINAL_RULE` (`packages/app-core/src/precheck.ts:15`) is the
+ *    `PARENT_TERMINAL_RULE` (`packages/app-core/src/precheck.ts:21`) is the
  *    client's own spelling, owned by a different package from the engine's
  *    literal, and the client BRANCHES on it. Nothing before this case compared
  *    the two.

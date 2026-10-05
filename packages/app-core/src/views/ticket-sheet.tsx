@@ -2623,7 +2623,7 @@ export function TicketSheet({
    * `ClientStateCache` — and that is the difference between this and
    * `precheck.ts`.** That module's own docblock records that it may not answer
    * `passed` for `ticket.created` or `ticket.reparented` because this client's
-   * cache holds *"no ticket-type store"* (`precheck.ts:251-267`), so no accept
+   * cache holds *"no ticket-type store"* (`precheck.ts:261-277`), so no accept
    * is derivable there. Here the definitions ARE held, the empty-vs-unread
    * distinction above is what keeps that honest, and the answer decides only
    * what to OFFER — never whether the event will be accepted, which stays the
