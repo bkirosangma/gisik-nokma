@@ -14,13 +14,16 @@ type Pt = { x: number; y: number };
 type Patch = { move?: Record<string, Pt>; nodes?: Record<string, Partial<DrawNode>>; drop?: string[] };
 /**
  * `B`: the target's border, px from its centre along the edge; `head`/`line`: the edge's ink beside the line, 3–8 px and
- * 20–25 px outside B; `ink(lo, hi)`: the same between `lo` and `hi` px from the target's centre.
+ * 20–25 px outside B; `tip`: px past B where the edge's own ink first shows on the axis (the head's point); `ink(lo, hi)`:
+ * the band's ink between `lo` and `hi` px from the target's centre.
  */
-type HeadRead = { B: number; head: number; line: number; L: number; ink: (lo: number, hi: number) => number };
+type HeadRead = { B: number; head: number; line: number; tip: number; L: number; ink: (lo: number, hi: number) => number };
 
 const AXIS_STEP = 0.25;
 /** Beside the line: the line (≤ 3 px wide) leaves these offsets blank, the head (4 × its width) does not. */
 const BAND = [-2.5, -2, 2, 2.5];
+/** Alpha the edge must add on the axis for its point to count as drawn (an antialiased point starts faint). */
+const TIP_INK = 40;
 
 test.afterEach(() => expect(takePageErrors()).toEqual([]));
 
@@ -73,12 +76,20 @@ async function headProbe(page: Page, id: string, patch: Patch = {}): Promise<Hea
   const B = i * AXIS_STEP;
   const ink = (lo: number, hi: number) =>
     on.band.reduce((sum, row, r) => sum + row.reduce((s, a, j) => (j * AXIS_STEP >= lo && j * AXIS_STEP <= hi ? s + Math.max(0, a - off.band[r]![j]!) : s), 0), 0);
-  return { B, head: ink(B + 3, B + 8), line: ink(B + 20, B + 25), L: on.L, ink };
+  const from = Math.ceil((B - 2) / AXIS_STEP);
+  const k = on.axis.findIndex((a, j) => j >= from && a - off.axis[j]! > TIP_INK);
+  return { B, head: ink(B + 3, B + 8), line: ink(B + 20, B + 25), tip: k < 0 ? Infinity : k * AXIS_STEP - B, L: on.L, ink };
 }
 
+/**
+ * A visible head, its point just outside the border: 0.5–4 px past B (B is where the card's antialiased edge falls below
+ * 200, so this is the ruling's 1–2 px gap). Measured on the code, 1–2.75 px; a gap of 0 or 0.15 px reads 0–0.25 on the centre card.
+ */
 const expectHead = (r: HeadRead) => {
   expect(r.head).toBeGreaterThan(300);
   expect(r.head).toBeGreaterThan(3 * r.line);
+  expect(r.tip).toBeGreaterThanOrEqual(0.5);
+  expect(r.tip).toBeLessThanOrEqual(4);
 };
 
 /** The stage point `d` px from `ref`'s centre towards `toward`'s. */
@@ -111,6 +122,11 @@ test('27.350 blocks and ref edges carry a visible head; a parent edge into the s
   const parent = await headProbe(page, 'parent|ticket:t118|ticket:t142');
   expect(parent.head).toBeLessThanOrEqual(parent.line + 60);
   expect(parent.head).toBeLessThan(300);
+  // a parent edge into a DOT (27.355's patch: no card covers its end) has no head either
+  const dot = await headProbe(page, 'parent|ticket:t118|ticket:t125', { nodes: { 'ticket:t125': { lv: 'dot', lbl: '', sub: null } } });
+  expect(dot.B).toBeLessThan(6);
+  expect(dot.head).toBeLessThanOrEqual(dot.line + 60);
+  expect(dot.head).toBeLessThan(300);
 });
 
 test('27.351 the head sits outside the border of the widest card (two rays, one through its far end) and of a chip at fit and at 2× zoom', async ({ page }) => {
@@ -236,6 +252,10 @@ test('27.353 regression control: layout, hover dimming and node hits are as befo
   const [a, b, c, d] = await page.evaluate((pts) => window.__kg.probe!.hitAt(pts), [...inside, outside]);
   expect([a, b, c].filter((h) => h === `edge:${id}`)).toEqual([]); // the clean tree hit the edge at all three (under the card's subtitle)
   expect(d).toBe(`edge:${id}`);
+  // mirror control: an UNdirected edge still runs to its target's centre, so it is still hit inside the target's card (GN-151's
+  // chip, between its dot and its border; the clean tree hit it there too)
+  const inChip = await Promise.all([6, 8, 10].map((d) => along(page, 'ticket:t151', 'ticket:t142', d)));
+  expect(await page.evaluate((pts) => window.__kg.probe!.hitAt(pts), inChip)).toEqual(Array(3).fill('edge:parent|ticket:t142|ticket:t151'));
   // a hover on the arrowhead itself reports the edge
   const head = await along(page, 'ticket:t142', 'note:n2', r.B + 5);
   await page.mouse.move(s.left + head.x, s.top + head.y);

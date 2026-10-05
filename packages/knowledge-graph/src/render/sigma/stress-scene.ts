@@ -33,7 +33,8 @@ function renderQuiet(sigma: { on(event: 'afterRender', cb: () => void): unknown;
 
 export type SweepStats = { frames: number; fps: number; worstMs: number; p99Ms: number; over167: number; overAt: number[] };
 /** `fps`/`worstMs` and the rest describe the FIRST sweep (what the spec §7 bar reads); `pass2` is an identical second sweep, warm. */
-export type StressResult = SweepStats & { cards: number; fog: number; edges: number; renderer: string; firstMs: number; pass2: SweepStats };
+/** `searched`: the edges that end at their target's card border (owner ruling B), so the sweep pays for that search. */
+export type StressResult = SweepStats & { cards: number; fog: number; edges: number; searched: number; renderer: string; firstMs: number; pass2: SweepStats };
 
 /** 500 clear + 2,000 fog + 3,000 edges (spec §7), moved for `durationMs` while every frame is timed. */
 export async function runStress(
@@ -101,7 +102,8 @@ export async function runStress(
   const gl = container.querySelector('canvas')?.getContext('webgl2');
   const info = gl?.getExtension('WEBGL_debug_renderer_info');
   const renderer = gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : 'unknown';
-  const result: StressResult = { cards, fog, edges: graph.size, renderer, ...summary(first), firstMs: +(first[0] ?? 0).toFixed(1), pass2: summary(second) };
+  const searched = graph.filterEdges((_id, a) => a.card !== null).length;
+  const result: StressResult = { cards, fog, edges: graph.size, searched, renderer, ...summary(first), firstMs: +(first[0] ?? 0).toFixed(1), pass2: summary(second) };
   sigma.kill();
   return result;
 }
