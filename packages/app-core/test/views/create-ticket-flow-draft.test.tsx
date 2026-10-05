@@ -102,7 +102,7 @@ describe('28.156 a saved draft', () => {
 
 describe('28.157 a refused draft', () => {
   it('28.157 removes the row, keeps the dialog with the same id and shows the refusal', async () => {
-    const source = createFakeDataSource({}, () => [{ status: 'refused', rule: 'draft.parent-unpublished', reason: 'Publish the parent first' }]);
+    const source = createFakeDataSource({}, (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'draft.parent-unpublished', reason: 'Publish the parent first' })));
     const calls = mount(source);
     await saveDraft();
     expect(await screen.findByText(/Publish the parent first/)).toBeInTheDocument();

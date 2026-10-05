@@ -2790,7 +2790,9 @@ export function TicketSheet({
           projectId: state.projectId,
           parentId: ticketId,
           title: newSubtaskTitle,
-          start: 'focus',
+          // Drafts T8 (planner ruling A): a child of a draft is the author's own draft (R3), born in Backlog on its own
+          // stream, so the draft parent's sheet lists it and nothing public names the draft.
+          ...(isDraft ? { draft: true as const, start: 'backlog' as const } : { start: 'focus' as const }),
         },
       });
       // The create flow's guarded door (`submitChildEvent`), not a bare
@@ -4466,6 +4468,7 @@ export function TicketSheet({
             ticketId={ticketId}
             canEdit={editorSlot !== undefined}
             make={make}
+            isDraft={isDraft}
             links={links}
             {...(queryTickets === undefined ? {} : { queryTickets })}
             {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}

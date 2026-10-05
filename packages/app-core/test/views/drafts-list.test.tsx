@@ -18,7 +18,7 @@ const row = (ticketId: string, extra: Partial<DraftRow> = {}): DraftRow => ({
 const listRows = { getTickets: async () => ({ projectId: 'p1', rows: [{ ticketId: 'a', stateId: 'backlog', rank: 'a0' }] }) as never };
 
 function mount(drafts: DraftRow[], opts: { phone?: boolean; ingest?: (e: never[]) => unknown } = {}) {
-  const source = createFakeDataSource(listRows, (opts.ingest ?? ((e) => e.map(() => committed))) as never);
+  const source = createFakeDataSource(listRows, (opts.ingest ?? ((e: unknown[]) => e.map(() => committed))) as never);
   const onOpenTicket = vi.fn();
   const onChanged = vi.fn();
   render(

@@ -35,7 +35,7 @@ describe('28.150 the draft copy', () => {
     expect(copy.draftsNavName(1)).toBe('Drafts, 1 draft');
     expect(copy.draftsNavName(3)).toBe('Drafts, 3 drafts');
     const every = [
-      ...Object.values(copy).filter((v): v is string => typeof v === 'string'),
+      ...Object.values(copy).filter((v: unknown): v is string => typeof v === 'string'),
       copy.subDraftsLine(2), copy.attachmentsLine(2), copy.draftParentLabel('x'), copy.draftsNavName(2),
     ];
     // 20 constants + 4 built sentences: the loop below is never empty, and a constant added without a row here

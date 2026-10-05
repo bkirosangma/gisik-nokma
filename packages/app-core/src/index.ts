@@ -475,5 +475,6 @@ export {
   type DiscardCounts,
   type DraftOutcome,
 } from './views/draft-actions.js';
+export { placeUnderEvent } from './views/draft-side-events.js';
 export { DraftsList, type DraftsListProps } from './views/drafts-list.js';
 export { DiscardDraftDialog } from './views/discard-draft-dialog.js';

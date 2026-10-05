@@ -21,7 +21,7 @@ const renderWith = (onCreate: (draft: NewTicketDraft) => void | Promise<void>) =
 describe('28.153 Save as draft', () => {
   it('28.153 sits in the footer, sends draft: true, and the switch is ON and disabled while it saves', async () => {
     let settle!: () => void;
-    const onCreate = vi.fn(() => new Promise<void>((resolve) => { settle = resolve; }));
+    const onCreate = vi.fn((_draft: NewTicketDraft) => new Promise<void>((resolve) => { settle = resolve; }));
     renderWith(onCreate);
     const save = screen.getByRole('button', { name: 'Save as draft' });
     expect(save.closest('.gn-dialog__footer')).not.toBeNull();
@@ -56,7 +56,7 @@ describe('28.153 Save as draft', () => {
 
 describe('28.154 one submit', () => {
   it('28.154 both buttons share the guard and the hint', async () => {
-    const onCreate = vi.fn(() => new Promise<void>(() => undefined));
+    const onCreate = vi.fn((_draft: NewTicketDraft) => new Promise<void>(() => undefined));
     renderWith(onCreate);
     const user = userEvent.setup();
     const save = screen.getByRole('button', { name: 'Save as draft' });
@@ -75,7 +75,7 @@ describe('28.154 one submit', () => {
   it('28.154 the other order: Create first, then Save as draft in the same tick, still one call', async () => {
     // Each order has its own mutant: with the ref check gone, Save-first reds only if Create's `disabled` lacks
     // `submitting`, and Create-first reds only if Save's does (see Kills).
-    const onCreate = vi.fn(() => new Promise<void>(() => undefined));
+    const onCreate = vi.fn((_draft: NewTicketDraft) => new Promise<void>(() => undefined));
     renderWith(onCreate);
     await userEvent.setup().type(screen.getByLabelText('Title'), 'Pave the lane');
     fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));

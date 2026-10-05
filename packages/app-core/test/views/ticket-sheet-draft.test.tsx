@@ -215,7 +215,7 @@ describe('28.174 Publish from the sheet', () => {
     await waitFor(() => expect(screen.getByTestId('sheet-crumb-ticket')).toHaveTextContent('RP-7'));
   });
   it('28.174 a refusal is shown verbatim and the pill stays; an unanswered publish says the plan sentence', async () => {
-    renderSheet(source({ getTicket: async () => draftRead() }, () => [{ status: 'refused', rule: 'draft.parent-unpublished', reason: 'Publish the parent first' }]));
+    renderSheet(source({ getTicket: async () => draftRead() }, (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'draft.parent-unpublished', reason: 'Publish the parent first' }))));
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Publish' }));
     expect(await screen.findByText(/Publish the parent first/)).toBeInTheDocument();
     expect(within(screen.getByTestId('sheet-crumb-ticket')).getByText('Draft')).toBeInTheDocument();
