@@ -2782,6 +2782,9 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
       // this line is also what fails if the mapper ever starts defaulting it.
       prefix: 'CC',
       role: 'admin',
+      // My-work-global T1 (30.012b): this body carries no `adminProjectIds`,
+      // and the mapper sets `[]` rather than leaving the key out.
+      adminProjectIds: [],
       // Trash series, Plan 1 Task 5 (spec T8). Served for every caller told
       // about this workspace at all.
       archived: false,
@@ -2803,6 +2806,30 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
     const [entry] = workspaces as Record<string, unknown>[];
     delete entry!['role'];
     expect(() => mapWorkspaceRefs({ workspaces })).toThrow(MappingError);
+  });
+});
+
+/**
+ * 30.012b (my-work-global T1, plan AMEND 16:26) — `adminProjectIds` is optional
+ * on `WorkspaceRef` so hand-built literals need no edit, and the mapper ALWAYS
+ * sets it, so every consumer reading `(w.adminProjectIds ?? [])` off a mapped
+ * row reads what the server said.
+ */
+describe('30.012b mapWorkspaceRefs always sets adminProjectIds', () => {
+  function row(extra: Record<string, unknown>): Record<string, unknown> {
+    return { workspaceId: 'ws1', name: 'Convenience Corner', prefix: 'CC', role: 'admin', archived: false, nameRestrictedProjectCount: 0, projects: [], ...extra };
+  }
+
+  it('30.012b a row carrying [P1] maps to [P1]; a row without the key maps to []; a malformed one is refused', () => {
+    const [carried, absent] = mapWorkspaceRefs({ workspaces: [row({ adminProjectIds: ['P1'] }), row({})] });
+    expect(carried!.adminProjectIds).toEqual(['P1']);
+    // The key is PRESENT on the mapped object, not merely `?? []`-able.
+    expect(Object.prototype.hasOwnProperty.call(absent, 'adminProjectIds')).toBe(true);
+    expect(absent!.adminProjectIds).toEqual([]);
+    // CONTROL, same `it`: a present key is read, not defaulted — a non-array
+    // or a non-string member is a server bug and the mapper names it.
+    expect(() => mapWorkspaceRefs({ workspaces: [row({ adminProjectIds: 'P1' })] })).toThrow(/adminProjectIds/);
+    expect(() => mapWorkspaceRefs({ workspaces: [row({ adminProjectIds: [7] })] })).toThrow(/adminProjectIds\[0\]/);
   });
 });
 

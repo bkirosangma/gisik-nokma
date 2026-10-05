@@ -697,6 +697,26 @@ export type AttentionResponse = {
 };
 
 /**
+ * The attention strip's `show` filter (my-work-global, spec D2): which of the
+ * viewer's tickets "Needs your attention" covers. A ticket qualifies when it
+ * matches ANY selected member, and the visibility predicate still bounds every
+ * member, so the filter only ever narrows.
+ *
+ * - `created` — the viewer created it (`proj_tickets.created_by`);
+ * - `assigned` — it is assigned to the viewer;
+ * - `ws-admin` — every ticket in a workspace where the viewer is `owner` or `admin`;
+ * - `project-admin` — every ticket in a project the viewer administers.
+ *
+ * On the wire it is `?show=` with a comma-separated set. The per-workspace route
+ * with NO `show` keeps its all-visible answer; the UI and MCP default is
+ * `created,assigned`.
+ */
+export type AttentionShow = 'created' | 'assigned' | 'ws-admin' | 'project-admin';
+
+/** Every `AttentionShow` member, spelled exactly as `?show=` carries it. */
+export const ATTENTION_SHOW_VALUES: readonly AttentionShow[] = ['created', 'assigned', 'ws-admin', 'project-admin'];
+
+/**
  * ## The builder's read surface (Plan 5 Task 9b)
  *
  * Plan 8's workflow builder consumes these through Plan 6's `DataSource.query`.
