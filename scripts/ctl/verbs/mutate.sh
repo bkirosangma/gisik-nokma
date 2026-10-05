@@ -19,6 +19,12 @@ while [ $# -gt 0 ]; do
 done
 repo="$(ctl_repo "${repo_arg:-$PWD}")" || { echo "FAIL mutate not a git worktree: ${repo_arg:-$PWD}"; exit 2; }
 ctl_node22 || exit 2
+# mutate.py's watchdog starts the command in its own process group with Popen(process_group=0), which needs Python 3.11 (macOS's
+# /usr/bin/python3 is 3.9): refuse before anything runs, never a TypeError mid-sweep
+pyv="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)"
+pymaj="${pyv%%.*}"; pymin="${pyv#*.}"
+case "$pymaj$pymin" in ''|*[!0-9]*) pymaj=0; pymin=0;; esac
+[ "$pymaj" -gt 3 ] || { [ "$pymaj" -eq 3 ] && [ "$pymin" -ge 11 ]; } || { echo "FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): $(command -v python3 || echo python3) is ${pyv:-not runnable}"; exit 2; }
 status_of() { /usr/bin/git -C "$repo" status --porcelain=v1 --untracked-files=all 2>&1; }
 before="$(status_of)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/ctl-mutate.XXXXXX")" || { echo "FAIL mutate no temp dir"; exit 2; }

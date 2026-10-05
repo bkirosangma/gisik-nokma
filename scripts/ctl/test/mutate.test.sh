@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2259).
-# Scratch git repos only (mktemp; never a worktree of this repo). The four real-Stryker legs (13.2206–13.2208 and the real 13.2216) link the
+# ctl mutate — Stryker plus the custom classes on a branch's changed lines (test-cases 13.2200–13.2223, 13.2228, 13.2229, 13.2250–13.2269).
+# Scratch git repos only (mktemp; never a worktree of this repo). The six real-Stryker legs (13.2206–13.2208, the real 13.2216, 13.2268, 13.2269) link the
 # checkout's own @stryker-mutator, vitest and typescript into the scratch repo and run through a PRIVATE semaphore dir (CTL_SEM_DIR), so the
 # suite, itself run inside one slot-run, never waits on a second machine slot; so does 13.2250's real run-tests queue. Every other leg replaces
 # run-tests with a recording shim.
@@ -39,6 +39,8 @@ mkrepo() {
 # backup-left | flips-dup | flips-missing | control-short | bad-report (fake_report.py). The verb's command is `<python> mutate.py watchdog <secs> <dir> -- <the run>`: the shim
 # keeps the watchdog (it runs INSIDE the slot) and fakes only the run. FAKE_REAL_RUN_TESTS=<ctl>: the faked run goes through the REAL run-tests (a real queue).
 # FAKE_NOREPORT_FILE=<suffix>: the Stryker run of the file ending in <suffix> exits 0 (through the watchdog) and writes NO report; other runs are untouched.
+# FAKE_STATIC_SLOW_FILE=<suffix>: that file's Stryker run with ignoreStatic OFF sleeps FAKE_SLEEP (the watchdog stops it); with it on, the run is normal
+# (FAKE_STATIC_SLOW_ALWAYS=1: the retry sleeps too). Every Stryker config is appended to DIR.fake/confs.jsonl (fake_report.py does it for the normal runs).
 # FAKE_REPORT_THEN_FAIL_FILE=<suffix>: that file's Stryker run writes fake_report.py's normal (valid) report, kept as DIR.fake/rtf-report.json, then exits 3.
 # FAKE_LIST_NOJSON_FILE=<base> / FAKE_LIST_FAIL_FILE=<base>: the `vitest list` control of the run labelled mutate-<k>-<base> (its label is mutate-<k>-control)
 # exits 0 writing NO --json file (marker DIR.fake/list-nojson-hit) / writes fake_report.py's normal 3-test list (kept as DIR.fake/list-fail.json), then exits 1.
@@ -65,6 +67,11 @@ case "${FAKE_MODE:-ok}" in
     ${wd[@]+"${wd[@]}"} bash -c 'echo $$ > "$0/inner.pid"; trap "echo \"command TERM\" >> \"\$0/signals\"; exit 143" TERM; sleep "$1" & wait $!' "$d" "${FAKE_SLEEP:-60}" & job=$!
     wait "$job"; rc=$?; echo "queue wait: 0s"; echo "log: $d/fake.log"; exit "$rc";;
 esac
+if [ -n "${FAKE_STATIC_SLOW_FILE:-}" ] && [[ "${@: -1}" == *.conf.json ]] \
+  && python3 -c 'import json,os,sys; c=json.load(open(sys.argv[1])); sys.exit(0 if c["mutate"][0].split(":")[0].endswith(os.environ["FAKE_STATIC_SLOW_FILE"]) and (not c["ignoreStatic"] or os.environ.get("FAKE_STATIC_SLOW_ALWAYS")) else 1)' "${@: -1}"; then
+  python3 -c 'import json,sys; open(sys.argv[2], "a").write(json.dumps(json.load(open(sys.argv[1]))) + "\n")' "${@: -1}" "$d/confs.jsonl"
+  echo "queue wait: 0s"; echo "log: $d/fake.log"; exec ${wd[@]+"${wd[@]}"} sleep "${FAKE_SLEEP:-60}"   # a run that holds its slot past the cap while its statics run
+fi
 if [ -n "${FAKE_NOREPORT_FILE:-}" ] && [[ "${@: -1}" == *.conf.json ]] \
   && python3 -c 'import json,os,sys; sys.exit(0 if json.load(open(sys.argv[1]))["mutate"][0].split(":")[0].endswith(os.environ["FAKE_NOREPORT_FILE"]) else 1)' "${@: -1}"; then
   echo "queue wait: 0s"; echo "log: $d/fake.log"; exec ${wd[@]+"${wd[@]}"} true   # a Stryker that exits 0 without writing its report
@@ -155,17 +162,18 @@ R1="$T/r1"; mkrepo "$R1"; mkfake "$R1"
 dry_ok() { local out rc; : > "$R1.fake/calls"; out="$(PATH="$FX/shims:$PATH" SHIM_LOG="$R1.fake/shimcalls" mut "$R1" --dry-run)"; rc=$?
   [ $rc -eq 0 ] && printf '%s\n' "$out" | grep -q "run 1: stryker on src/calc.ts:2-6" && [ ! -s "$R1.fake/calls" ] && [ ! -e "$R1.fake/shimcalls" ] && clean_tree "$R1" && committed "$R1"; }
 check "13.2205 --dry-run prints the ranges and the planned runs and runs NOTHING: the run-tests shim and the stryker/vitest/pnpm/npx PATH shims record no call, the tree and calc.ts are untouched" 'dry_ok'
-skips_ok() { local out; out="$(mut "$R1" --dry-run)"
-  printf '%s\n' "$out" | grep -q "SKIPPED  packages/harness/src/h.ts: packages/harness has no vitest" \
-  && printf '%s\n' "$out" | grep -q "SKIPPED  apps/server/src/s.ts: apps/server: the test Postgres 127.0.0.1:$PGPORT_CLOSED is not reachable" \
+skips_ok() { local out rc; out="$(mut "$R1" --dry-run)"; rc=$?
+  [ $rc -eq 0 ] && printf '%s\n' "$out" | grep -q "SKIPPED  packages/harness/src/h.ts: packages/harness has no vitest" \
   && printf '%s\n' "$out" | grep -q "excluded packages/calc/test/calc.test.ts: test file" \
   && printf '%s\n' "$out" | grep -q "excluded packages/calc/src/calc.generated.ts: generated" \
-  && ! printf '%s\n' "$out" | grep -q "file apps/server/"; }
-check "13.2209 skips: a package without vitest and apps/server with the test Postgres unreachable are listed as SKIPPED (and the test and generated files as excluded)" 'skips_ok'
-pg_up_ok() { local port out; exec 3< <(python3 -c 'import socket,time; s=socket.socket(); s.bind(("127.0.0.1",0)); s.listen(); print(s.getsockname()[1], flush=True); time.sleep(30)'); read -r port <&3
-  out="$(cd "$R1" && CTL_MUTATE_RUN_TESTS="$R1.fake/fake-run-tests" CTL_MUTATE_PG_PORT="$port" "$CTL" mutate --repo "$R1" --base HEAD~1 --dry-run 2>&1)"; exec 3<&-
-  printf '%s\n' "$out" | grep -q "file apps/server/src/s.ts" && ! printf '%s\n' "$out" | grep -q "SKIPPED  apps/server"; }
-check "13.2210 CONTROL for 13.2209: with something listening on the Postgres port, apps/server is planned, not skipped" 'pg_up_ok'
+  && ! printf '%s\n' "$out" | grep -q "apps/server"; }
+check "13.2209 skips: a package without vitest is listed as SKIPPED (and the test and generated files as excluded), dry-run exit 0; apps/server is never a skip (13.2264)" 'skips_ok'
+# R8: the base fixture, then a commit that changes apps/server/src/s.ts alone (HEAD~1: s.ts; HEAD~2: calc.ts and s.ts)
+R8="$T/r8"; mkrepo "$R8"; mkfake "$R8"; printf 'export const s = 3;\n' > "$R8/apps/server/src/s.ts"; $G -C "$R8" commit -q -am server
+pg_up_ok() { local port out rc; exec 3< <(python3 -c 'import socket,time; s=socket.socket(); s.bind(("127.0.0.1",0)); s.listen(); print(s.getsockname()[1], flush=True); time.sleep(30)'); read -r port <&3
+  out="$(cd "$R8" && CTL_MUTATE_RUN_TESTS="$R8.fake/fake-run-tests" CTL_MUTATE_PG_PORT="$port" "$CTL" mutate --repo "$R8" --base HEAD~1 --dry-run 2>&1)"; rc=$?; exec 3<&-
+  [ $rc -eq 0 ] && printf '%s\n' "$out" | grep -q "file apps/server/src/s.ts" && ! printf '%s\n' "$out" | grep -q -e "SKIPPED  apps/server" -e "TOOL-FAILURE"; }
+check "13.2210 CONTROL for 13.2264: with something listening on the Postgres port, apps/server is planned (dry-run exit 0), neither skipped nor a tool failure" 'pg_up_ok'
 fail_ok() { local out rc; out="$(FAKE_MODE=fail mut "$R1")"; rc=$?; [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run 1: Stryker failed (rc 3" && clean_tree "$R1" && committed "$R1"; }
 check "13.2211 a tool failure (run-tests exit 3) is exit 2, never a pass, and the tree is clean after it" 'fail_ok'
 left_ok() { local out rc; out="$(FAKE_MODE=backup-left mut "$R1")"; rc=$?; [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run 1: Stryker failed (rc 1" && clean_tree "$R1" && committed "$R1"; }
@@ -273,10 +281,10 @@ want = {'testRunner': 'vitest', 'coverageAnalysis': 'perTest', 'concurrency': 2,
         'inPlace': True, 'cleanTempDir': 'always', 'disableTypeChecks': False}
 got = {k: c.get(k, 'MISSING') for k in want}
 assert got == want and all(type(got[k]) is type(want[k]) for k in want), got
-assert c['vitest']['related'] is True and c['mutate'] == ['src/calc.ts:2-6'], (c['vitest'], c['mutate'])
+assert c['vitest']['related'] is False and c['vitest']['configFile'].endswith('-vitest/vitest.config.mjs') and c['mutate'] == ['src/calc.ts:2-6'], (c['vitest'], c['mutate'])
 PY
 }
-check "13.2254 the generated Stryker config, as run-tests is handed it: concurrency 2 (one slot's worth of workers), coverageAnalysis perTest, timeoutMS 10000, incremental false, ignoreStatic false, inPlace true, cleanTempDir always, disableTypeChecks false, vitest.related true, mutate = the changed range" 'conf_ok'
+check "13.2254 the generated Stryker config, as run-tests is handed it: concurrency 2 (one slot's worth of workers), coverageAnalysis perTest, timeoutMS 10000, incremental false, ignoreStatic false, inPlace true, cleanTempDir always, disableTypeChecks false, vitest.related false with the generated wrapper as its configFile (the wrapper's include is the cap, 13.2261), mutate = the changed range" 'conf_ok'
 R7="$T/r7"; mkrepo "$R7"; mkfake "$R7"; python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); assert s.count("LIMIT = 200;")==1; open(p,"w").write(s.replace("LIMIT = 200;", "LIMIT = 250;"))' "$R7/packages/calc/src/calc.ts"; $G -C "$R7" commit -q -am one-line
 lastline_ok() { local out rc; out="$(FAKE_MODE=flips-dup mut "$R7")"; rc=$?
   printf '%s\n' "$out" | grep -q "file packages/calc/src/calc.ts: ranges 3-3;" || { echo "       (precondition: the change is not the one-line range 3-3)"; return 1; }
@@ -338,6 +346,107 @@ est_ok() { local R="$T/r9" out one; mkrepo "$R"; mkfake "$R"; cp "$FX/small.ts" 
        printf '%s\n' "$one" | grep -e "stryker on" -e "dry-run, " | sed -n '1,2p;$p' | cut -c1-160 | sed 's/^/       (cap 1) /'; return 1; }; }
 check "13.2219 estimate: when Stryker's instrumenter cannot count (no @stryker-mutator in the repo, a dry run), each changed line counts 2 and the plan says 'mutant count estimated': small.ts's 12 changed lines are one run of ~24; at CTL_MUTATE_SPLIT=1 run 1 is line 1 alone (~2), 12 runs, never an empty one" 'est_ok'
 
+# ---- ctl-mutate-server (13.2260–13.2267): the capped test set, the sentinel, apps/server needs its PG, statics not swept, the Python floor ----
+RL="$T/related"; mkdir -p "$RL/node_modules"; cp -R "$FX/related/." "$RL/"; ln -s "$TSC" "$RL/node_modules/typescript"
+mkdir -p "$RL/pkg2/node_modules/z" "$RL/pkg2/.hid"; printf "import { T } from '../../src/target.js';\n" > "$RL/pkg2/node_modules/z/n.test.ts"; printf "import { T } from '../src/target.js';\n" > "$RL/pkg2/.hid/h.test.ts"
+walker_ok() { python3 - "$RL" "$HERE/verbs/mutate-tests.mjs" <<'PY'
+import json, subprocess, sys
+rl, js = sys.argv[1], sys.argv[2]
+run = lambda pkg: json.loads(subprocess.run(['node', js, rl, f'{rl}/{pkg}', 'src/target.ts'], capture_output=True, text=True, check=True).stdout)
+d = run('pkg')
+got = [(t['file'], t['via']) for t in d['tests']]
+want = [('test/actual.test.ts', 'direct'), ('test/direct.test.ts', 'direct'), ('test/dynamic.test.ts', 'direct'), ('test/nested/deep.test.ts', 'direct'),
+        ('test/noext.test.ts', 'direct'), ('test/side-effect.test.ts', 'direct'), ('test/via-barrel.test.ts', 'src/barrel.ts'), ('test/via-index.test.ts', 'src/dir/index.ts')]
+assert (d['testDir'], got, d['scanned']) == ('test', want, 15), d
+d2 = run('pkg2')
+assert (d2['testDir'], [(t['file'], t['via']) for t in d2['tests']], d2['scanned']) == ('.', [('src/target.test.ts', 'direct')], 2), d2
+PY
+}
+check "13.2260 the capped set (mutate-tests.mjs): IN = a test in the package's own test/ that imports the file (.js → .ts, extensionless, a nested dir, a side-effect import, a dynamic import(), vi.importActual) or imports a module that re-exports it (export * from, /index resolution); OUT = import type, vi.mock with no import, two re-export hops, a type-only re-export, a non-test helper, a near-named file, an import in a comment or a string, a bare self-name, a colocated src test when test/ exists, another package's test (15 scanned); with no test/ the whole package is scanned, node_modules and dot-dirs skipped (2 scanned)" 'walker_ok'
+# R10: calc.ts plus a barrel (src/index.ts) and two more tests: one through the barrel, one that imports nothing of calc
+R10="$T/r10"; mkrepo "$R10"; mkfake "$R10"; printf "export * from './calc.js';\n" > "$R10/packages/calc/src/index.ts"
+printf "import { it, expect } from 'vitest';\nimport { over } from '../src/index.js';\nit('via', () => expect(over(1)).toBe(false));\n" > "$R10/packages/calc/test/via.test.ts"
+printf "import { it, expect } from 'vitest';\nit('other', () => expect(1).toBe(1));\n" > "$R10/packages/calc/test/other.test.ts"; $G -C "$R10" add -A; $G -C "$R10" commit -q -m barrel
+cap_ok() { local out rc; out="$(mut "$R10" --base HEAD~2 --dry-run)"
+  printf '%s\n' "$out" | grep -qx "    own tests: 2 of 3 test files in packages/calc/test import it (directly or through one re-export): test/calc.test.ts, test/via.test.ts (via src/index.ts)" \
+  || { echo "       (dry-run: $(printf '%s\n' "$out" | grep 'own tests' | head -1 | cut -c1-200))"; return 1; }
+  rm -f "$R10.fake/wrapper.mjs" "$R10.fake/confs.jsonl"; out="$(FAKE_MODE=flips-dup mut "$R10" --base HEAD~2)"; rc=$?
+  [ $rc -eq 1 ] && grep -qx 'const ONLY = \["test/calc.test.ts", "test/via.test.ts"\];' "$R10.fake/wrapper.mjs" && grep -q 'include: ONLY' "$R10.fake/wrapper.mjs" \
+  && grep -q "^import base from \".*/packages/calc/vitest.config.ts\";" "$R10.fake/wrapper.mjs" \
+  && python3 -c 'import json,sys; c=[json.loads(l) for l in open(sys.argv[1])]; assert c and all(x["vitest"]["related"] is False and x["ignoreStatic"] is False for x in c), c' "$R10.fake/confs.jsonl" \
+  && grep -q "control: 6 tests in 2 files on the injected copy, 6 unmutated" "$(mdof "$R10")" && clean_tree "$R10" \
+  || { echo "       (rc $rc; wrapper: $(grep ONLY "$R10.fake/wrapper.mjs" 2>/dev/null | head -1 | cut -c1-160))"; return 1; }; }
+check "13.2261 the cap in the run: the dry run names the file's own tests ('own tests: 2 of 3 … test/calc.test.ts, test/via.test.ts (via src/index.ts)'; test/other.test.ts, which imports nothing of it, is out); the run's vitest wrapper keeps the package config and sets include to exactly those 2 files; vitest.related false and ignoreStatic false on every run; the control lists the same 2 files" 'cap_ok'
+leak_ok() { local out rc
+  out="$(FAKE_MODE=flips-dup FAKE_CAP_LEAK=test/leak.test.ts mut "$R1")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run [0-9]*: the test cap did not hold: the run used test/leak.test.ts outside its 1 own test file(s); log " && clean_tree "$R1" \
+  || { echo "       (leak: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }
+  out="$(FAKE_MODE=flips-dup FAKE_CAP_NONE=1 mut "$R1")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): packages/calc/src/calc.ts run [0-9]*: the test cap did not hold: the run used no test file; log " && clean_tree "$R1" \
+  || { echo "       (none: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; }
+check "13.2262 the cap is checked on the report: a run that used a test file outside the file's own set ('the run used test/leak.test.ts outside its 1 own test file(s)') or no test file at all is that file's tool failure, exit 2, never a silent pass" 'leak_ok'
+# R11: a new source file that no test imports
+R11="$T/r11"; mkrepo "$R11"; mkfake "$R11"; printf 'export const LONE = 7;\n' > "$R11/packages/calc/src/lone.ts"; $G -C "$R11" add -A; $G -C "$R11" commit -q -m lone
+sentinel_ok() { local out rc md; out="$(mut "$R11" --dry-run)"
+  printf '%s\n' "$out" | grep -qx "    NO OWN TEST: none of the 1 test files in packages/calc/test imports it (directly or through one re-export); it runs with one sentinel test, so every mutant reports no coverage" \
+  || { echo "       (dry-run: no NO OWN TEST plan line)"; return 1; }
+  rm -f "$R11.fake/wrapper.mjs"; : > "$R11.fake/calls"; out="$(FAKE_MODE=flips-dup mut "$R11")"; rc=$?; md="$(mdof "$R11")"
+  [ $rc -eq 1 ] && grep -qE '^const ONLY = \["\.stryker-tmp-ctlmutate-[0-9]+-1-vitest/sentinel\.test\.mjs"\];$' "$R11.fake/wrapper.mjs" \
+  && printf '%s\n' "$out" | grep -qx "  NO OWN TEST packages/calc/src/lone.ts n=2" && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/lone.ts:1  custom:numeric  7 → 70" \
+  && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/lone.ts:1  custom:numeric  7 → 0.7" \
+  && printf '%s\n' "$out" | grep -qx '  a NO OWN TEST file'"'"'s survivors mean "no test in reach", NOT "the tests are weak": hand-mutate it on the real suite (a route: through buildTestApp)' \
+  && grep -q "lone.ts:1  custom:numeric  7 → 70\`  (no coverage)" "$md" && grep -q "^NO OWN TEST packages/calc/src/lone.ts n=2" "$md" && grep -q "custom injected 2 == counted 2" "$md" \
+  && grep -q "control: none (NO OWN TEST: only the sentinel ran, 1 test)" "$md" && ! grep -q -- "--label mutate-[0-9]*-control" "$R11.fake/calls" && clean_tree "$R11" \
+  || { echo "       (sentinel: rc $rc)"; printf '%s\n' "$out" | tail -4 | cut -c1-200 | sed 's/^/       /'; return 1; }
+  out="$(FAKE_MODE=flips-dup FAKE_SENTINEL_TESTS=5 mut "$R11")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "the sentinel run saw 5 tests, not 1 (a whole-suite fallback?)" && clean_tree "$R11" \
+  || { echo "       (5 tests: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; }
+check "13.2263 NO OWN TEST (planner ruling 12:40 (A)): a file no own test imports runs with ONE sentinel test (the wrapper's include is the sentinel alone), every mutant is a no-coverage SURVIVOR, the custom ones counted (injected 2 == counted 2), the table says 'NO OWN TEST packages/calc/src/lone.ts n=2' and what its survivors mean, no vitest-list control runs, exit 1; a sentinel run that saw 5 tests instead of 1 (a whole-suite fallback) is exit 2" 'sentinel_ok'
+pg_closed_ok() { local out rc
+  out="$(mut "$R8" --base HEAD~2 --dry-run)"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | grep -qx "  TOOL-FAILURE apps/server/src/s.ts: apps/server needs the test Postgres 127.0.0.1:$PGPORT_CLOSED, which is not reachable (start the shared test PG; a closed port is never a skip)" \
+  && printf '%s\n' "$out" | grep -q "file packages/calc/src/calc.ts" && ! printf '%s\n' "$out" | grep -q -e "file apps/server" -e "SKIPPED  apps/server" \
+  && [ "$(printf '%s\n' "$out" | tail -1)" = "FAIL mutate dry-run: a planned file is a tool failure (its TOOL-FAILURE line above)" ] \
+  || { echo "       (dry-run: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }
+  : > "$R8.fake/calls"; out="$(FAKE_MODE=flips-dup mut "$R8" --base HEAD~2)"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | grep -qx "  TOOL-FAILURE apps/server/src/s.ts: apps/server needs the test Postgres 127.0.0.1:$PGPORT_CLOSED, which is not reachable (start the shared test PG; a closed port is never a skip)" \
+  && printf '%s\n' "$out" | grep -q "^  SURVIVOR packages/calc/src/calc.ts:3" && ! grep -q "src/s\.ts" "$R8.fake/calls" \
+  && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): apps/server needs the test Postgres" && clean_tree "$R8" \
+  || { echo "       (run: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; }
+check "13.2264 apps/server with the test Postgres closed is a TOOL-FAILURE, never a skip (ruling 19:25 (3)): the dry run lists it and exits 2 ('FAIL mutate dry-run: a planned file is a tool failure'); a real run sweeps calc.ts (its survivors reported), never starts a run for s.ts, and exits 2 with s.ts's TOOL-FAILURE (CONTROL 13.2210)" 'pg_closed_ok'
+statics_ok() { local out rc md; rm -f "$R1.fake/confs.jsonl"
+  out="$(FAKE_MODE=flips-dup FAKE_STATIC_SLOW_FILE=calc.ts FAKE_SLEEP=20 CTL_MUTATE_MAX_SECS=1 mut "$R1")"; rc=$?; md="$(mdof "$R1")"
+  [ $rc -eq 0 ] && printf '%s\n' "$out" | grep -qx "  STATICS NOT SWEPT: packages/calc/src/calc.ts n=2" && grep -qx "STATICS NOT SWEPT: packages/calc/src/calc.ts n=2" "$md" \
+  && ! printf '%s\n' "$out" | grep -q -e "SURVIVOR" -e "TOOL-FAILURE" && printf '%s\n' "$out" | tail -1 | grep -q "^OK mutate 0 survivors" \
+  && grep -q "retried once without its statics" "$md" && grep -q "stryker run 2 packages/calc/src/calc.ts:2-6 (ignoreStatic)" "$md" \
+  && [ "$(python3 -c 'import json,sys; print(" ".join(str(json.loads(l)["ignoreStatic"]) for l in open(sys.argv[1])))' "$R1.fake/confs.jsonl")" = "False True" ] && clean_tree "$R1" && committed "$R1" \
+  || { echo "       (rc $rc)"; printf '%s\n' "$out" | tail -3 | cut -c1-200 | sed 's/^/       /'; return 1; }; }
+check "13.2265 STATICS NOT SWEPT (ruling 19:25 (2)): a run the watchdog stops past the cap is retried ONCE for that chunk with ignoreStatic on (confs: False then True); its 2 static mutants (LIMIT = 200's custom flips) are Ignored, the table and the report say 'STATICS NOT SWEPT: packages/calc/src/calc.ts n=2', and with no survivor the exit is 0" 'statics_ok'
+statics_scope_ok() { local out rc; rm -f "$R2.fake/confs.jsonl"
+  out="$(FAKE_MODE=flips-dup FAKE_STATIC_SLOW_FILE=small.ts FAKE_SLEEP=20 CTL_MUTATE_MAX_SECS=1 mut "$R2")"; rc=$?
+  [ $rc -eq 1 ] && printf '%s\n' "$out" | grep -qx "  STATICS NOT SWEPT: packages/calc/src/small.ts n=0" && ! printf '%s\n' "$out" | grep -q "STATICS NOT SWEPT: packages/calc/src/big.ts" \
+  && python3 -c 'import json,sys
+c=[json.loads(l) for l in open(sys.argv[1])]
+s=[x["ignoreStatic"] for x in c if x["mutate"][0].startswith("src/small.ts")]; b=[x["ignoreStatic"] for x in c if x["mutate"][0].startswith("src/big.ts")]
+assert s == [False, True] and b and not any(b), (s, b)' "$R2.fake/confs.jsonl" && clean_tree "$R2" \
+  || { echo "       (one file: rc $rc)"; printf '%s\n' "$out" | grep -e STATICS -e TOOL | cut -c1-200 | sed 's/^/       /'; return 1; }
+  rm -f "$R1.fake/confs.jsonl"; out="$(FAKE_MODE=flips-dup FAKE_STATIC_SLOW_FILE=calc.ts FAKE_STATIC_SLOW_ALWAYS=1 FAKE_SLEEP=20 CTL_MUTATE_MAX_SECS=1 mut "$R1")"; rc=$?
+  [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate tool failure in 1 file(s): mutate-2-calc.ts: the slot-run passed 1 s in its slot and was stopped" \
+  && ! printf '%s\n' "$out" | grep -q "STATICS NOT SWEPT" && [ "$(wc -l < "$R1.fake/confs.jsonl" | tr -d ' ')" = 2 ] && clean_tree "$R1" && committed "$R1" \
+  || { echo "       (retry over the cap: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; }
+check "13.2266 the statics retry is THAT chunk's alone: with small.ts over the cap only small.ts is retried (False, True) and listed 'STATICS NOT SWEPT … n=0', big.ts keeps ignoreStatic false on every run; a retry that overruns too is the tool failure it always was (exit 2, 'mutate-2-calc.ts: the slot-run passed 1 s …', two runs, no STATICS NOT SWEPT line)" 'statics_scope_ok'
+PYS="$T/pyshim"; mkdir -p "$PYS"; REALPY="$(command -v python3)"
+printf '#!/bin/bash\ncase "$*" in *version_info*) echo "$FAKE_PYV";; *) exec "%s" "$@";; esac\n' "$REALPY" > "$PYS/python3"; chmod +x "$PYS/python3"
+pyfloor_ok() { local v out rc
+  for v in 3.10 3.9 2.7 x; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
+    [ $rc -eq 2 ] && [ "$(printf '%s\n' "$out" | tail -1)" = "FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): $PYS/python3 is $v" ] || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
+  for v in 3.11 3.14 4.0; do out="$(PATH="$PYS:$PATH" FAKE_PYV=$v mut "$R1" --dry-run)"; rc=$?
+    [ $rc -eq 0 ] && printf '%s\n' "$out" | tail -1 | grep -q "^OK mutate dry-run" || { echo "       ($v: rc $rc: $(printf '%s' "$out" | tail -1 | cut -c1-200))"; return 1; }; done
+  if [ -x /usr/bin/python3 ] && ! /usr/bin/python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+    mkdir -p "$T/syspy"; ln -sf /usr/bin/python3 "$T/syspy/python3"; out="$(PATH="$T/syspy:$PATH" mut "$R1" --dry-run)"; rc=$?
+    [ $rc -eq 2 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL mutate needs python3 >= 3.11" || { echo "       (the real /usr/bin/python3: rc $rc)"; return 1; }; fi; }
+check "13.2267 the Python floor: python3 3.10, 3.9, 2.7 or an unreadable version is exit 2 'FAIL mutate needs python3 >= 3.11 (the watchdog's Popen(process_group=0)): <path> is <version>' before anything runs; 3.11, 3.14 and 4.0 pass (the dry run completes); the real /usr/bin/python3, when it is below 3.11, is refused too" 'pyfloor_ok'
+
 # ---- the real Stryker legs (13.2206–13.2208): one private-slot run each ----
 R4="$T/r4"; mkrepo "$R4"
 realrun() { ( cd "$1" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" "$CTL" mutate --repo "$1" --base HEAD~1 2>&1 ); }
@@ -371,6 +480,30 @@ realterm_ok() { local vp n=0 rc; rm -f "$T/r6-started"
   [ "$mid" = " M packages/calc/src/calc.ts" ] || { echo "       (mid-run, tracked files other than calc.ts are modified: $(printf '%s' "$mid" | tr '\n' ' ' | cut -c1-200))"; return 1; }
   [ $rc -eq 143 ] && committed "$R6" && clean_tree "$R6" || { echo "       (rc $rc)"; tail -4 "$T/r6.out" | cut -c1-160 | sed 's/^/       /'; return 1; }; }
 check "13.2216 (real Stryker) mid dry run the ONLY tracked file Stryker has changed in place is the mutated calc.ts (no '// @ts-nocheck' written into the package: disableTypeChecks off); SIGTERM then is exit 143 with git status empty" 'realterm_ok'
+
+# R12: limit.ts's CAP = 200 (a module-level STATIC); its own test is weak, a DISTANT test (through use.ts, which imports it and is no re-export) would kill it
+R12="$T/r12"; mkrepo "$R12"; printf 'export const CAP = 100;\n' > "$R12/packages/calc/src/limit.ts"
+printf "import { CAP } from './limit.js';\nexport const atCap = (n: number): boolean => n >= CAP;\n" > "$R12/packages/calc/src/use.ts"
+printf "import { it, expect } from 'vitest';\nimport { CAP } from '../src/limit.js';\nit('a number', () => expect(typeof CAP).toBe('number'));\n" > "$R12/packages/calc/test/limit.test.ts"
+printf "import { it, expect } from 'vitest';\nimport { atCap } from '../src/use.js';\nit('at the cap', () => { expect(atCap(200)).toBe(true); expect(atCap(199)).toBe(false); });\n" > "$R12/packages/calc/test/use.test.ts"
+$G -C "$R12" add -A; $G -C "$R12" commit -q -m limit; printf 'export const CAP = 200;\n' > "$R12/packages/calc/src/limit.ts"; $G -C "$R12" commit -q -am limit2   # HEAD~1..HEAD: limit.ts line 1 alone
+distant_ok() { local out rc; out="$(cd "$R12" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" "$CTL" mutate --repo "$R12" --base HEAD~1 2>&1)"; rc=$?; printf '%s\n' "$out" > "$T/distant.out"
+  [ $rc -eq 1 ] && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/limit.ts:1  custom:numeric  200 → 2000" && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/limit.ts:1  custom:numeric  200 → 20" \
+  && printf '%s\n' "$out" | grep -q "own tests: 1 of 3 test files in packages/calc/test import it" && grep -q "control: 1 tests in 1 files on the injected copy, 1 unmutated" "$(mdof "$R12")" && clean_tree "$R12" \
+  || { echo "       (capped: rc $rc)"; printf '%s\n' "$out" | grep -e SURVIVOR -e FAIL -e 'own tests' | cut -c1-200 | sed 's/^/       /'; return 1; }
+  # CONTROL: the same distant test made DIRECT (it imports limit.ts too) kills both static mutants: the statics really run
+  printf "import { it, expect } from 'vitest';\nimport { atCap } from '../src/use.js';\nimport { CAP } from '../src/limit.js';\nit('at the cap', () => { expect(CAP).toBe(200); expect(atCap(200)).toBe(true); expect(atCap(199)).toBe(false); });\n" > "$R12/packages/calc/test/use.test.ts"
+  $G -C "$R12" commit -q -am direct; out="$(cd "$R12" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" "$CTL" mutate --repo "$R12" --base HEAD~2 2>&1)"; rc=$?
+  printf '%s\n' "$out" | grep -q "own tests: 2 of 3 test files in packages/calc/test import it" && ! printf '%s\n' "$out" | grep -q "SURVIVOR packages/calc/src/limit.ts" && clean_tree "$R12" \
+  || { echo "       (direct: rc $rc)"; printf '%s\n' "$out" | grep -e SURVIVOR -e FAIL -e 'own tests' | cut -c1-200 | sed 's/^/       /'; return 1; }; }
+check "13.2268 (real Stryker) a STATIC mutant only a distant test kills is a SURVIVOR under the cap: limit.ts's CAP = 200 ×10 and ÷10 survive (its own weak test runs, 1 test; use.test.ts reaches it only through use.ts, so it is out), exit 1; CONTROL: once use.test.ts imports limit.ts itself, it is in the set (2 of 3) and both statics are killed (ignoreStatic stays off)" 'distant_ok'
+R13="$T/r13"; mkrepo "$R13"; printf 'export const LONE = 7;\nexport const twice = (n: number): number => n * 2;\n' > "$R13/packages/calc/src/lone.ts"; $G -C "$R13" add -A; $G -C "$R13" commit -q -m lone
+realsentinel_ok() { local out rc n s md; out="$(cd "$R13" && CTL_MUTATE_PG_PORT="$PGPORT_CLOSED" "$CTL" mutate --repo "$R13" --base HEAD~1 2>&1)"; rc=$?; printf '%s\n' "$out" > "$T/realsentinel.out"; md="$(mdof "$R13")"
+  n="$(printf '%s\n' "$out" | sed -n 's/^  NO OWN TEST packages\/calc\/src\/lone.ts n=\([0-9]*\)$/\1/p')"; s="$(printf '%s\n' "$out" | grep -c '^  SURVIVOR packages/calc/src/lone.ts:')"
+  [ $rc -eq 1 ] && [ "${n:-0}" -ge 5 ] && [ "$n" = "$s" ] && printf '%s\n' "$out" | grep -qx "  SURVIVOR packages/calc/src/lone.ts:1  custom:numeric  7 → 70" \
+  && grep -q "control: none (NO OWN TEST: only the sentinel ran, 1 test)" "$md" && grep -q "custom injected 4 == counted 4" "$md" && [ "$(grep -c '(no coverage)' "$md")" = "$n" ] && clean_tree "$R13" \
+  || { echo "       (rc $rc, n=${n:-none}, survivors $s)"; printf '%s\n' "$out" | tail -4 | cut -c1-200 | sed 's/^/       /'; return 1; }; }
+check "13.2269 (real Stryker) NO OWN TEST end to end: the sentinel really runs under vitest (exactly 1 test, never the whole suite), every mutant of lone.ts is a no-coverage SURVIVOR (n = the survivor count, at least 5: 4 custom, counted 4 == injected 4, and Stryker's own), exit 1, the tree clean" 'realsentinel_ok'
 
 ctl_test_only_end mutate.test.sh
 [ "$fails" -eq 0 ] && echo "mutate.test.sh: ok" || { echo "mutate.test.sh: $fails FAILED"; exit 1; }
