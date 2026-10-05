@@ -2956,14 +2956,10 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
   });
   ```
   Kills:
-  - 27.263: (a) `dark: cs.colorScheme === 'dark' || …` → `dark: true` (the `light` leg) (b) `attributeFilter: ['data-theme', 'data-style']` → `['data-theme']` (the `calls` = 2 leg) (c) the returned stop drops `mo.disconnect()` (the stopped leg) (d) `.trim()` → `.trim() || '#000000'` (the unset leg).
+  - 27.263: (a) the `dark` threshold inverted (`<` → `>`) (b) `attributeFilter: ['data-theme', 'data-style']` → `['data-theme']` (the `calls` = 2 leg) (c) the returned stop drops `mo.disconnect()` (the stopped leg) (d) `.trim()` → `.trim() || '#000000'` (the unset leg) (e) `dark` read from a token that does not change with the theme (e.g. `edgeBlocks`) (f) the old `color-scheme` read.
 
-  Before writing the case, confirm jsdom's `CSSStyleDeclaration` keeps an inline `color-scheme` (it drops properties it does not know). (Planner ruling 2026-10-04, replacing the injected-`<style>` fallback.) Probe once, in the test file, after `root.style.setProperty('color-scheme', 'dark')`:
-  - `getComputedStyle(root).getPropertyValue('color-scheme')` reads `dark`: the case stays as written.
-  - It reads `''`, but `root.getAttribute('style')` contains `color-scheme: dark`: the jsdom legs assert on that inline `style` attribute string (`toContain('color-scheme: dark')`, then `toContain('color-scheme: light')`), and the two `p.dark` / `readThemePalette(root).dark` legs move to the browser check (below). Rename the `it` so its title says "dark: browser (27.263b)" instead of "dark is read from color-scheme".
-  - The inline attribute does not contain it either (jsdom dropped the property on set): the `color-scheme` legs leave jsdom entirely and move to the browser check; the case line says so.
+  **Planner ruling 2026-10-04 22:25 (KV5), superseding this step's `color-scheme` read.** No app stylesheet sets `color-scheme` (`themeStylesheet()` only uses `prefers-color-scheme` media queries), so a `color-scheme` read leaves `dark` false in the product and the label attachment name never leaves `subL`. `dark` is derived from what is PAINTED: the relative luminance of the resolved card fill (`surfaceRaised`, which the reader already reads) is below `0.5` (`DARK_LUMINANCE`; measured: light fills 0.83–0.94, dark 0.018–0.024). It holds for every `data-theme` / OS-dark / `data-style` combination with no selector copied, and `packages/ui` is untouched. The jsdom case sets the card fill instead of `color-scheme` (a near-black fill is dark, the light fill is light, `#bbbbbb` / `#bcbcbc` either side of the bound, and an inline `color-scheme: dark` decides nothing). The browser legs (same ids, with the REAL `themeStylesheet()` injected and no harness `color-scheme`): (1) `data-theme=dark` → dark, and the attachment name leaves `subL` (27.267); (2) no `data-theme` + emulated `prefers-color-scheme: dark` → dark; (3) `data-theme=light` under emulated OS dark → light (the control that makes (2) non-vacuous); (4) the default light → light (27.287, through `window.__kg.readPalette()`). (jsdom 25 was probed and does keep an inline `color-scheme`; it no longer matters.)
 
-  The browser check (`knowledge-graph-browser`, `tests/traps.spec.ts`, next to 27.287): `page.evaluate` sets `document.documentElement.style.colorScheme = 'dark'`, then `window.__kg.readPalette().dark` is `true`; set `'light'`: `false`. Kills (a) above moves with it.
   Check that `@gisik-nokma/ui/tokens` is an existing subpath: G-9's harness imports `themeStylesheet` from it. If `cssVariableName` is not exported there, import it from `@gisik-nokma/ui`.
 
   `src/theme/read-palette.ts`:
@@ -2971,11 +2967,12 @@ The mockup has twelve colours, not eleven. The cards' hairline is the mockup's `
   import { cssVariableName, type TokenRole } from '@gisik-nokma/ui/tokens';
   import { PALETTE_ROLES, type ThemePalette } from '../render/palette.js';
 
-  /** Port of `readPalette` (`knowledge-graph-sigma.html:461-465`), over the app's own variables. Sigma takes values, never `var(--…)`. */
+  /** Port of `readPalette` (`knowledge-graph-sigma.html:461-463`), over the app's own variables. Sigma takes values, never `var(--…)`. `dark` is read from the painted card fill (ruling above). */
   export function readThemePalette(el: Element): ThemePalette {
     const cs = getComputedStyle(el);
-    const out = { dark: cs.colorScheme === 'dark' || cs.getPropertyValue('color-scheme').trim() === 'dark' } as ThemePalette;
+    const out = {} as ThemePalette;
     for (const role of PALETTE_ROLES) out[role] = cs.getPropertyValue(cssVariableName(role as TokenRole)).trim();
+    out.dark = luminance(out.surfaceRaised) < DARK_LUMINANCE; // WCAG relative luminance of `#rrggbb[aa]`, NaN (light) otherwise
     return out;
   }
 
