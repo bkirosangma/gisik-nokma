@@ -6207,6 +6207,130 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-timeline__row:hover > .gn-timeline__claims,
 .gn-timeline__row:focus-within > .gn-timeline__claims { display: block; }
 
+/* "Nothing in view" (TV-9): a pill over the bottom of the stage, never inside the scroller, so panning does not carry it away. It
+   is a verdict about where the view has come to rest. */
+.gn-timeline__nothing {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font-size: 0.85rem;
+}
+.gn-timeline__nothing .gn-timeline__nav:disabled { opacity: 0.45; cursor: default; }
+
+/* PORTRAIT (PK-7, TV-6): a container narrower than 40rem lays the same packing out with time running DOWN. A lane is a column
+   group (`--lane-extent` = its rows x 112 px, placed by `--lane-offset`), the day labels ride a sticky 80 px gutter at the left, and
+   the lane headings stick to the top. The surface also pans sideways when the lanes are wider than the screen (2D). A bar is
+   100 px inside its 112 px column, 6 px in from each side (ERRATA E9): the 12 px between columns is the gutter an edge's channel
+   runs in. The numbers are `COLUMN_WIDTH`, `PORTRAIT_BAR_INSET`, `PORTRAIT_BAR_WIDTH` and `PORTRAIT_GUTTER_PX`
+   (packages/app-core/src/timeline/timeline-layout.ts); 29.109 pins these copies against them. */
+.gn-timeline[data-orientation='portrait'] {
+  --tl-gutter: 80px;
+  --tl-axis-height: 2.125rem; /* the lane-heading row; there is no horizontal axis */
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__surface,
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis {
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--tl-ppd) * 5px),
+    var(--tl-weekend) calc(var(--tl-ppd) * 5px),
+    var(--tl-weekend) calc(var(--tl-ppd) * 7px)
+  );
+  background-size: 100% calc(var(--tl-ppd) * 7px);
+  background-position: 0 var(--tl-axis-height);
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__canvas[data-weekend='off'] .gn-timeline__surface,
+.gn-timeline[data-orientation='portrait'] .gn-timeline__canvas[data-weekend='off'] .gn-timeline__axis { background-image: none; }
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis {
+  position: sticky;
+  left: 0;
+  top: auto;
+  z-index: 3;
+  width: var(--tl-gutter);
+  height: 0;
+  background-color: transparent;
+  border-bottom: none;
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--tl-gutter);
+  height: auto;
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis-label,
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis-day {
+  left: 0;
+  top: calc(var(--tl-axis-height) + var(--d0) * var(--tl-ppd) * 1px);
+  height: calc(var(--tl-ppd) * 1px);
+  line-height: calc(var(--tl-ppd) * 1px);
+  width: var(--tl-gutter);
+  background: var(--gn-surface);
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis-row--days .gn-timeline__axis-day { width: 1.75rem; text-align: right; padding-right: 0.25rem; }
+.gn-timeline[data-orientation='portrait'] .gn-timeline__axis-row--period .gn-timeline__axis-label { left: 1.75rem; width: calc(var(--tl-gutter) - 1.75rem); overflow: hidden; }
+.gn-timeline[data-orientation='portrait'] .gn-timeline__lane {
+  top: 0;
+  bottom: 0;
+  left: calc(var(--tl-gutter) + var(--lane-offset));
+  width: var(--lane-extent);
+  height: auto;
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__group-heading {
+  position: sticky;
+  top: 0;
+  left: auto;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A re-pack moves a portrait bar sideways and a zoom frame moves its top, so only `left` glides. The property alone, never the
+   `transition` shorthand: this selector outranks the reduced-motion `.gn-timeline__bar { transition: none }` above, and the base
+   rule's 200 ms (which reduced motion zeroes) is the duration this inherits (29.109). */
+.gn-timeline[data-orientation='portrait'] .gn-timeline__bar {
+  left: calc(var(--row) * 112px + 6px);
+  width: 100px;
+  top: calc(var(--tl-axis-height) + var(--d0) * var(--tl-ppd) * 1px);
+  height: max(6px, calc(var(--dn) * var(--tl-ppd) * 1px - 2px));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  white-space: normal;
+  transition-property: left;
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__key--outside { display: none; }
+/* TG-7 (ERRATA E9): the title wraps inside the 100 px bar, ellipsis after the third line. */
+.gn-timeline[data-orientation='portrait'] .gn-timeline__bar .gn-timeline__title-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.gn-timeline[data-orientation='portrait'] .gn-timeline__row > .gn-timeline__claims {
+  left: calc(var(--row) * 112px + 6px);
+  top: calc(var(--tl-axis-height) + (var(--d0) + var(--dn)) * var(--tl-ppd) * 1px);
+  max-width: 100px;
+}
+.gn-timeline[data-orientation='portrait'] .gn-timeline__today {
+  top: calc(var(--tl-axis-height) + (var(--d0) + 0.5) * var(--tl-ppd) * 1px);
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  border-left: none;
+  border-top: 2px solid var(--gn-accent);
+}
+
 .gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
 .gn-timeline__claim { font-size: 0.75rem; color: var(--gn-custom-marker); }
 /* In transit, on the claim itself. Without this rule the timeline was the one
