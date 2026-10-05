@@ -14,7 +14,7 @@ import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { PARENT, TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
 
 /**
- * 25.420–25.431 and 25.435 — G-8: the phone ticket-sheet header compacts with the scroll by TRANSFORMING the same
+ * 25.420–25.431, 25.435 and 25.443–25.444 — G-8: the phone ticket-sheet header compacts with the scroll by TRANSFORMING the same
  * elements (`sheet-header-compact.ts`).
  *
  * jsdom lays nothing out, so the phone is a stubbed `matchMedia`, the scroller's `scrollTop` is a plain
@@ -323,6 +323,92 @@ describe('the phone sheet', () => {
     await waitFor(() => expect(overlay()).toBeNull());
   });
 
+  // A close runs out a PEEK_CLOSE_MS timer before the card leaves the DOM; under load that crosses waitFor's 1 s default, so the waits
+  // for it take `settled()`'s budget (the 25.425 load run, 2026-10-05: 1 of 20 red at its toggle-shut wait, the card still `closing`).
+  const CLOSED = { timeout: 4_000 };
+
+  // sheet-peek-escape-race: the listener that consumes Escape is removed by a PASSIVE effect cleanup, which can run well after the
+  // overlay left the DOM; and while the overlay animates out (`closing`, PEEK_CLOSE_MS) nothing is open to consume a key. A quick
+  // second Escape in either window must reach `Sheet`.
+  it('25.443 a quick second Escape closes the sheet: two in one act, and one while the overlay animates out', async () => {
+    stubMedia({ phone: true });
+    const onClose = renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
+    await settled();
+    await scrollTo(500);
+    const overlay = (): HTMLElement | null => screen.queryByRole('group', { name: 'Full breadcrumb' });
+    const open = (): void => {
+      fireEvent.click(screen.getByRole('button', { name: 'Show the full breadcrumb' }));
+    };
+    // A raw dispatch, not `fireEvent` (which wraps its own act): two of these inside ONE act have no render and no effect between them.
+    const escape = (): void => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    };
+
+    // Control: one Escape alone collapses the overlay and leaves the sheet open.
+    open();
+    expect(overlay()).not.toBeNull();
+    act(() => {
+      escape();
+    });
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Two Escapes before React renders or runs an effect: the first collapses the overlay, the second closes the sheet.
+    open();
+    expect(overlay()).not.toBeNull();
+    act(() => {
+      escape();
+      escape();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
+
+    // The closing window: the first Escape's render and effects have run, the overlay is still animating out, and a second Escape
+    // closes the sheet. Control: the overlay is still in the DOM, `closing`, when the second one lands.
+    onClose.mockClear();
+    open();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(overlay()).toHaveAttribute('data-state', 'closing');
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
+
+    // Only an Escape that closes the overlay retires the listener (mutant: retire on any key): after a Tab the overlay's Escape still
+    // collapses it, and the sheet stays open.
+    onClose.mockClear();
+    open();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(overlay()).toHaveAttribute('data-state', 'open');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(overlay()).toHaveAttribute('data-state', 'closing');
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
+  });
+
+  it('25.444 an overlay reopened while it animates out takes its Escape again: it collapses and the sheet stays open', async () => {
+    stubMedia({ phone: true });
+    const onClose = renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
+    await settled();
+    await scrollTo(500);
+    const overlay = (): HTMLElement | null => screen.queryByRole('group', { name: 'Full breadcrumb' });
+    const open = (): void => {
+      fireEvent.click(screen.getByRole('button', { name: 'Show the full breadcrumb' }));
+    };
+
+    open();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(overlay()).toHaveAttribute('data-state', 'closing');
+    // "…" inside the closing window reopens the same overlay.
+    open();
+    expect(overlay()).toHaveAttribute('data-state', 'open');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(overlay()).toHaveAttribute('data-state', 'closing');
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(overlay()).toBeNull(), CLOSED);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('25.426 only one overlay is open at a time, and the title overlay brings Move back beside the full title', async () => {
     stubMedia({ phone: true });
     renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
@@ -365,7 +451,7 @@ describe('the phone sheet', () => {
 
   it('25.435 a press on Move while the title overlay is open is not an outside tap: Move stays live and its click opens the dialog (G-8 FIX 1 F1; G14)', async () => {
     stubMedia({ phone: true });
-    renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
+    const onClose = renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
     await settled();
     await scrollTo(500);
     const titleGroup = (): HTMLElement | null => screen.queryByRole('group', { name: 'Full title' });
@@ -389,6 +475,13 @@ describe('the phone sheet', () => {
     expect(titleGroup()).not.toBeNull();
     expect(moveButton()).not.toHaveAttribute('inert');
     expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
+    // The Move dialog's Escape was the dialog's own, so it did not retire the overlay's listener (sheet-peek-escape-race; mutant: an
+    // Escape inside another dialog retires it): the next Escape collapses the overlay, and the sheet stays open.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(panel()).toHaveAttribute('data-peek-state', 'closing');
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(titleGroup()).toBeNull(), CLOSED);
+    expect(onClose).not.toHaveBeenCalled();
     cleanup();
 
     // The control, in the same it(): a press on the sheet body is an outside tap, and Move goes inert.
