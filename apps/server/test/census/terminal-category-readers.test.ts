@@ -53,7 +53,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (17)
+  // invariant (18)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
@@ -67,6 +67,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   // wtg2 T9: a move into a terminal state ENDS the open work period, and terminal to terminal opens none (WP-1); a
   // Not-taken move folds no period at all (PS-8), so the fold never reads a not-taken ticket's terminal as work done.
   'packages/domain/src/flow/periods.ts': 'invariant',
+  'packages/domain/src/flow/settle.ts': 'invariant', // wtg2 T15: a finished ticket keeps its work; a Not-taken one is told apart by `notTaken`, not by the category
   'packages/domain/src/ticket-state.ts': 'invariant',
   'packages/rule-engine/src/checks/close.ts': 'invariant',
   // wtg2 T8: the flow parks a Not-taken ticket in the FIRST terminal state and never passes over a finished one (PS-8, PS-11).
@@ -76,14 +77,15 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/domain/src/flow/promotion.ts': 'invariant',
   'packages/rule-engine/src/checks/hierarchy.ts': 'invariant',
   'packages/rule-engine/src/transition.ts': 'invariant',
-  // done-meaning (12): T17 changes these
+  // done-meaning (12): T17 made these not-taken aware, except routes/my-work.ts (its `closed_at IS NULL` already drops a
+  // not-taken ticket, 29.374's My Work leg) and projections/rollups.ts (the structural count; no card route reads it)
   'apps/server/src/projections/rollups.ts': 'done-meaning',
   'apps/server/src/read/ticket-cards.ts': 'done-meaning',
   'apps/server/src/routes/my-work.ts': 'done-meaning',
   'apps/server/src/routes/tickets.ts': 'done-meaning',
   'apps/server/src/visibility/rollup.ts': 'done-meaning',
   'packages/app-core/src/online/mappers.ts': 'done-meaning',
-  'packages/app-core/src/timeline/timeline-view.tsx': 'done-meaning',
+  'packages/app-core/src/timeline/timeline-view.tsx': 'done-meaning', // not-taken aware (T17): stateMark via the input's notTaken (server notTakenOf) or resolutionOf, 29.440
   'packages/app-core/src/view-types.ts': 'done-meaning',
   'packages/app-core/src/views/list-model.ts': 'done-meaning',
   'packages/app-core/src/views/rollup-text.ts': 'done-meaning',

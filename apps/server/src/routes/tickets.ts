@@ -526,6 +526,7 @@ export function registerTicketRoutes(
           : {
               totalChildren: rollupView.total,
               terminalChildren: rollupView.terminal,
+              ...(rollupView.notTaken === undefined ? {} : { notTakenChildren: rollupView.notTaken }),
               uncategorizedChildren: rollupView.uncategorized,
               restrictedCount: rollupView.restrictedCount,
             };

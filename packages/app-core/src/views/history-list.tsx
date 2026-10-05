@@ -1,7 +1,7 @@
 import { IST_CLOCK_NOTE } from '@gisik-nokma/domain';
 import { actorLabel, formatDateTime } from '../provenance.js';
 import type { TicketHistoryEvent } from '../view-types.js';
-import { describeEvent, type HistoryCopyContext } from './history-copy.js';
+import { describeEvent, historyRounds, type HistoryCopyContext } from './history-copy.js';
 
 /**
  * The history view IS the ledger, filtered (spec §3). Every entry shows the
@@ -59,11 +59,12 @@ export function HistoryList({
   typeName?: (typeId: string) => string;
 }) {
   const ctx: HistoryCopyContext = { nameOf, stateName, typeName };
+  const rounds = historyRounds(events);
   return (
     <>
       <ol className="gn-history">
         {events.map((event) => {
-          const headline = describeEvent(event, ctx);
+          const headline = describeEvent(event, { ...ctx, round: rounds.get(event.id) });
           return (
           <li key={event.id} className="gn-history__event">
             <div className="gn-history__headline">

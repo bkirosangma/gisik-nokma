@@ -6,7 +6,7 @@ import type {
   TicketDueDate,
   TicketRollup,
 } from '@gisik-nokma/domain';
-import { PRIORITIES, prioritySchema, ticketKey } from '@gisik-nokma/domain';
+import { notTakenOf, PRIORITIES, prioritySchema, ticketKey } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { rollupsFor } from '../visibility/rollup.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
@@ -44,6 +44,8 @@ export type ProjTicketRow = {
    * (spec §8.1, second wave 2026-09-18).
    */
   rank: string | null;
+  /** `TicketCard.notTaken`'s source, read by every card route through `notTakenOf` (wtg2 T17); `rollupsFor` reads the children's own. */
+  closed_cause: unknown;
 };
 
 /**
@@ -70,12 +72,14 @@ export type ProjTicketRow = {
  *
  * If a future card-serving route needs the column, add it HERE with that
  * reader named; do not add it on the assumption that a canonical list should
- * be complete against the table.
+ * be complete against the table. `t.closed_cause` is the one added that way
+ * (wtg2 T17): `assembleTicketCards` reads it through `notTakenOf` into
+ * `TicketCard.notTaken`, on every card route.
  */
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
   't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +
-  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank';
+  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank, t.closed_cause';
 
 /**
  * Rows for explicit ids, in `ticket_id` order.
@@ -177,6 +181,7 @@ export async function assembleTicketCards(
         : {
             totalChildren: rollupView.total,
             terminalChildren: rollupView.terminal,
+            ...(rollupView.notTaken === undefined ? {} : { notTakenChildren: rollupView.notTaken }),
             uncategorizedChildren: rollupView.uncategorized,
             restrictedCount: rollupView.restrictedCount,
           };
@@ -213,6 +218,9 @@ export async function assembleTicketCards(
       // the one spec §8.1 names, and the others get it for free rather than by
       // a second enumeration that could be forgotten (case 13.603's failure).
       rank: row.rank,
+      // wtg2 T17 (Q1): closed Not taken by the flow; absent otherwise, and never the Decision's id (a card is served to
+      // viewers who may not see it).
+      ...(notTakenOf(row.closed_cause) === null ? {} : { notTaken: true as const }),
     });
   }
   return cards;

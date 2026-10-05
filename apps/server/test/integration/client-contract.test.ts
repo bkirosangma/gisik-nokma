@@ -1087,11 +1087,13 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     // this file, so it would pin nothing on the client side at all — the day
     // the fourth field arrived in `app-core` this case would have stayed green.
     const CLIENT_ROLLUP_FIELDS = clientTypeFields('view-types.ts', 'RollupToViewer');
-    // The pin and its own positive control in one line: the client type is
-    // these three fields, in this order, and no others. It is what turns
-    // "exactly three" from a transcription into a measurement, and it is what
-    // goes red the day anybody adds a fourth to `RollupToViewer`.
-    expect(CLIENT_ROLLUP_FIELDS).toEqual(['totalChildren', 'terminalChildren', 'restrictedCount']);
+    // The pin and its own positive control in one line: the client type is three required fields plus
+    // the optional `notTakenChildren`, in this order, and no others. It is what turns
+    // "exactly these" from a transcription into a measurement, and it is what
+    // goes red the day anybody adds another field to `RollupToViewer`. wtg2 T17 (29.374) added the OPTIONAL
+    // `notTakenChildren`, which the server sends only when a child is closed Not taken: it is not the fourth
+    // field this case is about (the server's `uncategorizedChildren` is still the one the client lacks).
+    expect(CLIENT_ROLLUP_FIELDS).toEqual(['totalChildren', 'terminalChildren', 'notTakenChildren', 'restrictedCount']);
 
     // The PARENT's rollup, non-null because a real `ticket.created` naming it
     // as parent went through the gate. Asserting this against a leaf's `null`
@@ -1109,8 +1111,9 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     // The divergence itself: one server key the client type cannot hold.
     expect(CLIENT_ROLLUP_FIELDS).not.toContain('uncategorizedChildren');
     // Positive control, same two lists, same run — the other three DO line up,
-    // so "the client is missing a key" is not "the two types share nothing".
-    for (const field of CLIENT_ROLLUP_FIELDS) {
+    // so "the client is missing a key" is not "the two types share nothing". The optional `notTakenChildren` is
+    // left out: this parent's child is not Not taken, so the exact key set above pins it ABSENT (29.374).
+    for (const field of CLIENT_ROLLUP_FIELDS.filter((f) => f !== 'notTakenChildren')) {
       expect(rollup).toHaveProperty(field);
     }
 

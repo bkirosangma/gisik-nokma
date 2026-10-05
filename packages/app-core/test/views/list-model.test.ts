@@ -302,3 +302,12 @@ describe('3.147 columnLabel', () => {
     expect(columnLabel('field:gstin')).toBe('gstin');
   });
 });
+
+describe('29.374 countRows: Not taken is closed, never done', () => {
+  it('29.374 countRows: a not-taken terminal row is closed, never done', () => {
+    const marked = [listRowSeed({ stateCategory: 'terminal' }), listRowSeed({ stateCategory: 'terminal', notTaken: true }), listRowSeed({ stateCategory: 'active' })];
+    expect(countRows(marked)).toEqual({ total: 3, terminal: 1 });
+    const unmarked = [listRowSeed({ stateCategory: 'terminal' }), listRowSeed({ stateCategory: 'terminal' }), listRowSeed({ stateCategory: 'active' })];
+    expect(countRows(unmarked)).toEqual({ total: 3, terminal: 2 }); // control: the same rows without the mark are done
+  });
+});

@@ -715,3 +715,18 @@ describe('assembleTicketCards', () => {
     expect(composeCardKey('CC', 'RE', undefined)).toBeNull();
   });
 });
+
+describe('29.374 the card carries notTaken and the parent counts it apart from done', () => {
+  it('29.374 a not-taken child has notTaken and is not terminalChildren; its finished sibling has neither', async () => {
+    const [parent, finished, skipped] = [newUlid(), newUlid(), newUlid()];
+    await applyCommitted(db.pool, [created({ id: parent, actorId: world.owner }), created({ id: finished, actorId: world.owner, parentId: parent }), created({ id: skipped, actorId: world.owner, parentId: parent })]);
+    await db.pool.query(`UPDATE proj_tickets SET state_category = 'terminal' WHERE ticket_id = ANY($1::text[])`, [[finished, skipped]]);
+    const cause = { kind: 'branch-not-taken', decisionTicketId: newUlid(), outcome: 'Yes', pass: 1, decidedBy: world.owner, decisionEventId: newUlid() };
+    await db.pool.query('UPDATE proj_tickets SET closed_at = now(), closed_by = $2, closed_cause = $3::jsonb WHERE ticket_id = $1', [skipped, world.owner, JSON.stringify(cause)]);
+    const cards = await assembleTicketCards(db.pool, world.owner, await fetchTicketRows(db.pool, [parent, finished, skipped]));
+    const byId = new Map(cards.map((c) => [c.ticketId, c]));
+    expect(byId.get(skipped)?.notTaken).toBe(true);
+    expect(byId.get(finished)).not.toHaveProperty('notTaken');
+    expect(byId.get(parent)?.rollup).toEqual({ totalChildren: 2, terminalChildren: 1, notTakenChildren: 1, uncategorizedChildren: 0, restrictedCount: 0 });
+  });
+});

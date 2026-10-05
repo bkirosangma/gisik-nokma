@@ -1495,6 +1495,39 @@ describe('GET /v1/me/work — backlog and closed (owner request, 2026-09-17)', (
   });
 });
 
+/**
+ * 29.374's My Work control (wtg2 T17): `readMyWork` is KEPT as a done-meaning reader because its `t.closed_at IS NULL`
+ * already drops a not-taken ticket (the not-taken pair ends in `ticket.closed`). DECLARED after 13.576 and mutating
+ * for the same reason: it seeds a ticket assigned to `member` and reads the groups by membership, never by an exact array.
+ */
+describe('GET /v1/me/work — a ticket closed Not taken (wtg2 T17)', () => {
+  it('29.374 a ticket closed Not taken by the flow is in no My Work group', async () => {
+    const skippedId = newUlid();
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+    const cause = { kind: 'branch-not-taken', decisionTicketId: newUlid(), outcome: 'Yes', pass: 1, decidedBy: read.world.owner, decisionEventId: newUlid() };
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: skippedId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: read.world.projectId, parentId: null, title: 'Assigned, then not taken' },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: skippedId }, type: 'ticket.assigned', payload: { assigneeId: read.world.member } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: skippedId }, type: 'ticket.transitioned', payload: { to: 'done', cause } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: skippedId }, type: 'ticket.closed', payload: { cause } }),
+    ]);
+    // precondition: the row really is a not-taken one, terminal and closed with the cause
+    const row = await db.pool.query<{ state_category: string; closed_at: Date | null; closed_cause: unknown }>(
+      'SELECT state_category, closed_at, closed_cause FROM proj_tickets WHERE ticket_id = $1',
+      [skippedId],
+    );
+    expect(row.rows[0]).toMatchObject({ state_category: 'terminal', closed_cause: cause });
+    expect(row.rows[0]?.closed_at).not.toBeNull();
+    const groups = await groupIds('member');
+    expect([...groups.open, ...groups.active, ...groups.terminal]).not.toContain(skippedId);
+  });
+});
+
 describe('GET /v1/me/work — a contested claim on a SOFT-DELETED ticket (round-1 F4, release batch B07)', () => {
   /**
    * `readContested` gates the title on `row.deleted_at === null && (await
