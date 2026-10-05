@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests-cap.test.sh — `ctl run-tests --max-min`: the wall-clock cap on SLOT time (13.2320-13.2326, 13.2328, 13.2329 and 13.2349,
+# scripts/ctl/test/run-tests-cap.test.sh — `ctl run-tests --max-min`: the wall-clock cap on SLOT time (13.2320-13.2326, 13.2328, 13.2329, 13.2349 and 13.2350,
 # test-cases/13-deploy-and-ops.md); run by `ctl selftest`. Every case id starts its check's name.
 # The legs use the REAL clock and real processes (a cap is a timer: a fake clock would prove nothing about it), scaled by the verb's seams:
 # CTL_RUN_SECS_PER_MIN=1 (a "minute" of cap is 1 s, so `--max-min 2` takes the production path and prints `TIMEOUT after 2 min`) and
@@ -172,6 +172,38 @@ reset; rm -f "$FXP".r.*; orc=$(REALPERL="$realperl" PATH="$SB:$PATH" RT_ALARM=20
 rrec=$(cat "$FXP.r.rec" 2>/dev/null); usr1rc=$((128 + $(kill -l USR1)))
 check "13.2349 the cap's USR1 landing on the verb's wait as the job exits 0 (verb STOPped inside its wait, job reaped, then USR1 + CONT) is a visible false RED: rc 128+USR1 (158 on macOS), never 0, the log's last line is 'CAP RACE: … its own rc is lost (158), so re-run', and no TIMEOUT in log or output (CONTROL: the shim's worker stopped the verb inside its wait — state T, fd 2 /dev/null —, saw the job a zombie or gone and sent the USR1; the job's last line is in the log)" \
   'case "$rrec" in "T"*" /dev/null Z"*" 1"|"T"*" /dev/null gone 1") true;; *) false;; esac && printf "%s\n" "$lrc" | grep -qx job-exits-0 && [ $rrc -eq $usr1rc ] && [ "$(printf "%s\n" "$lrc" | tail -1)" = "CAP RACE: the cap fired as the job ended; its own rc is lost ($usr1rc), so re-run" ] && ! printf "%s\n%s" "$lrc" "$orc" | grep -q TIMEOUT'
+
+# ---- 13.2350 the cap firing just AFTER a normal `wait` (the benign ordering) keeps the job's own rc and logs no CAP RACE ----
+# The window is one line wide (between `rc=$?` and the `if`), so no outside poll lands in it: a DEBUG trap read from BASH_ENV (this leg only;
+# it acts only in the verb, `$0` …/verbs/run-tests.sh, and is a bare `case` for every other command) pauses the verb at `timed_out=0`, after its
+# first `wait` returned: it writes the rc it holds and waits for its own USR1 trap to run. The `perl` shim (the timer, as in 13.2349) has a
+# worker that polls for that rc, records the verb's state and sends USR1. A second hook point, the `if`'s first test, records `cap_fired`
+# and rc there. The job exits 7: the old arm (any fired cap) logs `CAP RACE … lost (7)` here; the guard (rc = 128+USR1 only) logs nothing.
+cat > "$fx/dbg.sh" <<'SH'
+trap 'case "$BASH_COMMAND" in "timed_out=0"|"[ \"\$cap_fired\" = 1 ]") case "$0" in */verbs/run-tests.sh) ctl_bhook;; esac;; esac' DEBUG
+ctl_bhook() {
+  case "$BASH_COMMAND" in
+    timed_out=0) [ -e "$FXP.b.after" ] && return 0; echo "$rc" > "$FXP.b.after"
+      local n=0; until [ "$cap_fired" = 1 ] || [ $n -ge 200 ]; do sleep 0.05; n=$((n+1)); done;;
+    *) [ -e "$FXP.b.atif" ] || echo "$cap_fired $rc" > "$FXP.b.atif";;
+  esac
+}
+SH
+cat > "$SB/perl" <<'SH'
+#!/bin/bash
+case "$*" in *USR1*) ;; *) exec "$REALPERL" "$@";; esac
+v="$3"; r="$FXP.b"
+( fd() { lsof -a -p "$v" -d 2 -Fn 2>/dev/null | sed -n 's/^n//p'; }; st() { ps -o stat= -p "$1" 2>/dev/null | tr -d ' '; }
+  n=0; until [ -s "$r.after" ]; do sleep 0.05; n=$((n+1)); [ $n -lt 200 ] || exit 1; done
+  a=$(cat "$r.after"); vfd=$(fd); js=$(st "$(cat "$r.pid")"); js=${js:-gone}
+  kill -USR1 "$v" && sent=1 || sent=0; echo "$a ${vfd:-none} $js $sent" > "$r.rec" ) < /dev/null > /dev/null 2>&1 &
+echo $! >> "$FXP"
+SH
+chmod +x "$SB/perl"
+reset; rm -f "$FXP".b.*; obn=$(BASH_ENV="$fx/dbg.sh" REALPERL="$realperl" PATH="$SB:$PATH" RT_ALARM=20 rt --label benign --max-min 2 -- sh -c 'echo $$ >> "$FXP"; echo $$ > "$1.pid"; echo job-exits-7; exit 7' x "$FXP.b"); brc=$?; lbn=$(logtext)
+brec=$(cat "$FXP.b.rec" 2>/dev/null); batif=$(cat "$FXP.b.atif" 2>/dev/null)
+check "13.2350 the cap's USR1 landing just AFTER the verb's first wait returned the job's own 7 (the benign ordering) keeps that rc: rc 7 with 'FAIL … rc=7', no CAP RACE and no TIMEOUT in log or output (CONTROL: the verb held 7 when the worker sent the USR1 — its fd 2 off /dev/null, the job gone —, and at the if cap_fired was 1 with rc 7; the job's last line is in the log)" \
+  'case "$brec" in "7 /dev/null "*) false;; "7 "*" gone 1"|"7 "*" Z"*" 1") true;; *) false;; esac && [ "$batif" = "1 7" ] && printf "%s\n" "$lbn" | grep -qx job-exits-7 && [ $brc -eq 7 ] && printf "%s\n" "$obn" | grep -q "^FAIL run-tests benign rc=7 " && ! printf "%s\n%s" "$lbn" "$obn" | grep -q "CAP RACE\|TIMEOUT"'
 
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----
 cat > "$fx/rec-run-tests" <<'SH'
