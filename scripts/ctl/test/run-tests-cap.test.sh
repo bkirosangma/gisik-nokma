@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests-cap.test.sh — `ctl run-tests --max-min`: the wall-clock cap on SLOT time (13.2320-13.2326, 13.2328 and 13.2329,
+# scripts/ctl/test/run-tests-cap.test.sh — `ctl run-tests --max-min`: the wall-clock cap on SLOT time (13.2320-13.2326, 13.2328, 13.2329 and 13.2349,
 # test-cases/13-deploy-and-ops.md); run by `ctl selftest`. Every case id starts its check's name.
 # The legs use the REAL clock and real processes (a cap is a timer: a fake clock would prove nothing about it), scaled by the verb's seams:
 # CTL_RUN_SECS_PER_MIN=1 (a "minute" of cap is 1 s, so `--max-min 2` takes the production path and prints `TIMEOUT after 2 min`) and
@@ -67,8 +67,8 @@ logtext() { local l; l="$(lastlog)"; [ -n "$l" ] && cat "$l"; }
 reset; o0=$(rt --label ok0 --max-min 5 -- sh -c 'sleep 1; echo body0; exit 0'); r0=$?; l0=$(logtext)
 reset; o1=$(rt --label ok1 --max-min 5 -- sh -c 'sleep 1; echo body1; exit 1'); r1=$?; l1=$(logtext)
 reset; o4=$(rt --label own124 --max-min 5 -- sh -c 'echo body4; exit 124'); r4=$?; l4=$(logtext)
-check "13.2321 a job under the cap keeps its own exit code: rc 0 (OK line) and rc 1 (FAIL rc=1), neither with a TIMEOUT line in the log (CONTROL: the log was read, its body line is there) or the output" \
-  '[ $r0 -eq 0 ] && printf "%s\n" "$o0" | tail -1 | grep -q "^OK run-tests ok0 rc=0" && [ $r1 -eq 1 ] && printf "%s\n" "$o1" | tail -1 | grep -q "^FAIL run-tests ok1 rc=1 " && printf "%s\n" "$l0" | grep -qx body0 && printf "%s\n" "$l1" | grep -qx body1 && ! printf "%s\n%s\n%s\n%s" "$l0" "$l1" "$o0" "$o1" | grep -q TIMEOUT'
+check "13.2321 a job under the cap keeps its own exit code: rc 0 (OK line) and rc 1 (FAIL rc=1), neither with a TIMEOUT or a CAP RACE line (13.2349) in the log (CONTROL: the log was read, its body line is there) or the output" \
+  '[ $r0 -eq 0 ] && printf "%s\n" "$o0" | tail -1 | grep -q "^OK run-tests ok0 rc=0" && [ $r1 -eq 1 ] && printf "%s\n" "$o1" | tail -1 | grep -q "^FAIL run-tests ok1 rc=1 " && printf "%s\n" "$l0" | grep -qx body0 && printf "%s\n" "$l1" | grep -qx body1 && ! printf "%s\n%s\n%s\n%s" "$l0" "$l1" "$o0" "$o1" | grep -qE "TIMEOUT|CAP RACE"'
 check "13.2321 the discriminator is 124 PLUS the TIMEOUT line: a command's own exit 124 is rc 124 with 'FAIL … rc=124' and NO TIMEOUT line anywhere (CONTROL: its log was read)" \
   '[ $r4 -eq 124 ] && printf "%s\n" "$o4" | tail -1 | grep -q "^FAIL run-tests own124 rc=124 " && printf "%s\n" "$l4" | grep -qx body4 && ! printf "%s\n%s" "$l4" "$o4" | grep -q TIMEOUT'
 
@@ -148,6 +148,30 @@ reset; rm -f "$FXP.shim"; os=$(PATH="$SB:$PATH" rt --label shim --max-min 2 -- s
 { read -r shimpid shimppid perlpid < "$FXP.shim"; } 2>/dev/null
 check "13.2329 a timer whose parent is not the verb never signals it: with the timer run one process down (a PATH shim), a 4 s job under a 2 s cap runs to its end (rc 0, its output in the log, no TIMEOUT in log or output) (CONTROL: the shim really ran the timer: it recorded itself, its parent and the timer's pid)" \
   '[ -n "${perlpid:-}" ] && [ -n "${shimpid:-}" ] && [ $rs -eq 0 ] && printf "%s\n" "$ls_" | grep -qx outlived-the-cap && ! printf "%s\n%s" "$ls_" "$os" | grep -q TIMEOUT'
+
+# ---- 13.2349 the cap fires in the same instant the job exits: the residual is a visible false RED (128+USR1 + CAP RACE), never a false green ----
+# The race (the job reaped inside the verb's `wait` while the cap's USR1 is pending) is built without timing luck: a `perl` shim on PATH
+# replaces the timer and backgrounds a worker (the verb KILLs a timer that has not fired) that waits for the verb to sit inside its
+# `{ wait; } 2>/dev/null` (its fd 2 is /dev/null) and for the job to be up, STOPs the verb, lets the job `exit 0`, waits for the job to be a
+# zombie or gone (macOS: the stopped verb's own wait4 reaps it), sends USR1, then CONTs the verb: both land on the one `wait`. bash longjmps
+# out of it before recording the status, so the job's 0 is lost (a second `wait` returned 127, 5 of 5; ruling C+ 2026-10-05). The job exits 0
+# so that a verb reporting the lost rc as 0 is a false green this leg catches.
+cat > "$SB/perl" <<'SH'
+#!/bin/bash
+case "$*" in *USR1*) ;; *) exec "$REALPERL" "$@";; esac
+v="$3"; r="$FXP.r"
+( fd() { lsof -a -p "$v" -d 2 -Fn 2>/dev/null | sed -n 's/^n//p'; }; st() { ps -o stat= -p "$1" 2>/dev/null | tr -d ' '; }
+  n=0; until [ -s "$r.pid" ] && [ "$(fd)" = /dev/null ]; do sleep 0.05; n=$((n+1)); [ $n -lt 200 ] || exit 1; done
+  sleep 0.3; kill -STOP "$v"; vs=$(st "$v"); vfd=$(fd); j=$(cat "$r.pid"); : > "$r.go"
+  n=0; until case "$(st "$j")" in Z*|"") true;; *) false;; esac; do sleep 0.05; n=$((n+1)); [ $n -lt 200 ] || break; done
+  js=$(st "$j"); js=${js:-gone}; kill -USR1 "$v" && sent=1 || sent=0; echo "$vs $vfd $js $sent" > "$r.rec"; kill -CONT "$v" ) < /dev/null > /dev/null 2>&1 &
+echo $! >> "$FXP"
+SH
+chmod +x "$SB/perl"
+reset; rm -f "$FXP".r.*; orc=$(REALPERL="$realperl" PATH="$SB:$PATH" RT_ALARM=20 rt --label race --max-min 2 -- sh -c 'echo $$ >> "$FXP"; echo $$ > "$1.pid"; n=0; until [ -f "$1.go" ] || [ $n -ge 200 ]; do sleep 0.05; n=$((n+1)); done; echo job-exits-0; exit 0' x "$FXP.r"); rrc=$?; lrc=$(logtext)
+rrec=$(cat "$FXP.r.rec" 2>/dev/null); usr1rc=$((128 + $(kill -l USR1)))
+check "13.2349 the cap's USR1 landing on the verb's wait as the job exits 0 (verb STOPped inside its wait, job reaped, then USR1 + CONT) is a visible false RED: rc 128+USR1 (158 on macOS), never 0, the log's last line is 'CAP RACE: … its own rc is lost (158), so re-run', and no TIMEOUT in log or output (CONTROL: the shim's worker stopped the verb inside its wait — state T, fd 2 /dev/null —, saw the job a zombie or gone and sent the USR1; the job's last line is in the log)" \
+  'case "$rrec" in "T"*" /dev/null Z"*" 1"|"T"*" /dev/null gone 1") true;; *) false;; esac && printf "%s\n" "$lrc" | grep -qx job-exits-0 && [ $rrc -eq $usr1rc ] && [ "$(printf "%s\n" "$lrc" | tail -1)" = "CAP RACE: the cap fired as the job ended; its own rc is lost ($usr1rc), so re-run" ] && ! printf "%s\n%s" "$lrc" "$orc" | grep -q TIMEOUT'
 
 # ---- 13.2328 ctl mutate, the one ctl verb that runs through run-tests, names its cap explicitly, above its own watchdog ----
 cat > "$fx/rec-run-tests" <<'SH'
