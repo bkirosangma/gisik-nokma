@@ -8,6 +8,7 @@ import type { HomeResponse } from '@gisik-nokma/domain';
 import { HOME_NUMBERS, dueSoonLabel } from '../src/home/home-copy.js';
 import { HomeNumbers, type HomeNumbersProps } from '../src/home/home-numbers.js';
 import { useHomeHighlight } from '../src/home/use-home-highlight.js';
+import { ruleExactly, rulesNaming, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
 import { ruleFor } from './helpers/css-rule-scan.js';
 
 /**
@@ -80,11 +81,18 @@ describe('27.635 Past due carries the warning edge above 0', () => {
 });
 
 describe('27.636 a zero is disabled, a withheld Members reads Restricted', () => {
-  it('27.636 0 Notes and Restricted Members are disabled; control: 12 Tickets is enabled in the same render', () => {
+  it('27.636 0 Notes and Restricted Members are disabled, the word set apart inside the value; control: 12 Tickets is enabled in the same render, its value a bare count', () => {
     render(<HomeNumbers {...props({ home: { ...HOME, counts: { ...HOME.counts, notes: 0, members: null } } })} />);
     expect(screen.getByRole('button', { name: '0 Notes' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Restricted Members' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '12 Tickets' })).toBeEnabled();
+
+    // FIX 1 F4: a withheld count is a state, not a count. Its word sits INSIDE the value (on the value's line box and
+    // baseline) in its own span, set at 0.9375rem, so "Restricted" fits a phone's third. Control: a count's value is bare.
+    const word = screen.getByRole('button', { name: 'Restricted Members' }).querySelector('.gn-home__number-value > .gn-home__number-withheld');
+    expect(word?.textContent).toBe('Restricted');
+    expect(screen.getByRole('button', { name: '12 Tickets' }).querySelector('.gn-home__number-withheld')).toBeNull();
+    expect(valueOf(ruleExactly(CSS, '.gn-home__number-withheld'), 'font-size')).toBe('0.9375rem');
   });
 });
 
@@ -98,6 +106,38 @@ describe('27.637 loading: six placeholders in the tiles’ own box', () => {
     const rule = ruleFor(CSS, /^\s*\.gn-home__number\s*\{/);
     expect(rule).toBeDefined();
     expect(rule).toContain('min-height: 4.75rem');
+
+    // FIX 1 F4: ONE min-height at EVERY width (no media arm re-declares it), holding the padding, the value line, the
+    // gap and TWO label lines at the phone density (a phone's third wraps "Due in 365 days"), and one label line at the
+    // desktop density (a sixth never wraps it: 3×2 at 64rem and below, 27.640). The browser reading is the review's.
+    expect(rulesNaming(CSS, '.gn-home__number').filter((r) => valueOf(r.body, 'min-height') !== null).map((r) => r.atRule)).toEqual([null]);
+    const PHONE = '@media (max-width: 40rem)';
+    const rem = (value: string | null | undefined): number => {
+      const hit = /^([\d.]+)rem$/.exec(value ?? '');
+      if (hit === null) throw new Error(`not a rem length: ${String(value)}`);
+      return Number(hit[1]);
+    };
+    const ratio = (value: string | null): number => {
+      if (value === null || !/^[\d.]+$/.test(value)) throw new Error(`not a unitless line-height: ${String(value)}`);
+      return Number(value);
+    };
+    const tile = ruleExactly(CSS, '.gn-home__number');
+    const value = ruleExactly(CSS, '.gn-home__number-value');
+    const label = ruleExactly(CSS, '.gn-home__number-label');
+    expect(ratio(valueOf(label, 'line-height'))).toBeGreaterThanOrEqual(1.2); // a wrapped label stays legible
+    const content = (padding: string | null, valueSize: number, labelLines: number): number =>
+      2 * rem(padding?.split(' ')[0]) +
+      valueSize * ratio(valueOf(value, 'line-height')) +
+      rem(valueOf(tile, 'gap')) +
+      labelLines * rem(valueOf(label, 'font-size')) * ratio(valueOf(label, 'line-height'));
+    const minHeight = rem(valueOf(tile, 'min-height'));
+    expect(content(valueOf(tile, 'padding'), rem(valueOf(value, 'font-size')), 1)).toBeLessThanOrEqual(minHeight);
+    expect(
+      content(valueOf(ruleExactly(CSS, '.gn-home__number', PHONE), 'padding'), rem(valueOf(ruleExactly(CSS, '.gn-home__number-value', PHONE), 'font-size')), 2),
+    ).toBeLessThanOrEqual(minHeight);
+    // The bars stay inside the tile: its one column has a zero floor, and the bars are clamped to it.
+    expect(valueOf(tile, 'grid-template-columns')).toBe('minmax(0, 1fr)');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__number > .gn-skeleton'), 'max-width')).toBe('100%');
 
     // Control: the loaded state uses the same class, so the swap keeps the box.
     rerender(<HomeNumbers {...props()} />);
@@ -238,41 +278,21 @@ describe('27.639 one lit number at a time; Escape and a reload to 0 clear it', (
   });
 });
 
-/** The `@media (max-width: 40rem)` blocks, each walked by brace DEPTH to its own closing brace. */
-function mediaBlocks(css: string, query: string): string[] {
-  const blocks: string[] = [];
-  let from = 0;
-  for (;;) {
-    const at = css.indexOf(query, from);
-    if (at === -1) return blocks;
-    const open = css.indexOf('{', at);
-    let depth = 0;
-    let end = open;
-    for (let i = open; i < css.length; i += 1) {
-      if (css[i] === '{') depth += 1;
-      else if (css[i] === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
-      }
-    }
-    blocks.push(css.slice(open + 1, end));
-    from = end + 1;
-  }
-}
-
-describe('27.640 the phone grid: one row of six, 3×2 below 40rem', () => {
-  it('27.640 .gn-home__numbers declares six columns; the one 40rem block naming it declares three; control: the six-column rule is not inside that block', () => {
-    const top = ruleFor(CSS, /^\.gn-home__numbers\s*\{/);
-    expect(top).toBeDefined();
-    expect(top).toContain('grid-template-columns: repeat(6, minmax(0, 1fr))');
-    const blocks = mediaBlocks(CSS, '@media (max-width: 40rem)').filter((block) => block.includes('.gn-home__numbers'));
-    expect(blocks).toHaveLength(1);
-    const block = blocks[0]!;
-    expect(block.length).toBeGreaterThan(0);
-    expect(block).toContain('repeat(3, minmax(0, 1fr))');
-    expect(block).not.toContain('repeat(6');
+describe('27.640 the grid: one row of six on desktop, 3×2 at 64rem and below', () => {
+  // FIX 1 F4: 3×2 from 64rem down (the nav's own hand-over point), not 40rem: a sixth of anything narrower cannot hold
+  // "Due in 365 days" on one line, and the phone inherits the three.
+  it('27.640 .gn-home__numbers declares six columns; its one 64rem rule declares three; control: the 40rem rule naming it declares no columns, and no other rule does', () => {
+    expect(valueOf(ruleExactly(CSS, '.gn-home__numbers'), 'grid-template-columns')).toBe('repeat(6, minmax(0, 1fr))');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__numbers', '@media (max-width: 64rem)'), 'grid-template-columns')).toBe('repeat(3, minmax(0, 1fr))');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__numbers', '@media (max-width: 40rem)'), 'grid-template-columns')).toBeNull();
+    // Every rule naming it that sets columns: exactly the top-level six and the 64rem three.
+    expect(
+      rulesNaming(CSS, '.gn-home__numbers')
+        .filter((r) => valueOf(r.body, 'grid-template-columns') !== null)
+        .map((r) => [r.atRule, valueOf(r.body, 'grid-template-columns')]),
+    ).toEqual([
+      [null, 'repeat(6, minmax(0, 1fr))'],
+      ['@media (max-width: 64rem)', 'repeat(3, minmax(0, 1fr))'],
+    ]);
   });
 });

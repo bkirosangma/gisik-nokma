@@ -14,8 +14,9 @@ export type HomeNumbersProps = {
 };
 
 /**
- * Home's six numbers (spec E §2.2): one row of six tiles, 3×2 on a phone. Loading draws placeholders in the tiles' own
- * box (`.gn-home__number`, one `min-height`), so the swap to numbers does not move the page.
+ * Home's six numbers (spec E §2.2): one row of six tiles on desktop, 3×2 at 64rem and below (`globals.css`). Loading
+ * draws placeholders in the tiles' own box (`.gn-home__number`, one `min-height` at every width), so the swap to numbers
+ * does not move the page.
  */
 export function HomeNumbers({ home, failed, onRetry, pressed, onToggle, dueSoonDays: lastKnownDueSoonDays }: HomeNumbersProps) {
   if (home === null && !failed) {
@@ -37,7 +38,9 @@ export function HomeNumbers({ home, failed, onRetry, pressed, onToggle, dueSoonD
       <div className="gn-home__numbers">
         {HOME_NUMBERS.map((n) => {
           const count = home === null ? undefined : home.counts[n.key];
-          const value = count === undefined ? '–' : count === null ? 'Restricted' : String(count);
+          // A withheld Members is a state, not a count: its word sits in the value's line box, set smaller (FIX 1 F4).
+          const value =
+            count === undefined ? '–' : count === null ? <span className="gn-home__number-withheld">Restricted</span> : String(count);
           const disabled = count === undefined || count === null || count === 0;
           const warn = n.key === 'pastDue' && typeof count === 'number' && count > 0;
           return (
