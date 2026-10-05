@@ -604,6 +604,8 @@ describe('28.198 below 1025 px Drafts is reached from More (drafts T8 FIX 1; pla
     const more = await screen.findByRole('dialog', { name: 'More' });
     const drafts = within(more).getByRole('link', { name: 'Drafts' });
     expect(drafts.getAttribute('href')).toBe(`/w/${WS}/drafts`);
+    // The Sheet's panel stops a click's propagation (`sheet.tsx`), so the document-level swallow never sees this one.
+    drafts.addEventListener('click', (event) => event.preventDefault());
     await user.click(drafts);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull());
   });
