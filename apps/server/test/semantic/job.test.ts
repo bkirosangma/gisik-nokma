@@ -150,6 +150,7 @@ describe('27.487 the job never clusters across audiences', () => {
     const ND = newUlid(); // a deleted workspace note: no item
     const other = newUlid();
     const NX = newUlid(); // a workspace note in ANOTHER workspace: no item here
+    const TX = newUlid(); // a workspace-audience ticket in ANOTHER workspace ('w' there too): no item here
     const noteEv = (workspaceId: string, id: string, type: string, payload: unknown) =>
       makeCommitted({ workspaceId, actorId: world.ids.author, entity: { kind: 'note', id }, type, payload });
     await applyCommitted(db.pool, [
@@ -157,6 +158,24 @@ describe('27.487 the job never clusters across audiences', () => {
       noteEv(world.WS, ND, 'note.created', { title: 'Gone', homeProjectId: world.P, scope: { mode: 'workspace' } }),
       noteEv(world.WS, ND, 'note.deleted', {}),
       noteEv(other, NX, 'note.created', { title: 'Elsewhere', homeProjectId: '', scope: { mode: 'workspace' } }),
+      // The other workspace's own workflow and `task` type (a workflow id is unique across workspaces).
+      makeCommitted({
+        workspaceId: other,
+        actorId: world.ids.owner,
+        entity: { kind: 'workflow', id: 'wf-elsewhere' },
+        type: 'workflow.defined',
+        payload: {
+          id: 'wf-elsewhere',
+          version: 1,
+          name: 'Elsewhere',
+          initialStateId: 'todo',
+          states: [{ id: 'todo', name: 'To do', category: 'open' }],
+          transitions: [{ from: '*', to: 'todo', rules: [] }],
+        },
+      }),
+      makeCommitted({ workspaceId: other, actorId: world.ids.owner, entity: { kind: 'ticket-type', id: 'task' }, type: 'ticket-type.defined', payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-elsewhere', fields: [] } }),
+      makeCommitted({ workspaceId: other, actorId: world.ids.owner, entity: { kind: 'ticket', id: TX }, type: 'ticket.created', payload: { typeId: 'task', projectId: newUlid(), parentId: null, title: 'Elsewhere' } }),
+      makeCommitted({ workspaceId: other, actorId: world.ids.owner, entity: { kind: 'ticket', id: TX }, type: 'visibility.set', payload: { ticketId: TX, mode: 'workspace' } }),
       makeCommitted({ workspaceId: world.WS, actorId: world.ids.owner, entity: { kind: 'ticket', id: WT as string }, type: 'ticket.deleted', payload: {} }),
     ]);
     const text = 'licence renewal permit';
@@ -165,9 +184,12 @@ describe('27.487 the job never clusters across audiences', () => {
     await chunkNote(N, basis(0), text);
     await chunkNote(ND, basis(0), text);
     await chunkNote(NX, basis(0), text, other);
+    await chunkTicket(TX, basis(0), text, other);
     expect((await db.pool.query('SELECT 1 FROM proj_notes WHERE note_id = $1 AND deleted', [ND])).rows).toHaveLength(1);
     expect((await db.pool.query('SELECT 1 FROM proj_tickets WHERE ticket_id = $1 AND deleted_at IS NOT NULL', [WT])).rows).toHaveLength(1);
     expect((await db.pool.query('SELECT 1 FROM proj_notes WHERE note_id = $1', [NX])).rows).toHaveLength(1);
+    // TX is live with an audience row: only the job's two workspace clauses (its chunks, its audience map) keep it out.
+    expect((await db.pool.query(`SELECT v.resolved_mode FROM proj_tickets t JOIN proj_visibility v ON v.ticket_id = t.ticket_id WHERE t.ticket_id = $1 AND t.deleted_at IS NULL`, [TX])).rows).toEqual([{ resolved_mode: 'workspace' }]);
 
     await runSuggestionJob(db.pool, world.WS);
     const rows = await suggestionRows();

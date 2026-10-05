@@ -201,12 +201,18 @@ describe('27.494 a reader who sees a ticket only as its assignee (Review Focus 2
 
 describe('27.492 equal scores', () => {
   it('27.492 two rows with one score come in id order, so the MCP offset cursor pages a stable list; control: the scores above and below keep their places', async () => {
-    // The higher id is written first, so heap order and id order disagree (five rows sort in place, stably).
-    const [TA, TB] = [newUlid(), newUlid()].sort() as [string, string];
     // Item sets unlike S1–S3's (a signature is unique per workspace); TE makes both the owner's alone.
-    const owned = [{ kind: 'ticket' as const, id: world.TE }, { kind: 'note' as const, id: world.NOTES.nProject }];
-    await cache(TB, [...owned, { kind: 'note', id: world.NOTES.nWorkspace }], 0.3, 'i:mixed');
-    await cache(TA, [...owned, { kind: 'note', id: world.NOTES.nExplicit }], 0.3, 'i:mixed');
+    const owned: ItemRef[] = [{ kind: 'ticket', id: world.TE }, { kind: 'note', id: world.NOTES.nProject }];
+    const sets: ItemRef[][] = [[...owned, { kind: 'note', id: world.NOTES.nWorkspace }], [...owned, { kind: 'note', id: world.NOTES.nExplicit }]];
+    const sig = (items: ItemRef[]) => signatureOf(items.map((item) => itemKey(item.kind, item.id)).sort());
+    const [lowSig, highSig] = [...sets].sort((a, b) => (sig(a) < sig(b) ? -1 : 1)) as [ItemRef[], ItemRef[]];
+    // Without the tie-break the two come in heap order or (through the unique index) signature order. Both are made
+    // the REVERSE of id order: the higher id TB gets the lower signature and is written first.
+    const [TA, TB] = [newUlid(), newUlid()].sort() as [string, string];
+    await cache(TB, lowSig, 0.3, 'i:mixed');
+    await cache(TA, highSig, 0.3, 'i:mixed');
+    const unsorted = await db.pool.query<{ id: string }>('SELECT id FROM sem_suggestions WHERE workspace_id = $1 AND score = $2::real', [world.WS, 0.3]);
+    expect(unsorted.rows.map((row) => row.id), 'control: unsorted, TB comes first').toEqual([TB, TA]);
     expect(await listIds('owner')).toEqual([S1, S2, TA, TB, S3]);
   });
 });

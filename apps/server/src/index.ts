@@ -126,6 +126,9 @@ async function main(): Promise<void> {
     // compose stack, not inferred.
     webOrigin: config.webOrigin,
   });
+  // KG-D T5: the suggestion scheduler, created below with the embed worker (and
+  // only with it), is held here for the reason the next comment gives.
+  let suggestionScheduler: ReturnType<typeof startSuggestionScheduler> | null = null;
   // The embedding worker (notes series, Plan 3 of 6, spec §7.6) is created
   // BELOW, beside the snapshot writer, but `buildApp` registers its commit
   // listener at build time — so the callback has to exist first, and the loop
@@ -134,7 +137,6 @@ async function main(): Promise<void> {
   // assignment, and nothing can call it in that window because nothing is
   // listening yet.
   let nudgeEmbedWorker: ((noteId: string) => void) | null = null;
-  let suggestionScheduler: ReturnType<typeof startSuggestionScheduler> | null = null;
   const app = buildApp(
     {
       db: pool,

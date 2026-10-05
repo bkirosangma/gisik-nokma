@@ -192,6 +192,14 @@ export type AppDeps = {
    */
   stream?: Omit<StreamRouteDeps, 'pool' | 'hub' | 'now'>;
   /**
+   * Knowledge Graph spec D §4.1 (KG-D Task 5): called with the WORKSPACE id once per committed event that reaches
+   * `onNoteBodyCommitted` below (`nudgesEmbedding` or `nudgesItemEmbedding`): "an embedded text in this workspace
+   * changed", which is what the suggestion job's 200-change trigger counts. The same listener serves both callbacks,
+   * registered when EITHER is given; `index.ts` hands this `suggestionScheduler.change`, a test hands it nothing. A
+   * callback for the reason `onNoteBodyCommitted` gives: the scheduler owns timers, and `buildApp` starts none.
+   */
+  onSemanticChange?: (workspaceId: string) => void;
+  /**
    * Called once per committed note event whose TEXT changed — `note.created`
    * and `note.body_set`, filtered by `nudgesEmbedding` — and, since Knowledge
    * Graph spec D Task 2, once per committed ticket or ticket-comment event that
@@ -214,14 +222,6 @@ export type AppDeps = {
    * staleness is decided by the tables.
    */
   onNoteBodyCommitted?: (noteId: string) => void;
-  /**
-   * Knowledge Graph spec D §4.1 (KG-D Task 5): called with the WORKSPACE id once per committed event that reaches
-   * `onNoteBodyCommitted` above (`nudgesEmbedding` or `nudgesItemEmbedding`): "an embedded text in this workspace
-   * changed", which is what the suggestion job's 200-change trigger counts. The same listener serves both callbacks,
-   * registered when EITHER is given; `index.ts` hands this `suggestionScheduler.change`, a test hands it nothing. A
-   * callback for the reason `onNoteBodyCommitted` gives: the scheduler owns timers, and `buildApp` starts none.
-   */
-  onSemanticChange?: (workspaceId: string) => void;
 };
 
 /**
