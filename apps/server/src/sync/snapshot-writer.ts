@@ -184,6 +184,11 @@ type Due = { workspaceId: string; entityId: string };
  * silently — an identical event one seq higher was delivered in full.
  * `sync-routes.ts` carries the membership rule and the arithmetic.
  *
+ * It also holds only for a row of the CURRENT fold. A row from an older fold is
+ * refused until the boot pass settles (`bootRestate`), and a row whose restate
+ * failed is served as stored after that, its periods missing, with a warning
+ * naming the ticket (wtg2 fold-version bootstrap, `bootstrapTicket`).
+ *
  * `proj_tickets` happens to be maintained by the same reducer today, which is
  * precisely why reading it would be an invisible mistake — it would agree until
  * it didn't.

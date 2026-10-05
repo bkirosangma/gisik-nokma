@@ -2184,7 +2184,9 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   then a replica's bootstrap state differs from its own replay with nothing pointing at why. The
   equivalence is held by a test whose fixture leaves all three projections EMPTY and asserts it —
   under a fixture seeded through the full ingest path both implementations produce identical bytes and
-  the assertion would distinguish nothing. `apps/server/src/sync/snapshot-writer.ts`
+  the assertion would distinguish nothing. The equivalence also needs a row of the current fold: one whose
+  restate failed is served as stored, its periods missing ("A snapshot from an older fold waits for the boot
+  restate pass" below). `apps/server/src/sync/snapshot-writer.ts`
 - ⚙️ **The snapshot's seq counts EVENTS, not folds** — `visibility.set`, `claim.contested` and
   `claim.contested_resolved` are all three filed against `kind: 'ticket'` and are deliberately absent
   from `TICKET_EVENT_TYPES`, so they
