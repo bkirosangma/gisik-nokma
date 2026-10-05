@@ -72,7 +72,7 @@ const TABLES = [
    * `migrateLocal` runs `CREATE TABLE IF NOT EXISTS` and nothing else. There is
    * no `ALTER` path: **`LOCAL_SCHEMA_VERSION` was written into `meta` and never
    * read back** when this table was added (its one reader since version 5 is
-   * `createReplica`'s re-pull of held tickets, which converges STATE, not
+   * `createReplica`, which re-pulls held tickets' STATE, not
    * columns), so a version stamp exists and an upgrade mechanism does not. Adding a column to `snapshots` would therefore work on a fresh device
    * and fail on an existing one with `no such column: provenance`, at the first
    * write, at runtime. A new table is created by the same idempotent DDL on

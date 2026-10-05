@@ -299,4 +299,44 @@ describe('29.355 snapshot fold versions', () => {
     expect([restated?.seq, restated?.foldVersion, restated?.state['periods']]).toEqual([3, 2, [{ start: S2, end: S3, pass: 1 }]]);
     expect((await runSnapshotPass(db.pool, { minEvents: 20 })).written).toEqual([]);
   });
+
+  it('29.355 a ticket with no snapshot is not a restate: it folds with the definitions it is handed, and the pass writes it with the plain insert', async () => {
+    // Twins with the same three events, seeded after every definition: TICKET_7 holds a pre-periods row (the control),
+    // TICKET_6 holds no snapshot at all, and "no row" must not read as "a row an older fold wrote". Declared here, last:
+    // every ticket above is current by now, and a stale row planted earlier would join the passes of the legs above.
+    const TICKET_6 = newUlid();
+    const TICKET_7 = newUlid();
+    await seed([
+      created(TICKET_6, 'snap-task', S1), to(TICKET_6, 'doing', S2), to(TICKET_6, 'done', S3),
+      created(TICKET_7, 'snap-task', S1), to(TICKET_7, 'doing', S2), to(TICKET_7, 'done', S3),
+    ]);
+    const newest = await buildLedgerDeps(db.pool, WS);
+    await plant(TICKET_7, 1, await foldPrefix(TICKET_7, 1, newest), true);
+    const twin = await readLatestSnapshot(db.pool, 'ticket', TICKET_7);
+    expect([await readLatestSnapshot(db.pool, 'ticket', TICKET_6), twin?.foldVersion]).toEqual([null, 1]); // precondition
+
+    /** One recorded fold with the newest definitions: the head's `restated`, its definition loads, its tail reads. */
+    const fold = async (ticketId: string): Promise<unknown[]> => {
+      const calls: QueryCall[] = [];
+      const client = await db.pool.connect();
+      try {
+        const head = await foldTicketHead(recording(client, calls), ticketId, newest);
+        return [head?.restated, definitionScans(calls), tailReadsFor(calls, ticketId)];
+      } finally {
+        client.release();
+      }
+    };
+    // Control first: the stale twin is a restate, with one as-of load (no definition change in its history). The
+    // subject reads the same whole stream from 0 and folds it with the definitions it was handed: no restate, no load.
+    expect([await fold(TICKET_7), await fold(TICKET_6)]).toEqual([[true, 1, [0]], [false, 0, [0]]]);
+
+    // The pass: TICKET_6 is due by its event count, TICKET_7 by its fold version; every other ticket in this file is
+    // current and fewer than 3 events past its latest row. The restate writes through `overwriteSnapshot`; a first
+    // snapshot takes the plain INSERT, whose primary-key collision stays reserved for overlapping passes (12.89).
+    const calls: QueryCall[] = [];
+    await runSnapshotPass(recording(db.pool, calls), { minEvents: 3 });
+    const overwrites = (ticketId: string): boolean[] =>
+      calls.filter((call) => call.text.includes('INSERT INTO snapshots') && call.values[1] === ticketId).map((call) => call.text.includes('ON CONFLICT'));
+    expect([overwrites(TICKET_7), overwrites(TICKET_6)]).toEqual([[true], [false]]);
+  });
 });
