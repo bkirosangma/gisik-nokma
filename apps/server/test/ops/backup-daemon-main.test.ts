@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { builtinTicketTypeDefs, DECISION_TYPE_ID, newUlid } from '@gisik-nokma/domain';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { addTicket, lead, seedFlowWorld, stateOf } from '../flow/flow-world.js';
 
 /**
  * Spawned rather than imported: this module calls `main()` at import time with no
@@ -81,7 +82,7 @@ const runDaemon = (
     });
   });
 
-describe('backup-daemon-main — one scheduler for all eight jobs', () => {
+describe('backup-daemon-main — one scheduler for every job', () => {
   let db: TestDatabase;
   beforeAll(async () => {
     db = await createTestDatabase();
@@ -236,6 +237,65 @@ describe('backup-daemon-main — one scheduler for all eight jobs', () => {
     expect(run.stdout).not.toContain(SCHEDULED);
     expect(run.stderr).toContain('AUTO_CLOSE_SWEEP_INTERVAL_MS');
   }, 60_000);
+  /**
+   * 29.228 - the flow sweep (wtg2 T14) is a job of the same scheduler: its interval is refused by its own name, it runs
+   * `runFlowSweep` through the daemon's ingest, and a failure is reported under its own job name. The reader's default
+   * and empty handling are pinned in `test/flow/sweep.test.ts` (a five-minute first run is beyond this harness).
+   */
+  it('29.228 refuses a zero FLOW_SWEEP_INTERVAL_MS and names it, aborting the whole scheduler; control: unset announces itself', async () => {
+    const ok = await runDaemon({ DATABASE_URL: db.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000' });
+    expect(ok.stdout).toContain(SCHEDULED);
+    const run = await runDaemon({ DATABASE_URL: db.url, FLOW_SWEEP_INTERVAL_MS: '0' });
+    expect(run.stdout).not.toContain(SCHEDULED);
+    expect(run.stderr).toContain('FLOW_SWEEP_INTERVAL_MS');
+  }, 120_000);
+  const flowLine = (out: string) =>
+    out
+      .split('\n')
+      .flatMap((l) => {
+        try {
+          return [JSON.parse(l) as { msg?: string }];
+        } catch {
+          return [];
+        }
+      })
+      .find((e) => e.msg === 'flow sweep complete');
+  it('29.228 the flow job runs the sweep through the daemon\'s ingest and logs its counts', async () => {
+    // A due promotion in the daemon's database: zero counts on an empty database cannot tell a job that runs the sweep
+    // through the daemon's ingest from one that only prints the line. (This file shares one database across its cases.)
+    await seedFlowWorld(db.pool);
+    const s = await addTicket(db.pool, { start: 'focus', moves: ['doing', 'done'] });
+    const t = await addTicket(db.pool);
+    await lead(db.pool, s, t);
+    const run = await runDaemon(
+      { DATABASE_URL: db.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000', FLOW_SWEEP_INTERVAL_MS: '300' },
+      (out) => flowLine(out) !== undefined,
+    );
+    expect(flowLine(run.stdout), `stderr: ${run.stderr}`).toEqual({ msg: 'flow sweep complete', promoted: 1, settled: 0, refused: 0 });
+    expect(await stateOf(db.pool, t)).toBe('todo');
+  }, 60_000);
+  it('29.228 a failing flow sweep is reported under its own job name "flow" and the daemon keeps running; control: the run above logs completion', async () => {
+    const broken = await createTestDatabase();
+    try {
+      await broken.pool.query('ALTER TABLE proj_ticket_links RENAME TO proj_ticket_links_renamed');
+      const failed = await runDaemon(
+        { DATABASE_URL: broken.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000', FLOW_SWEEP_INTERVAL_MS: '300' },
+        (_out, err) => err.includes('"job":"flow"'),
+      );
+      expect(failed.stderr).toContain('"msg":"backup job failed","job":"flow"');
+      expect(failed.stdout).toContain(SCHEDULED);
+      expect(flowLine(failed.stdout)).toBeUndefined();
+    } finally {
+      await broken.drop();
+    }
+  }, 60_000);
+  it('29.228 the daemon hands the reader\'s value to the scheduler unscaled and under its own name (source pin: a x10 at the call site only shows as a later first run, which no spawned leg can time)', () => {
+    const source = readFileSync(join(SERVER_DIR, 'src/ops/backup-daemon-main.ts'), 'utf8');
+    expect(source).toContain('const flowSweepEveryMs = flowSweepIntervalMs(process.env.FLOW_SWEEP_INTERVAL_MS);');
+    expect(source).toContain("delayMs: () => requirePositiveIntervalMs(flowSweepEveryMs, 'FLOW_SWEEP_INTERVAL_MS'),");
+    // read once and used once: no second assignment can shadow either line above
+    expect(source.match(/flowSweepEveryMs/g)).toHaveLength(2);
+  });
   /**
    * 6.349 / 6.350 - the `expired-sessions` job the daemon SCHEDULES, run for real. `expired-sessions.test.ts` pins the pieces
    * (`runExpiredSessionSweep`, `sessionSweepIntervalMs`); these pin that `main()` wires them: the job fires, deletes, logs the
