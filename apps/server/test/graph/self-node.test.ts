@@ -90,6 +90,12 @@ beforeAll(async () => {
   await mentionFromTicket(ids.H4, w().guest);
   await mentionFromTicket(ids.H5, w().guest, read.neighbour.workspaceId);
   await mentionFromTicket(ids.PX, read.userIds.admin);
+  // A link the GUEST added, between two tickets she can open (27.692's addedBy leg).
+  // columns: A's migration, apps/server/migrations/1791700000000_proj-ticket-links.sql:7-16
+  await db.pool.query(
+    `INSERT INTO proj_ticket_links (workspace_id, source_id, target_id, kind, created_by, created_at, origin, seq) VALUES ($1, $2, $3, 'relates', $4, '2026-10-01T05:00:00Z', 'web', 1)`,
+    [ws(), ids.GT1, w().guestTaskId, w().guest],
+  );
 }, 600_000);
 afterAll(async () => {
   await read.app.close();
@@ -183,6 +189,12 @@ describe('27.690–27.693 the viewer’s own person node (KG release blocker P2-
     const memberOnGuest = await ring('member', P(w().guest));
     expect(memberOnGuest.body.center).toEqual(personCentre(w().guest, 'Gita Guest'));
     expect(refsOf(memberOnGuest.body)).toEqual([T(ids.H1), T(ids.H2), N(ids.H3)].sort());
+    // An edge's author is still the names read's alone (planner, 14:46: addedBy deliberately unchanged): the link the
+    // guest added reads no author to her, as before; control: the owner, whose read names her, reads her name.
+    const linkId = `relates|${T(ids.GT1)}|${T(w().guestTaskId)}`;
+    const edgeFor = async (role: ReadRole) => (await ring(role, T(ids.GT1), '1', 'relates')).body.edges.find((e) => e.id === linkId);
+    expect((await edgeFor('owner'))?.addedBy).toBe('Gita Guest');
+    expect(await edgeFor('guest')).toMatchObject({ id: linkId, addedBy: null });
   });
 
   it('27.693 a phone user no names read labels is drawn to themselves by their own name; control: FD3 still hides them from everyone else with the same 404, and a blank name with only a synthetic address is no label', async () => {
@@ -202,7 +214,11 @@ describe('27.690–27.693 the viewer’s own person node (KG release blocker P2-
     expect(refsOf((await ring('owner', T(ids.PX))).body)).toEqual([]);
     expect(refsOf((await ring('admin', T(ids.PX))).body)).toEqual([P(admin)]);
 
-    // a blank name: the synthetic address is never a label, so the project lead is not drawn, even to themselves
+    // a blank name falls to a REAL address (R3): the guest, emptied of her name, is labelled by her address
+    await db.pool.query('UPDATE "user" SET name = $1 WHERE id = $2', ['', w().guest]);
+    expect((await ring('guest', P(w().guest))).body.center).toEqual(personCentre(w().guest, 'guest@kg-self.test'));
+    await db.pool.query('UPDATE "user" SET name = $1 WHERE id = $2', [NAMES.guest, w().guest]);
+    // a blank name with only a synthetic address: never a label, so the project lead is not drawn, even to themselves
     const lead = read.userIds.projectLead;
     expect((await ring('projectLead', P(lead))).body.center).toEqual(personCentre(lead, PHONE_NAMES.projectLead));
     await db.pool.query('UPDATE "user" SET name = $1 WHERE id = $2', ['  ', lead]);
