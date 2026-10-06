@@ -48,7 +48,7 @@ function namesAPath(key: string, audit: Readonly<Record<string, WriteAudit>>): b
   return path !== undefined && audit[tool!]?.paths?.[path] !== undefined;
 }
 
-describe('27.517–27.518 the D2 audit: rendered by history, on an app surface, with a remove path', () => {
+describe('27.517–27.518, 27.671–27.672 the D2 audit: rendered by history, on an app surface, with a remove path, per tool and per path', () => {
   it('27.517 the computed failures of every tool and every path EQUAL the frozen ratchet (it may only shrink); control: the concept tools pass history', () => {
     // Control: ROOT is the repo root. A wrong ROOT fails EVERY surface leg, and the first run's paste would freeze that.
     expect(existsSync(`${ROOT}packages/app-core/src/views/history-copy.ts`)).toBe(true);

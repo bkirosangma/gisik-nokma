@@ -80,7 +80,7 @@ function censusOf(row: WriteAudit): string[] {
     .map(([type, acts]) => `${type}: ${acts.length === 0 ? 'no act' : acts.join(' + ')}${row.events.includes(type) ? '' : ' (not in events)'}`);
 }
 
-describe('27.515–27.516 the D2 audit, MCP side', () => {
+describe('27.515–27.516, 27.670 the D2 audit, MCP side', () => {
   it('27.515 every tool is classified exactly once; control: an unclassified name is reported', () => {
     const names = allTools(fakeSession()).map((tool) => tool.name);
     const classified = (name: string) => Number(name in MCP_WRITE_AUDIT) + Number(MCP_READ_ONLY_TOOLS.includes(name));
