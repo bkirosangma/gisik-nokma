@@ -24,8 +24,9 @@
  */
 
 /**
- * Everything a slot can hold. The scoped ones (all but `notes` and `inbox`) need a workspace to resolve. `drafts` (drafts
- * T8 FIX 1, planner ruling B, case 28.198) is offered and never in the default: below 1025px More is how Drafts is reached.
+ * Everything a slot can hold. The scoped ones (all but `notes`, `inbox` and `my-work`) need a workspace to resolve. `drafts`
+ * (drafts T8 FIX 1, planner ruling B, case 28.198) is offered and never in the default: below 1025px More is how Drafts is
+ * reached.
  */
 export type BarDestination =
   | 'board'

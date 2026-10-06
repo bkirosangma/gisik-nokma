@@ -1,3 +1,4 @@
+import { ATTENTION_SHOW_VALUES, type AttentionShow } from '@gisik-nokma/domain';
 import { z } from 'zod';
 import { NOTIFICATION_KINDS, notificationPreferencesSchema, type NotificationKind } from '@gisik-nokma/domain';
 import { HttpError } from '../http-client.js';
@@ -11,6 +12,10 @@ import { postJson, putJson } from './submit.js';
  * caller's own inbox (notifications, invitations); MCP sweep 2 T6 adds the caller's notification
  * preferences and saved filters. Every route here is one the app already uses and every
  * 404 is the product's one sentence — a stranger cannot tell a missing workspace from one they may not see.
+ *
+ * My-work-global T5: `my_work` and `get_attention` are GLOBAL when `workspaceId` is absent — one
+ * `/v1/me/workspaces` read, archived workspaces skipped, then one read per workspace, a workspace answering
+ * 404 left out — and `get_attention` takes `show` (default created + assigned), like the `/my-work` page.
  */
 const id = z.string().min(1);
 const enc = encodeURIComponent;
@@ -18,6 +23,73 @@ const enc = encodeURIComponent;
 const notificationArgs = { unreadOnly: z.boolean().optional(), cursor: id.optional(), limit: z.number().int().min(1).max(100).optional() };
 const markShape = { ids: z.array(id).min(1).max(100).optional(), all: z.literal(true).optional() };
 const answerSchema = z.enum(['accept', 'decline']);
+const showSchema = z.array(z.enum(ATTENTION_SHOW_VALUES as [AttentionShow, ...AttentionShow[]])).min(1);
+const workArgs = { workspaceId: id.optional() };
+const attentionArgs = { workspaceId: id.optional(), show: showSchema.optional() };
+/** The `/my-work` page's default "Show" (spec D2): only tickets the caller created or is assigned. */
+const DEFAULT_SHOW: readonly AttentionShow[] = ['created', 'assigned'];
+
+/** The attention route answers a `show` value the caller's role in THAT workspace does not allow with
+ *  `400 { error: 'invalid_query' }` and names nothing (`read/attention-show.ts`). On its own that reaches an
+ *  assistant as "answered 400"; this says what each value needs and how to ask instead. The tool only ever
+ *  sends one string of known values, so a role is the one thing the route can refuse here. */
+const SHOW_REFUSED_SENTENCE =
+  "invalid_query: show was refused for this workspace. 'ws-admin' needs the owner or admin role in it, and " +
+  "'project-admin' needs a project you run in it; leave out workspaceId to ask every workspace for only what it allows.";
+
+function isInvalidQuery(body: unknown): boolean {
+  return typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'invalid_query';
+}
+
+/** One `/v1/me/workspaces` row, the fields the fan-out reads. `adminProjectIds` is absent on an older server. */
+type MyWorkspace = { workspaceId: string; name: string | null; role: string; archived: boolean; adminProjectIds?: string[] };
+
+/**
+ * The part of `show` ONE workspace may be asked for, in canonical order and once each: `ws-admin` only where
+ * the caller owns or runs THAT workspace, `project-admin` only where they run a project in it — the attention
+ * route refuses either elsewhere (400 `invalid_query`). The same rule as `showForWorkspace` (my-work-global T3,
+ * app-core), inlined because this package does not depend on app-core. Empty = the workspace is not asked.
+ */
+function showForWorkspace(workspace: MyWorkspace, show: readonly AttentionShow[]): AttentionShow[] {
+  return ATTENTION_SHOW_VALUES.filter(
+    (value) =>
+      show.includes(value) &&
+      (value === 'created' ||
+        value === 'assigned' ||
+        (value === 'ws-admin' && (workspace.role === 'owner' || workspace.role === 'admin')) ||
+        (value === 'project-admin' && (workspace.adminProjectIds ?? []).length > 0)),
+  );
+}
+
+/** The `?show=` value: the enum members need no encoding, and a literal comma is what the route splits on. */
+const showQuery = (show: readonly AttentionShow[]): string => ATTENTION_SHOW_VALUES.filter((value) => show.includes(value)).join(',');
+
+/**
+ * Reads every live workspace of the caller, in `/v1/me/workspaces` order. `read` answering `undefined` skips
+ * that workspace; a 404 (the workspace went away, or out of sight, since the list) drops it alone; any other
+ * failure fails the whole call rather than return a partial answer that looks complete.
+ */
+async function eachLiveWorkspace<T>(
+  session: Session,
+  read: (workspace: MyWorkspace) => Promise<T> | undefined,
+): Promise<Array<{ workspace: MyWorkspace; body: T }>> {
+  const { workspaces } = (await session.get('/v1/me/workspaces')) as { workspaces: MyWorkspace[] };
+  const answers = await Promise.all(
+    workspaces
+      .filter((workspace) => !workspace.archived)
+      .map(async (workspace): Promise<{ workspace: MyWorkspace; body: T } | null> => {
+        const pending = read(workspace);
+        if (pending === undefined) return null;
+        try {
+          return { workspace, body: await pending };
+        } catch (error) {
+          if (error instanceof HttpError && error.status === 404) return null;
+          throw error;
+        }
+      }),
+  );
+  return answers.filter((answer): answer is { workspace: MyWorkspace; body: T } => answer !== null);
+}
 
 /** Unread notifications are paged in 100s and at most ten pages are marked in one call. */
 const MARK_ALL_PAGES = 10;
@@ -76,20 +148,43 @@ export function discoveryTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'my_work',
-      description: 'What is on your plate in one workspace: the tickets assigned to you or that you collaborate on, grouped the way the My Work screen groups them.',
-      inputSchema: { workspaceId: id },
+      description:
+        'What is on your plate: the tickets assigned to you or that you collaborate on, across all your workspaces, grouped the way the My Work screen groups them; pass workspaceId to limit it to one workspace.',
+      inputSchema: workArgs,
       handler: async (args) => {
-        const { workspaceId } = z.object({ workspaceId: id }).parse(args);
-        return readOrNotFound(session, `/v1/me/work?${new URLSearchParams({ workspaceId }).toString()}`, 'workspace');
+        const { workspaceId } = z.object(workArgs).parse(args);
+        const work = (ws: string) => `/v1/me/work?${new URLSearchParams({ workspaceId: ws }).toString()}`;
+        if (workspaceId !== undefined) return readOrNotFound(session, work(workspaceId), 'workspace');
+        const read = await eachLiveWorkspace(session, (workspace) => session.get(work(workspace.workspaceId)) as Promise<Record<string, unknown>>);
+        return { workspaces: read.map(({ workspace, body }) => ({ ...body, workspaceId: workspace.workspaceId, name: workspace.name })) };
       },
     },
     {
       name: 'get_attention',
-      description: 'What needs attention in a workspace: overdue, due soon, stale and blocked work, as the attention strip shows it.',
-      inputSchema: { workspaceId: id },
+      description:
+        "What needs your attention: overdue, due soon, stale and blocked work. By default only tickets you created or that are assigned to you, across all your workspaces; pass show to include 'ws-admin' or 'project-admin' tickets, and workspaceId to limit it to one workspace. With a workspaceId, a show value your role there does not allow is refused; without one, each workspace is asked only for what it allows.",
+      inputSchema: attentionArgs,
       handler: async (args) => {
-        const { workspaceId } = z.object({ workspaceId: id }).parse(args);
-        return readOrNotFound(session, `/v1/workspaces/${enc(workspaceId)}/attention`, 'workspace');
+        const a = z.object(attentionArgs).parse(args);
+        const show = a.show ?? DEFAULT_SHOW;
+        const attention = (ws: string, part: readonly AttentionShow[]) => `/v1/workspaces/${enc(ws)}/attention?show=${showQuery(part)}`;
+        // One named workspace is asked for the whole selection, never narrowed: a value the caller's role there
+        // does not allow is the route's 400, answered with the sentence that says what each value needs.
+        if (a.workspaceId !== undefined) {
+          try {
+            return await readOrNotFound(session, attention(a.workspaceId, show), 'workspace');
+          } catch (error) {
+            if (error instanceof HttpError && error.status === 400 && isInvalidQuery(error.body)) {
+              throw new Error(SHOW_REFUSED_SENTENCE, { cause: error });
+            }
+            throw error;
+          }
+        }
+        const read = await eachLiveWorkspace(session, (workspace) => {
+          const part = showForWorkspace(workspace, show);
+          return part.length === 0 ? undefined : (session.get(attention(workspace.workspaceId, part)) as Promise<{ items: unknown[] }>);
+        });
+        return { workspaces: read.map(({ workspace, body }) => ({ workspaceId: workspace.workspaceId, name: workspace.name, items: body.items })) };
       },
     },
     {

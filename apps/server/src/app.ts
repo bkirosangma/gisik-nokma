@@ -35,6 +35,7 @@ import { registerMcpHttpRoute } from './routes/mcp-http.js';
 import { registerMcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
+import { registerMyWorkPreferencesRoutes } from './routes/my-work-preferences.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { LogInviteMailer, type InviteMailer } from './invites/invite-mailer.js';
@@ -1091,6 +1092,7 @@ export function buildApp(
   // there is no workspace here to be a member OF — the Inbox itself is a
   // global route, and so is this.
   registerNotificationPreferencesRoutes(app, { pool: deps.pool }, requireSession);
+  registerMyWorkPreferencesRoutes(app, { pool: deps.pool }, requireSession);
 
   registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
 

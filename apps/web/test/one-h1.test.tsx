@@ -55,8 +55,11 @@ const ALLOWED_DOUBLES: Record<string, { count: number; why: string }> = {
     why: 'the same delegate file: the route mounts the New pane, never both',
   },
 };
-/** Routes that never paint: they redirect. Empty since `/` became Home (spec E, 27.625); kept so a new redirect has a home. */
-const REDIRECTS: string[] = [];
+/**
+ * Routes that never paint: they redirect. `/` left it when it became Home (spec E, 27.625); the per-workspace My work
+ * route joined it when My work went global (my-work-global T4, 30.040).
+ */
+const REDIRECTS: string[] = ['apps/web/app/w/[workspaceId]/my-work/page.tsx'];
 
 /** A heading element at level 1, written literally or chosen by a `heading = 'h1'` default. */
 const H1 = /<h1\b|heading\s*=\s*'h1'|<h1>/g;

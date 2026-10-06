@@ -49,6 +49,7 @@ export * from './read-models-flow.js';
 export * from './flow-read.js';
 export * from './notifications.js';
 export * from './notification-preferences.js';
+export * from './my-work-preferences.js';
 export * from './events/lifecycle-events.js';
 export * from './lifecycle.js';
 export * from './purge.js';

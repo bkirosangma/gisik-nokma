@@ -1351,7 +1351,12 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     // it is served to EVERY caller, guests included: it is not a count and not a
     // name of something the caller cannot see, it is half of every key on a
     // ticket they ARE shown.
+    // `adminProjectIds` joined with my-work-global T1 (30.011) and IS read by
+    // the client (`WorkspaceRef.adminProjectIds`, optional there, mapped to
+    // `[]` when absent): served to every caller, `[]` when they administer no
+    // project in this workspace.
     expect(Object.keys(ref).sort()).toEqual([
+      'adminProjectIds',
       'archived',
       'memberCount',
       'name',

@@ -63,7 +63,8 @@ describe('23.195 empty states point to a next step (web)', () => {
     render(emptyInbox());
     await screen.findByText(/^Nothing in your inbox\./);
     const next = await screen.findByRole('link', { name: 'Open My work' });
-    expect(next.getAttribute('href')).toBe('/w/ws_7/my-work');
+    // My work is global (my-work-global T4); the remembered workspace still decides that this step is offered.
+    expect(next.getAttribute('href')).toBe('/my-work');
     expect(screen.queryByRole('link', { name: 'Choose a workspace' })).toBeNull();
   });
 

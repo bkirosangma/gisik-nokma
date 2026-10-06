@@ -416,8 +416,8 @@ describe('GET /v1/me/workspaces — the directory', () => {
         // absent one is a route that stopped serving it, which the client's
         // mapper refuses outright. Both are DERIVED here, because `found()`
         // enters no prefix: 'Alpha' -> AL, 'Beta' -> BE.
-        { workspaceId: a, name: 'Alpha', prefix: 'AL', role: 'owner', archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
-        { workspaceId: b, name: 'Beta', prefix: 'BE', role: 'owner', archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: a, name: 'Alpha', prefix: 'AL', role: 'owner', adminProjectIds: [], archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: b, name: 'Beta', prefix: 'BE', role: 'owner', adminProjectIds: [], archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
       ].sort((x, y) => x.workspaceId.localeCompare(y.workspaceId)),
     );
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
@@ -481,7 +481,7 @@ describe('GET /v1/me/workspaces — the directory', () => {
         // prefix is not a count and not a name of something they cannot see —
         // it is half of every key they will read on a ticket they ARE shown,
         // and a guest holding one ticket needs it to say which ticket it is.
-        { workspaceId, name: 'Hosted', prefix: 'HO', role: 'guest', archived: false, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId, name: 'Hosted', prefix: 'HO', role: 'guest', adminProjectIds: [], archived: false, nameRestrictedProjectCount: 0, projects: [] },
       ],
     });
   });
@@ -509,6 +509,8 @@ describe('GET /v1/me/workspaces — the directory', () => {
       workspaceId,
       name: 'Leaving',
       role: 'owner',
+      // My-work-global T1 (30.011): an owner with no project-admin roster row.
+      adminProjectIds: [],
       archived: false,
       // `toContainEqual` is a DEEP equality on the whole object, so the new
       // fields belong here too — this is not a partial match that would have

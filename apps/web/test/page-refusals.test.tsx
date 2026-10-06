@@ -5,6 +5,7 @@ import { HttpError, LIST_TOO_LARGE_ABSENCE, ServingGapError } from '@gisik-nokma
 import { Providers } from '../src/providers.js';
 import { EXPIRED_SESSION_COPY, isExpiredSession, signInWithNext } from '../src/expired-session.js';
 import { stubServices } from './helpers/stub-services.js';
+import { clearMyWorkspacesCache } from '../src/use-my-workspaces.js';
 
 /**
  * ## THE ADAPTATION THIS FILE EXISTS TO PROVE
@@ -66,13 +67,36 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import MyWorkPage from '../app/w/[workspaceId]/my-work/page.js';
+import MyWorkPage from '../app/my-work/page.js';
 import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
 import WorkspacesPage from '../app/workspaces/page.js';
 
 afterEach(() => {
   push.mockClear();
+  clearMyWorkspacesCache();
 });
+
+/**
+ * My work is ONE global page now (my-work-global T4): it asks each of the viewer's workspaces,
+ * so every mount of it below names one. Without it the page stops at the workspaces refusal and
+ * never makes the two reads these cases are about.
+ */
+const MY_WORKSPACES = {
+  getMyWorkspaces: async () => [
+    {
+      id: '01J9WORKSPACE0000000000000',
+      name: 'Garo Hills Logistics',
+      prefix: 'GH',
+      role: 'member' as const,
+      memberCount: 1,
+      nameRestrictedProjectCount: 0,
+      archived: false,
+      projects: [
+        { id: '01J9PROJECT000000000000000', name: 'Shop floor', prefix: 'SF', archived: false, ticketCount: 1, blockedCount: 0 },
+      ],
+    },
+  ],
+};
 
 /**
  * A board carrying a DONE card, for 12.387. The board read takes no filter, so
@@ -140,6 +164,7 @@ const BOARD_WITH_DONE = {
 const ATTENTION_ITEM = {
   kind: 'due-soon' as const,
   ticketId: '01J9TICKET00000000000000AT',
+  workspaceId: '01J9WORKSPACE0000000000000',
   projectId: '01J9PROJECT000000000000000',
   title: 'File the GST return',
   reason: 'Needed by 2026-08-30 — due within 7 days.',
@@ -176,6 +201,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     render(
       <Providers
         services={stubServices({
+          ...MY_WORKSPACES,
           getMyWork: gap('getMyWork', 'WorkItem.stateName', '/v1/me/work'),
           getAttention: gap(
             'getAttention',
@@ -320,7 +346,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
   it('My work: the same read still renders the strip', async () => {
     const getAttention = vi.fn(async () => [ATTENTION_ITEM]);
     render(
-      <Providers services={stubServices({ getAttention })}>
+      <Providers services={stubServices({ ...MY_WORKSPACES, getAttention })}>
         <MyWorkPage />
       </Providers>,
     );
@@ -675,6 +701,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     render(
       <Providers
         services={stubServices({
+          ...MY_WORKSPACES,
           getMyWork: expired('/v1/me/work'),
           getAttention: expired('/v1/workspaces/w1/attention'),
         })}
@@ -763,7 +790,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     // `stubServices({})` is the shipped server's own state: four refusals whose
     // messages carry route names, field names and owners.
     render(
-      <Providers services={stubServices({})}>
+      <Providers services={stubServices(MY_WORKSPACES)}>
         <MyWorkPage />
       </Providers>,
     );
@@ -791,6 +818,7 @@ describe('17.070 the shared refusal panel says what to DO (E5-30)', () => {
     render(
       <Providers
         services={stubServices({
+          ...MY_WORKSPACES,
           getMyWork: () => Promise.reject(new Error('HTTP 500 for /v1/me/work')),
         })}
       >
