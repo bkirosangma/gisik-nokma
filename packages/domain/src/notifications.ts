@@ -31,6 +31,8 @@ export const NOTIFICATION_KINDS = [
   'contested-claim',
   'date-approaching',
   'stale-ticket',
+  'flow-ready',
+  'flow-reopened',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -148,12 +150,54 @@ export const staleTicketNotificationPayloadSchema = z
   .strict();
 export type StaleTicketNotificationPayload = z.infer<typeof staleTicketNotificationPayloadSchema>;
 
+/**
+ * A ticket became ready to start because the ticket it waits for was closed (or a Decision chose its branch; wtg2 T18,
+ * NT-1). `becauseTicketId`, `becauseTitle` and `label` are NULL when the recipient cannot see the source: visibility is
+ * decided ONCE, at delivery, and the row is never redacted on read (the ruling above), so a hidden source is stored as
+ * absent. Null, never a missing key: the three are required, so a payload that forgot one is refused.
+ */
+export const flowReadyNotificationPayloadSchema = z
+  .object({
+    ticketId: nonEmpty,
+    ticketTitle: z.string(),
+    becauseTicketId: nonEmpty.nullable(),
+    becauseTitle: z.string().nullable(),
+    label: z.string().nullable(),
+    eventId: nonEmpty,
+    clientTime: nonEmpty,
+    serverTime: nonEmpty,
+  })
+  .strict();
+export type FlowReadyNotificationPayload = z.infer<typeof flowReadyNotificationPayloadSchema>;
+
+/**
+ * A Decision's choice moved this ticket back (to its workflow's start, or to Backlog when `toBacklog`; wtg2 T18). The
+ * Decision's members are NULL for a recipient who cannot see it, as `flowReadyNotificationPayloadSchema`'s are.
+ */
+export const flowReopenedNotificationPayloadSchema = z
+  .object({
+    ticketId: nonEmpty,
+    ticketTitle: z.string(),
+    decisionTicketId: nonEmpty.nullable(),
+    decisionTitle: z.string().nullable(),
+    outcome: z.string().nullable(),
+    pass: z.number().int().min(1),
+    toBacklog: z.boolean(),
+    eventId: nonEmpty,
+    clientTime: nonEmpty,
+    serverTime: nonEmpty,
+  })
+  .strict();
+export type FlowReopenedNotificationPayload = z.infer<typeof flowReopenedNotificationPayloadSchema>;
+
 export const notificationPayloadSchemaByKind = {
   assignment: assignmentNotificationPayloadSchema,
   mention: z.union([mentionNotificationPayloadSchema, noteMentionNotificationPayloadSchema]),
   'contested-claim': contestedClaimNotificationPayloadSchema,
   'date-approaching': dateApproachingNotificationPayloadSchema,
   'stale-ticket': staleTicketNotificationPayloadSchema,
+  'flow-ready': flowReadyNotificationPayloadSchema,
+  'flow-reopened': flowReopenedNotificationPayloadSchema,
 } as const;
 
 export type NotificationPayload =
@@ -162,7 +206,9 @@ export type NotificationPayload =
   | NoteMentionNotificationPayload
   | ContestedClaimNotificationPayload
   | DateApproachingNotificationPayload
-  | StaleTicketNotificationPayload;
+  | StaleTicketNotificationPayload
+  | FlowReadyNotificationPayload
+  | FlowReopenedNotificationPayload;
 
 export type Notification = {
   id: string;
