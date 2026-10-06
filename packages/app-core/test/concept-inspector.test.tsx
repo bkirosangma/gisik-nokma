@@ -565,3 +565,158 @@ describe('27.522–27.538 the clauses one path never reaches (the P11 census)', 
     expect(screen.queryByText('This concept could not be loaded.')).toBeNull();
   });
 });
+
+describe('27.523, 27.536 focus follows the rename form and the Delete question, Esc stays in the panel, and an answer is shown only for the item it was read for', () => {
+  const heading = () => screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+  const baseProps = () => ({ workspaceId: WS, make: makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' }), nameOf: (id: string) => id, onChanged: vi.fn(), onRefusal: vi.fn() });
+  const OTHER = '01J9CONCEPTOTHER0000000000';
+  const B = () => suggestedItem({ ref: `concept:${OTHER_SUG.id}`, id: OTHER_SUG.id, label: OTHER_SUG.label });
+
+  it('27.523 keyboard focus follows Rename: into the "Concept name" field with its text selected, from the keyboard or a click; back on Rename after Cancel and after a committed Save; the Delete question\'s Cancel puts it back on Delete; control: the first draw takes no focus, and the question focuses its own Cancel', async () => {
+    const { user, ds } = mount({ ingest: (events) => events.map((e) => committed(e)) });
+    await heading();
+    // control: neither the first draw nor the read landing takes focus (the view's keys stay with the page)
+    expect(document.activeElement).toBe(document.body);
+    // control: the Delete question focuses its Cancel; that Cancel puts focus back on Delete
+    const del = screen.getByRole('button', { name: 'Delete' });
+    await user.click(del);
+    const ask = screen.getByRole('alertdialog', { name: 'Delete concept' });
+    expect(document.activeElement).toBe(within(ask).getByRole('button', { name: 'Cancel' }));
+    await user.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(document.activeElement).toBe(del);
+    // Rename from the keyboard: the field takes focus with its text selected, so typing replaces the name
+    screen.getByRole('button', { name: 'Rename' }).focus();
+    await user.keyboard('{Enter}');
+    const field = screen.getByRole('textbox', { name: 'Concept name' }) as HTMLInputElement;
+    expect(document.activeElement).toBe(field);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 'Scroll position on phone sheets'.length]);
+    // Cancel puts it back on Rename
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Rename' })));
+    // a click opens it the same way, and a committed Save (Enter in the field) puts focus back on Rename
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Concept name' }));
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Rename' })));
+    expect(screen.queryByRole('textbox', { name: 'Concept name' })).toBeNull();
+  });
+
+  it('27.523 Esc in the rename form or in the Delete question cancels it, focus going back to Rename or Delete, and goes no further: it is consumed (a Sheet around the view keeps its own Escape) and reaches no handler outside the panel (the view\'s Back); control: Esc on Rename with nothing open is left to the page', async () => {
+    const escapes = vi.fn();
+    const ds = createFakeDataSource({ getConcept: async () => concept() });
+    render(
+      <div onKeyDown={(e) => (e.key === 'Escape' ? escapes() : undefined)}>
+        <ConceptInspector item={confirmedItem()} {...baseProps()} dataSource={ds} />
+      </div>,
+    );
+    await heading();
+    const user = userEvent.setup();
+    // control: with nothing open, Esc is not the panel's (fireEvent answers false when a handler prevented it)
+    expect(fireEvent.keyDown(screen.getByRole('button', { name: 'Rename' }), { key: 'Escape' })).toBe(true);
+    expect(escapes).toHaveBeenCalledTimes(1);
+    // the rename form: Esc abandons the typed name
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.type(screen.getByRole('textbox', { name: 'Concept name' }), ' typed');
+    expect(fireEvent.keyDown(screen.getByRole('textbox', { name: 'Concept name' }), { key: 'Escape' })).toBe(false);
+    expect(screen.queryByRole('textbox', { name: 'Concept name' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 3, name: 'Scroll position on phone sheets' })).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Rename' })));
+    // the Delete question
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    const cancel = within(screen.getByRole('alertdialog', { name: 'Delete concept' })).getByRole('button', { name: 'Cancel' });
+    expect(fireEvent.keyDown(cancel, { key: 'Escape' })).toBe(false);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete' }));
+    // neither Esc left the panel, and nothing was written
+    expect(escapes).toHaveBeenCalledTimes(1);
+    expect(ds.ingested).toEqual([]);
+  });
+
+  it('27.536 a failed read is shown only for the concept it was read for: re-pointed after it, the inspector shows the wait until THAT concept answers, then that concept; control: the failure is shown for its own concept', async () => {
+    const failures: Array<[unknown, string]> = [
+      [new Error('network down'), 'This concept could not be loaded.'],
+      [new HttpError(404, `/v1/concepts/${CP}`), 'This concept is no longer available to you.'],
+    ];
+    for (const [why, line] of failures) {
+      const reads = new Map<string, { answer: (v: ConceptView) => void; fail: (e: unknown) => void }>();
+      const ds = createFakeDataSource({ getConcept: (id: string) => new Promise<ConceptView>((answer, fail) => reads.set(id, { answer, fail })) });
+      const props = { ...baseProps(), dataSource: ds };
+      const { rerender } = render(<ConceptInspector item={confirmedItem()} {...props} />);
+      act(() => reads.get(CP)!.fail(why));
+      expect(await screen.findByText(line), line).toBeInTheDocument(); // control
+      rerender(<ConceptInspector item={confirmedItem({ ref: `concept:${OTHER}`, id: OTHER, label: 'Board performance' })} {...props} />);
+      await settle();
+      expect(screen.queryByText(line), line).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Try again' }), line).toBeNull();
+      expect(screen.getByText('Loading concept'), line).toBeInTheDocument();
+      act(() => reads.get(OTHER)!.answer(concept({ id: OTHER, name: 'Board performance' })));
+      expect(await screen.findByRole('heading', { level: 3, name: 'Board performance' }), line).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it('27.536 a suggestion inspector re-pointed from A to B shows B even when A\'s list answers after B\'s; control: A alone, answered, shows A', async () => {
+    const lists: Array<(v: SuggestionView[]) => void> = [];
+    const ds = createFakeDataSource({
+      getSuggestions: () => new Promise<SuggestionView[]>((answer) => lists.push(answer)),
+      getConceptAudience: async (): Promise<ConceptAudienceResponse> => ({ conceptId: null, members: 9, before: 9, after: 9 }),
+    });
+    const props = { ...baseProps(), dataSource: ds };
+    // control: A alone shows A
+    const alone = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    act(() => lists[0]!([OTHER_SUG, SUG]));
+    expect(await screen.findByRole('heading', { level: 3, name: SUG.label })).toBeInTheDocument();
+    alone.unmount();
+    lists.length = 0;
+    const { rerender } = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    rerender(<ConceptInspector item={B()} {...props} />); // A's list is still out
+    act(() => lists[1]!([OTHER_SUG, SUG])); // B's answers first
+    expect(await screen.findByRole('heading', { level: 3, name: OTHER_SUG.label })).toBeInTheDocument();
+    act(() => lists[0]!([OTHER_SUG, SUG])); // A's answers last
+    await settle();
+    expect(screen.getByRole('heading', { level: 3, name: OTHER_SUG.label })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: SUG.label })).toBeNull();
+  });
+
+  it('27.536 the narrowing preview answers only for the suggestion on screen: re-pointed from A to B, A\'s late preview neither writes its sentence under B nor, failing, clears B\'s; control: A alone shows its own sentence', async () => {
+    const previews: Array<{ answer: (v: ConceptAudienceResponse) => void; fail: (e: unknown) => void }> = [];
+    const ds = createFakeDataSource({
+      getSuggestions: async () => [OTHER_SUG, SUG],
+      getConceptAudience: () => new Promise<ConceptAudienceResponse>((answer, fail) => previews.push({ answer, fail })),
+    });
+    const props = { ...baseProps(), dataSource: ds };
+    const seeing = (after: number): ConceptAudienceResponse => ({ conceptId: null, members: 9, before: 9, after });
+    const fewer = (n: number) => `Fewer people will see this concept: ${String(n)} of 9 members`;
+    // control: A alone shows its own sentence
+    const alone = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    await waitFor(() => expect(previews).toHaveLength(1));
+    act(() => previews[0]!.answer(seeing(3)));
+    expect(await screen.findByText(fewer(3))).toBeInTheDocument();
+    alone.unmount();
+    // A's preview answers after B's, which narrows nothing: no sentence under B
+    previews.length = 0;
+    const one = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    await waitFor(() => expect(previews).toHaveLength(1)); // A on screen, its preview out
+    one.rerender(<ConceptInspector item={B()} {...props} />);
+    await waitFor(() => expect(previews).toHaveLength(2));
+    await screen.findByRole('heading', { level: 3, name: OTHER_SUG.label });
+    act(() => previews[1]!.answer(seeing(9)));
+    act(() => previews[0]!.answer(seeing(3))); // A's, late
+    await settle();
+    expect(screen.queryByText(/Fewer people will see this concept/)).toBeNull();
+    one.unmount();
+    // A's preview FAILS after B's narrowed: B's sentence stays
+    previews.length = 0;
+    const two = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    await waitFor(() => expect(previews).toHaveLength(1));
+    two.rerender(<ConceptInspector item={B()} {...props} />);
+    await waitFor(() => expect(previews).toHaveLength(2));
+    act(() => previews[1]!.answer(seeing(5)));
+    expect(await screen.findByText(fewer(5))).toBeInTheDocument();
+    act(() => previews[0]!.fail(new Error('the older preview failed late')));
+    await settle();
+    expect(screen.getByText(fewer(5))).toBeInTheDocument();
+  });
+});

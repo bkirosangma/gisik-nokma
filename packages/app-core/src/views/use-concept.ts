@@ -26,7 +26,8 @@ function isNotFound(err: unknown): boolean {
  */
 export function useConcept(dataSource: DataSource, conceptId: string | null): ConceptRead {
   const [data, setData] = useState<ConceptView | null>(null);
-  const [error, setError] = useState<ConceptRead['error']>(null);
+  // A failure is kept with the id it was read for, as a view carries its own.
+  const [error, setError] = useState<{ id: string; is: NonNullable<ConceptRead['error']> } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const issued = useRef(0);
   useEffect(() => {
@@ -41,11 +42,12 @@ export function useConcept(dataSource: DataSource, conceptId: string | null): Co
       (err: unknown) => {
         if (mine !== issued.current) return;
         setData(null);
-        setError(isNotFound(err) ? 'unavailable' : 'failed');
+        setError({ id: conceptId, is: isNotFound(err) ? 'unavailable' : 'failed' });
       },
     );
   }, [dataSource, conceptId, attempt]);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  // An answer for another id (the inspector moved on) is not this one's: it is never shown under the new id.
-  return { data: data !== null && data.id === conceptId ? data : null, error, reload };
+  // An answer for another id (the inspector moved on), a concept or a failure, is not this one's: it is never shown
+  // under the new id, which shows the wait until its own read answers.
+  return { data: data !== null && data.id === conceptId ? data : null, error: error !== null && error.id === conceptId ? error.is : null, reload };
 }
