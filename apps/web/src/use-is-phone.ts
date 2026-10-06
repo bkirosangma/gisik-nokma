@@ -21,6 +21,10 @@ export const PHONE_QUERY = '(max-width: 40rem)';
  * AMENDED 2026-10-02 (neo F-2, 23.330): the project page also reads it, to move the workflow picker and "Only tickets in
  * progress" into the Filters sheet on a phone (the header keeps them inline above 40rem).
  *
+ * AMENDED 2026-10-06 (Knowledge Graph spec E T4): Home's graph reads it too, as the Knowledge Graph panel does (KG-C
+ * T9): on a phone the view takes its phone form (`config: 'phone'`: one clear hop, the folded bar, the inspector card),
+ * and Home offers no hop control.
+ *
  * `false` on the server and wherever `matchMedia` does not exist. It is a `useSyncExternalStore` (smoothness T8, case 25.141/25.144,
  * audit SM-08): the server snapshot is `false`, so on a HARD LOAD the server markup paints and hydrates first (the CSS belt keeps the
  * corner links hidden in that frame) and the client answer follows the hydration commit. On every CLIENT mount (each route hop
