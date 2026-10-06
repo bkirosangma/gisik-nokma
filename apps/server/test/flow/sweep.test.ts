@@ -17,6 +17,7 @@ import {
   SHIPPED_TASK,
   stateOf,
   step,
+  TASK,
   WS,
 } from './flow-world.js';
 
@@ -246,6 +247,26 @@ describe('29.226 the SELECT is a superset and the rule decides', () => {
     expect(logs.filter((m) => /initial state .* terminal/.test(m))).toEqual([
       `flow promotion skipped for ticket ${sh}: the initial state shipped of its workflow is terminal`,
     ]);
+  });
+
+  it('29.226 a target in a trashed PROJECT is never selected (LIVE_TICKET_WHERE\'s project clause); control: the same source\'s live-project target is offered and promotes', async () => {
+    // flow-world has no proj_projects row for PROJECT (its NOT EXISTS passes), so the trashed project is a row of its own.
+    const TRASHED_PROJECT = '01J9GPRJTRASHED00000000000';
+    await db.pool.query(
+      `INSERT INTO proj_projects (project_id, workspace_id, name, founding_name, created_by, created_at, deleted_at, deleted_by)
+       VALUES ($1, $2, 'Gone', 'Gone', $3, now(), now(), $3)`,
+      [TRASHED_PROJECT, WS, PERSON],
+    );
+    const s = await finishedSource();
+    const gone = newUlid();
+    await step(db.pool, gone, 'ticket.created', { typeId: TASK, projectId: TRASHED_PROJECT, parentId: null, title: 'Gone', start: 'backlog' });
+    const live = await addTicket(db.pool);
+    await lead(db.pool, s, gone);
+    await lead(db.pool, s, live);
+    expect(await sweep()).toEqual({ promoted: 1, settled: 0, refused: 0 });
+    expect([await stateOf(db.pool, live), await stateOf(db.pool, gone)]).toEqual(['todo', 'backlog']);
+    // the read count: the trashed project's target was not even offered to the rule (which would also decline it)
+    expect(candidates()).toEqual([[WS, [live]]]);
   });
 });
 

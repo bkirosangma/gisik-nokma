@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -287,6 +287,13 @@ describe('backup-daemon-main — one scheduler for every job', () => {
       await broken.drop();
     }
   }, 60_000);
+  it('29.228 the daemon hands the reader\'s value to the scheduler unscaled and under its own name (source pin: a x10 at the call site only shows as a later first run, which no spawned leg can time)', () => {
+    const source = readFileSync(join(SERVER_DIR, 'src/ops/backup-daemon-main.ts'), 'utf8');
+    expect(source).toContain('const flowSweepEveryMs = flowSweepIntervalMs(process.env.FLOW_SWEEP_INTERVAL_MS);');
+    expect(source).toContain("delayMs: () => requirePositiveIntervalMs(flowSweepEveryMs, 'FLOW_SWEEP_INTERVAL_MS'),");
+    // read once and used once: no second assignment can shadow either line above
+    expect(source.match(/flowSweepEveryMs/g)).toHaveLength(2);
+  });
   /**
    * 6.349 / 6.350 - the `expired-sessions` job the daemon SCHEDULES, run for real. `expired-sessions.test.ts` pins the pieces
    * (`runExpiredSessionSweep`, `sessionSweepIntervalMs`); these pin that `main()` wires them: the job fires, deletes, logs the
