@@ -10129,6 +10129,11 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-kg-concept__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .gn-kg-concept__actions .gn-button--primary { min-height: 2.75rem; padding: 0 1.25rem; font-size: 0.9375rem; }
 .gn-kg-concept__confirm { display: grid; gap: 0.625rem; padding: 0.75rem; background: var(--gn-surface-well); border-radius: var(--gn-radius-card); }
+/* KG-D Task 9: the concept's History disclosure. The ticket History's list (`.gn-history`) in a panel a third as wide, so
+   each headline wraps instead of running past the panel's edge. */
+.gn-kg-concept__history > summary { min-height: 2.75rem; display: flex; align-items: center; font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-subtle); cursor: pointer; }
+.gn-kg-concept__history .gn-history__headline { flex-wrap: wrap; row-gap: 0.125rem; }
+.gn-kg-concept__history .gn-history__type { overflow-wrap: anywhere; }
 /* KG: end */
 
 /* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
