@@ -5,8 +5,11 @@ import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { newUlid } from '@gisik-nokma/domain';
+import { applyCommitted, makeCommitted } from './helpers/apply.js';
 import { createTestDatabase } from './helpers/db.js';
 import type { TestDatabase } from './helpers/db.js';
+import { seedNotesFixture } from './helpers/notes-fixture.js';
 
 /**
  * The graceful-shutdown path in `src/index.ts` (SIGTERM / SIGINT).
@@ -372,17 +375,45 @@ describe('graceful shutdown', () => {
 
 describe('the boot starts the one-shot backfills', () => {
   it(
-    '18.529 the real index.ts runs the vocabulary re-derive once the bind re-derive has ended: both markers are written, the vocabulary one last',
+    '18.529 the real index.ts runs the vocabulary re-derive only once the bind re-derive has ended: no vocabulary marker while the bind pass waits on a note, then both, the vocabulary one last',
     async () => {
+      // One note of W2 linked before 18.500 to the fixture's WS ticket: the bind pass's one note, whose entity lock
+      // this test holds, so the child's bind pass waits on it.
+      const world = await seedNotesFixture(db.pool);
+      const W2 = newUlid();
+      const note = newUlid();
+      const inW2 = { workspaceId: W2, actorId: world.ids.author };
+      await applyCommitted(db.pool, [
+        makeCommitted({ ...inW2, entity: { kind: 'workspace', id: W2 }, type: 'workspace.created', payload: { name: 'Elsewhere' } }),
+        makeCommitted({ ...inW2, entity: { kind: 'membership', id: `${W2}:${world.ids.author}` }, type: 'membership.granted', payload: { userId: world.ids.author, role: 'owner' } }),
+        makeCommitted({ ...inW2, entity: { kind: 'note', id: note }, type: 'note.created', payload: { title: 'Linked', homeProjectId: '', scope: { mode: 'workspace' } } }),
+        makeCommitted({ ...inW2, entity: { kind: 'note', id: note }, type: 'note.attached', payload: { ticketId: world.TP } }),
+      ]);
+      const names = ['proj_note_search:workspace-bind', 'proj_note_lexemes:rederive-all'];
       const client = new pg.Client({ connectionString: db.url });
+      const holder = new pg.Client({ connectionString: db.url });
       await client.connect();
+      await holder.connect();
       try {
-        // The boots above wrote both already: start from neither, so this boot must write them.
-        const names = ['proj_note_search:workspace-bind', 'proj_note_lexemes:rederive-all'];
+        // The boots above wrote both markers already: start from neither, so this boot must write them.
         await client.query('DELETE FROM projection_backfills WHERE name = ANY($1::text[])', [names]);
-        const child = await startServer();
+        await holder.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [`note:${note}`]);
         const read = async () =>
           (await client.query<{ name: string; completed_at: Date }>('SELECT name, completed_at FROM projection_backfills WHERE name = ANY($1::text[])', [names])).rows;
+        const child = await startServer();
+        // The haystack: a backend of the child is waiting on the held note lock.
+        const waitingDeadline = Date.now() + 20_000;
+        let waiting = 0;
+        while (Date.now() < waitingDeadline && waiting === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          waiting = (await client.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted")).rows[0]?.n ?? 0;
+        }
+        expect(waiting).toBeGreaterThan(0);
+        // A vocabulary pass that did not wait would write its marker now (a few workspaces: milliseconds).
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        expect(await read()).toEqual([]);
+
+        await holder.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [`note:${note}`]);
         const deadline = Date.now() + 20_000;
         let rows = await read();
         while (Date.now() < deadline && rows.length < 2) {
@@ -395,9 +426,10 @@ describe('the boot starts the one-shot backfills', () => {
         child.process.kill('SIGTERM');
         expect(await child.exit).toEqual({ code: 0, signal: null });
       } finally {
+        await holder.end();
         await client.end();
       }
     },
-    60_000,
+    90_000,
   );
 });
