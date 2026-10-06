@@ -1,8 +1,8 @@
 /**
  * Knowledge Graph spec D §6 in the ring read (KG-D Task 6): `GET /v1/graph/neighbours?…&groups=concepts` draws the
- * concepts a reader may see (D4: every live item visible), with a `tag` edge to each item. Cases 27.506 and the server
- * half of 27.513 (`test-cases/27-knowledge-graph.md` §27.D, under `<!-- D T6 -->`). 27.507, the suggestion arm, needs
- * Task 5's `sem_suggestions`, which is not on the release tip yet: it stays ❌ and has no test here.
+ * concepts a reader may see (D4: every live item visible), with a `tag` edge to each item, and the model suggestions a
+ * member may see, drawn as concepts with `suggested: true`. Cases 27.506, 27.507 and the server half of 27.513
+ * (`test-cases/27-knowledge-graph.md` §27.D, under `<!-- D T6 -->`).
  *
  * The world is `seedNotesFixture` around seven people who signed in over the wire first, so each can call the route
  * with a bearer. Each gets a real name and address, because the names read never labels a synthetic phone address
@@ -20,11 +20,22 @@
  * - CP2 {TP, TQ}, with TP blocks TQ (a `ticket.link_added`), so ring 1 of TP holds CP2 AND TQ, and the tag between them
  *   is an edge AMONG the ring;
  * - CD {TP}, deleted; CF in another workspace FW.
+ *
+ * Suggestions (27.507) are rows written straight into `sem_suggestions`, as the job writes them (its own tests are
+ * `test/semantic/job.test.ts`), INSIDE the `it` that reads them and removed before it ends (`withSuggestions`): a row
+ * holding TE would otherwise join 27.506's exact two-hop answer from TE. S1 {TP, nProject, nWorkspace} is read by every
+ * non-guest (Rule A); S2 {TE, nProject, nWorkspace} hides ONE item (TE) of three from `memberOut`; SG {TE, nExplicit}
+ * hides nothing from `guestListed`, so only the members-only rule can drop it; SF is another workspace's; SX {TX,
+ * nProject, nWorkspace} reaches `memberOut` only through TX's assignee arm (a per-user arm, as 27.494's).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { newUlid, type GraphRingResponse, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, type GraphPathResponse, type GraphRingResponse, type LedgerEvent } from '@gisik-nokma/domain';
+import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
+import { visibleSuggestions } from '../../src/read/suggestions.js';
 import { readActorNames } from '../../src/routes/builder-reads.js';
+import { itemHash, itemKey, parseItemKey, signatureOf } from '../../src/semantic/signature.js';
 import { buildTestApp } from '../helpers/app.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -62,6 +73,35 @@ async function ring(who: NotesUser, center: string, groups: string, hops = 1): P
 }
 const refs = (r: GraphRingResponse) => r.items.map((item) => item.ref);
 const touching = (r: GraphRingResponse, ref: string) => r.edges.filter((edge) => edge.from === ref || edge.to === ref);
+
+const [S1, S2, SG, SF, SR, SA] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+const LABEL = 'licence · renewal';
+type Cached = { signature: string; itemHashes: string[] };
+/** A row as the job writes one: items in sorted key order, `itemHash` per key, `signatureOf` the keys. */
+async function cache(id: string, items: ItemRef[], workspaceId = world.WS): Promise<Cached> {
+  const keys = items.map((item) => itemKey(item.kind, item.id)).sort();
+  const parsed = keys.map(parseItemKey);
+  const row = { signature: signatureOf(keys), itemHashes: keys.map(itemHash) };
+  await db.pool.query(
+    `INSERT INTO sem_suggestions (id, workspace_id, signature, partition_key, item_kind, item_id, item_hashes, terms, label, score, computed_at)
+     VALUES ($1, $2, $3, 'w', $4, $5, $6, $7, $8, 0.5, '2026-10-06T10:00:00Z')`,
+    [id, workspaceId, row.signature, parsed.map((r) => r.kind), parsed.map((r) => r.id), row.itemHashes, ['licence', 'renewal'], LABEL],
+  );
+  return row;
+}
+/** Writes `rows`, runs `legs`, and removes every row before the `it` ends (each written exactly once). */
+async function withSuggestions(rows: Record<string, { items: ItemRef[]; workspaceId?: string }>, legs: (cached: Record<string, Cached>) => Promise<void>): Promise<void> {
+  const cached: Record<string, Cached> = {};
+  try {
+    for (const [id, row] of Object.entries(rows)) cached[id] = await cache(id, row.items, row.workspaceId);
+    await legs(cached);
+  } finally {
+    const ids = Object.keys(rows);
+    expect((await db.pool.query('DELETE FROM sem_suggestions WHERE id = ANY ($1::text[])', [ids])).rowCount, 'every row is removed before the it ends').toBe(ids.length);
+  }
+}
+const ticket = (id: string): ItemRef => ({ kind: 'ticket', id });
+const note = (id: string): ItemRef => ({ kind: 'note', id });
 
 beforeAll(async () => {
   db = await createTestDatabase();
@@ -159,6 +199,179 @@ describe('27.506 the ring read draws the concepts a reader may see (D4)', () => 
     expect(await getRing('memberIn', query(`concept:${CF}`, 'concepts'))).toEqual(unknown);
     // Control: the owner may centre on CWE.
     expect(refs(await ring('owner', `concept:${CWE}`, 'concepts')).sort()).toEqual([`note:${world.NOTES.nWorkspace}`, `ticket:${world.TE}`].sort());
+  });
+});
+
+describe('27.507 the ring read draws model suggestions as concepts, for members who see every item', () => {
+  const core = () => ({
+    [S1]: { items: [ticket(world.TP), note(world.NOTES.nProject), note(world.NOTES.nWorkspace)] },
+    [S2]: { items: [ticket(world.TE), note(world.NOTES.nProject), note(world.NOTES.nWorkspace)] },
+    [SG]: { items: [ticket(world.TE), note(world.NOTES.nExplicit)] },
+  });
+
+  it('27.507 memberIn gets S1 and its tag edge with suggested: true (CP\'s false); memberOut never gets S2 (TE hidden); guestListed never gets SG although hiddenItems answers []; controls: the owner gets S2 and SG, memberOut gets S1', async () => {
+    await withSuggestions(core(), async () => {
+      const mine = await ring('memberIn', `ticket:${world.TP}`, 'concepts');
+      expect(mine.items.find((item) => item.ref === `concept:${S1}`)).toEqual({
+        ref: `concept:${S1}`, kind: 'concept', id: S1, workspaceId: world.WS, projectId: null,
+        label: LABEL, title: null, category: null, hop: 1, out: false, suggested: true,
+      });
+      expect(mine.edges.find((edge) => edge.id === `tag|concept:${S1}|ticket:${world.TP}`)).toEqual({
+        id: `tag|concept:${S1}|ticket:${world.TP}`, kind: 'tag', from: `concept:${S1}`, to: `ticket:${world.TP}`,
+        snippet: null, addedBy: null, addedAt: null, origin: null, suggested: true,
+      });
+      // The same response draws a confirmed concept and its edge `suggested: false`, so no one hard-coded value passes both.
+      expect(mine.items.find((item) => item.ref === `concept:${CP}`)?.suggested).toBe(false);
+      expect(mine.edges.find((edge) => edge.id === `tag|concept:${CP}|ticket:${world.TP}`)?.suggested).toBe(false);
+
+      // Every item visible: S2 holds TE, which memberOut cannot read (one item of three).
+      const outside = await ring('memberOut', `note:${world.NOTES.nWorkspace}`, 'concepts');
+      expect(refs(outside)).toContain(`concept:${S1}`); // Rule A, and the precondition that the arm runs for this reader at all
+      expect(refs(outside)).not.toContain(`concept:${S2}`);
+      expect(touching(outside, `concept:${S2}`)).toEqual([]);
+      // Control: the owner, who reads TE, gets S2 from the same centre, so its absence above is the visibility rule, not the walk.
+      expect(refs(await ring('owner', `note:${world.NOTES.nWorkspace}`, 'concepts'))).toEqual(expect.arrayContaining([`concept:${S1}`, `concept:${S2}`]));
+
+      // Members only: guestListed reads both of SG's items, so only the guest rule can drop it.
+      const guestEff = await resolveEffectiveRole(db.pool, ids.guestListed, world.WS);
+      expect(await hiddenItems(db.pool, guestEff, ids.guestListed, world.WS, [ticket(world.TE), note(world.NOTES.nExplicit)])).toEqual([]);
+      const guest = await ring('guestListed', `ticket:${world.TE}`, 'concepts');
+      expect(refs(guest)).toContain(`concept:${CE}`); // precondition: the guest's ring is not empty for some other reason
+      expect(refs(guest)).not.toContain(`concept:${SG}`);
+      expect(touching(guest, `concept:${SG}`)).toEqual([]);
+      // Control: the owner gets SG from the same centre.
+      expect(refs(await ring('owner', `ticket:${world.TE}`, 'concepts'))).toEqual(expect.arrayContaining([`concept:${CE}`, `concept:${SG}`]));
+    });
+  });
+
+  it('27.507 a suggestion is a centre too; S2 for memberOut, SG for the guest and another workspace\'s SF are the 404 an unknown id gets', async () => {
+    await withSuggestions({ ...core(), [SF]: { items: [ticket(newUlid()), ticket(newUlid()), ticket(newUlid())], workspaceId: FW } }, async () => {
+      const centred = await ring('memberIn', `concept:${S1}`, 'concepts');
+      expect(refs(centred).sort()).toEqual([`note:${world.NOTES.nProject}`, `note:${world.NOTES.nWorkspace}`, `ticket:${world.TP}`].sort());
+      expect(centred.center).toMatchObject({ ref: `concept:${S1}`, label: LABEL, suggested: true });
+      expect(centred.edges.map((edge) => [edge.id, edge.suggested]).sort()).toEqual([
+        [`tag|concept:${S1}|note:${world.NOTES.nProject}`, true],
+        [`tag|concept:${S1}|note:${world.NOTES.nWorkspace}`, true],
+        [`tag|concept:${S1}|ticket:${world.TP}`, true],
+      ].sort());
+      const unknown = await getRing('memberOut', query(`concept:${newUlid()}`, 'concepts'));
+      expect(unknown).toEqual({ status: 404, body: '{"error":"not_found"}' });
+      expect(await getRing('memberOut', query(`concept:${S2}`, 'concepts'))).toEqual(unknown);
+      expect(await getRing('guestListed', query(`concept:${SG}`, 'concepts'))).toEqual(unknown);
+      expect(await getRing('memberIn', query(`concept:${SF}`, 'concepts'))).toEqual(unknown);
+      // Control: the owner may centre on S2.
+      expect(refs(await ring('owner', `concept:${S2}`, 'concepts'))).toContain(`ticket:${world.TE}`);
+      // The read the ring resolves through answers only the ids it is asked about (control: unasked, the owner's three).
+      const ownerEff = await resolveEffectiveRole(db.pool, ids.owner, world.WS);
+      expect((await visibleSuggestions(db.pool, ownerEff, ids.owner, world.WS)).map((row) => row.id).sort(), 'control').toEqual([S1, S2, SG].sort());
+      expect((await visibleSuggestions(db.pool, ownerEff, ids.owner, world.WS, [S1])).map((row) => row.id)).toEqual([S1]);
+    });
+  });
+
+  it('27.507 graph/path steps through a suggestion: TP to nWorkspace is exactly [TP, S1, nWorkspace], both edges suggested', async () => {
+    await withSuggestions(core(), async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/v1/graph/path?${new URLSearchParams({ from: `ticket:${world.TP}`, to: `note:${world.NOTES.nWorkspace}`, groups: 'concepts' }).toString()}`,
+        headers: { authorization: `Bearer ${tokens.memberIn}` },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const body = res.json() as GraphPathResponse;
+      expect(body.paths.map((path) => path.refs)).toEqual([[`ticket:${world.TP}`, `concept:${S1}`, `note:${world.NOTES.nWorkspace}`]]);
+      expect(body.paths[0]!.edges.map((edge) => [edge.id, edge.suggested])).toEqual([
+        [`tag|concept:${S1}|ticket:${world.TP}`, true],
+        [`tag|concept:${S1}|note:${world.NOTES.nWorkspace}`, true],
+      ]);
+    });
+  });
+
+  it('27.507 a rejected or confirmed suggestion is not drawn (its row waits for the job), and the confirmed concept reads suggested: false; another workspace\'s rejection or concept hides nothing; a deleted concept gives its suggestion back, and so does one merged into another workspace\'s concept', async () => {
+    const tpTq = [ticket(world.TP), ticket(TQ)];
+    await withSuggestions({ [SR]: { items: [...tpTq, note(world.NOTES.nProject)] }, [SA]: { items: [...tpTq, note(world.NOTES.nWorkspace)] } }, async (cached) => {
+      const drawn = async () => refs(await ring('memberIn', `ticket:${world.TP}`, 'concepts')).filter((ref) => ref === `concept:${SR}` || ref === `concept:${SA}`).sort();
+      const both = [`concept:${SA}`, `concept:${SR}`].sort();
+      expect(await drawn(), 'control: both are drawn before anything is resolved').toEqual(both);
+      // A suggestion in the ring and TQ in the ring: their tag is returned AMONG the ring.
+      const among = await ring('memberIn', `ticket:${world.TP}`, 'blocks,concepts');
+      expect(among.edges.find((edge) => edge.id === `tag|concept:${SR}|ticket:${TQ}`)?.suggested).toBe(true);
+
+      // The same signature rejected, and a concept made from SA, in ANOTHER workspace: neither hides anything here.
+      const CA = newUlid(), CFA = newUlid();
+      await applyCommitted(db.pool, [
+        makeCommitted({ workspaceId: FW, actorId: world.ids.owner, entity: { kind: 'workspace', id: FW }, type: 'workspace.concept_suggestion_rejected', payload: cached[SR] }),
+        makeCommitted({ workspaceId: FW, actorId: world.ids.owner, entity: { kind: 'concept', id: CFA }, type: 'concept.created', payload: { name: 'Elsewhere too', fromSuggestion: SA } }),
+      ]);
+      expect(await drawn(), 'another workspace resolves nothing here').toEqual(both);
+
+      const unknown = await getRing('memberIn', query(`concept:${newUlid()}`, 'concepts'));
+      await applyCommitted(db.pool, [
+        makeCommitted({ workspaceId: world.WS, actorId: world.ids.memberIn, entity: { kind: 'workspace', id: world.WS }, type: 'workspace.concept_suggestion_rejected', payload: cached[SR] }),
+      ]);
+      expect(await drawn(), 'rejected: SR is gone, SA is not').toEqual([`concept:${SA}`]);
+      expect(await getRing('memberIn', query(`concept:${SR}`, 'concepts'))).toEqual(unknown);
+
+      await applyCommitted(db.pool, [
+        cev(CA, 'concept.created', { name: 'Accepted', fromSuggestion: SA }, 'memberIn'),
+        cev(CA, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'memberIn'),
+      ]);
+      const confirmed = await ring('memberIn', `ticket:${world.TP}`, 'concepts');
+      expect(refs(confirmed)).not.toContain(`concept:${SA}`);
+      expect(confirmed.items.find((item) => item.ref === `concept:${CA}`)).toMatchObject({ label: 'Accepted', suggested: false });
+      expect(confirmed.edges.find((edge) => edge.id === `tag|concept:${CA}|ticket:${world.TP}`)?.suggested).toBe(false);
+
+      await applyCommitted(db.pool, [cev(CA, 'concept.deleted', {}, 'memberIn')]);
+      expect(await drawn(), 'a deleted concept no longer resolves SA, as the job would offer its group again').toEqual([`concept:${SA}`]);
+
+      // A merge resolves only into a live concept of THIS workspace: CA2, made from SA, merged into FW's live CF (no door
+      // admits that, `seesConcept`; the projection stores it as it stores any merge) leaves SA drawn.
+      const CA2 = newUlid();
+      await applyCommitted(db.pool, [
+        cev(CA2, 'concept.created', { name: 'Accepted again', fromSuggestion: SA }, 'memberIn'),
+        cev(CA2, 'concept.item_tagged', { itemKind: 'ticket', itemId: world.TP }, 'memberIn'),
+      ]);
+      expect(await drawn(), 'control: live, CA2 resolves SA').toEqual([]);
+      await applyCommitted(db.pool, [cev(CA2, 'concept.merged', { intoId: CF }, 'memberIn')]);
+      const stored = await db.pool.query('SELECT concept_id, workspace_id, deleted, merged_into FROM proj_concepts WHERE concept_id = ANY ($1::text[]) ORDER BY workspace_id = $2', [[CA2, CF], FW]);
+      expect(stored.rows, 'precondition: CA2 is merged into CF, which is live in FW').toEqual([
+        { concept_id: CA2, workspace_id: world.WS, deleted: true, merged_into: CF },
+        { concept_id: CF, workspace_id: FW, deleted: false, merged_into: null },
+      ]);
+      expect(await drawn(), 'merged into another workspace’s concept: SA is drawn again').toEqual([`concept:${SA}`]);
+    });
+  });
+
+  it('27.507 a member who reads an item only as its assignee gets the suggestion in the ring and may centre on it; controls: hiddenItems answers [] for them, memberIn never gets it, and after a reassignment to the owner memberOut no longer does', async () => {
+    // As 27.494: a fresh ticket TX, explicit [owner], assigned to memberOut, who then reads it through the assignee arm alone.
+    const TX = newUlid();
+    await applyCommitted(db.pool, [
+      tev(TX, 'ticket.created', { typeId: 'task', projectId: world.P, parentId: null, title: 'Lock the cash drawer' }),
+      tev(TX, 'visibility.set', { ticketId: TX, mode: 'explicit', userIds: [world.ids.owner] }),
+      tev(TX, 'ticket.assigned', { assigneeId: world.ids.memberOut }),
+    ]);
+    const SX = newUlid();
+    const { nProject, nWorkspace } = world.NOTES;
+    await withSuggestions({ [SX]: { items: [ticket(TX), note(nProject), note(nWorkspace)] } }, async () => {
+      const outEff = await resolveEffectiveRole(db.pool, ids.memberOut, world.WS);
+      expect(await hiddenItems(db.pool, outEff, ids.memberOut, world.WS, [ticket(TX), note(nProject), note(nWorkspace)]), 'control: memberOut sees every item').toEqual([]);
+      const inEff = await resolveEffectiveRole(db.pool, ids.memberIn, world.WS);
+      expect(await hiddenItems(db.pool, inEff, ids.memberIn, world.WS, [ticket(TX)]), 'control: TX is not memberIn’s').toEqual([ticket(TX)]);
+
+      const outside = await ring('memberOut', `note:${nWorkspace}`, 'concepts');
+      expect(outside.items.find((item) => item.ref === `concept:${SX}`)).toMatchObject({ kind: 'concept', label: LABEL, suggested: true });
+      const centred = await ring('memberOut', `concept:${SX}`, 'concepts');
+      expect(centred.center).toMatchObject({ ref: `concept:${SX}`, suggested: true });
+      expect(refs(centred).sort()).toEqual([`note:${nProject}`, `note:${nWorkspace}`, `ticket:${TX}`].sort());
+
+      const unknown = await getRing('memberOut', query(`concept:${newUlid()}`, 'concepts'));
+      expect(unknown).toEqual({ status: 404, body: '{"error":"not_found"}' });
+      expect(refs(await ring('memberIn', `note:${nWorkspace}`, 'concepts'))).not.toContain(`concept:${SX}`);
+      expect(await getRing('memberIn', query(`concept:${SX}`, 'concepts'))).toEqual(unknown);
+
+      // Reassigned to the owner: memberOut no longer reads TX, so neither the suggestion.
+      await applyCommitted(db.pool, [tev(TX, 'ticket.assigned', { assigneeId: world.ids.owner })]);
+      expect(refs(await ring('memberOut', `note:${nWorkspace}`, 'concepts'))).not.toContain(`concept:${SX}`);
+      expect(await getRing('memberOut', query(`concept:${SX}`, 'concepts'))).toEqual(unknown);
+    });
   });
 });
 

@@ -11,6 +11,7 @@ import { requireMember } from './membership.js';
 import { NOTE_HOME_SQL, NOTE_PROJECT_LIVE_WHERE } from './notes.js';
 import { SqlParams } from './sql-params.js';
 import { cardKeysFor } from './ticket-cards.js';
+import { visibleSuggestions } from './suggestions.js';
 import { visibleProjects } from './visible-projects.js';
 import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './visible-where.js';
 
@@ -22,8 +23,9 @@ import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './vis
  * ## Visibility is decided per WORKSPACE, by the predicates every other read uses
  *
  * A ring can span workspaces (a person connects them), so each item is resolved in its own workspace with the viewer's
- * effective role THERE (`requireMember`), through `visibleTicketsWhere` / `visibleNotesWhere` / `visibleProjects`, and a
- * concept through `visibleConceptIds` (spec D's D4).
+ * effective role THERE (`requireMember`), through `visibleTicketsWhere` / `visibleNotesWhere` / `visibleProjects`, a
+ * concept through `visibleConceptIds` (spec D's D4), and a model suggestion through `visibleSuggestions` (members only,
+ * every item visible).
  * Nothing here restates who may see what.
  *
  * ## An item the viewer cannot see is never returned, never walked THROUGH, and no edge into it is returned
@@ -49,7 +51,7 @@ export type GraphRingRequest = {
 };
 
 type Resolved = Omit<GraphItemView, 'hop' | 'out'>;
-type RawEdge = { id: string; kind: GraphEdgeKind; from: string; to: string; snippet: string | null; addedById: string | null; addedAt: Date | null; origin: string | null };
+type RawEdge = { id: string; kind: GraphEdgeKind; from: string; to: string; snippet: string | null; addedById: string | null; addedAt: Date | null; origin: string | null; suggested: boolean };
 
 export function createGraphVisibility(db: Queryable, viewerId: string) {
   const roles = new Map<string, EffectiveRole | null>();
@@ -154,7 +156,6 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
     }
     // Spec D §6 (KG-D Task 6): a concept is drawn only for a reader who sees it, which `visibleConceptIds` decides (D4: every
     // live item visible, an empty concept for non-guests only; a deleted concept for nobody), and nothing here restates.
-    // Model suggestions join this arm once Task 5's `sem_suggestions` lands (case 27.507).
     for (const [workspaceId, conceptIds] of await groupByWorkspace('proj_concepts', 'concept_id', ids.concept)) {
       const eff = await roleIn(workspaceId);
       if (eff === null) continue;
@@ -166,6 +167,17 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
       for (const row of rows) {
         const ref = graphRef('concept', row.concept_id);
         out.set(ref, { ref, kind: 'concept', id: row.concept_id, workspaceId, projectId: null, label: row.name, title: row.summary === '' ? null : row.summary, category: null, suggested: false });
+      }
+    }
+    // Spec D §4.2/§6 (27.507): a concept id that is no concept may be a model suggestion (a `sem_suggestions` id, a ULID like
+    // a concept's, never the same one), drawn as a concept with `suggested: true`. `visibleSuggestions` decides who sees it,
+    // as it does for the suggestions list: members only, every item visible, and not a rejected or confirmed one, although
+    // its row waits for the job's next run.
+    const leftover = ids.concept.filter((id) => !out.has(graphRef('concept', id)));
+    for (const [workspaceId, suggestionIds] of await groupByWorkspace('sem_suggestions', 'id', leftover)) {
+      for (const row of await visibleSuggestions(db, await roleIn(workspaceId), viewerId, workspaceId, suggestionIds)) {
+        const ref = graphRef('concept', row.id);
+        out.set(ref, { ref, kind: 'concept', id: row.id, workspaceId, projectId: null, label: row.label, title: null, category: null, suggested: true });
       }
     }
     return out;
@@ -190,7 +202,7 @@ export async function graphEdgeView(vis: ReturnType<typeof createGraphVisibility
     id: edge.id, kind: edge.kind, from: edge.from, to: edge.to, snippet: edge.snippet,
     addedBy: edge.addedById === null ? null : await vis.nameOf(edge.addedById),
     addedAt: edge.addedAt === null ? null : edge.addedAt.toISOString(),
-    origin: edge.origin, suggested: false,
+    origin: edge.origin, suggested: edge.suggested,
   };
 }
 
@@ -205,7 +217,7 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
   const edges = new Map<string, RawEdge>();
   const add = (kind: GraphEdgeKind, from: string, to: string, extra: Partial<RawEdge> = {}) => {
     const id = edgeId(kind, from, to);
-    if (!edges.has(id)) edges.set(id, { id, kind, from, to, snippet: null, addedById: null, addedAt: null, origin: null, ...extra });
+    if (!edges.has(id)) edges.set(id, { id, kind, from, to, snippet: null, addedById: null, addedAt: null, origin: null, suggested: false, ...extra });
   };
   // Spec B's planner ruling: a reference's edge starts at its PARENT item. `source_parent_*` is the ticket or note a comment is filed
   // against, and for a ticket or note source it is the source itself, so one expression covers all three source kinds.
@@ -291,6 +303,23 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
         WHERE ((item_kind = 'ticket' AND item_id = ANY ($1::text[])) OR (item_kind = 'note' AND item_id = ANY ($2::text[])))
               ${within ? 'AND' : 'OR'} concept_id = ANY ($3::text[])`, [t, n, c]);
     for (const r of rows) add('tag', graphRef('concept', r.concept_id), graphRef(r.item_kind, r.item_id), { addedById: r.tagged_by, addedAt: r.tagged_at, origin: r.origin });
+    // A model suggestion's tags (27.507), `suggested: true`. `item_id &&` matches a WHOLE row and ignores the kind, so
+    // each item is checked again here, with its kind: an edge is answered only when it touches the frontier (or,
+    // `within`, has both ends in it), as every other arm's rows are selected. The emitter stays exact so no read has to
+    // rely on `graph-path.ts`'s guard: the path walk also skips an edge with neither end in the frontier (27.552).
+    const suggestionRows = await db.query<{ id: string; item_kind: ('ticket' | 'note')[]; item_id: string[] }>(
+      `SELECT id, item_kind, item_id FROM sem_suggestions
+        WHERE (item_id && $1::text[] OR item_id && $2::text[]) ${within ? 'AND' : 'OR'} id = ANY ($3::text[])`, [t, n, c]);
+    const inFrontier = { ticket: new Set(t), note: new Set(n) };
+    const conceptsIn = new Set(c);
+    for (const r of suggestionRows.rows) {
+      r.item_id.forEach((itemId, index) => {
+        const kind = r.item_kind[index]!;
+        const itemIn = inFrontier[kind].has(itemId);
+        const rowIn = conceptsIn.has(r.id);
+        if (within ? itemIn && rowIn : itemIn || rowIn) add('tag', graphRef('concept', r.id), graphRef(kind, itemId), { suggested: true });
+      });
+    }
   }
   return [...edges.values()];
 }
