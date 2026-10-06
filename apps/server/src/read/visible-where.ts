@@ -220,6 +220,10 @@ export const LIVE_BASE_WHERE =
  *    sites across 17 files (the docblock hits in this file, this paragraph's
  *    included, are not counted), **6** array members across 5 files and 21 import lines:
  *    **29 uses of the constant**. The longhand sweep was again not re-run.
+ *    ⚠ **Re-measured after wtg4 T1's merge of `release/workflow-graph` (dc635854,
+ *    `../flow/promote.ts` adds one site and one import), same grep:** **24** executable
+ *    sites across 18 files, **6** array members across 5 files and 22 import lines:
+ *    **30 uses of the constant**.
  *
  * AND it into every SELECT that serves a VIEW. Do NOT add it to
  * `../projections/tickets.ts`'s `getTicketStateFromDb` /
