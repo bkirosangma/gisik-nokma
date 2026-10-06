@@ -308,12 +308,14 @@ export function visibleNotesWhere(eff: EffectiveRole, userId: string, params: Sq
   const inheritArm = `(n.scope_mode = 'inherit' AND EXISTS (
       SELECT 1 FROM proj_note_attachments na
       JOIN proj_visibility v ON v.ticket_id = na.ticket_id
-      JOIN proj_tickets t ON t.ticket_id = na.ticket_id
+      JOIN proj_tickets t ON t.ticket_id = na.ticket_id AND t.workspace_id = n.workspace_id
       WHERE na.note_id = n.note_id AND ${LIVE_TICKET_WHERE}
         AND (${ticketAudienceWhere(eff, userId, params)} OR ${assigneeReachWhere(userId, params, 'na.ticket_id')})))`;
   // The audience OR the assignee arm over the attached ticket: an inherit note follows the ticket's
   // readers, and since R1 (case 6.273) the assignee of an attached ticket — or of one it inherits from —
-  // is one of them. Any ONE attached ticket admits (FD7), as in `canReadNote`.
+  // is one of them. Any ONE attached ticket admits (FD7), as in `canReadNote`. Only a ticket of the NOTE's
+  // workspace (18.522): the audience is asked with this workspace's role, and `canReadNote` loads only
+  // those (`ticketIsLive(db, note.workspaceId, …)`), so a link written before 18.500 admits nobody in either.
   const arms = [
     `n.author_id = ${user}`,
     isGuest ? null : `n.scope_mode = 'workspace'`,

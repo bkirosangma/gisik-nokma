@@ -11,6 +11,7 @@ import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
 import { signInMaxFor } from './http/rate-limit.js';
 import { createIngestService } from './ingest/ingest-service.js';
+import { startNoteSearchBindBackfill } from './projections/backfill-note-search-binds.js';
 import { startReferencesBackfill } from './projections/backfill-references.js';
 import { buildProjectionRegistry } from './projections/index.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
@@ -370,6 +371,16 @@ async function main(): Promise<void> {
   app.addHook('onClose', async () => {
     await referencesBackfill.stop();
   });
+  // task/notes-cross-workspace-followup (18.522): the one-shot re-derive of note search rows a cross-workspace link
+  // wrote before the index bound its tickets to the note's workspace. Wired exactly as the backfill above.
+  const noteSearchBindBackfill = startNoteSearchBindBackfill(pool, {
+    log: (msg) => {
+      app.log.warn(msg);
+    },
+  });
+  app.addHook('onClose', async () => {
+    await noteSearchBindBackfill.stop();
+  });
 
   // BEFORE `listen`, so there is no window in which this process is alive and
   // ignoring SIGTERM — on PID 1 that window is not a race with a default
@@ -379,6 +390,7 @@ async function main(): Promise<void> {
 
   await app.listen({ port: config.port, host: config.host });
   referencesBackfill.run();
+  noteSearchBindBackfill.run();
 }
 
 main().catch((error: unknown) => {
