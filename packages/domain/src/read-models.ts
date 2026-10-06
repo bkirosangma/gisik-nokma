@@ -82,8 +82,8 @@ export type StateProvenance = {
  * category comes from `proj_tickets`. A child the first knows and the second
  * has no row for has an UNKNOWN category, and counting it as non-terminal
  * would understate "done" while looking exactly like a true count. So it is
- * counted on its own line: `terminalChildren + uncategorizedChildren <=
- * totalChildren`, and a client rendering "5 of 8 done" while
+ * counted on its own line: `terminalChildren + notTakenChildren +
+ * uncategorizedChildren <= totalChildren`, and a client rendering "5 of 8 done" while
  * `uncategorizedChildren > 0` is rendering a number it was told is incomplete.
  *
  * It is 0 whenever BOTH projections are current with the ledger — the condition,
@@ -99,7 +99,13 @@ export type StateProvenance = {
  */
 export type TicketRollup = {
   totalChildren: number;
+  /** Terminal children that were not closed Not taken: a DONE count (wtg2 T17). */
   terminalChildren: number;
+  /**
+   * wtg2 T17 (Q1): terminal children closed Not taken by the flow, counted APART from `terminalChildren`, which is done
+   * only; ABSENT when 0. `terminalChildren + notTakenChildren + uncategorizedChildren <= totalChildren`.
+   */
+  notTakenChildren?: number;
   uncategorizedChildren: number;
   restrictedCount: number;
 };
@@ -226,6 +232,11 @@ export type TicketCard = {
   rollup: TicketRollup | null;
   /** The closed flag (backlog/closed spec §3.3, 2026-09-17); see this type's own docblock. */
   closed: { actorId: string; at: string } | null;
+  /**
+   * wtg2 T17 (Q1): this ticket was closed "Not taken" by the flow. ABSENT otherwise; never names the Decision (a card is
+   * served to viewers who may not see it).
+   */
+  notTaken?: true;
   /**
    * The backlog rank key (spec §8.1, second wave 2026-09-18), or `null` when
    * nobody has ranked this ticket. REQUIRED here for the same reason `closed`

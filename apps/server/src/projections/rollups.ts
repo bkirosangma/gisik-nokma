@@ -105,6 +105,7 @@ export type RollupRow = {
   totalChildren: number;
   openChildren: number;
   activeChildren: number;
+  /** Counts a Not-taken child as terminal (the structural fact). NOT a done count: no card route reads this table; `rollupsFor` is the reader that excludes it (wtg2 T17). */
   terminalChildren: number;
 };
 
