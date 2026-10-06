@@ -339,7 +339,7 @@ describe('27.648 a pressed number lights its items on the graph', () => {
 describe('27.649 the highlight note', () => {
   it('27.649 highlightNote: all lit, none lit, a zero, and the noun following lit (not total)', () => {
     expect(highlightNote({ key: 'pastDue', total: 3, lit: 3, further: 0, dueSoonDays: 3 })).toEqual({ text: '3 past due, lit up on the graph.', further: 0 });
-    expect(highlightNote({ key: 'pastDue', total: 3, lit: 0, further: 5, dueSoonDays: 3 })).toEqual({ text: 'None to light up.', further: 5 });
+    expect(highlightNote({ key: 'pastDue', total: 3, lit: 0, further: 0, dueSoonDays: 3 })).toEqual({ text: 'None to light up.', further: 0 });
     expect(highlightNote({ key: 'pastDue', total: 0, lit: 0, further: 5, dueSoonDays: 3 })).toEqual({ text: '', further: 0 });
     expect(highlightNote({ key: 'notes', total: 2, lit: 1, further: 1, dueSoonDays: 3 })).toEqual({ text: '1 note, lit up on the graph. 1 more are further out.', further: 1 });
     expect(highlightNote({ key: 'dueSoon', total: 2, lit: 2, further: 0, dueSoonDays: 0 })).toEqual({ text: '2 due today, lit up on the graph.', further: 0 });
@@ -442,6 +442,30 @@ describe('27.650 fog and beyond are further out, with Show more hops', () => {
     report(partial);
     expect(noteText()).toBe('2 past due, lit up on the graph. 6 more are further out.');
     expect(showMore()).toBeNull();
+  });
+});
+
+describe('27.688 none lit, some further out: the note still says the count (kg-walk-fixes-2 item 3)', () => {
+  it('27.688 highlightNote: 0 lit + 364 further reads the count; 1 further is singular; 0 + 0 is "None to light up."; control: k lit + m further is the desktop sentence, unchanged', () => {
+    expect(highlightNote({ key: 'tickets', total: 364, lit: 0, further: 364, dueSoonDays: 7 })).toEqual({ text: 'None to light up here; 364 are further out than the graph shows.', further: 364 });
+    expect(highlightNote({ key: 'notes', total: 4, lit: 0, further: 1, dueSoonDays: 7 })).toEqual({ text: 'None to light up here; 1 is further out than the graph shows.', further: 1 });
+    expect(highlightNote({ key: 'tickets', total: 364, lit: 0, further: 0, dueSoonDays: 7 })).toEqual({ text: 'None to light up.', further: 0 });
+    // CONTROL: with some lit, the desktop sentence is untouched.
+    expect(highlightNote({ key: 'tickets', total: 364, lit: 343, further: 21, dueSoonDays: 7 })).toEqual({ text: '343 tickets, lit up on the graph. 21 more are further out.', further: 21 });
+  });
+
+  it('27.688 on a phone, one hop from the workspace (no ticket clear), pressing Tickets says how many are further out, with no Show more hops; control: the same press with nothing in fog or beyond reads "None to light up."', async () => {
+    media.phone = true;
+    const ids = ['t1', 't2', 't3'];
+    const user = userEvent.setup();
+    renderHome('ws_689', () => home('ws_689', { counts: { tickets: 3 }, ids: { tickets: ids } }));
+    await mounted();
+    await user.click(tile('3 Tickets'));
+    report({ clear: ['workspace:ws_689', 'project:p1'], fog: ['ticket:t1', 'ticket:t2'], beyond: 1 });
+    expect(noteText()).toBe('None to light up here; 3 are further out than the graph shows.');
+    expect(showMore()).toBeNull();
+    report({ clear: ['workspace:ws_689', 'project:p1'] });
+    expect(noteText()).toBe('None to light up.');
   });
 });
 
