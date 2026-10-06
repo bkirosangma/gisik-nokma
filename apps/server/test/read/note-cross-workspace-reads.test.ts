@@ -7,7 +7,7 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { purgeItem } from '../../src/purge/purge-item.js';
 import { readDeletedItems } from '../../src/read/deleted-items.js';
 import { readGraphRing } from '../../src/read/graph-neighbours.js';
-import { correctWords, lexicalNoteSearch } from '../../src/read/note-search.js';
+import { correctWords, lexicalNoteSearch, meaningNoteSearch } from '../../src/read/note-search.js';
 import { attachedTicketsByNote, getNoteDetail, listNotes, listNotesForTicket } from '../../src/read/notes.js';
 import { canReadNoteById } from '../../src/visibility/can-read-note.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -143,6 +143,8 @@ beforeAll(async () => {
     preFixLink(n.away, world.TP),
     w2Note(n.movedL, 'Moved under a live project of WS', 'workspace'),
     preFixMove(n.movedL, world.P),
+    // A legitimate link (a W2 ticket), so the ticket's notes list carries this note and its home (18.523).
+    makeCommitted({ ...inW2, entity: { kind: 'note', id: n.movedL }, type: 'note.attached', payload: { ticketId: TW2 } }),
     w2Note(n.movedX, 'Moved under the binned project', 'workspace'),
     preFixMove(n.movedX, PX),
     w2Note(n.movedY, 'Moved under the erased project', 'workspace'),
@@ -186,6 +188,13 @@ const ring = async (center: string, groups: GraphGroup[]) =>
   });
 const hitsFor = async (q: string) =>
   (await lexicalNoteSearch(db.pool, await effOf(author(), W2), author(), W2, q)).hits;
+/** A unit vector in the plane of the first two components; the meaning query sits at angle 0. */
+const vectorAt = (angle: number): Float32Array => {
+  const vector = new Float32Array(512);
+  vector[0] = Math.cos(angle);
+  vector[1] = Math.sin(angle);
+  return vector;
+};
 
 describe('18.522 a pre-fix cross-workspace link is absent from every read of the note', () => {
   it('18.522 attachedTicketsByNote and the ticket\'s notes list show the W2 note with its W2 ticket only, never WS\'s TP', async () => {
@@ -230,6 +239,27 @@ describe('18.522 a pre-fix cross-workspace link is absent from every read of the
     // The haystack holds its subject: before the re-derive the old row answers for the WS word.
     expect((await hitsFor('licence')).map((hit) => hit.noteId)).toEqual([n.away]);
     expect(await correctWords(db.pool, W2, ['licenc'])).toEqual([["'licence'"]]);
+
+    // Another instance holds the run's lock: this one does nothing, and the old row still answers.
+    const holder = await db.pool.connect();
+    try {
+      await holder.query("SELECT pg_advisory_lock(hashtextextended('backfill:proj_note_search:workspace-bind', 0))");
+      expect(await backfillNoteSearchBinds(db.pool)).toMatchObject({ ran: false, entities: 0 });
+      await holder.query("SELECT pg_advisory_unlock(hashtextextended('backfill:proj_note_search:workspace-bind', 0))");
+    } finally {
+      holder.release();
+    }
+    expect((await hitsFor('licence')).map((hit) => hit.noteId)).toEqual([n.away]);
+    // A shutdown before the first note: nothing re-indexed, no marker.
+    expect(await backfillNoteSearchBinds(db.pool, { shouldStop: () => true })).toMatchObject({ ran: false, entities: 0 });
+    expect((await hitsFor('licence')).map((hit) => hit.noteId)).toEqual([n.away]);
+    // A shutdown after both notes and before the vocabulary: the rows are re-indexed, the old word is still in the
+    // vocabulary, and there is no marker, so the next boot does the whole run again.
+    let asked = 0;
+    expect(await backfillNoteSearchBinds(db.pool, { shouldStop: () => asked++ >= 2 })).toMatchObject({ ran: false, entities: 2 });
+    expect(await hitsFor('licence')).toEqual([]);
+    expect(await correctWords(db.pool, W2, ['licenc'])).toEqual([["'licence'"]]);
+    expect((await db.pool.query("SELECT 1 FROM projection_backfills WHERE name = 'proj_note_search:workspace-bind'")).rowCount).toBe(0);
 
     let lockedElsewhere: boolean | undefined;
     let freeElsewhere: boolean | undefined;
@@ -312,5 +342,20 @@ describe('18.523 a WS project\'s state reaches no note of W2', () => {
     expect(await listNotes(db.pool, eff, author(), W2, { homeProjectId: P2 })).not.toEqual([]); // CONTROL
     const moved = (await hitsFor('moved')).filter((hit) => hit.noteId === n.movedL || hit.noteId === n.movedY);
     expect(moved.map((hit) => hit.homeProjectId)).toEqual(['', '']);
+    // The ticket's notes list (movedL is linked to TW2 as well; CONTROL: away, homed in P2).
+    const onTicket = await listNotesForTicket(db.pool, eff, author(), W2, TW2);
+    expect(onTicket.find((s) => s.noteId === n.away)?.homeProjectId).toBe(P2);
+    expect(onTicket.find((s) => s.noteId === n.movedL)?.homeProjectId).toBe('');
+    // Meaning search: a chunk of each note at distance 0 (CONTROL: away carries P2).
+    for (const id of [n.away, n.movedL]) {
+      await db.pool.query(
+        `INSERT INTO search_note_chunks (note_id, chunk_index, workspace_id, heading_path, chunk_text, model, source_seq, embedding)
+         VALUES ($1, 0, $2, '', 'a chunk', 'xws-test@1', 0, $3)`,
+        [id, W2, `[${Array.from(vectorAt(0)).join(',')}]`],
+      );
+    }
+    const meant = await meaningNoteSearch(db.pool, eff, author(), W2, 'a chunk', { embed: async () => vectorAt(0) });
+    expect(meant.find((hit) => hit.noteId === n.away)?.homeProjectId).toBe(P2);
+    expect(meant.find((hit) => hit.noteId === n.movedL)?.homeProjectId).toBe('');
   });
 });
