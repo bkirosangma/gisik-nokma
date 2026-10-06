@@ -12466,7 +12466,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". A suggested concept offers "
+                      "text": ". While you rename it or answer Delete's question, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Escape"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " cancels that instead of going back. A suggested concept offers "
                     },
                     {
                       "kind": "bold",
