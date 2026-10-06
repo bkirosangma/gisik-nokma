@@ -94,6 +94,8 @@ describe('the empty frame (27.673, AMEND-kg-empty-reframe-fit)', () => {
     }
     // the centre alone takes ring 1's four points (desktop R[1] = [300, 185] × 0.9), after its own card
     expect(frame(alone, 'desktop').fit.slice(1).map((f) => [f.x, f.y])).toEqual([[270, 0], [-270, 0], [0, 166.5], [0, -166.5]]);
+    // and a phone takes its own ring 1 with its own factor (R[1] = [150, 170] × 0.82); the band alone holds × 0.9 (review rider, P44)
+    expect(frame(alone, 'phone').fit.slice(1).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10])).toEqual([[123, 0], [-123, 0], [0, 139.4], [0, -139.4]]);
     // control: a frame with any clear item besides the centre is exactly 8671e629's (the literals read off that tip's draw-model)
     const card = { x: 0, y: 0, l: 59.5, r: 59.5, t: 30, b: 30 };
     expect(frame(one, 'desktop')).toEqual({ fit: [card, { x: 1.8369701987210297e-14, y: -185, l: 16, r: 103, t: 18, b: 36 }], cam: { cx: 10.33544140625001, cy: -99.15269791666667, ratio: 0.4725353298611111 } });
