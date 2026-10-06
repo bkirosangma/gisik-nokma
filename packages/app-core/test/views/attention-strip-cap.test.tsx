@@ -10,6 +10,7 @@ import { AttentionStrip } from '../../src/views/attention-strip.js';
  */
 const itemOf = (kind: AttentionKind, ticketId: string, title = `Ticket ${ticketId}`): AttentionItem => ({
   kind,
+  workspaceId: 'w',
   ticketId,
   projectId: 'project-1',
   title,

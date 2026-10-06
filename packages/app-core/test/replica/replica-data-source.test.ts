@@ -538,6 +538,11 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['getWorkspaceSettings', () => ds.query.getWorkspaceSettings(WS)],
       ['getPreferences', () => ds.query.getPreferences(WS)],
       ['putPreferences', () => ds.query.putPreferences(WS, { version: 1, projects: {}, savedFilters: [] })],
+      // 30.029 (my-work-global T3): the user-level My work document is a server row like the
+      // per-workspace one above, so the replica refuses both halves rather than answering
+      // the defaults as if they were the person's choice.
+      ['getMyWorkPreferences', () => ds.query.getMyWorkPreferences()],
+      ['putMyWorkPreferences', () => ds.query.putMyWorkPreferences({ show: ['created'], grouping: 'flat' })],
       // Added by Knowledge Graph B (case 27.141), LAST because REPLICA_GAPS gained the key last: the local
       // store holds no reference index, and an empty page would claim nothing links here.
       ['getLinkedFrom', () => ds.query.getLinkedFrom(WS, { kind: 'ticket', id: newUlid() })],
@@ -599,6 +604,23 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
    *
    * Amended by trash Plan 3 (19.197): this fixture's transport answers `deletedItems` with a failure and nothing is cached, which is now the only way this read refuses.
    */
+  it('30.029 the two My work preference methods reject with ReplicaGapError, naming the document', async () => {
+    const { ds } = await fixture();
+    for (const [name, call] of [
+      ['getMyWorkPreferences', () => ds.query.getMyWorkPreferences()],
+      ['putMyWorkPreferences', () => ds.query.putMyWorkPreferences({ show: ['created'], grouping: 'flat' })],
+    ] as const) {
+      const err = await call().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(err, name).toBeInstanceOf(ReplicaGapError);
+      expect((err as ReplicaGapError).absences.map((absence) => absence.field), name).toEqual([
+        'MyWorkPreferences (the whole document)',
+      ]);
+    }
+  });
+
   it('19.071 getDeletedItems rejects with ReplicaGapError while nothing is cached; control: getTicketTypes on the same replica resolves', async () => {
     const { ds } = await fixture();
     await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(ReplicaGapError);

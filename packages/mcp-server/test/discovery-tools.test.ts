@@ -72,18 +72,172 @@ describe('14.480 list_ticket_types and list_workflows read the builder routes', 
 });
 
 describe('14.481 my_work and get_attention', () => {
-  it('14.481 my_work carries workspaceId in the query string; get_attention reads the workspace route', async () => {
+  it('14.481 my_work(workspaceId) carries the id in the query string; get_attention(workspaceId) reads the workspace route', async () => {
     const work = { groups: [] };
     const attention = { overdue: [] };
-    const f = fake({ [`/v1/me/work?workspaceId=${WS}`]: work, [`/v1/workspaces/${WS}/attention`]: attention });
+    const f = fake({ [`/v1/me/work?workspaceId=${WS}`]: work, [`/v1/workspaces/${WS}/attention?show=created,assigned`]: attention });
     expect(await tool('my_work', f.session).handler({ workspaceId: WS })).toEqual(work);
     expect(await tool('get_attention', f.session).handler({ workspaceId: WS })).toEqual(attention);
-    expect(f.asked).toEqual([`/v1/me/work?workspaceId=${WS}`, `/v1/workspaces/${WS}/attention`]); // CONTROL: the id is in the query
-    await expect(tool('my_work', f.session).handler({})).rejects.toThrow(); // never sent without one (the server would 400)
-    expect(f.asked).toHaveLength(2);
-    const gone = fake({ [`/v1/me/work?workspaceId=${WS}`]: NOT_FOUND, [`/v1/workspaces/${WS}/attention`]: NOT_FOUND });
+    // CONTROL: the id is in the query; get_attention now carries the default `show` (30.052)
+    expect(f.asked).toEqual([`/v1/me/work?workspaceId=${WS}`, `/v1/workspaces/${WS}/attention?show=created,assigned`]);
+    const gone = fake({ [`/v1/me/work?workspaceId=${WS}`]: NOT_FOUND, [`/v1/workspaces/${WS}/attention?show=created,assigned`]: NOT_FOUND });
     await expect(tool('my_work', gone.session).handler({ workspaceId: WS })).rejects.toThrow('workspace not found or not visible to you');
     await expect(tool('get_attention', gone.session).handler({ workspaceId: WS })).rejects.toThrow('workspace not found or not visible to you');
+  });
+});
+
+/**
+ * My-work-global T5 (cases 30.051–30.058): both tools go global when `workspaceId` is absent — one
+ * `/v1/me/workspaces` read, archived workspaces skipped, then one read per workspace — and `get_attention`
+ * takes `show` (default created + assigned), narrowed per workspace to what the viewer may ask there.
+ * Rig: w1 the viewer OWNS; w2 a plain membership where the viewer runs a project; w3 archived; w4 a plain
+ * membership whose row carries no `adminProjectIds` key at all (an older server); w5 one the viewer ADMINS.
+ */
+const ME_WORKSPACES = {
+  workspaces: [
+    { workspaceId: 'w1', name: 'One', prefix: 'ONE', role: 'owner', adminProjectIds: [], archived: false },
+    { workspaceId: 'w2', name: 'Two', prefix: 'TWO', role: 'member', adminProjectIds: ['p2'], archived: false },
+    { workspaceId: 'w3', name: 'Three', prefix: 'THR', role: 'owner', adminProjectIds: ['p3'], archived: true },
+    { workspaceId: 'w4', name: 'Four', prefix: 'FOU', role: 'member', archived: false },
+    { workspaceId: 'w5', name: 'Five', prefix: 'FIV', role: 'admin', adminProjectIds: [], archived: false },
+  ],
+};
+const attentionPath = (ws: string, show: string) => `/v1/workspaces/${ws}/attention?show=${show}`;
+const attentionBody = (ws: string) => ({ workspaceId: ws, generatedAt: '2026-10-05T00:00:00.000Z', settings: { staleDays: 7 }, items: [{ ticketId: `t-${ws}` }] });
+const workBody = (ws: string) => ({ workspaceId: ws, groups: { open: [{ ticketId: `t-${ws}` }], active: [], terminal: [] }, projectNames: { [`p-${ws}`]: `P ${ws}` }, stateNames: { [`t-${ws}`]: 'Open' } });
+const LIVE = ['w1', 'w2', 'w4', 'w5'] as const;
+const NAMES: Record<string, string> = { w1: 'One', w2: 'Two', w4: 'Four', w5: 'Five' };
+
+describe('30.5 my_work and get_attention go global (my-work-global T5)', () => {
+  it('30.051 get_attention with no arguments: one workspace list, then each live workspace with show=created,assigned', async () => {
+    const pages: Record<string, unknown> = { '/v1/me/workspaces': ME_WORKSPACES };
+    for (const ws of LIVE) pages[attentionPath(ws, 'created,assigned')] = attentionBody(ws);
+    const f = fake(pages);
+    const out = await tool('get_attention', f.session).handler({});
+    expect(f.asked).toEqual(['/v1/me/workspaces', ...LIVE.map((ws) => attentionPath(ws, 'created,assigned'))]);
+    // the pinned shape: { workspaces: [{ workspaceId, name, items }] }, in the list's order
+    expect(out).toEqual({ workspaces: LIVE.map((ws) => ({ workspaceId: ws, name: NAMES[ws], items: [{ ticketId: `t-${ws}` }] })) });
+  });
+
+  it('30.052 get_attention({workspaceId}) is ONE call carrying the default show, answered in today\'s shape', async () => {
+    const f = fake({ [attentionPath('w1', 'created,assigned')]: attentionBody('w1') });
+    expect(await tool('get_attention', f.session).handler({ workspaceId: 'w1' })).toEqual(attentionBody('w1'));
+    expect(f.asked).toEqual([attentionPath('w1', 'created,assigned')]);
+    // CONTROL: an explicit show is carried as given, in canonical order and once each
+    const g = fake({ [attentionPath('w1', 'created,ws-admin')]: attentionBody('w1') });
+    expect(await tool('get_attention', g.session).handler({ workspaceId: 'w1', show: ['ws-admin', 'created', 'ws-admin'] })).toEqual(attentionBody('w1'));
+    expect(g.asked).toEqual([attentionPath('w1', 'created,ws-admin')]);
+  });
+
+  it('30.053 show is narrowed per workspace: a workspace the viewer may not ask is skipped, never 400ed; named outright, the refusal is a sentence', async () => {
+    const pages: Record<string, unknown> = {
+      '/v1/me/workspaces': ME_WORKSPACES,
+      [attentionPath('w1', 'ws-admin')]: attentionBody('w1'),
+      [attentionPath('w5', 'ws-admin')]: attentionBody('w5'),
+    };
+    const f = fake(pages);
+    // ws-admin: only w1 (owner) and w5 (admin) may be asked; w2 and w4 (member) are neither requested nor listed
+    expect(await tool('get_attention', f.session).handler({ show: ['ws-admin'] })).toEqual({
+      workspaces: [
+        { workspaceId: 'w1', name: 'One', items: [{ ticketId: 't-w1' }] },
+        { workspaceId: 'w5', name: 'Five', items: [{ ticketId: 't-w5' }] },
+      ],
+    });
+    expect(f.asked).toEqual(['/v1/me/workspaces', attentionPath('w1', 'ws-admin'), attentionPath('w5', 'ws-admin')]);
+    // project-admin: only w2 (runs p2); w1 and w5 (no admin project) and w4 (no key) are skipped
+    const p = fake({ '/v1/me/workspaces': ME_WORKSPACES, [attentionPath('w2', 'project-admin')]: attentionBody('w2') });
+    expect(await tool('get_attention', p.session).handler({ show: ['project-admin'] })).toEqual({ workspaces: [{ workspaceId: 'w2', name: 'Two', items: [{ ticketId: 't-w2' }] }] });
+    expect(p.asked).toEqual(['/v1/me/workspaces', attentionPath('w2', 'project-admin')]);
+    // CONTROL: a selection mixing all four asks each workspace for exactly its own part
+    const all = fake({
+      '/v1/me/workspaces': ME_WORKSPACES,
+      [attentionPath('w1', 'created,assigned,ws-admin')]: attentionBody('w1'),
+      [attentionPath('w2', 'created,assigned,project-admin')]: attentionBody('w2'),
+      [attentionPath('w4', 'created,assigned')]: attentionBody('w4'),
+      [attentionPath('w5', 'created,assigned,ws-admin')]: attentionBody('w5'),
+    });
+    const out = (await tool('get_attention', all.session).handler({ show: ['project-admin', 'ws-admin', 'assigned', 'created'] })) as { workspaces: Array<{ workspaceId: string }> };
+    expect(out.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w2', 'w4', 'w5']);
+    expect(all.asked).toEqual([
+      '/v1/me/workspaces',
+      attentionPath('w1', 'created,assigned,ws-admin'),
+      attentionPath('w2', 'created,assigned,project-admin'),
+      attentionPath('w4', 'created,assigned'),
+      attentionPath('w5', 'created,assigned,ws-admin'),
+    ]);
+    // Named outright, nothing is narrowed: the route's 400 `invalid_query` (a role the caller lacks THERE) is
+    // answered with a sentence that says what each value needs, carrying the route's error as its cause.
+    const refusal = new HttpError(400, { error: 'invalid_query' });
+    const named = fake({ [attentionPath('w2', 'ws-admin')]: refusal });
+    await expect(tool('get_attention', named.session).handler({ workspaceId: 'w2', show: ['ws-admin'] })).rejects.toMatchObject({
+      message:
+        "invalid_query: show was refused for this workspace. 'ws-admin' needs the owner or admin role in it, and 'project-admin' needs a project you run in it; leave out workspaceId to ask every workspace for only what it allows.",
+      cause: refusal,
+    });
+    expect(named.asked).toEqual([attentionPath('w2', 'ws-admin')]);
+    // CONTROL: any other 400, a 400 with no body, the same error under another status, and a 404 are not that refusal
+    for (const [other, message] of [
+      [new HttpError(400, { error: 'something_else' }), 'gisik-nokma answered 400'],
+      [new HttpError(400, null), 'gisik-nokma answered 400'],
+      [new HttpError(500, { error: 'invalid_query' }), 'gisik-nokma answered 500'],
+      [NOT_FOUND, 'workspace not found or not visible to you'],
+    ] as const) {
+      const g = fake({ [attentionPath('w2', 'ws-admin')]: other });
+      await expect(tool('get_attention', g.session).handler({ workspaceId: 'w2', show: ['ws-admin'] })).rejects.toMatchObject({ message });
+    }
+  });
+
+  it('30.054 show:[] and an unknown value are refused before any read', async () => {
+    const f = fake({ '/v1/me/workspaces': ME_WORKSPACES, [attentionPath('w1', 'created')]: attentionBody('w1') });
+    await expect(tool('get_attention', f.session).handler({ show: [] })).rejects.toThrow();
+    await expect(tool('get_attention', f.session).handler({ workspaceId: 'w1', show: [] })).rejects.toThrow();
+    await expect(tool('get_attention', f.session).handler({ workspaceId: 'w1', show: ['bogus'] })).rejects.toThrow();
+    expect(f.asked).toEqual([]);
+    // CONTROL: one valid value answers
+    expect(await tool('get_attention', f.session).handler({ workspaceId: 'w1', show: ['created'] })).toEqual(attentionBody('w1'));
+  });
+
+  it('30.055 my_work with no arguments fans out over /v1/me/work for each live (non-archived) workspace', async () => {
+    const pages: Record<string, unknown> = { '/v1/me/workspaces': ME_WORKSPACES };
+    for (const ws of LIVE) pages[`/v1/me/work?workspaceId=${ws}`] = workBody(ws);
+    const f = fake(pages);
+    const out = await tool('my_work', f.session).handler({});
+    expect(f.asked).toEqual(['/v1/me/workspaces', ...LIVE.map((ws) => `/v1/me/work?workspaceId=${ws}`)]); // w3 (archived) never read
+    expect(out).toEqual({ workspaces: LIVE.map((ws) => ({ ...workBody(ws), name: NAMES[ws] })) });
+  });
+
+  it('30.056 my_work({workspaceId}) is today\'s single call, answered unchanged', async () => {
+    const f = fake({ '/v1/me/work?workspaceId=w3': workBody('w3') });
+    expect(await tool('my_work', f.session).handler({ workspaceId: 'w3' })).toEqual(workBody('w3'));
+    expect(f.asked).toEqual(['/v1/me/work?workspaceId=w3']); // no workspace list, and an archived id named outright is still read
+  });
+
+  it('30.057 the two descriptions, verbatim', () => {
+    const f = fake();
+    expect(tool('get_attention', f.session).description).toBe(
+      "What needs your attention: overdue, due soon, stale and blocked work. By default only tickets you created or that are assigned to you, across all your workspaces; pass show to include 'ws-admin' or 'project-admin' tickets, and workspaceId to limit it to one workspace. With a workspaceId, a show value your role there does not allow is refused; without one, each workspace is asked only for what it allows.",
+    );
+    expect(tool('my_work', f.session).description).toBe(
+      'What is on your plate: the tickets assigned to you or that you collaborate on, across all your workspaces, grouped the way the My Work screen groups them; pass workspaceId to limit it to one workspace.',
+    );
+  });
+
+  it('30.058 one workspace answering 404 is left out and the rest return; any other failure fails the tool', async () => {
+    const pages: Record<string, unknown> = { '/v1/me/workspaces': ME_WORKSPACES };
+    for (const ws of LIVE) {
+      pages[attentionPath(ws, 'created,assigned')] = ws === 'w2' ? NOT_FOUND : attentionBody(ws);
+      pages[`/v1/me/work?workspaceId=${ws}`] = ws === 'w2' ? NOT_FOUND : workBody(ws);
+    }
+    const f = fake(pages);
+    const att = (await tool('get_attention', f.session).handler({})) as { workspaces: Array<{ workspaceId: string }> };
+    expect(att.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w4', 'w5']);
+    const work = (await tool('my_work', f.session).handler({})) as { workspaces: Array<{ workspaceId: string }> };
+    expect(work.workspaces.map((x) => x.workspaceId)).toEqual(['w1', 'w4', 'w5']);
+    // CONTROL: a 500 is not a missing workspace — the tool fails rather than hide it
+    const boom = new HttpError(500, { error: 'internal' });
+    const g = fake({ ...pages, [attentionPath('w2', 'created,assigned')]: boom, '/v1/me/work?workspaceId=w2': boom });
+    await expect(tool('get_attention', g.session).handler({})).rejects.toThrow();
+    await expect(tool('my_work', g.session).handler({})).rejects.toThrow();
   });
 });
 
