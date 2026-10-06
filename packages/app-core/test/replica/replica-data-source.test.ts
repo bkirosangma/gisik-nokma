@@ -488,7 +488,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 27.141 27.633 FIFTEEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 27.141 27.633 SEVENTEEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
