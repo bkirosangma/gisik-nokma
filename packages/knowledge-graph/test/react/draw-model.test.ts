@@ -89,8 +89,8 @@ describe('the empty frame (27.673, AMEND-kg-empty-reframe-fit)', () => {
   it('27.673 the centre alone frames within its band of a centre with one hop-1 item, in every config; control: the one-item frame is byte-equal to 8671e629', () => {
     for (const config of ['desktop', 'phone', 'home'] as const) {
       const k = frame(alone, config).cam.ratio / frame(one, config).cam.ratio;
-      expect(k, config).toBeGreaterThanOrEqual(BAND[config][0]);
-      expect(k, config).toBeLessThanOrEqual(BAND[config][1]);
+      expect.soft(k, config).toBeGreaterThanOrEqual(BAND[config][0]);
+      expect.soft(k, config).toBeLessThanOrEqual(BAND[config][1]);
     }
     // the centre alone takes ring 1's four points (desktop R[1] = [300, 185] × 0.9), after its own card
     expect(frame(alone, 'desktop').fit.slice(1).map((f) => [f.x, f.y])).toEqual([[270, 0], [-270, 0], [0, 166.5], [0, -166.5]]);
