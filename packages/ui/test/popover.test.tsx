@@ -223,6 +223,13 @@ function GrowingHost() {
   );
 }
 
+// Where the popover is, as react-aria leaves it: compared by value, because its direct style writes
+// reorder the `style` attribute without moving anything.
+function placementOf(popover: HTMLElement) {
+  const { position, top, bottom, left, maxHeight } = popover.style;
+  return { placement: popover.dataset.placement, position, top, bottom, left, maxHeight };
+}
+
 // The bottom edge of the popover's last row (Apply) in the viewport: the box's top, wherever
 // react-aria anchored it, plus the content (which spills past a capped box) less the padding.
 function actionsBottom(popover: HTMLElement): number {
@@ -234,7 +241,7 @@ function actionsBottom(popover: HTMLElement): number {
 }
 
 describe('Popover — content that grows after it opens', () => {
-  it('18.256a re-positions when the content outgrows the space below: it flips above the trigger and its actions stay inside the viewport', async () => {
+  it('18.256a re-positions when the content outgrows the space below: it flips above the trigger and its actions stay inside the viewport; its first frame is already placed, on open and on reopen', async () => {
     const layout = installLayout();
     try {
       const user = userEvent.setup();
@@ -243,12 +250,16 @@ describe('Popover — content that grows after it opens', () => {
       layout.deliver();
 
       await user.click(screen.getByRole('button', { name: 'Trigger' }));
-      layout.deliver();
       const popover = screen.getByRole('dialog', { name: 'Change who can see this' });
       // The control: 232 px fits the 260 px below the trigger, so it opens there — 18.256's trace.
-      expect(popover).toHaveAttribute('data-placement', 'bottom');
-      expect(popover.style.top).toBe('448px');
-      expect(popover.style.maxHeight).toBe('260px');
+      const below = { placement: 'bottom', position: 'absolute', top: '448px', bottom: '', left: '880px', maxHeight: '260px' };
+      // The first frame: the opening commit itself places it (react-aria's layout effect, which runs
+      // before the browser paints), BEFORE any ResizeObserver delivery or animation frame — no first
+      // frame at the unpositioned `position: fixed; top: 0; left: 0`.
+      expect(placementOf(popover)).toEqual(below);
+      layout.deliver();
+      // The first measurement after layout leaves it where it was painted.
+      expect(placementOf(popover)).toEqual(below);
       expect(actionsBottom(popover)).toBeLessThanOrEqual(VIEWPORT.height);
 
       await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
@@ -260,6 +271,16 @@ describe('Popover — content that grows after it opens', () => {
       // Its bottom edge 6 px above the trigger: 720 - 328 = 392 = 398 - 6.
       expect(popover.style.bottom).toBe('328px');
       expect(actionsBottom(popover)).toBeLessThanOrEqual(VIEWPORT.height);
+
+      // Reopened after the flip, its content is short again (the list closed with it): the first
+      // frame is already at the NEW spot below the trigger, not the old one above it.
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Trigger' }));
+      const reopened = screen.getByRole('dialog', { name: 'Change who can see this' });
+      expect(placementOf(reopened)).toEqual(below);
+      layout.deliver();
+      expect(placementOf(reopened)).toEqual(below);
     } finally {
       layout.restore();
     }
