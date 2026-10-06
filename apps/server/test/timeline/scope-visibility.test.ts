@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, SYSTEM_ACTOR_FLOW } from '@gisik-nokma/domain';
+import { istDayOf, newUlid, SYSTEM_ACTOR_FLOW } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { computeScope } from '../../src/timeline/compute.js';
 import { loadWorkspace } from '../../src/timeline/load.js';
@@ -221,6 +221,7 @@ describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
     const A = w.A.workspaceId;
     const ev = (id: string, type: string, payload: Record<string, unknown>, actorId = w.ama) =>
       makeCommitted({ workspaceId: A, actorId, entity: { kind: 'ticket', id }, type, payload });
+    const notTaken = { kind: 'branch-not-taken', decisionTicketId: D, outcome: 'Stop', pass: 1, decidedBy: w.ama, decisionEventId: newUlid() };
     await applyCommitted(db.pool, [
       ev(D, 'ticket.created', { typeId: 'decision', projectId: w.A.p2, parentId: null, title: 'Secret call', startDate: { date: '2026-10-14' }, estimate: 1, assigneeId: w.ama }),
       ev(D, 'visibility.set', { ticketId: D, mode: 'explicit', userIds: [w.ama] }),
@@ -233,32 +234,35 @@ describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
       ev(Q, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Mine after', estimate: 1, assigneeId: w.ama }),
       ev(S, 'ticket.link_added', { kind: 'leads_to', targetId: Q }),
       // the settle's "Not taken": the state moves to Done and the close flag carries the cause (`ticketClosedPayload`, wtg2 T8)
-      ev(N, 'ticket.transitioned', { to: 'done' }, SYSTEM_ACTOR_FLOW),
-      ev(
-        N,
-        'ticket.closed',
-        { cause: { kind: 'branch-not-taken', decisionTicketId: D, outcome: 'Stop', pass: 1, decidedBy: w.ama, decisionEventId: newUlid() } },
-        SYSTEM_ACTOR_FLOW,
-      ),
+      // as the settle moves it (`settle.ts`): the transition carries the cause too, so it opens no period (PS-8) and N never started
+      ev(N, 'ticket.transitioned', { to: 'done', cause: notTaken }, SYSTEM_ACTOR_FLOW),
+      ev(N, 'ticket.closed', { cause: notTaken }, SYSTEM_ACTOR_FLOW),
     ]);
   });
 
-  it('29.296 a blind viewer: no index, chunk or tray body carries the Decision id; the resolution keeps its outcome; control: the seeing viewer gets it', async () => {
+  it('29.296 a blind viewer: no index, chunk or tray body carries the Decision id or its outcome (planner ruling 2026-10-06 05:46); the resolution keeps its kind and pass; control: the seeing viewer gets both', async () => {
     const bo = await reads(w.bo);
     // the subjects are there, so an absent id is the blanking, not a missing row
-    expect(bo.index.items.find((e) => e.id === N)?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, outcome: 'Stop', pass: 1 });
+    expect(bo.index.items.find((e) => e.id === N)?.resolution).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
     expect(bo.chunk.items.some((d) => d.id === N)).toBe(true);
+    // N never started: its one segment is the stub on its close day (D-W4-11), read from the row the load folds
+    const { rows: [closedRow] } = await db.pool.query<{ closed_at: Date }>('SELECT closed_at FROM proj_tickets WHERE ticket_id = $1', [N]);
+    const closeDay = istDayOf((closedRow as { closed_at: Date }).closed_at.toISOString());
+    expect(bo.index.items.find((e) => e.id === N)?.segments).toEqual([{ start: closeDay, end: closeDay, pass: 1, type: 'stub' }]);
     expect(bo.tray.items.find((r) => r.id === T)).toMatchObject({ reachedBy: null });
     expect(JSON.stringify(bo.index)).not.toContain(D);
     expect(JSON.stringify(bo.chunk)).not.toContain(D);
     expect(JSON.stringify(bo.tray)).not.toContain(D);
+    for (const body of [bo.index, bo.chunk, bo.tray]) expect(JSON.stringify(body)).not.toContain('"Stop"'); // D's outcome, its branch name
     // Me: N is bo's, the scope narrows, and the answer is still blind
     const boMe = await reads(w.bo, true);
-    expect(boMe.index.items.find((e) => e.id === N)?.resolution).toMatchObject({ decisionTicketId: null, outcome: 'Stop' });
+    expect(boMe.index.items.find((e) => e.id === N)?.resolution).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
     expect(JSON.stringify(boMe)).not.toContain(D);
+    expect(JSON.stringify(boMe)).not.toContain('"Stop"');
 
     const ama = await reads(w.ama);
     expect(ama.index.items.find((e) => e.id === N)?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: D, outcome: 'Stop', pass: 1 });
+    expect(JSON.stringify(ama.index)).toContain('"Stop"'); // control: the haystack holds its subject
     const flow = ama.index.flows.find((f) => f.nodes.some((n) => n.id === N));
     expect(flow?.nodes.find((n) => n.id === N)?.notTaken).toMatchObject({ decisionTicketId: D });
     expect(flow?.edges).toContainEqual({ from: N, to: T, kind: 'blocks', label: null }); // a blocks link between two members rides the flow
@@ -270,5 +274,23 @@ describe('29.296 a hidden Decision is never named (PTR privacy rule)', () => {
     // the load admits an out-of-scope SOURCE as well as a target: S is nobody's, Q is hers
     expect(amaMe.index.flows.find((f) => f.nodes.some((n) => n.id === Q))?.nodes.map((n) => n.id).sort()).toEqual([S, Q].sort());
     expect(amaMe.index.items.some((e) => e.id === S)).toBe(false);
+  });
+
+  it('29.296 out of scope, the load admits a ticket only as a FLOW member: two tickets joined by a blocks link alone stay unloaded; control: in scope both load, and the diamond loads out of scope through its leads_to links', async () => {
+    const [X1, X2] = [newUlid(), newUlid()];
+    const A = w.A.workspaceId;
+    const mk = (id: string, type: string, payload: Record<string, unknown>) => makeCommitted({ workspaceId: A, actorId: w.ama, entity: { kind: 'ticket', id }, type, payload });
+    await applyCommitted(db.pool, [
+      mk(X1, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Blocker' }),
+      mk(X2, 'ticket.created', { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Blocked' }),
+      mk(X1, 'ticket.link_added', { kind: 'blocks', targetId: X2 }),
+    ]);
+    const eff = await resolveEffectiveRole(db.pool, w.ama, A);
+    const loadIn = async (projectIds: string[]) => new Map((await loadWorkspace(db.pool, eff, w.ama, A, scopeOf([A], false, projectIds))).tickets.map((t) => [t.id, t.inScope]));
+    const p2 = await loadIn([w.A.p2]);
+    expect(p2.has(X1) || p2.has(X2)).toBe(false);
+    const p1 = await loadIn([w.A.p1]);
+    expect([p1.get(X1), p1.get(X2)]).toEqual([true, true]); // control: in scope, both load
+    expect(p1.get(w.t.fStart)).toBe(false); // control: out of scope, a flow member loads (inScope false)
   });
 });

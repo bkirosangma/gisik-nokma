@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { membershipId, newUlid, TIMELINE_CHUNK_DAYS, TIMELINE_FLOW_CAP, TIMELINE_INDEX_CAP, TIMELINE_PAGE_SIZE } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
@@ -14,6 +14,21 @@ import { readableWorkspaces, type TimelineScope } from '../../src/timeline/scope
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { insertUser, seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
+
+/**
+ * 29.293's cap leg lowers `HOME_ID_CAP` for the calls inside it, so the six id lists are longer than the cap without
+ * seeding 2,001 tickets; every other leg reads the real one (`homeCap.value` is undefined outside that leg).
+ */
+const homeCap = vi.hoisted(() => ({ value: undefined as number | undefined }));
+vi.mock('@gisik-nokma/domain', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@gisik-nokma/domain')>();
+  return {
+    ...real,
+    get HOME_ID_CAP() {
+      return homeCap.value ?? real.HOME_ID_CAP;
+    },
+  };
+});
 
 /**
  * 29.299 (the index, chunk and tray slice one core) and 29.293 (Home's numbers over a scope, and `asOf`) on
@@ -228,6 +243,8 @@ describe("29.293 Home's numbers over a scope", () => {
     expect((hA.counts.members ?? 0) + (hB.counts.members ?? 0)).toBe(4); // control: the per-workspace sum differs
     expect([...two.ids.members].sort()).toEqual([w.ama, w.bo].sort());
     expect(two.ids.tickets).toEqual([...two.ids.tickets].sort().reverse()); // newest first across workspaces
+    expect(two.ids.open).toEqual([...two.ids.open].sort().reverse()); // open: newest first across workspaces too
+    expect(two.ids.open).not.toEqual([...hA.ids.open, ...hB.ids.open]); // control: A's then B's is another order
     expect(two.ids.dueSoon).toEqual([due.bSoon, w.t.dated]); // by day across workspaces (B's 10-05 before A's 10-07)
     expect(two.ids.pastDue).toEqual([due.bPast, due.aPast]); // 09-10 (B) before 09-20 (A)
 
@@ -250,6 +267,31 @@ describe("29.293 Home's numbers over a scope", () => {
     expect(p1.ids.notes).not.toContain(notes.p2);
     expect(p1.ids.tickets).toContain(w.t.dated);
     expect(p1.ids.tickets).not.toContain(w.t.fStart); // A.p2
+  });
+
+  it('29.293 each id list is the first HOME_ID_CAP ids of the MERGED order and the counts are taken before the cap; readHome caps the same six (the cap lowered)', async () => {
+    const ws = [w.A.workspaceId, w.B.workspaceId];
+    const keys = ['tickets', 'open', 'pastDue', 'dueSoon', 'members', 'notes'] as const;
+    const full = await summary(w.ama, scopeOf(ws));
+    const fullHome = await home(w.ama, w.A.workspaceId);
+    let capped: typeof full;
+    let cappedHome: typeof fullHome;
+    try {
+      homeCap.value = 1;
+      capped = await summary(w.ama, scopeOf(ws));
+      homeCap.value = 0;
+      cappedHome = await home(w.ama, w.A.workspaceId);
+    } finally {
+      homeCap.value = undefined;
+    }
+    for (const k of keys) {
+      expect(full.ids[k].length, k).toBeGreaterThan(1); // control: every merged list is longer than the lowered cap
+      expect(capped.ids[k], k).toEqual(full.ids[k].slice(0, 1));
+      expect(fullHome.ids[k].length, k).toBeGreaterThan(0); // control: none of A's own lists is empty
+      expect(cappedHome.ids[k], k).toEqual([]);
+    }
+    expect(capped.counts).toEqual(full.counts);
+    expect(cappedHome.counts).toEqual(fullHome.counts);
   });
 
   it('29.293 members is null only when every readable workspace withholds its roster (a guest everywhere); control: one roster is enough', async () => {

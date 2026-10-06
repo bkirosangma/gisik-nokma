@@ -82,12 +82,15 @@ export const dayPeriods = (periods: readonly WorkPeriod[]) =>
   periods.map((p) => ({ start: istDayOf(p.start), end: p.end === null ? null : istDayOf(p.end), pass: p.pass }));
 
 /**
- * The resolution AS SERVED (FL-1, PTR privacy rule): the Decision's id only when that Decision is loaded for this viewer
- * (`seen`: a hidden ticket is never loaded), else `null`; the outcome and the pass stay. Part 3's `buildFlowRead` blanks
- * `FlowNodeRead.resolution` the same way. `planFlow` reads only whether `notTaken` is null, so the plan is unchanged.
+ * The resolution AS SERVED (FL-1, PTR privacy rule): the Decision's id and its outcome only when that Decision is loaded for
+ * this viewer (`seen`: a hidden ticket is never loaded); else the id is `null` and the outcome, the hidden Decision's authored
+ * branch name, is not served (planner ruling 2026-10-06 05:46); the kind and the pass stay. Part 3's `buildFlowRead` serves
+ * a hole the same way (`resolutionRead`, 29.449). `planFlow` reads only whether `notTaken` is null, so the plan is unchanged.
+ * The server's fold never holds a withheld cause, so `decisionTicketId` is a string here; a `null` one is never in `seen`.
  */
-export function servedResolution(r: NotTakenResolution | null, seen: ReadonlySet<string>): TimelineResolution {
-  return r === null ? null : { ...r, decisionTicketId: seen.has(r.decisionTicketId) ? r.decisionTicketId : null };
+export function servedResolution(r: NotTakenResolution | null, seen: ReadonlySet<string | null>): TimelineResolution {
+  if (r === null) return null;
+  return seen.has(r.decisionTicketId) ? { ...r } : { kind: r.kind, decisionTicketId: null, pass: r.pass };
 }
 
 /**
@@ -191,8 +194,6 @@ export function assembleScope(
       }
     }
   }
-  entries.sort((a, b) => (a.id < b.id ? -1 : 1));
-  tray.sort((a, b) => (a.id < b.id ? -1 : 1));
   return { today: i.today, entries, flows, tray, details, truncated: null };
 }
 
@@ -217,8 +218,8 @@ const byIdAsc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ?
 
 /**
  * Merge per-workspace cores and apply PR-0's cap: the entries that ended longest ago go first. Entries and tray rows are
- * put back in `ticket_id` order ACROSS workspaces: each core is sorted on its own, and the tray's keyset pager
- * (`id > cursor`) would skip a later workspace's smaller id if the merged list were only concatenated.
+ * put in `ticket_id` order ACROSS workspaces HERE, the one place the served order is made (a core lists them component by
+ * component; `computeScope` merges even one core): the tray's keyset pager (`id > cursor`) needs that order.
  */
 export function mergeCores(today: string, cores: readonly ScopeCore[], limits: Limits = DEFAULT_LIMITS): ScopeCore {
   const all = cores.flatMap((c) => c.entries).sort(byIdAsc);

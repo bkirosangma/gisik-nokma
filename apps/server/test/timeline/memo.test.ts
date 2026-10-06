@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { readAsOf } from '../../src/timeline/as-of.js';
 import { coreKey, forgetCores, TIMELINE_CORE_MEMO_MAX, TIMELINE_CORE_TTL_MS } from '../../src/timeline/memo.js';
 import { readTimelineChunk } from '../../src/timeline/read-chunk.js';
 import { readTimelineIndex } from '../../src/timeline/read-index.js';
@@ -9,7 +10,7 @@ import { readTimelineTray } from '../../src/timeline/read-tray.js';
 import { readableWorkspaces, type ReadableWorkspace, type TimelineScope } from '../../src/timeline/scope.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
+import { insertUser, seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
 
 /**
  * 29.299, the owner's (b) ruling (AMEND-wtg4-t1-reads-perf.md): a chunk or tray after its index slices the core the index
@@ -18,17 +19,26 @@ import { seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
  *
  * World (`seedTimelineWorld`): in A, `hidden` (chained after `step1`) is ama's alone; bo is A's member and sees `dated`
  * (nobody's; `other` would not do for the write leg: bo is its assignee, who always sees it). Filed here: `undated`, so the
- * tray has a row.
+ * tray has a row; `bea`, a second member of A with bo's role and project flags; and `onlyBo`, dated, which ama and bo may see
+ * and bea may not (so for bo and bea the viewer is the ONLY input of the key that differs).
  */
 const NOW = new Date('2026-10-03T06:00:00.000Z');
 const WINDOW = { from: '2026-10-01', to: '2026-10-31' };
 let db: TestDatabase;
 let w: TimelineWorld;
 const undated = newUlid();
+const bea = newUlid();
+const onlyBo = newUlid();
 beforeAll(async () => {
   db = await createTestDatabase();
   w = await seedTimelineWorld(db.pool);
+  await insertUser(db.pool, bea, 'Bea');
+  const wa = { workspaceId: w.A.workspaceId, actorId: w.ama };
   await applyCommitted(db.pool, [
+    makeCommitted({ ...wa, entity: { kind: 'membership', id: membershipId(w.A.workspaceId, bea) }, type: 'membership.granted', payload: { userId: bea, role: 'member' } }),
+    ...[w.A.p1, w.A.p2].map((p) => makeCommitted({ ...wa, entity: { kind: 'project', id: p }, type: 'project.member_added', payload: { userId: bea, projectAdmin: false } })),
+    makeCommitted({ ...wa, entity: { kind: 'ticket', id: onlyBo }, type: 'ticket.created', payload: { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Only bo', startDate: { date: '2026-10-08' }, estimate: 1 } }),
+    makeCommitted({ ...wa, entity: { kind: 'ticket', id: onlyBo }, type: 'visibility.set', payload: { ticketId: onlyBo, mode: 'explicit', userIds: [w.ama, w.bo] } }),
     makeCommitted({ workspaceId: w.A.workspaceId, actorId: w.ama, entity: { kind: 'ticket', id: undated }, type: 'ticket.created', payload: { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Undated' } }),
   ]);
 }, 120_000);
@@ -102,6 +112,22 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     expect(c.computes()).toBe(2); // bo's own core
   });
 
+  it("29.299 the VIEWER alone separates two cores: bea has bo's role and project flags and may not see onlyBo; within the TTL she never gets bo's core; control: with the viewer left out their keys are one key", async () => {
+    const scope = scopeOf();
+    const [rBo, rBea] = [await readableWorkspaces(db.pool, w.bo, scope), await readableWorkspaces(db.pool, bea, scope)];
+    const asOf = await readAsOf(db.pool, rBo);
+    expect(coreKey('-', scope, rBea, asOf, NOW)).toBe(coreKey('-', scope, rBo, asOf, NOW)); // control: nothing but the viewer differs
+    const c = counting();
+    expect(JSON.stringify((await (await reads(c.pool, w.bo)).index()).items)).toContain(onlyBo); // bo may see it, and his core is kept
+    const r = await reads(c.pool, bea);
+    const chunk = await r.chunk();
+    const tray = await r.tray();
+    expect(chunk.items.some((d) => d.id === w.t.dated)).toBe(true); // bea's chunk is not empty: the absence below is sight
+    expect(JSON.stringify(chunk)).not.toContain(onlyBo);
+    expect(JSON.stringify(tray)).not.toContain(onlyBo);
+    expect(c.computes()).toBe(2); // bea's own core
+  });
+
   it('29.299 a write moves asOf, so the next chunk computes again and sees it: a privacy change never waits for the TTL; control: before it, a hit', async () => {
     const c = counting();
     const bo = await reads(c.pool, w.bo);
@@ -146,6 +172,10 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     expect(c.computes()).toBe(10); // the third-oldest and the re-kept one are still kept
     await (await view(keys[1] as (typeof keys)[number])).chunk();
     expect(c.computes()).toBe(11); // the oldest kept (keys[1], once keys[0] moved up) was evicted
+    // kept again while the memo is full and it is NOT the oldest: it moves up and evicts nothing (kept now: 3-7, 0, 8, 1)
+    await (await view(keys[5] as (typeof keys)[number])).index();
+    await (await view(keys[3] as (typeof keys)[number])).chunk();
+    expect(c.computes()).toBe(12); // the oldest kept (keys[3]) survived it
   });
 
   it('29.299 a compute that fails is not kept: the next read computes again; control: a kept core is reused', async () => {

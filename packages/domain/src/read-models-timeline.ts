@@ -22,11 +22,12 @@ export type TimelineSegment = { start: string; end: string; pass: number; type: 
 export type TimelinePin = { notes: number; attachments: number };
 /**
  * The index's wire name is `resolution` (spec :174, as Part 3's `FlowNodeRead.resolution`); the value is Part 2's
- * `NotTakenResolution` (`FlowNode.notTaken`) AS SERVED: `decisionTicketId` is `null` when this viewer cannot see that
- * Decision (FL-1; Part 3's `buildFlowRead` blanks it the same way). The outcome and the pass stay. A raw close cause is
- * never served (`viewerSafeCause`'s rule): only this resolution, and the Decision's id only to a viewer who sees it.
+ * `NotTakenResolution` (`FlowNode.notTaken`) AS SERVED: when this viewer cannot see that Decision (FL-1) `decisionTicketId`
+ * is `null` and the `outcome` key is ABSENT, a hidden Decision's outcome being its authored branch name (planner ruling
+ * 2026-10-06 05:46; Part 3's `buildFlowRead` serves a hole the same way, 29.449). The kind and the pass stay. A raw close
+ * cause is never served (`viewerSafeCause`'s rule): only this resolution, its Decision and outcome only to a viewer who sees it.
  */
-export type TimelineResolution = { kind: 'not-taken'; decisionTicketId: string | null; outcome: string; pass: number } | null;
+export type TimelineResolution = { kind: 'not-taken'; decisionTicketId: string | null; outcome?: string; pass: number } | null;
 export type TimelineUnscheduledReason = UnscheduledReason;
 
 /** PR-0's index entry (+ `workspaceId`, needed once a scope spans workspaces). About 100 bytes plus 16 per segment. */

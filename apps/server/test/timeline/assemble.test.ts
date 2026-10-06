@@ -126,6 +126,11 @@ describe('29.295 assembleScope', () => {
     // a flow's blocks link between two members rides the flow (drawn fainter); control: its leads_to is there too
     const withBlocks = assembleScope({ tickets: [t(74, { explicitStart: '2026-10-05', estimate: 1 }), t(75, { estimate: 1 })], edges: [lead(74, 75), { ...blocks, from: id(74), to: id(75) }], keys: none, pins, today: TODAY });
     expect(withBlocks.flows[0]?.edges).toEqual([{ from: id(74), to: id(75), kind: 'leads_to', label: null }, { from: id(74), to: id(75), kind: 'blocks', label: null }]);
+    // between two siblings of a fork a blocks link is drawn, never planned: both start the day after their source ends
+    const fork = assembleScope({ tickets: [t(76, { explicitStart: '2026-10-05', estimate: 1 }), t(77, { estimate: 2 }), t(78, { estimate: 1 })], edges: [lead(76, 77), lead(76, 78), { ...blocks, from: id(77), to: id(78) }], keys: none, pins, today: TODAY });
+    const startOf = (n: number) => fork.entries.find((e) => e.id === id(n))?.segments.find((s) => s.type === 'planned')?.start;
+    expect(startOf(77)).toBe('2026-10-06'); // control: chained after 76
+    expect(startOf(78)).toBe(startOf(77));
     const order = assembleScope({ tickets: [t(83), t(81), t(82, { explicitStart: '2026-10-06', estimate: 1 }), t(80, { explicitStart: '2026-10-05', estimate: 1 })], edges: [], keys: none, pins, today: TODAY });
     expect(order.tray.map((r) => r.id)).toEqual([id(81), id(83)]);
     expect(order.entries.map((e) => e.id)).toEqual([id(80), id(82)]);
@@ -144,14 +149,16 @@ describe('29.295 assembleScope', () => {
     expect(out.entries.find((e) => e.id === id(88))?.flowId).toBeNull(); // the edge from an unloaded id makes no flow of 88
   });
 
-  it('29.295 a Not-taken resolution names its Decision only when this viewer has it loaded (FL-1), in items and in flows; control: loaded (even out of scope), it is named', () => {
+  it('29.295 a Not-taken resolution names its Decision and that Decision\'s outcome only when this viewer has it loaded (FL-1; planner ruling 2026-10-06 05:46), in items and in flows; control: loaded (even out of scope), both are named', () => {
     const nt: NotTakenResolution = { kind: 'not-taken', decisionTicketId: id(50), outcome: 'No', pass: 1 };
     const target = t(51, { notTaken: nt, category: 'terminal', closed: true });
     const before = t(52, { explicitStart: '2026-10-05', estimate: 1 });
     const blind = assembleScope({ tickets: [before, target], edges: [lead(52, 51)], keys: none, pins, today: TODAY });
-    expect(blind.entries.find((e) => e.id === id(51))?.resolution).toEqual({ ...nt, decisionTicketId: null });
-    expect(blind.flows[0]?.nodes.find((n) => n.id === id(51))?.notTaken).toEqual({ ...nt, decisionTicketId: null });
+    // a hole: no id and no `outcome` key (the hidden Decision's authored branch name), the kind and the pass kept
+    expect(blind.entries.find((e) => e.id === id(51))?.resolution).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
+    expect(blind.flows[0]?.nodes.find((n) => n.id === id(51))?.notTaken).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
     expect(text(blind)).not.toContain(id(50));
+    expect(text(blind)).not.toContain('"No"');
     const dec = t(50, { typeId: DECISION_TYPE_ID, explicitStart: '2026-10-04', estimate: 1, inScope: false, outcome: 'Yes' });
     const seeing = assembleScope({ tickets: [dec, before, target], edges: [lead(52, 51), lead(50, 52, 'Yes'), lead(50, 51, 'No')], keys: none, pins, today: TODAY });
     expect(seeing.entries.find((e) => e.id === id(51))?.resolution).toEqual(nt);
@@ -178,6 +185,13 @@ describe('29.298 the caps', () => {
     expect(m.truncated).toEqual({ dropped: 2, before: '2026-10-03' });
     expect(m.tray.map((r) => r.id)).toEqual([id(7), id(8)]);
     expect([...m.details.keys()].sort()).toEqual([id(1), id(2), id(3), id(4), id(7), id(8)].sort());
+  });
+
+  it("29.298 every core's flows are kept by the merge, in core order; control: each core holds one", () => {
+    const w1 = assembleScope({ tickets: [t(11, { explicitStart: '2026-10-01', estimate: 1 }), t(12, { estimate: 1 })], edges: [lead(11, 12)], keys: none, pins, today: TODAY });
+    const w2 = assembleScope({ tickets: [t(13, { explicitStart: '2026-10-02', estimate: 1, workspaceId: 'W2' }), t(14, { estimate: 1, workspaceId: 'W2' })], edges: [lead(13, 14)], keys: none, pins, today: TODAY });
+    expect([w1.flows.map((f) => f.id), w2.flows.map((f) => f.id)]).toEqual([[id(11)], [id(13)]]);
+    expect(mergeCores(TODAY, [w1, w2]).flows.map((f) => [f.id, f.workspaceId])).toEqual([[id(11), 'W'], [id(13), 'W2']]);
   });
 
   it('29.298 a flow over the flow cap is truncated with no nodes, still planned; control: at the cap it keeps its nodes', () => {

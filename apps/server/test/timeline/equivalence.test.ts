@@ -18,7 +18,8 @@ import { seedDraft, seedTimelineWorld, type TimelineWorld } from './helpers/worl
  * or narrows holds a value its stub does not: a long `description` and a priority (narrowed out of `fields`), transitions
  * and periods (a ticket worked to Done), `reopened_at`, a `rank`, a draft with a pending child (`pending_children`, the
  * draft columns), `links` (every link source); and, for the assembler: a Decision that has decided (passes, a pruned
- * branch), a loop edge, a Not-taken ticket under a Decision bo cannot see, a `blocks` inside a flow and one between two
+ * branch), a loop whose 'Rework' reset its first ticket into round 2 as the settle does (`rounds`, `reworkEstimate`), a
+ * Not-taken ticket under a Decision bo cannot see, a `blocks` inside a flow and one between two
  * singletons, and a flow in B.
  */
 const NOW = new Date('2026-10-03T06:00:00.000Z');
@@ -41,6 +42,7 @@ beforeAll(async () => {
   const lead = (ws: typeof A, from: string, to: string, label?: string): LedgerEvent =>
     ev(ws.workspaceId, from, 'ticket.link_added', { kind: 'leads_to', targetId: to, ...(label === undefined ? {} : { label }) });
   const long = 'A long description the Timeline never reads. '.repeat(60);
+  const rework = { kind: 'reopened-by-flow', decisionTicketId: x.LD, outcome: 'Rework', pass: 1, decidedBy: w.ama, decisionEventId: newUlid() };
   await applyCommitted(db.pool, [
     created(A, x.desc, 'Described', { startDate: { date: '2026-10-06' }, estimate: 2, description: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: long }] }] }, priority: 'P1' }),
     created(A, x.worked, 'Worked', { startDate: { date: '2026-09-28' }, estimate: 3 }),
@@ -69,7 +71,12 @@ beforeAll(async () => {
     lead(A, x.L1, x.LD),
     lead(A, x.LD, x.L2, 'Ship'),
     lead(A, x.LD, x.L1, 'Rework'),
+    ev(A.workspaceId, x.L1, 'ticket.transitioned', { to: 'doing' }),
+    ev(A.workspaceId, x.L1, 'ticket.transitioned', { to: 'done' }),
     ev(A.workspaceId, x.LD, 'ticket.decided', { outcome: 'Rework' }),
+    // the settle's loop reset (`settle.ts`): reopen, then back to the initial state, both carrying the cause; L1 is in round 2
+    ev(A.workspaceId, x.L1, 'ticket.reopened', { cause: rework }, SYSTEM_ACTOR_FLOW),
+    ev(A.workspaceId, x.L1, 'ticket.transitioned', { to: 'todo', cause: rework }, SYSTEM_ACTOR_FLOW),
     // the diamond's Decision has decided 'Yes': fNo is pruned (a ghost)
     ev(A.workspaceId, w.t.fDec, 'ticket.decided', { outcome: 'Yes' }),
     // singletons: dated + undated + due-only, and a blocks between two of them (a link that makes no flow)
@@ -140,6 +147,8 @@ describe('29.295 / 29.299 the (c) changes answer exactly what the 1882524a reads
       [w.A.workspaceId],
     );
     expect(rows[0]).toEqual({ transitions: true, links: true, pending: true, reopened: true, rank: true, draft: true, description: true, priority: true, started: true, ended: true });
+    // a fold column the load keeps holds a non-default value too: the loop's reset counted L1's second round
+    expect((await db.pool.query<{ rounds: number }>('SELECT rounds FROM proj_tickets WHERE ticket_id = $1', [x.L1])).rows).toEqual([{ rounds: 2 }]);
   });
 
   it('29.295 / 29.299 the index, every chunk page and every tray page are byte-identical for both viewers, Everyone and Me, one and two workspaces; control: the bodies differ across viewers', async () => {
