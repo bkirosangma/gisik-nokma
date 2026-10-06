@@ -6606,7 +6606,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": "."
+                    "text": ". A small paper pin on a bar means the ticket has a note you can read or an attachment, and the bar's hover text says how many."
                   }
                 ]
               },
