@@ -14,6 +14,8 @@ import { reindexNote, rederiveWorkspaceLexemes } from './note-search.js';
  * there), and `proj_note_lexemes`, which is never deleted, still holds those words in the note's workspace's spelling
  * vocabulary. So every note with a link to a ticket of another workspace is re-indexed, and then each such note's
  * workspace's vocabulary is re-derived from its rows. Nothing else is touched, and no link is deleted: it HIDES.
+ * A workspace whose link is gone by now (detached, or its ticket purged) is not reached here: once this run has
+ * ended, `backfill-note-vocabularies.ts` re-derives every workspace's vocabulary (18.526).
  *
  * ## Why no live write is lost
  * Each note is re-indexed under `lockEntity`, the lock ingest holds across every projection's `apply` for that note,
@@ -33,7 +35,8 @@ export const NOTE_SEARCH_BIND_BACKFILL = 'proj_note_search:workspace-bind';
 export type NoteSearchBindProbe = (stage: 'locked' | 'vocabulary', id: string) => Promise<void>;
 export type NoteSearchBindDeps = { probe?: NoteSearchBindProbe; shouldStop?: () => boolean; log?: (message: string) => void };
 
-async function inTransaction(pool: Pool, body: (client: PoolClient) => Promise<void>): Promise<number> {
+/** One short transaction on its own client; resolves to its duration in ms. Shared with `backfill-note-vocabularies.ts`. */
+export async function inTransaction(pool: Pool, body: (client: PoolClient) => Promise<void>): Promise<number> {
   const client = await pool.connect();
   const started = performance.now();
   let failed: Error | undefined;
@@ -103,8 +106,14 @@ export async function backfillNoteSearchBinds(pool: Pool, deps: NoteSearchBindDe
   }
 }
 
-/** The boot wiring, as `startReferencesBackfill`: `run()` after `listen` (never awaited), `stop()` from `onClose`. */
-export function startNoteSearchBindBackfill(pool: Pool, deps: Omit<NoteSearchBindDeps, 'shouldStop'>): { run(): void; stop(): Promise<void> } {
+/**
+ * The boot wiring, as `startReferencesBackfill`: `run()` after `listen` (never awaited), `stop()` from `onClose`.
+ * `settled()` resolves when the run `run()` started has ended, however it ended: the vocabulary re-derive waits on it.
+ */
+export function startNoteSearchBindBackfill(
+  pool: Pool,
+  deps: Omit<NoteSearchBindDeps, 'shouldStop'>,
+): { run(): void; stop(): Promise<void>; settled(): Promise<void> } {
   let stopping = false;
   let running: Promise<unknown> = Promise.resolve();
   return {
@@ -115,6 +124,9 @@ export function startNoteSearchBindBackfill(pool: Pool, deps: Omit<NoteSearchBin
     },
     async stop() {
       stopping = true;
+      await running;
+    },
+    async settled() {
       await running;
     },
   };

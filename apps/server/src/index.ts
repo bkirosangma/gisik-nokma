@@ -12,6 +12,7 @@ import { buildServerGates } from './gates/index.js';
 import { signInMaxFor } from './http/rate-limit.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { startNoteSearchBindBackfill } from './projections/backfill-note-search-binds.js';
+import { startNoteVocabularyBackfill } from './projections/backfill-note-vocabularies.js';
 import { startReferencesBackfill } from './projections/backfill-references.js';
 import { buildProjectionRegistry } from './projections/index.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
@@ -381,6 +382,18 @@ async function main(): Promise<void> {
   app.addHook('onClose', async () => {
     await noteSearchBindBackfill.stop();
   });
+  // task/kg-vocab-rederive-all (18.526-18.530): the one-shot re-derive of EVERY workspace's spelling vocabulary, for the
+  // words a pre-fix link left behind once it was detached or its ticket purged. It waits for the run above to end
+  // (`after`); `run()` below must follow `noteSearchBindBackfill.run()`, whose run `settled()` answers for.
+  const noteVocabularyBackfill = startNoteVocabularyBackfill(pool, {
+    after: () => noteSearchBindBackfill.settled(),
+    log: (msg) => {
+      app.log.warn(msg);
+    },
+  });
+  app.addHook('onClose', async () => {
+    await noteVocabularyBackfill.stop();
+  });
 
   // BEFORE `listen`, so there is no window in which this process is alive and
   // ignoring SIGTERM — on PID 1 that window is not a race with a default
@@ -391,6 +404,7 @@ async function main(): Promise<void> {
   await app.listen({ port: config.port, host: config.host });
   referencesBackfill.run();
   noteSearchBindBackfill.run();
+  noteVocabularyBackfill.run();
 }
 
 main().catch((error: unknown) => {

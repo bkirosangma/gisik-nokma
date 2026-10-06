@@ -95,7 +95,10 @@ import type { Projection } from './registry.js';
  *
  * Two events narrow "never deleted": a purge (`rederiveWorkspaceLexemes`, trash
  * series Plan 2) and a prefix change (above), which re-derive the workspace's
- * vocabulary from its current rows.
+ * vocabulary from its current rows. So does one boot, once: the re-derive of
+ * every workspace's vocabulary (`backfill-note-vocabularies.ts`, 18.526), which
+ * drops the words a pre-fix link to another workspace's ticket left behind, and
+ * with them every word no current row holds.
  */
 
 type NoteSourceRow = {
@@ -248,7 +251,7 @@ async function reindexNotesAttachedInWorkspace(tx: PoolClient, workspaceId: stri
  * `"<key> <title>\n"` per attached LIVE ticket of the note's OWN workspace (`workspaceId`), in ticket-id order. A
  * link to another workspace's ticket, written before 18.500 refused it, indexes nothing (18.522): it would make the
  * note a hit for that ticket's words, and put them in this workspace's vocabulary. Rows written before this line are
- * re-derived once at boot (`backfill-note-search-binds.ts`).
+ * re-derived once at boot (`backfill-note-search-binds.ts`), and then every vocabulary (`backfill-note-vocabularies.ts`).
  *
  * A deleted ticket contributes nothing — its line is dropped rather than kept
  * and marked, because a search hit whose snippet names a ticket the reader
