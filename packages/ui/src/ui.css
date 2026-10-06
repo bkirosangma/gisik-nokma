@@ -3476,8 +3476,9 @@ a.gn-ticket-sheet__crumb--link {
    note's byline (app-core `ConceptsRow`). A confirmed concept is drawn as the canvas draws one (spec C §3.7): a solid
    pill in the concept fill with its name in `text` (`conceptFill` carries `text` at 4.5, `CONTRAST_PAIRS`). A long name
    wraps inside its pill rather than truncating, and the remove control is a 24px circle (WCAG 2.5.8) tucked into the
-   pill's end, named for its concept. The caption is the sheet's shared `.gn-ticket-sheet__caption`. */
-.gn-concepts-row { display: grid; gap: 0.5rem; min-width: 0; }
+   pill's end, named for its concept. The caption is the sheet's shared `.gn-ticket-sheet__caption`. The row carries
+   its own space below: the Notes section under it has no top margin (Subtasks' last paragraph used to give it). */
+.gn-concepts-row { display: grid; gap: 0.5rem; min-width: 0; margin-block-end: 1rem; }
 .gn-concepts-row__pills { display: flex; flex-wrap: wrap; gap: 0.375rem; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .gn-concept-pill { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; min-height: 1.75rem; padding: 0.125rem 0.625rem; color: var(--gn-text); background: var(--gn-concept-fill); border-radius: 999px; }
 .gn-concept-pill__name { min-width: 0; padding: 0; font: inherit; font-size: 0.8125rem; font-weight: 500; line-height: 1.25rem; color: inherit; text-align: start; overflow-wrap: anywhere; background: none; border: 0; border-radius: 0.25rem; }

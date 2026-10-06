@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from './helpers/css-rules.js';
 
 /**
  * Knowledge Graph spec D §6 (KG-D Task 9, case 27.544's stylesheet leg): the `/* D: concepts row *\/` block, the Concepts
@@ -45,6 +45,15 @@ describe('27.544 the Concepts row block', () => {
     const name = ruleExactly(CSS, '.gn-concept-pill__name');
     expect(valueOf(name, 'overflow-wrap')).toBe('anywhere');
     expect(valueOf(name, 'min-width')).toBe('0');
+  });
+
+  it('27.544 the row keeps its own space below it: the Notes section it sits above has no top margin', () => {
+    // precondition: the space above Notes came from Subtasks' last paragraph; the row ends in a margin-less list
+    expect(rulesNaming(CSS, '.gn-ticket-sheet__notes').map((r) => valueOf(r.body, 'margin-top') ?? valueOf(r.body, 'margin'))).toEqual(
+      rulesNaming(CSS, '.gn-ticket-sheet__notes').map(() => null),
+    );
+    expect(valueOf(ruleExactly(CSS, '.gn-concepts-row__pills'), 'margin')).toBe('0');
+    expect(rem(valueOf(ruleExactly(CSS, '.gn-concepts-row'), 'margin-block-end'))).toBeGreaterThanOrEqual(0.75);
   });
 
   it('27.544 the remove control is a circle at least 24px wide that fits inside the pill, with a visible keyboard focus', () => {
