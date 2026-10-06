@@ -226,6 +226,7 @@ describe('27.646 Home mounts the view in its configuration, the hops following t
     h.push.mockClear();
     act(() => last().onOpen(item('ticket', 't_1')));
     act(() => last().onOpen(item('person', 'u_1', null)));
+    act(() => last().onOpen(item('project', 'p_2', null))); // a project with no workspace has no page to open
     expect(h.push).not.toHaveBeenCalled();
   });
 
@@ -238,6 +239,7 @@ describe('27.646 Home mounts the view in its configuration, the hops following t
     // The numbers answered (the page's own read); the graph's scope read has not: the canvas's placeholder holds its box.
     await screen.findByRole('button', { name: '2 Past due' });
     await waitFor(() => expect(document.querySelector('.gn-home__graph-placeholder')).not.toBeNull());
+    expect(document.querySelector<HTMLElement>('.gn-home__graph-placeholder .gn-skeleton--block')!.style.getPropertyValue('--gn-skeleton-h')).toBe('100%');
     expect(screen.queryByTestId('kg-probe')).toBeNull();
 
     cleanup();
@@ -455,6 +457,10 @@ describe('27.652 capped ids: further out is what the graph reports, not the unca
     report({ clear, fog: [], beyond: 0, capped: true });
     expect(noteText()).toBe('2000 past due, lit up on the graph.');
     expect(showMore()).toBeNull();
+    // The boundary: ONE further out is a remainder, with its button.
+    report({ clear, fog: [], beyond: 1, capped: true });
+    expect(noteText()).toBe('2000 past due, lit up on the graph. 1 more are further out.');
+    expect(showMore()).not.toBeNull();
   });
 });
 
@@ -503,6 +509,11 @@ describe('27.657 the SSR seam: Sigma loads client-only, through one door', () =>
     expect(canvas).toMatch(/\bssr:\s*false\b/);
     expect(canvas).toMatch(/import\(\s*'@gisik-nokma\/knowledge-graph'\s*\)/);
     expect(canvas).not.toMatch(/from\s*['"]@gisik-nokma\/knowledge-graph['"]/);
+    // Its placeholder holds the canvas's height (C's `.gn-kg__canvas`, and its phone form's), so the swap moves nothing below.
+    expect(valueOf(ruleExactly(CSS, '.gn-home__graph-placeholder'), 'height')).toBe('clamp(26rem, 62vh, 46rem)');
+    expect(valueOf(ruleExactly(UI_CSS, '.gn-kg__canvas'), 'height')).toBe('clamp(26rem, 62vh, 46rem)');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__graph-placeholder', '@media (max-width: 40rem)'), 'height')).toBe('70vh');
+    expect(valueOf(ruleExactly(UI_CSS, '.gn-kg--phone .gn-kg__canvas'), 'height')).toBe('70vh');
 
     // Control, every planted form flagged (a regex walker misses side-effect and re-export imports).
     const home = 'src/home/home-graph.tsx';
