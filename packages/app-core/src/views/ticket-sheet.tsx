@@ -3793,7 +3793,12 @@ export function TicketSheet({
 
           Spec C §1: a FOURTH tab, `Knowledge Graph`, when the host passes
           `knowledgeGraphSlot`; 16.81 counts both mounts (three without the slot,
-          four with it, 27.341). */}
+          four with it, 27.341).
+
+          kg-walk-fixes-2 (release walk part 2, P2-1; cases 27.680–27.686): every label stays on ONE line
+          (`.gn-ticket-sheet__sections`, `ui.css`), so "Knowledge Graph" no longer breaks under neo's selected bar. On a
+          phone the four are wider than the sheet, so the track scrolls inside itself (`fade` cues the hidden side) and
+          `keepSelectedInView` brings the chosen tab wholly into view; the sheet's body never scrolls sideways. */}
       <SegmentedControl
         options={[
           { value: 'details', label: 'Details' },
@@ -3804,6 +3809,9 @@ export function TicketSheet({
         value={tab}
         onChange={setTab}
         aria-label="Ticket sections"
+        className="gn-ticket-sheet__sections"
+        fade
+        keepSelectedInView
       />
 
       {/*

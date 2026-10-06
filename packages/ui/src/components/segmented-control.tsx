@@ -1,5 +1,5 @@
 // packages/ui/src/components/segmented-control.tsx
-import { useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { useScrollEdges } from '../use-scroll-edges.js';
 
 export type SegmentedOption<T extends string> = { value: T; label: string };
@@ -36,7 +36,38 @@ export type SegmentedControlProps<T extends string> = {
    * a track that wraps or fits never needs it.
    */
   fade?: boolean;
+  /**
+   * In a track that scrolls (the caller's CSS makes it one), keep the SELECTED option wholly in view: whenever the choice
+   * changes (a tap on an option the track half hides, a host that switches the choice itself) the TRACK scrolls by the
+   * least amount that brings that option inside its scrollport, inset by the track's own `scroll-padding` (set it to the
+   * fade's width and the option clears the faded edge too). Only the track moves, never a scrolling ancestor: the ticket
+   * sheet's body keeps its place. Arrow keys need none of this, `focus()` already scrolls the option in.
+   *
+   * Opt-in, and off for the project rail and the board's picker: the rail snaps (`scroll-snap-type`), and a programmatic
+   * scroll there would fight its snap (kg-walk-fixes-2, case 27.684).
+   */
+  keepSelectedInView?: boolean;
 };
+
+/**
+ * The least scroll of `track` ALONE that brings `option` inside the track's scrollport, inset by its `scroll-padding`
+ * (case 27.684). An option wider than the inset port is aligned to its start. A track with no `scrollTo` (jsdom) is left
+ * alone. Smooth unless the reader asked for less motion.
+ */
+function revealInTrack(track: HTMLElement, option: HTMLElement): void {
+  if (typeof track.scrollTo !== 'function') return;
+  const style = getComputedStyle(track);
+  const insetStart = parseFloat(style.scrollPaddingLeft) || 0;
+  const insetEnd = parseFloat(style.scrollPaddingRight) || 0;
+  const port = track.getBoundingClientRect();
+  const box = option.getBoundingClientRect();
+  const before = box.left - (port.left + insetStart);
+  const after = box.right - (port.right - insetEnd);
+  const delta = before < 0 ? before : after > 0 ? after : 0;
+  if (delta === 0) return;
+  const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  track.scrollTo({ left: track.scrollLeft + delta, behavior: reduced ? 'auto' : 'smooth' });
+}
 
 /**
  * HIG's method / view picker. Replaces the bordered `.gn-view-tabs` buttons
@@ -84,8 +115,10 @@ export function SegmentedControl<T extends string>({
   'aria-label': ariaLabel,
   className,
   fade = false,
+  keepSelectedInView = false,
 }: SegmentedControlProps<T>) {
-  const edgesRef = useScrollEdges<HTMLDivElement>('x');
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const edgesRef = useScrollEdges<HTMLDivElement>('x', trackRef);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = options.findIndex((option) => option.value === value);
   // A `value` matching no option is reachable (a caller whose options narrowed
@@ -93,6 +126,13 @@ export function SegmentedControl<T extends string>({
   // reachable by keyboard instead of leaving every tab at `tabindex="-1"`, which
   // would take the whole group out of the tab order.
   const tabStopIndex = selectedIndex === -1 ? 0 : selectedIndex;
+
+  useEffect(() => {
+    const track = trackRef.current;
+    const option = tabRefs.current[selectedIndex];
+    if (!keepSelectedInView || track === null || option === undefined || option === null) return;
+    revealInTrack(track, option);
+  }, [keepSelectedInView, selectedIndex]);
 
   const moveTo = (index: number) => {
     const option = options[index];
@@ -131,7 +171,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      ref={fade ? edgesRef : undefined}
+      ref={fade ? edgesRef : trackRef}
       className={[
         'gn-segmented',
         ...(className === undefined ? [] : [className]),

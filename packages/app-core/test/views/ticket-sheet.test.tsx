@@ -2979,6 +2979,33 @@ describe('sheet prototype parity', () => {
     expect(screen.queryByText('Knowledge Graph')).toBeNull();
   });
 
+  it('27.685 the sections wear the sheet\'s own track (one-line labels, a phone scroller) with the fade, and a chosen tab past the end scrolls the TRACK back into view', async () => {
+    // jsdom lays nothing out: the tablist is the port [0, 300] and Knowledge Graph's box [280, 420] runs past its end, so
+    // only `keepSelectedInView` can call the track's `scrollTo` (no scroll-padding in jsdom: the bare port). 27.684 pins the
+    // arithmetic, 27.683 the real tap in Chromium.
+    const scrollTo = vi.fn();
+    (HTMLElement.prototype as unknown as { scrollTo: unknown }).scrollTo = scrollTo;
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const [left, right] = this.getAttribute('role') === 'tablist' ? [0, 300] : this.textContent === 'Knowledge Graph' ? [280, 420] : [0, 60];
+      return { left, right, top: 0, bottom: 44, width: right - left, height: 44, x: left, y: 0, toJSON: () => ({}) } as DOMRect;
+    });
+    try {
+      const read = ticketRead();
+      renderSheet(read, sheetSource(read, [], []), { knowledgeGraphSlot: () => <p>graph here</p> });
+      await settled();
+      const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
+      expect(tablist.className.split(' ')).toEqual(['gn-segmented', 'gn-ticket-sheet__sections', 'gn-scroll-fade']);
+      expect(scrollTo).not.toHaveBeenCalled(); // CONTROL, same it: Details is inside the port
+      await userEvent.click(within(tablist).getByRole('tab', { name: 'Knowledge Graph' }));
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(scrollTo.mock.contexts[0]).toBe(tablist);
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 120 }));
+    } finally {
+      rect.mockRestore();
+      delete (HTMLElement.prototype as unknown as { scrollTo?: unknown }).scrollTo;
+    }
+  });
+
   it('16.82 Full screen moves the SCRIM, the PANEL and the BODY together — and says which way it goes', async () => {
     const read = ticketRead();
     renderSheet(read, sheetSource(read, [], []));

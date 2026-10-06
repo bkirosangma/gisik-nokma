@@ -3386,6 +3386,28 @@ a.gn-ticket-sheet__crumb--link {
    be present, so the row must not be arranged for one of them. */
 .gn-ticket-sheet__chips { display: flex; gap: 0.625rem; align-items: center; flex-wrap: wrap; margin: 0 0 1rem; }
 .gn-ticket-sheet__restricted { color: var(--gn-restricted); }
+/* The sheet's four sections (Details, History, Attachments, Knowledge Graph), the track `ticket-sheet.tsx` passes as
+   `className` (kg-walk-fixes-2, release walk part 2 P2-1; cases 27.680–27.686). Each label is ONE line at every width:
+   the shared item's `flex: 1` shares the track from a zero basis, so the longest label wrapped ("Knowledge" over
+   "Graph", even in the 640px desktop sheet) and neo's selected bar, drawn 6px above the item's foot, crossed "Graph".
+   `nowrap` here, inherited by the items, and not on the shared item: tracks that wrap today would overflow instead.
+   On a phone the four one-line labels (412px of track at 0.625rem a side, measured) are wider than the track's box
+   (312px at 360, 342 at 390), so below 40rem the track scrolls inside itself, the same shape as the project rail
+   (21.110, 23.345): `fade` cues the hidden side, the scroll-padding is the fade's width (the selected tab is brought
+   in clear of it), and 0.625rem a side lets 50px of the fourth tab show at 360 instead of 14. From 641px the track's
+   box is at least 593px and the four fit (~460px at 1rem a side), so no scroller: the overflow would clip hig's
+   lifted selected tab for nothing. Selectors that do not END in `.gn-segmented__item`,
+   so `components.test.tsx`'s first-match `rule()` keeps reading the shared rule (`segmented-control.tsx`'s `className`). */
+.gn-ticket-sheet__sections { white-space: nowrap; }
+@media (max-width: 40rem) {
+  .gn-ticket-sheet__sections {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-padding-inline: var(--gn-scroll-fade-size);
+  }
+  .gn-ticket-sheet__sections > [role='tab'] { padding-inline: 0.625rem; }
+}
 /* The subtasks section's header row — the prototype's own row, not an invention
    (`desktop.dc.html:1237`, `align-items:baseline;gap:10px;flex-wrap:wrap`) — the
    row's own line, NOT `:1238`, which is the heading `<p>` it contains.
