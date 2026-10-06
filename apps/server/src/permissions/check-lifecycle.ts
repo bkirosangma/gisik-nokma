@@ -75,11 +75,16 @@ async function ticketProjectId(db: Queryable, ticketId: string): Promise<string 
 /**
  * The project a note's mark is contained by, or `null` for a workspace-level
  * note (`home_project_id = ''`) — that note's immediate container is the
- * WORKSPACE, which Task 5's own workspace-wide gate covers, not this one.
+ * WORKSPACE, which Task 5's own workspace-wide gate covers, not this one. Only a
+ * project of the note's OWN workspace contains it (18.523): a note filed under
+ * another workspace's project before 18.520 refused that is not frozen by, and
+ * so learns nothing of, that project's deletion.
  */
 async function noteHomeProjectId(db: Queryable, noteId: string): Promise<string | null> {
   const { rows } = await db.query<{ home_project_id: string }>(
-    'SELECT home_project_id FROM proj_notes WHERE note_id = $1',
+    `SELECT n.home_project_id FROM proj_notes n
+       JOIN proj_projects p ON p.project_id = n.home_project_id AND p.workspace_id = n.workspace_id
+      WHERE n.note_id = $1`,
     [noteId],
   );
   const id = rows[0]?.home_project_id;
@@ -166,6 +171,15 @@ export async function checkLifecycle(db: Queryable, env: EventEnvelope, now: Dat
     if (projectId !== null) {
       const project = await readLifecycle(db, 'project', projectId);
       if (project.deletedAt !== null) {
+        return refuse(PROJECT_DELETED_REASON);
+      }
+    }
+    // A move names a SECOND project, the one it files the note under, and that one must be live too, as a new
+    // note's home is (task/notes-cross-workspace-followup, 18.521). The container above is still the CURRENT home.
+    // `checkProjectExists` ran first, so the target is a project of this workspace.
+    if (env.type === 'note.moved') {
+      const target = (env.payload as { homeProjectId: string }).homeProjectId;
+      if (target !== '' && (await readLifecycle(db, 'project', target)).deletedAt !== null) {
         return refuse(PROJECT_DELETED_REASON);
       }
     }

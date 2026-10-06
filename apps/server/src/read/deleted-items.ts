@@ -139,7 +139,8 @@ async function deletedProjectItems(db: Queryable, workspaceId: string, workspace
         db,
         null,
         'SELECT count(*) FROM proj_tickets WHERE project_id = $1 AND deleted_at IS NULL',
-        'SELECT count(*) FROM proj_notes WHERE home_project_id = $1 AND deleted = FALSE',
+        // The project's own workspace's notes only, as the purge's erasure set takes (18.523, migration 1792500000000).
+        'SELECT count(*) FROM proj_notes WHERE home_project_id = $1 AND deleted = FALSE AND workspace_id = (SELECT workspace_id FROM proj_projects WHERE project_id = $1)',
         row.project_id,
       ),
     });
