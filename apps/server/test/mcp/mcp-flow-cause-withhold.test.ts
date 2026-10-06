@@ -69,4 +69,28 @@ describe('29.444 MCP names no Decision or decider the caller cannot see', () => 
     expect(closeLine(memberHistory.json)?.payload.cause).not.toHaveProperty('outcome');
     for (const secret of [decision, DECIDER, OUTCOME]) expect(memberHistory.text, `get_ticket_history names ${secret}`).not.toContain(secret);
   });
+  it('29.449 get_flow, hosted: the blind member\'s flow parses and its Not-taken ticket\'s resolution has neither the hidden Decision nor its outcome; control: the owner\'s names both', async () => {
+    const w = await buildDoorWorld(db, '4449');
+    const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
+    const skipped = await mk(w, w.owner, 'Rework the pitch');
+    await file(w, w.owner.userId, decision, 'visibility.set', { ticketId: decision, mode: 'explicit', userIds: [w.owner.userId] });
+    await file(w, w.owner.userId, decision, 'ticket.link_added', { kind: 'leads_to', targetId: skipped, label: 'No' });
+    const OUTCOME = 'branch-chosen-4449';
+    const cause = { kind: 'branch-not-taken', decisionTicketId: decision, outcome: OUTCOME, pass: 1, decidedBy: newUlid(), decisionEventId: newUlid() };
+    await file(w, SYSTEM_ACTOR_FLOW, skipped, 'ticket.closed', { cause });
+
+    type Flow = { nodes: Array<{ id: string; resolution: unknown }> };
+    const flow = (token: string) => callTool(w.app, token, 'get_flow', { workspaceId: w.workspaceId, ticketId: skipped });
+    const resolutionOf = (json: unknown) => (json as Flow).nodes.find((n) => n.id === skipped)?.resolution;
+    // control: the owner's walk reaches the Decision, so the resolution names it and its outcome
+    const owner = await flow(w.owner.token);
+    expect(owner.isError, owner.text).toBe(false);
+    expect(resolutionOf(owner.json)).toEqual({ kind: 'not-taken', decisionTicketId: decision, outcome: OUTCOME, pass: 1 });
+
+    const member = await flow(w.member.token);
+    expect(member.isError, member.text).toBe(false); // the seam reads a resolution with no outcome
+    expect(resolutionOf(member.json)).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
+    expect(resolutionOf(member.json)).not.toHaveProperty('outcome');
+    for (const secret of [decision, OUTCOME]) expect(member.text, `get_flow names ${secret}`).not.toContain(secret);
+  });
 });

@@ -9,7 +9,11 @@ import type { StateCategory } from './workflow.js';
  */
 export type FlowStateRead = { id: string; name: string; category: StateCategory };
 
-/** PS-7: one of the Decision's OTHER forward labelled edges, for a ticket that sits on exactly one branch of it. */
+/**
+ * PS-7: one of the Decision's OTHER forward labelled edges, for a ticket that sits on exactly one branch of it. Never a
+ * hidden Decision's: `buildFlowRead` takes the Decisions from the read's own nodes, and the server's walk keeps only edges
+ * with both ends in the read, so `viaDecisionId` and `firstTicketId` are always nodes of it (29.450).
+ */
 export type FlowAlternateRead = { viaDecisionId: string; outcome: string; firstTicketId: string };
 
 export type FlowNoteRead = { id: string; title: string };
@@ -39,11 +43,9 @@ export type FlowNodeRead = {
   outcome: string | null;
   passes: PassRecord[];
   /**
-   * PS-8: set when the ticket was closed "Not taken". `decisionTicketId` is `null` when that Decision is not in this read
-   * (a hole for this viewer): the outcome and the pass stay, the id does not (FL-1). `outcome` is optional only because
-   * `notTakenOf` reads a client's served withheld cause too, which has none (planner ruling 2026-10-06 05:46); this read
-   * folds the server's raw causes, so it always names one. Whether a hole's outcome goes as well is PENDING
-   * wtg-automoves-outcome-withhold (the same ruling, (c)).
+   * PS-8: set when the ticket was closed "Not taken". When that Decision is not in this read (a hole for this viewer),
+   * `decisionTicketId` is `null` (FL-1) and the `outcome` key is absent: a hidden Decision's outcome is its authored branch
+   * name (planner ruling 2026-10-06 05:46). The kind and the pass stay. A Decision in the read keeps both.
    */
   resolution: { kind: 'not-taken'; decisionTicketId: string | null; outcome?: string; pass: number } | null;
   alternates: FlowAlternateRead[];
@@ -82,7 +84,11 @@ export type FlowAutoMoveRead = {
   /** The ticket whose finishing or choice caused it; `null` when that ticket is not in this read. */
   becauseTicketId: string | null;
   pass: number | null;
-  outcome: string | null;
+  /**
+   * The Decision's outcome; `null` when the cause names none (a `led-to` promotion). ABSENT when `becauseTicketId` is `null`:
+   * a hidden Decision's outcome is its authored branch name (planner ruling 2026-10-06 05:46), withheld with its id.
+   */
+  outcome?: string | null;
 };
 
 export type FlowRead = {
