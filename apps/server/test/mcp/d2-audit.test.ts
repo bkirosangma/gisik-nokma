@@ -11,6 +11,7 @@ import { KNOWN_D2_GAPS, MCP_WRITE_AUDIT, type D2Act, type D2Leg, type WriteAudit
  * `paths` (a branch other than the primary act), each event it posts is rendered by History (`HISTORY_RENDERED_TYPES`,
  * app-core), the app shows the result (a file holding the marker), and a member has a registered event to undo it.
  * The failures, keyed `<tool>` and `<tool>#<path>`, EQUAL the frozen ratchet `KNOWN_D2_GAPS`, which may only shrink.
+ * Every event type a row declares, and every `remove` type of a row or of one of its paths, is a registered domain type.
  *
  * The server can read both lists because `@gisik-nokma/mcp-server` and `@gisik-nokma/app-core` are already its
  * dependencies (`apps/server/package.json:36` and `:53`). The MCP half (27.515–27.516, 27.670) is
@@ -42,6 +43,18 @@ function failuresByKey(audit: Readonly<Record<string, WriteAudit>>): Record<stri
   return Object.fromEntries(judged.filter(([, legs]) => legs.length > 0));
 }
 
+/**
+ * 27.518: each declared `remove` type the domain registry does not know, a row's (`<tool> remove: <type>`) or one of its
+ * paths' (`<tool>#<path> remove: <type>`). A null `remove` (no undo) is the remove leg's business (27.517), not this one's.
+ */
+function unregisteredRemoves(audit: Readonly<Record<string, WriteAudit>>): string[] {
+  const acts = Object.entries(audit).flatMap(([tool, row]): [string, D2Act][] => [
+    [tool, row],
+    ...Object.entries(row.paths ?? {}).map(([path, act]): [string, D2Act] => [`${tool}#${path}`, act]),
+  ]);
+  return acts.flatMap(([key, act]) => (act.remove !== null && !domainRegistry.hasType(act.remove) ? [`${key} remove: ${act.remove}`] : []));
+}
+
 /** 27.671: a ratchet key `<tool>#<path>` names a `paths` entry of that tool's row. */
 function namesAPath(key: string, audit: Readonly<Record<string, WriteAudit>>): boolean {
   const [tool, path] = key.split('#');
@@ -67,18 +80,27 @@ describe('27.517–27.518, 27.671–27.672 the D2 audit: rendered by history, on
     expect(legsOf({ ...row, remove: null })).toEqual(['remove']);
   });
 
-  it('27.518 every declared event and remove type is registered; control: a made-up remove type fails the remove leg', () => {
+  it('27.518 every declared event type, and every remove type of a row or of one of its paths, is registered; controls: a made-up remove type on a path or a row is reported, and fails the remove leg', () => {
     let declared = 0;
     for (const [tool, audit] of Object.entries(MCP_WRITE_AUDIT)) {
       for (const type of audit.events) {
         declared += 1;
         expect(domainRegistry.hasType(type), `${tool}: ${type}`).toBe(true);
       }
-      if (audit.remove !== null) expect(domainRegistry.hasType(audit.remove), `${tool} remove: ${audit.remove}`).toBe(true);
     }
     expect(declared).toBeGreaterThan(0);
-    // Control, on the SUBJECT: the same audit row with only `remove` changed gains the 'remove' leg, and without the change does not.
+    expect(unregisteredRemoves(MCP_WRITE_AUDIT), 'a declared remove type must be a registered domain type').toEqual([]);
+    // Control, through the same check: an in-test update_ticket whose reparent path undoes with an unregistered type is
+    // reported by its path key, and alone (27.517 cannot see it: null and an unregistered type fail the same leg).
+    expect(domainRegistry.hasType('ticket.unparented')).toBe(false);
+    const ticket = MCP_WRITE_AUDIT['update_ticket']!;
+    const unparented = { ...ticket, paths: { ...ticket.paths, reparent: { ...ticket.paths!['reparent']!, remove: 'ticket.unparented' } } };
+    expect(unregisteredRemoves({ ...MCP_WRITE_AUDIT, update_ticket: unparented })).toEqual(['update_ticket#reparent remove: ticket.unparented']);
+    // Control, on a row's own remove: the manage_concept row with only `remove` changed is reported by its tool, and gains
+    // the 'remove' leg; without the change it does neither.
     const row = MCP_WRITE_AUDIT['manage_concept']!;
+    expect(domainRegistry.hasType('concept.unmade')).toBe(false);
+    expect(unregisteredRemoves({ ...MCP_WRITE_AUDIT, manage_concept: { ...row, remove: 'concept.unmade' } })).toEqual(['manage_concept remove: concept.unmade']);
     expect(legsOf(row)).not.toContain('remove');
     expect(legsOf({ ...row, remove: 'concept.unmade' })).toContain('remove');
   });

@@ -9,7 +9,8 @@
  * read-only tool writes nothing and a write tool posts only its declared events; each tool's source block quotes
  * exactly its `events`; 27.670: each row's events partition into its primary act and its `paths`) and
  * `apps/server/test/mcp/d2-audit.test.ts` (27.517–27.518, 27.671–27.672: history, surface and remove for every tool
- * and every path against the frozen ratchet `KNOWN_D2_GAPS`; every declared type is registered).
+ * and every path against the frozen ratchet `KNOWN_D2_GAPS`; every declared event type, and every `remove` of a row
+ * or a path, is registered).
  *
  * A plan that adds an MCP tool, or a new event path to one, adds or edits its row (and its `paths`) here in the same PR.
  */
@@ -30,8 +31,9 @@ export type WriteAudit = D2Act & {
   /** With `paths`: the event types the PRIMARY act posts. Without them the row is one act and every event is primary. */
   primary?: readonly string[];
   /**
-   * Each other branch of the tool, keyed by a short path name, judged by its own `surface` and `remove`. Its `events`
-   * are a subset of the row's; each row type belongs to `primary` or to exactly one path (27.670).
+   * Each other branch of the tool (bar an act pair that undoes itself: see MCP_WRITE_AUDIT), keyed by a short path
+   * name, judged by its own `surface` and `remove`. Its `events` are a subset of the row's; each row type belongs to
+   * `primary` or to exactly one path (27.670).
    */
   paths?: Readonly<Record<string, D2Act>>;
 };
@@ -55,9 +57,11 @@ const TICKET_TYPES = 'packages/app-core/src/workflow-builder/ticket-types/ticket
  * One row per write tool, in `allTools` order. `events` lists EVERY type the tool can post, on every path (27.516
  * holds it to the module's source), so the row's History leg is judged on all of them. The row's `surface` and
  * `remove` judge the tool's primary act (the one its name says; the create for a `manage_*` tool), as the plan's D
- * rows do. Every other branch is a `paths` entry with its own three legs, so a branch's gap is a `<tool>#<path>` key
- * of the ratchet, never a comment. A route-only act (`events: []`: the server writes the event, not the tool) passes
- * `history` by having nothing to judge. Each marker is a className or JSX literal in rendered code, never a comment.
+ * rows do. Every other branch is a `paths` entry with its own three legs, except an act pair whose two events undo
+ * each other (link_note attach/detach, link_tickets add/remove), which the row judges as one act. So a branch's gap is
+ * a `<tool>#<path>` key of the ratchet, never a comment. A route-only act (`events: []`: the server writes the event,
+ * not the tool) passes `history` by having nothing to judge. Each marker is a className or JSX literal in rendered
+ * code, never a comment.
  * The concept rows (KG-D's D rows) keep one act each: Tasks 8–9 own their surfaces.
  */
 export const MCP_WRITE_AUDIT: Readonly<Record<string, WriteAudit>> = {
@@ -269,7 +273,7 @@ export const KNOWN_D2_GAPS: Readonly<Record<string, { missing: readonly D2Leg[];
   'manage_members#change_role': { missing: ['history'], why: 'Membership events have no History renderer (describeEvent renders ticket history only).' },
   'manage_members#remove_member': { missing: ['remove'], why: 'Route-only: a removed member has no event to undo it; only a new invite brings them back.' },
   'manage_members#revoke_invite': { missing: ['history', 'remove'], why: 'Invite events have no History renderer, and a revoked invite has no member event to undo it.' },
-  'manage_members#project': { missing: ['history', 'remove'], why: 'Project-member events have no History renderer, and the app never submits project.member_added or project.member_removed.' },
+  'manage_members#project': { missing: ['history', 'remove'], why: 'Project-member events have no History renderer, and no member event undoes a project membership: the app submits project.member_added only when it founds a project, and never project.member_removed.' },
   'change_prefix#project': { missing: ['history'], why: 'Project events have no History renderer: describeEvent renders ticket history only (history-copy.ts).' },
   'manage_groups#rename': { missing: ['history'], why: 'Group events have no History renderer (describeEvent renders ticket history only).' },
   'manage_groups#reorder': { missing: ['history'], why: 'Group events have no History renderer (describeEvent renders ticket history only).' },
