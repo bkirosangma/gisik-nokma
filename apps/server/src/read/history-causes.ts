@@ -23,7 +23,8 @@ export function causeTicketId(cause: FlowCause): string {
 
 /**
  * Sets `causeTicket` on every flow-caused event: `{ key }` when this viewer can see the cause's ticket, else `null`,
- * and then the payload's cause is served with its ticket id and people nulled (`withholdCauseTicket`, AMEND 2). A cause
+ * and then the payload's cause is served with its ticket id and people nulled and no label or outcome (`withholdCauseTicket`,
+ * AMEND 2; planner ruling 2026-10-06 05:46). A cause
  * the route's `withholdEvent` already withheld reads `null` with no lookup; the nulling here still answers a raw cause
  * whose ticket has no row (unknown and invisible are one answer). An event with no flow cause is left as it is, with no
  * `causeTicket` key. A page is at most `MAX_LIMIT` events, so the per-ticket lookups are bounded.

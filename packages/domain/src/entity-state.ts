@@ -50,7 +50,7 @@ export type TicketState = {
    * `cause` is the flow's `branch-not-taken` close cause (wtg2 T8, PS-5), present only on such a close; the reducer
    * stores it and `ticket.reopened` drops it with the flag. The server projects it to `proj_tickets.closed_cause` and
    * `rowToTicketState` reads it back onto `closed` (wtg2 T9); `resolutionOf` (`flow/derive.ts`) reads it as "not taken".
-   * A CLIENT may hold the served `WithheldFlowCause` instead (the Decision and its decider null): every server door
+   * A CLIENT may hold the served `WithheldFlowCause` instead (the Decision and its decider null, no outcome): every server door
    * serves that to a viewer who cannot see the Decision (wtg-flow-cause-withhold); the server's own fold never does.
    */
   closed?: { actorId: string; at: string; cause?: FlowCause | WithheldFlowCause } | null;

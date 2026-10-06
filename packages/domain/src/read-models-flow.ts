@@ -40,9 +40,12 @@ export type FlowNodeRead = {
   passes: PassRecord[];
   /**
    * PS-8: set when the ticket was closed "Not taken". `decisionTicketId` is `null` when that Decision is not in this read
-   * (a hole for this viewer): the outcome and the pass stay, the id does not (FL-1).
+   * (a hole for this viewer): the outcome and the pass stay, the id does not (FL-1). `outcome` is optional only because
+   * `notTakenOf` reads a client's served withheld cause too, which has none (planner ruling 2026-10-06 05:46); this read
+   * folds the server's raw causes, so it always names one. Whether a hole's outcome goes as well is PENDING
+   * wtg-automoves-outcome-withhold (the same ruling, (c)).
    */
-  resolution: { kind: 'not-taken'; decisionTicketId: string | null; outcome: string; pass: number } | null;
+  resolution: { kind: 'not-taken'; decisionTicketId: string | null; outcome?: string; pass: number } | null;
   alternates: FlowAlternateRead[];
   periods: Array<{ start: string; end: string | null; pass: number }>;
   planned: Array<{ pass: number; start: string; end: string; basis: 'explicit' | 'chained'; pruned: boolean }>;

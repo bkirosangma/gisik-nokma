@@ -82,8 +82,9 @@ export function targetSight(db: Queryable, viewerId: string): TargetSight {
 /**
  * A flow cause as this viewer may be served it (wtg-flow-cause-withhold; spec FL-1). It names a ticket (`sourceTicketId`
  * for `led-to`, else `decisionTicketId`) and a person (`triggeredBy` / `decidedBy`); a viewer who cannot see that ticket
- * gets both NULLED with their keys kept, and the kind, label or outcome, pass and the opaque decision event id kept
- * (`withholdCauseTicket`, T17 AMEND 2: the shape MCP's `phrasedCause` reads as "a ticket you can't see" / "someone you
+ * gets both NULLED with their keys kept, the kind, pass and the opaque decision event id kept, and the label or outcome
+ * gone, its key absent: the hidden ticket's own branch name (`withholdCauseTicket`, T17 AMEND 2 and planner ruling
+ * 2026-10-06 05:46: the shape MCP's `phrasedCause` reads as "a ticket you can't see" / "someone you
  * can't see"). The person goes with the ticket, never on their own: no person-sight rule exists, and a person's act on a
  * ticket the viewer can see is already theirs to read in that ticket's History (planner ruling 2026-10-06 03:49, Q3).
  * Anything that is not a flow cause (no cause, a person's `reopened-for-child`) comes back as the same reference, as does
