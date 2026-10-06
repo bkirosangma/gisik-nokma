@@ -250,7 +250,7 @@ describe('27.689 a failed FIRST ring is the graph\'s failure, and the view state
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("Couldn't load the graph. Retry");
     expect(alert.textContent).not.toContain('next hop');
-    expect(count()!.trim()).toBe('');
+    expect(count()).toBe('\u00a0'); // no count, but the line is held (a no-break space), so the bar keeps its height
     expect(chips()).toBe(CHIP_GROUPS.length); // the chips are there…
     expect(chipCounts()).toEqual([]); // …and say no count
     expect(canvasName()).toBe('Knowledge Graph');
@@ -277,7 +277,7 @@ describe('27.689 a failed FIRST ring is the graph\'s failure, and the view state
   it('27.689 while ring 1 is out nothing is counted either (no "0 items"); control: once it lands, the count and the chip counts read', async () => {
     const { fake } = setup({}, { delayFor: (q) => (q.hops === 1 ? 150 : 0) });
     expect(screen.getByText('Loading the Knowledge Graph')).toBeInTheDocument();
-    expect(count()!.trim()).toBe('');
+    expect(count()).toBe('\u00a0'); // no count, but the line is held (a no-break space), so the bar keeps its height
     expect(chipCounts()).toEqual([]);
     expect(canvasName()).toBe('Knowledge Graph');
     await drawn(fake, T('t126'));
@@ -292,7 +292,7 @@ describe('27.689 a failed FIRST ring is the graph\'s failure, and the view state
     doubleClick(fake, T('t133'));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("Couldn't load the graph. Retry");
-    expect(count()!.trim()).toBe('');
+    expect(count()).toBe('\u00a0'); // no count, but the line is held (a no-break space), so the bar keeps its height
     expect(canvasName()).toBe('Knowledge Graph of items linked to GN-133');
   });
 });

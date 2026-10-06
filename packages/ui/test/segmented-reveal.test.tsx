@@ -49,11 +49,14 @@ describe('27.684 SegmentedControl keepSelectedInView', () => {
     const { getByRole, rerender } = mount('a');
     expect(scrollTo).not.toHaveBeenCalled(); // CONTROL, same it: Alpha [124, 180] is inside the inset port
     scrollTo.mockClear();
+    // The track is already scrolled 30px (jsdom keeps scrollLeft at 0, so it is set on the element): the target is
+    // relative to where the track is, not to its start.
+    Object.defineProperty(getByRole('tablist'), 'scrollLeft', { value: 30, configurable: true });
     rerender(<SegmentedControl options={OPTIONS} value="c" onChange={() => {}} aria-label="View" fade keepSelectedInView />);
     expect(scrollTo).toHaveBeenCalledTimes(1);
     expect(scrollTo.mock.contexts[0]).toBe(getByRole('tablist'));
-    // Gamma's right 420 against the inset end 376: 44px. scrollLeft is 0 in jsdom.
-    expect(scrollTo).toHaveBeenCalledWith({ left: 44, behavior: 'smooth' });
+    // Gamma's right 420 against the inset end 376: 44px past it, from a scrollLeft of 30.
+    expect(scrollTo).toHaveBeenCalledWith({ left: 74, behavior: 'smooth' });
   });
 
   it('27.684 an option before the START scrolls back by its overhang (negative), clear of the start inset', () => {
@@ -91,6 +94,9 @@ describe('27.684 SegmentedControl keepSelectedInView', () => {
     pad = { left: 'auto', right: 'auto' };
     mount('c'); // 399 <= 400: inside the bare port
     expect(scrollTo).not.toHaveBeenCalled();
+    BOXES['Gamma'] = [302, 420];
+    mount('c'); // 420 against the bare port's 400: "auto" is a zero inset, not a reason to stay put
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 20, behavior: 'smooth' });
   });
 
   it('27.684 a reader who asked for less motion gets an instant scroll', () => {
@@ -99,9 +105,11 @@ describe('27.684 SegmentedControl keepSelectedInView', () => {
     expect(scrollTo).toHaveBeenCalledWith({ left: 44, behavior: 'auto' });
   });
 
-  it('27.684 CONTROL: without the prop nothing scrolls, on mount or on a change; and a track with no scrollTo (jsdom) is left alone', () => {
+  it('27.684 CONTROL: without the prop nothing scrolls, on mount or on a change; a value no option has scrolls nothing; and a track with no scrollTo (jsdom) is left alone', () => {
     const { rerender } = mount('c', false);
     rerender(<SegmentedControl options={OPTIONS} value="a" onChange={() => {}} aria-label="View" fade />);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(() => mount('none-of-them')).not.toThrow();
     expect(scrollTo).not.toHaveBeenCalled();
     delete (HTMLElement.prototype as unknown as { scrollTo?: unknown }).scrollTo;
     expect(() => mount('c')).not.toThrow();

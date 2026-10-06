@@ -1152,7 +1152,7 @@ input, textarea, select { font-family: inherit; }
    ONE line (the shared `.gn-segmented__item`, kg-walk-fixes-2 item 1, case 27.686), so the track is measured whole: in neo
    with Neumorphic selected (the longest label in weight 600; Chromium, 2026-10-06) it is 319px at the shared `0 1rem`
    and 271px at `0 0.5rem`, against a card content of `viewport - 88px` (24px shell + 20px card padding a side), 232px at
-   320. Half the side padding up to 26rem (the whole track fits from 407px); below 22.4375rem (359px) even the half-padded
+   320. Half the side padding up to 26rem (the whole track fits from 407px); up to 22.4375rem (359px) even the half-padded
    track is wider than the card, so it scrolls inside itself with a fading edge (`StyleToggle` passes `fade` and
    `keepSelectedInView`) rather than spilling out of the card. Scoped to this card and these widths: the shared item keeps
    `0 1rem` for sign-in, inbox, help and the ticket-type editor (20.661). */

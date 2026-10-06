@@ -6,7 +6,7 @@ import { dropRules } from './css-controls.js';
  * `harness/segmented-hosts.html`: the REAL `/account` Appearance card and the REAL My work Group pair, ui.css and
  * globals.css, neo light, at LITERAL widths. Every label is one line (the shared item's `nowrap`, 27.686), so:
  *
- * - /account's Style trims its side padding to 0.5rem up to 26rem and fits its card from 359px; below that it scrolls
+ * - /account's Style trims its side padding to 0.5rem up to 26rem and fits its card from 360px; up to 359px it scrolls
  *   inside itself with the selected style wholly in view (`fade keepSelectedInView`), and the keyboard reaches both ends.
  *   Nothing spills the card at any width.
  * - My work's Group trims its side padding to 0.625rem up to 22.5rem and fits its row at 320.
@@ -18,7 +18,7 @@ import { dropRules } from './css-controls.js';
  */
 
 type Box = { sw: number; cw: number };
-type Track = Box & { left: number; right: number; overflowX: string; atStart: string | undefined; atEnd: string | undefined; fade: number };
+type Track = Box & { left: number; right: number; overflowX: string; faded: boolean; atStart: string | undefined; atEnd: string | undefined; fade: number };
 type Item = { name: string; selected: boolean; lines: number; left: number; right: number; padLeft: number };
 type Hosts = {
   style: { track: Track; group: Box; card: Box; items: Item[] };
@@ -38,6 +38,7 @@ function measure(page: Page): Promise<Hosts> {
         left: r.left,
         right: r.right,
         overflowX: getComputedStyle(element).overflowX,
+        faded: element.classList.contains('gn-scroll-fade'),
         atStart: element.dataset['atStart'],
         atEnd: element.dataset['atEnd'],
         fade: raw.endsWith('rem') ? parseFloat(raw) * rootPx : parseFloat(raw) || 0,
@@ -75,7 +76,9 @@ function inView(track: Track, item: Item): boolean {
   return item.left >= start - 0.5 && item.right <= end + 0.5;
 }
 
-for (const width of [320, 360, 390, 412, 1280] as const) {
+// Each arm's bound is met from both sides (STEPS-common P11): the scroller's 22.4375rem at 359 / 360, the Group arm's 22.5rem
+// at 360 / 361, the half padding's 26rem at 416 / 417.
+for (const width of [320, 359, 360, 361, 390, 412, 416, 417, 1280] as const) {
   test(`27.686 at a literal ${width}px /account's Style and My work's Group keep one-line labels inside their box`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/segmented-hosts.html');
@@ -97,14 +100,16 @@ for (const width of [320, 360, 390, 412, 1280] as const) {
     for (const item of m.style.items) expect(item.padLeft, `${item.name}: ${width <= 416 ? '0.5rem' : '1rem'} a side`).toBe(width <= 416 ? 8 : 16);
     const selected = m.style.items.find((x) => x.selected)!;
     expect(selected.name, 'neo is the selected style').toBe('Neumorphic');
-    if (width < 359) {
-      expect(m.style.track.overflowX, 'below 359px the Style track scrolls inside itself').toBe('auto');
+    expect(m.style.track.overflowX, width <= 359 ? 'up to 359px the Style track scrolls inside itself' : 'from 360px no scroller').toBe(width <= 359 ? 'auto' : 'visible');
+    if (width <= 359) {
       expect(m.style.track.sw, 'and it really scrolls').toBeGreaterThan(m.style.track.cw);
+      expect(m.style.track.faded, 'the scrolling track fades the side it hides').toBe(true);
       // The reveal scrolls smoothly (no reduced motion here), so the arrival is polled.
       await expect.poll(async () => {
         const now = (await measure(page)).style;
         return inView(now.track, now.items.find((x) => x.selected)!);
       }, 'the selected style is wholly in view on arrival').toBe(true);
+      await expect.poll(async () => (await measure(page)).style.track.atStart, 'and the start it scrolled past is faded').toBe('false');
       const step = async (key: string, name: string) => {
         await page.keyboard.press(key);
         await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
@@ -118,8 +123,7 @@ for (const width of [320, 360, 390, 412, 1280] as const) {
       await step('Home', 'Apple HIG');
       await step('End', 'Neumorphic');
     } else {
-      expect(m.style.track.overflowX, 'from 359px no scroller').toBe('visible');
-      expect(m.style.track.sw, 'the three fit').toBeLessThanOrEqual(m.style.track.cw);
+      expect(m.style.track.sw, 'from 360px the three fit').toBeLessThanOrEqual(m.style.track.cw);
     }
     expect(m.theme.track.sw, 'Theme fits').toBeLessThanOrEqual(m.theme.track.cw);
 

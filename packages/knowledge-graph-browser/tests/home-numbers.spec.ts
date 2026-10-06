@@ -78,7 +78,7 @@ async function release(page: Page): Promise<{ height: number; graphTop: number; 
 }
 
 for (const width of [1280, 360] as const) {
-  test(`27.687 at a literal ${width}px the numbers' placeholders hold the tiles' grid: the release moves nothing (CLS < 0.01); CONTROL: the placeholder rule deleted, it does`, async ({ page }) => {
+  test(`27.687 at a literal ${width}px the numbers' placeholders hold the tiles' grid: the release moves nothing (CLS < 0.01); CONTROL: the region rule at its old specificity, it does`, async ({ page }) => {
     // CONTROL first, on its own load: the region rule at its old (0,1,0), the placeholders take its `display: block` and stack.
     await openHeld(page, width, true);
     const bareHeld = await layout(page);
