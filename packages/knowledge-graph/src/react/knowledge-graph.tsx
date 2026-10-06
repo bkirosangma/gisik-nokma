@@ -163,9 +163,14 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     setSelected(ref);
     setStatus('');
   }
+  const trailRef = useRef<HTMLDivElement>(null);
   function goTrail(i: number) {
     const to = trail[i]!;
     const next = trail.slice(0, i + 1);
+    // Back to the first centre empties the trail, which unmounts with the button that has focus (Back, the first crumb, or Esc
+    // pressed on either), and focus would fall out of the view: in a Sheet, to its first breadcrumb (release walk row 10). It
+    // goes to the canvas first, while the button still exists. A click that left focus elsewhere (Safari's buttons) moves none.
+    if (next.length <= 1 && trailRef.current?.contains(document.activeElement)) mountRef.current?.focus({ preventScroll: true });
     setTrail(next.length <= 1 ? [] : next);
     setCentre(to);
     setSelected(to);
@@ -336,7 +341,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
             </div>
           )}
           {trail.length > 0 && (
-            <div className="gn-kg__trail">
+            <div className="gn-kg__trail" ref={trailRef}>
               <button type="button" className="gn-button gn-kg__back" aria-label={`Back to ${label(trail[trail.length - 2]!)}`} onClick={() => goTrail(trail.length - 2)}>
                 ‹ Back
               </button>

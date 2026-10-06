@@ -404,6 +404,41 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     expect(b.onClose).not.toHaveBeenCalled();
   });
 
+  it('27.703 in a ui Sheet, Back by keyboard and the first crumb by keyboard leave focus on the canvas (the trail unmounts); control: a crumb that keeps the trail leaves focus on itself', async () => {
+    const fake = fakeRenderer();
+    const props: KnowledgeGraphProps = {
+      centre: T('t142'), config: 'desktop', source: fixtureSource({}).source, scope: SCOPE, defaultWorkspaceIds: ['gn', 'st'], onOpen: vi.fn(),
+      createRenderer: fake.createRenderer,
+    };
+    render(<Sheet open title="Knowledge Graph" onClose={vi.fn()}><KnowledgeGraph {...props} /></Sheet>);
+    const user = userEvent.setup();
+    const canvas = () => document.querySelector('.gn-kg__mount');
+    await drawn(fake, T('t126'));
+    doubleClick(fake, T('t133'));
+    const back = await screen.findByRole('button', { name: 'Back to GN-142' });
+    back.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Back to GN-142' })).toBeNull());
+    expect(document.activeElement).toBe(canvas());
+    // the first crumb, by Space
+    doubleClick(fake, T('t133'));
+    await screen.findByRole('button', { name: 'Back to GN-142' });
+    screen.getByRole('button', { name: 'GN-142' }).focus();
+    await user.keyboard(' ');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Back to GN-142' })).toBeNull());
+    expect(document.activeElement).toBe(canvas());
+    // CONTROL: t142 → t133 → t131, then the GN-133 crumb: the trail stays (Back and two crumbs), and so does focus on that crumb
+    doubleClick(fake, T('t133'));
+    await drawn(fake, T('t128'));
+    doubleClick(fake, T('t131'));
+    await screen.findByRole('button', { name: 'Back to GN-133' });
+    const crumb = screen.getByRole('button', { name: 'GN-133' });
+    crumb.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back to GN-142' })).toBeInTheDocument());
+    expect(document.activeElement).toBe(crumb);
+  });
+
   it('27.323 the trail: t142 → t133 → t131 shows Back and three crumbs, a crumb past the loaded rings keeps its label, and the first crumb goes back two steps; control: a new centre prop resets the trail', async () => {
     const { fake, fx, rerender } = setup();
     await drawn(fake, T('t126'));

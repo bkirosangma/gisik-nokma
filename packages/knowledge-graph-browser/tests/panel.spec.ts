@@ -92,3 +92,53 @@ test('27.701 CONTROL (browser): the ticket tab and the note panel (the view in a
   const ruled = await page.evaluate(() => [...document.styleSheets].some((s) => [...s.cssRules].some((r) => (r as CSSStyleRule).selectorText === '.gn-kg-list__box')));
   expect(ruled).toBe(true);
 });
+
+/*
+ * 27.703–27.704 (release walk row 10): after a double-click the trail holds Back and two crumbs; Back (or the first crumb)
+ * empties it, and the trail unmounts with the button that had focus. In the Sheet the ticket tab and the note panel use,
+ * focus then fell to the sheet's first stop. The view hands it to its canvas first.
+ */
+async function centreOnT133(page: Page): Promise<void> {
+  const p = await page.evaluate(() => {
+    const s = document.querySelector('.gn-kg__stage')!.getBoundingClientRect();
+    const v = window.__kgView.probe!.viewportOf('ticket:t133')!;
+    return { x: s.left + v.x, y: s.top + v.y };
+  });
+  await page.mouse.dblclick(p.x, p.y);
+  await expect(page.getByRole('button', { name: 'Back to GN-142' })).toBeVisible();
+  await stillView(page);
+}
+const focusNow = (page: Page) =>
+  page.evaluate(() => {
+    const a = document.activeElement!;
+    return { mount: a.classList.contains('gn-kg__mount'), ring: a.matches(':focus-visible'), name: a.getAttribute('aria-label') };
+  });
+
+test('27.703 (browser) in a sheet, Back by keyboard (Enter) and the first crumb by keyboard (Space) leave focus on the graph\'s canvas, ringed, naming the first centre again', async ({ page }) => {
+  await openView(page, '?panel=sheet');
+  await centreOnT133(page);
+  await page.getByRole('button', { name: 'Back to GN-142' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.gn-kg__trail')).toHaveCount(0);
+  expect(await focusNow(page)).toEqual({ mount: true, ring: true, name: 'Knowledge Graph of items linked to GN-142' });
+
+  await centreOnT133(page);
+  await page.locator('.gn-kg__crumb', { hasText: 'GN-142' }).focus();
+  await page.keyboard.press(' ');
+  await expect(page.locator('.gn-kg__trail')).toHaveCount(0);
+  expect(await focusNow(page)).toEqual({ mount: true, ring: true, name: 'Knowledge Graph of items linked to GN-142' });
+});
+
+test('27.704 CONTROL (browser): a mouse Back shows no focus ring anywhere (as before: the click\'s focus fell with the trail); Esc from the canvas keeps focus where it was', async ({ page }) => {
+  await openView(page, '?panel=sheet');
+  await centreOnT133(page);
+  await page.getByRole('button', { name: 'Back to GN-142' }).click();
+  await expect(page.locator('.gn-kg__trail')).toHaveCount(0);
+  expect(await page.evaluate(() => document.querySelectorAll(':focus-visible').length)).toBe(0);
+
+  await centreOnT133(page);
+  await page.locator('.gn-kg__mount').focus();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.gn-kg__trail')).toHaveCount(0);
+  expect((await focusNow(page)).mount).toBe(true);
+});
