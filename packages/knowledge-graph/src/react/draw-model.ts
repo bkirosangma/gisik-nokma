@@ -48,12 +48,16 @@ export function buildDrawModel(store: GraphStore, z: Zones, o: DrawModelOptions)
     edges.push({ id: e.id, from: e.from, to: e.to, grp, fog, sug: e.suggested, on: !fog && o.selectedEdge === null && (e.from === o.selected || e.to === o.selected) });
   }
   const byRef = new Map(nodes.map((n) => [n.ref, n]));
+  const clearDrawn = z.clear.filter((ref) => byRef.has(ref));
   const fit = fitItemsFor(
-    z.clear.filter((ref) => byRef.has(ref)).map((ref) => {
+    clearDrawn.map((ref) => {
       const n = byRef.get(ref)!, p = positions.get(ref)!;
       return { x: p.x, y: p.y, kind: n.kind, label: n.lbl, sub: n.sub, center: n.center };
     }),
     { fogRadius: z.fog.length > 0 ? radius(cfg.R, z.clearHop + 1) : null, phone },
   );
+  // The centre alone (every empty state): one item at the origin gives the fit no extent, and its solve zooms in about 100×.
+  // Ring 1's four points frame it as a centre with hop-1 links is framed, so a chip turned back on draws them inside the view.
+  if (clearDrawn.length === 1) fit.push(...fitItemsFor([], { fogRadius: radius(cfg.R, 1), phone }));
   return { nodes, edges, positions, fit, topPx: phone ? TOP_PX.phone : TOP_PX.desktop, counts };
 }
