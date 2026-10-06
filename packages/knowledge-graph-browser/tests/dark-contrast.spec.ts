@@ -115,6 +115,8 @@ for (const arm of DARK) {
     expect(hovered).not.toBe(resting); // control: the hover applied
     const hoverFill = over(parse(hovered), ground);
     expect(ratio(selFill, ground)).toBeGreaterThan(ratio(hoverFill, ground));
+    // CLEARLY stronger (brief item 1): by at least 0.25. fill-tertiary passes a bare `>` (neo 1.196 vs hover 1.172; reviewer mutant Mb)
+    expect(ratio(selFill, ground) - ratio(hoverFill, ground)).toBeGreaterThanOrEqual(0.25);
   });
 }
 
@@ -163,11 +165,18 @@ for (const arm of DARK) {
     expect([edge.x, edge.blur, edge.spread]).toEqual([0, 0, 1]);
     const ground = over(parse(well.bg), parse(card.ground));
     expect(ratio(over(edge.colour, ground), ground)).toBeGreaterThanOrEqual(3);
+    // control: the outline is the phone CARD's; at 1280 the same well, not in a card, keeps none (reviewer mutant Mc)
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openArm(page, arm);
+    await select(page, /^Ama Rangsa/, 'Ama Rangsa');
+    await expect(page.locator('.gn-kg-insp--card')).toHaveCount(0);
+    await expect(page.locator('.gn-kg-insp .gn-kg-insp__outs')).toHaveCount(1); // the subject is there
+    expect((await paint(page, '.gn-kg-insp .gn-kg-insp__outs'))!.shadow).toBe('none');
   });
 }
 
-test('27.666 control (hig light, neo light): the pill and the phone well have no box-shadow', async ({ page }) => {
-  for (const arm of LIGHT.slice(0, 2)) {
+test('27.666 control (hig light, neo light, neo data-theme light under an OS dark): the pill and the phone well have no box-shadow', async ({ page }) => {
+  for (const arm of LIGHT) {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openArm(page, arm);
     await select(page, /^Phone pass rulings/, 'Phone pass rulings');
