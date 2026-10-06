@@ -82,7 +82,7 @@ function home(workspaceId: string, over: { counts?: Partial<HomeResponse['counts
   };
 }
 /** Each case answers for a workspace id of its own: the read cache (`home:<id>`) is module state. */
-function renderHome(workspaceId: string, answer: () => HomeResponse = () => home(workspaceId), getMyWorkspaces?: () => Promise<WorkspaceRef[]>) {
+function renderHome(workspaceId: string, answer: () => HomeResponse | Promise<HomeResponse> = () => home(workspaceId), getMyWorkspaces?: () => Promise<WorkspaceRef[]>) {
   const services = stubServices(
     { getMyWorkspaces: getMyWorkspaces ?? (async () => [workspace(workspaceId)]), getHome: async () => answer() },
     NOTIFICATIONS,
@@ -313,6 +313,22 @@ describe('27.648 a pressed number lights its items on the graph', () => {
     expect(last().highlight!.has('ticket:t_pd1')).toBe(false);
   });
 
+  it('27.648 a lit number whose answer is withdrawn (a cached answer, then a refused read) passes null and the page stays up; control: lit before the refusal', async () => {
+    const user = userEvent.setup();
+    renderHome('ws_648w');
+    await mounted();
+    // Remount: the cached answer is served first, then the read is refused and the stale answer withdrawn (`home` null).
+    cleanup();
+    let refuse: (error: Error) => void = () => undefined;
+    renderHome('ws_648w', () => new Promise<HomeResponse>((_, reject) => (refuse = reject)));
+    await mounted();
+    await user.click(tile('2 Past due'));
+    expect(last().highlight).toEqual(new Set(['ticket:t_pd1', 'ticket:t_pd2']));
+    act(() => refuse(new Error('HTTP 500 for /v1/workspaces/ws_648w/home')));
+    expect(await screen.findByText("Couldn't load the numbers.")).toBeInTheDocument();
+    await waitFor(() => expect(last().highlight).toBeNull());
+  });
+
   it('27.648 homeNodeIds maps each number to its kind', () => {
     expect(homeNodeIds('members', ['u_1', 'u_2'])).toEqual(new Set(['person:u_1', 'person:u_2']));
     expect(homeNodeIds('notes', ['n_1'])).toEqual(new Set(['note:n_1']));
@@ -354,6 +370,7 @@ describe('27.649 the highlight note', () => {
     expect(valueOf(ruleExactly(UI_CSS, '.gn-button'), 'min-height')).toBe('2.75rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'line-height')).toBe('1.25rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note', '@media (max-width: 40rem)'), 'min-height')).toBe('2.5rem');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__note', '@media (max-width: 40rem)'), 'flex-basis')).toBe('100%'); // its own row, Start from below
   });
 });
 
