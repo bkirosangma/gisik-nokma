@@ -250,6 +250,9 @@ describe('29.370 the Decision gates', () => {
     expect(refused).toEqual({ rule: RULE_DECISION_BAD_CLOSE_STARTED, reason: 'Some of the tickets chosen to close are not part of this flow.' });
     expect(RULE_DECISION_BAD_CLOSE_STARTED).toBe('decision.bad-close-started');
     for (const id of [z, other, d]) expect(refused!.reason).not.toContain(id);
+    // the foreign id first, and alone: every id is judged, the first one included (review P44)
+    expect(await gate.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [other, z] }), db.pool)).toEqual(refused);
+    expect(await gate.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [other] }), db.pool)).toEqual(refused);
     // controls: every id in the flow (the Decision itself is in it), an empty list, none, and a non-string entry ignored
     expect(await gate.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [z, d] }), db.pool)).toBeNull();
     expect(await gate.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [] }), db.pool)).toBeNull();

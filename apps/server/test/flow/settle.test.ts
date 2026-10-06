@@ -633,16 +633,20 @@ describe('29.369 the sweep settle half', () => {
     }
   });
 
-  it('29.369 (d) each Decision is settled in its own workspace, the row\'s', async () => {
+  it('29.369 (d) each Decision is settled in its own workspace, the row\'s, under its OWN latest choice', async () => {
     await seedSecondWorkspace(db.pool);
     const one = await loopWorld(db.pool);
-    await decide(db.pool, one.d, 'Redo');
+    const decidedOne = await decide(db.pool, one.d, 'Redo');
     const two = await loopWorld(db.pool, { workspaceId: WS2 });
     const decidedTwo = await decide(db.pool, two.d, 'Redo', {}, WS2);
     expect(await sweepWith({ now: after(decidedTwo, 120_000) })).toEqual({ promoted: 0, settled: 2, refused: 0 });
-    const { rows } = await db.pool.query<{ workspace_id: string; entity_id: string }>(
-      "SELECT workspace_id, entity_id FROM events WHERE payload->'cause'->>'kind' = 'reopened-by-flow'");
-    expect(rows.map((r) => [r.workspace_id, r.entity_id]).sort()).toEqual([[WS, one.a], [WS, one.d], [WS2, two.a], [WS2, two.d]].sort());
+    // each cause names its own Decision's choice: one.d is settled after two.d's choice, the newest in the whole ledger, was
+    // filed, so a latest-choice read not bound to the Decision would hand one.d the other workspace's event (review P44)
+    const { rows } = await db.pool.query<{ workspace_id: string; entity_id: string; event_id: string }>(
+      "SELECT workspace_id, entity_id, payload->'cause'->>'decisionEventId' AS event_id FROM events WHERE payload->'cause'->>'kind' = 'reopened-by-flow'");
+    expect(rows.map((r) => [r.workspace_id, r.entity_id, r.event_id]).sort()).toEqual(
+      [[WS, one.a, decidedOne.id], [WS, one.d, decidedOne.id], [WS2, two.a, decidedTwo.id], [WS2, two.d, decidedTwo.id]].sort(),
+    );
     expect(logs).toEqual([]);
   });
 
