@@ -49,5 +49,16 @@ describe('18.503 the MCP note tools refuse a cross-workspace link with the unkno
     // CONTROL: the same create, in the world's workspace, commits.
     const bornHome = await callTool(w.app, w.member.token, 'create_note', { workspaceId: w.workspaceId, title: 'Born linked at home', attachTicketId: w.ticketId });
     expect(bornHome.isError, bornHome.text).toBe(false);
+
+    // The assistant is told the rule before it tries: `link_note`'s description, as `tools/list` serves it, whole.
+    const list = await w.app.inject({
+      method: 'POST', url: '/mcp',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18', authorization: `Bearer ${w.member.token}` },
+      payload: { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+    });
+    const tools = (list.json().result as { tools: Array<{ name: string; description?: string }> }).tools;
+    expect(tools.find((t) => t.name === 'link_note')?.description).toBe(
+      'Attach a note to a ticket (action "attach") or detach it ("detach"). You must be able to see both, and the ticket must be in the note\'s workspace.',
+    );
   });
 });

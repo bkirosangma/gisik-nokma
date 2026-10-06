@@ -178,3 +178,43 @@ describe('28.129 a discard leaves no trace on the other ticket', () => {
     expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
   });
 });
+
+describe('18.504 a draft holds or withdraws only a child of its own workspace (task/notes-cross-workspace-attach)', () => {
+  it('18.504 the member\'s draft naming a task of the member\'s OTHER workspace is refused with the unknown-target sentence, withdrawal and hold alike, as a never-issued id is; CONTROL: a task of this workspace is held and withdrawn', async () => {
+    // W2: the MEMBER founds it and files a published task C2 there, so C2 is a ticket they may open. `canOpen` asks in
+    // C2's own workspace, and the engine accepts a withdrawal as a no-op before its own workspace bind: until this task
+    // the withdrawal naming C2 committed and wrote C2's id into the draft's stream.
+    const auth = read.authOf('member');
+    const W2 = (await read.app.inject({ method: 'POST', url: '/v1/workspaces', headers: auth, payload: { name: 'Elsewhere' } })).json<{ workspaceId: string }>()
+      .workspaceId;
+    const [p2, c2, p, c, d] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+    const inW2 = (entity: { kind: string; id: string }, type: string, payload: unknown) => ({
+      id: newUlid(), workspaceId: W2, entity, type, version: 1, payload, actorId: read.userIds.member, origin: 'web', clientTime: new Date().toISOString(),
+    });
+    const seeded = await read.app.inject({
+      method: 'POST', url: '/v1/events', headers: auth,
+      payload: { events: [
+        inW2({ kind: 'project', id: p2 }, 'project.created', { name: 'Elsewhere' }),
+        inW2({ kind: 'project', id: p2 }, 'project.member_added', { userId: read.userIds.member, projectAdmin: true }),
+        inW2({ kind: 'ticket', id: c2 }, 'ticket.created', { typeId: 'task', projectId: p2, parentId: null, title: 'Elsewhere child' }),
+      ] },
+    });
+    for (const r of seeded.json<{ results: Array<{ status: string; reason?: string }> }>().results) expect(r.status, r.reason).toBe('committed');
+    await family(p, c);
+    await draftEpic(d);
+    const withdraw = (child: string) => w.send('member', 'ticket.reparented', d, { newParentId: null, childId: child });
+    const REFUSED = { status: 'refused', rule: 'permission.visibility', reason: 'The other ticket does not exist in this workspace, or you cannot see it.' };
+
+    // CONTROL first: C, of this workspace, is held and withdrawn by the same person on the same draft.
+    expect(await hold(d, c)).toMatchObject(committed);
+    expect(await withdraw(c)).toMatchObject(committed);
+
+    expect(await withdraw(c2)).toMatchObject(REFUSED);
+    expect(await hold(d, c2)).toMatchObject(REFUSED);
+    // No oracle: a never-issued id answers byte for byte what C2 answers.
+    const pick = (r: Record<string, unknown>) => ({ rule: r['rule'], reason: r['reason'] });
+    expect(pick(await withdraw(c2))).toEqual(pick(await withdraw(newUlid())));
+    // Nothing of C2 reached D's stream.
+    expect((await db.pool.query(`SELECT count(*)::int AS n FROM events WHERE entity_id = $1 AND payload ->> 'childId' = $2`, [d, c2])).rows[0].n).toBe(0);
+  });
+});

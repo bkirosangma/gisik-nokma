@@ -1496,13 +1496,13 @@ const NOTE_HOME_REASON = 'You are not a member of the project this note is filed
 const NOTE_TICKET_REASON = 'You cannot see the ticket this note would be attached to.';
 
 /**
- * Whether `ticketId` names a ticket of `workspaceId` — the note's own workspace (task/notes-cross-workspace-attach,
- * 18.500–18.503). `canSee` and `canOpen` resolve the role in the TICKET's workspace, and the ingest door's
- * entity↔workspace guard binds only the NOTE, so on their own they admitted a person who is in both workspaces: a note
- * of one workspace linked to a ticket of another, and that workspace's readers then read the ticket's title. The
- * workspace is the one `proj_entity_heads` holds (`readEntityHead`'s row), the binding that guard itself trusts. An
- * unknown id has no row, and every caller refuses a false with the unknown-ticket sentence, so the bind is no
- * existence oracle.
+ * Whether `ticketId` names a ticket of `workspaceId`: the note's own workspace, or the draft's for a child it holds
+ * (task/notes-cross-workspace-attach, 18.500–18.504). `canSee` and `canOpen` resolve the role in the TICKET's
+ * workspace, and the ingest door's entity↔workspace guard binds only the event's own entity, so on their own they
+ * admitted a person who is in both workspaces: a note of one workspace linked to a ticket of another, and that
+ * workspace's readers then read the ticket's title. The workspace is the one `proj_entity_heads` holds
+ * (`readEntityHead`'s row), the binding that guard itself trusts. An unknown id has no row, and every caller refuses a
+ * false with the sentence an unknown ticket gets, so the bind is no existence oracle.
  */
 async function ticketInWorkspace(db: Queryable, ticketId: string, workspaceId: string): Promise<boolean> {
   const { rowCount } = await db.query(
@@ -1745,10 +1745,18 @@ export async function checkVisibilityPermission(
    * draft. The door above granted the draft; the child must be one this person could reparent, the same question
    * the door asks of a plain reparent's own entity, and with the link block's sentence for the other end it names.
    * `canOpen`, as above: the author's own draft child reaches the engine, which says it moves on its own stream.
+   * And C must be in the DRAFT's workspace (18.504, task/notes-cross-workspace-attach): `canOpen` asks in C's own
+   * workspace, and the WITHDRAWAL (`newParentId: null`) is accepted by the engine as a no-op before its own
+   * workspace bind, so a person in two workspaces wrote the other workspace's ticket id into the draft's stream.
    */
   if (env.type === 'ticket.reparented') {
     const moved = ticketReparentedPayload.safeParse(env.payload);
-    if (moved.success && moved.data.childId !== undefined && !(await canOpen(ctx.db, ctx.sessionUserId, moved.data.childId))) {
+    if (
+      moved.success &&
+      moved.data.childId !== undefined &&
+      !((await ticketInWorkspace(ctx.db, moved.data.childId, env.workspaceId)) &&
+        (await canOpen(ctx.db, ctx.sessionUserId, moved.data.childId)))
+    ) {
       return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
     }
   }
