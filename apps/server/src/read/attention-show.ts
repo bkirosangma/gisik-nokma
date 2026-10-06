@@ -76,7 +76,7 @@ export function adminProjectIdsOf(eff: EffectiveRole): string[] {
  *
  * `ws-admin` matches every row: `parseShow` has already refused it unless the
  * viewer is `owner` or `admin` in this workspace. Visibility is NOT judged here
- * — each caller keeps its own audience check (`visibleTicketsWhere`, `canSee`),
+ * — each caller keeps its own audience check (`visibleTicketsWhere`, `canOpen`),
  * and this only ever narrows what that check let through.
  */
 export function ticketMatchesShow(

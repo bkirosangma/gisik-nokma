@@ -226,7 +226,7 @@ function toView(row: ContestRow): ContestView {
  * the workspace, and one naming a workspace that does not exist, both resolve
  * no role and get the same answer for the same `show`. Each surviving row is
  * then judged by the ticket it names (`ticketMatchesShow`, over the joined
- * `created_by` / `assignee_id` / `project_id`) BEFORE `canSee`, which still
+ * `created_by` / `assignee_id` / `project_id`) BEFORE `canOpen`, which still
  * decides the audience: `show` only narrows.
  */
 export function registerContestsRoute(
