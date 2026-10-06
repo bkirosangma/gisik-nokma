@@ -430,6 +430,9 @@ describe('29.115 a row carries the paper pin only when there is something to cou
     expect(onlyRow(model([pinned({ notes: 2, attachments: 1 })])).pin).toEqual({ notes: 2, attachments: 1 });
     expect(onlyRow(model([pinned({ notes: 0, attachments: 3 })])).pin).toEqual({ notes: 0, attachments: 3 });
     expect(onlyRow(model([pinned({ notes: 3, attachments: 0 })])).pin).toEqual({ notes: 3, attachments: 0 });
+    // One of either is enough: the boundary of each count, on its own.
+    expect(onlyRow(model([pinned({ notes: 1, attachments: 0 })])).pin).toEqual({ notes: 1, attachments: 0 });
+    expect(onlyRow(model([pinned({ notes: 0, attachments: 1 })])).pin).toEqual({ notes: 0, attachments: 1 });
     // CONTROLS, same it: known-none and unknown both draw no pin, and neither is an error.
     expect(onlyRow(model([pinned({ notes: 0, attachments: 0 })])).pin).toBeNull();
     expect(onlyRow(model([pinned(undefined)])).pin).toBeNull();

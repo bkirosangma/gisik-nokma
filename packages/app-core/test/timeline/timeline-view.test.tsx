@@ -863,6 +863,18 @@ describe('29.116 the paper pin sits inside the bar\'s end, or after the key outs
     expect(rowOf(roomy).querySelector('.gn-timeline__key--outside')).toBeNull();
   });
 
+  it('29.116 the view hands the pin to the packer: a pinned one-day bar with a 58 px key reserves one day more than the same bar unpinned, so a bar five days on takes a second row only when the first is pinned', () => {
+    // At the Week preset (24 px/day) the packing bucket is 16 px/day. GN-1234 measures 7 x 6.5 + 12 = 57.5, so 58 px (jsdom).
+    // Unpinned: ceil((4 + 58) / 16) = 4 days after the bar (days 0-4); pinned: ceil((4 + 58 + 14) / 16) = 5 (days 0-5).
+    const rowOfBar = (title: string) => rowOf(screen.getByRole('button', { name: title })).style.getPropertyValue('--row');
+    renderTimeline([pinnedTicket('First', 'GN-1234', '2026-08-24', '2026-08-24', { notes: 1, attachments: 0 }), pinnedTicket('Five on', 'GN-20', '2026-08-29', '2026-08-30')]);
+    expect(rowOfBar('Five on')).toBe('1');
+    document.body.innerHTML = '';
+    // CONTROL: the same two bars with the first unpinned share a row.
+    renderTimeline([pinnedTicket('First', 'GN-1234', '2026-08-24', '2026-08-24'), pinnedTicket('Five on', 'GN-20', '2026-08-29', '2026-08-30')]);
+    expect(rowOfBar('Five on')).toBe('0');
+  });
+
   it('29.116 a keyless bar too short for its pin puts the pin alone outside its end; a keyless bar that holds it keeps it inside', () => {
     // A keyless pinned label is the pin inside a bar's two paddings: 12 + 14 = 26 px. A one-day bar at 24 px/day is narrower.
     renderTimeline([

@@ -56,6 +56,8 @@ describe('29.114 the list row carries the paper pin whole, or not at all', () =>
     expect(() => mapListPage(page(card({ pin: { notes: 2 } })))).toThrow(/cards\[0\]\.pin\.attachments/);
     expect(() => mapListPage(page(card({ pin: { notes: '2', attachments: 1 } })))).toThrow(/cards\[0\]\.pin\.notes/);
     expect(() => mapListPage(page(card({ pin: 'two notes' })))).toThrow(MappingError);
+    // null is not "unknown" (that is an ABSENT key): the server never sends it, so it is a malformed pin, refused at its path.
+    expect(() => mapListPage(page(card({ pin: null })))).toThrow(/cards\[0\]\.pin/);
     // CONTROL: the same card with a whole pin maps, so the refusals above are about the pin and nothing else on the card.
     expect(() => mapListPage(page(card({ pin: { notes: 2, attachments: 1 } })))).not.toThrow();
   });

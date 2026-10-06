@@ -107,6 +107,8 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     // The workspace note's own attachment (ticket_id NULL) did not become an attachment of TP: TP has exactly the two files.
     expect((await pinsFor('owner')).get(world.TP)?.attachments).toBe(2);
     const eff = await resolveEffectiveRole(db.pool, world.ids.owner, world.WS);
+    // Only the asked-for ids are read: asked for TE alone, TP (six note links, two files) is not in the answer.
+    expect([...(await pinCountsFor(db.pool, eff, world.ids.owner, [world.TE])).entries()]).toEqual([[world.TE, { notes: 1, attachments: 1 }]]);
     // "Reads nothing" is a statement about the database: no query is sent for an empty page (an `ANY('{}')` query would also
     // answer an empty map, so the map's size alone cannot tell).
     const queries = vi.spyOn(db.pool, 'query');
