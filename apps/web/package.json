@@ -18,6 +18,7 @@
     "@gisik-nokma/app-core": "workspace:*",
     "@gisik-nokma/domain": "workspace:*",
     "@gisik-nokma/editor": "workspace:*",
+    "@gisik-nokma/knowledge-graph": "workspace:*",
     "@gisik-nokma/ui": "workspace:*",
     "better-auth": "^1.7.2",
     "next": "^15.1.6",

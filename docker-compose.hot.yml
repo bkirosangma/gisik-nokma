@@ -256,6 +256,7 @@ services:
       - ./packages/app-core/src:/repo/packages/app-core/src
       - ./packages/domain/src:/repo/packages/domain/src
       - ./packages/editor/src:/repo/packages/editor/src
+      - ./packages/knowledge-graph/src:/repo/packages/knowledge-graph/src
       - ./packages/mcp-server/src:/repo/packages/mcp-server/src
       - ./packages/rule-engine/src:/repo/packages/rule-engine/src
       - ./packages/sync-client/src:/repo/packages/sync-client/src
@@ -370,6 +371,7 @@ services:
       - ./packages/app-core/src:/repo/packages/app-core/src
       - ./packages/domain/src:/repo/packages/domain/src
       - ./packages/editor/src:/repo/packages/editor/src
+      - ./packages/knowledge-graph/src:/repo/packages/knowledge-graph/src
       - ./packages/mcp-server/src:/repo/packages/mcp-server/src
       - ./packages/rule-engine/src:/repo/packages/rule-engine/src
       - ./packages/sync-client/src:/repo/packages/sync-client/src
