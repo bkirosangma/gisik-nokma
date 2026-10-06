@@ -634,6 +634,54 @@ describe('27.523, 27.536 focus follows the rename form and the Delete question, 
     expect(ds.ingested).toEqual([]);
   });
 
+  it('27.523 when the button focus would go back to is not drawn, the form or question still closes and nothing breaks: the question cancelled after Rename hid Delete, the form cancelled after the panel turned read-only; control: with Delete drawn, its question\'s Cancel puts focus on it', async () => {
+    const user = userEvent.setup();
+    // "nothing breaks": React hands a throw in a handler or an effect to the window as an 'error' event
+    const thrown: unknown[] = [];
+    const onError = (e: ErrorEvent) => {
+      e.preventDefault();
+      thrown.push(e.error);
+    };
+    window.addEventListener('error', onError);
+    try {
+      // control: a handler's throw reaches the listener
+      const boom = new Error('control');
+      const probe = render(<button type="button" onClick={() => { throw boom; }}>Throw</button>);
+      await user.click(screen.getByRole('button', { name: 'Throw' }));
+      expect(thrown).toEqual([boom]);
+      probe.unmount();
+      thrown.length = 0;
+      await edgePaths(user);
+      expect(thrown).toEqual([]);
+    } finally {
+      window.removeEventListener('error', onError);
+    }
+  });
+
+  async function edgePaths(user: ReturnType<typeof userEvent.setup>) {
+    const props = { ...baseProps(), dataSource: createFakeDataSource({ getConcept: async () => concept() }) };
+    const { rerender } = render(<ConceptInspector item={confirmedItem()} {...props} />);
+    await heading();
+    // control: Delete drawn, focus goes back to it
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(within(screen.getByRole('alertdialog', { name: 'Delete concept' })).getByRole('button', { name: 'Cancel' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete' }));
+    // the question open, then Rename, whose form hides Rename and Delete: the question's Cancel finds no Delete
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    // the only Delete left is the question's own
+    expect(screen.getAllByRole('button', { name: 'Delete' }).map((b) => b.closest('[role="alertdialog"]') !== null)).toEqual([true]);
+    await user.click(within(screen.getByRole('alertdialog', { name: 'Delete concept' })).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    // the form still open, then read-only (a member made a guest): its Cancel finds no Rename
+    rerender(<ConceptInspector item={confirmedItem()} {...props} readOnly />);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await settle();
+    expect(screen.queryByRole('textbox', { name: 'Concept name' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 3, name: 'Scroll position on phone sheets' })).toBeInTheDocument();
+  }
+
   it('27.536 a failed read is shown only for the concept it was read for: re-pointed after it, the inspector shows the wait until THAT concept answers, then that concept; control: the failure is shown for its own concept', async () => {
     const failures: Array<[unknown, string]> = [
       [new Error('network down'), 'This concept could not be loaded.'],
