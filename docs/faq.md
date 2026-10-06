@@ -677,7 +677,7 @@ cannot open it. That is today's behaviour; whether it should instead hide the ti
 the product owner is still deciding.
 
 **Can I delete a note?**
-Yes — open it and press **Delete…** beside **History** (its author, a workspace admin or the owner).
+Yes — open it and press **Delete…** beside **History** and **Knowledge Graph** (its author, a workspace admin or the owner).
 It goes to the **Deleted** group on the Notes page and to **Deleted items** on your Account page, and
 **Restore** in either brings it back exactly as it was; a note marked for permanent deletion has to be unmarked first, with **Unmark** in Deleted items.
 
