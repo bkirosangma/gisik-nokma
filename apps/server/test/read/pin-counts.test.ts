@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
+import { evaluateEvent } from '@gisik-nokma/rule-engine';
+import { buildServerGates } from '../../src/gates/index.js';
+import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { buildProjectionRegistry } from '../../src/projections/index.js';
+import { listNotesForTicket } from '../../src/read/notes.js';
 import { NO_PIN, pinCountsFor, pinOf } from '../../src/read/pin-counts.js';
 import { readList } from '../../src/routes/list.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -15,7 +20,8 @@ import { seedNotesFixture, type NotesFixture, type NotesUser } from '../helpers/
  * project P; TE is explicit-to-guestListed. Four live notes are attached to TP (workspace, project, private, explicit scope),
  * plus two that no one may count: one that was then deleted, and a workspace note homed in a second project that was then
  * deleted (`NOTE_PROJECT_LIVE_WHERE`, the notes list's own clause). `nInherit` is already attached to TE by the fixture. Two
- * attachments belong to TP, one to TE, one to a NOTE (not a ticket).
+ * attachments belong to TP, one to TE, one to a NOTE (not a ticket). The last case adds what belongs to a SECOND workspace: a
+ * note homed there and linked to TP through the client door, and a file row filed there on TP; neither counts here.
  */
 let db: TestDatabase;
 let world: NotesFixture;
@@ -71,7 +77,7 @@ afterAll(async () => {
 
 async function pinsFor(who: NotesUser) {
   const eff = await resolveEffectiveRole(db.pool, world.ids[who], world.WS);
-  return pinCountsFor(db.pool, eff, world.ids[who], [world.TP, world.TE]);
+  return pinCountsFor(db.pool, eff, world.ids[who], world.WS, [world.TP, world.TE]);
 }
 
 async function pageFor(who: NotesUser) {
@@ -108,11 +114,11 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     expect((await pinsFor('owner')).get(world.TP)?.attachments).toBe(2);
     const eff = await resolveEffectiveRole(db.pool, world.ids.owner, world.WS);
     // Only the asked-for ids are read: asked for TE alone, TP (six note links, two files) is not in the answer.
-    expect([...(await pinCountsFor(db.pool, eff, world.ids.owner, [world.TE])).entries()]).toEqual([[world.TE, { notes: 1, attachments: 1 }]]);
+    expect([...(await pinCountsFor(db.pool, eff, world.ids.owner, world.WS, [world.TE])).entries()]).toEqual([[world.TE, { notes: 1, attachments: 1 }]]);
     // "Reads nothing" is a statement about the database: no query is sent for an empty page (an `ANY('{}')` query would also
     // answer an empty map, so the map's size alone cannot tell).
     const queries = vi.spyOn(db.pool, 'query');
-    expect((await pinCountsFor(db.pool, eff, world.ids.owner, [])).size).toBe(0);
+    expect((await pinCountsFor(db.pool, eff, world.ids.owner, world.WS, [])).size).toBe(0);
     expect(queries).not.toHaveBeenCalled();
     queries.mockRestore();
     // The literal, not `NO_PIN`: comparing with the module's own constant would pass whatever that constant held.
@@ -152,5 +158,80 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     ]);
     const noteOnly = (await pageFor('owner')).find((c) => c.ticketId === bareId);
     expect(noteOnly?.pin).toEqual({ notes: 1, attachments: 0 });
+  });
+
+  it('29.113 a note homed in ANOTHER workspace counts for nobody here, though linked to TP through the client door, and nor does a file row filed under that workspace on TP', async () => {
+    // W2 is a second workspace owned by `author`, who is also a member on P here, so TP is a ticket the author may open. Its
+    // note is live, workspace-scope and homed in a live project: every clause of the count but the workspace bind admits it
+    // for this workspace's owner (`visibleNotesWhere` is TRUE) and members (the unbound `scope_mode = 'workspace'` arm).
+    const W2 = newUlid();
+    const P2 = newUlid();
+    const away = newUlid();
+    const inW2 = { workspaceId: W2, actorId: world.ids.author };
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...inW2, entity: { kind: 'workspace', id: W2 }, type: 'workspace.created', payload: { name: 'Elsewhere' } }),
+      makeCommitted({
+        ...inW2,
+        entity: { kind: 'membership', id: `${W2}:${world.ids.author}` },
+        type: 'membership.granted',
+        payload: { userId: world.ids.author, role: 'owner' },
+      }),
+      makeCommitted({ ...inW2, entity: { kind: 'project', id: P2 }, type: 'project.created', payload: { name: 'Elsewhere' } }),
+      makeCommitted({
+        ...inW2,
+        entity: { kind: 'note', id: away },
+        type: 'note.created',
+        payload: { title: 'Homed in the second workspace', homeProjectId: P2, scope: { mode: 'workspace' } },
+      }),
+    ]);
+    const onTP = async (table: 'proj_note_attachments' | 'attachments') =>
+      (await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table} WHERE ticket_id = $1`, [world.TP])).rows[0]?.n;
+    const linksBefore = await onTP('proj_note_attachments');
+    const filesBefore = await onTP('attachments');
+    // The link goes through the CLIENT door as `src/index.ts` builds it (permission gate, rule engine, projections, the
+    // production gates), not through a seeder: whether that door refuses a link from a W2 note to a WS ticket is the planner's
+    // write-door question (09:54), and this line records the answer. Nothing is seeded into W2 after it: the door numbers W2's
+    // events from the ledger, `applyCommitted` from a process-local map.
+    const ingest = createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections: buildProjectionRegistry(), gates: buildServerGates() });
+    const [attached] = await ingest.ingestClientBatch(
+      [
+        {
+          id: newUlid(),
+          workspaceId: W2,
+          entity: { kind: 'note', id: away },
+          type: 'note.attached',
+          version: 1,
+          payload: { ticketId: world.TP },
+          actorId: world.ids.author,
+          origin: 'web',
+          clientTime: '2026-10-06T10:00:00.000Z',
+        },
+      ],
+      world.ids.author,
+    );
+    expect(attached).toMatchObject({ status: 'committed' });
+    // No door files a ticket's attachment under another workspace (the upload route takes the TICKET's own workspace,
+    // `routes/attachments.ts`), but no constraint forbids the row either, so it is written directly, as this file's others are.
+    await db.pool.query(
+      `INSERT INTO attachments (id, workspace_id, ticket_id, note_id, uploader_id, filename, mime, size, object_key)
+       VALUES ($1, $2, $3, NULL, $4, 'b.pdf', 'application/pdf', 3, $5)`,
+      [newUlid(), W2, world.TP, world.ids.author, `k/${newUlid()}`],
+    );
+    // CONTROL, same it: both rows exist and name TP, and W2's own Notes read lists the note on TP, so the counts below are the
+    // workspace binds at work and not rows the world failed to write.
+    expect(await onTP('proj_note_attachments')).toBe((linksBefore ?? 0) + 1);
+    expect(await onTP('attachments')).toBe((filesBefore ?? 0) + 1);
+    const effW2 = await resolveEffectiveRole(db.pool, world.ids.author, W2);
+    expect((await listNotesForTicket(db.pool, effW2, world.ids.author, W2, world.TP)).map((note) => note.noteId)).toEqual([away]);
+    // Here nobody counts either row: not the owner (who may read every note), not a member (the workspace-scope arm), not the
+    // owner's list page, whose route binds its own workspace.
+    expect((await pinsFor('owner')).get(world.TP)).toEqual({ notes: 4, attachments: 2 });
+    expect((await pinsFor('memberIn')).get(world.TP)).toEqual({ notes: 2, attachments: 2 });
+    expect((await pageFor('owner')).find((c) => c.ticketId === world.TP)?.pin).toEqual({ notes: 4, attachments: 2 });
+    // Bound to W2 instead, the same TP counts exactly W2's note and W2's file: the binds pick the home workspace, they do not
+    // drop the rows.
+    expect([...(await pinCountsFor(db.pool, effW2, world.ids.author, W2, [world.TP])).entries()]).toEqual([
+      [world.TP, { notes: 1, attachments: 1 }],
+    ]);
   });
 });

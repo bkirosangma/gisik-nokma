@@ -418,9 +418,9 @@ export type ListCard = TicketCard & {
   assignedProvenance: AssignmentProvenance | null;
   hasRestrictedParent: boolean;
   /**
-   * The paper pin (Workflow and Timeline graphs, TG-11 and TV-10): the notes THIS viewer may read that are attached to the card's
-   * ticket, and the attachments it owns. The list route sends it on every card (`routes/list.ts`, `read/pin-counts.ts`); it is
-   * optional in the TYPE only because `assembleListCards` — which the other list-shaped reads share — does not compute it.
+   * The paper pin (Workflow and Timeline graphs, TG-11 and TV-10): the notes THIS viewer may read in the card's workspace that
+   * are attached to its ticket, and the attachments it owns there. The list route sends it on every card (`routes/list.ts`,
+   * `read/pin-counts.ts`); it is optional in the TYPE only because `assembleListCards` (the other list reads share it) omits it.
    */
   pin?: PinCounts;
 };
