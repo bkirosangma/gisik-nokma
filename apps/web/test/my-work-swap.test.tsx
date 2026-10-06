@@ -246,7 +246,7 @@ describe('the two regions swap in one commit (G1 §3)', () => {
     mount(cached.services);
     await waitFor(() => expect(document.querySelector('aside.gn-attention:not([aria-busy])'), 'the answered strip must not wait for the slow body').not.toBeNull());
     expect(frame().bodySkeleton).toBe(true);
-    // Its mirror: the BODY answered at the first ask and the strip still out. Each region's answer releases the page on its own.
+    // Its mirror: the BODY already answered at the first ask, the strip still out: an answer present at the first ask is never held.
     cleanup();
     clearMyWorkspacesCache();
     clearWorkspaceNameCache();
