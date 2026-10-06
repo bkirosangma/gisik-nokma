@@ -175,7 +175,7 @@ export function notificationBody(notification: Notification): string {
  * The ticket a row is about, where the row's BODY does not already say it.
  *
  * E5-35. `mentionNotificationPayloadSchema` carries `ticketTitle`
- * (`notifications.ts:66`) and neither the headline nor the body used it, so a
+ * (`notifications.ts:68`) and neither the headline nor the body used it, so a
  * mention said what was written and never where — the one row of the seven whose
  * body is not already the title. The other six return `null` here because their
  * bodies ARE the title (`notificationBody` above), and repeating it would be the

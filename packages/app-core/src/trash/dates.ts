@@ -3,7 +3,7 @@ import { formatClaimDate } from '../claims/claim-labels.js';
 
 /**
  * The IST day an instant falls in, as "8 Oct" (spec §6.3's own example). The
- * inbox's `sinceDay` pattern (`inbox/format.ts:51-60`): `istDayOf` — never a
+ * inbox's `sinceDay` pattern (`inbox/format.ts:55-64`): `istDayOf` — never a
  * ten-character slice, which would put 18:30Z–23:59Z on the wrong day — then
  * `formatClaimDate`, and a malformed instant is printed verbatim rather than
  * throwing a whole list down.

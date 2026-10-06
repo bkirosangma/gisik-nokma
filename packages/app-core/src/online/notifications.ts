@@ -146,7 +146,7 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
        *
        * Point-free `.map(parseNotification)` is safe here and was checked
        * rather than assumed: the signature is `(value: unknown) => Notification`
-       * (`packages/domain/src/notifications.ts:151`) — one parameter, so `.map`'s
+       * (`packages/domain/src/notifications.ts:238`) — one parameter, so `.map`'s
        * index and array arguments land nowhere.
        */
       return {

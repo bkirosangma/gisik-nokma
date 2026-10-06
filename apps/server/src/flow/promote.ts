@@ -128,7 +128,7 @@ export async function retargetsOf(db: Queryable, event: EventEnvelope): Promise<
 export function createFlowPromoter(deps: FlowPromoteDeps): { onCommitted(event: EventEnvelope): Promise<void> } {
   const log = logOf(deps);
   return {
-    /** Never rejects: it runs fire-and-forget after a commit (AP-5), like `notifications/fanout.ts:376`. */
+    /** Never rejects: it runs fire-and-forget after a commit (AP-5), like `notifications/fanout.ts:452`. */
     async onCommitted(event) {
       try {
         const targets = await retargetsOf(deps.pool, event);

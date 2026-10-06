@@ -83,11 +83,11 @@ computed "now".
 - **11.223** ✅ E4-28 (batch B15), the timeline's own half of 11.222: a bar's date span is linked as an `aria-describedby` DESCRIPTION, not folded into its accessible NAME — the name stays exactly the ticket title, and the linked description is the same string the `title` attribute already carried, composed from the model's own `barProvenance`, never hand-typed — (`timeline-view.test.tsx`)
 
 ## Notification formatting & icons (`packages/app-core`)
-- **11.83** ✅ Every notification kind is spoken for by the formatter — a sixth kind would arrive mute — (`format.test.ts`)
+- **11.83** ✅ Every notification kind is spoken for by the formatter — a new kind would arrive mute — (`format.test.ts`)
 - **11.84** ✅ The headline states the claim, attributed — never invented urgency — (`format.test.ts`)
 - **11.85** ✅ PLANTED DEFECT: "since" is the IST day of the instant, not a UTC slice — (`format.test.ts`)
 - **11.86** ✅ The body is the sender's own words, unparaphrased and unredacted — (`format.test.ts`)
-- **11.87** ✅ All five notification kinds reach an icon, and no two kinds reach the same one — (`icons.test.tsx`)
+- **11.87** ✅ All seven notification kinds (the two flow kinds since wtg2 T18) reach an icon, and no two kinds reach the same one — (`icons.test.tsx`)
 
 ## Inbox core components (`packages/app-core`)
 - **11.88** ✅ The unread badge is silent when there is nothing to say, treats its cap as a boundary witnessed on both sides, and carries an accessible name that agrees with itself about the count — an accessible NAME, not merely an attribute nobody must expose — (`unread-badge.test.tsx`)
@@ -280,7 +280,7 @@ empty scan result would be indistinguishable from a stale or vacuous scanner.
 - **11.178** ✅ CONTROL: both needles match at the declaration site, so an empty scan result means real absence, not a stale needle — (`reporting-scope-guard.test.ts`)
 - **11.179** ✅ CONTROL: every scanned root actually yields source files — a root that silently walked up empty would make its scan vacuous — (`reporting-scope-guard.test.ts`)
 - **11.180** ✅ No source file in any scanned client or server tree speaks the estimation vocabulary (velocity/burndown/forecast) — (`reporting-scope-guard.test.ts`)
-- **11.181** ✅ The notification vocabulary is closed over exactly the five shipped kinds — no room for a computed-urgency kind to creep in unnoticed — (`reporting-scope-guard.test.ts`)
+- **11.181** ✅ The notification vocabulary is closed over exactly the shipped kinds (seven since wtg2 T18) — no room for a computed-urgency kind to creep in unnoticed — (`reporting-scope-guard.test.ts`)
 - **11.182** ✅ No file but `ist-day.ts` writes the IANA zone as a literal — every view imports `IST_TIME_ZONE` instead — (`reporting-scope-guard.test.ts`)
 - **11.183** ✅ No file but `ist-day.ts` re-declares the day shape — everyone imports `IST_DAY_REGEX` instead — (`reporting-scope-guard.test.ts`)
 - **11.184** ✅ The zone string every view actually formats with comes from the domain package, and is the real IANA name — (`reporting-scope-guard.test.ts`)
@@ -311,7 +311,7 @@ global route) and stored in a NEW table (`user_notification_preferences`), never
 `PreferencesDoc`/`user_preferences` — see `packages/domain/src/notification-preferences.ts` for why that
 table's `(user_id, workspace_id)` key and its 30-day sweep-on-revocation make it the wrong home. Muting
 hides a kind from what is READ; it never stops the row from being WRITTEN.*
-- **11.197** ✅ `notificationPreferencesSchema` accepts the empty (everything-on) default and any real subset of the five kinds, refuses an unknown kind, and refuses an unknown top-level key (`.strict()`) — `EMPTY_NOTIFICATION_PREFERENCES` is exactly the empty-list answer — (`packages/domain/test/notification-preferences.test.ts`)
+- **11.197** ✅ `notificationPreferencesSchema` accepts the empty (everything-on) default and any real subset of the kinds, refuses an unknown kind, and refuses an unknown top-level key (`.strict()`) — `EMPTY_NOTIFICATION_PREFERENCES` is exactly the empty-list answer — (`packages/domain/test/notification-preferences.test.ts`)
 - **11.198** ✅ The store answers the empty default for a user with no row, round-trips a written preference, upsert-REPLACES rather than merges on a second write, keeps two users' rows independent, and the database's own `CHECK` refuses a kind outside the five (positive control: a valid kind inserts fine) — (`apps/server/test/notification-preferences/store.test.ts`)
 - **11.199** ✅ `GET`/`PUT /v1/me/notification-preferences`: 401 with no session on both verbs and nothing stored; `GET` answers the empty default for a fresh user; `PUT` then `GET` round-trips and the `PUT` answers what it stored; an unknown kind and an unknown top-level key are both refused `400 {error:'invalid_notification_preferences'}` with nothing partial landed; and one user's write never touches another's row (positive control: the writer's own row did move) — (`apps/server/test/routes/notification-preferences.test.ts`)
 - **11.200** ✅ The read-side filter: `unreadNotificationCount` and `listNotifications` both exclude a muted kind's rows entirely — not merely marking them read — while an unmuted kind's row in the SAME fixture stays visible (the positive control against a query that silently returned nothing at all); an empty muted list changes nothing, the default; and `/v1/me/notifications` and its `/unread-count` sibling actually look the caller's stored preference up and pass it through — the wiring witness that `notifications.test.ts`'s own docblock says a route-registration test alone cannot give, since a store-level pass here is silent about whether the ROUTE ever calls `getNotificationPreferences` at all — (`apps/server/test/notifications/store.test.ts`, `apps/server/test/routes/notifications.test.ts`)

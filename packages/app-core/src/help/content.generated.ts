@@ -7534,7 +7534,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Exactly five kinds of message, and no more. The list is deliberately closed — nothing can quietly add a sixth kind."
+                    "text": "Exactly seven kinds of message, and no more. The list is deliberately closed — nothing can quietly add an eighth kind."
                   }
                 ]
               },
@@ -7590,6 +7590,66 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "italic",
                       "text": "\"In Doing since 21 Aug, moved there by Anselma Marak\""
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "A ticket of yours is ready to start because the step before it was closed — "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Ready to start: Draft the brief was closed\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Ready to start: Ship or redo chose Yes\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": " when a decision chose its branch. A step you can't see is not named: "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Ready to start: a step you can't see was closed\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". Not sent to the person whose finish caused it"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "A decision sent a ticket of yours back — "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Reopened by the flow: Ship or redo chose Redo (pass 2)\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Back in Backlog by the flow: …\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". A decision you can't see is not named: "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Reopened by the flow: a decision you can't see (pass 2)\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". Not sent to the person who chose"
                     }
                   ]
                 ]

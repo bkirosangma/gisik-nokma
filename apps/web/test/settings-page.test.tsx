@@ -742,7 +742,7 @@ describe('13.718-13.720 the Workspace settings tab — what the review found unp
  * of the spacings."*
  *
  * The control question was settled by the owner after two wrong guesses: the
- * thing on `/account` is a SWITCH (`notifications-section.tsx:51-58`, the
+ * thing on `/account` is a SWITCH (`notifications-section.tsx:87-95`, the
  * `<Switch>` this change put there), not a radio group — so `Off` became a
  * switch, and the CSS behind it was extracted
  * into `@gisik-nokma/ui` rather than copied. Cases 13.899/13.900 (in

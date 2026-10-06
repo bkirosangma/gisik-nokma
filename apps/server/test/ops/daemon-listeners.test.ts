@@ -12,7 +12,8 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * wtg2 T14 (NT-1): the backup daemon files events through an ingest nobody listens to (the flow sweep's promotions,
  * auto-close), so `registerDaemonListeners` subscribes the notification fan-out on it. The fan-out is the server's own
  * (`createNotificationFanout`); this pins the subscription, its unsubscribe, and that the caller's gate and log reach it.
- * An assignment is the probe: it has a fan-out arm today, and the flow's own (`flow-ready`) arrives with T18.
+ * An assignment is the probe here; the flow's own `flow-ready`, filed by the sweep through this same registration, is 29.392
+ * (`test/notifications/flow-fanout.test.ts`).
  */
 
 let db: TestDatabase;
@@ -68,9 +69,9 @@ describe('29.229 the daemon\'s ingest notifies', () => {
   });
 
   /**
-   * The daemon's own call. A behavioural leg needs a daemon-filed event the fan-out has an arm for, and there is none
-   * before T18 (the sweep files `ticket.transitioned`, auto-close `ticket.closed`, and the fan-out answers neither), so
-   * this pins the source until T18's `flow-ready` arm lets a spawned daemon's promotion show up in the inbox.
+   * The daemon's own call, pinned at the source. Since wtg2 T18 the fan-out answers the sweep's `ticket.transitioned`
+   * (`flow-ready`), and 29.392 drives that through `registerDaemonListeners` and `runFlowSweep` in-process; a spawned
+   * daemon's first flow run is five minutes out, so the call site itself stays pinned here.
    */
   it('29.229 the daemon registers the fan-out on its own ingest, once, after building it', () => {
     const source = readFileSync(new URL('../../src/ops/backup-daemon-main.ts', import.meta.url), 'utf8');

@@ -21,6 +21,7 @@
     "8 of 12 shown",
     "Anselma Marak assigned this to you",
     "Anselma Marak mentioned you",
+    "Back in Backlog by the flow: …",
     "Callout",
     "Closed by … on …",
     "Colour palette",
@@ -42,7 +43,11 @@
     "Offline: n claims waiting to send",
     "Print proofs",
     "Project access",
+    "Ready to start: Draft the brief was closed",
+    "Ready to start: Ship or redo chose Yes",
     "Rebrand for Kalita Tea",
+    "Reopened by the flow: Ship or redo chose Redo (pass 2)",
+    "Reopened by the flow: a decision you can't see (pass 2)",
     "Residential repairs",
     "Restricted parent: it exists, but you can't see it",
     "Robert's Plumbing",
@@ -124,6 +129,11 @@
     "due today": "A paraphrase of the idea (a day measured in IST), not a string the product prints.",
     "2 × 3 table": "Composed example: `TablePicker.tsx` builds `${row} × ${col} table` from the hovered cell.",
     "sees everything": "A paraphrase in a question heading, not a label the product prints.",
-    "captured 20 Aug 2026": "Composed example: `attachment-list.tsx` builds `captured ${formatDate(capturedAt)}` from the claim's date."
+    "captured 20 Aug 2026": "Composed example: `attachment-list.tsx` builds `captured ${formatDate(capturedAt)}` from the claim's date.",
+    "Ready to start: Draft the brief was closed": "Composed example (wtg2 T18): `inbox/format.ts` builds `Ready to start: ${becauseTitle} was closed` from the source's title.",
+    "Ready to start: Ship or redo chose Yes": "Composed example (wtg2 T18): `inbox/format.ts` builds `Ready to start: ${becauseTitle} chose ${label}` for a Decision's branch.",
+    "Reopened by the flow: Ship or redo chose Redo (pass 2)": "Composed example (wtg2 T18): `inbox/format.ts` builds `${lead}: ${decisionTitle} chose ${outcome} (pass ${pass})`; case 29.398 pins it.",
+    "Back in Backlog by the flow: …": "Composed example (wtg2 T18): the `toBacklog` lead of the same `inbox/format.ts` sentence; case 29.398 pins it.",
+    "Reopened by the flow: a decision you can't see (pass 2)": "Composed example (wtg2 T18): `inbox/format.ts` builds the hidden-Decision sentence with the pass; cases 29.395 and 29.398 pin it."
   }
 }

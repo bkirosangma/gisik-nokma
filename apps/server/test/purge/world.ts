@@ -110,7 +110,7 @@ export async function insertAttachment(
   );
 }
 
-/** An assignment notification: its payload names the ticket and quotes its title (`packages/domain/src/notifications.ts:51-60`). */
+/** An assignment notification: its payload names the ticket and quotes its title (`packages/domain/src/notifications.ts:53-62`). */
 export async function insertNotification(
   pool: Pool,
   base: Pick<Base, 'WS' | 'OWNER'>,

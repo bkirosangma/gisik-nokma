@@ -1259,15 +1259,15 @@ affected by either number: blocked is blocked.
 
 ### The Inbox
 
-Exactly five kinds of message, and no more. The list is deliberately closed — nothing can quietly add
-a sixth kind.
+Exactly seven kinds of message, and no more. The list is deliberately closed — nothing can quietly add an eighth kind.
 
 1. Somebody assigned something to you — *"Anselma Marak assigned this to you"*
 2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a ticket's comment or description, or in a note or one of its comments. The row names the ticket or the note, and clicking it opens that ticket or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
-5. Something has been sitting in one state too long — *"In Doing since 21 Aug, moved there by
-   Anselma Marak"*
+5. Something has been sitting in one state too long — *"In Doing since 21 Aug, moved there by Anselma Marak"*
+6. A ticket of yours is ready to start because the step before it was closed — *"Ready to start: Draft the brief was closed"*, or *"Ready to start: Ship or redo chose Yes"* when a decision chose its branch. A step you can't see is not named: *"Ready to start: a step you can't see was closed"*. Not sent to the person whose finish caused it
+7. A decision sent a ticket of yours back — *"Reopened by the flow: Ship or redo chose Redo (pass 2)"*, or *"Back in Backlog by the flow: …"*. A decision you can't see is not named: *"Reopened by the flow: a decision you can't see (pass 2)"*. Not sent to the person who chose
 
 **To mark one thing read: click the row.** If the marking fails, it reloads to show you the truth
 rather than leaving a fake "read" mark. Clicking also takes you to the ticket it is about.
