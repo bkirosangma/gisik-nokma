@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyRequest, onRouteHookHandler } from 'fastify';
 import type { Pool } from 'pg';
+import type { SubmittedEvent } from '@gisik-nokma/domain';
 import { hstsHeaderFor } from './http/hsts.js';
 import { SECURITY_HEADERS } from './http/security-headers.js';
 import { FORBIDDEN_ORIGIN_BODY, httpOriginRefused, normalizeOrigin } from './http/http-origin.js';
@@ -12,7 +13,7 @@ import { NoopErrorAlerter, alertWithoutWaiting, type ErrorAlerter } from './aler
 import { registerAuthRoutes } from './auth/routes.js';
 import { registerAuthMethodRoutes } from './routes/auth-methods.js';
 import { makeRequireSession } from './auth/require-session.js';
-import type { ClientIngest } from './ingest/ingest-service.js';
+import type { AtomicOutcome, ClientIngest } from './ingest/ingest-service.js';
 import { createNotificationFanout } from './notifications/fanout.js';
 import { nudgesEmbedding } from './search/nudge.js';
 import { createInAppTransport } from './notifications/transport.js';
@@ -46,6 +47,7 @@ import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerFlowRoutes } from './routes/flow.js';
 import { createFlowPromoter } from './flow/promote.js';
+import { createFlowSettler } from './flow/settle.js';
 import { registerTicketLinkRoutes } from './routes/ticket-links.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerDraftRoutes } from './routes/drafts.js';
@@ -218,6 +220,13 @@ export type AppDeps = {
    * purge sweep (`purge/sweep.ts`) erases the draft on its next run instead.
    */
   onDraftDiscarded?: (ticketId: string) => Promise<void>;
+  /**
+   * The INTERNAL atomic door (`IngestService.ingestAtomic`), for the Decision settle listener alone (wtg2 T16, PS-9): a
+   * Decision's cascade is filed as one all-or-nothing batch under the Flow actor. A named capability for the reason
+   * `serverAppend` is one. Optional, like `onNoteBodyCommitted`, so the many suites that build the app without it are
+   * untouched; when absent no settle listener is registered, and the flow sweep's settle half applies the cascade instead.
+   */
+  serverAtomic?: (events: SubmittedEvent[]) => Promise<AtomicOutcome>;
 };
 
 /**
@@ -1221,6 +1230,17 @@ export function buildApp(
   app.addHook('onClose', () => {
     unsubscribeFlowPromoter();
   });
+  // The settle listener (wtg2 T16, PS-9), beside the promoter and fire-and-forget like it: a committed choice, or a Decision's
+  // finishing transition, files the Decision's cascade as ONE atomic batch through `serverAtomic`. Registered only when supplied.
+  if (deps.serverAtomic !== undefined) {
+    const flowSettler = createFlowSettler({ pool: deps.pool, ingest: { ingestAtomic: deps.serverAtomic } });
+    const unsubscribeFlowSettler = deps.ingest.onEventCommitted((event) => {
+      void flowSettler.onCommitted(event);
+    });
+    app.addHook('onClose', () => {
+      unsubscribeFlowSettler();
+    });
+  }
   // The attachment doors (Plan 7 Tasks 9 and 10) — upload and download. This
   // line is the whole of what was missing: the module was complete and tested
   // and reachable from nothing, so on the server this repo booted the

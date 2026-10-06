@@ -342,9 +342,10 @@ async function main(): Promise<void> {
     },
     {
       // wtg2 T14 (AP-5): promotes what the server's listener missed, through this process's ingest. LAST in the list.
+      // wtg2 T16 (PS-9): and settles first what it missed, through the same ingest's atomic door.
       name: 'flow',
       run: async (): Promise<void> => {
-        const report = await runFlowSweep({ pool, ingest });
+        const report = await runFlowSweep({ pool, ingest, atomic: { ingestAtomic: (events) => ingest.ingestAtomic(events) } });
         console.log(JSON.stringify({ msg: 'flow sweep complete', promoted: report.promoted, settled: report.settled, refused: report.refused }));
       },
       delayMs: () => requirePositiveIntervalMs(flowSweepEveryMs, 'FLOW_SWEEP_INTERVAL_MS'),

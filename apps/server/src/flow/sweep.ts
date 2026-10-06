@@ -1,7 +1,8 @@
-import { BACKLOG_STATE_ID } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, DECISION_TYPE_ID, type planSettle } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { promoteTargets, type FlowIngest } from './promote.js';
+import { settleDecision, type FlowAtomicIngest } from './settle.js';
 
 /**
  * The reconciling sweep (AP-5; contract decision 5). It exists for two losses the listener cannot prevent: events committed by the
@@ -12,7 +13,15 @@ import { promoteTargets, type FlowIngest } from './promote.js';
  * `led-to` is refused by the engine, `cause.led-to-not-backlog`). There is no cursor to resume.
  */
 export type FlowSweepReport = { promoted: number; settled: number; refused: number };
-export type FlowSweepDeps = { pool: Queryable; ingest: FlowIngest; now?: () => Date; log?: (message: string, error?: unknown) => void };
+export type FlowSweepDeps = {
+  pool: Queryable; ingest: FlowIngest; now?: () => Date; log?: (message: string, error?: unknown) => void;
+  /** The settle half's door (wtg2 T16). Absent, the settle half is off: the daemon passes its `ingestAtomic`. */
+  atomic?: FlowAtomicIngest;
+  /** T15's `planSettle` unless a test blocks it. */
+  plan?: typeof planSettle;
+  /** At most this many Decisions per run, newest first (default `SETTLE_SCAN_LIMIT`). */
+  settleScanLimit?: number;
+};
 
 /** Five minutes, not the hour the other sweeps use: this is the only thing that moves a ticket after a daemon-filed event, and an hour-late promotion reads as broken. */
 export const DEFAULT_FLOW_SWEEP_INTERVAL_MS = 300_000;
@@ -27,12 +36,55 @@ export function flowSweepIntervalMs(raw: string | undefined): number {
   return Number(raw === undefined || raw.trim() === '' ? String(DEFAULT_FLOW_SWEEP_INTERVAL_MS) : raw);
 }
 
+/** The listener may still be running on a fresh choice: the sweep leaves a Decision alone for this long after its last choice or move. */
+const SETTLE_GRACE_SECONDS = 60;
+/** Bounds the scan: the sweep never re-reads every Decision ever decided. */
+const SETTLE_LOOKBACK_DAYS = 14;
+/** Decisions settled per run, newest first; the rest wait for the next run. */
+export const SETTLE_SCAN_LIMIT = 500;
+
 /**
  * The settle half (PS-9) runs FIRST, so a Decision's cascade is applied before promotion reads the world (AP-4: "after the settle
- * cascade"). Task 16 replaces this body; until then there is nothing to settle and it reports zero.
+ * cascade"). It repairs a settle the listener lost (a crash, or a Decision committed in the daemon process, contract decision 5)
+ * and applies one that was blocked and is not any more. A candidate is a live, finished Decision whose last choice or move is
+ * older than the grace window and inside the lookback, holding an outcome or still owning a Not-taken close (a cleared choice).
+ * Each runs through `settleDecision`, the listener's own path and chain, so a plan applied already is empty: idempotent by the
+ * ledger, with no cursor. `applied` counts as settled; `blocked` and `refused` as refused; `empty` and `skipped` as neither.
+ * The `EXISTS` reads no row of `c`, only whether a Not-taken close names this Decision; the Decision itself is
+ * `LIVE_TICKET_WHERE`-filtered, so a draft or trashed Decision is never offered.
  */
-async function settleHalf(_deps: FlowSweepDeps): Promise<{ settled: number; refused: number }> {
-  return { settled: 0, refused: 0 };
+async function settleHalf(deps: FlowSweepDeps): Promise<{ settled: number; refused: number }> {
+  if (deps.atomic === undefined) return { settled: 0, refused: 0 };
+  const now = (deps.now ?? (() => new Date()))();
+  const { rows } = await deps.pool.query<{ workspace_id: string; ticket_id: string }>(
+    `SELECT t.workspace_id, t.ticket_id
+       FROM proj_tickets t
+       JOIN LATERAL (SELECT max(e.server_time) AS at FROM events e
+                      WHERE e.entity_kind = 'ticket' AND e.entity_id = t.ticket_id AND e.type IN ('ticket.decided', 'ticket.transitioned')) last ON true
+      WHERE t.type_id = $1 AND t.state_category = 'terminal' AND ${LIVE_TICKET_WHERE}
+        AND last.at < $2::timestamptz - make_interval(secs => $3) AND last.at > $2::timestamptz - make_interval(days => $4)
+        AND (t.outcome IS NOT NULL OR EXISTS (SELECT 1 FROM proj_tickets c WHERE c.closed_cause->>'kind' = 'branch-not-taken' AND c.closed_cause->>'decisionTicketId' = t.ticket_id))
+      ORDER BY last.at DESC LIMIT $5`,
+    [DECISION_TYPE_ID, now.toISOString(), SETTLE_GRACE_SECONDS, SETTLE_LOOKBACK_DAYS, deps.settleScanLimit ?? SETTLE_SCAN_LIMIT],
+  );
+  let settled = 0;
+  let refused = 0;
+  for (const row of rows) {
+    const outcome = await settleDecision(
+      {
+        pool: deps.pool,
+        ingest: deps.atomic,
+        ...(deps.log === undefined ? {} : { log: deps.log }),
+        ...(deps.plan === undefined ? {} : { plan: deps.plan }),
+        ...(deps.now === undefined ? {} : { now: deps.now }),
+      },
+      row.workspace_id,
+      row.ticket_id,
+    );
+    if (outcome === 'applied') settled += 1;
+    else if (outcome === 'blocked' || outcome === 'refused') refused += 1;
+  }
+  return { settled, refused };
 }
 
 /**

@@ -153,6 +153,8 @@ async function main(): Promise<void> {
       // the same object, narrowed to `ClientIngest` on the way in, so no route
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
+      // Its atomic sibling, for the Decision settle cascade alone (wtg2 T16): one all-or-nothing batch under the Flow actor.
+      serverAtomic: (events) => ingest.ingestAtomic(events),
       webOrigin: config.webOrigin,
       mcpPublicUrl: config.mcpPublicUrl,
       inviteMailer: selectInviteMailer(config, smtpLog),

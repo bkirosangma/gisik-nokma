@@ -53,11 +53,14 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (19)
+  // invariant (20)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   // wtg2 T14: the sweep's candidate SELECT reads a source's terminal CATEGORY as "finished" (AP-1), a superset whose Not-taken
-  // sources the promotion rule then drops (AP-3), so it is not on T17's done-meaning work list.
+  // sources the promotion rule then drops (AP-3), so it is not on T17's done-meaning work list. T16's settle half reads a Decision's
+  // terminal category the same way: only a finished Decision settles (PS-9).
   'apps/server/src/flow/sweep.ts': 'invariant',
+  // wtg2 T16: only a FINISHED Decision settles (PS-9); a Not-taken ticket parked in a terminal state is finished too, so it is not settled again.
+  'apps/server/src/flow/settle.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
   'apps/server/src/routes/home.ts': 'invariant',
