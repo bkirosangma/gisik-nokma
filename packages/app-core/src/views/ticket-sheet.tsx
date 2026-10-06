@@ -4483,6 +4483,7 @@ export function TicketSheet({
             canEdit={editorSlot !== undefined}
             make={make}
             isDraft={isDraft}
+            isDecision={state.typeId === DECISION_TYPE_ID}
             links={links}
             {...(queryTickets === undefined ? {} : { queryTickets })}
             {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}

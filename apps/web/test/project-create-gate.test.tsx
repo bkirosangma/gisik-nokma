@@ -172,8 +172,8 @@ const LIST: TicketListView = {
  * The SERVER'S OWN types, not the built-in ladder — case 7.38
  * (`apps/server/test/routes/builder-reads.test.ts:250`) measures exactly these
  * against a real database: ordered by rank then id, with `chore` between `epic`
- * and `task`. Two of the four ladder entries (`Story`, `Sub-task`) are absent
- * from it and one entry (`Chore`) is absent from the ladder, which is what lets
+ * and `task`. Three of the five ladder entries (`Story`, `Sub-task`, `Decision`) are
+ * absent from it and one entry (`Chore`) is absent from the ladder, which is what lets
  * a single render tell the two apart in both directions.
  */
 const WORKSPACE_TYPES: TicketTypeDef[] = [

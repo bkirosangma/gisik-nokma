@@ -3500,7 +3500,7 @@ a.gn-linked-from__link:focus-visible { outline: 2px solid var(--gn-focus-ring); 
 .gn-ticket-sheet__links { display: grid; gap: 0.5rem; margin-top: 1rem; }
 .gn-ticket-sheet__link-group-title { margin: 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--gn-text-muted); }
 .gn-ticket-sheet__link-list { list-style: none; margin: 0; padding: 0; }
-.gn-ticket-sheet__link-row { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; }
+.gn-ticket-sheet__link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; min-height: 2.75rem; }
 .gn-ticket-sheet__link-row[aria-busy='true'] { opacity: 0.6; }
 .gn-ticket-sheet__link-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: none; }
 .gn-ticket-sheet__link-dot--open { background: var(--gn-category-open); }
@@ -3509,15 +3509,28 @@ a.gn-linked-from__link:focus-visible { outline: 2px solid var(--gn-focus-ring); 
 .gn-ticket-sheet__link-key { flex: none; font-weight: 600; color: inherit; text-decoration: none; }
 a.gn-ticket-sheet__link-key:hover { text-decoration: underline; }
 a.gn-ticket-sheet__link-key:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
-.gn-ticket-sheet__link-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gn-ticket-sheet__link-title { flex: 1 1 8rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gn-ticket-sheet__link-remove { flex: none; min-height: 2.75rem; }
 .gn-ticket-sheet__links-empty { margin: 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__links-refusal { margin: 0; color: var(--gn-danger); font-size: 0.875rem; }
 .gn-ticket-sheet__link-picker { display: grid; gap: 0.5rem; min-width: min(20rem, 100%); }
 .gn-ticket-sheet__link-results { list-style: none; margin: 0; padding: 0; max-height: 14rem; overflow-y: auto; }
 .gn-ticket-sheet__link-result { width: 100%; min-height: 2.75rem; text-align: left; background: none; border: 0; padding: 0 0.5rem; border-radius: 0.5rem; color: inherit; font: inherit; cursor: pointer; }
-.gn-ticket-sheet__link-result:hover { background: var(--gn-surface-well); }
+.gn-ticket-sheet__link-result:hover:not(:disabled) { background: var(--gn-surface-well); }
+.gn-ticket-sheet__link-result:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 .gn-ticket-sheet__link-result:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+/* Leads-to links (wtg2 T3). The branch label is the house `.gn-chip`, so each style draws it its own way (a fill in hig,
+   a carve in neo, bare text in minimal) and this block adds no colour pair; here it only sits in the row, and a long label
+   (up to 60 characters) ends in an ellipsis instead of squeezing the title away. The row wraps (above): at a phone's width
+   the title keeps 8rem and Edit label / Remove move to the next line rather than covering it. The relabel form takes its
+   own line, indented to the key (the dot's 0.5rem plus the row's 0.5rem gap); its field and buttons keep the house
+   2.75rem (44px) minimum. Own class names, never `… .gn-field__input`: a first-match rule reader would take it for the
+   field's base rule (13.291). */
+.gn-ticket-sheet__link-label { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gn-ticket-sheet__link-edit { flex: none; min-height: 2.75rem; }
+.gn-ticket-sheet__link-hint { margin: 0; color: var(--gn-text-muted); font-size: 0.8125rem; line-height: 1.125rem; }
+.gn-ticket-sheet__link-relabel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; flex-basis: 100%; padding-left: 1rem; }
+.gn-ticket-sheet__link-relabel-input { flex: 1 1 10rem; min-width: 0; }
 .gn-ticket-sheet__attach { margin-top: 0.5rem; }
 /* The AttachNotePicker menu — `.gn-popover` (below) already supplies the
    floating shell (surface/shadow/radius), so this block is internal layout

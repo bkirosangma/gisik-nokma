@@ -82,7 +82,7 @@ export function foundingSequence(founding: FoundingEvent): SubmittedEvent[] {
   return [
     serverEvent({ kind: 'workflow', id: workflowDef.id }, 'workflow.defined', workflowDef),
     // A fresh entity ULID per ticket-type submission; the payload's `id` is the
-    // stable type key (`epic`, `story`, `task`, `sub-task`) and the projection
+    // stable type key (`epic`, `story`, `task`, `sub-task`, `decision`) and the projection
     // folds by it (Plan 8 design decision 6).
     ...builtinTicketTypeDefs(workflowDef.id).map((def) =>
       serverEvent({ kind: 'ticket-type', id: newUlid() }, 'ticket-type.defined', def),
