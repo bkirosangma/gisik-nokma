@@ -234,6 +234,23 @@ describe('29.393 who flow-ready addresses, and what a hidden source leaves out',
     expect(await rowsFor(ASSIGNEE)).toHaveLength(1);
   });
 
+  it('29.393 a source the projection no longer holds is a hidden one: the assignee is told, the row names nothing and nothing is logged; control: once it is there, it is named', async () => {
+    see([ASSIGNEE, T1]); // the production `canSee` answers false for a ticket with no row (`getResolvedVisibility` null)
+    await seedTicket(T1, ASSIGNEE, 'Write the copy');
+    const gone = moved(T1, 'todo', cause.led({ label: 'Yes' })); // SRC is not seeded
+    await fanout().onCommitted(gone);
+    expect((await rowsFor(ASSIGNEE)).map((row) => row.payload)).toEqual([{
+      ticketId: T1, ticketTitle: 'Write the copy', becauseTicketId: null, becauseTitle: null, label: null,
+      eventId: gone.id, clientTime: gone.clientTime, serverTime: gone.serverTime,
+    }]);
+    expect(logs).toEqual([]);
+    // CONTROL, same it(): the source seeded and visible, the same move names it
+    see([ASSIGNEE, SRC]);
+    await seedTicket(SRC, null, 'Draft the brief');
+    await fanout().onCommitted(moved(T1, 'todo', cause.led({ label: 'Yes' })));
+    expect((await rowsFor(ASSIGNEE))[1]!.payload).toMatchObject({ becauseTicketId: SRC, becauseTitle: 'Draft the brief', label: 'Yes' });
+  });
+
   it('29.393 nobody, and no log line, for an assignee who cannot see the target; control: once they can, it notifies', async () => {
     see([ASSIGNEE, SRC]);
     await seedTicket(T1, ASSIGNEE, 'Write the copy');
@@ -346,6 +363,23 @@ describe('29.395 who flow-reopened addresses, and what a hidden Decision leaves 
     see([ASSIGNEE, T2]);
     await fanout().onCommitted(moved(T2, 'todo', cause.reopened()));
     expect((await rowsFor(ASSIGNEE)).map((row) => row.payload['ticketId'])).toEqual([T2]);
+  });
+
+  it('29.395 a Decision the projection no longer holds is a hidden one: the assignee is told, the row names nothing and nothing is logged; control: once it is there, it is named', async () => {
+    see([ASSIGNEE, T1]);
+    await seedTicket(T1, ASSIGNEE, 'Write the copy');
+    const gone = moved(T1, 'backlog', cause.reopened()); // DEC is not seeded
+    await fanout().onCommitted(gone);
+    expect((await rowsFor(ASSIGNEE)).map((row) => row.payload)).toEqual([{
+      ticketId: T1, ticketTitle: 'Write the copy', decisionTicketId: null, decisionTitle: null, outcome: null, pass: 2, toBacklog: true,
+      eventId: gone.id, clientTime: gone.clientTime, serverTime: gone.serverTime,
+    }]);
+    expect(logs).toEqual([]);
+    // CONTROL, same it(): the Decision seeded and visible, the same move names it
+    see([ASSIGNEE, DEC]);
+    await seedTicket(DEC, null, 'Ship or redo', 'decision');
+    await fanout().onCommitted(moved(T1, 'backlog', cause.reopened()));
+    expect((await rowsFor(ASSIGNEE))[1]!.payload).toMatchObject({ decisionTicketId: DEC, decisionTitle: 'Ship or redo', outcome: 'Redo' });
   });
 
   it('29.395 a recipient who sees the moved ticket but not the Decision learns neither its title nor its outcome, in the payload or the headline; control: one who sees both reads the whole sentence', async () => {

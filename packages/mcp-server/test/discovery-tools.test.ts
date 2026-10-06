@@ -254,6 +254,12 @@ describe('14.482 list_notifications', () => {
     await expect(tool('list_notifications', f.session).handler({ limit: 0 })).rejects.toThrow();
     expect(f.asked).toHaveLength(2);
   });
+
+  it('14.482 the description names the kinds of message in words, the two flow kinds included (wtg2 T18)', () => {
+    expect(tool('list_notifications', fake({}).session).description).toBe(
+      'Your notifications, newest first (mentions, assignments, conflicts, tickets ready to start, tickets reopened by a flow). unreadOnly for just the unread; page with cursor (the answer carries nextCursor); limit 1–100.',
+    );
+  });
 });
 
 describe('14.483 mark_notifications_read', () => {
