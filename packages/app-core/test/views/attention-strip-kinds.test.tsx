@@ -20,6 +20,7 @@ void _check;
 
 const itemOf = (kind: AttentionKind): AttentionItem => ({
   kind,
+  workspaceId: 'w',
   ticketId: `ticket-${kind}`,
   projectId: 'project-1',
   title: `A ticket that is ${kind}`,

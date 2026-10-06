@@ -27,7 +27,7 @@ export type KnowledgeGraphProps = {
   /** Home's stat highlight: lit 100%, the rest items 25% / edges 12%; WINS over hover dimming. */
   highlight?: ReadonlySet<string> | null;
   onZones?: (zones: GraphZonesSummary) => void;
-  /** The host gets Esc first: return true to consume it (Home clears its highlight); otherwise the view does Back. */
+  /** The host gets Esc first: return true to consume it (Home clears its highlight); otherwise the view does Back. An Esc consumed either way is `preventDefault`ed, so a ui `Sheet` around the view stays open. */
   onEscape?: () => boolean;
   onOpen: (item: GraphItemView) => void;
   /** Kinds the host has no page for get no Open button (a control that cannot be honoured is refused, `ticket-sheet.tsx:340-348`). Default: all. */

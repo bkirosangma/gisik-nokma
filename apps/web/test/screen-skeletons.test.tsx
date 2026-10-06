@@ -42,7 +42,7 @@ import MembersPage from '../app/w/[workspaceId]/members/page.js';
 import WorkspacesPage from '../app/workspaces/page.js';
 import WorkspaceHomePage from '../app/w/[workspaceId]/page.js';
 import InboxPage from '../app/inbox/page.js';
-import MyWorkPage from '../app/w/[workspaceId]/my-work/page.js';
+import MyWorkPage from '../app/my-work/page.js';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -201,7 +201,7 @@ describe('25.125 Inbox', () => {
 
 describe('25.126 My work', () => {
   it('25.126 reserves the attention band (the strip\'s own aside) and draws the four sections in the page\'s own classes while both reads are open', async () => {
-    currentPath = `/w/${WS}/my-work`;
+    currentPath = '/my-work';
     const attention = deferred<never[]>();
     const work = deferred<{ assigned: never[]; inTransit: never[]; contested: never[]; shared: never[] }>();
     render(

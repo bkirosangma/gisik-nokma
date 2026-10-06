@@ -105,10 +105,10 @@ export default function InvitePage() {
     if (joining) return;
     setJoining(true);
     void invites.acceptInvite(token).then(
-      ({ workspaceId }) => {
+      () => {
         // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
         bumpProjectsVersion();
-        router.push(`/w/${workspaceId}/my-work`);
+        router.push('/my-work'); // global since my-work-global T4: the joined workspace is one of the ones it covers
       },
       (cause: unknown) => {
         setJoining(false);

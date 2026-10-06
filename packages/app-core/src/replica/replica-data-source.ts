@@ -603,6 +603,15 @@ const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+const MY_WORK_PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'MyWorkPreferences (the whole document)',
+    because:
+      'my-work-global T2: the user-level My work document is a SERVER-OWNED per-user row (`user_my_work_preferences`), not a ledger event, so it is not in the event stream this replica mirrors and there is no such table locally. Answering DEFAULT_MY_WORK_PREFERENCES would be a default wearing the person\'s authority, and accepting a write it can never send would lose the choice silently. It is the per-workspace document\'s refusal above, for the same reasons',
+    owner: 'Plan 10: replicating user-level preference rows (a decision no task owns yet)',
+  },
+];
+
 /**
  * WHY A TICKET BORN OFFLINE IS IN SOME DOORS AND NOT OTHERS.
  *
@@ -719,6 +728,8 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
   getPreferences: PREFERENCES_ABSENCES,
   putPreferences: PREFERENCES_ABSENCES,
+  getMyWorkPreferences: MY_WORK_PREFERENCES_ABSENCES,
+  putMyWorkPreferences: MY_WORK_PREFERENCES_ABSENCES,
   getLinkedFrom: LINKED_FROM_ABSENCES,
 };
 
@@ -1410,6 +1421,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       Promise.reject(new ReplicaGapError('getWorkspaceSettings', WORKSPACE_SETTINGS_ABSENCES)),
     getPreferences: () => Promise.reject(new ReplicaGapError('getPreferences', PREFERENCES_ABSENCES)),
     putPreferences: () => Promise.reject(new ReplicaGapError('putPreferences', PREFERENCES_ABSENCES)),
+    getMyWorkPreferences: () =>
+      Promise.reject(new ReplicaGapError('getMyWorkPreferences', MY_WORK_PREFERENCES_ABSENCES)),
+    putMyWorkPreferences: () =>
+      Promise.reject(new ReplicaGapError('putMyWorkPreferences', MY_WORK_PREFERENCES_ABSENCES)),
     search: () => Promise.reject(new ReplicaGapError('search', SEARCH_ABSENCES)),
     searchNotes: () => Promise.reject(new ReplicaGapError('searchNotes', NOTE_SEARCH_ABSENCES)),
     getLinkedFrom: () => Promise.reject(new ReplicaGapError('getLinkedFrom', LINKED_FROM_ABSENCES)),

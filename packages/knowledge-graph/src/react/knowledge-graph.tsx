@@ -228,8 +228,14 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest(OWNS_KEYS)) return;
     if (e.key === 'Escape') {
-      if (props.onEscape?.() === true) return;
-      if (trail.length > 0) goTrail(trail.length - 2);
+      if (props.onEscape?.() === true) {
+        e.preventDefault(); // consumed by the host; a ui Sheet around the view stays open (sheet.tsx's escape-hatch contract)
+        return;
+      }
+      if (trail.length > 0) {
+        e.preventDefault(); // consumed by Back
+        goTrail(trail.length - 2);
+      }
       return;
     }
     if (phone || props.showHops === false) return;

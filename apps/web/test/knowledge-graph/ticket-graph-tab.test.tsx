@@ -73,7 +73,7 @@ function ticketSheetElements(source: string): string[] {
   return out;
 }
 
-const HOSTS = ['app/w/[workspaceId]/my-work/page.tsx', 'app/w/[workspaceId]/p/[projectId]/page.tsx', 'src/notes/note-document.tsx'];
+const HOSTS = ['app/my-work/page.tsx', 'app/w/[workspaceId]/p/[projectId]/page.tsx', 'src/notes/note-document.tsx'];
 const PROP = /(^|\s)knowledgeGraphSlot=\{TicketGraphTab\}(?=\s|\/?>)/;
 
 beforeEach(() => {

@@ -1,6 +1,8 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import type { FieldClaim } from '@gisik-nokma/domain';
+import type { AttentionShow, FieldClaim } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
+import { parseShow, ticketMatchesShow } from '../read/attention-show.js';
 import { canSee } from '../visibility/can-see.js';
 import { targetSight, withholdContest } from '../visibility/withhold-link-targets.js';
 
@@ -69,6 +71,9 @@ type ContestRow = {
   ticket_fields: Record<string, FieldClaim> | null;
   /** `proj_tickets.project_id`, or `null` when the LEFT JOIN found no row. */
   ticket_project_id: string | null;
+  /** `proj_tickets.created_by` and `assignee_id`, for `?show=` (my-work-global T1); `null` as above. */
+  ticket_created_by: string | null;
+  ticket_assignee_id: string | null;
   claimant_id: string;
   rule: string;
   reason: string;
@@ -202,6 +207,25 @@ function toView(row: ContestRow): ContestView {
  * and returns a different shape; reusing it would mean stating the visibility
  * decision a second way, which is the two-sources-of-truth shape this series
  * keeps catching.
+ *
+ * ## `?show=`: the attention strip's filter, on the contests it appends
+ *
+ * My-work-global T1 (plan AMEND 16:26, cases 30.059–30.061). The client builds
+ * the strip from the attention route AND this one, so this route takes the same
+ * `show` through the same parse (`read/attention-show.ts`): without it, a viewer
+ * on the default "created by me or assigned to me" would still be shown every
+ * contest in the workspace. Absent, nothing changes — no role is resolved and
+ * no row is dropped.
+ *
+ * Given, the viewer's role in the NAMED workspace is resolved through
+ * `resolveEffectiveRole` (never built by hand, per the paragraph above), and
+ * `parseShow` refuses what it refuses on the attention route, with the same
+ * `400 {error:'invalid_query'}`. That is not an oracle either: a caller outside
+ * the workspace, and one naming a workspace that does not exist, both resolve
+ * no role and get the same answer for the same `show`. Each surviving row is
+ * then judged by the ticket it names (`ticketMatchesShow`, over the joined
+ * `created_by` / `assignee_id` / `project_id`) BEFORE `canSee`, which still
+ * decides the audience: `show` only narrows.
  */
 export function registerContestsRoute(
   app: FastifyInstance,
@@ -209,7 +233,7 @@ export function registerContestsRoute(
   requireSession: preHandlerHookHandler,
 ): void {
   app.get<{
-    Querystring: { workspaceId: string; ticketId?: string; claimantId?: string; open?: string };
+    Querystring: { workspaceId: string; ticketId?: string; claimantId?: string; open?: string; show?: unknown };
   }>(
     '/v1/contests',
     {
@@ -238,12 +262,28 @@ export function registerContestsRoute(
              * the one that quietly does nothing.
              */
             open: { type: 'string', enum: ['true'] },
+            /**
+             * UNTYPED on purpose: `parseShow` is the one door for `show`, so a
+             * repeated `show` (an array) reaches it and is refused with the same
+             * `{error:'invalid_query'}` body the attention route answers, rather
+             * than a schema error worded differently for the same mistake.
+             */
+            show: {},
           },
         },
       },
     },
-    async (request) => {
+    async (request, reply) => {
       const { workspaceId, ticketId, claimantId, open } = request.query;
+      let filter: { show: ReadonlySet<AttentionShow>; eff: EffectiveRole } | undefined;
+      if (request.query.show !== undefined) {
+        const eff = await resolveEffectiveRole(deps.pool, request.currentUserId, workspaceId);
+        const parsed = parseShow(request.query, eff);
+        if (!parsed.ok) {
+          return reply.status(400).send({ error: 'invalid_query' });
+        }
+        if (parsed.show !== undefined) filter = { show: parsed.show, eff };
+      }
       const clauses = ['c.workspace_id = $1'];
       const params: unknown[] = [workspaceId];
       if (ticketId !== undefined) {
@@ -283,7 +323,8 @@ export function registerContestsRoute(
         // rather than left to be found: the deleted ticket's TITLE travels with
         // the contest, because the title is joined from `proj_tickets.fields`
         // and `canSee` knows nothing about deletion.
-        `SELECT c.*, t.fields AS ticket_fields, t.project_id AS ticket_project_id
+        `SELECT c.*, t.fields AS ticket_fields, t.project_id AS ticket_project_id,
+                t.created_by AS ticket_created_by, t.assignee_id AS ticket_assignee_id
            FROM proj_contested c
            LEFT JOIN proj_tickets t
              ON t.ticket_id = c.ticket_id AND t.workspace_id = c.workspace_id
@@ -295,6 +336,17 @@ export function registerContestsRoute(
       const contests: ContestView[] = [];
       const sees = targetSight(deps.pool, request.currentUserId);
       for (const row of rows) {
+        if (
+          filter !== undefined &&
+          !ticketMatchesShow(
+            { createdBy: row.ticket_created_by, assigneeId: row.ticket_assignee_id, projectId: row.ticket_project_id },
+            filter.show,
+            request.currentUserId,
+            filter.eff,
+          )
+        ) {
+          continue;
+        }
         if (!(await canSee(deps.pool, request.currentUserId, row.ticket_id))) {
           continue;
         }

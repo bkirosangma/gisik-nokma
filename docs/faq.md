@@ -153,7 +153,8 @@ settings screens for states and ticket types are behind **Settings**. See
 
 On a phone, a tablet or any window up to about 1024 pixels wide the links are in a **bar along the
 bottom** instead, with **More** at its right-hand end holding the rest, plus **Settings**, **Account** and
-**Help**. **Edit bottom bar**, the last row of **More**, lets you choose what the bar carries.
+**Help**. **Edit bottom bar**, the last row of **More**, lets you choose what the bar carries. Unlike the
+top bar, it offers **My work** even with no workspace open, because My work covers every workspace you are in.
 
 ---
 
@@ -847,7 +848,9 @@ thing and says so, rather than marking some of them.
 **My "Needs your attention" strip isn't showing.**
 If nothing needs attention, the strip does not appear at all — no box, no "all caught up" message,
 nothing. That is deliberate: an empty box headed "Needs your attention" reads like an all-clear you did not
-earn. A blank space there is the normal way of saying "nothing needs you right now".
+earn. A blank space there is the normal way of saying "nothing needs you right now". On the website's My work
+page one line takes its place, *"Nothing needs your attention for"* and the chips you have selected, and it is
+left out whenever a workspace could not say what needs your attention (its refusal shows instead).
 
 **The strip only shows five rows. Where's the rest?**
 Each ticket appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and

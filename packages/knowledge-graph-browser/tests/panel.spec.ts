@@ -65,15 +65,17 @@ test('27.342 (browser) the phone view keeps its own stacking inside the panel; c
   expect(inPanel.below.top - inPanel.insp.bottom).toBeCloseTo(10, 0);
 });
 
-test('27.342 (browser) the loading box is the canvas\'s own height at two window heights, so the panel does not jump by a canvas when the view arrives', async ({ page }) => {
-  for (const height of [720, 1100]) {
+test('27.342 (browser) the loading box is the canvas\'s own height at four window heights, its clamp\'s floor and cap included, so the panel does not jump by a canvas when the view arrives', async ({ page }) => {
+  // 600 and 1300 put the canvas on its clamp's 26rem floor (416px) and 46rem cap (736px). At 720 and 1100 alone neither bound
+  // binds, so a loading box whose own floor or cap had moved (2.6rem, 460rem) measured the same (reviewer A, P44).
+  for (const height of [600, 720, 1100, 1300]) {
     await page.setViewportSize({ width: 1280, height });
     await page.goto('/index.html?panel=loading');
     const loading = await box(page, '.gn-kg-panel--loading');
     await openView(page, '?panel=sheet');
     const { canvas } = await layout(page);
     expect(loading.height, `window height ${height}`).toBeCloseTo(canvas.height, 0);
-    // CONTROL: the canvas follows the window here (62vh, inside its clamp), so a fixed height could not pass both rounds.
-    expect(canvas.height, `window height ${height}`).toBeCloseTo(height * 0.62, 0);
+    // CONTROL: the canvas follows the window (62vh) between its floor and its cap, so a fixed height could not pass every round.
+    expect(canvas.height, `window height ${height}`).toBeCloseTo(Math.min(736, Math.max(416, height * 0.62)), 0);
   }
 });

@@ -20,6 +20,7 @@ import type {
 // twinned in `packages/editor`); re-declaring it here would be the second
 // spelling of one contract that `attachment-list.tsx`'s own docblock forbids.
 import type { AttachmentListEntry } from './views/attachment-list.js';
+import type { AttentionShow, MyWorkPreferences } from '@gisik-nokma/domain';
 import type { TicketComment } from './views/comments-thread.js';
 // The note read models come straight from the DOMAIN, not from a view type
 // here: `NoteSummary` and its siblings describe the wire body the routes send
@@ -452,7 +453,13 @@ export type DataSourceQuery = {
     options: NoteSearchQueryOptions,
   ): Promise<NoteSearchResult>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
-  getAttention(workspaceId: string): Promise<AttentionItem[]>;
+  /**
+   * `show` (my-work-global T3) narrows the strip to the tickets the viewer created, is
+   * assigned, runs the workspace of, or runs the project of — any of the selected. ABSENT
+   * is today's request, byte for byte: every ticket the viewer can see. The caller passes
+   * only what this workspace allows (`showForWorkspace`); the route refuses the rest.
+   */
+  getAttention(workspaceId: string, show?: readonly AttentionShow[]): Promise<AttentionItem[]>;
   /**
    * Home's six numbers and their capped ids (Knowledge Graph spec E, `GET /v1/workspaces/:ws/home`). Online only:
    * the replica refuses (`HOME_ABSENCES`) — a local count would disagree with the server's visibility and IST day.
@@ -491,6 +498,16 @@ export type DataSourceQuery = {
   getWorkspaceSettings(workspaceId: string): Promise<WorkspaceSettings>;
   getPreferences(workspaceId: string): Promise<UserPreferences>;
   putPreferences(workspaceId: string, preferences: UserPreferences): Promise<void>;
+  /**
+   * The user-level My work preferences (my-work-global T3): which "Show" chips are selected
+   * and whether the page is grouped. One document per PERSON, not per workspace — the page
+   * they arrange is global — so neither method takes a `workspaceId`. A person who never
+   * saved one is answered the defaults by the SERVER; a failed read rejects here, and the
+   * page decides to fall back.
+   */
+  getMyWorkPreferences(): Promise<MyWorkPreferences>;
+  /** Stores the document and answers what was STORED (the server de-duplicates `show`). */
+  putMyWorkPreferences(preferences: MyWorkPreferences): Promise<MyWorkPreferences>;
 };
 
 /** Coordination amendment 10 — the one seam between views and the world. */

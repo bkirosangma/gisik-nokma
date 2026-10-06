@@ -6,7 +6,7 @@ import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns
 
 /**
  * The web app on phones, Plan Task 9 — cases 21.130–21.132 (§21.9): Notes, a note's page, My work at
- * ≤40rem. (21.131's markup half — Copy / History / Delete behind a "⋯" — is `note-byline-phone.test.tsx`;
+ * ≤40rem. (21.131's markup half — Copy / History / Knowledge Graph / Delete behind a "⋯" — is `note-byline-phone.test.tsx`;
  * 21.133, typing a note with the keyboard up, is the controller's browser pass and stays 🧪.)
  *
  * Every phone rule is read from the ONE `@media (max-width: 40rem)` arm AND must come after the base

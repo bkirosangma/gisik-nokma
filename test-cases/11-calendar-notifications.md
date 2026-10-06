@@ -250,7 +250,10 @@ it stayed in `apps/web` when the gateway left.*
   `/account` into `AccountMenu`, so the arrays in `app-nav.test.tsx` — not the sentences here — are
   the authority today (without a workspace they are `/workspaces`, `/notes`, `/inbox`); and the new
   link is a prefix match (`/notes/<id>` keeps it current), which is a ROUTE rule and not a link-set
-  one, so it is 18.182's subject rather than this case's. — (`app-nav.test.tsx`)
+  one, so it is 18.182's subject rather than this case's. **AMENDED 2026-10-05 (my-work-global T4): My work
+  is ONE global page, so its link in the workspace arms is `/my-work`, no longer `/w/<id>/my-work`.
+  The link set is otherwise unchanged, and so is the gate that shows My work only inside a workspace
+  (11.171): spec D4 moves the link, it does not lift the owner's gate (planner ruling 20:06).** — (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)
 - **11.186** ✅ The Calendar tab says "Loading…" and draws NO grid before the list read answers — the
