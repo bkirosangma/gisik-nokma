@@ -32,7 +32,7 @@ import { graphRef, type GraphEdgeKind, type GraphEdgeView, type GraphItemKind, t
     s12:{k:'ticket',key:'ST-12',title:'Pricing page copy',state:'In progress',cat:'active',project:'Website',ws:'st',who:'pA'},
     s15:{k:'ticket',key:'ST-15',title:'Contact form breaks on phone',state:'To do',cat:'open',project:'Website',ws:'st',due:'2026-09-29'},
     sn1:{k:'note',title:'Brand voice',project:'Brand',ws:'st'},
-    c1:{k:'concept',name:'Scroll position on phone sheets',status:'confirmed',summary:'Why sheets on phone jump back to the top, and the fixes we tried.',by:'Claude, for Ama Rangsa',reason:'All of these lose or restore scroll when the sheet remounts.'},
+    c1:{k:'concept',name:'Scroll position on phone sheets',status:'confirmed',summary:'Why sheets on phone jump back to the top, and the fixes we tried.',by:'Assistant, for Ama Rangsa',reason:'All of these lose or restore scroll when the sheet remounts.'},
     c2:{k:'concept',name:'drag · column · board',status:'suggested',summary:'',by:'the model',reason:'These 4 items sit close together by meaning. Name it, or reject it.'},
     wgn:{k:'workspace',name:'Gisik Nokma',ws:'gn'}, wst:{k:'workspace',name:'Studio',ws:'st'},
     j_mw:{k:'project',name:'Mobile web',ws:'gn',project:'Mobile web'}, j_wf:{k:'project',name:'Workflows',ws:'gn',project:'Workflows'}, j_ds:{k:'project',name:'Design',ws:'gn',project:'Design'},
@@ -127,7 +127,7 @@ export function fixtureEdges(): GraphEdgeView[] {
       snippet: e.snip,
       addedBy: e.kind === 'parent' ? null : e.by ?? null,
       addedAt: e.at && e.kind !== 'parent' ? `${ISO[e.at]}T05:00:00.000Z` : null,
-      origin: e.kind === 'relates' && a === 't142' && b === 't160' ? 'mcp' : e.by ? 'web' : null, // one "via Claude" edge for 27.33x
+      origin: e.kind === 'relates' && a === 't142' && b === 't160' ? 'mcp' : e.by ? 'web' : null, // one "via an assistant" edge for 27.33x
       suggested: e.sug,
     };
   });

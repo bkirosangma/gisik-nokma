@@ -86,7 +86,7 @@ export type GraphEdgeView = {
   /** A display name, never a user id. */
   addedBy: string | null;
   addedAt: string | null;
-  /** The ledger origin of a typed link (`'mcp'` → "via Claude"); null where the table records none. */
+  /** The ledger origin of a typed link (`'mcp'` → "via an assistant"); null where the table records none. */
   origin: string | null;
   suggested: boolean;
 };
