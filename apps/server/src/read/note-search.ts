@@ -4,7 +4,7 @@ import type { EffectiveRole } from '../permissions/effective-role.js';
 import { embedQuery } from '../search/embedding.js';
 import { FTS_CONFIG } from './fts.js';
 import { HEADLINE_OPTIONS } from './headline.js';
-import { attachedTicketsByNote } from './notes.js';
+import { attachedTicketsByNote, NOTE_HOME_SQL } from './notes.js';
 import { SqlParams } from './sql-params.js';
 import { visibleNotesWhere } from './visible-where.js';
 
@@ -150,7 +150,7 @@ async function hitsFor(
     updated_at: Date;
     snippet: string;
   }>(
-    `SELECT s.note_id, n.title AS title, n.home_project_id, n.scope_mode, n.author_id, n.updated_at,
+    `SELECT s.note_id, n.title AS title, ${NOTE_HOME_SQL} AS home_project_id, n.scope_mode, n.author_id, n.updated_at,
             ts_headline(${quoteConfig()}, s.body_text, to_tsquery(${quoteConfig()}, ${query}),
                         ${params.add(HEADLINE_OPTIONS)}) AS snippet,
             ts_rank_cd(s.tsv, to_tsquery(${quoteConfig()}, ${query})) AS rank
@@ -333,7 +333,7 @@ export async function meaningNoteSearch(
   }>(
     `SELECT * FROM (
        SELECT DISTINCT ON (c.note_id)
-              c.note_id, n.title, n.home_project_id, n.scope_mode, n.author_id, n.updated_at,
+              c.note_id, n.title, ${NOTE_HOME_SQL} AS home_project_id, n.scope_mode, n.author_id, n.updated_at,
               c.chunk_text, (c.embedding <=> ${query}::vector) AS distance
          FROM search_note_chunks c
          JOIN proj_notes n ON n.note_id = c.note_id
