@@ -1,4 +1,5 @@
 import { IST_DAY_REGEX, type TicketState } from '@gisik-nokma/domain';
+import type { TicketPin } from '../view-types.js';
 
 /** A date claim as a view renders it: the FieldClaim flattened, plus the in-transit flag. */
 export type DateClaimView = {
@@ -27,7 +28,9 @@ export type CustomDateClaimView = {
 /**
  * What the views take from the DataSource: head state, which fields'
  * latest claims are still in transit (outbox-applied, not yet accepted),
- * and the ticket type's custom `date`-kind fields as {id, name}.
+ * and the ticket type's custom `date`-kind fields as {id, name} — plus the
+ * optional facts a shell may carry beside them: the key, the Not-taken mark
+ * and the paper pin's counts (each absent when the shell does not know it).
  * The mounting shell maps the DataSource's read result into this shape — one
  * site to adjust, and the one place that resolves a `TicketTypeDef` into
  * `customDateFields`. Optional: a shell that has not wired the type roster yet
@@ -51,6 +54,8 @@ export type TicketDatesInput = {
    * so no legacy literal changes.
    */
   notTaken?: true;
+  /** The paper pin's counts (TG-11, TV-10): the Timeline draws a pin on the bar when either count is above zero. Absent = unknown. */
+  pin?: TicketPin;
 };
 
 /**

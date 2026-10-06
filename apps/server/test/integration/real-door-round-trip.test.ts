@@ -387,7 +387,9 @@ function expectedCard(over: {
 
 /**
  * The LIST route's card: `expectedCard` plus the five facts ruling P25 clause 1
- * added to it, and only the list route serves them.
+ * added to it, and only the list route serves them — and the paper pin's counts
+ * (`pin`, Workflow and Timeline graphs Part 1 T12), which the list route adds to
+ * the assembled card.
  *
  * `stateName` is read out of `SIMPLE_KANBAN_TEMPLATE` rather than typed as a
  * literal, for the reason `workflowId` and `stateId` are parameters above: the
@@ -418,6 +420,9 @@ function expectedListCard(
     stateName,
     assignedProvenance: over.assignedProvenance,
     hasRestrictedParent: over.hasRestrictedParent,
+    // The paper pin (Workflow and Timeline graphs Part 1 T12, 29.113): this world has no note and no attachment, so the server's answer is
+    // zeros, spelled out — a card WITHOUT the field would mean the route stopped sending it.
+    pin: { notes: 0, attachments: 0 },
   };
 }
 

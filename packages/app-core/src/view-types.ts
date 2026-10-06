@@ -557,7 +557,17 @@ export type ListRow = {
   rank: string | null;
   /** wtg2 T17 (Q1): closed "Not taken" by the flow; ABSENT otherwise. Optional (unlike `closed`) so no legacy literal changes; read by `countRows` and `toTicketDatesInput` (the web Timeline's mark, 29.440). */
   notTaken?: true;
+  /**
+   * The paper pin's counts (Workflow and Timeline graphs, TG-11 and TV-10): the notes THIS viewer may read in the ticket's
+   * workspace that are attached to it, and the attachments it owns there. OPTIONAL, unlike most fields above, and on purpose:
+   * `undefined` means "this producer does not know" (the offline replica holds no attachments, so it leaves the field off rather
+   * than claim zero), and `{ notes: 0, attachments: 0 }` means "known: none". The server always sends it (case 29.113).
+   */
+  pin?: TicketPin;
 };
+
+/** How many notes and attachments a ticket has, as the viewer is allowed to count them (TG-11). */
+export type TicketPin = { notes: number; attachments: number };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };
 

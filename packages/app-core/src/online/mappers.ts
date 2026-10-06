@@ -52,6 +52,7 @@ import type {
   TicketHistoryEvent,
   TicketLinkView,
   TicketListView,
+  TicketPin,
   TicketRead,
   TicketVisibility,
   TransitionCause,
@@ -1896,6 +1897,17 @@ function mapOptionalInstant(raw: unknown, path: string): string | null {
   return asString(raw, path);
 }
 
+/**
+ * The list row's optional paper-pin counts (TG-11) as a spread: `{}` when the wire has none (a server that predates the field:
+ * unknown, never zero), `{ pin }` when it has both counts. A half-built object, a string or a non-number count is a refusal
+ * that names the path (case 29.114).
+ */
+function mapPin(raw: unknown, path: string): { pin?: TicketPin } {
+  if (raw === undefined) return {};
+  const record = asRecord(raw, path);
+  return { pin: { notes: asNumber(record['notes'], `${path}.notes`), attachments: asNumber(record['attachments'], `${path}.attachments`) } };
+}
+
 function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
   const record = asRecord(raw, path);
   return {
@@ -1960,6 +1972,8 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
     rank: mapRank(record['rank'], `${path}.rank`),
     // wtg2 T17 (Q1): the card's mark, absent when the server did not set it.
     ...(record['notTaken'] === true ? { notTaken: true as const } : {}),
+    // The paper pin (TG-11): absent from a server that predates it, whole when present. A half-built object is refused.
+    ...mapPin(record['pin'], `${path}.pin`),
   };
 }
 
