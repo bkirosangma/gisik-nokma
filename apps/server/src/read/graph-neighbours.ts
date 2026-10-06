@@ -37,9 +37,9 @@ import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './vis
  * An item outside the chosen workspaces/projects is returned with `out: true` and is not put in the next frontier (C-scope).
  * The centre is always walked, whatever its scope. People are always in scope (they belong to no workspace).
  *
- * ## The viewer's own node always resolves
+ * ## The viewer's own node resolves (unless they have no label: a phone user whose name is blank, 27.693)
  *
- * A person is drawn when a workspace of the viewer's names them, but the viewer is always drawn to themselves (planner
+ * A person is drawn when a workspace of the viewer's names them, but the viewer is drawn to themselves (planner
  * ruling 2026-10-06, KG release blocker P2-3: Home's "Start from: Me"), by their own label (`readOwnName`). Only that
  * node: every item around it still passes its own visibility rule, and every OTHER person is drawn exactly as before.
  */
@@ -155,7 +155,7 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
 
     for (const userId of ids.person) {
       // The viewer's own node falls back to their own label: a guest's names read names only the people on their own
-      // tickets, and no names read names a phone user (FD3), yet you can always see yourself (planner ruling 2026-10-06).
+      // tickets, and no names read names a phone user (FD3), yet you can see yourself (planner ruling 2026-10-06).
       const name = (await nameOf(userId)) ?? (userId === viewerId ? await (ownName ??= readOwnName(db, viewerId)) : null);
       if (name === null) continue; // any OTHER person no workspace of the viewer's names is not drawn
       const ref = graphRef('person', userId);
