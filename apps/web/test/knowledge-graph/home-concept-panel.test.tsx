@@ -90,7 +90,8 @@ function mount(host: 'home' | 'ticket', role: WorkspaceRole = 'member') {
     {
       getMyWorkspaces: async () => [workspace(role)],
       getHome: async () => HOME,
-      getActorNames: async () => [{ id: AMA, name: 'Ama Rangsa' }],
+      // names only for the concept's workspace, so a panel reading another workspace's names says "u_ama"
+      getActorNames: async (workspaceId: string) => (workspaceId === WS ? [{ id: AMA, name: 'Ama Rangsa' }] : []),
       getConcept,
       getSuggestions: async () => [SUGGESTION_VIEW],
       getConceptAudience: async () => ({ conceptId: null, members: 5, before: 5, after: 5 }),
