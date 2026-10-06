@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { domainRegistry } from '@gisik-nokma/domain';
 import { allTools } from '../src/tools/register.js';
-import { MCP_READ_ONLY_TOOLS, MCP_WRITE_AUDIT } from '../src/tools/write-audit.js';
+import { MCP_READ_ONLY_TOOLS, MCP_WRITE_AUDIT, type WriteAudit } from '../src/tools/write-audit.js';
 import type { Session } from '../src/session.js';
 import { NO_TRANSFER } from './fixtures/fake-session.js';
 import { SWEEP } from './fixtures/tool-sweep.js';
@@ -10,8 +10,9 @@ import { SWEEP } from './fixtures/tool-sweep.js';
 /**
  * Knowledge Graph spec D §7 case 8 (D2), KG-D Task 7. Cases 27.515–27.516: the MCP side of the audit. Every tool is
  * classified once, a read-only tool writes nothing, and a write tool posts only the event types its row in
- * `src/tools/write-audit.ts` declares. The server half (`apps/server/test/mcp/d2-audit.test.ts`, 27.517–27.518)
- * judges each row against History, an app surface and a remove path.
+ * `src/tools/write-audit.ts` declares. 27.670: each row's events partition into its primary act and its `paths`.
+ * The server half (`apps/server/test/mcp/d2-audit.test.ts`, 27.517–27.518, 27.671–27.672) judges each row and each
+ * path against History, an app surface and a remove path.
  */
 
 const NEW_TOOL_HINT = 'A new MCP tool must be classified in packages/mcp-server/src/tools/write-audit.ts (spec D §7 case 8, D2).';
@@ -58,7 +59,28 @@ function blocksOf(text: string, tools: ReadonlySet<string>): { tools: readonly s
   });
 }
 
-describe('27.515–27.516 the D2 audit, MCP side', () => {
+/**
+ * 27.670's census: the acts that own each of a row's event types (`primary`, or a `paths` name), and each type an
+ * act lists that the row's `events` does not. A row without `paths` is one act, so all its events are primary.
+ */
+function ownersOf(row: WriteAudit): Map<string, string[]> {
+  const owners = new Map(row.events.map((type) => [type, [] as string[]]));
+  const acts: [string, readonly string[]][] = [
+    ['primary', row.paths === undefined ? row.events : (row.primary ?? [])],
+    ...Object.entries(row.paths ?? {}).map(([path, act]): [string, readonly string[]] => [path, act.events]),
+  ];
+  for (const [act, types] of acts) for (const type of types) owners.set(type, [...(owners.get(type) ?? []), act]);
+  return owners;
+}
+
+/** A row's census failures: a type owned by no act or by two, or an act's type the row's `events` does not list. */
+function censusOf(row: WriteAudit): string[] {
+  return [...ownersOf(row)]
+    .filter(([type, acts]) => acts.length !== 1 || !row.events.includes(type))
+    .map(([type, acts]) => `${type}: ${acts.length === 0 ? 'no act' : acts.join(' + ')}${row.events.includes(type) ? '' : ' (not in events)'}`);
+}
+
+describe('27.515–27.516, 27.670 the D2 audit, MCP side', () => {
   it('27.515 every tool is classified exactly once; control: an unclassified name is reported', () => {
     const names = allTools(fakeSession()).map((tool) => tool.name);
     const classified = (name: string) => Number(name in MCP_WRITE_AUDIT) + Number(MCP_READ_ONLY_TOOLS.includes(name));
@@ -154,5 +176,32 @@ describe('27.515–27.516 the D2 audit, MCP side', () => {
       { tools: ['x_tool'], events: ['comment.added', 'ticket.closed'] },
       { tools: ['y_tool'], events: [] },
     ]);
+  });
+
+  it('27.670 every row\'s events partition into the primary act and its paths, no type in two; control: a type moved into two paths is reported', () => {
+    const withPaths = Object.entries(MCP_WRITE_AUDIT).filter(([, row]) => row.paths !== undefined);
+    expect(withPaths.length).toBeGreaterThan(5); // precondition: the census has branch rows to read
+    for (const [tool, row] of Object.entries(MCP_WRITE_AUDIT)) {
+      expect(censusOf(row), `${tool}: each event type is owned by the primary act or by exactly one path`).toEqual([]);
+      if (row.paths !== undefined) expect(row.primary, `${tool} has paths, so it names its primary events`).toBeDefined();
+    }
+    // The census reads the paths: update_ticket's branches own their types, the fields own the rest.
+    const ticket = MCP_WRITE_AUDIT['update_ticket']!;
+    expect(Object.fromEntries(ownersOf(ticket))).toEqual({
+      'ticket.field_set': ['primary'],
+      'ticket.reparented': ['reparent'],
+      'ticket.collaborator_added': ['collaborators'],
+      'ticket.collaborator_removed': ['collaborators'],
+      'ticket.workflow_rebound': ['workflow'],
+    });
+    // Controls, on in-test copies of that row: a type in two paths, a type no act owns, a type in primary and a path,
+    // and a path type the row's events do not list are each reported.
+    const paths = ticket.paths!;
+    expect(censusOf({ ...ticket, paths: { ...paths, workflow: { ...paths['workflow']!, events: ['ticket.workflow_rebound', 'ticket.reparented'] } } }))
+      .toEqual(['ticket.reparented: reparent + workflow']);
+    expect(censusOf({ ...ticket, primary: [] })).toEqual(['ticket.field_set: no act']);
+    expect(censusOf({ ...ticket, primary: ['ticket.field_set', 'ticket.reparented'] })).toEqual(['ticket.reparented: primary + reparent']);
+    expect(censusOf({ ...ticket, paths: { ...paths, reparent: { ...paths['reparent']!, events: ['ticket.reparented', 'ticket.ranked'] } } }))
+      .toEqual(['ticket.ranked: reparent (not in events)']);
   });
 });

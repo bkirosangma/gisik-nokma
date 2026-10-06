@@ -125,9 +125,12 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.config]);
   const keepView = useRef(false);
+  // The empty states (the centre alone, its sentence under it). Every one is framed as nothing-linked is: a chip turned off, or
+  // the last link removed, would otherwise keep a camera framed for links no longer drawn, leaving the centre on its sentence.
+  const empty = !rings.loading && rings.failedHop === null && centreItem !== undefined && z.clear.length === 1 && z.fog.length === 0;
   useEffect(() => {
     if (!ready || renderer.current === null || rings.store.items.size === 0) return;
-    renderer.current.setGraph(model.nodes, model.edges, model.positions, { selected, selectedEdge, highlight: props.highlight ?? null }, { fit: model.fit, topPx: model.topPx, clearHop: z.clearHop, keepView: keepView.current });
+    renderer.current.setGraph(model.nodes, model.edges, model.positions, { selected, selectedEdge, highlight: props.highlight ?? null }, { fit: model.fit, topPx: model.topPx, clearHop: z.clearHop, keepView: keepView.current && !empty });
     keepView.current = false;
     props.onZones?.({ clear: z.clearSet, fog: z.fogSet, beyond: z.beyond, clearHop: z.clearHop, capped: z.capped });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,7 +199,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   // "Remove link" (spec A's `ticket.link_removed`, through the host): the cached store drops the edge, and Undo puts it back
   // through `mergeRing` with no refetch (planner ruling 2026-10-04). The camera stays where it is either way, when the change
   // is drawn: if the view moved to another centre while the host answered, nothing is, so nothing is kept (the hook's bump
-  // renders after this line).
+  // renders after this line). Removing the centre's last link is the exception: that draw is an empty state, framed (27.668).
   const removeLink =
     props.onRemoveLink === undefined
       ? undefined
@@ -246,7 +249,6 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   const firstLoad = rings.loading && rings.store.items.size === 0;
   const edgeView = selectedEdge === null ? undefined : (rings.store.edges.get(selectedEdge) ?? (removedEdge?.id === selectedEdge ? removedEdge : undefined));
   const selectedItem = selected === null ? undefined : rings.store.items.get(selected);
-  const empty = !rings.loading && rings.failedHop === null && centreItem !== undefined && z.clear.length === 1 && z.fog.length === 0;
   // Empty with a link held means every chip carrying the centre's links is off: the walk follows only the chips that are on,
   // and a neighbour outside the scope is fog, not nothing. The far end must be held, as the walk requires.
   const chipsHideAll = empty && (rings.store.adj.get(centre) ?? []).some((x) => rings.store.items.has(x.to));
