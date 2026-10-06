@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -688,6 +690,46 @@ describe('KnowledgeGraph: Home\'s list box (release walk row 8)', () => {
     await drawn(b.fake, T('t126'));
     expect(document.querySelectorAll('.gn-kg-list__row').length).toBeGreaterThan(0); // the haystack: a list is there
     expect(document.querySelector('.gn-kg-list__box')).toBeNull();
+  });
+});
+
+describe('KnowledgeGraph: the manual\'s link-type buttons are the chips each host offers (release walk row 9)', () => {
+  /**
+   * The manual's §17 "Link types" bullet (`docs/manual.md`), read from the file: its bold names before "Home's graph" are
+   * every host's buttons, and the ones after it are what Home adds. Spec C names its mockups "the bar" (spec :11), and the
+   * mockup offers Projects only on a workspace centre (`GROUPS = GROUPS_ALL.slice(1)` at `:556`, `GROUPS_ALL` only when the
+   * home item is a workspace at `:713`), as plan C decided (item 14, `2026-10-03-knowledge-graph-view.md:5105`).
+   */
+  function manualButtons(): { every: string[]; home: string[] } {
+    // the repo root above the package (vitest runs in the package; this jsdom file has no file: import.meta.url)
+    let root = process.cwd();
+    while (!existsSync(join(root, 'docs/manual.md')) && dirname(root) !== root) root = dirname(root);
+    const manual = readFileSync(join(root, 'docs/manual.md'), 'utf8');
+    const start = manual.indexOf('- **Link types.**');
+    expect(start).toBeGreaterThan(-1);
+    const end = manual.indexOf('\n- **', start + 1);
+    const bullet = manual.slice(start, end).replace(/\s+/g, ' ');
+    const at = bullet.indexOf("Home's graph");
+    expect(at).toBeGreaterThan(-1);
+    const bold = (s: string) => [...s.matchAll(/\*\*([^*]+)\*\*/g)].map((m) => m[1]!);
+    return { every: bold(bullet.slice(0, at)).slice(1), home: bold(bullet.slice(at)) }; // .slice(1): the bullet's own title
+  }
+  /** Each chip's label: its own text, without the swatch (empty) and the count span. */
+  const chips = () => [...document.querySelectorAll('.gn-kg__chips .gn-kg__chip')].map((b) => [...b.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join(''));
+
+  it('27.702 per host: the ticket tab and the note panel (the view\'s default groups) offer exactly the manual\'s buttons; Home (GRAPH_CHIP_ORDER) offers Projects first and then those, as the manual says', async () => {
+    const m = manualButtons();
+    expect(m.every.length).toBe(8); // the haystack: the parse found the list, not an empty one
+    expect(m.home).toEqual(['Projects']);
+    // the ticket tab and the note panel: GraphPanel passes no `groups` (27.701), so the view's default
+    const tab = setup();
+    await drawn(tab.fake, T('t126'));
+    expect(chips()).toEqual(m.every);
+    cleanup();
+    // Home: `groups={HOME_GROUPS}`, which is GRAPH_CHIP_ORDER (27.646)
+    const home = setup({ centre: 'workspace:wgn', config: 'home', groups: GRAPH_CHIP_ORDER });
+    await waitFor(() => expect(home.fake.calls.length).toBeGreaterThan(0));
+    expect(chips()).toEqual([...m.home, ...m.every]);
   });
 });
 

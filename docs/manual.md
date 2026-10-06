@@ -2276,10 +2276,10 @@ the keyboard and a screen reader, and each row selects or opens its item.
 
 ### Choosing what it shows
 
-- **Link types.** One button per kind of link — **Projects**, **Parent and subtasks**, **Blocks**,
-  **Relates to**, **Duplicates**, **Attached notes**, **Links in text**, **People** and **Concepts** — each
-  with how many there are. Press one to hide that kind of link; a hidden kind is not followed further out
-  either.
+- **Link types.** One button per kind of link — **Parent and subtasks**, **Blocks**, **Relates to**,
+  **Duplicates**, **Attached notes**, **Links in text**, **People** and **Concepts** — each with how many
+  there are; Home's graph, centred on a workspace, also has **Projects** first. Press one to hide that kind
+  of link; a hidden kind is not followed further out either.
 - **Scope.** **Workspaces** and **Projects** choose where the graph looks. It starts with the workspace you are
   in and all its projects. An item outside the scope stays in the fog, and the list under the graph says how
   many are outside.

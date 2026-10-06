@@ -12688,14 +12688,6 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "Projects"
-                    },
-                    {
-                      "kind": "text",
-                      "text": ", "
-                    },
-                    {
-                      "kind": "bold",
                       "text": "Parent and subtasks"
                     },
                     {
@@ -12756,7 +12748,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — each with how many there are. Press one to hide that kind of link; a hidden kind is not followed further out either."
+                      "text": " — each with how many there are; Home's graph, centred on a workspace, also has "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Projects"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " first. Press one to hide that kind of link; a hidden kind is not followed further out either."
                     }
                   ],
                   [
