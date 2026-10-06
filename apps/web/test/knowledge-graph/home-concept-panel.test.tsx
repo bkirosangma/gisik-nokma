@@ -7,7 +7,7 @@ import type { GraphEdgeView, GraphItemView, GraphRingResponse, HomeResponse, Ing
 import type { GraphSource, KnowledgeGraphProps } from '@gisik-nokma/knowledge-graph';
 import { Providers, resetLastKnownUser } from '../../src/providers.js';
 import { stubServices } from '../helpers/stub-services.js';
-import { AMA, CENTRE, CONCEPT, SUGGESTION_VIEW, VISIBLE, WS, conceptView, conceptWorld, recordingRenderer } from './concept-world.js';
+import { AMA, CENTRE, CONCEPT, SUGGESTION_VIEW, VISIBLE, WS, WS2, conceptView, conceptWorld, recordingRenderer } from './concept-world.js';
 
 /**
  * Knowledge Graph spec D §6 on Home (case 27.642; planner ruling 2026-10-06 13:51 (B)(3), added to KG-D Task 9): Home
@@ -81,17 +81,19 @@ function homeSource(world: ReturnType<typeof conceptWorld>): GraphSource {
 const inspector = () => screen.getByRole('complementary', { name: 'Inspector' });
 const PANEL = 'Concept Scroll position on phone sheets';
 
-function mount(host: 'home' | 'ticket', role: WorkspaceRole = 'member') {
-  const world = conceptWorld();
+/** `second`: the concept lives in WS2, a second workspace the graph spans, where the viewer holds `second.role`. */
+function mount(host: 'home' | 'ticket', role: WorkspaceRole = 'member', second?: { role: WorkspaceRole }) {
+  const conceptWs = second === undefined ? WS : WS2;
+  const world = conceptWorld({ conceptWs });
   const rr = recordingRenderer();
   h.createRenderer = rr.createRenderer;
-  const getConcept = vi.fn(async () => conceptView());
+  const getConcept = vi.fn(async () => conceptView({ workspaceId: conceptWs }));
   const services = stubServices(
     {
-      getMyWorkspaces: async () => [workspace(role)],
+      getMyWorkspaces: async () => (second === undefined ? [workspace(role)] : [workspace(role), { ...workspace(second.role), id: WS2, name: 'Second', prefix: 'SW' }]),
       getHome: async () => HOME,
       // names only for the concept's workspace, so a panel reading another workspace's names says "u_ama"
-      getActorNames: async (workspaceId: string) => (workspaceId === WS ? [{ id: AMA, name: 'Ama Rangsa' }] : []),
+      getActorNames: async (workspaceId: string) => (workspaceId === conceptWs ? [{ id: AMA, name: 'Ama Rangsa' }] : []),
       getConcept,
       getSuggestions: async () => [SUGGESTION_VIEW],
       getConceptAudience: async () => ({ conceptId: null, members: 5, before: 5, after: 5 }),
@@ -105,6 +107,17 @@ function mount(host: 'home' | 'ticket', role: WorkspaceRole = 'member') {
 }
 async function pickConcept(rr: ReturnType<typeof recordingRenderer>) {
   await waitFor(() => expect(rr.drawnRefs()).toContain(CONCEPT.ref));
+  act(() => rr.pick(CONCEPT.ref));
+}
+/**
+ * A concept of WS2 starts in the fog on Home (its scope is Home's workspace): the inspector says it "is outside the
+ * scope" and offers "Add Second", the viewer's own way to bring the workspace in. Then it is picked again.
+ */
+async function pickSecondWorkspaceConcept(rr: ReturnType<typeof recordingRenderer>) {
+  await pickConcept(rr);
+  expect(await within(inspector()).findByText(/is outside the scope/)).toBeInTheDocument(); // precondition: fog first
+  await userEvent.setup().click(await within(inspector()).findByRole('button', { name: /^Add Second/ }));
+  await waitFor(() => expect(within(inspector()).queryByRole('button', { name: /^Add Second/ })).toBeNull());
   act(() => rr.pick(CONCEPT.ref));
 }
 
@@ -152,6 +165,25 @@ describe('27.642 Home hands the view the same concept inspector as the ticket an
     await pickConcept(rr);
     const panel = await within(inspector()).findByRole('region', { name: PANEL });
     expect(within(panel).getByText('GN-7 Renew the trade licence')).toBeInTheDocument();
+    for (const name of ['Remove from concept', 'Rename', 'Delete']) expect(within(inspector()).queryByRole('button', { name })).toBeNull();
+  });
+
+  // Reviewer B's P44 rider (SL9 168c2dc1): a Home ring spans every workspace in its scope (`ws=` is a list), so a concept
+  // can live in a workspace other than Home's. Kills R1 (`conceptWorkspaceId` = Home's `workspaceId`, `item.workspaceId` ignored).
+  it('27.642 a concept from a SECOND workspace the graph spans is named from, filed in and guarded by THAT workspace: a member of Home\'s workspace who is a guest of the concept\'s alone reads no Remove, Rename or Delete; CONTROL first: a member of both removes, filed in the concept\'s workspace', async () => {
+    const member = mount('home', 'member', { role: 'member' });
+    await pickSecondWorkspaceConcept(member.rr);
+    const control = await within(inspector()).findByRole('region', { name: PANEL });
+    expect(within(control).getByText('Created by Ama Rangsa')).toBeInTheDocument(); // the names read is the concept's workspace's
+    await userEvent.setup().click(within(control).getAllByRole('button', { name: 'Remove from concept' })[0]!);
+    await waitFor(() => expect(member.ingest).toHaveBeenCalledTimes(1));
+    expect(member.ingest.mock.calls[0]![0][0]).toMatchObject({ workspaceId: WS2, entity: { kind: 'concept', id: CONCEPT.id }, type: 'concept.item_untagged' });
+    cleanup();
+
+    const { rr } = mount('home', 'member', { role: 'guest' });
+    await pickSecondWorkspaceConcept(rr);
+    const panel = await within(inspector()).findByRole('region', { name: PANEL });
+    expect(within(panel).getByText('GN-7 Renew the trade licence')).toBeInTheDocument(); // precondition: the panel is drawn
     for (const name of ['Remove from concept', 'Rename', 'Delete']) expect(within(inspector()).queryByRole('button', { name })).toBeNull();
   });
 });

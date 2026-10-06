@@ -53,7 +53,11 @@ describe('27.544 the Concepts row block', () => {
       rulesNaming(CSS, '.gn-ticket-sheet__notes').map(() => null),
     );
     expect(valueOf(ruleExactly(CSS, '.gn-concepts-row__pills'), 'margin')).toBe('0');
-    expect(rem(valueOf(ruleExactly(CSS, '.gn-concepts-row'), 'margin-block-end'))).toBeGreaterThanOrEqual(0.75);
+    // between 0.75rem and one 1.5rem section gap: enough to part the last pill from "Notes", never a hole above it
+    // (reviewer B's P44 rider, SL9 168c2dc1: kills R5, the gap x10, which the lower bound alone let through)
+    const gap = rem(valueOf(ruleExactly(CSS, '.gn-concepts-row'), 'margin-block-end'));
+    expect(gap).toBeGreaterThanOrEqual(0.75);
+    expect(gap).toBeLessThanOrEqual(1.5);
   });
 
   it('27.544 the remove control is a circle at least 24px wide that fits inside the pill, with a visible keyboard focus', () => {
@@ -63,6 +67,12 @@ describe('27.544 the Concepts row block', () => {
     expect(w).toBe(h);
     expect(w * 16).toBeGreaterThanOrEqual(24);
     expect(h).toBeLessThanOrEqual(rem(valueOf(pill, 'min-height')));
+    // ...and across: the negative end margin that tucks the control into the pill's end is no deeper than the pill's
+    // end padding, so its box never passes the pill's edge (reviewer B's P44 rider, SL9 168c2dc1: kills R3, the tuck x10)
+    const tuck = valueOf(remove, 'margin-inline-end');
+    expect(tuck).toMatch(/^-[\d.]+rem$/); // precondition: the control is tucked in, in rem
+    const [, padInline] = (valueOf(pill, 'padding') ?? '').trim().split(/\s+/);
+    expect(-Number.parseFloat(tuck!)).toBeLessThanOrEqual(rem(padInline ?? null));
     expect(Number.parseFloat(valueOf(remove, 'border-radius') ?? '')).toBeGreaterThanOrEqual(50);
     expect(valueOf(remove, 'border-radius')).toMatch(/%$/);
     const focus = ruleExactly(CSS, ['.gn-concept-pill__name:focus-visible', '.gn-concept-pill__remove:focus-visible']);
