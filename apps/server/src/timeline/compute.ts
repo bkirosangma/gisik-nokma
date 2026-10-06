@@ -5,7 +5,10 @@ import { assembleScope, DEFAULT_LIMITS, mergeCores, type Limits, type ScopeCore 
 import { loadPins, loadWorkspace } from './load.js';
 import type { ReadableWorkspace, TimelineScope } from './scope.js';
 
-/** The ONE core the index, chunk, tray (and Part 5's `get_timeline`) slice. Planning runs per flow component inside `assembleScope`. */
+/**
+ * The ONE core the index, chunk, tray (and Part 5's `get_timeline`) slice. Planning runs per flow component inside `assembleScope`.
+ * The reads reach it through `memo.ts` (the index computes and keeps it per viewer; a chunk or tray slices the kept one).
+ */
 export async function computeScope(
   db: Queryable,
   readable: readonly ReadableWorkspace[],

@@ -1,0 +1,183 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { newUlid } from '@gisik-nokma/domain';
+import type { Queryable } from '../../src/db/queryable.js';
+import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { coreKey, forgetCores, TIMELINE_CORE_MEMO_MAX, TIMELINE_CORE_TTL_MS } from '../../src/timeline/memo.js';
+import { readTimelineChunk } from '../../src/timeline/read-chunk.js';
+import { readTimelineIndex } from '../../src/timeline/read-index.js';
+import { readTimelineTray } from '../../src/timeline/read-tray.js';
+import { readableWorkspaces, type ReadableWorkspace, type TimelineScope } from '../../src/timeline/scope.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
+import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedTimelineWorld, type TimelineWorld } from './helpers/world.js';
+
+/**
+ * 29.299, the owner's (b) ruling (AMEND-wtg4-t1-reads-perf.md): a chunk or tray after its index slices the core the index
+ * kept, per VIEWER, for `TIMELINE_CORE_TTL_MS`, at most `TIMELINE_CORE_MEMO_MAX` cores. A compute is counted by its scope
+ * statement (`AS in_scope`, one per workspace per compute), through a recording pool; every scope here is ONE workspace.
+ *
+ * World (`seedTimelineWorld`): in A, `hidden` (chained after `step1`) is ama's alone; bo is A's member and sees `dated`
+ * (nobody's; `other` would not do for the write leg: bo is its assignee, who always sees it). Filed here: `undated`, so the
+ * tray has a row.
+ */
+const NOW = new Date('2026-10-03T06:00:00.000Z');
+const WINDOW = { from: '2026-10-01', to: '2026-10-31' };
+let db: TestDatabase;
+let w: TimelineWorld;
+const undated = newUlid();
+beforeAll(async () => {
+  db = await createTestDatabase();
+  w = await seedTimelineWorld(db.pool);
+  await applyCommitted(db.pool, [
+    makeCommitted({ workspaceId: w.A.workspaceId, actorId: w.ama, entity: { kind: 'ticket', id: undated }, type: 'ticket.created', payload: { typeId: 'task', projectId: w.A.p1, parentId: null, title: 'Undated' } }),
+  ]);
+}, 120_000);
+afterAll(async () => {
+  await db.drop();
+});
+beforeEach(() => forgetCores());
+
+/** A pool that counts the scope statements it runs: one per workspace each time a core is computed. */
+function counting(): { pool: Queryable; computes: () => number } {
+  let n = 0;
+  const pool = new Proxy(db.pool, {
+    get(target, prop, receiver) {
+      if (prop !== 'query') return Reflect.get(target, prop, receiver);
+      return (text: string, values?: unknown[]) => {
+        if (typeof text === 'string' && text.includes('AS in_scope')) n += 1;
+        return (target.query as (t: string, v?: unknown[]) => Promise<unknown>)(text, values);
+      };
+    },
+  }) as unknown as Queryable;
+  return { pool, computes: () => n };
+}
+const scopeOf = (o: { mine?: boolean; projectIds?: string[] } = {}): TimelineScope => ({ workspaceIds: [w.A.workspaceId], projectIds: o.projectIds ?? [], mine: o.mine ?? false });
+const at = (ms: number): Date => new Date(NOW.getTime() + ms);
+async function reads(pool: Queryable, viewer: string, scope: TimelineScope = scopeOf(), now: Date = NOW) {
+  const readable = await readableWorkspaces(db.pool, viewer, scope);
+  return {
+    index: () => readTimelineIndex(pool, readable, viewer, scope, now),
+    chunk: () => readTimelineChunk(pool, readable, viewer, scope, now, WINDOW),
+    tray: () => readTimelineTray(pool, readable, viewer, scope, now),
+  };
+}
+
+describe('29.299 the chunk and the tray slice the core their index kept (owner ruling (b))', () => {
+  it('29.299 a chunk and a tray after their index compute nothing; control: a second index computes again (the index never reads the memo)', async () => {
+    const c = counting();
+    const r = await reads(c.pool, w.ama);
+    await r.index();
+    expect(c.computes()).toBe(1);
+    expect((await r.chunk()).items.length).toBeGreaterThan(0);
+    expect((await r.tray()).items.map((t) => t.id)).toContain(undated);
+    expect(c.computes()).toBe(1); // sliced, not recomputed
+    await r.index();
+    expect(c.computes()).toBe(2);
+  });
+
+  it('29.299 the TTL is 30 s on the read’s own clock: just inside it a chunk is sliced, at it the chunk computes again; control: the recomputed core is kept', async () => {
+    expect(TIMELINE_CORE_TTL_MS).toBe(30_000);
+    const c = counting();
+    await (await reads(c.pool, w.ama)).index();
+    await (await reads(c.pool, w.ama, scopeOf(), at(29_999))).chunk();
+    expect(c.computes()).toBe(1);
+    await (await reads(c.pool, w.ama, scopeOf(), at(30_000))).chunk();
+    expect(c.computes()).toBe(2);
+    await (await reads(c.pool, w.ama, scopeOf(), at(30_000))).tray();
+    expect(c.computes()).toBe(2);
+  });
+
+  it('29.299 the memo is per VIEWER: within the TTL, same scope and asOf, the blind viewer never gets the seeing viewer’s hidden ticket; control: the same viewer hits', async () => {
+    const c = counting();
+    const ama = await reads(c.pool, w.ama);
+    expect(JSON.stringify((await ama.index()).items)).toContain(w.t.hidden);
+    expect(JSON.stringify(await ama.chunk())).toContain(w.t.hidden); // control: the seeing viewer's own core, sliced
+    expect(c.computes()).toBe(1);
+    const bo = await reads(c.pool, w.bo);
+    const chunk = await bo.chunk();
+    const tray = await bo.tray();
+    expect(chunk.items.some((d) => d.id === w.t.step1)).toBe(true); // the subject's neighbours are there: the absence below is sight
+    expect(JSON.stringify(chunk)).not.toContain(w.t.hidden);
+    expect(JSON.stringify(tray)).not.toContain(w.t.hidden);
+    expect(c.computes()).toBe(2); // bo's own core
+  });
+
+  it('29.299 a write moves asOf, so the next chunk computes again and sees it: a privacy change never waits for the TTL; control: before it, a hit', async () => {
+    const c = counting();
+    const bo = await reads(c.pool, w.bo);
+    await bo.index();
+    expect((await bo.chunk()).items.some((d) => d.id === w.t.dated)).toBe(true);
+    expect(c.computes()).toBe(1);
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: w.A.workspaceId, actorId: w.ama, entity: { kind: 'ticket', id: w.t.dated }, type: 'visibility.set', payload: { ticketId: w.t.dated, mode: 'explicit', userIds: [w.ama] } }),
+    ]);
+    const after = await bo.chunk();
+    expect(c.computes()).toBe(2);
+    expect(JSON.stringify(after)).not.toContain(w.t.dated);
+  });
+
+  it('29.299 across IST midnight within the TTL the chunk computes again (the day is in the key); control: the same day, a hit', async () => {
+    const c = counting();
+    const before = new Date('2026-10-03T18:29:50.000Z'); // 23:59:50 IST
+    const after = new Date('2026-10-03T18:30:05.000Z'); // 00:00:05 IST, 15 s later
+    await (await reads(c.pool, w.ama, scopeOf(), before)).index();
+    await (await reads(c.pool, w.ama, scopeOf(), new Date('2026-10-03T18:29:59.000Z'))).chunk();
+    expect(c.computes()).toBe(1);
+    await (await reads(c.pool, w.ama, scopeOf(), after)).chunk();
+    expect(c.computes()).toBe(2);
+  });
+
+  it('29.299 the memo holds 8 cores: with 8 kept every one is sliced; a 9th evicts the OLDEST, and only it', async () => {
+    expect(TIMELINE_CORE_MEMO_MAX).toBe(8);
+    const c = counting();
+    const keys = [w.ama, w.bo].flatMap((viewer) =>
+      [false, true].flatMap((mine) => [[], [w.A.p1], [w.A.p2], [w.A.p1, w.A.p2].sort()].map((projectIds) => ({ viewer, scope: scopeOf({ mine, projectIds }) }))),
+    );
+    const view = (k: (typeof keys)[number]) => reads(c.pool, k.viewer, k.scope);
+    for (const k of keys.slice(0, 8)) await (await view(k)).index();
+    expect(c.computes()).toBe(8);
+    for (const k of keys.slice(0, 8)) await (await view(k)).chunk();
+    expect(c.computes()).toBe(8); // all 8 kept
+    await (await view(keys[8] as (typeof keys)[number])).index();
+    expect(c.computes()).toBe(9);
+    await (await view(keys[1] as (typeof keys)[number])).chunk();
+    expect(c.computes()).toBe(9); // the second-oldest is still kept
+    await (await view(keys[0] as (typeof keys)[number])).chunk();
+    expect(c.computes()).toBe(10); // the oldest was evicted
+  });
+
+  it('29.299 a compute that fails is not kept: the next read computes again; control: a kept core is reused', async () => {
+    const c = counting();
+    const failing = new Proxy(db.pool, {
+      get(target, prop, receiver) {
+        if (prop !== 'query') return Reflect.get(target, prop, receiver);
+        return (text: string, values?: unknown[]) =>
+          typeof text === 'string' && text.includes('AS in_scope')
+            ? Promise.reject(new Error('scope statement failed'))
+            : (target.query as (t: string, v?: unknown[]) => Promise<unknown>)(text, values);
+      },
+    }) as unknown as Queryable;
+    await expect((await reads(failing, w.ama)).chunk()).rejects.toThrow('scope statement failed');
+    const r = await reads(c.pool, w.ama);
+    expect((await r.chunk()).items.length).toBeGreaterThan(0);
+    expect(c.computes()).toBe(1);
+    await r.tray();
+    expect(c.computes()).toBe(1);
+  });
+
+  it('29.299 the key separates viewer, scope, day, asOf and role; control: the same inputs are one key', async () => {
+    const readable: ReadableWorkspace[] = [{ workspaceId: w.A.workspaceId, eff: await resolveEffectiveRole(db.pool, w.ama, w.A.workspaceId) }];
+    const asOf = { [w.A.workspaceId]: 41 };
+    const base = coreKey(w.ama, scopeOf(), readable, asOf, NOW);
+    expect(coreKey(w.ama, scopeOf(), readable, { ...asOf }, at(1000))).toBe(base); // control
+    const variants = [
+      coreKey(w.bo, scopeOf(), readable, asOf, NOW),
+      coreKey(w.ama, scopeOf({ mine: true }), readable, asOf, NOW),
+      coreKey(w.ama, scopeOf(), readable, asOf, new Date('2026-10-04T06:00:00.000Z')),
+      coreKey(w.ama, scopeOf(), readable, { [w.A.workspaceId]: 42 }, NOW),
+      coreKey(w.ama, scopeOf(), [{ workspaceId: w.A.workspaceId, eff: await resolveEffectiveRole(db.pool, w.bo, w.A.workspaceId) }], asOf, NOW),
+    ];
+    for (const v of variants) expect(v).not.toBe(base);
+    expect(new Set(variants).size).toBe(variants.length);
+  });
+});
