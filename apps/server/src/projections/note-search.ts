@@ -329,7 +329,8 @@ export async function rederiveWorkspaceLexemes(tx: PoolClient, workspaceId: stri
     'SELECT title, body_text, ticket_text FROM proj_note_search WHERE workspace_id = $1 ORDER BY note_id',
     [workspaceId],
   );
-  for (const row of rows) {
-    await insertLexemes(tx, workspaceId, `${row.title} ${row.body_text} ${row.ticket_text}`);
-  }
+  // ONE insert for the workspace, not one per row (18.531: a 1 000-note workspace took 2.2 s with an insert per row,
+  // 0.14 s with one, under the workspace lock).
+  // A space separates words, so the joined text splits into exactly the words the rows give one by one.
+  await insertLexemes(tx, workspaceId, rows.map((row) => `${row.title} ${row.body_text} ${row.ticket_text}`).join(' '));
 }
