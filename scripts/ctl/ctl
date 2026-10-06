@@ -32,7 +32,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   prune-gate-locks [--apply] [--list]  remove gate-lock-* run dirs > 24 h and gate logs > 7 days from the log dir, never a live one (dry-run by default)
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
-  run-tests [--label L] [--max-min N] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary; stopped (124 + TIMEOUT) past N min of slot time (default 30)
+  run-tests [--label L] [--max-min N] [--short] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary; stopped (124 + TIMEOUT) past N min of slot time (default 30); --short may take the express slot
   mutate [--base REF] [--json]    Stryker + numeric ×10/÷10, ceil/floor/round, casts stripped, on the branch's changed lines; one slot-run per file
                                   (exit 0 no survivor, 1 survivors to triage, 2 tool failure; report ~/.cache/gisik-ctl/mutate-<branch>-<sha8>.md)
   post <to> --kind K (--body FILE | --text STR) [--from SEAT] [--reply-to ID]
