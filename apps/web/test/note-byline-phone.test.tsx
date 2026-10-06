@@ -16,7 +16,7 @@ import { stubServices } from './helpers/stub-services.js';
 
 /**
  * The web app on phones, Plan Task 9 — the markup half of case 21.131 (§21.9): a note's byline
- * puts Copy as Markdown / History / Delete behind a "⋯" menu at phone width, inline above it.
+ * puts Copy as Markdown / History / Knowledge Graph / Delete behind a "⋯" menu at phone width, inline above it.
  * (The CSS half — the title on one line — is `phone-screens-b.test.ts`.)
  */
 const NOTE: NoteDetail = {

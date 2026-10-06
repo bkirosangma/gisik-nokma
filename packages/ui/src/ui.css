@@ -9941,12 +9941,12 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   :root:not([data-theme="light"]) .gn-kg-pill:not(.gn-kg-pill--suggested), :root:not([data-theme="light"]) .gn-kg-insp--card .gn-kg-insp__outs { box-shadow: inset 0 0 0 1px var(--gn-border); }
 }
 /* KG: T9 tab+panel */
-/* The ticket sheet's Knowledge Graph tab and the note's Knowledge Graph panel (KG-C T9) host the view in a 40rem sheet
-   (`.gn-sheet`) whatever the window's width, and the view picks its two-column body by the VIEWPORT: beside an 18.75rem
-   inspector the canvas would be a ~17rem strip. In a panel the body is one column at every width: canvas, inspector 18px
-   under it, then the keys line and the list 10px under that, the view's own one-column stacking. A flex column, so the
-   wide arm's grid placement (the inspector over two rows, the list in column 1, row 2; 27.660) has nothing to place and
-   no rule here places either; its 0.625rem row gap is put back to the body's 1.125rem. A phone keeps its own. */
+/* The ticket sheet's Knowledge Graph tab and the note's Knowledge Graph panel (KG-C T9) host the view in a sheet (`.gn-sheet`:
+   40rem; Full screen's body, 53.75rem at most) whatever the window's width, and the view picks its two-column body by the
+   VIEWPORT: beside an 18.75rem inspector the 40rem sheet's canvas would be a ~17rem strip. In a panel the body is one column at
+   every width: canvas, inspector 18px under it, then the keys line and the list 10px under that, the view's own one-column
+   stacking. A flex column, so the wide arm's grid placement (the inspector over two rows, the list in column 1, row 2; 27.660) has
+   nothing to place and no rule here places either; its 0.625rem row gap is put back to the body's 1.125rem. A phone keeps its own. */
 .gn-kg-panel { min-width: 0; }
 .gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg__body { display: flex; flex-direction: column; align-items: stretch; row-gap: 1.125rem; }
 .gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg__below { margin-top: calc(0.625rem - 1.125rem); }

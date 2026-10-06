@@ -2955,7 +2955,7 @@ describe('sheet prototype parity', () => {
 
     await userEvent.click(within(tablist).getByRole('tab', { name: 'Knowledge Graph' }));
     expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Knowledge Graph');
-    // Inside the sheet's graph region (the class the KG CSS sizes).
+    // Inside the sheet's graph region, the branch's own wrapper (no rule sizes it; the panel's `.gn-kg-panel` rules do).
     expect(screen.getByRole('button', { name: 'graph slot: show links' }).closest('.gn-ticket-sheet__graph')).not.toBeNull();
     expect(seen.at(-1)).toEqual(expect.objectContaining({ workspaceId: WS, ticketId: TICKET }));
     // The sheet's own opener reaches the graph, so its "Open ticket" opens in the same host.
