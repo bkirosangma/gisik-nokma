@@ -10,6 +10,8 @@ import { ScopeEditor } from './scope-editor.js';
 
 const COPY_MARKDOWN_LABEL = 'Copy as Markdown';
 const HISTORY_LABEL = 'History';
+/** Spec C §1: the note's Knowledge Graph, a panel opened from the byline as History is (KG-C T9). */
+const GRAPH_LABEL = 'Knowledge Graph';
 /** The phone menu's accessible name (case 21.131); case 13.1059 wants every `role="menu"` named. */
 const NOTE_MENU_LABEL = 'Note actions';
 
@@ -63,6 +65,7 @@ export function NoteByline({
   readingLabel,
   onCopyMarkdown,
   onOpenHistory,
+  onOpenGraph,
   onDelete,
 }: {
   note: NoteDetail;
@@ -85,6 +88,8 @@ export function NoteByline({
   readingLabel: string;
   onCopyMarkdown: () => void;
   onOpenHistory: () => void;
+  /** Opens the note's Knowledge Graph panel (spec C §1; `NoteDocument`'s `Sheet`). Open to every viewer, like History. */
+  onOpenGraph: () => void;
   /**
    * The note's delete door (trash Plan 4, D2) — present only for someone who
    * may edit the note right now (`NoteDocument`'s `canEditNow`: its author, a
@@ -126,7 +131,7 @@ export function NoteByline({
 
       <span className="gn-notes__byline-actions">
         {isPhone ? (
-          // At phone width the three actions share one "⋯" menu (case 21.131) so the title keeps
+          // At phone width the actions share one "⋯" menu (case 21.131) so the title keeps
           // its line; the SAME `OverflowMenu` the workspace card uses, items in the inline order.
           <OverflowMenu
             className="gn-card-menu--inline"
@@ -135,6 +140,7 @@ export function NoteByline({
             items={[
               { label: COPY_MARKDOWN_LABEL, onSelect: onCopyMarkdown },
               { label: HISTORY_LABEL, onSelect: onOpenHistory },
+              { label: GRAPH_LABEL, onSelect: onOpenGraph },
               ...(onDelete !== undefined ? [{ label: DELETE_TRIGGER_LABEL, onSelect: onDelete }] : []),
             ]}
           />
@@ -146,6 +152,9 @@ export function NoteByline({
                 the panel itself, not the door to it. */}
             <Button variant="ghost" onClick={onOpenHistory}>
               {HISTORY_LABEL}
+            </Button>
+            <Button variant="ghost" onClick={onOpenGraph}>
+              {GRAPH_LABEL}
             </Button>
             {onDelete !== undefined ? (
               <Button variant="ghost" onClick={onDelete}>
