@@ -207,13 +207,13 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "bold",
-                    "text": "Epic / Story / Task / Sub-task"
+                    "text": "Epic / Story / Task / Sub-task / Decision"
                   }
                 ],
                 [
                   {
                     "kind": "text",
-                    "text": "The four built-in kinds of ticket, biggest to smallest. An admin can rename these."
+                    "text": "The five built-in kinds of ticket. Epic is the biggest and Sub-task the smallest; a Decision sits at the same level as a Task and stands for a choice between branches of work. An admin can rename these."
                   }
                 ]
               ],
@@ -1359,7 +1359,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Four built-in kinds of ticket: "
+                      "text": "Five built-in kinds of ticket: "
                     },
                     {
                       "kind": "bold",
@@ -1383,11 +1383,19 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " and "
+                      "text": ", "
                     },
                     {
                       "kind": "bold",
                       "text": "sub-task"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "decision"
                     },
                     {
                       "kind": "text",
@@ -9089,7 +9097,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": " badge on the four that came with the workspace."
+                "text": " badge on the five that came with the workspace."
               }
             ]
           },
@@ -9130,7 +9138,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": " (the top of your own types). An item that cannot apply is greyed out and says why in words. The four built-in types have no Reorder button: they keep their rank, and your own types are ordered among themselves."
+                "text": " (the top of your own types). An item that cannot apply is greyed out and says why in words. The five built-in types have no Reorder button: they keep their rank, and your own types are ordered among themselves."
               }
             ]
           }
@@ -9246,8 +9254,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "the-built-in-four",
-            "title": "The built-in four",
+            "id": "the-built-in-five",
+            "title": "The built-in five",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -9262,7 +9270,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rename epic, story, task and sub-task, change their icons, and change which workflow they use. Do it — \"Epic\" and \"Story\" mean nothing in a plumbing business or a design studio."
+                    "text": " rename epic, story, task, sub-task and decision, change their icons, and change which workflow they use. Do it — \"Epic\" and \"Story\" mean nothing in a plumbing business or a design studio."
                   }
                 ]
               },
@@ -14665,7 +14673,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes. An admin can rename all four built-in types, change their icons, and change which workflow they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
+                    "text": "Yes. An admin can rename all five built-in types, change their icons, and change which workflow they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
                   }
                 ]
               }
@@ -14712,7 +14720,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " (an item that cannot apply is greyed out and says why). The four built-in types have no such button — they keep their rank."
+                    "text": " (an item that cannot apply is greyed out and says why). The five built-in types have no such button — they keep their rank."
                   }
                 ]
               }

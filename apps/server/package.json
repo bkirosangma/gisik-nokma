@@ -10,6 +10,7 @@
     "dev": "tsx src/index.ts",
     "migrate": "node-pg-migrate up --migrations-dir migrations",
     "verify:projections": "tsx src/tools/verify-projections.ts",
+    "wtg:backfill-decision": "tsx src/tools/backfill-decision-type.ts",
     "rebuild:projection": "tsx src/tools/rebuild-projection.ts",
     "auth:schema": "tsx src/tools/auth-schema.ts",
     "search:preflight": "tsx src/tools/search-preflight.ts",
