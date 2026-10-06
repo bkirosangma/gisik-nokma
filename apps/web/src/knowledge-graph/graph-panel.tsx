@@ -62,7 +62,9 @@ export function GraphPanel(props: GraphPanelProps) {
         make({ workspaceId: props.workspaceId, entity: { kind: 'ticket', id: source.id }, type, payload: { kind, targetId: target.id } }),
       ]);
       // IngestResult (`packages/domain/src/ingest-result.ts`): committed | invalid { message } | refused { rule, reason }.
-      if (result === undefined || result.status === 'committed') return;
+      // No result at all is a failure in the inspector, never a silent success: the words every note door uses.
+      if (result === undefined) throw new Error('The server did not answer this change.');
+      if (result.status === 'committed') return;
       throw new Error(result.status === 'refused' ? `refused by ${result.rule}: ${result.reason}` : result.message);
     };
     await submit('ticket.link_removed');
