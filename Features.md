@@ -2921,8 +2921,8 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   one job's failure or schedule never touches another's. `startBackupDaemon` becomes a thin wrapper over it
   with an unchanged external signature, so its own existing tests (the stderr shape, the
   `` `backup:${name}` `` alerter key, the two-timer construction) pin the wrapper byte-for-byte with no
-  edits — but **`backup-daemon-main.ts` itself now calls `startScheduler` directly with all eight jobs**
-  (four when this bullet was written; Task 8 of the second wave added `auto-close`, trash Plan 2 `purge`, devices Task 4 `expired-sessions` and wtg2 T7 `decision-backfill`), not
+  edits — but **`backup-daemon-main.ts` itself now calls `startScheduler` directly with every job**
+  (four when this bullet was written; Task 8 of the second wave added `auto-close`, trash Plan 2 `purge`, devices Task 4 `expired-sessions`, wtg2 T7 `decision-backfill` and wtg2 T14 `flow`), not
   `startBackupDaemon`: one scheduler, one `stop()`, one `'backup daemon scheduled'` log line, for the
   two backup jobs, the three errands below and the later jobs alike. `startBackupDaemon`'s only remaining caller is its own
   test file, kept because it is what pins `startScheduler`'s stderr/alerter contract in one place; a
@@ -3910,6 +3910,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- wtg-part2-model T13 bullet -->
 - ⚙️ **Auto-promotion** (wtg2 T13; `packages/domain/src/flow/promotion.ts`, `apps/server/src/flow/promote.ts`) — a Backlog ticket moves to its workflow's first state, as the reserved Flow actor with a `led-to` cause, when any incoming "leads to" source is finished (or all of them with Wait for all); a person's Send to backlog sticks; the engine accepts a `led-to` move only out of Backlog. Cases 29.210-29.221.
 <!-- wtg-part2-model T14 bullet -->
+- ⚙️ **Flow sweep** (wtg2 T14; `apps/server/src/flow/sweep.ts`, `apps/server/src/ops/daemon-listeners.ts`, `apps/server/src/ops/backup-daemon-main.ts`) — a daemon job `flow` every five minutes (`FLOW_SWEEP_INTERVAL_MS`) promotes what the server's listener missed, through the same promotion path, idempotently; the daemon's own commits notify through the same fan-out. Cases 29.222-29.229.
 <!-- wtg-part2-model T15 bullet -->
 - ⚙️ **Settle plan** (wtg2 T15; `packages/domain/src/flow/settle.ts`) — a pure function from a flow's current states and a Decision's outcome to the moves that settle it: close the branches not taken (children first), re-run a loop body, return a revised or cleared Decision's Not-taken tickets to Backlog, refuse the whole plan when the engine would refuse a step (a finished parent, an open child, an outcome with no branch, a workflow with no terminal state), and build the events as the Flow actor with the right causes. Cases 29.364-29.367.
 <!-- wtg-part2-model T16 bullet -->
