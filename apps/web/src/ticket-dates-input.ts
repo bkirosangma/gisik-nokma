@@ -95,7 +95,16 @@ export function toTicketDatesInput(
   };
   // The row's key (`CCSO-4`, null with no prefix) names a calendar marker (UX fixes T8, 23.140). `notTaken` is the server's
   // `notTakenOf` (`ListRow.notTaken`), absent when not: `state` has no `closed` for `resolutionOf`, so the Timeline reads this (29.440).
-  return { state, pendingFieldIds: [], customDateFields, key: row.key, ...(row.notTaken === true ? { notTaken: true as const } : {}) };
+  // The paper pin's counts ride along when the producer knew them (`undefined` = unknown, e.g. the offline replica); never
+  // defaulted to zero (29.114).
+  return {
+    state,
+    pendingFieldIds: [],
+    customDateFields,
+    key: row.key,
+    ...(row.notTaken === true ? { notTaken: true as const } : {}),
+    ...(row.pin === undefined ? {} : { pin: row.pin }),
+  };
 }
 
 /**
