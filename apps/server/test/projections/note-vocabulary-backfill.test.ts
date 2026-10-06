@@ -30,6 +30,7 @@ import { dueAt, recordingStore } from '../purge/world.js';
  * - W5: as W2, then the workspace DELETED (in the trash). Own word `pamphlet`.
  * - W8: still linked to TP: the bind re-derive's case (18.522), here for the order of the two passes. Own word `pelican`.
  * - W7: no note at all, so no word and no row.
+ * - W9: one note titled "Ok": a search row and no word (no word of three letters), so only the rows half finds it.
  */
 let db: TestDatabase;
 let world: NotesFixture;
@@ -40,8 +41,9 @@ const W5 = newUlid();
 const W6 = newUlid();
 const W7 = newUlid();
 const W8 = newUlid();
+const W9 = newUlid();
 const TQ = newUlid();
-const n = { WS: newUlid(), W2: newUlid(), W3: newUlid(), W4: newUlid(), W5: newUlid(), W6: newUlid(), W8: newUlid() };
+const n = { WS: newUlid(), W2: newUlid(), W3: newUlid(), W4: newUlid(), W5: newUlid(), W6: newUlid(), W8: newUlid(), W9: newUlid() };
 const MARKER = 'proj_note_lexemes:rederive-all';
 
 beforeAll(async () => {
@@ -85,6 +87,8 @@ beforeAll(async () => {
     noteIn(W8, n.W8, 'Pelican crate count'),
     preFixLink(W8, n.W8, world.TP),
     ...founding(W7),
+    ...founding(W9),
+    noteIn(W9, n.W9, 'Ok'),
   ]);
 
   // What the OLD index wrote while each link stood: the ticket's words in the note's workspace's vocabulary, and for
@@ -138,7 +142,7 @@ const gate = () => {
   return { open, opened };
 };
 /** The workspaces that hold a word or a row, which the pass must visit: every one but W7. */
-const holders = () => [world.WS, W2, W3, W4, W5, W6, W8].sort();
+const holders = () => [world.WS, W2, W3, W4, W5, W6, W8, W9].sort();
 
 describe('the residue is there before the pass (the haystacks hold their subjects)', () => {
   it('18.526 18.527 each workspace whose link went corrects to the other workspace\'s word, and the purge re-indexed W3\'s row but left its words', async () => {
@@ -273,6 +277,10 @@ describe('the boot: the bind re-derive, then the vocabulary re-derive', () => {
     expect([...visited].sort()).toEqual(holders());
     expect(new Set(visited).size).toBe(visited.length);
     expect(visited).not.toContain(W7);
+    // W9 holds a row and no word: the rows half of the selection finds it (the haystack: it really has no word).
+    expect(visited).toContain(W9);
+    expect((await db.pool.query('SELECT 1 FROM proj_note_lexemes WHERE workspace_id = $1', [W9])).rowCount).toBe(0);
+    expect((await db.pool.query('SELECT 1 FROM proj_note_search WHERE workspace_id = $1', [W9])).rowCount).toBe(1);
     expect(heldWhileVisited).toEqual(visited.map(() => true));
     expect(otherWorkspaceFree).toBe(true);
     // The archived W4 and the trashed W5 are cleaned like any other; their own words stay.

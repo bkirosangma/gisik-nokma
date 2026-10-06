@@ -369,3 +369,35 @@ describe('graceful shutdown', () => {
     60_000,
   );
 });
+
+describe('the boot starts the one-shot backfills', () => {
+  it(
+    '18.529 the real index.ts runs the vocabulary re-derive once the bind re-derive has ended: both markers are written, the vocabulary one last',
+    async () => {
+      const client = new pg.Client({ connectionString: db.url });
+      await client.connect();
+      try {
+        // The boots above wrote both already: start from neither, so this boot must write them.
+        const names = ['proj_note_search:workspace-bind', 'proj_note_lexemes:rederive-all'];
+        await client.query('DELETE FROM projection_backfills WHERE name = ANY($1::text[])', [names]);
+        const child = await startServer();
+        const read = async () =>
+          (await client.query<{ name: string; completed_at: Date }>('SELECT name, completed_at FROM projection_backfills WHERE name = ANY($1::text[])', [names])).rows;
+        const deadline = Date.now() + 20_000;
+        let rows = await read();
+        while (Date.now() < deadline && rows.length < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          rows = await read();
+        }
+        expect(rows.map((row) => row.name).sort()).toEqual([...names].sort());
+        const at = (name: string) => rows.find((row) => row.name === name)?.completed_at.getTime() ?? Number.NaN;
+        expect(at('proj_note_lexemes:rederive-all')).toBeGreaterThanOrEqual(at('proj_note_search:workspace-bind'));
+        child.process.kill('SIGTERM');
+        expect(await child.exit).toEqual({ code: 0, signal: null });
+      } finally {
+        await client.end();
+      }
+    },
+    60_000,
+  );
+});
