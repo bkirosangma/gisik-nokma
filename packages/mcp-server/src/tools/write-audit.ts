@@ -2,7 +2,7 @@
  * The D2 audit's manifest (Knowledge Graph spec D §6 D2, §7 case 8; KG-D Task 7): every MCP tool is classified
  * here exactly once, as a write tool with its audit row or as a read-only tool. A write must be VISIBLE (History
  * renders each event it posts, and an app surface shows the result), ATTRIBUTED (History's actor line reads
- * "Claude, for <name>" for an `origin: 'mcp'` event, `attributionLabel` in app-core) and REMOVABLE (a member has an
+ * "Assistant, for <name>" for an `origin: 'mcp'` event, `attributionLabel` in app-core) and REMOVABLE (a member has an
  * event to undo it).
  *
  * Checked by `packages/mcp-server/test/d2-audit.test.ts` (27.515–27.516: classification; under the 14.88 sweep a

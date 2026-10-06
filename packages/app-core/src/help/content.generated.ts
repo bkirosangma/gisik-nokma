@@ -11405,7 +11405,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "Claude, for"
+                      "text": "Assistant, for"
                     },
                     {
                       "kind": "text",

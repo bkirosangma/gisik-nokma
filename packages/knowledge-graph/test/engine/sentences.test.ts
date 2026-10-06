@@ -29,10 +29,10 @@ describe('edge sentences (port of rel, knowledge-graph-sigma.html:566)', () => {
     expect(edgeSentence(edge('blocks', T('142'), T('133')), labelOf)).toBe('GN-142 blocks GN-133');
   });
 
-  it('27.234 provenance: who, when (IST, en-GB) and "via Claude" for an MCP origin; control: a web origin has no "via", and no author gives the date alone', () => {
+  it('27.234 provenance: who, when (IST, en-GB) and "via an assistant" for an MCP origin; control: a web origin has no "via", and no author gives the date alone', () => {
     expect(formatGraphDate('2026-10-01T20:00:00.000Z')).toBe('2 Oct 2026'); // 01:30 IST next day
     expect(provenanceLine(edge('blocks', T('133'), T('142'), { addedBy: 'Bolsrang Momin', addedAt: '2026-10-01T05:00:00.000Z', origin: 'mcp' })))
-      .toBe('Added by Bolsrang Momin on 1 Oct 2026, via Claude.');
+      .toBe('Added by Bolsrang Momin on 1 Oct 2026, via an assistant.');
     expect(provenanceLine(edge('blocks', T('133'), T('142'), { addedBy: 'Bolsrang Momin', addedAt: '2026-10-01T05:00:00.000Z', origin: 'web' })))
       .toBe('Added by Bolsrang Momin on 1 Oct 2026.');
     // Node 22.22.2 (ICU 78.2) abbreviates September as "Sept" for en-GB; pinned as measured
