@@ -46,3 +46,21 @@ export function dropSharedNowrap(page: Page): Promise<number> {
     return touched;
   });
 }
+
+/** Gives ui.css's region rule back its old specificity: `:where(.gn-skeleton-region)` (zero) becomes `.gn-skeleton-region`
+ *  (0,1,0) in place, as it was before kg-walk-fixes-2 item 5 (case 27.695), so its `display: block` wins every tie with a
+ *  container's own class rule served earlier. */
+export function restoreRegionSpecificity(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    let touched = 0;
+    for (const sheet of [...document.styleSheets]) {
+      for (const rule of [...sheet.cssRules]) {
+        if (rule instanceof CSSStyleRule && rule.selectorText === ':where(.gn-skeleton-region)') {
+          rule.selectorText = '.gn-skeleton-region';
+          touched += 1;
+        }
+      }
+    }
+    return touched;
+  });
+}

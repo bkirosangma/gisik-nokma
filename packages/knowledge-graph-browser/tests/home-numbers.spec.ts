@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { dropRules } from './css-controls.js';
+import { restoreRegionSpecificity } from './css-controls.js';
 
 /*
  * Home's body in a real browser (kg-walk-fixes-2; the release walk's P2-2, item 2), on `harness/home-page.html`: the
@@ -8,8 +8,9 @@ import { dropRules } from './css-controls.js';
  *
  * 27.687: the numbers' placeholders sit in the tiles' own grid, so the swap to numbers moves nothing: with the read held,
  *   the grid's height and the graph placeholder's top are read, the read is released, and both read again; equal within
- *   1px, and the layout-shift entries recorded from the release sum below 0.01. CONTROL, same leg on a fresh load: the
- *   `.gn-home__numbers.gn-skeleton-region` rule deleted, the placeholders stack and the release moves the graph.
+ *   1px, and the layout-shift entries recorded from the release sum below 0.01. CONTROL, same leg on a fresh load: ui.css's
+ *   region rule given back its old specificity (`.gn-skeleton-region`, not `:where()`; item 5, 27.695), the placeholders
+ *   stack and the release moves the graph.
  */
 
 declare global {
@@ -42,7 +43,7 @@ function layout(page: Page): Promise<{ height: number; graphTop: number; display
 
 /** Opens Home with the numbers read held and the scope held (the graph stays its placeholder), lets the page settle, and
  *  starts summing layout shifts from zero. */
-async function openHeld(page: Page, width: number, dropFix: boolean): Promise<void> {
+async function openHeld(page: Page, width: number, oldSpecificity: boolean): Promise<void> {
   // Once per document: a second `openHeld` in the same it() adds the script again, and two observers would count twice.
   await page.addInitScript(() => {
     const flags = window as unknown as Record<string, unknown>;
@@ -58,7 +59,7 @@ async function openHeld(page: Page, width: number, dropFix: boolean): Promise<vo
   await open(page, width, '?numbers=held&scope=held');
   await expect(page.locator('.gn-home__numbers.gn-skeleton-region')).toBeVisible();
   await expect(page.locator('.gn-home__graph-placeholder')).toBeVisible();
-  if (dropFix) expect(await dropRules(page, 'gn-home__numbers.gn-skeleton-region'), 'the placeholder grid rule was found and deleted').toBe(1);
+  if (oldSpecificity) expect(await restoreRegionSpecificity(page), "the region rule's old specificity was restored").toBe(1);
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await page.waitForTimeout(300);
@@ -78,10 +79,10 @@ async function release(page: Page): Promise<{ height: number; graphTop: number; 
 
 for (const width of [1280, 360] as const) {
   test(`27.687 at a literal ${width}px the numbers' placeholders hold the tiles' grid: the release moves nothing (CLS < 0.01); CONTROL: the placeholder rule deleted, it does`, async ({ page }) => {
-    // CONTROL first, on its own load: the placeholders take the region's shared `display: block` and stack.
+    // CONTROL first, on its own load: the region rule at its old (0,1,0), the placeholders take its `display: block` and stack.
     await openHeld(page, width, true);
     const bareHeld = await layout(page);
-    expect(bareHeld.display, 'CONTROL: the region is a block without the rule').toBe('block');
+    expect(bareHeld.display, 'CONTROL: the region is a block under the old specificity').toBe('block');
     const bare = await release(page);
     expect(Math.abs(bare.graphTop - bareHeld.graphTop), 'CONTROL: the release moves the graph placeholder').toBeGreaterThan(1);
     expect(bare.cls, 'CONTROL: and the shift is counted').toBeGreaterThanOrEqual(0.01);

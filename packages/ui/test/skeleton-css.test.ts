@@ -53,8 +53,9 @@ describe('the placeholder block in ui.css (spec §4.2, §4.3; amendment S-R1)', 
     // keyframe steps (`0%, 100%`) are not selectors: the one keyframe is named by its own case (25.017)
     const rulesAfter = parseRules(placeholderBlock()).filter((r) => !(r.atRule ?? '').startsWith('@keyframes')).map((r) => r.selectors.join(','));
     expect(rulesAfter.length).toBeGreaterThan(0);
-    for (const sel of rulesAfter) expect(sel).toMatch(/^(\.gn-skeleton|\.gn-pending|\.gn-skeleton__rows|\.gn-skeleton-region)/);
+    // The region's rule is `:where(.gn-skeleton-region)`, zero specificity (kg-walk-fixes-2 item 5, 27.695): the same family.
+    for (const sel of rulesAfter) expect(sel).toMatch(/^(\.gn-skeleton|\.gn-pending|\.gn-skeleton__rows|\.gn-skeleton-region|:where\(\.gn-skeleton-region\))/);
     // Control: a rule of any other family would be caught by the same pattern.
-    expect('.gn-board-card').not.toMatch(/^(\.gn-skeleton|\.gn-pending|\.gn-skeleton__rows|\.gn-skeleton-region)/);
+    expect('.gn-board-card').not.toMatch(/^(\.gn-skeleton|\.gn-pending|\.gn-skeleton__rows|\.gn-skeleton-region|:where\(\.gn-skeleton-region\))/);
   });
 });

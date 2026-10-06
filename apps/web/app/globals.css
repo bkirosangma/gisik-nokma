@@ -348,13 +348,6 @@ input, textarea, select { font-family: inherit; }
    third wraps the label. Past due's warning is an inset 3px edge in `--gn-warning`, a non-text boundary held to 3:1 on
    `surfaceRaised` (`CONTRAST_PAIRS`); the value ink stays `--gn-text`. */
 .gn-home__numbers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.625rem; }
-/* The loading placeholder is the SAME grid (kg-walk-fixes-2 item 2, release walk P2-2; case 27.687). `HomeNumbers`
-   draws it as `SkeletonRegion className="gn-home__numbers"`, and `.gn-skeleton-region { display: block }` (ui.css, which
-   the BUILT app links after this sheet's chunk, although `layout.tsx` imports it first) won the tie at equal specificity:
-   the six placeholder tiles stacked 456px tall, collapsed to
-   one 76px row (158px at 390) when the numbers arrived, and moved the graph under them (CLS 0.19 at 1280, 0.20 at 390).
-   Two classes beat one here, and only for this region: the shared skeleton rule stays block for every other user. */
-.gn-home__numbers.gn-skeleton-region { display: grid; }
 .gn-home__number {
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; align-content: start; text-align: start; min-height: 4.75rem;
   padding: 0.75rem 0.875rem; border: 0; border-radius: var(--gn-radius-card);

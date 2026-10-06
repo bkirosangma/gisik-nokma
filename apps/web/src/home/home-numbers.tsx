@@ -16,8 +16,9 @@ export type HomeNumbersProps = {
 /**
  * Home's six numbers (spec E §2.2): one row of six tiles on desktop, 3×2 at 64rem and below (`globals.css`). Loading
  * draws placeholders in the tiles' own box (`.gn-home__number`, one `min-height` at every width) and in the tiles' own
- * grid (`.gn-home__numbers.gn-skeleton-region`: the region's shared `display: block` stacked them until kg-walk-fixes-2),
- * so the swap to numbers does not move the page: measured in Chromium at 360 and 1280, case 27.687.
+ * grid (the region is `.gn-home__numbers` too; ui.css's region rule is `:where()`, zero specificity, since kg-walk-fixes-2
+ * item 5: its old `display: block` won the tie and stacked them), so the swap to numbers does not move the page: measured
+ * in Chromium at 360 and 1280, case 27.687.
  */
 export function HomeNumbers({ home, failed, onRetry, pressed, onToggle, dueSoonDays: lastKnownDueSoonDays }: HomeNumbersProps) {
   if (home === null && !failed) {

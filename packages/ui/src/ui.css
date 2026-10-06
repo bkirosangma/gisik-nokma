@@ -10150,7 +10150,7 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-skeleton--circle { border-radius: 50%; width: var(--gn-skeleton-w, 2rem); height: var(--gn-skeleton-h, 2rem); }
 .gn-skeleton--card { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 5.5rem); }
 .gn-skeleton__rows { display: flex; flex-direction: column; gap: var(--gn-space-2); }
-.gn-skeleton-region { display: block; }
+:where(.gn-skeleton-region) { display: block; } /* ZERO specificity (kg-walk-fixes-2 item 5, 27.695): an `li` region is a block (no marker), and a region's own container class sets its display in any sheet order */
 .gn-pending > * { opacity: var(--gn-disabled-opacity); }
 @keyframes gnPulse {
   0%, 100% { opacity: 1; }
