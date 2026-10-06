@@ -252,7 +252,14 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       : reach === Number.POSITIVE_INFINITY
         ? `${n} items, everything connected${fogTxt}${outTxt}`
         : `${n} items within ${reach} hop${reach > 1 ? 's' : ''}${fogTxt}${outTxt}`;
-  const firstLoad = rings.loading && rings.store.items.size === 0;
+  // Nothing has loaded for this centre: ring 1 is still out, or it failed. No count is a fact yet, so the bar states none, and
+  // a failure is the graph's, not a next hop's (kg-walk-fixes-2 item 4, the release walk's P2-5, case 27.689: a failed
+  // first ring read "Couldn't load the next hop." over "0 items within 2 hops" and a "0" on every chip).
+  const nothingLoaded = rings.store.items.size === 0;
+  const firstLoad = rings.loading && nothingLoaded;
+  // The centre's name as far as anything has told the view (its rings, or an earlier store's, `seen`); unknown, the canvas
+  // is just the Knowledge Graph, never "… linked to " with no name (27.689).
+  const centreName = label(centre);
   const edgeView = selectedEdge === null ? undefined : (rings.store.edges.get(selectedEdge) ?? (removedEdge?.id === selectedEdge ? removedEdge : undefined));
   const selectedItem = selected === null ? undefined : rings.store.items.get(selected);
   // Empty with a link held means every chip carrying the centre's links is off: the walk follows only the chips that are on,
@@ -291,7 +298,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         onSemantic={setSemantic}
         groups={shownGroups}
         on={on}
-        counts={model.counts}
+        counts={nothingLoaded ? null : model.counts}
         onToggle={(g) => {
           keepView.current = true;
           setOn((s) => {
@@ -301,7 +308,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
             return t;
           });
         }}
-        count={count}
+        count={nothingLoaded ? '' : count}
         scopeNote={scopeNote}
       />
       <div className="gn-kg__body">
@@ -311,7 +318,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
             className="gn-kg__mount"
             role="img"
             tabIndex={0}
-            aria-label={`Knowledge Graph of items linked to ${label(centre)}`}
+            aria-label={centreName === '' ? 'Knowledge Graph' : `Knowledge Graph of items linked to ${centreName}`}
             data-kg-probe={props.createRenderer ? '' : undefined}
             // the edge sentence follows the pointer along its edge, as the mockup's does (`knowledge-graph-sigma.html:884`):
             // Sigma reports an edge once, on entering it (and leaving the canvas is Sigma's leaveEdge, 27.329)
@@ -354,7 +361,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           )}
           {rings.failedHop !== null && (
             <p className="gn-kg__error" role="alert">
-              Couldn&apos;t load the next hop.{' '}
+              {nothingLoaded ? "Couldn't load the graph." : "Couldn't load the next hop."}{' '}
               <button type="button" className="gn-button" onClick={rings.retry}>
                 Retry
               </button>

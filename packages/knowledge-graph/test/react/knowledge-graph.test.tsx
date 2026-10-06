@@ -240,6 +240,63 @@ describe('KnowledgeGraph: rings, cache and race (spec C §2.2, §2.3)', () => {
   });
 });
 
+describe('27.689 a failed FIRST ring is the graph\'s failure, and the view states no zeros (kg-walk-fixes-2 item 4)', () => {
+  const chips = () => document.querySelectorAll('.gn-kg__chip').length;
+  const chipCounts = () => [...document.querySelectorAll('.gn-kg__chip-n')].map((x) => x.textContent);
+  const canvasName = () => document.querySelector('.gn-kg__mount')!.getAttribute('aria-label');
+
+  it('27.689 ring 1 fails: "Couldn\'t load the graph." with Retry, an empty count line, chips with no counts, the canvas named "Knowledge Graph"; Retry draws the graph and the counts come', async () => {
+    const { fake, fx } = setup({}, { failHop: 1 });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Couldn't load the graph. Retry");
+    expect(alert.textContent).not.toContain('next hop');
+    expect(count()!.trim()).toBe('');
+    expect(chips()).toBe(CHIP_GROUPS.length); // the chips are there…
+    expect(chipCounts()).toEqual([]); // …and say no count
+    expect(canvasName()).toBe('Knowledge Graph');
+    fx.ctl.failHop = 0;
+    await userEvent.setup().click(within(alert).getByRole('button', { name: 'Retry' }));
+    await drawn(fake, T('t126'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(count()).toMatch(/^[1-9]\d* items within 2 hops/);
+    expect(chipCounts()).toHaveLength(CHIP_GROUPS.length);
+    expect(canvasName()).toBe('Knowledge Graph of items linked to GN-142');
+  });
+
+  it('27.689 CONTROL: ring 2 fails after ring 1 drew: "Couldn\'t load the next hop.", and ring 1\'s count, chip counts and the centre\'s name stay', async () => {
+    const { fake } = setup({}, { failHop: 2 });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Couldn't load the next hop. Retry");
+    await waitFor(() => expect(fake.calls.length).toBeGreaterThan(0));
+    expect(count()).toBe('11 items within 2 hops');
+    expect(chipCounts()).toHaveLength(CHIP_GROUPS.length);
+    expect(chipCounts().some((n) => n !== '0')).toBe(true);
+    expect(canvasName()).toBe('Knowledge Graph of items linked to GN-142');
+  });
+
+  it('27.689 while ring 1 is out nothing is counted either (no "0 items"); control: once it lands, the count and the chip counts read', async () => {
+    const { fake } = setup({}, { delayFor: (q) => (q.hops === 1 ? 150 : 0) });
+    expect(screen.getByText('Loading the Knowledge Graph')).toBeInTheDocument();
+    expect(count()!.trim()).toBe('');
+    expect(chipCounts()).toEqual([]);
+    expect(canvasName()).toBe('Knowledge Graph');
+    await drawn(fake, T('t126'));
+    expect(count()).toMatch(/^[1-9]\d* items within 2 hops/);
+    expect(chipCounts()).toHaveLength(CHIP_GROUPS.length);
+  });
+
+  it('27.689 a recentre whose first ring fails keeps the name the view already knows ("… linked to GN-133") and says the graph failed', async () => {
+    const { fake, fx } = setup();
+    await drawn(fake, T('t126'));
+    fx.ctl.failHop = 1;
+    doubleClick(fake, T('t133'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Couldn't load the graph. Retry");
+    expect(count()!.trim()).toBe('');
+    expect(canvasName()).toBe('Knowledge Graph of items linked to GN-133');
+  });
+});
+
 describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
   it('27.320 before ring 1 answers the skeleton and the canvas are both there; control: after it the skeleton is gone', async () => {
     const { fake } = setup({}, { delayFor: (q) => (q.hops === 1 ? 150 : 0) });

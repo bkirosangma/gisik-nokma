@@ -30,8 +30,10 @@ export type GraphBarProps = {
   /** The chips shown, in display order (Concepts is left out while the semantic layer is Off). */
   groups: readonly GraphGroup[];
   on: ReadonlySet<GraphGroup>;
-  counts: Partial<Record<GraphGroup, number>>;
+  /** Each chip's link count; null while nothing has loaded for the centre, when no count is a fact yet (27.689). */
+  counts: Partial<Record<GraphGroup, number>> | null;
   onToggle: (group: GraphGroup) => void;
+  /** The count line; empty while nothing has loaded (27.689), when the line keeps its one-line height and says nothing. */
   count: string;
   scopeNote: string | null;
 };
@@ -81,7 +83,7 @@ export function GraphBar(props: GraphBarProps) {
           <button key={g} type="button" className="gn-button gn-kg__chip" aria-pressed={pressed} onClick={() => props.onToggle(g)}>
             <span className={`gn-kg__swatch gn-kg__swatch--${g}`} aria-hidden="true" />
             {GROUP_LABEL[g]}
-            <span className="gn-kg__chip-n">{props.counts[g] ?? 0}</span>
+            {props.counts !== null && <span className="gn-kg__chip-n">{props.counts[g] ?? 0}</span>}
           </button>
         );
       })}
@@ -89,7 +91,7 @@ export function GraphBar(props: GraphBarProps) {
   );
   const count = (
     <p className="gn-kg__count" aria-live="polite">
-      {props.count}
+      {props.count === '' ? '\u00a0' : props.count}
     </p>
   );
   // The note's slot is always there, one line high and empty while the centre is in scope, as the board's scope row is
