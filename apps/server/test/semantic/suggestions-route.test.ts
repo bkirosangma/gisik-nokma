@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { domainRegistry, makeEnvelope, newUlid, type LedgerEvent, type SuggestionListResponse, type Ulid } from '@gisik-nokma/domain';
+import { domainRegistry, makeEnvelope, newUlid, type GraphRingResponse, type LedgerEvent, type SuggestionListResponse, type Ulid } from '@gisik-nokma/domain';
 import { checkPermission } from '../../src/permissions/check-permission.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
+import { openSuggestionIds } from '../../src/read/suggestions.js';
 import { itemHash, itemKey, parseItemKey, signatureOf } from '../../src/semantic/signature.js';
 import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { buildTestApp } from '../helpers/app.js';
@@ -24,8 +25,13 @@ import { signInWithPhone } from '../helpers/session.js';
  * alone (TE and nExplicit are explicit `[guestListed]`, nExplicit's author arm admits `author`, and `guestListed` does
  * not read nWorkspace). S4 = {TE, nWorkspace, nProject} hides exactly ONE item (TE) from `memberIn`; the two door cases
  * write it and remove it inside their own `it` (`withS4`), so no other case's exact list holds it. Everything is seeded
- * with `applyCommitted` before the one describe that writes through the door (27.496, last): a door write takes the
- * ledger's next seqs.
+ * with `applyCommitted` before the describes that write through the door (27.496, then 27.550–27.551, last): a door
+ * write takes the ledger's next seqs.
+ *
+ * 27.550–27.551 (task kg-sl6-suggested-arm, planner 12:42): a RESOLVED suggestion (rejected, or a concept made from it
+ * that is live, or merged into a live one: planner 14:14) is gone from the list and the door before the job's next run
+ * drops its row (`openSuggestionIds`). Their rows hold two more project tickets, R1 and R2 (every non-guest reads them,
+ * as TP), and live only inside their own `it`.
  */
 type Who = NotesUser | 'outsider';
 let db: TestDatabase;
@@ -43,6 +49,7 @@ const S4 = newUlid(); // ONE item hidden from memberIn; written and removed insi
 const SF = newUlid(); // a suggestion of ANOTHER workspace
 const FW = newUlid();
 const TX = newUlid();
+const [R1, R2] = [newUlid(), newUlid()]; // 27.550–27.551's items (project tickets, read by every non-guest)
 
 type Cached = { id: string; signature: string; itemHashes: string[]; keys: string[] };
 const cached = {} as Record<'S1' | 'S2' | 'S3' | 'SF', Cached>;
@@ -110,6 +117,10 @@ beforeAll(async () => {
   cached.S1 = await cache(S1, [{ kind: 'ticket', id: TP }, { kind: 'note', id: NOTES.nProject }, { kind: 'note', id: NOTES.nWorkspace }], 0.9, `p:${world.P}`);
   cached.S2 = await cache(S2, [{ kind: 'note', id: NOTES.nWorkspace }, { kind: 'note', id: NOTES.nExplicit }, { kind: 'ticket', id: TE }], 0.5, 'i:mixed');
   cached.SF = await cache(SF, [{ kind: 'ticket', id: newUlid() }, { kind: 'ticket', id: newUlid() }, { kind: 'ticket', id: newUlid() }], 0.7, 'w', FW);
+  await applyCommitted(db.pool, [
+    tev(R1, 'ticket.created', { typeId: 'task', projectId: world.P, parentId: null, title: 'Collect the licence' }),
+    tev(R2, 'ticket.created', { typeId: 'task', projectId: world.P, parentId: null, title: 'Frame the licence' }),
+  ]);
 }, 120_000);
 afterAll(async () => {
   await app.close();
@@ -288,5 +299,192 @@ describe('27.496 a rejection reaches the workspace stream as hashes only', () =>
     const text = JSON.stringify(rejections[0]?.payload);
     for (const key of cached.S1.keys) expect(text).not.toContain(parseItemKey(key).id);
     expect(events.filter((event) => event.entity.kind === 'concept')).toEqual([]);
+  });
+});
+
+/** One event through `POST /v1/events` (the real door, then the commit), as `test/concepts/reads.test.ts` posts one. */
+async function submit(who: NotesUser, entity: { kind: 'workspace' | 'concept'; id: string }, type: string, payload: unknown): Promise<Record<string, unknown>> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: { authorization: `Bearer ${tokens[who]}` },
+    payload: { events: [{ id: newUlid(), version: 1, origin: 'web', clientTime: new Date().toISOString(), workspaceId: world.WS, entity, type, payload, actorId: ids[who] }] },
+  });
+  return (res.json() as { results: Array<Record<string, unknown>> }).results[0]!;
+}
+const COMMITTED = { status: 'committed' };
+const REFUSED = { status: 'refused', rule: UNKNOWN.rule, reason: UNKNOWN.reason };
+/** Writes `rows` (id → items, score), runs `legs`, and removes every row before the `it` ends. */
+async function withRows(rows: Array<[string, ItemRef[], number]>, legs: (byId: Record<string, Cached>) => Promise<void>): Promise<void> {
+  const byId: Record<string, Cached> = {};
+  try {
+    for (const [id, items, score] of rows) byId[id] = await cache(id, items, score, `p:${world.P}`);
+    await legs(byId);
+  } finally {
+    const removed = await db.pool.query('DELETE FROM sem_suggestions WHERE id = ANY ($1::text[])', [rows.map(([id]) => id)]);
+    expect(removed.rowCount, 'every row is removed before the it ends').toBe(rows.length);
+  }
+}
+/** The ids of the suggestions `memberIn`'s ring centred on `center` draws (`GET /v1/graph/neighbours`, 27.507's arm). */
+async function drawnFrom(center: string): Promise<string[]> {
+  const res = await get('memberIn', `/v1/graph/neighbours?${new URLSearchParams({ center, hops: '1', ws: world.WS, groups: 'concepts' }).toString()}`);
+  expect(res.statusCode, res.body).toBe(200);
+  return (res.json() as GraphRingResponse).items.filter((item) => item.suggested).map((item) => item.id);
+}
+/** A route answer without its `eventId`, which differs per event: what is left must be byte-equal. */
+const sansEventId = (result: Record<string, unknown>): string => JSON.stringify({ ...result, eventId: undefined });
+
+// After 27.496: these write through the door too.
+describe('27.550–27.551 a resolved suggestion is gone from the list and the door before the job drops its row', () => {
+  it('27.550 the list leaves out a rejected suggestion and one a live concept was made from, and lists it again once that concept is deleted; control: an open one is listed; an item the read cannot name is listed with an empty label', async () => {
+    const [SC, SD, SZ] = [newUlid(), newUlid(), newUlid()];
+    const absent = newUlid(); // a ticket id with no row: `hiddenItems` ignores it, and the labels read has nothing to say
+    await withRows(
+      [
+        [SC, [{ kind: 'ticket', id: R1 }, { kind: 'ticket', id: R2 }, { kind: 'note', id: world.NOTES.nWorkspace }], 0.35],
+        [SD, [{ kind: 'ticket', id: R1 }, { kind: 'note', id: world.NOTES.nProject }, { kind: 'note', id: world.NOTES.nWorkspace }], 0.34],
+        [SZ, [{ kind: 'ticket', id: R1 }, { kind: 'ticket', id: R2 }, { kind: 'ticket', id: absent }], 0.33],
+      ],
+      async (rows) => {
+        // Control: all three are open, so all three are listed (S1 was rejected in 27.496, which is why it is not).
+        expect(await listIds('memberIn')).toEqual([SC, SD, SZ]);
+        const zRes = await get('memberIn', `/v1/workspaces/${world.WS}/suggestions`);
+        const z = (zRes.json() as SuggestionListResponse).suggestions.find((row) => row.id === SZ);
+        expect(z?.items.find((item) => item.id === absent)).toEqual({ kind: 'ticket', id: absent, label: '' });
+
+        expect(await submit('memberIn', { kind: 'workspace', id: world.WS }, 'workspace.concept_suggestion_rejected', { signature: rows[SC]!.signature, itemHashes: rows[SC]!.itemHashes })).toMatchObject(COMMITTED);
+        expect(await listIds('memberIn')).toEqual([SD, SZ]);
+        expect(await listIds('owner')).not.toContain(SC); // resolved for everyone, not only for the one who rejected it
+
+        const CD = newUlid();
+        expect(await submit('memberIn', { kind: 'concept', id: CD }, 'concept.created', { name: 'Licence frames', fromSuggestion: SD })).toMatchObject(COMMITTED);
+        expect(await listIds('memberIn')).toEqual([SZ]);
+
+        expect(await submit('memberIn', { kind: 'concept', id: CD }, 'concept.deleted', {})).toMatchObject(COMMITTED);
+        expect(await listIds('memberIn'), 'a deleted concept gives its suggestion back, as the job would offer the group again').toEqual([SD, SZ]);
+      },
+    );
+  });
+
+  it('27.551 the door refuses a second accept of an accepted suggestion, and an accept or a rejection of a rejected one, with the sentence a made-up id gets; control: an open one is accepted once; a deleted concept makes it acceptable again', async () => {
+    const [SA, SB] = [newUlid(), newUlid()];
+    await withRows(
+      [
+        [SA, [{ kind: 'ticket', id: R1 }, { kind: 'ticket', id: R2 }, { kind: 'ticket', id: world.TP }], 0.32],
+        [SB, [{ kind: 'ticket', id: R2 }, { kind: 'ticket', id: world.TP }, { kind: 'note', id: world.NOTES.nProject }], 0.31],
+      ],
+      async (rows) => {
+        const madeUp = await createFrom('memberIn', newUlid());
+        expect(madeUp).toEqual(UNKNOWN);
+
+        // Accepted once, through the door and the commit; then no second time, for anyone, in the made-up id's words.
+        expect(await createFrom('memberIn', SA), 'control: an open suggestion is admitted').toBeNull();
+        const CA = newUlid();
+        expect(await submit('memberIn', { kind: 'concept', id: CA }, 'concept.created', { name: 'Licence work', fromSuggestion: SA })).toMatchObject(COMMITTED);
+        expect(await submit('memberIn', { kind: 'concept', id: newUlid() }, 'concept.created', { name: 'Licence work again', fromSuggestion: SA })).toEqual(expect.objectContaining(REFUSED));
+        expect(await createFrom('memberIn', SA)).toEqual(madeUp);
+        expect(await createFrom('owner', SA)).toEqual(madeUp);
+        expect(await reject('memberIn', rows[SA]!.signature, rows[SA]!.itemHashes)).toEqual(madeUp);
+        const made = await db.pool.query('SELECT concept_id FROM proj_concepts WHERE workspace_id = $1 AND from_suggestion = $2', [world.WS, SA]);
+        expect(made.rows, 'one suggestion, one concept').toEqual([{ concept_id: CA }]);
+
+        // Rejected: neither accepted nor rejected again.
+        expect(await reject('memberIn', rows[SB]!.signature, rows[SB]!.itemHashes), 'control: an open suggestion may be rejected').toBeNull();
+        expect(await submit('memberIn', { kind: 'workspace', id: world.WS }, 'workspace.concept_suggestion_rejected', { signature: rows[SB]!.signature, itemHashes: rows[SB]!.itemHashes })).toMatchObject(COMMITTED);
+        expect(await createFrom('memberIn', SB)).toEqual(madeUp);
+        expect(await reject('memberIn', rows[SB]!.signature, rows[SB]!.itemHashes)).toEqual(madeUp);
+
+        // The concept made from SA is deleted: SA may be accepted again.
+        expect(await submit('memberIn', { kind: 'concept', id: CA }, 'concept.deleted', {})).toMatchObject(COMMITTED);
+        expect(await createFrom('memberIn', SA)).toBeNull();
+      },
+    );
+  });
+
+  it('27.550 27.551 a concept merged into a live one keeps its suggestion resolved in the list, the ring and the door, to the end of a two-step merge chain, and one concept names it; once the chain’s end is deleted it is listed, drawn and admitted again; control: an open one is listed throughout', async () => {
+    const [SM, SN] = [newUlid(), newUlid()];
+    const items: ItemRef[] = [{ kind: 'ticket', id: R1 }, { kind: 'ticket', id: world.TP }, { kind: 'note', id: world.NOTES.nWorkspace }];
+    await withRows(
+      [
+        [SM, items, 0.3],
+        [SN, [{ kind: 'ticket', id: R2 }, { kind: 'ticket', id: world.TP }, { kind: 'note', id: world.NOTES.nWorkspace }], 0.29],
+      ],
+      async () => {
+        const concept = (id: string) => ({ kind: 'concept' as const, id });
+        /** A concept made through the route and tagged with SM's items, as `resolve_suggestion accept` makes one. */
+        async function make(id: string, payload: Record<string, unknown>): Promise<void> {
+          expect(await submit('memberIn', concept(id), 'concept.created', payload), `create ${id}`).toMatchObject(COMMITTED);
+          for (const item of items) {
+            expect(await submit('memberIn', concept(id), 'concept.item_tagged', { itemKind: item.kind, itemId: item.id }), `tag ${item.id}`).toMatchObject(COMMITTED);
+          }
+        }
+        const named = async () =>
+          (await db.pool.query('SELECT concept_id, deleted, merged_into FROM proj_concepts WHERE workspace_id = $1 AND from_suggestion = $2', [world.WS, SM])).rows;
+        const madeUp = sansEventId(await submit('memberIn', concept(newUlid()), 'concept.created', { name: 'Made up', fromSuggestion: newUlid() }));
+        expect(JSON.parse(madeUp), 'control: the route refuses a made-up id').toEqual(REFUSED);
+
+        // Control: both open, so both are listed, and SM is drawn from R1 (its only row).
+        expect(await listIds('memberIn')).toEqual([SM, SN]);
+        expect(await drawnFrom(`ticket:${R1}`)).toEqual([SM]);
+
+        const [CM, D, E] = [newUlid(), newUlid(), newUlid()];
+        await make(CM, { name: 'Merge desk', fromSuggestion: SM });
+        await make(D, { name: 'Merge target' });
+        expect(await submit('memberIn', concept(CM), 'concept.merged', { intoId: D })).toMatchObject(COMMITTED);
+        expect(await named(), 'a merge stores CM deleted, merged into D').toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
+
+        // Soft, so a broken walk reports every read it reaches (the list, the ring, the door), not only the first.
+        async function resolved(why: string): Promise<void> {
+          expect.soft(await listIds('memberIn'), `${why}: the list`).toEqual([SN]);
+          expect.soft(await drawnFrom(`ticket:${R1}`), `${why}: the ring`).toEqual([]);
+          const again = await submit('memberIn', concept(newUlid()), 'concept.created', { name: 'Merge desk again', fromSuggestion: SM });
+          expect.soft(sansEventId(again), `${why}: a second accept gets the made-up id's answer`).toBe(madeUp);
+          expect.soft(await createFrom('memberIn', SM), `${why}: the door`).toEqual(UNKNOWN);
+          expect.soft(await named(), `${why}: one concept names SM`).toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
+        }
+        await resolved('CM merged into D, which is live');
+
+        // Two steps: D merged into E, which is live.
+        await make(E, { name: 'Merge end' });
+        expect(await submit('memberIn', concept(D), 'concept.merged', { intoId: E })).toMatchObject(COMMITTED);
+        await resolved('CM → D → E, E live');
+
+        // The chain's end is deleted: nothing live holds the group, as the job would see it, so SM is back.
+        expect(await submit('memberIn', concept(E), 'concept.deleted', {})).toMatchObject(COMMITTED);
+        expect(await listIds('memberIn'), 'CM → D → E, E deleted').toEqual([SM, SN]);
+        expect(await drawnFrom(`ticket:${R1}`)).toEqual([SM]);
+        expect(await createFrom('memberIn', SM), 'admitted again').toBeNull();
+      },
+    );
+  });
+
+  it('27.550 the merge walk is bounded: a merge cycle, which no door admits, ends it and leaves the suggestion open; control: a live concept made from it resolves it in the same transaction', async () => {
+    const SY = newUlid();
+    await withRows([[SY, [{ kind: 'ticket', id: R2 }, { kind: 'note', id: world.NOTES.nProject }, { kind: 'note', id: world.NOTES.nWorkspace }], 0.28]], async () => {
+      const [CX, CY] = [newUlid(), newUlid()];
+      const client = await db.pool.connect();
+      try {
+        // Rolled back below, so the cycle never outlives this `it`; a walk that never ends fails in a second here
+        // instead of holding the test database.
+        await client.query('BEGIN');
+        await client.query("SET LOCAL statement_timeout = '1s'");
+        expect(await openSuggestionIds(client, world.WS, [SY]), 'control: no concept, so open').toEqual([SY]);
+        await client.query(
+          `INSERT INTO proj_concepts (concept_id, workspace_id, name, created_by, created_at, origin, from_suggestion) VALUES ($1, $2, 'Loop', $3, now(), 'web', $4)`,
+          [CX, world.WS, world.ids.owner, SY],
+        );
+        expect(await openSuggestionIds(client, world.WS, [SY]), 'control: a live concept made from it resolves it').toEqual([]);
+        // CX merged into CY and CY into CX, stored as `proj-concepts.ts` stores a merge: both deleted, nothing live.
+        await client.query(
+          `INSERT INTO proj_concepts (concept_id, workspace_id, name, created_by, created_at, origin, deleted, merged_into) VALUES ($1, $2, 'Loop back', $3, now(), 'web', TRUE, $4)`,
+          [CY, world.WS, world.ids.owner, CX],
+        );
+        await client.query('UPDATE proj_concepts SET deleted = TRUE, merged_into = $2 WHERE concept_id = $1', [CX, CY]);
+        await expect(openSuggestionIds(client, world.WS, [SY])).resolves.toEqual([SY]);
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    });
   });
 });

@@ -129,7 +129,8 @@ export function noteTools(session: Session): ToolDefinition[] {
       name: 'update_note',
       description:
         'Change a note: title; body (markdown, with mode "replace" (default) the whole body, "append" to the end, or "replace_section" ' +
-        'the content under the heading named in `section`, keeping everything else exactly); scope (+explicitUserIds); or projectId to move it. ' +
+        'the content under the heading named in `section`, keeping everything else exactly); scope (+explicitUserIds); or projectId to move it ' +
+        '(a project of the note\'s own workspace, or "" for the workspace itself). ' +
         `Only the author, an admin who can read it, or the owner can. ${MARKDOWN_SYNTAX_HELP}`,
       inputSchema: updateShape,
       handler: async (args) => {

@@ -4,7 +4,7 @@ import { allTools } from '@gisik-nokma/mcp-server';
 import { newUlid } from '@gisik-nokma/domain';
 import { hostedSession } from '../../src/mcp/in-process-fetch.js';
 import { runSuggestionJob } from '../../src/semantic/suggestion-job.js';
-import { signatureOf } from '../../src/semantic/signature.js';
+import { itemHash, itemKey, parseItemKey, signatureOf } from '../../src/semantic/signature.js';
 import { buildTestApp } from '../helpers/app.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -17,6 +17,9 @@ import { signInWithPhone } from '../helpers/session.js';
  * `concept-tools-e2e.test.ts`), then the job re-run. A row inserted straight into `sem_suggestions` would have no
  * vectors behind it, so the re-run leg could not fail; here TP, a second project ticket TP2 and nProject carry
  * IDENTICAL vectors and share one partition (`p:<P>`), which `memberIn` reads in full.
+ *
+ * 27.550's MCP half (task kg-sl6-suggested-arm, planner 12:42): `review_suggestions` no longer offers a suggestion once it
+ * is rejected or accepted, before any job re-run, and `resolve_suggestion` answers it as it answers a made-up id.
  */
 let db: TestDatabase;
 let app: FastifyInstance;
@@ -110,5 +113,42 @@ describe('27.499 a job suggestion accepted through MCP', () => {
     // Every item is now tagged (≥ 50%), so the re-run writes no suggestion and drops the stale row.
     await runSuggestionJob(db.pool, world.WS);
     expect(await suggestionRows()).toEqual([]);
+  });
+});
+
+describe('27.550 through MCP, a resolved suggestion is offered no more', () => {
+  it('27.550 review_suggestions drops a rejected and an accepted suggestion before any re-run, and resolve_suggestion answers either as it answers a made-up id; control: both are offered first', async () => {
+    const write = async (id: string, keys: string[], score: number) => {
+      const sorted = [...keys].sort();
+      const refs = sorted.map(parseItemKey);
+      await db.pool.query(
+        `INSERT INTO sem_suggestions (id, workspace_id, signature, partition_key, item_kind, item_id, item_hashes, terms, label, score, computed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())`,
+        [id, world.WS, signatureOf(sorted), `p:${world.P}`, refs.map((r) => r.kind), refs.map((r) => r.id), sorted.map(itemHash), ['licence'], 'licence', score],
+      );
+    };
+    const [SJ, SK] = [newUlid(), newUlid()];
+    await write(SJ, [itemKey('ticket', world.TP), itemKey('ticket', TP2), itemKey('note', world.NOTES.nWorkspace)], 0.9);
+    await write(SK, [itemKey('ticket', TP2), itemKey('note', world.NOTES.nProject), itemKey('note', world.NOTES.nWorkspace)], 0.8);
+    const call = toolsOf('memberIn');
+    const offered = async () => ((await call('review_suggestions', { workspaceId: world.WS })) as { suggestions: Array<{ id: string }> }).suggestions.map((s) => s.id);
+    const refusal = async (suggestionId: string, action: 'accept' | 'reject') =>
+      call('resolve_suggestion', { workspaceId: world.WS, suggestionId, action, name: 'Again' }).then(() => 'resolved', (error: unknown) => String(error));
+    const madeUp = await refusal(newUlid(), 'accept');
+    expect(madeUp).toBe('Error: suggestion not found or not visible to you');
+
+    expect(await offered(), 'control: both are offered').toEqual([SJ, SK]);
+    await call('resolve_suggestion', { workspaceId: world.WS, suggestionId: SJ, action: 'reject' });
+    expect(await offered()).toEqual([SK]);
+    expect(await refusal(SJ, 'reject')).toBe(madeUp);
+    expect(await refusal(SJ, 'accept')).toBe(madeUp);
+
+    await call('resolve_suggestion', { workspaceId: world.WS, suggestionId: SK, action: 'accept', name: 'Licence frames' });
+    expect(await offered()).toEqual([]);
+    expect(await refusal(SK, 'accept')).toBe(madeUp);
+    const fromSk = await db.pool.query('SELECT 1 FROM proj_concepts WHERE workspace_id = $1 AND from_suggestion = $2', [world.WS, SK]);
+    expect(fromSk.rowCount, 'one suggestion, one concept').toBe(1);
+    // Neither row has been dropped: only the read leaves them out.
+    expect((await suggestionRows()).map((row) => row.id).sort()).toEqual([SJ, SK].sort());
   });
 });
