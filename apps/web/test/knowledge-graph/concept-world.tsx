@@ -5,9 +5,11 @@ import type { CreateRenderer, DrawEdge, DrawNode, GraphRenderer, GraphRingQuery,
  * A small world for the web host's concept cases (KG-D Task 8: 27.528, 27.529, 27.533, 27.535): the REAL Knowledge
  * Graph view, mounted by `GraphPanel` through its own `next/dynamic` loader, on a recording stand-in renderer (jsdom has
  * no WebGL). Centre `ticket:T`; ring 1 holds the confirmed concept CP (tags T and TV), the suggestion SG (tags T) and
- * the ticket TV; ring 2 is empty.
+ * the ticket TV; ring 2 is empty. `conceptWorld({ conceptWs: WS2 })` puts the two concepts in a second workspace the
+ * graph spans (the panel's own workspace stays WS).
  */
 export const WS = '01J9WSGISIKNOKMA0000000000';
+export const WS2 = '01J9WSSECONDWORKSPACE00000';
 export const T = '01J9TICKETCENTRE0000000000';
 export const TV = '01J9TICKETVISIBLE000000000';
 export const CP = '01J9CONCEPTSCROLL000000000';
@@ -27,13 +29,15 @@ const tag = (from: GraphItemView, to: GraphItemView, suggested = false): GraphEd
 const EDGES: GraphEdgeView[] = [tag(CONCEPT, CENTRE), tag(CONCEPT, VISIBLE), tag(SUGGESTION, CENTRE, true)];
 
 /** The ring door, recording every question; Off's rings (no `concepts` group) hold no concept and no tag edge. */
-export function conceptWorld() {
+export function conceptWorld(opts: { conceptWs?: string } = {}) {
   const log: GraphRingQuery[] = [];
+  const ws = opts.conceptWs ?? WS;
+  const ringConcepts = [CONCEPT, SUGGESTION].map((c) => ({ ...c, workspaceId: ws }));
   const source: GraphSource = {
     async ring(q) {
       log.push(q);
       const concepts = q.groups.includes('concepts');
-      const items = q.hops === 1 ? [VISIBLE, ...(concepts ? [CONCEPT, SUGGESTION] : [])] : [];
+      const items = q.hops === 1 ? [VISIBLE, ...(concepts ? ringConcepts : [])] : [];
       const edges = q.hops === 1 && concepts ? EDGES : [];
       const answer: GraphRingResponse = { hop: q.hops, center: CENTRE, items, edges, frontier: items.map((i) => i.ref), truncated: false, cursor: null };
       return answer;

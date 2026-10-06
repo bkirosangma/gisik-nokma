@@ -325,10 +325,10 @@ describe('27.536–27.538 failures, a fresh read after a change, and a reader wh
     expect(await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' })).toBeInTheDocument();
   });
 
-  it('27.536 a suggestion that is no longer offered says so (never "Loading…" for ever); a refused suggestions read says so; a refused audience read shows no sentence and Confirm still works', async () => {
+  it('27.536 a suggestion that is no longer offered says so (never the wait for ever); a refused suggestions read says so; a refused audience read shows no sentence and Confirm still works', async () => {
     mount({ item: suggestedItem(), query: { getSuggestions: async () => [OTHER_SUG] } });
     expect(await screen.findByText('This suggestion is no longer offered.')).toBeInTheDocument();
-    expect(screen.queryByText('Loading…')).toBeNull();
+    expect(screen.queryByText('Loading suggestion')).toBeNull();
     cleanup();
     mount({ item: suggestedItem(), query: { getSuggestions: async () => Promise.reject(new HttpError(404, `/v1/workspaces/${WS}/suggestions`)) } });
     expect(await screen.findByText('Suggestions could not be loaded.')).toBeInTheDocument();
@@ -407,7 +407,7 @@ describe('27.522, 27.524, 27.536 the guards: no answer is not a change, one Conf
     await waitFor(() => expect(button).toBeEnabled());
   });
 
-  it('27.536 re-pointed at another concept, the inspector shows Loading… until THAT concept\'s read answers, never the previous concept; a read that answers after a newer one is ignored', async () => {
+  it('27.536 re-pointed at another concept, the inspector shows the wait until THAT concept\'s read answers, never the previous concept; a read that answers after a newer one is ignored', async () => {
     const reads = new Map<string, (v: ConceptView) => void>();
     const ds = createFakeDataSource({ getConcept: (id: string) => new Promise<ConceptView>((answer) => reads.set(id, answer)) });
     const props = { workspaceId: WS, dataSource: ds, make: makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' }), nameOf: (id: string) => id, onChanged: vi.fn(), onRefusal: vi.fn() };
@@ -420,7 +420,7 @@ describe('27.522, 27.524, 27.536 the guards: no answer is not a change, one Conf
     await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
     rerender(<ConceptInspector item={at(OTHER, 'Board performance')} {...props} />);
     expect(screen.queryByRole('heading', { name: 'Scroll position on phone sheets' })).toBeNull();
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByText('Loading concept')).toBeInTheDocument();
     // OTHER's read is still out when the inspector moves on to THIRD, and it answers last
     rerender(<ConceptInspector item={at(THIRD, 'Release notes')} {...props} />);
     act(() => reads.get(THIRD)!(concept({ id: THIRD, name: 'Release notes' })));
@@ -428,6 +428,22 @@ describe('27.522, 27.524, 27.536 the guards: no answer is not a change, one Conf
     act(() => reads.get(OTHER)!(concept({ id: OTHER, name: 'Board performance' })));
     await settle();
     expect(screen.getByRole('heading', { level: 3, name: 'Release notes' })).toBeInTheDocument();
-    expect(screen.queryByText('Loading…')).toBeNull();
+    expect(screen.queryByText('Loading concept')).toBeNull();
+  });
+
+  it('27.536 the wait for a concept or a suggestion is a skeleton region, busy and named once, with no loading sentence (spec S7, 25.121); control: once read, nothing is busy', async () => {
+    let answer: (v: ConceptView) => void = () => undefined;
+    mount({ query: { getConcept: () => new Promise<ConceptView>((r) => (answer = r)) } });
+    const label = screen.getByText('Loading concept');
+    expect(label).toHaveClass('gn-visually-hidden');
+    expect(label.closest('[aria-busy="true"]')).toHaveClass('gn-skeleton-region');
+    expect(document.body.textContent).not.toContain('…');
+    act(() => answer(concept()));
+    await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    cleanup();
+    mount({ item: suggestedItem(), query: { getSuggestions: () => new Promise<SuggestionView[]>(() => undefined) } });
+    expect(screen.getByText('Loading suggestion').closest('[aria-busy="true"]')).toHaveClass('gn-skeleton-region');
+    expect(document.body.textContent).not.toContain('…');
   });
 });

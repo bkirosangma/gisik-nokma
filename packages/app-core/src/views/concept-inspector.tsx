@@ -1,4 +1,5 @@
 import { newUlid, type GraphItemView, type IngestResult, type SubmittedEvent, type SuggestionView } from '@gisik-nokma/domain';
+import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { useEffect, useId, useState } from 'react';
 import type { DataSource } from '../data-source.js';
 import { attributionLabel } from '../provenance.js';
@@ -83,7 +84,13 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
         </div>
       );
     }
-    return <p className="gn-kg-concept__note">Loading…</p>;
+    // The wait is a skeleton named once for assistive tech, never a sentence (spec S7, case 25.121).
+    return (
+      <SkeletonRegion label="Loading concept" className="gn-kg-concept-inspector">
+        <Skeleton width="60%" height="1.25rem" />
+        <Skeleton rows={3} height="0.875rem" />
+      </SkeletonRegion>
+    );
   }
   const c = concept.data;
   const readOnly = props.readOnly === true;
@@ -273,7 +280,14 @@ function SuggestionPanel(props: ConceptInspectorProps) {
       live = false;
     };
   }, [dataSource, workspaceId, suggestionId, readOnly]);
-  if (read.status === 'loading') return <p className="gn-kg-concept__note">Loading…</p>;
+  if (read.status === 'loading') {
+    return (
+      <SkeletonRegion label="Loading suggestion" className="gn-kg-concept-inspector">
+        <Skeleton width="40%" height="1.25rem" />
+        <Skeleton rows={3} height="0.875rem" />
+      </SkeletonRegion>
+    );
+  }
   if (read.status === 'failed') return <p className="gn-kg-concept__note">Suggestions could not be loaded.</p>;
   if (read.status === 'gone') return <p className="gn-kg-concept__note">This suggestion is no longer offered.</p>;
   const s = read.suggestion;
