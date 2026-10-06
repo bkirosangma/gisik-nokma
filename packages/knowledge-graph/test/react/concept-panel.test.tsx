@@ -87,6 +87,22 @@ describe('27.527 the concept panel renders in the inspector for a selected conce
     expect(within(inspector()).getByRole('heading', { level: 4, name: /^Items/ })).toBeInTheDocument();
   });
 
+  it('27.527 control: the heading the panel stands in for is a ticket\'s title, or its label when the ring sends the title as null (the server\'s ticket row may carry none); control: GN-151 is headed by its title', async () => {
+    const fx = fixtureSource();
+    const source: GraphSource = {
+      async ring(q) {
+        const r = await fx.source.ring(q);
+        return { ...r, items: r.items.map((i) => (i.ref === 'ticket:t139' ? { ...i, title: null } : i)) };
+      },
+    };
+    const { fake } = setup({ source });
+    await drawn(fake, 'ticket:t139');
+    pick(fake, 'ticket:t151');
+    await waitFor(() => expect(within(inspector()).getByRole('heading', { level: 3, name: 'Restore scroll after Move closes' })).toBeInTheDocument());
+    pick(fake, 'ticket:t139');
+    await waitFor(() => expect(within(inspector()).getByRole('heading', { level: 3, name: 'GN-139' })).toBeInTheDocument());
+  });
+
   it('27.527 a new selection is a new panel: its state does not carry from one concept to the next', async () => {
     const mounts: string[] = [];
     const renderConceptPanel = (item: GraphItemView) => <Mounted item={item} onMount={(ref) => mounts.push(ref)} />;
