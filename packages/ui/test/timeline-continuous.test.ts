@@ -158,10 +158,12 @@ describe('29.117 the paper pin is decoration inside the bar\'s trailing edge, or
     expect(valueOf(pin, 'top')).toBe('50%');
     expect(valueOf(pin, 'transform')).toBe('translateY(-50%)');
     expect(valueOf(pin, 'color')).toBe('inherit');
+    expect(valueOf(pin, 'display')).toBe('inline-flex'); // the svg is a flex item, no line box under it: the box centred is the icon
     const outside = ruleExactly(ui, '.gn-timeline__key--outside .gn-timeline__pin');
     expect(valueOf(outside, 'position')).toBe('static');
     expect(valueOf(outside, 'margin-left')).toBe('2px');
     expect(valueOf(outside, 'transform')).toBe('none');
+    expect(valueOf(outside, 'vertical-align')).toBe('middle'); // centred on the key's line, not sat on its baseline
     // Portrait: the bar is a 100 px column, so the pin rides its top line (the key's line) at the right instead of its middle.
     const portrait = ruleExactly(ui, ".gn-timeline[data-orientation='portrait'] .gn-timeline__pin");
     expect(valueOf(portrait, 'top')).toBe('2px');
