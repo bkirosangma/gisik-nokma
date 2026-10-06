@@ -1,10 +1,10 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConceptAudienceResponse, ConceptView, GraphItemView, IngestResult, SubmittedEvent, SuggestionView } from '@gisik-nokma/domain';
 import type { DataSourceQuery } from '../src/data-source.js';
 import { HttpError } from '../src/online/http.js';
-import { makeSubmittedFactory } from '../src/submit.js';
+import { makeSubmittedFactory, type MakeSubmitted } from '../src/submit.js';
 import { ConceptInspector } from '../src/views/concept-inspector.js';
 import { createFakeDataSource, type IngestScript } from './helpers/fake-data-source.js';
 
@@ -72,7 +72,7 @@ function deferredIngest() {
   return { script, pending };
 }
 
-function mount(opts: { item?: GraphItemView; query?: Partial<DataSourceQuery>; ingest?: IngestScript; readOnly?: boolean } = {}) {
+function mount(opts: { item?: GraphItemView; query?: Partial<DataSourceQuery>; ingest?: IngestScript; readOnly?: boolean; make?: MakeSubmitted } = {}) {
   const ds = createFakeDataSource(
     {
       getConcept: async () => concept(),
@@ -84,7 +84,7 @@ function mount(opts: { item?: GraphItemView; query?: Partial<DataSourceQuery>; i
   );
   const onChanged = vi.fn();
   const onRefusal = vi.fn();
-  const make = makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' });
+  const make = opts.make ?? makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' });
   const nameOf = (id: string) => (id === AMA ? 'Ama Rangsa' : id);
   render(
     <ConceptInspector
@@ -445,5 +445,123 @@ describe('27.522, 27.524, 27.536 the guards: no answer is not a change, one Conf
     mount({ item: suggestedItem(), query: { getSuggestions: () => new Promise<SuggestionView[]>(() => undefined) } });
     expect(screen.getByText('Loading suggestion').closest('[aria-busy="true"]')).toHaveClass('gn-skeleton-region');
     expect(document.body.textContent).not.toContain('…');
+  });
+});
+
+/** The real factory, recording each event's type and payload BEFORE it builds (the factory refuses a blank name by throwing). */
+function recordingMake() {
+  const real = makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' });
+  const built: Array<[string, unknown]> = [];
+  const make: MakeSubmitted = (e) => {
+    built.push([e.type, e.payload]);
+    return real(e);
+  };
+  return { make, built };
+}
+
+describe('27.522–27.538 the clauses one path never reaches (the P11 census)', () => {
+  const heading = () => screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+  const baseProps = () => ({ workspaceId: WS, make: makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' }), nameOf: (id: string) => id, onChanged: vi.fn(), onRefusal: vi.fn() });
+
+  it('27.522 an INVALID answer (the server could not read the event) is reported by its code and message, and the row comes back', async () => {
+    const { onRefusal, user } = mount({ ingest: (events) => [{ status: 'invalid', eventId: events[0]!.id, code: 'duplicate-event-id', message: 'That event was already written.' }] });
+    await heading();
+    await user.click(screen.getAllByRole('button', { name: 'Remove from concept' })[0]!);
+    await waitFor(() => expect(onRefusal).toHaveBeenCalledWith({ rule: 'duplicate-event-id', reason: 'That event was already written.' }));
+    expect(onRefusal).toHaveBeenCalledTimes(1);
+    expect(itemRows()).toEqual(['CCRE-1 Renew the trade licence', 'Field notes']);
+  });
+
+  it('27.522 every event goes to the CONCEPT\'s own workspace, the one the server\'s view names, whatever the host passed', async () => {
+    const { ds, user } = mount({ query: { getConcept: async () => concept({ workspaceId: 'ws_other' }) }, ingest: (events) => events.map((e) => committed(e)) });
+    await heading();
+    await user.click(screen.getAllByRole('button', { name: 'Remove from concept' })[0]!);
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+    expect(ds.ingested[0]!.map((e) => e.workspaceId)).toEqual(['ws_other']);
+  });
+
+  it('27.523 a blank name submitted from the keyboard builds and writes nothing and keeps the form; control: a typed name submitted the same way is written', async () => {
+    const { make, built } = recordingMake();
+    const { ds, user } = mount({ ingest: (events) => events.map((e) => committed(e)), make });
+    await heading();
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Concept name' });
+    await user.clear(input);
+    await user.type(input, '   ');
+    fireEvent.submit(input.closest('form')!);
+    await settle();
+    expect(built).toEqual([]);
+    expect(ds.ingested).toEqual([]);
+    expect(screen.getByRole('textbox', { name: 'Concept name' })).toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, 'Phone sheets');
+    fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+  });
+
+  it('27.523 while renaming, Rename and Delete give way to Save and Cancel; control: Cancel brings them back', async () => {
+    const { user } = mount();
+    await heading();
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('27.538 the Delete question goes when the panel turns read-only (a member made a guest meanwhile); control: it stays while still a member', async () => {
+    const props = { ...baseProps(), item: confirmedItem(), dataSource: createFakeDataSource({ getConcept: async () => concept() }) };
+    const { rerender } = render(<ConceptInspector {...props} />);
+    await heading();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Delete' }));
+    expect(screen.getByRole('alertdialog', { name: 'Delete concept' })).toBeInTheDocument();
+    rerender(<ConceptInspector {...props} readOnly={false} />);
+    expect(screen.getByRole('alertdialog', { name: 'Delete concept' })).toBeInTheDocument();
+    rerender(<ConceptInspector {...props} readOnly />);
+    expect(screen.queryByRole('alertdialog', { name: 'Delete concept' })).toBeNull();
+  });
+
+  it('27.524 the Confirm form submitted from the keyboard builds and writes nothing while the name is blank, and nothing again once a Confirm committed; control: a named submit writes one batch', async () => {
+    const { make, built } = recordingMake();
+    const { ds, user } = mount({ item: suggestedItem(), ingest: (events) => events.map((e) => committed(e)), make });
+    const input = await screen.findByRole('textbox', { name: 'Name' });
+    await user.clear(input);
+    fireEvent.submit(input.closest('form')!);
+    await settle();
+    expect(built).toEqual([]);
+    expect(ds.ingested).toEqual([]);
+    await user.type(input, 'Board drag');
+    fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+    fireEvent.submit(input.closest('form')!);
+    await settle();
+    expect(ds.ingested).toHaveLength(1);
+  });
+
+  it('27.536 a read that fails with no reason at all (undefined, then null) says it could not be loaded, never the wait for ever', async () => {
+    for (const reason of [undefined, null]) {
+      mount({ query: { getConcept: () => Promise.reject(reason) } });
+      expect(await screen.findByText('This concept could not be loaded.'), String(reason)).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it('27.536 a read that FAILS after a newer one answered is ignored too: the newer concept stays, with no failure line', async () => {
+    const reads = new Map<string, { answer: (v: ConceptView) => void; fail: (e: unknown) => void }>();
+    const ds = createFakeDataSource({ getConcept: (id: string) => new Promise<ConceptView>((answer, fail) => reads.set(id, { answer, fail })) });
+    const props = { ...baseProps(), dataSource: ds };
+    const OTHER = '01J9CONCEPTOTHER0000000000';
+    const THIRD = '01J9CONCEPTTHIRD0000000000';
+    const at = (id: string, name: string) => confirmedItem({ ref: `concept:${id}`, id, label: name });
+    const { rerender } = render(<ConceptInspector item={at(OTHER, 'Board performance')} {...props} />);
+    rerender(<ConceptInspector item={at(THIRD, 'Release notes')} {...props} />);
+    act(() => reads.get(THIRD)!.answer(concept({ id: THIRD, name: 'Release notes' })));
+    await screen.findByRole('heading', { level: 3, name: 'Release notes' });
+    act(() => reads.get(OTHER)!.fail(new Error('the older read failed late')));
+    await settle();
+    expect(screen.getByRole('heading', { level: 3, name: 'Release notes' })).toBeInTheDocument();
+    expect(screen.queryByText('This concept could not be loaded.')).toBeNull();
   });
 });

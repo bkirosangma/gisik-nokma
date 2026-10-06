@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GraphEdgeView, GraphItemView, GraphRingResponse } from '@gisik-nokma/domain';
 import type { AdjEntry, GraphStore } from '../../src/engine/model.js';
 import { KnowledgeGraph } from '../../src/react/knowledge-graph.js';
-import type { GraphSource, KnowledgeGraphProps, ScopeChoices } from '../../src/react/types.js';
+import type { GraphRingQuery, GraphSource, KnowledgeGraphProps, ScopeChoices } from '../../src/react/types.js';
 import { fakeRenderer } from './fake-renderer.js';
 import { fixtureSource } from './fixture/fixture-source.js';
 
@@ -215,5 +215,126 @@ describe('27.534 ctx.refresh: the rings are read again and the graph redrawn in 
     await waitFor(() => expect(fx.log.length).toBe(asked + 3));
     expect(fx.log.slice(asked).every((q) => q.center === 'ticket:t142')).toBe(true);
     await waitFor(() => expect(edgesOf(fake.last())).not.toContain(TAG_151));
+  });
+});
+
+/**
+ * The fixture's rings, answered from the world AS IT IS WHEN ASKED, with one ring the test may hold (delivered on
+ * `release`) or fail. Each predicate applies to the next matching ask only.
+ */
+function steeredSource(fx: ReturnType<typeof fixtureSource>) {
+  const holds: Array<{ q: GraphRingQuery; answer: GraphRingResponse; release: () => void }> = [];
+  let hold: ((q: GraphRingQuery) => boolean) | null = null;
+  let fail: ((q: GraphRingQuery) => boolean) | null = null;
+  const source: GraphSource = {
+    async ring(q) {
+      const answer = await fx.source.ring(q);
+      if (fail?.(q)) {
+        fail = null;
+        throw new Error('test: ring failed');
+      }
+      if (hold?.(q)) {
+        hold = null;
+        await new Promise<void>((release) => holds.push({ q, answer, release }));
+      }
+      return answer;
+    },
+  };
+  return { source, holds, holdNext: (p: (q: GraphRingQuery) => boolean) => void (hold = p), failNext: (p: (q: GraphRingQuery) => boolean) => void (fail = p) };
+}
+function panelWithRefresh() {
+  const box = { refresh: (): void => undefined };
+  const renderConceptPanel = (_item: GraphItemView, ctx: { refresh: () => void }) => {
+    box.refresh = ctx.refresh;
+    return <p data-testid="concept-panel">panel</p>;
+  };
+  return { box, renderConceptPanel };
+}
+const pause = () => act(async () => new Promise((r) => setTimeout(r, 60)));
+
+describe('27.534 the refresh\'s edges: where the world ends, a failed ring, two refreshes, a centre moved meanwhile', () => {
+  it('27.534 a refresh stops where the world ends: after an empty ring it asks no further; control: the ordinary fetch stopped there too', async () => {
+    const { box, renderConceptPanel } = panelWithRefresh();
+    const fx = fixtureSource();
+    const source: GraphSource = {
+      async ring(q) {
+        const answer = await fx.source.ring(q);
+        return q.hops >= 2 ? { ...answer, items: [], edges: [], frontier: [], truncated: false, cursor: null } : answer;
+      },
+    };
+    const { fake } = setup({ renderConceptPanel, source });
+    await drawn(fake, C1);
+    expect(fx.log.map((q) => q.hops)).toEqual([1, 2]); // control: ring 2 came back empty, and the walk ended there
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    act(() => box.refresh());
+    await waitFor(() => expect(fx.log.length).toBeGreaterThan(2));
+    await pause();
+    expect(fx.log.slice(2).map((q) => q.hops)).toEqual([1, 2]);
+  });
+
+  it('27.534 a refresh whose ring fails swaps nothing and RESUMES the ordinary fetch it cut short: the ring that was out is asked again and its item drawn; control: that ring was held, its item not yet drawn', async () => {
+    const { box, renderConceptPanel } = panelWithRefresh();
+    const fx = fixtureSource();
+    const st = steeredSource(fx);
+    st.holdNext((q) => q.hops === 3);
+    const { fake } = setup({ renderConceptPanel, source: st.source });
+    await drawn(fake, C1);
+    await waitFor(() => expect(st.holds).toHaveLength(1));
+    const late = st.holds[0]!.answer.items.map((i) => i.ref).find((r) => !refsOf(fake.last()).includes(r));
+    expect(late).toBeDefined(); // control: the held ring 3 brings an item not drawn yet
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    const asked = fx.log.length;
+    st.failNext((q) => q.hops === 1);
+    act(() => box.refresh());
+    await waitFor(() => expect(fx.log.slice(asked).map((q) => q.hops)).toEqual([1, 3]));
+    await waitFor(() => expect(refsOf(fake.last())).toContain(late));
+  });
+
+  it('27.534 two refreshes in a row: the FIRST, still out when the second has landed, asks nothing more and swaps nothing in; control: the second took the tag edge away', async () => {
+    const { box, renderConceptPanel } = panelWithRefresh();
+    const fx = fixtureSource();
+    const st = steeredSource(fx);
+    const { fake } = setup({ renderConceptPanel, source: st.source });
+    await drawn(fake, C1);
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    expect(edgesOf(fake.last())).toContain(TAG_151);
+    st.holdNext((q) => q.hops === 1);
+    act(() => box.refresh()); // the first: its ring 1 read from the world WITH the edge, then held
+    await waitFor(() => expect(st.holds).toHaveLength(1));
+    untag(fx.all, TAG_151);
+    act(() => box.refresh()); // the second
+    await waitFor(() => expect(edgesOf(fake.last())).not.toContain(TAG_151));
+    const asked = fx.log.length;
+    await act(async () => st.holds[0]!.release());
+    await pause();
+    expect(fx.log.length).toBe(asked);
+    expect(edgesOf(fake.last())).not.toContain(TAG_151);
+  });
+
+  it('27.534 a refresh that lands after the view moved to another centre leaves that centre\'s graph on screen; control: it was drawn, and the refresh did read its three rings', async () => {
+    const { box, renderConceptPanel } = panelWithRefresh();
+    const fx = fixtureSource();
+    const st = steeredSource(fx);
+    const { fake } = setup({ renderConceptPanel, source: st.source });
+    await drawn(fake, C1);
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    st.holdNext((q) => q.hops === 1 && q.center === 'ticket:t142');
+    act(() => box.refresh());
+    await waitFor(() => expect(st.holds).toHaveLength(1));
+    act(() => fake.pick({ kind: 'node', ref: 'ticket:t151', double: true }));
+    await waitFor(() => expect(fx.log.filter((q) => q.center === 'ticket:t151').length).toBe(3));
+    await pause();
+    const shown = refsOf(fake.last());
+    expect(shown).toContain('ticket:t151');
+    expect(shown.length).toBeGreaterThan(3);
+    await act(async () => st.holds[0]!.release());
+    await waitFor(() => expect(fx.log.filter((q) => q.center === 'ticket:t142').length).toBe(6));
+    await pause();
+    expect(refsOf(fake.last())).toEqual(shown);
+    expect(document.querySelector('.gn-kg__skeleton')).toBeNull();
   });
 });
