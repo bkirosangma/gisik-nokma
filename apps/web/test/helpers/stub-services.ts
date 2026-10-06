@@ -225,6 +225,10 @@ export function stubServices(
     getWorkspaceSettings: unstubbed('getWorkspaceSettings'),
     getPreferences: async () => EMPTY_PREFERENCES,
     putPreferences: async () => undefined,
+    // UNSTUBBED, the settings rule above (my-work-global T3): the global My work page shows
+    // what this PERSON chose, so a default here would be this helper inventing their choice.
+    getMyWorkPreferences: unstubbed('getMyWorkPreferences'),
+    putMyWorkPreferences: unstubbed('putMyWorkPreferences'),
     ...overrides,
   };
   const dataSource: DataSource = {

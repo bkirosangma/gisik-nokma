@@ -1,12 +1,39 @@
+import { Fragment } from 'react';
 import { renderContestedClaimAttribution } from '@gisik-nokma/domain';
 import { Card, Chip } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import type { ContestedClaim, MyWorkView, WorkItem } from '../view-types.js';
+import type { ItemPlace, WorkspaceGroup } from './my-work-global.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
+
+/**
+ * The global page's grouping of My Work (my-work-global T3, plan AMEND 16:3x): one tree per
+ * section that has a workspace and a project to group by. `contested` has neither
+ * (`ContestedClaim` carries only a ticket), so it stays a flat list in every arrangement.
+ */
+export type MyWorkGroups = {
+  assigned: WorkspaceGroup<WorkItem>[];
+  inTransit: WorkspaceGroup<WorkItem>[];
+  shared: WorkspaceGroup<WorkItem>[];
+};
 
 export type MyWorkProps = {
   view: MyWorkView;
+  /**
+   * Given, the three groupable sections draw an `<h3>` per workspace and an `<h4>` per
+   * project inside their own `<h2>` — the workspace sits UNDER "Assigned to me", so it is a
+   * level below it, never a sibling. Each section's emptiness still reads off `view`.
+   */
+  groups?: MyWorkGroups;
+  /**
+   * The global page's FLAT arrangement (my-work-global T4, case 30.037): each work card names
+   * its workspace and its project, because no heading says where it lives. Both are the grouped
+   * headings' own names (`placeLookup`): a withheld project reads "Unknown project", never its
+   * id, and the card's own project line is not drawn (planner 22:09 P1, 22:26 (A)). Absent, the
+   * cards are today's markup, 3.161's id line included. `contested` rows have no workspace.
+   */
+  placeOf?: (item: WorkItem) => ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
   /**
    * What to call the claimant of a contested claim (a refused claim carries no
@@ -17,6 +44,46 @@ export type MyWorkProps = {
 };
 
 const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
+
+function WorkItems({
+  items,
+  groups,
+  placeOf,
+  onOpenTicket,
+  pending = false,
+}: {
+  items: WorkItem[];
+  groups: WorkspaceGroup<WorkItem>[] | undefined;
+  placeOf: ((item: WorkItem) => ItemPlace | null) | undefined;
+  onOpenTicket: (ticketId: string) => void;
+  pending?: boolean;
+}) {
+  const card = (item: WorkItem) => (
+    <WorkItemCard
+      key={item.ticketId}
+      item={item}
+      place={placeOf === undefined ? null : placeOf(item)}
+      onOpenTicket={onOpenTicket}
+      pending={pending}
+    />
+  );
+  if (groups === undefined) return <>{items.map(card)}</>;
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.workspaceId} className="gn-my-work__group">
+          <h3 className="gn-my-work__workspace">{group.workspaceName}</h3>
+          {group.projects.map((project) => (
+            <Fragment key={project.projectId}>
+              <h4 className="gn-my-work__project-heading">{project.projectName}</h4>
+              {project.items.map(card)}
+            </Fragment>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
 
 /**
  * My Work: assigned, in transit, contested (spec §7).
@@ -76,7 +143,7 @@ const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
  * fourth kind; a section heading inside a view the user opened on purpose is
  * not read as an all-clear about the product.
  */
-export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
+export function MyWork({ view, groups, placeOf, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
   return (
     <div className="gn-my-work">
       <section role="region" aria-label="Assigned to me" className="gn-my-work__section">
@@ -84,9 +151,7 @@ export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }:
         {view.assigned.length === 0 ? (
           <p className="gn-my-work__empty">Nothing assigned to you.</p>
         ) : (
-          view.assigned.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} />
-          ))
+          <WorkItems items={view.assigned} groups={groups?.assigned} placeOf={placeOf} onOpenTicket={onOpenTicket} />
         )}
       </section>
 
@@ -95,9 +160,13 @@ export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }:
         {view.inTransit.length === 0 ? (
           <p className="gn-my-work__empty">No claims in transit.</p>
         ) : (
-          view.inTransit.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} pending />
-          ))
+          <WorkItems
+            items={view.inTransit}
+            groups={groups?.inTransit}
+            placeOf={placeOf}
+            onOpenTicket={onOpenTicket}
+            pending
+          />
         )}
       </section>
 
@@ -130,9 +199,7 @@ export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }:
         {view.shared.length === 0 ? (
           <p className="gn-my-work__empty">Nothing has been shared with you.</p>
         ) : (
-          view.shared.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} />
-          ))
+          <WorkItems items={view.shared} groups={groups?.shared} placeOf={placeOf} onOpenTicket={onOpenTicket} />
         )}
       </section>
     </div>
@@ -200,13 +267,27 @@ function ContestedCard({
  */
 function WorkItemCard({
   item,
+  place,
   onOpenTicket,
   pending = false,
 }: {
   item: WorkItem;
+  /** The flat arrangement's two names (T4, `placeLookup`); `null` draws today's project line alone. */
+  place: ItemPlace | null;
   onOpenTicket: (ticketId: string) => void;
   pending?: boolean;
 }) {
+  const projectLine =
+    item.projectName !== null ? (
+      <span className="gn-my-work__project">{item.projectName}</span>
+    ) : (
+      <span
+        className="gn-my-work__project gn-my-work__project--id"
+        title="You have not been told this project’s name."
+      >
+        {item.projectId}
+      </span>
+    );
   return (
     <Card className="gn-my-work__item">
       <button
@@ -238,14 +319,20 @@ function WorkItemCard({
         for. Removed, and recorded here because the comment justifying it read
         as measured and was not.
       */}
-      {item.projectName !== null ? (
-        <span className="gn-my-work__project">{item.projectName}</span>
+      {place === null ? (
+        projectLine
       ) : (
-        <span
-          className="gn-my-work__project gn-my-work__project--id"
-          title="You have not been told this project’s name."
-        >
-          {item.projectId}
+        // The SAME two names the grouped headings print (`placeLookup`, planner 22:09 P1), with
+        // the crumb separator the ticket sheet uses between them (aria-hidden): two names, never
+        // one string joined by a spaced middle dot (23.191; ruling 20:06). The card's own project
+        // line is not drawn here, so a withheld project reads "Unknown project", as its heading
+        // does; 3.161's id line stays where `place` is null (ruling 22:26 (A)).
+        <span className="gn-my-work__place">
+          <span>{place.workspaceName}</span>
+          <span className="gn-my-work__place-sep" aria-hidden="true">
+            ›
+          </span>
+          <span>{place.projectName}</span>
         </span>
       )}
       <Chip tone={item.stateCategory} title={formatStateProvenance(item.stateName, item.stateProvenance)}>

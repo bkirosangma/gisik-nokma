@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import type { MyWorkView, TicketRead, WorkItem } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
+import { clearMyWorkspacesCache } from '../src/use-my-workspaces.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -66,7 +67,7 @@ let searchParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: WORKSPACE }),
-  usePathname: () => `/w/${WORKSPACE}/my-work`,
+  usePathname: () => '/my-work',
   useSearchParams: () => searchParams,
 }));
 
@@ -77,7 +78,7 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import MyWorkPage from '../app/w/[workspaceId]/my-work/page.js';
+import MyWorkPage from '../app/my-work/page.js';
 
 const claim = {
   actorId: ANSELMA,
@@ -216,7 +217,7 @@ function mount(view: MyWorkView) {
 
 /** Land the router on the ticket the click named, the way `push` would. */
 function landOn(ticketId: string) {
-  searchParams = new URLSearchParams({ ticket: ticketId });
+  searchParams = new URLSearchParams({ ticket: ticketId, ws: WORKSPACE });
 }
 
 beforeEach(() => {
@@ -227,6 +228,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearWorkspaceNameCache();
+  clearMyWorkspacesCache();
 });
 
 describe('3.162 My work opens a ticket from the Shared with me section', () => {
@@ -260,7 +262,7 @@ describe('3.162 My work opens a ticket from the Shared with me section', () => {
     // everything below: the sheet that answers must be this page's.
     await waitFor(() =>
       expect(push).toHaveBeenCalledWith(
-        `/w/${WORKSPACE}/my-work?ticket=${TICKET_SHARED}`,
+        `/my-work?ticket=${TICKET_SHARED}&ws=${WORKSPACE}`,
         { scroll: false },
       ),
     );
@@ -303,7 +305,7 @@ describe('3.162 My work opens a ticket from the Shared with me section', () => {
     );
     await waitFor(() =>
       expect(push).toHaveBeenCalledWith(
-        `/w/${WORKSPACE}/my-work?ticket=${TICKET_ASSIGNED}`,
+        `/my-work?ticket=${TICKET_ASSIGNED}&ws=${WORKSPACE}`,
         { scroll: false },
       ),
     );
@@ -395,7 +397,7 @@ describe('V5 My work opens a contested claim, or says why it cannot', () => {
 
     await waitFor(() =>
       expect(push).toHaveBeenCalledWith(
-        `/w/${WORKSPACE}/my-work?ticket=${TICKET_CONTESTED}`,
+        `/my-work?ticket=${TICKET_CONTESTED}&ws=${WORKSPACE}`,
         { scroll: false },
       ),
     );
@@ -404,7 +406,7 @@ describe('V5 My work opens a contested claim, or says why it cannot', () => {
     // test artefact: the param is what names the open ticket, so the locator is
     // asked by the page's RESOLUTION of `?ticket=` — not by the click handler.
     // One code path serves the click, the reload and a shared link alike.
-    searchParams = new URLSearchParams({ ticket: TICKET_CONTESTED });
+    searchParams = new URLSearchParams({ ticket: TICKET_CONTESTED, ws: WORKSPACE });
     view.rerender(
       <Providers services={services}>
         <MyWorkPage />
@@ -436,6 +438,7 @@ describe('V5 My work opens a contested claim, or says why it cannot', () => {
         getAttention: async () => [],
         getTicket: async (_workspaceId, ticketId) => ticketFor(ticketId),
         getTicketAttachments: async () => [],
+        getMyWorkspaces: async () => [workspaceRow()],
       },
       { ticketLocation: { locate } },
     );
@@ -451,7 +454,7 @@ describe('V5 My work opens a contested claim, or says why it cannot', () => {
     );
     // The landing, as above: the request is the param, and the answer to it is
     // the sentence below.
-    searchParams = new URLSearchParams({ ticket: TICKET_CONTESTED });
+    searchParams = new URLSearchParams({ ticket: TICKET_CONTESTED, ws: WORKSPACE });
     view.rerender(
       <Providers services={services}>
         <MyWorkPage />
@@ -468,7 +471,7 @@ describe('V5 My work opens a contested claim, or says why it cannot', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith(
-      `/w/${WORKSPACE}/my-work?ticket=${TICKET_CONTESTED}`,
+      `/my-work?ticket=${TICKET_CONTESTED}&ws=${WORKSPACE}`,
       { scroll: false },
     );
     expect(push).not.toHaveBeenCalledWith(

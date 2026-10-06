@@ -484,7 +484,7 @@ for (const viewport of VIEWPORTS) {
             await page.waitForTimeout(600);
           },
         },
-        { name: 'my work', reach: () => visit(`/w/${workspaceId}/my-work`) },
+        { name: 'my work', reach: () => visit('/my-work') },
       ];
 
       console.log(`[neo-shadow-clip] allow-list (${ALLOW.length}): ${ALLOW.map((a) => `${a.element}|${a.clipper}: ${a.reason}`).join(' ; ') || 'none'}`);
