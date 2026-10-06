@@ -70,7 +70,7 @@ export type GraphItemView = {
   hop: number;
   /** Outside the chosen workspaces/projects: drawn as fog and never walked past (C-scope). */
   out: boolean;
-  /** A concept suggestion (spec D); always false until D. */
+  /** A model suggestion drawn as a concept (spec D §4.2): a `sem_suggestions` row, for a member who sees every item in it (27.507). */
   suggested: boolean;
 };
 

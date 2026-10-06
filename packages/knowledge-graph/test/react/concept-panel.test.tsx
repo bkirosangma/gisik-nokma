@@ -354,3 +354,131 @@ describe('27.534 the refresh\'s edges: where the world ends, a failed ring, two 
     expect(document.querySelector('.gn-kg__skeleton')).toBeNull();
   });
 });
+
+/** The rings asked for one centre, in the order asked (the fixture logs an ask when it is made, before it answers). */
+const asksFor = (fx: ReturnType<typeof fixtureSource>, centre: string) => fx.log.filter((q) => q.center === centre).map((q) => q.hops);
+
+/**
+ * A write's refresh is the `ctx.refresh` handed out with the render the person clicked in: the panel calls the
+ * `onChanged` it held at the click, so the refresh re-reads THAT render's centre. The legs below move the view (another
+ * centre, more hops) while the write is out, then call the refresh handed out before the move.
+ */
+describe('27.534 a refresh handed out before the view moved: the view on screen still loads, and nothing is asked twice', () => {
+  /** The person centres on GN-151 while the write is out (GN-151's first ring held); the write then untags GN-151. */
+  async function moveThenRefresh(callRefresh: boolean) {
+    const { box, renderConceptPanel } = panelWithRefresh();
+    const fx = fixtureSource();
+    const st = steeredSource(fx);
+    const { fake } = setup({ renderConceptPanel, source: st.source });
+    await drawn(fake, C1);
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    const handedOut = box.refresh; // the write's onChanged, held from this render (centre GN-142)
+    st.holdNext((q) => q.center === 'ticket:t151' && q.hops === 1);
+    act(() => fake.pick({ kind: 'node', ref: 'ticket:t151', double: true }));
+    await waitFor(() => expect(st.holds).toHaveLength(1)); // GN-151's ring 1, read from the world WITH the tag, held
+    untag(fx.all, TAG_151); // the write commits
+    if (callRefresh) {
+      act(() => handedOut());
+      await waitFor(() => expect(asksFor(fx, 'ticket:t142')).toHaveLength(6)); // the refresh read GN-142's three rings
+      await waitFor(() => expect(asksFor(fx, 'ticket:t151')).toEqual([1, 1, 2, 3]));
+      await pause();
+    }
+    const before = { nodes: refsOf(fake.last()), edges: edgesOf(fake.last()) };
+    await act(async () => st.holds[0]!.release()); // the held ring answers last
+    await waitFor(() => expect(asksFor(fx, 'ticket:t151')).toHaveLength(callRefresh ? 4 : 3));
+    await pause();
+    const canvas = screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-151' });
+    return { fake, fx, before, canvas };
+  }
+
+  it('27.534 a refresh handed out BEFORE the person centred elsewhere, landing after: the new centre\'s ring that was out is asked again (it predates the write), then rings 2 and 3, and its graph is drawn with the write in it, no skeleton left; the held ring answering afterwards changes nothing; control: with no refresh that ring lands as asked, carrying the tag', async () => {
+    const control = await moveThenRefresh(false);
+    expect(asksFor(control.fx, 'ticket:t151')).toEqual([1, 2, 3]);
+    expect(document.querySelector('.gn-kg__skeleton')).toBeNull();
+    expect(control.canvas).toBeInTheDocument();
+    expect(refsOf(control.fake.last())).toContain('ticket:t151');
+    expect(edgesOf(control.fake.last())).toContain(TAG_151); // the haystack: the held ring carried the tag
+    cleanup();
+    const { fake, fx, before } = await moveThenRefresh(true);
+    expect(asksFor(fx, 'ticket:t151')).toEqual([1, 1, 2, 3]);
+    expect(document.querySelector('.gn-kg__skeleton')).toBeNull();
+    expect(refsOf(fake.last())).toContain('ticket:t151');
+    expect(refsOf(fake.last()).length).toBeGreaterThan(3);
+    expect(edgesOf(fake.last())).not.toContain(TAG_151);
+    // the held ring (read before the write) answered after all that, and nothing of it was drawn
+    expect({ nodes: refsOf(fake.last()), edges: edgesOf(fake.last()) }).toEqual(before);
+  });
+
+  it('27.534 a refresh that lands while the centre the view moved to is still fetching, that fetch having begun AFTER the refresh, asks none of its rings again; control: the refresh read GN-142\'s three rings while GN-151\'s ring 2 was out', async () => {
+    const { box, renderConceptPanel } = panelWithRefresh();
+    const fx = fixtureSource();
+    const st = steeredSource(fx);
+    const { fake } = setup({ renderConceptPanel, source: st.source });
+    await drawn(fake, C1);
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    st.holdNext((q) => q.center === 'ticket:t142' && q.hops === 1);
+    act(() => box.refresh()); // the refresh's ring 1, held
+    await waitFor(() => expect(st.holds).toHaveLength(1));
+    st.holdNext((q) => q.center === 'ticket:t151' && q.hops === 2);
+    act(() => fake.pick({ kind: 'node', ref: 'ticket:t151', double: true })); // GN-151's fetch begins after the refresh did
+    await waitFor(() => expect(st.holds).toHaveLength(2));
+    await act(async () => st.holds[0]!.release());
+    await waitFor(() => expect(asksFor(fx, 'ticket:t142')).toHaveLength(6)); // control: the refresh read all three
+    await pause(); // ... and swapped
+    expect(asksFor(fx, 'ticket:t151')).toEqual([1, 2]); // GN-151's ring 2 is still out, and is not asked again
+    await act(async () => st.holds[1]!.release());
+    await waitFor(() => expect(asksFor(fx, 'ticket:t151')).toEqual([1, 2, 3]));
+    await pause();
+    expect(asksFor(fx, 'ticket:t151')).toEqual([1, 2, 3]);
+    expect(document.querySelector('.gn-kg__skeleton')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Knowledge Graph of items linked to GN-151' })).toBeInTheDocument();
+    expect(refsOf(fake.last()).length).toBeGreaterThan(3);
+  });
+
+  it('27.534 Hops raised while the write is out, before or after its refresh is called: the refresh reads as many rings as the view asks NOW, so the ring the raise brought stays drawn; control: the same raise with no refresh draws those items', async () => {
+    const user = userEvent.setup();
+    // control: Hops 3 asks a fourth ring (its items drawn in the fog), with no refresh
+    const plain = setup({ renderConceptPanel: panelWithRefresh().renderConceptPanel });
+    await drawn(plain.fake, C1);
+    pick(plain.fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    const three = new Set(refsOf(plain.fake.last()));
+    await user.click(screen.getByRole('tab', { name: '3' }));
+    await waitFor(() => expect(asksFor(plain.fx, 'ticket:t142')).toEqual([1, 2, 3, 4]));
+    await pause();
+    const four = new Set(refsOf(plain.fake.last()));
+    expect([...four].filter((r) => !three.has(r)).length).toBeGreaterThan(0); // the fourth ring brings items
+    cleanup();
+    for (const order of ['raised, then the refresh called', 'the refresh called, then raised'] as const) {
+      const { box, renderConceptPanel } = panelWithRefresh();
+      const fx = fixtureSource();
+      const st = steeredSource(fx);
+      const { fake } = setup({ renderConceptPanel, source: st.source });
+      await drawn(fake, C1);
+      pick(fake, C1);
+      await within(inspector()).findByTestId('concept-panel');
+      const handedOut = box.refresh; // handed out at Hops 2: three rings
+      if (order === 'raised, then the refresh called') {
+        st.holdNext((q) => q.center === 'ticket:t142' && q.hops === 4); // the raise's ring 4, out when the refresh begins
+        await user.click(screen.getByRole('tab', { name: '3' }));
+        await waitFor(() => expect(st.holds).toHaveLength(1));
+        act(() => handedOut());
+      } else {
+        st.holdNext((q) => q.center === 'ticket:t142' && q.hops === 3); // the refresh's ring 3, out when Hops goes to 3
+        act(() => handedOut());
+        await waitFor(() => expect(st.holds).toHaveLength(1));
+        await user.click(screen.getByRole('tab', { name: '3' }));
+        await waitFor(() => expect(asksFor(fx, 'ticket:t142').filter((h) => h === 4)).toHaveLength(1)); // the raise's own ring 4
+        await pause(); // ... answered meanwhile
+      }
+      await act(async () => st.holds[0]!.release());
+      await waitFor(() => expect(new Set(refsOf(fake.last())), order).toEqual(four));
+      await pause();
+      expect(new Set(refsOf(fake.last())), order).toEqual(four);
+      expect(document.querySelector('.gn-kg__skeleton'), order).toBeNull();
+      cleanup();
+    }
+  });
+});

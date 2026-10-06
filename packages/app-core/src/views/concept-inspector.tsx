@@ -1,6 +1,6 @@
 import { newUlid, type ConceptView, type GraphItemView, type IngestResult, type SubmittedEvent, type SuggestionView } from '@gisik-nokma/domain';
 import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { DataSource } from '../data-source.js';
 import { attributionLabel } from '../provenance.js';
 import type { MakeSubmitted } from '../submit.js';
@@ -58,6 +58,18 @@ async function send(props: Pick<ConceptInspectorProps, 'dataSource' | 'onChanged
   return false;
 }
 
+/**
+ * Esc in the rename form or the Delete question closes it and goes no further: not to the view, whose Esc is Back (a
+ * button is not one of the controls it leaves the keys to), and not to a Sheet around the view (`sheet.tsx`: a child
+ * that handled Escape calls `preventDefault`).
+ */
+const escapeCloses = (close: () => void) => (e: KeyboardEvent) => {
+  if (e.key !== 'Escape') return;
+  e.preventDefault();
+  e.stopPropagation();
+  close();
+};
+
 function ConfirmedPanel(props: ConceptInspectorProps) {
   const concept = useConcept(props.dataSource, props.item.id);
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
@@ -65,6 +77,20 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleted, setDeleted] = useState(false);
   const ids = useId();
+  const nameField = useRef<HTMLInputElement>(null);
+  const renameButton = useRef<HTMLButtonElement>(null);
+  const deleteButton = useRef<HTMLButtonElement>(null);
+  const editing = renaming !== null;
+  const opened = useRef(false);
+  // Keyboard focus follows the rename form, which stands in for the heading and the buttons: into the name, its text
+  // selected, when it opens; back on Rename, when drawn, as it closes (Cancel, Esc, a committed Save). Never on the first draw.
+  useEffect(() => {
+    if (editing) {
+      opened.current = true;
+      nameField.current?.focus();
+      nameField.current?.select();
+    } else if (opened.current) renameButton.current?.focus();
+  }, [editing]);
   if (deleted) {
     return (
       <section className="gn-kg-concept-inspector" aria-label="Concept">
@@ -106,6 +132,11 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
     },
   };
   const items = c.items.filter((i) => !removed.has(`${i.kind}:${i.id}`));
+  // The question goes and focus goes back to the Delete that asked it, when drawn (Rename's form hides it meanwhile).
+  const cancelDelete = () => {
+    setConfirmDelete(false);
+    deleteButton.current?.focus();
+  };
   return (
     <section className="gn-kg-concept-inspector" aria-label={`Concept ${c.name}`}>
       {renaming === null ? (
@@ -113,13 +144,14 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
       ) : (
         <form
           className="gn-kg-concept__rename"
+          onKeyDown={escapeCloses(() => setRenaming(null))}
           onSubmit={async (e) => {
             e.preventDefault();
             const name = renaming.trim();
             if (name !== '' && (await send(changed, [ev('concept.renamed', { name })]))) setRenaming(null);
           }}
         >
-          <input className="gn-field__input" aria-label="Concept name" value={renaming} onChange={(e) => setRenaming(e.target.value)} />
+          <input ref={nameField} className="gn-field__input" aria-label="Concept name" value={renaming} onChange={(e) => setRenaming(e.target.value)} />
           <div className="gn-kg-concept__actions">
             <button className="gn-button gn-button--primary" type="submit" disabled={renaming.trim() === ''}>
               Save
@@ -202,16 +234,16 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
       )}
       {readOnly || renaming !== null ? null : (
         <div className="gn-kg-concept__actions">
-          <button className="gn-button gn-button--ghost" type="button" onClick={() => setRenaming(c.name)}>
+          <button ref={renameButton} className="gn-button gn-button--ghost" type="button" onClick={() => setRenaming(c.name)}>
             Rename
           </button>
-          <button className="gn-button gn-button--danger-quiet" type="button" onClick={() => setConfirmDelete(true)}>
+          <button ref={deleteButton} className="gn-button gn-button--danger-quiet" type="button" onClick={() => setConfirmDelete(true)}>
             Delete
           </button>
         </div>
       )}
       {confirmDelete && !readOnly ? (
-        <div role="alertdialog" aria-label="Delete concept" className="gn-kg-concept__confirm">
+        <div role="alertdialog" aria-label="Delete concept" className="gn-kg-concept__confirm" onKeyDown={escapeCloses(cancelDelete)}>
           <p>Delete the concept {c.name}? Its items stay; only the grouping goes.</p>
           <div className="gn-kg-concept__actions">
             <button
@@ -227,7 +259,7 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
               Delete
             </button>
             {/* Focus lands on the safe choice. */}
-            <button className="gn-button gn-button--ghost" type="button" autoFocus onClick={() => setConfirmDelete(false)}>
+            <button className="gn-button gn-button--ghost" type="button" autoFocus onClick={cancelDelete}>
               Cancel
             </button>
           </div>
