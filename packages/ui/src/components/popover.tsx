@@ -21,28 +21,34 @@ export type PopoverProps = {
  * outside interaction, `DismissButton` gives screen-reader users a way out.
  * `role="dialog"` and not `menu`: the content is a fieldset with radios and
  * a button, not a list of commands.
+ *
+ * The hooks live in `OpenPopover`, mounted only while open (case 18.256a).
+ * `useOverlayPosition` re-positions when the overlay changes size, through a
+ * ResizeObserver that it attaches once, when the hook mounts, and only if the
+ * overlay element exists at that moment. Mounted closed, the overlay never got
+ * observed, so content that grew after opening (the visibility menu's people
+ * list) was never re-positioned: the popover stayed below the trigger with Apply
+ * past the fold, and the scroll that reached Apply closed the popover.
  */
-export function Popover({
-  triggerRef,
-  open,
-  onClose,
-  'aria-label': ariaLabel,
-  children,
-}: PopoverProps): ReactElement | null {
+export function Popover(props: PopoverProps): ReactElement | null {
+  if (!props.open) return null;
+  return <OpenPopover {...props} />;
+}
+
+function OpenPopover({ triggerRef, onClose, 'aria-label': ariaLabel, children }: PopoverProps): ReactElement {
   const overlayRef = useRef<HTMLDivElement>(null);
   const { overlayProps: positionProps, placement } = useOverlayPosition({
     targetRef: triggerRef,
     overlayRef,
     placement: 'bottom end',
     offset: 6,
-    isOpen: open,
+    isOpen: true,
     onClose,
   });
   const { overlayProps: dismissProps } = useOverlay(
-    { isOpen: open, onClose, isDismissable: true, shouldCloseOnBlur: false },
+    { isOpen: true, onClose, isDismissable: true, shouldCloseOnBlur: false },
     overlayRef,
   );
-  if (!open) return null;
   return createPortal(
     <div
       {...positionProps}

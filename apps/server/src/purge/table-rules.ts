@@ -138,6 +138,7 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
   oauth_connections: { rule: 'not-entity-bearing', why: 'A person’s consent to an assistant app.' },
   oauth_refresh_tokens: { rule: 'not-entity-bearing', why: 'A person’s refresh token.' },
   user_notification_preferences: { rule: 'not-entity-bearing', why: 'A person’s muted kinds.' },
+  user_my_work_preferences: { rule: 'not-entity-bearing', why: 'A person’s My work Show and Group choices.' },
   proj_ticket_comments: { rule: 'erase', by: ['workspace_id', 'ticket_id'], why: 'Comment bodies.' },
   proj_ticket_links: {
     rule: 'erase',

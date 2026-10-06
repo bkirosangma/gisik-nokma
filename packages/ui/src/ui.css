@@ -9778,6 +9778,145 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   z-index: 1;
 }
 
+/* ── MY WORK, GLOBAL: CONTROLS AND GROUPS (my-work-global T3, cases 30.034, 30.035, 30.020) ──
+   The global page's "Show" chips and "Group" pair, and the workspace → project headings both of its sections draw when
+   grouped. Placed above the loading-placeholders block on purpose: its readers slice from its marker to EOF (25.019), so this
+   comment must not spell that marker either.
+   Tokens only. */
+.gn-my-work-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+.gn-my-work-control__label {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
+.gn-show-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+/* A chip is a segment standing on its own: `.gn-segmented__item`'s height (the 44px floor), pill, padding and type, so the
+   two controls read as one family. Unpressed it rests on the track fill; pressed it takes the segment's SELECTED treatment
+   — lifted in hig/minimal, pressed into the paper in neo — and a check glyph, so the state is a shape too, never a shadow
+   alone (minimal draws none). A long label wraps inside its chip rather than widening the row past a 360px screen. */
+.gn-show-filter__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  max-width: 100%;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-show-filter__chip { transition: none; }
+}
+.gn-show-filter__chip--on {
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font-weight: 600;
+  box-shadow: var(--gn-shadow-lift);
+}
+/* neo inverts the pair, as `.gn-segmented__item--on` does: an unpressed chip is a raised control, a pressed one is cut in. */
+[data-style="neo"] .gn-show-filter__chip {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+}
+[data-style="neo"] .gn-show-filter__chip--on {
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-selected);
+}
+.gn-show-filter__check { flex: none; }
+.gn-show-filter__chip:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* The Group pair is the shared segmented track, content-sized, and never wider than its row. */
+.gn-group-toggle { max-width: 100%; }
+/* Grouped sections: a workspace heading, then each project's heading over its own rows. Names are the user's and can be
+   long, so every heading wraps (anywhere) rather than pushing its card past a 360px screen (30.047, T4's browser pass). */
+.gn-attention__group,
+.gn-my-work__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gn-attention__group + .gn-attention__group,
+.gn-my-work__group + .gn-my-work__group { margin-top: 0.75rem; }
+.gn-attention__workspace,
+.gn-my-work__workspace {
+  margin: 0.75rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--gn-text);
+  overflow-wrap: anywhere;
+}
+.gn-attention__project,
+.gn-my-work__project-heading {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 500;
+  color: var(--gn-text-muted);
+  overflow-wrap: anywhere;
+}
+.gn-attention__group .gn-attention__items { margin-top: 0.25rem; }
+.gn-my-work__project-heading + .gn-my-work__item,
+.gn-my-work__project-heading + .gn-my-work__contested { margin-top: 0.375rem; }
+/* The global page's control bar (my-work-global T4): "Show" over "Group", each a row that wraps on its own, above the
+   strip. Layout only; the controls draw themselves. */
+.gn-my-work-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+/* The Group pair's segments are CONTENT-sized: the shared `flex: 1` split this content-sized track into equal halves, so
+   "By workspace and project" wrapped to two lines at every width up to 1280px (measured in T4's static fixture sweep).
+   The board's rail opts out of `flex: 1` the same way (`.gn-project__rail`). A row too narrow for both still wraps. */
+.gn-group-toggle .gn-segmented__item { flex: 0 1 auto; }
+/* Under neo the pressed segment's bar sits 0.375rem off the item's bottom edge, and a wrapped label's second line ran
+   into it. A deeper bottom padding keeps the bar below the text at any line count; one line stays at the 44px floor. */
+[data-style="neo"] .gn-group-toggle .gn-segmented__item {
+  padding-top: 0.5rem;
+  padding-bottom: 0.75rem;
+}
+/* The FLAT arrangement's place label (T4, case 30.037): each row and card names its workspace, then its project, with the
+   ticket sheet's crumb separator between the two (aria-hidden: two names, never one joined string). Small and muted like
+   the card's own project line, and it wraps (anywhere) rather than widening a row past a 360px screen. */
+.gn-attention__place,
+.gn-my-work__place {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.375rem;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.85rem;
+  color: var(--gn-text-muted);
+  overflow-wrap: anywhere;
+}
+.gn-attention__place-sep,
+.gn-my-work__place-sep { color: var(--gn-text-muted); }
+
 /* ── KNOWLEDGE GRAPH (KG-C, 2026-10-03; spec C) ──
    Four per-task regions, seeded empty by T1 so the parallel lanes write inside their own block and never insert at the
    same point. It sits directly above the loading-placeholder section, which stays last in the sheet (25.019; moved here by KV7, planner ruling Q2 2026-10-05). */

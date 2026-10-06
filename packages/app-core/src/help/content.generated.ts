@@ -710,7 +710,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " — the tickets assigned to you."
+                  "text": " — your tickets from every workspace you are in, on one page."
                 }
               ],
               [
@@ -921,7 +921,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": "."
+                    "text": ". Unlike the top bar, the bottom bar offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "My work"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " even with no workspace open, since My work covers every workspace you are in."
                   }
                 ]
               },
@@ -7167,6 +7175,35 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "On the website's My work page, one line takes the strip's place instead:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Nothing needs your attention for\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the chips you have selected. It answers for those chips only, never for everything you could see, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "it is left out whenever a workspace could not say what needs your attention"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": that workspace's refusal shows instead, so a failure never reads as an all-clear."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "Changing the thresholds:"
                   },
                   {
@@ -13170,7 +13207,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", lets you choose what the bar carries."
+                    "text": ", lets you choose what the bar carries. Unlike the top bar, it offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "My work"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " even with no workspace open, because My work covers every workspace you are in."
                   }
                 ]
               }
@@ -16243,7 +16288,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If nothing needs attention, the strip does not appear at all — no box, no \"all caught up\" message, nothing. That is deliberate: an empty box headed \"Needs your attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\"."
+                    "text": "If nothing needs attention, the strip does not appear at all — no box, no \"all caught up\" message, nothing. That is deliberate: an empty box headed \"Needs your attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\". On the website's My work page one line takes its place, "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Nothing needs your attention for\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the chips you have selected, and it is left out whenever a workspace could not say what needs your attention (its refusal shows instead)."
                   }
                 ]
               }
