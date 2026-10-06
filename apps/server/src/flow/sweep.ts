@@ -39,7 +39,7 @@ async function settleHalf(_deps: FlowSweepDeps): Promise<{ settled: number; refu
  * A SUPERSET of the promotable tickets, in SQL: live, in Backlog, with an incoming `leads_to` from a live terminal source. The exact
  * rule (waitForAll, a Decision's label, not-taken sources, drafts) is `promotionsFor`'s, so a candidate it declines costs one read and
  * never an event. Draft and trashed targets never reach the rule: `LIVE_TICKET_WHERE` already carries
- * `t.draft_author_id IS NULL` (`read/visible-where.ts:256`), so this file names no Drafts column itself.
+ * `t.draft_author_id IS NULL` (`read/visible-where.ts:265`), so this file names no Drafts column itself.
  */
 async function promoteHalf(deps: FlowSweepDeps): Promise<{ promoted: number; refused: number }> {
   const { rows } = await deps.pool.query<{ workspace_id: string; ticket_id: string }>(
