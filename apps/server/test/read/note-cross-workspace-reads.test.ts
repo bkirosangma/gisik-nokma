@@ -263,21 +263,31 @@ describe('18.522 a pre-fix cross-workspace link is absent from every read of the
 
     let lockedElsewhere: boolean | undefined;
     let freeElsewhere: boolean | undefined;
+    let vocabularyLocked: boolean | undefined;
+    let otherVocabularyFree: boolean | undefined;
+    const tryLock = async (key: string) => {
+      const { rows } = await db.pool.query<{ ok: boolean }>('SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS ok', [key]);
+      if (rows[0]?.ok === true) await db.pool.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [key]);
+      return rows[0]?.ok === true;
+    };
     const result = await backfillNoteSearchBinds(db.pool, {
-      probe: async (_stage, noteId) => {
-        if (noteId !== n.away) return;
-        const tryLock = async (id: string) => {
-          const { rows } = await db.pool.query<{ ok: boolean }>("SELECT pg_try_advisory_lock(hashtextextended('note:' || $1, 0)) AS ok", [id]);
-          if (rows[0]?.ok === true) await db.pool.query("SELECT pg_advisory_unlock(hashtextextended('note:' || $1, 0))", [id]);
-          return rows[0]?.ok === true;
-        };
-        lockedElsewhere = await tryLock(n.away);
-        freeElsewhere = await tryLock(n.homeless); // CONTROL: a note the run is not on is free
+      probe: async (stage, id) => {
+        if (stage === 'locked' && id === n.away) {
+          lockedElsewhere = await tryLock(`note:${n.away}`);
+          freeElsewhere = await tryLock(`note:${n.homeless}`); // CONTROL: a note the run is not on is free
+        }
+        if (stage === 'vocabulary' && id === W2) {
+          vocabularyLocked = !(await tryLock(`workspace-seq:${W2}`));
+          otherVocabularyFree = await tryLock(`workspace-seq:${world.WS}`); // CONTROL
+        }
       },
     });
     expect(result).toMatchObject({ ran: true, entities: 2 }); // away (TP) and inheritAway (TWS)
     expect(lockedElsewhere).toBe(false);
     expect(freeElsewhere).toBe(true);
+    // The vocabulary is re-derived under the lock ingest takes first for any event of the workspace.
+    expect(vocabularyLocked).toBe(true);
+    expect(otherVocabularyFree).toBe(true);
 
     expect(await hitsFor('licence')).toEqual([]);
     expect(await correctWords(db.pool, W2, ['licenc'])).toBeNull();

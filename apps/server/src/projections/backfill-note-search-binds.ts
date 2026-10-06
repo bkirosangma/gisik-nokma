@@ -26,8 +26,11 @@ import { reindexNote, rederiveWorkspaceLexemes } from './note-search.js';
  */
 export const NOTE_SEARCH_BIND_BACKFILL = 'proj_note_search:workspace-bind';
 
-/** Test seam: `locked` = the note's entity lock is held, its row not yet re-derived. */
-export type NoteSearchBindProbe = (stage: 'locked', noteId: string) => Promise<void>;
+/**
+ * Test seam: `locked` = the note's entity lock is held, its row not yet re-derived (the id is the note's);
+ * `vocabulary` = the workspace's lock is held, its vocabulary not yet re-derived (the id is the workspace's).
+ */
+export type NoteSearchBindProbe = (stage: 'locked' | 'vocabulary', id: string) => Promise<void>;
 export type NoteSearchBindDeps = { probe?: NoteSearchBindProbe; shouldStop?: () => boolean; log?: (message: string) => void };
 
 async function inTransaction(pool: Pool, body: (client: PoolClient) => Promise<void>): Promise<number> {
@@ -83,6 +86,7 @@ export async function backfillNoteSearchBinds(pool: Pool, deps: NoteSearchBindDe
       if (deps.shouldStop?.() === true) return { ...skipped, entities: notes.length };
       await inTransaction(pool, async (client) => {
         await lockWorkspace(client, workspaceId);
+        await deps.probe?.('vocabulary', workspaceId);
         await rederiveWorkspaceLexemes(client, workspaceId);
       });
     }
