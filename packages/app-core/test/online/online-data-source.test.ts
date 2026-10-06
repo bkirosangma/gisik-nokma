@@ -1633,3 +1633,58 @@ describe('22.123 getGroups reads the workspace group tree', () => {
     await expect(refused.query.getGroups(WORKSPACE)).rejects.toBeInstanceOf(HttpError);
   });
 });
+
+describe('27.520 the four concept reads (Knowledge Graph spec D, KG-D Task 8)', () => {
+  const CONCEPT = { id: 'c', workspaceId: 'w', name: 'Scroll on phones', items: [], links: [] };
+  const EVENT = { id: 'e1', type: 'concept.created', version: 1, payload: { name: 'Scroll on phones' }, actorId: 'u1', origin: 'web', clientTime: '2026-10-06T04:00:00.000Z', serverTime: '2026-10-06T04:00:01.000Z', seq: 7 };
+  const HISTORY = { conceptId: 'c', events: [EVENT] };
+  const SUGGESTIONS = { workspaceId: 'w', suggestions: [{ id: 's1', label: 'drag · column' }] };
+  const AUDIENCE = { conceptId: 'c', members: 9, before: 6, after: 3 };
+  const ANSWERS = {
+    '/v1/concepts/c': CONCEPT,
+    '/v1/concepts/c/history': HISTORY,
+    '/v1/workspaces/w/suggestions': SUGGESTIONS,
+    '/v1/workspaces/w/concepts/audience': AUDIENCE,
+  };
+
+  it('27.520 each read GETs its exact path and answers the unwrapped value; control: no conceptId leaves `conceptId=` out', async () => {
+    const { fetchImpl, calls } = recordingFetch(ANSWERS);
+    const { query } = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    expect(await query.getConcept('c')).toBe(CONCEPT);
+    // the ticket history's event shape, mapped as that one is (`ConceptHistoryResponse`): the body's `events`, not the body
+    expect(await query.getConceptHistory('c')).toEqual([EVENT]);
+    expect(await query.getSuggestions('w')).toBe(SUGGESTIONS.suggestions);
+    expect(await query.getConceptAudience('w', 'c', [{ kind: 'ticket', id: 't' }, { kind: 'note', id: 'n' }])).toBe(AUDIENCE);
+    expect(calls.map((call) => call.input)).toEqual([
+      '/v1/concepts/c',
+      '/v1/concepts/c/history',
+      '/v1/workspaces/w/suggestions',
+      '/v1/workspaces/w/concepts/audience?conceptId=c&add=ticket%3At&add=note%3An',
+    ]);
+    // every one is a read: nothing is posted
+    expect(calls.every((call) => call.init?.method === undefined || call.init.method === 'GET')).toBe(true);
+
+    // CONTROL: a concept that does not exist yet (Confirm's preview) sends no `conceptId=`
+    const none = recordingFetch(ANSWERS);
+    await createOnlineDataSource({ baseUrl: '', fetchImpl: none.fetchImpl }).query.getConceptAudience('w', null, [{ kind: 'ticket', id: 't' }]);
+    expect(none.calls.map((call) => call.input)).toEqual(['/v1/workspaces/w/concepts/audience?add=ticket%3At']);
+  });
+
+  it('27.520 a 404 (absent, hidden, or a guest) is re-raised as HttpError 404 by EACH of the four, never an empty answer', async () => {
+    const { query } = createOnlineDataSource({ baseUrl: '', fetchImpl: recordingFetch({}).fetchImpl });
+    const reads: Array<[string, () => Promise<unknown>]> = [
+      ['getConcept', () => query.getConcept('c')],
+      ['getConceptHistory', () => query.getConceptHistory('c')],
+      ['getSuggestions', () => query.getSuggestions('w')],
+      ['getConceptAudience', () => query.getConceptAudience('w', 'c', [{ kind: 'ticket', id: 't' }])],
+    ];
+    for (const [name, read] of reads) {
+      const err = await read().then(
+        (value) => ({ resolved: value }),
+        (e: unknown) => e,
+      );
+      expect(err, name).toBeInstanceOf(HttpError);
+      expect((err as HttpError).status, name).toBe(404);
+    }
+  });
+});

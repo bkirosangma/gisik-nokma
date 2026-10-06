@@ -20,6 +20,19 @@ export type RingState = {
   forget: (edgeId: string) => boolean;
   /** Undo (planner ruling 2026-10-04): puts the edge back through the door it first came in by, `mergeRing`. Answers as `forget`. */
   restore: (edge: GraphEdgeView) => boolean;
+  /**
+   * After a write (KG-D Task 8, the concept panel's `ctx.refresh`): rings 1…N of THIS key, N being as many as the view
+   * asks for NOW (Hops may move while the write is out), read again into a FRESH store and swapped in only when the last
+   * one has answered, so the old graph stays drawn meanwhile (no skeleton, no empty frame). Fresh, not merged:
+   * `mergeRing` only adds, and an untag or a delete must take its edge or item away. Every OTHER key's entry is dropped,
+   * their stores predating the write (Back reads them again), except the key on screen if the view moved on meanwhile:
+   * its entry is kept as it stands, so the rings it already holds may predate the write. A fetch that began before this
+   * reload has the ring it had out dropped when that ring answers (it predates the write), so the swap resumes the fetch
+   * on screen from what its entry holds and that ring is asked again; a fetch that began after keeps landing and nothing
+   * is asked twice. A failed ring swaps nothing and resumes the ordinary fetch. `onShown` runs when the swap is the one
+   * drawn (the view keeps its camera for that draw, as `forget` lets it).
+   */
+  reload: (onShown?: () => void) => void;
 };
 
 /**
@@ -38,9 +51,21 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
   const [failed, setFailed] = useState<{ key: string; hop: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const want = Math.min(q.rings, GRAPH_MAX_HOPS);
+  /** The rings the view asks for NOW: a `reload` handed out before Hops moved reads to it, not to its own render's. */
+  const wantNow = useRef(want);
+  wantNow.current = want;
+  /**
+   * The latest `reload`: an older one, or a ring of the ordinary fetch that was out when it began, never lands on it.
+   * That fetch is not lost: the reload's swap resumes the fetch on screen when it began before (`began`).
+   */
+  const reloads = useRef(0);
+  /** The `reloads` count the fetch on screen began under: below the swap's own, the ring it had out is dropped. */
+  const began = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const generation = reloads.current;
+    began.current = generation;
     void (async () => {
       let entry = cache.current.get(key) ?? { store: emptyStore(), loaded: 0 };
       cache.current.set(key, entry);
@@ -48,6 +73,7 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
         const hop = entry.loaded + 1;
         try {
           const ring = await source.ring({ center: q.centre, hops: hop, workspaceIds: q.workspaceIds, projectIds: q.projectIds, groups: q.groups });
+          if (generation !== reloads.current) return; // a reload began meanwhile: this ring predates the write it follows
           // merged into the entry AS CACHED NOW: a link removed (`forget`) while this ring was out stays removed
           const base = cache.current.get(key) ?? entry;
           entry = { store: mergeRing(base.store, ring), loaded: hop };
@@ -96,6 +122,34 @@ export function useGraphRings(source: GraphSource, q: { centre: string; workspac
       cache.current.set(key, { ...e, store: { ...merged, exhausted: e.store.exhausted } });
       bump((n) => n + 1);
       return current.current === key;
+    },
+    reload: (onShown) => {
+      const mine = ++reloads.current;
+      const ask = { center: q.centre, workspaceIds: q.workspaceIds, projectIds: q.projectIds, groups: q.groups };
+      void (async () => {
+        let store = emptyStore();
+        let loaded = 0;
+        while (loaded < wantNow.current && !store.exhausted) {
+          const hop = loaded + 1;
+          try {
+            store = mergeRing(store, await source.ring({ ...ask, hops: hop }));
+          } catch {
+            if (mine === reloads.current) setAttempt((n) => n + 1); // the shown store stays; the ordinary fetch resumes
+            return;
+          }
+          loaded = hop;
+          if (mine !== reloads.current) return;
+        }
+        const next = new Map<string, Entry>([[key, { store, loaded }]]);
+        const shown = cache.current.get(current.current);
+        if (current.current !== key && shown !== undefined) next.set(current.current, shown);
+        cache.current = next;
+        bump((n) => n + 1);
+        if (current.current === key) onShown?.();
+        // the fetch on screen began before this reload: its ring that was out is dropped above, so it resumes from what
+        // its entry holds, as after a failed ring (for THIS key the fresh store already holds every ring: nothing is asked)
+        if (began.current !== mine) setAttempt((n) => n + 1);
+      })();
     },
   };
 }

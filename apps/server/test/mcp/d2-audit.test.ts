@@ -123,3 +123,16 @@ describe('27.517–27.518, 27.671–27.672 the D2 audit: rendered by history, on
     expect(failuresByKey(fixed)['update_ticket']).toEqual(failuresByKey(MCP_WRITE_AUDIT)['update_ticket']); // the tool's own legs unmoved
   });
 });
+
+describe('27.532 KG-D Task 8: the concept inspector is three tools\' app surface', () => {
+  it('27.532 manage_concept, link_concepts and resolve_suggestion each pass all three legs on concept-inspector.tsx and none is left in the ratchet; control: the same row with its marker renamed fails surface alone', () => {
+    for (const tool of ['manage_concept', 'link_concepts', 'resolve_suggestion']) {
+      expect(MCP_WRITE_AUDIT[tool]!.surface?.file, tool).toBe('packages/app-core/src/views/concept-inspector.tsx');
+      expect(failuresOf(tool), tool).toEqual([]);
+      expect(Object.keys(KNOWN_D2_GAPS).filter((key) => key.split('#')[0] === tool), tool).toEqual([]);
+    }
+    // Control: the file read can fail; the links list's class renamed is exactly a missing surface.
+    const links = MCP_WRITE_AUDIT['link_concepts']!;
+    expect(legsOf({ ...links, surface: { ...links.surface!, marker: 'gn-kg-concept__links' } })).toEqual(['surface']);
+  });
+});
