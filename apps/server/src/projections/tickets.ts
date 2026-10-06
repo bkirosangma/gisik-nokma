@@ -350,17 +350,24 @@ export async function getChildrenStatesFromDb(
  * once, on creation, from the event that created the ticket; nothing in the
  * vocabulary moves a ticket between workspaces, and a later event that somehow
  * claimed to would be rewriting the row's tenancy rather than its state.
+ *
+ * `created_by` is absent from it for the same reason (my-work-global T1): it is
+ * the actor of the `ticket.created` event, `createdBy` is non-null only when
+ * `apply` is folding that event, and every later event reaches this function
+ * with `null`, which the INSERT half never uses because the row already exists.
+ * It is NOT a `TicketState` field: the reducer and its fold are shared with the
+ * offline replica, and nothing there needs a creator.
  */
-async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
+async function upsertTicket(db: PoolClient, next: TicketState, createdBy: string | null): Promise<void> {
   await db.query(
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
         closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by,
         draft_author_id, draft_at, draft_discarded, links, pending_children, outcome, passes,
-        started_at, ended_at, periods, rounds, closed_cause)
+        started_at, ended_at, periods, rounds, closed_cause, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-             $27, $28, $29, $30, $31)
+             $27, $28, $29, $30, $31, $32)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -461,6 +468,7 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       JSON.stringify(next.periods ?? []),
       ticketRound(next),
       next.closed?.cause === undefined ? null : JSON.stringify(next.closed.cause),
+      createdBy,
     ],
   );
 }
@@ -577,7 +585,9 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
   const getVersion = (version: number): WorkflowDef | null => cache.get(version) ?? null;
 
   for (const row of rows) {
-    await upsertTicket(db, foldTicketToWorkflowVersion(rowToTicketState(row), target, getVersion));
+    // `null`: every row here already exists, so only the UPDATE half runs and
+    // `created_by` (write-once, see `upsertTicket`) is left as it was.
+    await upsertTicket(db, foldTicketToWorkflowVersion(rowToTicketState(row), target, getVersion), null);
   }
 }
 
@@ -681,7 +691,14 @@ export const ticketsProjection: Projection = {
       return;
     }
     const deps = await loadDeps(tx, event);
-    await upsertTicket(tx, applyTicketEvent(current, event, deps));
+    // The creator is the `ticket.created` event's actor and nobody else's
+    // (my-work-global T1): any other event passes `null`, which reaches no
+    // column because `created_by` is outside the ON CONFLICT update list.
+    await upsertTicket(
+      tx,
+      applyTicketEvent(current, event, deps),
+      event.type === 'ticket.created' ? event.actorId : null,
+    );
   },
 
   async reset(tx) {

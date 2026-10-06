@@ -503,6 +503,10 @@ type AbsenceDecision =
   | 'getWorkspaceSettings'
   | 'getPreferences'
   | 'putPreferences'
+  // my-work-global T3: the user-level My work document. A per-PERSON choice of chips and
+  // grouping, no ticket content at all — `carries: false`, the per-workspace pair's verdict.
+  | 'getMyWorkPreferences'
+  | 'putMyWorkPreferences'
   // The notes series, Plan 1 of 6. The four SUMMARY reads are carriers and the
   // three single-document reads are not — see their rows in `DECIDED` for why,
   // which is the decision this tripwire exists to force.
@@ -687,6 +691,12 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     carries: false,
     why: 'A WRITE, declared rather than skipped so the table stays total over the union. It is called with the document `getPreferences` just returned, so it cannot fail on a shape this file invented.',
   },
+  getMyWorkPreferences: { verdict: 'excluded', carries: false },
+  putMyWorkPreferences: {
+    verdict: 'excluded',
+    carries: false,
+    why: 'A WRITE, declared for the same reason as `putPreferences`, and round-tripped the same way: it is called with the document `getMyWorkPreferences` just returned.',
+  },
   /**
    * THE NOTES SERIES' FOUR CARRIERS, and they are carriers for a reason worth
    * reading before anyone "simplifies" them to `false`.
@@ -804,6 +814,8 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getWorkspaceSettings: () => ds.getWorkspaceSettings(workspaceId),
     getPreferences: () => ds.getPreferences(workspaceId),
     putPreferences: async () => ds.putPreferences(workspaceId, await ds.getPreferences(workspaceId)),
+    getMyWorkPreferences: () => ds.getMyWorkPreferences(),
+    putMyWorkPreferences: async () => ds.putMyWorkPreferences(await ds.getMyWorkPreferences()),
     // The seven note reads. `noteId` is the LIVE note the fixture attached to
     // the child; `getNoteVersion` is handed a fresh ULID DELIBERATELY — it is a
     // `carries: false` row, so a version that does not exist exercises the same
@@ -899,8 +911,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
   // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
   // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`; 30 until drafts T8 added
-  // `getMyDrafts`; 31 until the Workflow graph (Part 3 T3) added `getFlow`.
-  expect(MEMBERS).toHaveLength(32);
+  // `getMyDrafts`; 31 until the Workflow graph (Part 3 T3) added `getFlow`; 32 until my-work-global T3 added the
+  // user-level `getMyWorkPreferences` / `putMyWorkPreferences` pair.
+  expect(MEMBERS).toHaveLength(34);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

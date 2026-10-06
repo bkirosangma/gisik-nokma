@@ -226,7 +226,7 @@ describe('AppNav — the mounts, not the components', () => {
     );
     expect(await screen.findByRole('link', { name: 'My work' })).toHaveAttribute(
       'href',
-      '/w/ws_1/my-work',
+      '/my-work',
     );
     // And the inbox is unconditional on the workspace, which is the decision
     // `app-nav.tsx`'s own comment records.
@@ -280,7 +280,7 @@ describe('AppNav — the mounts, not the components', () => {
         '/',
         '/workspaces',
         '/w/ws_1',
-        '/w/ws_1/my-work',
+        '/my-work',
         // Drafts T8 (spec §12.2): the viewer's own drafts, right of My work.
         '/w/ws_1/drafts',
         '/w/ws_1/members',
@@ -343,7 +343,7 @@ describe('AppNav — the mounts, not the components', () => {
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/p/p_beta',
-        '/w/ws_1/my-work',
+        '/my-work',
         // Drafts T8 (spec §12.2): the viewer's own drafts, right of My work.
         '/w/ws_1/drafts',
         '/w/ws_1/members',
@@ -369,7 +369,7 @@ describe('AppNav — the mounts, not the components', () => {
         '/',
         '/workspaces',
         '/w/ws_1',
-        '/w/ws_1/my-work',
+        '/my-work',
         // Drafts T8 (spec §12.2): the viewer's own drafts, right of My work.
         '/w/ws_1/drafts',
         '/w/ws_1/members',
@@ -587,7 +587,7 @@ describe('13.391 the nav is contextual', () => {
     );
     expect(screen.getByRole('link', { name: 'My work' })).toHaveAttribute(
       'href',
-      '/w/ws_1/my-work',
+      '/my-work',
     );
     expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute(
       'href',
@@ -1186,7 +1186,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
     // not a nav target any more. The loop below subtracts rendered hrefs from
     // this table, so a stale row here would fail as "nav does not render it"
     // rather than sitting unnoticed.
-    ['/w/ws_1/my-work', 'app/w/[workspaceId]/my-work/page.tsx'],
+    ['/my-work', 'app/my-work/page.tsx'],
     ['/w/ws_1/drafts', 'app/w/[workspaceId]/drafts/page.tsx'],
     ['/notes', 'app/notes/page.tsx'],
     ['/inbox', 'app/inbox/page.tsx'],
@@ -1243,7 +1243,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
  */
 describe('13.393 exactly one nav item is current, and sign-out keeps its full name', () => {
   it('marks the current item aria-current="page" and no sibling carries it', async () => {
-    currentPath = '/w/ws_1/my-work';
+    currentPath = '/my-work';
     render(
       <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
         <AppNav workspaceId="ws_1" />

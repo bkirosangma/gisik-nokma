@@ -42,7 +42,7 @@
     "duplicates": 0,
     "swapShiftCls": 0.0055
   },
-  "1440|/w/<id>/my-work": {
+  "1440|/my-work": {
     "cls": 0.0055,
     "requests": 9,
     "duplicates": 2,
@@ -96,7 +96,7 @@
     "duplicates": 0,
     "swapShiftCls": 0.0212
   },
-  "390|/w/<id>/my-work": {
+  "390|/my-work": {
     "cls": 0,
     "requests": 9,
     "duplicates": 2,
@@ -150,7 +150,7 @@
     "duplicates": 0,
     "swapShiftCls": 0.0179
   },
-  "768|/w/<id>/my-work": {
+  "768|/my-work": {
     "cls": 0,
     "requests": 9,
     "duplicates": 2,

@@ -1,5 +1,6 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
+import { adminProjectIdsOf } from '../read/attention-show.js';
 import { visibleProjects } from '../read/visible-projects.js';
 import {
   nameRestrictedProjectCount,
@@ -235,6 +236,14 @@ export function registerWorkspaceRoutes(
         // `CC` in `CCSO-1183`. See `workspaces/workspace-name.ts`.
         prefix: identity.prefix,
         role: row.role,
+        // My-work-global T1 (cases 30.011–30.012). ALWAYS PRESENT, `[]` when
+        // the caller administers no project here: the projects whose roster
+        // row carries `projectAdmin`, from this row's OWN `eff` (resolved per
+        // workspace above). A workspace role alone contributes nothing — an
+        // owner's implicit rule-A projects carry `projectAdmin: false` — which
+        // is exactly when `?show=project-admin` is refused (`parseShow`), so the
+        // client offers "Projects I run" only where this is non-empty.
+        adminProjectIds: adminProjectIdsOf(eff),
         // REQUIRED, never omitted (Task 5): T8 says an archived workspace is
         // still served in FULL — archive removes nobody's access — so this is
         // metadata every viewer sees, not a withholding like the counts below.

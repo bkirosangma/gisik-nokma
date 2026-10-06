@@ -293,6 +293,9 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       '/v1/workspaces/:workspaceId/drafts/publish',
       'POST',
     ],
+    // My work preferences (my-work-global plan, Task 2): a per-user write, the
+    // same category as the notification preferences write above.
+    ['My work preferences write', '/v1/me/my-work-preferences', '/v1/me/my-work-preferences', 'PUT'],
   ];
 
   /**
