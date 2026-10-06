@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GRAPH_CHIP_ORDER, type GraphEdgeView, type GraphItemView, type GraphRingResponse } from '@gisik-nokma/domain';
+import { Sheet } from '@gisik-nokma/ui';
 import { walk } from '../../src/engine/walk.js';
 import { KnowledgeGraph } from '../../src/react/knowledge-graph.js';
 import type { GraphRingQuery, GraphSource, KnowledgeGraphProps, ScopeChoices } from '../../src/react/types.js';
@@ -355,6 +356,50 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     await user.keyboard('c');
     await settle();
     expect(p.fx.log.some((q) => q.center === T('t133'))).toBe(false);
+  });
+
+  it('27.322 Esc inside a ui Sheet: an Esc the view uses (Back, or a host onEscape that answers true) is marked consumed, so the Sheet stays open; control: an Esc it does not use (no trail, no host) still closes the Sheet', async () => {
+    // KV9's two hosts mount the view in a ui `Sheet`, which closes on a document-level Escape unless it is `defaultPrevented`
+    // (sheet.tsx's escape-hatch contract), so the view must mark every Esc it acts on
+    const inSheet = (over: Partial<KnowledgeGraphProps>) => {
+      const fake = fakeRenderer();
+      const onClose = vi.fn();
+      const props: KnowledgeGraphProps = {
+        centre: T('t142'), config: 'desktop', source: fixtureSource({}).source, scope: SCOPE, defaultWorkspaceIds: ['gn', 'st'], onOpen: vi.fn(),
+        createRenderer: fake.createRenderer, ...over,
+      };
+      render(<Sheet open title="Knowledge Graph" onClose={onClose}><KnowledgeGraph {...props} /></Sheet>);
+      return { fake, onClose };
+    };
+    const canvasOf = (key: string) => screen.getByRole('img', { name: `Knowledge Graph of items linked to ${key}` });
+    const user = userEvent.setup();
+    // leg 1: with a trail, Esc goes Back and the Sheet stays open
+    const a = inSheet({});
+    await drawn(a.fake, T('t126'));
+    doubleClick(a.fake, T('t133'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back to GN-142' })).toBeInTheDocument());
+    canvasOf('GN-133').focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Back to GN-142' })).toBeNull());
+    expect(a.onClose).not.toHaveBeenCalled();
+    // CONTROL, same it: the trail is empty now and there is no host handler, so the view leaves this Esc alone and the Sheet closes
+    canvasOf('GN-142').focus();
+    expect(document.activeElement!.closest('.gn-kg')).not.toBeNull(); // the Esc below reaches the view's handler
+    await user.keyboard('{Escape}');
+    expect(a.onClose).toHaveBeenCalledTimes(1);
+    // leg 3: a host that takes the Esc (onEscape answers true): neither Back nor the Sheet's close runs
+    cleanup();
+    const onEscape = vi.fn(() => true);
+    const b = inSheet({ onEscape });
+    await drawn(b.fake, T('t126'));
+    doubleClick(b.fake, T('t133'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back to GN-142' })).toBeInTheDocument());
+    canvasOf('GN-133').focus();
+    await user.keyboard('{Escape}');
+    await settle();
+    expect(onEscape).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Back to GN-142' })).toBeInTheDocument();
+    expect(b.onClose).not.toHaveBeenCalled();
   });
 
   it('27.323 the trail: t142 → t133 → t131 shows Back and three crumbs, a crumb past the loaded rings keeps its label, and the first crumb goes back two steps; control: a new centre prop resets the trail', async () => {

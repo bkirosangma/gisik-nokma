@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -99,5 +99,91 @@ describe('13.1427 no `dev` stage remains in a production Dockerfile', () => {
     const hotCompose = read(HOT_COMPOSE_PATH);
     expect(hotCompose).toContain('dockerfile: apps/server/Dockerfile.dev');
     expect(hotCompose).toContain('dockerfile: apps/web/Dockerfile.dev');
+  });
+});
+
+/**
+ * 13.2356 — ERRATUM E4 (`task/kg-c-t9-wiring`, KV9): the web app gained `@gisik-nokma/knowledge-graph`, and no Dockerfile
+ * or hot-mode service named it. A package an app builds from needs its manifest line in the manifest block BEFORE
+ * `RUN pnpm fetch` (that layer's cache key; an absent line is an offline-store miss at the install, the comment above
+ * each block says so) and its `src` mounted in both `docker-compose.hot.yml` services (an edit never reaches `dist`
+ * without it). The registry is the workspace itself: the `dependencies` of apps/web and apps/server, walked over
+ * `workspace:` ranges, so a package added to app-core later is caught the day it is added. Every match is
+ * line-anchored and stage-scoped: these files' comments name the same paths.
+ */
+type Manifest = { name: string; dependencies?: Record<string, string> };
+const manifestOf = (dir: string): Manifest => JSON.parse(read(resolve(ROOT, dir, 'package.json'))) as Manifest;
+
+function builtFrom(appDirs: readonly string[]): string[] {
+  const byName = new Map<string, string>();
+  for (const entry of readdirSync(resolve(ROOT, 'packages'), { withFileTypes: true })) {
+    if (entry.isDirectory() && existsSync(resolve(ROOT, 'packages', entry.name, 'package.json'))) {
+      byName.set(manifestOf(`packages/${entry.name}`).name, `packages/${entry.name}`);
+    }
+  }
+  const seen = new Set<string>();
+  const walk = (dir: string): void => {
+    for (const [name, range] of Object.entries(manifestOf(dir).dependencies ?? {})) {
+      const child = byName.get(name);
+      if (range.startsWith('workspace:') && child !== undefined && !seen.has(child)) {
+        seen.add(child);
+        walk(child);
+      }
+    }
+  };
+  for (const app of appDirs) walk(app);
+  return [...seen].sort();
+}
+
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const CLOSURE = builtFrom(['apps/web', 'apps/server']);
+const MANIFEST_BLOCKS = [
+  ['apps/server/Dockerfile', SERVER_DOCKERFILE_PATH, 'build'],
+  ['apps/server/Dockerfile.dev', SERVER_DEV_DOCKERFILE_PATH, 'dev'],
+  ['apps/web/Dockerfile', WEB_DOCKERFILE_PATH, 'build'],
+  ['apps/web/Dockerfile.dev', WEB_DEV_DOCKERFILE_PATH, 'dev'],
+] as const;
+
+describe('13.2356 every workspace package an app builds from is fetched by all four Dockerfiles and mounted in both hot-mode services', () => {
+  it('13.2356 the closure is read from the manifests: it holds knowledge-graph (the web dependency) and no browser-test package', () => {
+    expect(CLOSURE).toEqual(expect.arrayContaining(['packages/app-core', 'packages/domain', 'packages/knowledge-graph', 'packages/ui']));
+    expect(CLOSURE).not.toContain('packages/knowledge-graph-browser');
+    expect(CLOSURE).not.toContain('packages/workflow-canvas-browser');
+    // CONTROL, same it: a walk that found nothing would pass every loop below.
+    expect(CLOSURE.length).toBeGreaterThanOrEqual(8);
+  });
+
+  for (const [name, path, stageName] of MANIFEST_BLOCKS) {
+    it(`13.2356 ${name}: each one's manifest COPY sits in the ${stageName} stage, above RUN pnpm fetch`, () => {
+      const stage = stageText(read(path), stageName);
+      const fetchIdx = stage.search(/^RUN pnpm fetch$/m);
+      expect(fetchIdx, `${name} ${stageName} stage must RUN pnpm fetch`).toBeGreaterThan(-1);
+      const misplaced = CLOSURE.filter((dir) => {
+        const at = stage.search(new RegExp(`^COPY ${escape(dir)}/package\\.json ${escape(dir)}/$`, 'm'));
+        return at === -1 || at > fetchIdx;
+      });
+      expect(misplaced, `${name} lacks above its fetch: ${misplaced.join(', ')}`).toEqual([]);
+    });
+  }
+
+  it('13.2356 docker-compose.hot.yml mounts each one\'s src in the server service and in the web service', () => {
+    const compose = read(HOT_COMPOSE_PATH);
+    const serverAt = compose.search(/^ {2}server:$/m);
+    const webAt = compose.search(/^ {2}web:$/m);
+    const afterWeb = compose.slice(webAt + 1).search(/^\S/m);
+    const services = [
+      ['server', compose.slice(serverAt, webAt)],
+      ['web', afterWeb === -1 ? compose.slice(webAt) : compose.slice(webAt, webAt + 1 + afterWeb)],
+    ] as const;
+    // CONTROL, same it: both services were found and neither slice is empty, so the loop below can fail.
+    expect(serverAt).toBeGreaterThan(-1);
+    expect(webAt).toBeGreaterThan(serverAt);
+    for (const [service, text] of services) {
+      expect(text.length, service).toBeGreaterThan(500);
+      const missing = CLOSURE.filter(
+        (dir) => !new RegExp(`^ +- \\./${escape(dir)}/src:/repo/${escape(dir)}/src$`, 'm').test(text),
+      );
+      expect(missing, `the ${service} service lacks: ${missing.join(', ')}`).toEqual([]);
+    }
   });
 });

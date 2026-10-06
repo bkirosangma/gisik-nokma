@@ -41,6 +41,7 @@ COPY apps/web/package.json apps/web/
 COPY packages/app-core/package.json packages/app-core/
 COPY packages/domain/package.json packages/domain/
 COPY packages/editor/package.json packages/editor/
+COPY packages/knowledge-graph/package.json packages/knowledge-graph/
 COPY packages/mcp-server/package.json packages/mcp-server/
 COPY packages/rule-engine/package.json packages/rule-engine/
 COPY packages/sync-client/package.json packages/sync-client/

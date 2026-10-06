@@ -534,7 +534,7 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 ### What you can change afterwards
 
 Open a ticket by clicking it on any of the ticket tabs — the Backlog, Board, List, Calendar or Timeline. You
-get a panel with three tabs: **Details**, **History** and **Attachments**.
+get a panel with four tabs: **Details**, **History**, **Attachments** and **Knowledge Graph** (§17).
 
 On the Details tab you can do **five things**:
 
@@ -2048,7 +2048,7 @@ A deleted note goes into a **Deleted** group on the Notes page, with a **Restore
 see your own there, and an owner or admin sees everyone's. Restoring it brings it back exactly as it
 was; while deleted, the note is read-only for everyone, its own author included.
 
-**Deleting a note:** open it and press **Delete…** beside **History** — only the note's author, a
+**Deleting a note:** open it and press **Delete…** beside **History** and **Knowledge Graph** — only the note's author, a
 workspace admin or the owner sees it. The same confirmation a ticket's delete uses opens, with its
 **Delete permanently** switch. A deleted note shows a banner on its own page; **Restore** there brings
 it back, and if the server refuses (for example because the note is marked for permanent deletion
@@ -2206,3 +2206,84 @@ it has gone about three months without being used. Nothing is lost. Press the bu
 **Allow** page again; it is the same as the first time.
 
 Day to day you never see any of this: the permission renews itself every time the assistant is used.
+
+---
+
+## §17 — The Knowledge Graph
+
+### What the Knowledge Graph shows
+
+The Knowledge Graph puts one ticket or note in the middle and draws what is linked to it around it: the
+tickets it blocks, relates to or duplicates, its parent and subtasks, the notes attached to it, the tickets
+and notes that mention it in their text, its project and workspace, and the people on it. Each link is a line
+between two items, and each kind of link has its own colour.
+
+It is a way of looking at your work, not a place where work is kept. Everything on it comes from the tickets
+and notes themselves, so it changes when they do, and it shows only what you could open anyway.
+
+### Where to find it
+
+- **On a ticket:** open the ticket and choose **Knowledge Graph**, the fourth tab beside **Details**,
+  **History** and **Attachments**. The ticket is in the middle.
+- **On a note:** press **Knowledge Graph** under the note's title, beside **History** (on a phone it is in the
+  **⋯** menu there). The graph opens in a panel with the note in the middle; close the panel to go back to
+  the note. Opening a ticket from it closes the panel and opens the ticket over the note.
+
+### Rings and the fog
+
+Items sit on rings around the middle. The first ring is everything linked to it directly, the second is
+everything linked to those, and so on; each step out is one **hop**.
+
+Past the last clear ring is **the fog**: small grey dots and faint lines for what is one more hop away. Nothing
+in the fog can be clicked. To bring it in, select an item near the edge and centre on it, or raise **Hops**.
+
+The line above the graph counts what you are looking at: how many items are within reach, how many more are
+in the fog, and how many are outside the scope you picked. When a lot is linked, the 500 nearest items are
+drawn clearly and the rest go into the fog; a button at the bottom left says how many are further out and
+how to reach them.
+
+### Moving around, hops and keys
+
+- **Click** an item to select it. The panel beside the graph (on a phone, a card under it) shows what it is,
+  its main facts, its direct links grouped by kind, and a button that opens it: **Open ticket**, **Open note**,
+  **Open board** or **Open workspace**. People and concepts have no page of their own to open.
+- **Double-click** an item, or select it and press **Center on** and its name, to put it in the middle. The
+  one you left goes onto the trail at the top left; **Back** or the Esc key returns to it.
+- **Hover** an item to fade everything that is not linked to it. **Hover a line** to read what it means — for
+  example, that one ticket blocks another — and **click it** to see both ends and who added it and when.
+- **Scroll or pinch** to zoom and **drag** to move around; the buttons in the corner zoom in, zoom out and fit
+  the whole graph back in.
+- **Hops**, above the graph on a computer, sets how many rings are clear: 1 to 4, or **Everything**. It starts
+  at 2. On a phone the graph always shows one clear ring, and the next is fog.
+- **Keys:** 1 to 4 set the hops, C centres on the selected item, and Esc goes back.
+
+Under the graph, **Linked to** and the centre's name lists the same items as text, ring by ring. It works with
+the keyboard and a screen reader, and each row selects or opens its item.
+
+### Choosing what it shows
+
+- **Link types.** One button per kind of link — **Projects**, **Parent and subtasks**, **Blocks**,
+  **Relates to**, **Duplicates**, **Attached notes**, **Links in text**, **People** and **Concepts** — each
+  with how many there are. Press one to hide that kind of link; a hidden kind is not followed further out
+  either.
+- **Scope.** **Workspaces** and **Projects** choose where the graph looks. It starts with the workspace you are
+  in and all its projects. An item outside the scope stays in the fog, and the list under the graph says how
+  many are outside.
+- **Semantic layer.** Concepts are the topics the app finds across your tickets and notes, and the links it
+  suggests between them. **Off** hides the concepts, their links and the suggestions, and the **Concepts**
+  button goes away. It only changes what you see on this browser: nothing is saved to a ticket, and nobody
+  else's view changes. It starts **On**, and the browser remembers your choice.
+
+On a phone, the scope, the link types and the semantic layer fold into one **Scope and links** button.
+
+### Removing a link from the graph
+
+Click a **Blocks**, **Relates to** or **Duplicates** line, then **Remove link**. The link goes from both
+tickets, as if you had removed it in the ticket's **Links** section, and **Undo** puts it back. If you are not
+allowed to change that link, the panel says why and nothing changes.
+
+The panel also says who added a link and when. A link your assistant added (§16) ends with **via an
+assistant**; in the ticket's History the same change reads **Assistant, for** your name.
+
+A ticket with no links yet says so in the middle of the graph and offers **Add link**, which takes you to the
+ticket's **Details** tab, where links are added.

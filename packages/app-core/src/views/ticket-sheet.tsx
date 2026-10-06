@@ -44,6 +44,7 @@ import {
   type EditorSlotComponent,
   type EditorSlotSubmission,
   type EditorSlotUpload,
+  type KnowledgeGraphSlotComponent,
 } from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
@@ -214,6 +215,11 @@ export type TicketSheetProps = {
   canModerateComments?: boolean;
   onClose: () => void;
   editorSlot?: EditorSlotComponent;
+  /**
+   * The Knowledge Graph tab (spec C §1). A slot, like `editorSlot`, so app-core never depends on the renderer: the web
+   * passes `TicketGraphTab`. Absent = no tab: the sheet keeps its three (16.81's first mount).
+   */
+  knowledgeGraphSlot?: KnowledgeGraphSlotComponent;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
   /**
    * The ticket's files — what `DataSourceQuery.getTicketAttachments` reads.
@@ -712,6 +718,7 @@ export function TicketSheet({
   canModerateComments,
   onClose,
   editorSlot,
+  knowledgeGraphSlot,
   uploadEvidence,
   attachments,
   attachmentsUnavailable,
@@ -731,7 +738,8 @@ export function TicketSheet({
   assignOutsider,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
-  const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
+  const KnowledgeGraphSlot = knowledgeGraphSlot;
+  const [tab, setTab] = useState<'details' | 'history' | 'attachments' | 'graph'>('details');
   // Unit 5(b), owner: "I thought we already made the attachment feature but
   // i dont see where we can attach files in our build" — the Attachments
   // tab's own "Attach a file" (prototype `addFile`, `desktop.dc.html:1363-
@@ -3781,12 +3789,17 @@ export function TicketSheet({
           of drawing a third surface was open, and **the owner ruled it IN on
           2026-09-22** (spec decision 5 — *"add the Attachments tab"*). So the
           tab is BUILT rather than assumed, and `16.81`'s count moved 2 → 3 in
-          the same change. */}
+          the same change.
+
+          Spec C §1: a FOURTH tab, `Knowledge Graph`, when the host passes
+          `knowledgeGraphSlot`; 16.81 counts both mounts (three without the slot,
+          four with it, 27.341). */}
       <SegmentedControl
         options={[
           { value: 'details', label: 'Details' },
           { value: 'history', label: 'History' },
           { value: 'attachments', label: 'Attachments' },
+          ...(KnowledgeGraphSlot !== undefined ? [{ value: 'graph' as const, label: 'Knowledge Graph' }] : []),
         ]}
         value={tab}
         onChange={setTab}
@@ -4592,6 +4605,15 @@ export function TicketSheet({
             message={attachRefusals.join(' ')}
             tone="danger"
             onDismiss={() => setAttachRefusals([])}
+          />
+        </div>
+      ) : tab === 'graph' && KnowledgeGraphSlot !== undefined ? (
+        <div className="gn-ticket-sheet__graph">
+          <KnowledgeGraphSlot
+            workspaceId={workspaceId}
+            ticketId={ticketId}
+            onOpenTicket={onOpenTicket}
+            onShowLinks={() => setTab('details')}
           />
         </div>
       ) : tab === 'attachments' ? (

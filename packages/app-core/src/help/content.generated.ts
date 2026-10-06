@@ -3246,7 +3246,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open a ticket by clicking it on any of the ticket tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with three tabs: "
+                    "text": "Open a ticket by clicking it on any of the ticket tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with four tabs: "
                   },
                   {
                     "kind": "bold",
@@ -3262,7 +3262,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and "
+                    "text": ", "
                   },
                   {
                     "kind": "bold",
@@ -3270,7 +3270,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": "."
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Knowledge Graph"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (§17)."
                   }
                 ]
               },
@@ -11221,6 +11229,14 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Knowledge Graph"
+                  },
+                  {
+                    "kind": "text",
                     "text": " — only the note's author, a workspace admin or the owner sees it. The same confirmation a ticket's delete uses opens, with its "
                   },
                   {
@@ -12198,6 +12214,635 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "Day to day you never see any of this: the permission renews itself every time the assistant is used."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "17-the-knowledge-graph",
+        "title": "§17 — The Knowledge Graph",
+        "intro": [],
+        "entries": [
+          {
+            "id": "what-the-knowledge-graph-shows",
+            "title": "What the Knowledge Graph shows",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The Knowledge Graph puts one ticket or note in the middle and draws what is linked to it around it: the tickets it blocks, relates to or duplicates, its parent and subtasks, the notes attached to it, the tickets and notes that mention it in their text, its project and workspace, and the people on it. Each link is a line between two items, and each kind of link has its own colour."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "It is a way of looking at your work, not a place where work is kept. Everything on it comes from the tickets and notes themselves, so it changes when they do, and it shows only what you could open anyway."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "where-to-find-it",
+            "title": "Where to find it",
+            "blocks": [
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "On a ticket:"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " open the ticket and choose "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Knowledge Graph"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", the fourth tab beside "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Details"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "History"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attachments"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". The ticket is in the middle."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "On a note:"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Knowledge Graph"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " under the note's title, beside "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "History"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (on a phone it is in the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "⋯"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " menu there). The graph opens in a panel with the note in the middle; close the panel to go back to the note. Opening a ticket from it closes the panel and opens the ticket over the note."
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "rings-and-the-fog",
+            "title": "Rings and the fog",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Items sit on rings around the middle. The first ring is everything linked to it directly, the second is everything linked to those, and so on; each step out is one "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "hop"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Past the last clear ring is "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "the fog"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": small grey dots and faint lines for what is one more hop away. Nothing in the fog can be clicked. To bring it in, select an item near the edge and centre on it, or raise "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Hops"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The line above the graph counts what you are looking at: how many items are within reach, how many more are in the fog, and how many are outside the scope you picked. When a lot is linked, the 500 nearest items are drawn clearly and the rest go into the fog; a button at the bottom left says how many are further out and how to reach them."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "moving-around-hops-and-keys",
+            "title": "Moving around, hops and keys",
+            "blocks": [
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Click"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " an item to select it. The panel beside the graph (on a phone, a card under it) shows what it is, its main facts, its direct links grouped by kind, and a button that opens it: "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Open ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Open note"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Open board"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Open workspace"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". People and concepts have no page of their own to open."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Double-click"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " an item, or select it and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Center on"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and its name, to put it in the middle. The one you left goes onto the trail at the top left; "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Back"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or the Esc key returns to it."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Hover"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " an item to fade everything that is not linked to it. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Hover a line"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to read what it means — for example, that one ticket blocks another — and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "click it"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to see both ends and who added it and when."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Scroll or pinch"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to zoom and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "drag"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to move around; the buttons in the corner zoom in, zoom out and fit the whole graph back in."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Hops"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", above the graph on a computer, sets how many rings are clear: 1 to 4, or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Everything"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". It starts at 2. On a phone the graph always shows one clear ring, and the next is fog."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Keys:"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " 1 to 4 set the hops, C centres on the selected item, and Esc goes back."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Under the graph, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Linked to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the centre's name lists the same items as text, ring by ring. It works with the keyboard and a screen reader, and each row selects or opens its item."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "choosing-what-it-shows",
+            "title": "Choosing what it shows",
+            "blocks": [
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Link types."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " One button per kind of link — "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Projects"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Parent and subtasks"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Blocks"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Relates to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Duplicates"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attached notes"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Links in text"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "People"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Concepts"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — each with how many there are. Press one to hide that kind of link; a hidden kind is not followed further out either."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Scope."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Workspaces"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Projects"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " choose where the graph looks. It starts with the workspace you are in and all its projects. An item outside the scope stays in the fog, and the list under the graph says how many are outside."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Semantic layer."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Concepts are the topics the app finds across your tickets and notes, and the links it suggests between them. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Off"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " hides the concepts, their links and the suggestions, and the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Concepts"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button goes away. It only changes what you see on this browser: nothing is saved to a ticket, and nobody else's view changes. It starts "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "On"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and the browser remembers your choice."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a phone, the scope, the link types and the semantic layer fold into one "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Scope and links"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "removing-a-link-from-the-graph",
+            "title": "Removing a link from the graph",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Click a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Blocks"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Relates to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Duplicates"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " line, then "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Remove link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". The link goes from both tickets, as if you had removed it in the ticket's "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Links"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " section, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " puts it back. If you are not allowed to change that link, the panel says why and nothing changes."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The panel also says who added a link and when. A link your assistant added (§16) ends with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "via an assistant"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; in the ticket's History the same change reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assistant, for"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " your name."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A ticket with no links yet says so in the middle of the graph and offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", which takes you to the ticket's "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Details"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " tab, where links are added."
                   }
                 ]
               }
@@ -15512,6 +16157,14 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "bold",
                     "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Knowledge Graph"
                   },
                   {
                     "kind": "text",
