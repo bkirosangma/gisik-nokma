@@ -23,7 +23,7 @@ import {
 } from '../claims/ticket-dates.js';
 import { matchesFilter } from '../filter/matches-filter.js';
 import { epicAncestorOf, isBuiltinEpicType, type IsEpicType } from '../hierarchy/epic-ancestor.js';
-import type { FilterSpec } from '../view-types.js';
+import type { FilterSpec, TicketPin } from '../view-types.js';
 import { dayNumberOf } from './timeline-days.js';
 
 /** A claimed custom date field with its attributed rendering. Never geometry. */
@@ -62,7 +62,17 @@ export type TimelineRow = {
   pending: boolean;
   provenance: string;
   customClaims: TimelineCustomClaim[];
+  /** TG-11: the counts behind the paper pin, or `null` when the ticket has no note and no attachment (or the producer does not know). */
+  pin: TicketPin | null;
 };
+
+/** TG-11: the words behind the paper pin, "2 notes, 1 attachment" (singular at one, a count of zero left out). */
+export function timelinePinLabel(pin: TicketPin): string {
+  const parts: string[] = [];
+  if (pin.notes > 0) parts.push(`${pin.notes} ${pin.notes === 1 ? 'note' : 'notes'}`);
+  if (pin.attachments > 0) parts.push(`${pin.attachments} ${pin.attachments === 1 ? 'attachment' : 'attachments'}`);
+  return parts.join(', ');
+}
 
 export type TimelineSideEntry = {
   ticketId: string;
@@ -301,6 +311,8 @@ export function buildTimelineModel(
           pending: start.pending || due.pending,
           provenance: barProvenance(start, due, opts.userName),
           customClaims,
+          // TG-11: a pin only when there is something to count; zeros (known: none) and an absent pin (unknown) draw none.
+          pin: input.pin !== undefined && (input.pin.notes > 0 || input.pin.attachments > 0) ? input.pin : null,
         },
       };
     }

@@ -161,9 +161,18 @@ describe('29.116 the packer and the view ask one function for a label\'s footpri
     expect(layoutLanes([keyless], { ppd: 16, measure: line }).lanes[0]?.rows).toBe(2);
   });
 
-  it('29.116 PIN_PX is added in one place in app-core, and both the packer and the view ask barLabelPx; control: the scan counts a planted copy', () => {
+  it('29.116 PIN_PX is added in one place in app-core, and both the packer and the view ask barLabelPx; control: the scan counts a planted copy and skips comments, imports and the declaration', () => {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../src');
-    const adds = (text: string) => (text.match(/\+\s*PIN_PX\b|\bPIN_PX\s*\+/g) ?? []).length;
+    // Every use of PIN_PX in CODE (comments, imports and the declaration itself stripped): the one sum in barLabelPx.
+    const adds = (text: string) =>
+      (
+        text
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\/\/.*$/gm, '')
+          .replace(/^import [^;]*;/gm, '')
+          .replace(/export const PIN_PX = \d+;/g, '')
+          .match(/\bPIN_PX\b/g) ?? []
+      ).length;
     let total = 0;
     for (const file of readdirSync(root, { recursive: true }) as string[]) {
       if (/\.tsx?$/.test(file)) total += adds(readFileSync(join(root, file), 'utf8'));
@@ -173,6 +182,7 @@ describe('29.116 the packer and the view ask one function for a label\'s footpri
     expect(readFileSync(join(root, 'timeline/timeline-layout.ts'), 'utf8')).toMatch(/labelPx: \(item\) => barLabelPx\(options\.measure, item\.key, byId\.get\(item\.id\)\?\.pinned === true, options\.orientation\)/);
     expect(readFileSync(join(root, 'timeline/timeline-view.tsx'), 'utf8')).toMatch(/\bbarLabelPx\(measure, row\.key, row\.pin !== null, orientation\)/);
     expect(adds('return options.measure(item.key) + (pinned ? PIN_PX : 0);')).toBe(1);
+    expect(adds("import { PIN_PX } from './timeline-layout.js';\n// adds PIN_PX\n/** PIN_PX */\nexport const PIN_PX = 14;")).toBe(0);
   });
 });
 
