@@ -469,6 +469,24 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     }
   });
 
+  it('29.132 an add the server leaves UNANSWERED after a committed removal is compensated the same way; control: the removal-only answer is one result for a two-event call', async () => {
+    // The server answers the removal and nothing for the add: `added` is undefined, which is not a commit either.
+    const removalOnly: IngestScript = (events) =>
+      events.length === 2 ? [{ status: 'committed', eventId: events[0]!.id, seq: 1, serverTime: '2026-10-03T10:00:00.000Z' }] : COMMIT(events);
+    const source = createFakeDataSource({ getTicketLinks: async () => [row('leads_to', 'out', 'GN-147', 'Yes')] }, removalOnly);
+    const user = userEvent.setup();
+    render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} />);
+    await user.click(await screen.findByRole('button', { name: 'Edit label: leads to GN-147' }));
+    await user.clear(screen.getByLabelText('New label'));
+    await user.type(screen.getByLabelText('New label'), 'Maybe');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(calls(source)[0]).toHaveLength(2); // control: the relabel itself was the two-event call
+    expect(calls(source)[1]).toEqual([['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]]);
+    expect((await screen.findByRole('alert')).textContent).toBe('The server did not answer this change.');
+    expect(screen.queryByText(/^Relabelled/)).toBeNull();
+  });
+
   it("29.132 the Decision rules bind only a Decision's own outgoing branches: blank is refused there; control: blank is sent on a Task and on an incoming row, a Task may repeat a sibling's label, and an incoming row is no sibling", async () => {
     const yes = row('leads_to', 'out', 'GN-147', 'Yes');
     const blank = await relabelTo([yes], true, 'Edit label: leads to GN-147', '');
