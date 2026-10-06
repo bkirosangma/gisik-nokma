@@ -349,3 +349,62 @@ describe('27.536–27.538 failures, a fresh read after a change, and a reader wh
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
   });
 });
+
+describe('27.522, 27.524, 27.536 the guards: no answer is not a change, one Confirm, and only the latest read answers', () => {
+  it('27.522 an ingest that throws (the server never answered) puts the row back and reports the transport refusal, and is not a change; control: both rows before the click', async () => {
+    const { user, onChanged, onRefusal } = mount({
+      ingest: async () => {
+        throw new Error('network down');
+      },
+    });
+    await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+    expect(itemRows()).toEqual(['CCRE-1 Renew the trade licence', 'Field notes']);
+    await user.click(screen.getAllByRole('button', { name: 'Remove from concept' })[0]!);
+    await waitFor(() => expect(onRefusal).toHaveBeenCalledWith({ rule: 'transport', reason: 'The server did not answer this change.' }));
+    expect(itemRows()).toEqual(['CCRE-1 Renew the trade licence', 'Field notes']);
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it('27.524 once Confirm has committed it stays disabled, so a second click makes no second concept; control: a batch where nothing committed enables it again', async () => {
+    const { user, ds } = mount({ item: suggestedItem(), ingest: async (events) => events.map((e, i) => committed(e, i + 1)) });
+    const confirm = await screen.findByRole('button', { name: 'Confirm' });
+    await user.click(confirm);
+    await waitFor(() => expect(ds.ingested).toHaveLength(1));
+    await settle();
+    expect(confirm).toBeDisabled();
+    await user.click(confirm);
+    await settle();
+    expect(ds.ingested).toHaveLength(1);
+    // control: nothing committed, so the person may try again
+    cleanup();
+    const again = mount({ item: suggestedItem(), ingest: async (events) => events.map((e) => refused(e, 'concept-visibility', 'No.')) });
+    const button = await screen.findByRole('button', { name: 'Confirm' });
+    await again.user.click(button);
+    await waitFor(() => expect(again.ds.ingested).toHaveLength(1));
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it('27.536 re-pointed at another concept, the inspector shows Loading… until THAT concept\'s read answers, never the previous concept; a read that answers after a newer one is ignored', async () => {
+    const reads = new Map<string, (v: ConceptView) => void>();
+    const ds = createFakeDataSource({ getConcept: (id: string) => new Promise<ConceptView>((answer) => reads.set(id, answer)) });
+    const props = { workspaceId: WS, dataSource: ds, make: makeSubmittedFactory({ actorId: 'u_kiro', origin: 'web' }), nameOf: (id: string) => id, onChanged: vi.fn(), onRefusal: vi.fn() };
+    const at = (id: string, name: string) => confirmedItem({ ref: `concept:${id}`, id, label: name });
+    const OTHER = '01J9CONCEPTOTHER0000000000';
+    const THIRD = '01J9CONCEPTTHIRD0000000000';
+    const { rerender } = render(<ConceptInspector item={confirmedItem()} {...props} />);
+    act(() => reads.get(CP)!(concept()));
+    // control: the first concept is shown once its read answers
+    await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+    rerender(<ConceptInspector item={at(OTHER, 'Board performance')} {...props} />);
+    expect(screen.queryByRole('heading', { name: 'Scroll position on phone sheets' })).toBeNull();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    // OTHER's read is still out when the inspector moves on to THIRD, and it answers last
+    rerender(<ConceptInspector item={at(THIRD, 'Release notes')} {...props} />);
+    act(() => reads.get(THIRD)!(concept({ id: THIRD, name: 'Release notes' })));
+    await screen.findByRole('heading', { level: 3, name: 'Release notes' });
+    act(() => reads.get(OTHER)!(concept({ id: OTHER, name: 'Board performance' })));
+    await settle();
+    expect(screen.getByRole('heading', { level: 3, name: 'Release notes' })).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+});

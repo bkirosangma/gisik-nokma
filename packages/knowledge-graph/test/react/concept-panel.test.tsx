@@ -1,11 +1,11 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { GraphEdgeView, GraphItemView } from '@gisik-nokma/domain';
+import type { GraphEdgeView, GraphItemView, GraphRingResponse } from '@gisik-nokma/domain';
 import type { AdjEntry, GraphStore } from '../../src/engine/model.js';
 import { KnowledgeGraph } from '../../src/react/knowledge-graph.js';
-import type { KnowledgeGraphProps, ScopeChoices } from '../../src/react/types.js';
+import type { GraphSource, KnowledgeGraphProps, ScopeChoices } from '../../src/react/types.js';
 import { fakeRenderer } from './fake-renderer.js';
 import { fixtureSource } from './fixture/fixture-source.js';
 
@@ -40,6 +40,14 @@ async function drawn(fake: ReturnType<typeof fakeRenderer>, ref: string) {
 }
 const pick = (fake: ReturnType<typeof fakeRenderer>, ref: string) => act(() => fake.pick({ kind: 'node', ref, double: false }));
 const inspector = () => screen.getByRole('complementary', { name: 'Inspector' });
+/** Takes an item and its edges out of the fixture's world, as a delete on the server would. */
+function remove(all: GraphStore, ref: string) {
+  (all.items as Map<string, GraphItemView>).delete(ref);
+  for (const [id, e] of all.edges) if (e.from === ref || e.to === ref) (all.edges as Map<string, GraphEdgeView>).delete(id);
+  const adj = all.adj as Map<string, AdjEntry[]>;
+  adj.delete(ref);
+  for (const [k, v] of adj) adj.set(k, v.filter((x) => x.to !== ref));
+}
 /** Takes a tag edge out of the fixture's world, as an untag on the server would. The fixture's maps are real `Map`s. */
 function untag(all: GraphStore, id: string) {
   (all.edges as Map<string, GraphEdgeView>).delete(id);
@@ -139,6 +147,51 @@ describe('27.534 ctx.refresh: the rings are read again and the graph redrawn in 
     expect(document.querySelector('.gn-kg__skeleton')).toBeNull();
     // the selection is kept: the concept is still in the graph
     expect(within(inspector()).getByTestId('concept-panel')).toBeInTheDocument();
+  });
+
+  it('27.534 a ring of the earlier fetch that answers AFTER a refresh never lands: the refreshed graph keeps what the refresh read; control: that ring held the item, and unheld it is drawn', async () => {
+    let refresh: () => void = () => undefined;
+    const renderConceptPanel = (_item: GraphItemView, ctx: { refresh: () => void }) => {
+      refresh = ctx.refresh;
+      return <p data-testid="concept-panel">panel</p>;
+    };
+    // The first ring 3 is answered from the world as it was when asked, but delivered only when the test says so.
+    const fx = fixtureSource();
+    let stale: GraphRingResponse | null = null;
+    let deliver: () => void = () => undefined;
+    let asked = 0;
+    const source: GraphSource = {
+      async ring(q) {
+        asked += 1;
+        const answer = await fx.source.ring(q);
+        if (q.hops === 3 && stale === null) {
+          stale = answer;
+          await new Promise<void>((r) => (deliver = r));
+        }
+        return answer;
+      },
+    };
+    const { fake } = setup({ renderConceptPanel, source });
+    await drawn(fake, C1);
+    await waitFor(() => expect(stale).not.toBeNull());
+    const held = stale!.items[0]!.ref; // first seen at hop 3
+    remove(fx.all, held);
+    pick(fake, C1);
+    await within(inspector()).findByTestId('concept-panel');
+    const before = asked;
+    act(() => refresh());
+    await waitFor(() => expect(asked).toBe(before + 3));
+    await act(async () => new Promise((r) => setTimeout(r, 60)));
+    expect(refsOf(fake.last())).not.toContain(held);
+    // the earlier fetch's ring 3 answers now, holding the item the refresh no longer has
+    expect(stale!.items.map((i) => i.ref)).toContain(held);
+    await act(async () => deliver());
+    await act(async () => new Promise((r) => setTimeout(r, 60)));
+    expect(refsOf(fake.last())).not.toContain(held);
+    // control: answered in the ordinary way, that ring's item is drawn
+    cleanup();
+    const plain = setup();
+    await drawn(plain.fake, held);
   });
 
   it('27.534 a refresh drops the OTHER cached centres, so Back re-reads them rather than drawing the old tags', async () => {
