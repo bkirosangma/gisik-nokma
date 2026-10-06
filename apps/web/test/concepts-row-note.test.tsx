@@ -82,12 +82,12 @@ function stubViewport(phone: boolean): void {
   });
 }
 
-function mount(opts: { role?: WorkspaceRef['role']; getItemConcepts?: DataSourceQuery['getItemConcepts']; ingest?: (events: SubmittedEvent[]) => Promise<IngestResult[]> } = {}) {
+function mount(opts: { role?: WorkspaceRef['role']; authorId?: string; getItemConcepts?: DataSourceQuery['getItemConcepts']; ingest?: (events: SubmittedEvent[]) => Promise<IngestResult[]> } = {}) {
   const getItemConcepts = vi.fn(opts.getItemConcepts ?? (async () => [CP]));
   const ws = { ...WS_REF, role: opts.role ?? 'owner' };
   const services = stubServices({
     getMyWorkspaces: async () => [ws],
-    getNote: async (_ws: string, id: string) => (id === NOTE ? DETAIL : null),
+    getNote: async (_ws: string, id: string) => (id === NOTE ? { ...DETAIL, authorId: opts.authorId ?? DETAIL.authorId } : null),
     getMembers: async () => MEMBERS,
     getActorNames: async () => [],
     getNotes: async () => [],
@@ -135,6 +135,17 @@ describe('27.543 the note page mounts the Concepts row', () => {
     expect(line).toHaveAttribute('role', 'alert');
     expect(line).toHaveClass('gn-refusal', 'gn-refusal--server');
     expect(within(row()!).getByRole('button', { name: `Remove from concept ${CP.name}` })).toBeInTheDocument();
+  });
+});
+
+describe('27.543 the note row\'s writer', () => {
+  it('27.543 a Remove on another member\'s note is the signed-in member\'s event, not the author\'s', async () => {
+    const ingest = vi.fn(async (events: SubmittedEvent[]): Promise<IngestResult[]> => [{ status: 'committed', eventId: events[0]!.id, seq: 1, serverTime: '2026-10-06T04:00:00.000Z' }]);
+    const { user } = mount({ ingest, authorId: 'u_ama' });
+    await waitFor(() => expect(row()).not.toBeNull());
+    await user.click(screen.getByRole('button', { name: `Remove from concept ${CP.name}` }));
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(ingest.mock.calls[0]![0][0]).toMatchObject({ type: 'concept.item_untagged', actorId: 'u_kiro' });
   });
 });
 

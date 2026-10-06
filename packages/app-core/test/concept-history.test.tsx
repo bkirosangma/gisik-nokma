@@ -33,7 +33,7 @@ const CONCEPT: ConceptView = {
   createdAt: T_AT,
   fromSuggestion: null,
   items: [{ kind: 'ticket', id: TP, label: 'GN-12 Scroll jumps', taggedBy: AMA, taggedAt: T_AT, origin: 'mcp' }],
-  links: [],
+  links: [{ otherId: 'CW', otherName: 'Workflows', relation: 'related', direction: 'related' }],
 };
 const ITEM: GraphItemView = { ref: `concept:${CP}`, kind: 'concept', id: CP, workspaceId: WS, projectId: null, label: CONCEPT.name, title: null, category: null, hop: 1, out: false, suggested: false };
 
@@ -46,6 +46,10 @@ const TAG_BY_MCP = event('concept.item_tagged', { itemKind: 'ticket', itemId: TP
 const REDACTED = event('concept.item_untagged', { itemKind: 'ticket', itemId: '' });
 const UNHELD = event('concept.item_untagged', { itemKind: 'ticket', itemId: UNKNOWN });
 const HELD = event('concept.item_untagged', { itemKind: 'ticket', itemId: TP });
+// the held ticket's id under the other kind: an item is matched on kind AND id
+const OTHER_KIND = event('concept.item_untagged', { itemKind: 'note', itemId: TP });
+const LINKED = event('concept.linked', { otherId: 'CW', relation: 'related' });
+const LINKED_GONE = event('concept.linked', { otherId: 'C_GONE', relation: 'related' }); // not among the concept's links
 
 function mount(getConceptHistory: DataSourceQuery['getConceptHistory']) {
   const history = vi.fn(getConceptHistory);
@@ -87,6 +91,30 @@ describe('27.545 a concept\'s History in the inspector', () => {
       // CONTROL: the same event naming an item the concept holds is named; a `web` event's actor is the bare name
       { headline: 'Removed GN-12 Scroll jumps from the concept', actor: 'Ama Rangsa' },
     ]);
+  });
+
+  it('27.545 a link names the other concept from the concept\'s links (its id when the link is gone), and an item is matched on kind as well as id', async () => {
+    const { user } = mount(async () => [LINKED, LINKED_GONE, OTHER_KIND]);
+    await user.click(await screen.findByText('History', { selector: 'summary' }));
+    await waitFor(() => expect(entries()).toHaveLength(3));
+    expect(entries().map((e) => e.headline)).toEqual([
+      'Linked the related concept Workflows',
+      'Linked the related concept C_GONE',
+      'Removed a note from the concept',
+    ]);
+  });
+
+  it('27.545 the wait is a skeleton named "Loading history" once; CONTROL: once read, nothing is busy', async () => {
+    let answer: (events: TicketHistoryEvent[]) => void = () => {};
+    const { user } = mount(() => new Promise((r) => (answer = r)));
+    await user.click(await screen.findByText('History', { selector: 'summary' }));
+    const details = document.querySelector<HTMLElement>('.gn-kg-concept__history')!;
+    const label = within(details).getByText('Loading history');
+    expect(label.closest('[aria-busy="true"]')).toHaveClass('gn-skeleton-region');
+    await act(async () => answer([HELD]));
+    expect(within(details).queryByText('Loading history')).toBeNull();
+    expect(details.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(entries()).toHaveLength(1);
   });
 
   it('27.545 a failed read says so and Try again reads it again', async () => {

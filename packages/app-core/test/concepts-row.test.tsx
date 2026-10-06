@@ -106,6 +106,19 @@ describe('27.541 removing a pill, and Undo', () => {
     expect(pillNames()).toEqual([CP.name, CW.name]);
   });
 
+  it('27.541 removing the only pill keeps the row for its toast, and Undo puts the pill back', async () => {
+    const { script, pending } = deferredIngest();
+    const { user } = mount({ ingest: script, query: { getItemConcepts: async () => [CP] } });
+    await waitFor(() => expect(pillNames()).toEqual([CP.name]));
+    await user.click(removeButton(CP.name));
+    await act(async () => pending[0]!.answer([committed(pending[0]!.events[0]!)]));
+    expect(pillNames()).toEqual([]);
+    expect(screen.getByText(`Removed from ${CP.name}`)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await act(async () => pending[1]!.answer([committed(pending[1]!.events[0]!)]));
+    expect(pillNames()).toEqual([CP.name]);
+  });
+
   it('27.541 CONTROL: a refusal puts the pill back, reports the server\'s exact rule and reason, and shows no toast', async () => {
     const { script, pending } = deferredIngest();
     const { user, onRefusal } = mount({ ingest: script });
@@ -218,6 +231,19 @@ describe('27.549 the row\'s edges', () => {
     expect(onRefusal).toHaveBeenCalledWith({ rule: 'concept.narrows', reason: 'Tagging it would hide the concept from 2 people.' });
   });
 
+  it('27.549 an Undo the transport drops is reported as unanswered, and the pill stays removed', async () => {
+    const { script, pending } = deferredIngest();
+    const { user, onRefusal } = mount({ ingest: script });
+    await waitFor(() => expect(pillNames()).toEqual([CP.name, CW.name]));
+    await user.click(removeButton(CP.name));
+    await act(async () => pending[0]!.answer([committed(pending[0]!.events[0]!)]));
+    expect(onRefusal).not.toHaveBeenCalled(); // precondition: the Remove itself was committed
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await act(async () => pending[1]!.fail(new TypeError('Failed to fetch')));
+    expect(pillNames()).toEqual([CW.name]);
+    expect(onRefusal).toHaveBeenCalledWith({ rule: 'transport', reason: 'The server did not answer this change.' });
+  });
+
   it('27.549 a reader who may not write sees the pills with no remove button; CONTROL: the name opens the concept only when the host can', async () => {
     const onOpenConcept = vi.fn();
     mount({ extra: { readOnly: true, onOpenConcept } });
@@ -263,7 +289,7 @@ function read(): TicketRead {
     visibility: { ownMode: 'inherit', resolvedMode: 'project' },
   } as TicketRead;
 }
-async function renderSheet(concepts: ConceptSummary[], slot?: KnowledgeGraphSlotComponent) {
+async function renderSheet(concepts: ConceptSummary[], slot?: KnowledgeGraphSlotComponent, editable = true) {
   const getItemConcepts = vi.fn(async () => concepts);
   const source = createFakeDataSource({
     getTicket: async () => read(),
@@ -281,7 +307,7 @@ async function renderSheet(concepts: ConceptSummary[], slot?: KnowledgeGraphSlot
       ticketId={TICKET}
       currentUserId="user_kiro"
       onClose={vi.fn()}
-      editorSlot={() => <div />}
+      {...(editable ? { editorSlot: () => <div /> } : {})}
       {...(slot === undefined ? {} : { knowledgeGraphSlot: slot })}
     />,
   );
@@ -316,6 +342,18 @@ describe('27.543 the ticket sheet mounts the row directly above Notes', () => {
     expect(screen.queryByTestId('kg-slot')).toBeNull(); // precondition: Details is the open tab
     await userEvent.setup().click(within(row()!).getByRole('button', { name: CP.name }));
     expect(screen.getByTestId('kg-slot')).toBeInTheDocument();
+  });
+});
+
+describe('27.549 the ticket sheet\'s reader', () => {
+  it('27.549 a sheet with no editor (the reader may not write) shows the pills with no remove button; CONTROL: with an editor each pill has one', async () => {
+    viewport(false);
+    await renderSheet([CP, CW], undefined, false);
+    expect(pillNames()).toEqual([CP.name, CW.name]);
+    expect(within(row()!).queryAllByRole('button', { name: /^Remove from concept/ })).toHaveLength(0);
+    cleanup();
+    await renderSheet([CP, CW]);
+    expect(within(row()!).getAllByRole('button', { name: /^Remove from concept/ })).toHaveLength(2);
   });
 });
 
