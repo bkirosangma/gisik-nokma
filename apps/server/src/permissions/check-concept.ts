@@ -11,6 +11,7 @@ import type { Refusal } from '@gisik-nokma/rule-engine'; // as check-permission.
 import { itemsMissingFromTarget } from '../concepts/merge.js';
 import type { Queryable } from '../db/queryable.js';
 import { hiddenItems, type ItemRef } from '../read/item-visibility.js';
+import { openSuggestionIds } from '../read/suggestions.js';
 import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import type { VisibilityContext } from './check-permission.js'; // type-only: erased, so no runtime cycle
 
@@ -64,9 +65,10 @@ async function seesConcept(db: Queryable, ctx: VisibilityContext, workspaceId: s
 }
 
 /**
- * The cached suggestion (`sem_suggestions`) with this signature or id in this workspace, when the actor sees every live
- * item in it (D4, as the suggestions read decides it, `routes/suggestions.ts`); `null` for absent and hidden alike. Its
- * `itemHashes` are returned so a rejection can be bound to the row it names.
+ * The cached suggestion (`sem_suggestions`) with this signature or id in this workspace, when nobody has resolved it
+ * (`openSuggestionIds`: a second Confirm would make a second concept from it, 27.551) and the actor sees every live item
+ * in it (D4, as the suggestions read decides it, `routes/suggestions.ts`); `null` for absent, resolved and hidden alike.
+ * Its `itemHashes` are returned so a rejection can be bound to the row it names.
  */
 async function visibleSuggestion(
   db: Queryable,
@@ -74,12 +76,13 @@ async function visibleSuggestion(
   workspaceId: string,
   where: { signature?: string; id?: string },
 ): Promise<{ itemHashes: string[] } | null> {
-  const { rows } = await db.query<{ item_kind: ('ticket' | 'note')[]; item_id: string[]; item_hashes: string[] }>(
-    'SELECT item_kind, item_id, item_hashes FROM sem_suggestions WHERE workspace_id = $1 AND (signature = $2 OR id = $3)',
+  const { rows } = await db.query<{ id: string; item_kind: ('ticket' | 'note')[]; item_id: string[]; item_hashes: string[] }>(
+    'SELECT id, item_kind, item_id, item_hashes FROM sem_suggestions WHERE workspace_id = $1 AND (signature = $2 OR id = $3)',
     [workspaceId, where.signature ?? null, where.id ?? null],
   );
   const row = rows[0];
   if (row === undefined) return null;
+  if ((await openSuggestionIds(db, workspaceId, [row.id])).length === 0) return null;
   const items = row.item_id.map((id, index) => ({ kind: row.item_kind[index] as ItemRef['kind'], id }));
   return (await hiddenItems(db, ctx.eff, ctx.sessionUserId, workspaceId, items)).length === 0 ? { itemHashes: row.item_hashes } : null;
 }

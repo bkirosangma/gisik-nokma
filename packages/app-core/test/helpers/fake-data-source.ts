@@ -1,5 +1,6 @@
 import { builtinTicketTypeDefs, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSource, DataSourceQuery, ServerStreamFrame, Unsubscribe } from '../../src/data-source.js';
+import { HttpError } from '../../src/online/http.js';
 
 export type IngestScript = (events: SubmittedEvent[]) => IngestResult[] | Promise<IngestResult[]>;
 
@@ -32,6 +33,12 @@ export function createFakeDataSource(
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => [],
     getGroups: async () => [],
+    // These four REJECT with the server's 404 by default rather than answering empty, as their neighbours do: an
+    // empty concept would be one the server never sent (online, `getConcept` re-raises the 404). A case stubs them.
+    getConcept: async (conceptId) => Promise.reject(new HttpError(404, `/v1/concepts/${conceptId}`)),
+    getConceptHistory: async (conceptId) => Promise.reject(new HttpError(404, `/v1/concepts/${conceptId}/history`)),
+    getSuggestions: async (workspaceId) => Promise.reject(new HttpError(404, `/v1/workspaces/${workspaceId}/suggestions`)),
+    getConceptAudience: async (workspaceId) => Promise.reject(new HttpError(404, `/v1/workspaces/${workspaceId}/concepts/audience`)),
     getDeletedItems: async () => [],
     purgedAmong: async () => [],
     getMembers: async () => [],

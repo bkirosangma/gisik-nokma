@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@gisik-nokma/app-core": "workspace:*",
     "@gisik-nokma/domain": "workspace:*",
     "@gisik-nokma/knowledge-graph": "workspace:*",
     "@gisik-nokma/ui": "workspace:*",

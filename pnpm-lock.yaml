@@ -556,6 +556,9 @@ importers:
 
   packages/knowledge-graph-browser:
     dependencies:
+      '@gisik-nokma/app-core':
+        specifier: workspace:*
+        version: link:../app-core
       '@gisik-nokma/domain':
         specifier: workspace:*
         version: link:../domain
