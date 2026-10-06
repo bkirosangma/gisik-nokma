@@ -111,6 +111,24 @@ export const unlink = (pool: Pool, source: string, target: string) => step(pool,
 export const decide = (pool: Pool, decisionId: string, outcome: string | null, extra: Record<string, unknown> = {}) =>
   step(pool, decisionId, 'ticket.decided', { outcome, ...extra });
 
+/**
+ * The Decision loop of PS-4 (wtg2 T16): `s(done) -> a(done) -> d(Decision) ; d -[Redo]-> a` is a back edge, `d -[Ship]-> z`
+ * (z in the Backlog). `d` is finished last, by a person, unless `finished: false` leaves it in Doing; `finishing` is that
+ * transition's envelope (null when it was not filed).
+ */
+export async function loopWorld(pool: Pool, o: { finished?: boolean } = {}) {
+  const s = await addTicket(pool, { start: 'focus', moves: ['doing', 'done'] });
+  const a = await addTicket(pool, { start: 'focus', moves: ['doing', 'done'] });
+  const d = await addTicket(pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing'] });
+  const z = await addTicket(pool);
+  await lead(pool, s, a);
+  await lead(pool, a, d);
+  await lead(pool, d, a, 'Redo');
+  await lead(pool, d, z, 'Ship');
+  const finishing = o.finished === false ? null : await step(pool, d, 'ticket.transitioned', { to: 'done' });
+  return { s, a, d, z, finishing };
+}
+
 export async function stateOf(pool: Pool, ticketId: string): Promise<string> {
   const { rows } = await pool.query<{ state_id: string }>('SELECT state_id FROM proj_tickets WHERE ticket_id = $1', [ticketId]);
   return rows[0]!.state_id;
