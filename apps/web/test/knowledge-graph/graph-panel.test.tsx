@@ -130,9 +130,13 @@ describe('GraphPanel (KG-C T9)', () => {
     // CONTROL, same it: a host with no ticket opener (the note panel) gets no Open on a ticket, and the rest stand.
     cleanup();
     h.seen.length = 0;
+    h.push.mockClear();
     mount();
     await screen.findByTestId('kg-view');
     expect(['ticket', 'note'].map((kind) => last().canOpen!(item(kind as GraphItemView['kind'], 'x')))).toEqual([false, true]);
+    // … and an Open on a ticket there is a no-op, not a throw (the view only offers it where canOpen allows).
+    expect(() => last().onOpen(item('ticket', 'T2'))).not.toThrow();
+    expect(h.push).not.toHaveBeenCalled();
   });
 
   it('27.342 shows the loading box until the scope read answers, and a refused read as the shell\'s refusal; control: an answer mounts the view', async () => {
@@ -150,6 +154,49 @@ describe('GraphPanel (KG-C T9)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Your workspaces');
     expect(screen.queryByTestId('kg-view')).toBeNull();
     expect(screen.queryByText('Loading the Knowledge Graph')).toBeNull();
+  });
+
+  it('27.342 a read answered after the services changed is dropped, its refusal too; control: the current read lands', async () => {
+    let answerOld!: (list: WorkspaceRef[]) => void;
+    let refuseOld!: (cause: Error) => void;
+    const OLD: WorkspaceRef[] = [workspace({ id: 'ws_old', name: 'Old answer' })];
+    const first = stubServices({ getMyWorkspaces: () => new Promise<WorkspaceRef[]>((resolve) => (answerOld = resolve)) });
+    const second = stubServices({ getMyWorkspaces: async () => WORKSPACES });
+    const view = render(
+      <Providers services={first}>
+        <GraphPanel centre={`ticket:${SOURCE}`} workspaceId={WS} />
+      </Providers>,
+    );
+    view.rerender(
+      <Providers services={second}>
+        <GraphPanel centre={`ticket:${SOURCE}`} workspaceId={WS} />
+      </Providers>,
+    );
+    await screen.findByTestId('kg-view');
+    // CONTROL: the current read is what the view has.
+    expect(last().scope.workspaces.map((w) => w.id)).toEqual([WS]);
+    await act(async () => answerOld(OLD));
+    expect(last().scope.workspaces.map((w) => w.id)).toEqual([WS]);
+    expect(last().source).toBe(second.graph);
+
+    // The same for a late refusal: it never replaces the drawn view with the shell's refusal.
+    cleanup();
+    h.seen.length = 0;
+    const late = stubServices({ getMyWorkspaces: () => new Promise<WorkspaceRef[]>((_resolve, reject) => (refuseOld = reject)) });
+    const again = render(
+      <Providers services={late}>
+        <GraphPanel centre={`ticket:${SOURCE}`} workspaceId={WS} />
+      </Providers>,
+    );
+    again.rerender(
+      <Providers services={second}>
+        <GraphPanel centre={`ticket:${SOURCE}`} workspaceId={WS} />
+      </Providers>,
+    );
+    await screen.findByTestId('kg-view');
+    await act(async () => refuseOld(new Error('HTTP 500 for /v1/me/workspaces')));
+    expect(screen.queryByText('HTTP 500 for /v1/me/workspaces')).toBeNull();
+    expect(screen.getByTestId('kg-view')).toBeInTheDocument();
   });
 
   it('27.343 Remove link files ONE ticket.link_removed on the source\'s stream, Undo one ticket.link_added, a refusal throws its rule and reason; control: removed while viewing the TARGET, it still writes on the source', async () => {
@@ -175,6 +222,9 @@ describe('GraphPanel (KG-C T9)', () => {
     await expect(last().onRemoveLink!(edge(SOURCE, TARGET))).rejects.toThrow(new Error('refused by link-permission: only a member of both projects may unlink'));
     ingest.mockResolvedValueOnce([{ status: 'invalid', eventId: null, code: 'invalid_payload', message: 'targetId must be a ticket' } as IngestResult]);
     await expect(last().onRemoveLink!(edge(SOURCE, TARGET))).rejects.toThrow(new Error('targetId must be a ticket'));
+    // No result at all is the note doors' failure, never a silent success (the inspector would say "Link removed.").
+    ingest.mockResolvedValueOnce([]);
+    await expect(last().onRemoveLink!(edge(SOURCE, TARGET))).rejects.toThrow(new Error('The server did not answer this change.'));
 
     // CONTROL, same it: centred on the TARGET, the same edge still writes on the SOURCE's stream.
     cleanup();
