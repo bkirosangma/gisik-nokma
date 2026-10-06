@@ -9943,13 +9943,13 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 /* KG: T9 tab+panel */
 /* The ticket sheet's Knowledge Graph tab and the note's Knowledge Graph panel (KG-C T9) host the view in a 40rem sheet
    (`.gn-sheet`) whatever the window's width, and the view picks its two-column body by the VIEWPORT: beside an 18.75rem
-   inspector the canvas would be a ~17rem strip. In a panel the body is one column at every width (canvas, inspector, then
-   the keys line and the list 10px under it), the view's own stacking at 57.5rem and under; that includes the body's 1.125rem
-   row gap, which the wide arm narrows to 0.625rem for its two rows. A phone keeps its own. */
+   inspector the canvas would be a ~17rem strip. In a panel the body is one column at every width: canvas, inspector 18px
+   under it, then the keys line and the list 10px under that, the view's own one-column stacking. A flex column, so the
+   wide arm's grid placement (the inspector over two rows, the list in column 1, row 2; 27.660) has nothing to place and
+   no rule here places either; its 0.625rem row gap is put back to the body's 1.125rem. A phone keeps its own. */
 .gn-kg-panel { min-width: 0; }
-.gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg__body { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: 1.125rem; }
-.gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg-insp { grid-row: auto; }
-.gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg__below { grid-column: auto; grid-row: auto; margin-top: calc(0.625rem - 1.125rem); }
+.gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg__body { display: flex; flex-direction: column; align-items: stretch; row-gap: 1.125rem; }
+.gn-kg-panel .gn-kg:not(.gn-kg--phone) .gn-kg__below { margin-top: calc(0.625rem - 1.125rem); }
 /* Until the scope read answers: the canvas's own height, so the tab does not jump by a canvas when the view arrives. */
 .gn-kg-panel--loading { display: block; height: clamp(26rem, 62vh, 46rem); }
 /* KG: end */
