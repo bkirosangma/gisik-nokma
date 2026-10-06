@@ -348,6 +348,18 @@ function labelled(row: NameRow): ActorName[] {
 }
 
 /**
+ * The viewer's OWN label, for their own Knowledge Graph person node (planner ruling 2026-10-06, KG release blocker
+ * P2-3: you can always see yourself). `labelled`'s rule, except FD3's phone drop: that drop keeps a phone user's name
+ * (their number) from OTHER people, so here a synthetic address is only blanked, never a label, and a phone user is
+ * labelled by their own name. Null when nothing is left to say (no such user, or a blank name and no real address).
+ */
+export async function readOwnName(db: Queryable, userId: string): Promise<string | null> {
+  const { rows } = await db.query<NameRow>('SELECT u."id" AS user_id, u."name" AS display_name, u."email", FALSE AS removed FROM "user" u WHERE u."id" = $1', [userId]);
+  const own = rows.flatMap((row) => labelled({ ...row, email: isSyntheticPhoneEmail(row.email) ? '' : row.email }));
+  return own[0]?.displayName ?? null;
+}
+
+/**
  * FD2 / spec N3 (owner ruling 2026-09-29, "go with the recommendation"): a guest
  * is named the people on the tickets they can see — each such ticket's current
  * assignee and every actor of an event filed against it — and nobody else.

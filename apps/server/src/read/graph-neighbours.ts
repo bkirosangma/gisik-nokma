@@ -4,7 +4,7 @@ import {
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
-import { readActorNames, readActorNamesForGuest } from '../routes/builder-reads.js';
+import { readActorNames, readActorNamesForGuest, readOwnName } from '../routes/builder-reads.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 import { visibleConceptIds } from './concepts.js';
 import { requireMember } from './membership.js';
@@ -36,6 +36,12 @@ import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './vis
  *
  * An item outside the chosen workspaces/projects is returned with `out: true` and is not put in the next frontier (C-scope).
  * The centre is always walked, whatever its scope. People are always in scope (they belong to no workspace).
+ *
+ * ## The viewer's own node always resolves
+ *
+ * A person is drawn when a workspace of the viewer's names them, but the viewer is always drawn to themselves (planner
+ * ruling 2026-10-06, KG release blocker P2-3: Home's "Start from: Me"), by their own label (`readOwnName`). Only that
+ * node: every item around it still passes its own visibility rule, and every OTHER person is drawn exactly as before.
  */
 export type GraphRingRequest = {
   center: { kind: GraphItemKind; id: string };
@@ -54,12 +60,13 @@ type RawEdge = { id: string; kind: GraphEdgeKind; from: string; to: string; snip
 export function createGraphVisibility(db: Queryable, viewerId: string) {
   const roles = new Map<string, EffectiveRole | null>();
   const names = new Map<string, Map<string, string>>();
+  let ownName: Promise<string | null> | undefined;
 
   async function roleIn(workspaceId: string): Promise<EffectiveRole | null> {
     if (!roles.has(workspaceId)) roles.set(workspaceId, await requireMember(db, viewerId, workspaceId));
     return roles.get(workspaceId) ?? null;
   }
-  /** The label read every "who" in the app uses (owner ruling 2026-09-29: names are not the sensitive part); a guest gets the people on their own tickets, as `builder-reads.ts:814-817` decides. */
+  /** The label read every "who" in the app uses (owner ruling 2026-09-29: names are not the sensitive part); a guest gets the people on their own tickets, as `builder-reads.ts:826-829` decides. */
   async function namesIn(workspaceId: string): Promise<Map<string, string>> {
     const cached = names.get(workspaceId);
     if (cached !== undefined) return cached;
@@ -147,8 +154,10 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
     }
 
     for (const userId of ids.person) {
-      const name = await nameOf(userId);
-      if (name === null) continue; // a person no workspace of the viewer's names is not drawn
+      // The viewer's own node falls back to their own label: a guest's names read names only the people on their own
+      // tickets, and no names read names a phone user (FD3), yet you can always see yourself (planner ruling 2026-10-06).
+      const name = (await nameOf(userId)) ?? (userId === viewerId ? await (ownName ??= readOwnName(db, viewerId)) : null);
+      if (name === null) continue; // any OTHER person no workspace of the viewer's names is not drawn
       const ref = graphRef('person', userId);
       out.set(ref, { ref, kind: 'person', id: userId, workspaceId: null, projectId: null, label: name, title: null, category: null, suggested: false });
     }
