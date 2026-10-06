@@ -230,7 +230,13 @@ describe('27.646 Home mounts the view in its configuration, the hops following t
     expect(h.push).not.toHaveBeenCalled();
   });
 
-  it('27.646 the scope read: its placeholder while pending, its refusal when refused, never an endless placeholder', async () => {
+  // Two `it`s, not two renders in one: the stubs below answer by CALL ORDER, and Home now records its fallback workspace
+  // (27.675), so a second render in the same `it` starts with the nav remembering it. The nav's shared workspaces read then
+  // fires first (a child effect) and takes call #1, and the refusal lands on Home's own read instead of the graph's.
+  // `beforeEach` clears the record and its module cache, so each half starts fresh. In the first half the nav remembers
+  // nothing at mount, so Home's own read takes call #1 (the numbers prove it answered) and every later read, the graph's
+  // scope read among them, is pending.
+  it('27.646 the scope read: its placeholder while pending, never an endless placeholder', async () => {
     let n = 0;
     renderHome('ws_646s', () => home('ws_646s'), async () => {
       n += 1;
@@ -241,15 +247,21 @@ describe('27.646 Home mounts the view in its configuration, the hops following t
     await waitFor(() => expect(document.querySelector('.gn-home__graph-placeholder')).not.toBeNull());
     expect(document.querySelector<HTMLElement>('.gn-home__graph-placeholder .gn-skeleton--block')!.style.getPropertyValue('--gn-skeleton-h')).toBe('100%');
     expect(screen.queryByTestId('kg-probe')).toBeNull();
+  });
 
-    cleanup();
+  it('27.646 the scope read: its refusal when refused, in the graph\'s place (not Home\'s own refusal), never an endless placeholder', async () => {
     let m = 0;
     renderHome('ws_646r', () => home('ws_646r'), async () => {
       m += 1;
       if (m === 1) return [workspace('ws_646r')];
       throw new Error('HTTP 500 for /v1/me/workspaces');
     });
-    expect(await screen.findByText('HTTP 500 for /v1/me/workspaces')).toBeInTheDocument();
+    const wire = await screen.findByText('HTTP 500 for /v1/me/workspaces');
+    // The graph's own refusal (`ShellRefusal what="Your workspaces"`), with Home's page read answered: the numbers show and
+    // Home's "Couldn't load your workspaces." does not.
+    expect(wire.closest('.gn-shell__refusal')?.textContent).toContain('Your workspaces could not be loaded.');
+    expect(await screen.findByRole('button', { name: '2 Past due' })).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load your workspaces.")).toBeNull();
     expect(document.querySelector('.gn-home__graph-placeholder')).toBeNull();
     expect(screen.queryByTestId('kg-probe')).toBeNull();
   });

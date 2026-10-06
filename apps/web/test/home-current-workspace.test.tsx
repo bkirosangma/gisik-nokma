@@ -127,6 +127,24 @@ describe('27.676 CONTROL: a remembered live workspace is shown and stays remembe
     act(() => rememberLastWorkspace(KIRO.id, 'ws_first'));
     await waitFor(() => expect(navWorkspace()?.getAttribute('href')).toBe('/w/ws_first'));
   });
+
+  // The nav does NOT unmount when the person changes: sign-out then sign-in is a client navigation (the hook's "THE VIEWER
+  // CHANGED" comment). So the listener must be dropped when the person changes and re-subscribed for the new one: a record
+  // for the OLD person must not move the mounted hook, and one for the NEW person must.
+  it('a MOUNTED hook whose person changes stops hearing the old person and hears the new one (the listener follows the user)', () => {
+    function Nav({ userId }: { userId: string }) {
+      return <span data-testid="last">{JSON.stringify(useLastWorkspace(undefined, userId))}</span>;
+    }
+    const view = render(<Nav userId="u_a" />);
+    view.rerender(<Nav userId="u_b" />);
+    const value = () => JSON.parse(screen.getByTestId('last').textContent ?? 'null') as LastWorkspace;
+    expect(value()).toEqual({ status: 'none' });
+    act(() => rememberLastWorkspace('u_a', 'ws_a'));
+    expect(value()).toEqual({ status: 'none' });
+    // control, same it: a record for the person signed in NOW reaches the same mounted hook
+    act(() => rememberLastWorkspace('u_b', 'ws_b'));
+    expect(value()).toEqual({ status: 'remembered', workspaceId: 'ws_b' });
+  });
 });
 
 describe('27.677 a remembered archived or unknown id: Home falls back to the first live one and records it', () => {
