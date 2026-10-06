@@ -20,16 +20,23 @@ import { insertUser, seedTimelineWorld, type TimelineWorld } from './helpers/wor
  * `seedTimelineWorld`, plus, filed here: three undated tickets in A (the tray has pages), a workspace-level note
  * (`home_project_id = ''`) and a note homed in A.p2, `gus`, a GUEST in C who owns a fifth workspace D, and in B two tickets
  * whose ids are minted BEFORE the world's (an undated one and a dated one: across workspaces the merged order is not the
- * concatenation) and three due dates that interleave A's across the workspaces (B 10-05, B 09-10, A 09-20).
+ * concatenation) and three due dates that interleave A's across the workspaces (B 10-05, B 09-10, A 09-20), and a
+ * workspace-level note in B that ama sees as B's member (so a sum over the workspaces is not A's alone).
  */
-const earlyUndated = newUlid();
-const earlyDated = newUlid();
+/**
+ * B's two early ids carry a time prefix below every id minted in this run, so they are the earliest by construction. Minted
+ * with `newUlid()` they shared a millisecond with `due.*` and the rest, and their order was the random part (the 1882524a
+ * flake: `due.bSoon` sorted first).
+ */
+const early = (): string => `00${newUlid().slice(2)}`;
+const earlyUndated = early();
+const earlyDated = early();
 
 const NOW = new Date('2026-10-03T06:00:00.000Z');
 let db: TestDatabase;
 let w: TimelineWorld;
 const undated = [newUlid(), newUlid(), newUlid()];
-const notes = { ws: newUlid(), p2: newUlid() };
+const notes = { ws: newUlid(), p2: newUlid(), b: newUlid() };
 const due = { bSoon: newUlid(), bPast: newUlid(), aPast: newUlid() };
 const gus = newUlid();
 const D = newUlid();
@@ -45,6 +52,7 @@ beforeAll(async () => {
     ),
     makeCommitted({ workspaceId: A, actorId: w.ama, entity: { kind: 'note', id: notes.ws }, type: 'note.created', payload: { title: 'Workspace-level', homeProjectId: '', scope: { mode: 'workspace' } } }),
     makeCommitted({ workspaceId: A, actorId: w.ama, entity: { kind: 'note', id: notes.p2 }, type: 'note.created', payload: { title: 'Website note', homeProjectId: w.A.p2, scope: { mode: 'workspace' } } }),
+    makeCommitted({ workspaceId: w.B.workspaceId, actorId: w.bo, entity: { kind: 'note', id: notes.b }, type: 'note.created', payload: { title: 'B note', homeProjectId: '', scope: { mode: 'workspace' } } }),
     makeCommitted({ workspaceId: w.C.workspaceId, actorId: w.cy, entity: { kind: 'membership', id: membershipId(w.C.workspaceId, gus) }, type: 'membership.granted', payload: { userId: gus, role: 'guest' } }),
     makeCommitted({ workspaceId: D, actorId: gus, entity: { kind: 'workspace', id: D }, type: 'workspace.created', payload: { name: 'D' } }),
     makeCommitted({ workspaceId: D, actorId: gus, entity: { kind: 'membership', id: membershipId(D, gus) }, type: 'membership.granted', payload: { userId: gus, role: 'owner' } }),
@@ -213,6 +221,8 @@ describe("29.293 Home's numbers over a scope", () => {
     const two = await summary(w.ama, scopeOf([w.A.workspaceId, w.B.workspaceId]));
     expect(two.counts.tickets).toBe(hA.counts.tickets + hB.counts.tickets);
     expect(two.counts.notes).toBe(hA.counts.notes + hB.counts.notes);
+    expect(hB.counts.notes).toBeGreaterThan(0); // control: B holds a note ama sees, so the sum is not A's alone
+    expect(two.ids.notes).toEqual(expect.arrayContaining([notes.ws, notes.b])); // each workspace's notes, not the first one's
     expect(two.dueSoonDays).toEqual({ [w.A.workspaceId]: hA.dueSoonDays, [w.B.workspaceId]: hB.dueSoonDays });
     expect(two.counts.members).toBe(2); // ama and bo are in both: distinct people, not 4
     expect((hA.counts.members ?? 0) + (hB.counts.members ?? 0)).toBe(4); // control: the per-workspace sum differs
