@@ -141,7 +141,7 @@ export function MyWorkPageShell() {
   return (
     <main id="gn-main" className="gn-shell gn-shell--skeleton" aria-busy="true">
       <AppNavSkeleton />
-      <Skeleton className="gn-page-title" width="12rem" height="var(--gn-title-page-size)" />
+      <Skeleton className="gn-page-title gn-skeleton--title" width="12rem" />
       <div className="gn-shell__main">
         <AttentionBandSkeleton />
         <MyWorkSkeleton />
