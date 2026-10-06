@@ -137,6 +137,13 @@
       "passThroughEnv": ["KG_PW_PORT"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/knowledge-graph/src/**", "$TURBO_ROOT$/packages/ui/src/ui.css"]
     },
+    // kg-walk-fixes item 3 (27.078): `harness/sheet-errors.tsx` imports the web app's `globals.css` and `shell-refusal.tsx`, and
+    // `apps/web` is not this package's dependency, so `^build` never folds them into the hash: without these an edit to either
+    // replayed a cached green.
+    "@gisik-nokma/workflow-canvas-browser#test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/app/globals.css", "$TURBO_ROOT$/apps/web/src/shell-refusal.tsx"]
+    },
     // `reporting-scope-guard.test.ts` walks SEVEN trees (its own `SCANNED_ROOTS`),
     // and three CSS-binding suites read `packages/ui/src/ui.css` — the stylesheet
     // whose class names they assert against rendered markup. A rule deleted from

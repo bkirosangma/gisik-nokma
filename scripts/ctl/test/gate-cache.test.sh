@@ -22,6 +22,7 @@ ctl_node22 >/dev/null
 TURBO="$repo/node_modules/.bin/turbo"
 [ -x "$TURBO" ] || { echo "FAIL gate-cache: $TURBO missing — pnpm install first"; exit 1; }
 UI=@gisik-nokma/ui; MOBILE=@gisik-nokma/mobile; APPCORE=@gisik-nokma/app-core; SERVER=@gisik-nokma/server; EDITOR=@gisik-nokma/editor
+WCB=@gisik-nokma/workflow-canvas-browser
 fails=0
 . "$HERE/test/harness.sh"   # check NAME CODE, and the CTL_TEST_ONLY case filter
 
@@ -59,7 +60,7 @@ check "13.1707 mobile#test depends on editor#build:webview (the stale-build root
 if [ "$MODE" != --real ]; then
   # THE TABLE: id | task's package | probe file | what it stands for | HIT control (a file the task does not read).
   # Every row asserts the control leaves the hash alone and the probe changes it. A row exists for each input turbo.json
-  # declares that is NOT a dependency of the task (13.1712-13.1715): remove the entry and its row goes red
+  # declares that is NOT a dependency of the task (13.1712-13.1715, 13.1718): remove the entry and its row goes red
   # (shown 2026-10-02 by deleting each entry in turn). The server rows use CLAUDE.md as the control because server#test
   # reads docs/** — the README control would be a read file there.
   desktop_file=$(/usr/bin/git ls-files apps/desktop/src | sed -n 1p)
@@ -79,6 +80,8 @@ if [ "$MODE" != --real ]; then
     "13.1714|$SERVER|apps/web/next.config.ts|next.config.ts, which security-middleware.test.ts reads|CLAUDE.md"
     "13.1715|$EDITOR|$views_file|a packages/app-core/src/views file the editor tests read as text|$ctl_file"
     "13.1715|$EDITOR|packages/ui/test/helpers/css-rules.ts|the ui css-rules helper four editor tests import|$ctl_file"
+    "13.1718|$WCB|apps/web/app/globals.css|apps/web globals.css, which the sheet-errors harness imports|$ctl_file"
+    "13.1718|$WCB|apps/web/src/shell-refusal.tsx|the ShellRefusal component the sheet-errors harness renders|$ctl_file"
   )
   for t in "${rows[@]}"; do
     IFS='|' read -r id pkg file what ctl <<<"$t"

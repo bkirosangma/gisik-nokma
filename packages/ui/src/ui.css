@@ -3487,6 +3487,22 @@ a.gn-linked-from__link:focus-visible { outline: 2px solid var(--gn-focus-ring); 
 .gn-linked-from__snippet { grid-column: 2; color: var(--gn-text-muted); font-size: 0.875rem; line-height: 1.25rem; overflow-wrap: anywhere; }
 .gn-linked-from__snippet mark { background: none; color: var(--gn-text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--gn-accent); }
 .gn-linked-from__error { margin: 0.5rem 0 0; color: var(--gn-text-muted); font-size: 0.875rem; }
+/* A failed read or write says so in a sentence that carries the transport's own words: `HttpError`'s
+   `HTTP 503 for /v1/workspaces/<id>/tickets/<id>/links` is ONE unbroken run of 80-odd characters. Unwrapped, it sized
+   the Links error to ~753 px and the ticket sheet's body scrolled sideways (Add link cut to "Ad"; release walk
+   should-fix #3, case 27.078). `anywhere`, not `break-word`: only `anywhere` counts in min-content sizing, so the
+   Links error (a grid item of `.gn-ticket-sheet__links`) stops widening its track too. Every sheet sentence and refusal
+   panel that interpolates a read's error or a write's `cause.message` wraps the same way, and so do the visibility
+   editor's unreached sentence and the workflow builder's publish banner. */
+.gn-ticket-sheet__notes-error,
+.gn-linked-from__error,
+.gn-ticket-sheet__history-error,
+.gn-ticket-sheet__attachments-error,
+.gn-ticket-sheet__subtask-withheld,
+.gn-ticket-sheet__refusal,
+.gn-visibility__unreached,
+.publish-controls__banner-reason,
+.gn-refusal { overflow-wrap: anywhere; }
 .gn-linked-from__more { margin-top: 0.25rem; }
 .gn-linked-from__dot { width: 0.5rem; height: 0.5rem; margin: 0.4375rem 0.25rem; border-radius: 50%; }
 .gn-linked-from__dot--open { background: var(--gn-category-open); }

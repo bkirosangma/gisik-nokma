@@ -3316,6 +3316,13 @@ input, textarea, select { font-family: inherit; }
    rather than the statement. Pinned rather than left to inheritance: the line
    above is `display: block` and this span would otherwise ride it. */
 .gn-shell__refusal-wire { display: block; font-weight: 400; }
+/* The wire string is the transport's own `HTTP <status> for <path>`, one unbroken run: unwrapped, a refusal page
+   scrolled sideways at a phone's width (+290 px at 390, the MWG T4 re-check; PENDING row refusal-wire-wrap, planner
+   2026-10-06 00:09). On the PANEL, so the sign-in and profile refusals that hold their text directly wrap too; the
+   Notes dialog's and scope popover's refusals carry a write's `cause.message` the same way (case 27.078). */
+.gn-shell__refusal,
+.gn-notes__dialog-failure,
+.gn-notes__scope-failure { overflow-wrap: anywhere; }
 .gn-shell__expired { margin: 0; padding: 0.75rem 0.9rem; border-radius: var(--gn-radius-control); color: var(--gn-text); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); }
 
 /* ── The 404, and the two legal pages ────────────────────────────────────────
