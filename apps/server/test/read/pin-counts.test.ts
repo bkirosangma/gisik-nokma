@@ -1,10 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
-import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { buildServerGates } from '../../src/gates/index.js';
-import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
-import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { listNotesForTicket } from '../../src/read/notes.js';
 import { NO_PIN, pinCountsFor, pinOf } from '../../src/read/pin-counts.js';
 import { readList } from '../../src/routes/list.js';
@@ -21,7 +17,8 @@ import { seedNotesFixture, type NotesFixture, type NotesUser } from '../helpers/
  * plus two that no one may count: one that was then deleted, and a workspace note homed in a second project that was then
  * deleted (`NOTE_PROJECT_LIVE_WHERE`, the notes list's own clause). `nInherit` is already attached to TE by the fixture. Two
  * attachments belong to TP, one to TE, one to a NOTE (not a ticket). The last case adds what belongs to a SECOND workspace: a
- * note homed there and linked to TP through the client door, and a file row filed there on TP; neither counts here.
+ * note homed there and linked to TP (a link row written directly: the client door refuses it since
+ * task/notes-cross-workspace-attach, 18.500), and a file row filed there on TP; neither counts here.
  */
 let db: TestDatabase;
 let world: NotesFixture;
@@ -160,7 +157,7 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
     expect(noteOnly?.pin).toEqual({ notes: 1, attachments: 0 });
   });
 
-  it('29.113 a note homed in ANOTHER workspace counts for nobody here, though linked to TP through the client door, and nor does a file row filed under that workspace on TP', async () => {
+  it('29.113 a note homed in ANOTHER workspace counts for nobody here, though a link row ties it to TP, and nor does a file row filed under that workspace on TP', async () => {
     // W2 is a second workspace owned by `author`, who is also a member on P here, so TP is a ticket the author may open. Its
     // note is live, workspace-scope and homed in a live project: every clause of the count but the workspace bind admits it
     // for this workspace's owner (`visibleNotesWhere` is TRUE) and members (the unbound `scope_mode = 'workspace'` arm).
@@ -188,28 +185,16 @@ describe('29.113 the paper pin counts what the viewer may read, plus the ticket-
       (await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table} WHERE ticket_id = $1`, [world.TP])).rows[0]?.n;
     const linksBefore = await onTP('proj_note_attachments');
     const filesBefore = await onTP('attachments');
-    // The link goes through the CLIENT door as `src/index.ts` builds it (permission gate, rule engine, projections, the
-    // production gates), not through a seeder: whether that door refuses a link from a W2 note to a WS ticket is the planner's
-    // write-door question (09:54), and this line records the answer. Nothing is seeded into W2 after it: the door numbers W2's
-    // events from the ledger, `applyCommitted` from a process-local map.
-    const ingest = createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections: buildProjectionRegistry(), gates: buildServerGates() });
-    const [attached] = await ingest.ingestClientBatch(
-      [
-        {
-          id: newUlid(),
-          workspaceId: W2,
-          entity: { kind: 'note', id: away },
-          type: 'note.attached',
-          version: 1,
-          payload: { ticketId: world.TP },
-          actorId: world.ids.author,
-          origin: 'web',
-          clientTime: '2026-10-06T10:00:00.000Z',
-        },
-      ],
-      world.ids.author,
+    // The link row is written DIRECTLY (task/notes-cross-workspace-attach): until that task the client door committed a
+    // W2 note's link to a WS ticket for a person in both workspaces (the planner's write-door question, 09:54), and
+    // production may still hold such rows. The door now refuses it (18.500), so the row a pre-fix link left is seeded
+    // as the projection writes it (`insertAttachment`: the NOTE's workspace on the row); the note's attached ids are
+    // read back from this table, so `proj_notes` needs nothing more.
+    await db.pool.query(
+      `INSERT INTO proj_note_attachments (note_id, ticket_id, workspace_id, attached_at, workspace_seq)
+       VALUES ($1, $2, $3, '2026-10-06T10:00:00.000Z', 5)`,
+      [away, world.TP, W2],
     );
-    expect(attached).toMatchObject({ status: 'committed' });
     // No door files a ticket's attachment under another workspace (the upload route takes the TICKET's own workspace,
     // `routes/attachments.ts`), but no constraint forbids the row either, so it is written directly, as this file's others are.
     await db.pool.query(

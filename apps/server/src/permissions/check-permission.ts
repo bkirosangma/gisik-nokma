@@ -1496,6 +1496,23 @@ const NOTE_HOME_REASON = 'You are not a member of the project this note is filed
 const NOTE_TICKET_REASON = 'You cannot see the ticket this note would be attached to.';
 
 /**
+ * Whether `ticketId` names a ticket of `workspaceId` — the note's own workspace (task/notes-cross-workspace-attach,
+ * 18.500–18.503). `canSee` and `canOpen` resolve the role in the TICKET's workspace, and the ingest door's
+ * entity↔workspace guard binds only the NOTE, so on their own they admitted a person who is in both workspaces: a note
+ * of one workspace linked to a ticket of another, and that workspace's readers then read the ticket's title. The
+ * workspace is the one `proj_entity_heads` holds (`readEntityHead`'s row), the binding that guard itself trusts. An
+ * unknown id has no row, and every caller refuses a false with the unknown-ticket sentence, so the bind is no
+ * existence oracle.
+ */
+async function ticketInWorkspace(db: Queryable, ticketId: string, workspaceId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    "SELECT 1 FROM proj_entity_heads WHERE entity_kind = 'ticket' AND entity_id = $1 AND workspace_id = $2",
+    [ticketId, workspaceId],
+  );
+  return rowCount === 1;
+}
+
+/**
  * The events only the author (or an admin who can read it, or the owner) may
  * send — spec §4.2's D6 row.
  *
@@ -1554,10 +1571,13 @@ const NOTE_AUTHOR_EVENTS = new Set([
  * is in this workspace and is not deleted, and that the project in
  * `homeProjectId` exists and is not archived.
  *
- * - The TICKET half is discharged by `canSee`, which answers false for a ticket
- *   that does not exist or is not in the workspace, plus
- *   `loadNoteForVisibility`'s `ticketIsLive` filter — the `attachTicketId` arm
- *   below and the attach/detach arm.
+ * - The TICKET half is discharged by `ticketInWorkspace` (the ticket is in the
+ *   NOTE's workspace: an unknown id is in none) and `canSee` / `canOpen` (this
+ *   person may see or open it), plus `loadNoteForVisibility`'s `ticketIsLive`
+ *   filter — the `attachTicketId` arm below and the attach/detach arm. `canSee`
+ *   alone never said "in this workspace": it resolves the role in the TICKET's
+ *   own workspace, which is how a person in two workspaces linked a note of one
+ *   to a ticket of the other until task/notes-cross-workspace-attach (18.500).
  * - The PROJECT half is discharged in TWO places, and the split is the ordering
  *   rule `checkProjectExists`'s docblock states: EXISTENCE is asked there, which
  *   is why `projectsNamedBy` gained a `note.created` case, and MEMBERSHIP is
@@ -1582,7 +1602,12 @@ export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityCon
     if (p.homeProjectId !== '' && role !== 'owner' && !ctx.eff.projects.has(p.homeProjectId)) {
       return refuseWith(NOTE_PERMISSION_RULE, NOTE_HOME_REASON);
     }
-    if (p.attachTicketId !== undefined && !(await canSee(ctx.db, ctx.sessionUserId, p.attachTicketId))) {
+    // The new note is homed in the event's workspace, so that is the workspace its ticket must be in (18.501).
+    if (
+      p.attachTicketId !== undefined &&
+      !((await ticketInWorkspace(ctx.db, p.attachTicketId, env.workspaceId)) &&
+        (await canSee(ctx.db, ctx.sessionUserId, p.attachTicketId)))
+    ) {
       return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
     }
     return null;
@@ -1608,14 +1633,21 @@ export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityCon
     // the note who cannot OPEN the ticket (see it, or be the author of the
     // draft, G11 below) is refused, and a person who can see the ticket but not
     // the note never reaches this line. Attaching is how a
-    // note's audience is widened, so it is not a reader's act alone.
+    // note's audience is widened, so it is not a reader's act alone. And the
+    // ticket must be in the NOTE's workspace (18.500): opening it is asked in the
+    // ticket's own workspace, so a person in both workspaces could otherwise
+    // link across them. The detach is bound too: it can name any ticket id, and
+    // a committed one puts that id in the note's event stream for its readers.
     const { ticketId } = (env.type === 'note.attached' ? noteAttachedPayload : noteDetachedPayload).parse(
       env.payload,
     );
     // G11 (drafts spec R66): `canOpen`, not `canSee`. The author of a draft attaches notes to it; everyone else is
     // refused with the sentence an unknown ticket gets. `note.created {attachTicketId}` above keeps `canSee` on
     // purpose: a creation event cannot be withheld from the note's other readers (28.191).
-    if (!(await canOpen(ctx.db, ctx.sessionUserId, ticketId))) {
+    if (
+      !((await ticketInWorkspace(ctx.db, ticketId, loaded.note.workspaceId)) &&
+        (await canOpen(ctx.db, ctx.sessionUserId, ticketId)))
+    ) {
       return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
     }
     return null;
