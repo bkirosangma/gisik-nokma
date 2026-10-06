@@ -158,7 +158,7 @@ export function noteTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'link_note',
-      description: 'Attach a note to a ticket (action "attach") or detach it ("detach"). You must be able to see both.',
+      description: 'Attach a note to a ticket (action "attach") or detach it ("detach"). You must be able to see both, and the ticket must be in the note\'s workspace.',
       inputSchema: linkShape,
       handler: async (args) => {
         const a = z.object(linkShape).parse(args);

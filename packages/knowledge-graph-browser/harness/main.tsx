@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import '@gisik-nokma/ui/ui.css';
 import { themeStylesheet } from '@gisik-nokma/ui/tokens';
+import { Sheet, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import type { GraphItemView, GraphRingResponse } from '@gisik-nokma/domain';
 import { KnowledgeGraph, type GraphRenderer, type GraphSource, type GraphZonesSummary, type RendererProbe, type ScopeChoices } from '@gisik-nokma/knowledge-graph';
 import { createSigmaRenderer } from '@gisik-nokma/knowledge-graph/sigma';
@@ -10,8 +11,8 @@ import { fixtureDelay, fixtureRing, setFixtureTitle } from './fixture-source.js'
  * The VIEW harness (KG-C T7): `KnowledgeGraph` on the fixture, centred on GN-142, with the REAL Sigma adapter injected, so
  * the probe is on (`data-kg-probe`). `?config=phone|desktop|home`, `?hl=<ref>,<ref>` (Home's highlight), `?delay=<ms>`
  * (every ring answers late), `?long=<ref>` (that item's title is 200 characters: Review Focus 4), `?world=gn9-blocks|gn9-lonely`
- * (instead of the fixture, GN-9 with one Blocks link to GN-5, or with nothing linked: the empty states, 27.668). `window.__kgView`
- * exposes the probe and the last `onZones` report.
+ * (instead of the fixture, GN-9 with one Blocks link to GN-5, or with nothing linked: the empty states, 27.668), `?panel=`
+ * (below). `window.__kgView` exposes the probe and the last `onZones` report.
  */
 const style = document.createElement('style');
 style.textContent = themeStylesheet();
@@ -65,7 +66,7 @@ window.__kgView = {
   },
 };
 
-createRoot(document.getElementById('root')!).render(
+const view = (
   <KnowledgeGraph
     centre={world === null ? 'ticket:t142' : 'ticket:t9'}
     config={config}
@@ -76,5 +77,28 @@ createRoot(document.getElementById('root')!).render(
     onZones={(z) => (state.zones = z)}
     onOpen={() => undefined}
     createRenderer={async () => () => (state.renderer = createSigmaRenderer())}
-  />,
+  />
+);
+
+/*
+ * `?panel=sheet|bare|loading` (KG-C T9, case 27.342's browser half): the view as the web hosts it, in the ui `Sheet` inside a
+ * `.gn-kg-panel` (`apps/web/src/knowledge-graph/graph-panel.tsx`); `bare` is the same Sheet without the panel class (the
+ * control); `loading` is graph-panel.tsx's loading box in the Sheet instead of the view (its markup, copied: the harness
+ * cannot import the web app).
+ */
+const panel = params.get('panel');
+createRoot(document.getElementById('root')!).render(
+  panel === null ? (
+    view
+  ) : (
+    <Sheet open title="Knowledge Graph" onClose={() => undefined}>
+      {panel === 'loading' ? (
+        <SkeletonRegion label="Loading the Knowledge Graph" className="gn-kg-panel gn-kg-panel--loading">
+          <Skeleton shape="block" height="100%" />
+        </SkeletonRegion>
+      ) : (
+        <div className={panel === 'bare' ? undefined : 'gn-kg-panel'}>{view}</div>
+      )}
+    </Sheet>
+  ),
 );

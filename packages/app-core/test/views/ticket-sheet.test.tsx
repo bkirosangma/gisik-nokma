@@ -8,7 +8,7 @@ import { createClientStateCache } from '../../src/cache.js';
 import { formatDate } from '../../src/provenance.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
-import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
+import type { EditorSlotComponent, KnowledgeGraphSlotComponent } from '../../src/views/editor-slot.js';
 import type { ListRow, TicketHistoryEvent, TicketRead, TicketVisibility } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
 import { DELETE_NOTE, unansweredLine } from '../../src/trash/copy.js';
@@ -2896,7 +2896,7 @@ describe('the `Subtask of {parent}` chip', () => {
  * run's, which is part of this task rather than an extra.
  */
 describe('sheet prototype parity', () => {
-  it('16.81 the sections are ONE segmented control — the tablist roles kept, and a NAME it never had', async () => {
+  it('16.81 / 27.341 the sections are ONE segmented control — the tablist roles kept, and a NAME it never had; a fourth tab, Knowledge Graph, when the host mounts the graph slot', async () => {
     const read = ticketRead();
     renderSheet(read, sheetSource(read, [], []));
     await settled();
@@ -2911,6 +2911,8 @@ describe('sheet prototype parity', () => {
     // was pinned while the question of the authority's third tab was open; the
     // owner ruled it IN (spec 2026-09-22 decision 5 — "add the Attachments
     // tab"), so the case now asserts the ruled shape rather than the absence.
+    // THREE is still the count for a sheet mounted WITHOUT `knowledgeGraphSlot`; the second mount at the end of this
+    // case is the four-tab shape (spec C §1, 27.341).
     expect(tabs.map((t) => t.textContent)).toEqual(['Details', 'History', 'Attachments']);
     expect(tabs).toHaveLength(3);
 
@@ -2925,6 +2927,56 @@ describe('sheet prototype parity', () => {
     expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Details');
     await userEvent.click(within(tablist).getByRole('tab', { name: 'History' }));
     expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('History');
+
+    // The second mount: the same sheet WITH the graph slot draws four tabs, the fourth `Knowledge Graph` (27.341).
+    cleanup();
+    renderSheet(read, sheetSource(read, [], []), { knowledgeGraphSlot: () => <p>graph here</p> });
+    await settled();
+    const withSlot = within(screen.getByRole('tablist', { name: 'Ticket sections' })).getAllByRole('tab');
+    expect(withSlot.map((t) => t.textContent)).toEqual(['Details', 'History', 'Attachments', 'Knowledge Graph']);
+  });
+
+  it('27.341 the Knowledge Graph tab renders the slot with the sheet\'s workspace and ticket, and its onShowLinks returns to Details; control: no slot, no tab and no Knowledge Graph anywhere', async () => {
+    const read = ticketRead();
+    const seen: Parameters<KnowledgeGraphSlotComponent>[0][] = [];
+    const Slot: KnowledgeGraphSlotComponent = (props) => {
+      seen.push(props);
+      return (
+        <button type="button" onClick={props.onShowLinks}>
+          graph slot: show links
+        </button>
+      );
+    };
+    const onOpenTicket = vi.fn();
+    renderSheet(read, sheetSource(read, [], []), { knowledgeGraphSlot: Slot, onOpenTicket });
+    await settled();
+    const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
+    expect(screen.queryByRole('button', { name: 'graph slot: show links' })).toBeNull();
+
+    await userEvent.click(within(tablist).getByRole('tab', { name: 'Knowledge Graph' }));
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Knowledge Graph');
+    // Inside the sheet's graph region, the branch's own wrapper (no rule sizes it; the panel's `.gn-kg-panel` rules do).
+    expect(screen.getByRole('button', { name: 'graph slot: show links' }).closest('.gn-ticket-sheet__graph')).not.toBeNull();
+    expect(seen.at(-1)).toEqual(expect.objectContaining({ workspaceId: WS, ticketId: TICKET }));
+    // The sheet's own opener reaches the graph, so its "Open ticket" opens in the same host.
+    expect(seen.at(-1)?.onOpenTicket).toBe(onOpenTicket);
+
+    // `Add link` in the graph is `onShowLinks`: back to Details, where spec A's Links section is; the slot unmounts.
+    await userEvent.click(screen.getByRole('button', { name: 'graph slot: show links' }));
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Details');
+    expect(screen.queryByRole('button', { name: 'graph slot: show links' })).toBeNull();
+    // The graph is the fourth tab's alone: Attachments with the slot mounted still draws no graph.
+    await userEvent.click(within(tablist).getByRole('tab', { name: 'Attachments' }));
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Attachments');
+    expect(screen.queryByRole('button', { name: 'graph slot: show links' })).toBeNull();
+
+    // CONTROL, same it: with no slot the options are EXACTLY the three, and nothing on the screen reads Knowledge Graph.
+    cleanup();
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+    const plain = within(screen.getByRole('tablist', { name: 'Ticket sections' })).getAllByRole('tab');
+    expect(plain.map((t) => t.textContent)).toEqual(['Details', 'History', 'Attachments']);
+    expect(screen.queryByText('Knowledge Graph')).toBeNull();
   });
 
   it('16.82 Full screen moves the SCRIM, the PANEL and the BODY together — and says which way it goes', async () => {

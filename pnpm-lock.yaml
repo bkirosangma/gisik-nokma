@@ -266,6 +266,9 @@ importers:
       '@gisik-nokma/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@gisik-nokma/knowledge-graph':
+        specifier: workspace:*
+        version: link:../../packages/knowledge-graph
       '@gisik-nokma/ui':
         specifier: workspace:*
         version: link:../../packages/ui
