@@ -8982,7 +8982,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": " badge on the four that came with the workspace."
+                "text": " badge on the five that came with the workspace."
               }
             ]
           },

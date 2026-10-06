@@ -2924,7 +2924,7 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   edits — but **`backup-daemon-main.ts` itself now calls `startScheduler` directly with all eight jobs**
   (four when this bullet was written; Task 8 of the second wave added `auto-close`, trash Plan 2 `purge`, devices Task 4 `expired-sessions` and wtg2 T7 `decision-backfill`), not
   `startBackupDaemon`: one scheduler, one `stop()`, one `'backup daemon scheduled'` log line, for the
-  two backup jobs and the three errands below alike. `startBackupDaemon`'s only remaining caller is its own
+  two backup jobs, the three errands below and the later jobs alike. `startBackupDaemon`'s only remaining caller is its own
   test file, kept because it is what pins `startScheduler`'s stderr/alerter contract in one place; a
   `sweep-orphans` failure in production alerts through that SAME contract, as `` `backup:sweep-orphans` ``
   with `msg: 'backup job failed'` (cases 13.25/13.27's naming, extended to the two new jobs by construction

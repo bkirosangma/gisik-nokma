@@ -358,7 +358,7 @@ describe('POST /v1/workspaces — the founding door', () => {
 
     // The premise, still asserted: `task` really is defined in this workspace's
     // ledger, by the founding sequence, bound to the workspace's only workflow.
-    // Without those four events the create would be refused `ticket.unknown-type`
+    // Without those five events the create would be refused `ticket.unknown-type`
     // by a context that reads the table correctly and finds nothing in it — "a
     // context that can read the table is not the same thing as a table with the
     // type in it".

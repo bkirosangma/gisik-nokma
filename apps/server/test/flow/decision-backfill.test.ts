@@ -31,7 +31,7 @@ const workflowEvent = (workspaceId: string, id: string) => makeCommitted({
 const typeEvent = (workspaceId: string, def: TicketTypeDef) => makeCommitted({
   workspaceId, actorId: HUMAN, entity: { kind: 'ticket-type', id: newUlid() }, type: 'ticket-type.defined', payload: def,
 });
-const lifecycle = (workspaceId: string, type: 'workspace.deleted' | 'purge.marked') => makeCommitted({
+const lifecycle = (workspaceId: string, type: 'workspace.deleted' | 'workspace.undeleted' | 'workspace.archived' | 'purge.marked') => makeCommitted({
   workspaceId, actorId: HUMAN, entity: { kind: 'workspace', id: workspaceId }, type, payload: {},
 });
 
@@ -223,4 +223,33 @@ describe('29.143 the Decision backfill', () => {
     expect(unset.status).toBe(2);
     expect(unset.stderr).toContain('DATABASE_URL is required');
   }, 120_000);
+
+  it('29.143 one run defines every candidate in ITS OWN workspace, bound to ITS OWN task workflow; control: each holds exactly one definition', async () => {
+    // Two candidates through the REAL door in one batch: every other case hands the door one candidate (or a stub that
+    // never reads the envelope's workspace), so an envelope filed in the wrong tenant would pass them all.
+    const pair = [newUlid(), newUlid()];
+    for (const ws of pair) await seedLegacy(ws, { taskWf: `wf-task-${ws}` });
+    expect(await backfillDecisionType({ pool: db.pool, ingest: door() })).toEqual({ candidates: 2, defined: 2, refused: 0, alreadyHad: 0 });
+    for (const ws of pair) {
+      expect(await decisionRows(ws), ws).toEqual([expect.objectContaining({ workflow_id: `wf-task-${ws}`, defined_by: SYSTEM_ACTOR_FLOW })]);
+      expect(await decisionEvents(ws), ws).toHaveLength(1);
+    }
+  });
+
+  it('29.143 a live workspace that HAS a lifecycle row (archived; deleted then undeleted) is still a candidate; control: a trashed one beside them is not', async () => {
+    const [archived, back, trashed] = [newUlid(), newUlid(), newUlid()];
+    for (const ws of [archived, back, trashed]) await seedLegacy(ws);
+    await applyCommitted(db.pool, [
+      lifecycle(archived, 'workspace.archived'),
+      lifecycle(back, 'workspace.deleted'), lifecycle(back, 'workspace.undeleted'),
+      lifecycle(trashed, 'workspace.deleted'),
+    ]);
+    // The premise: all three hold a proj_workspaces row, so "has a row" is not what excludes the trashed one.
+    const rows = await db.pool.query<{ workspace_id: string }>(`SELECT workspace_id FROM proj_workspaces WHERE workspace_id = ANY($1)`, [[archived, back, trashed]]);
+    expect(rows.rows.map((row) => row.workspace_id).sort()).toEqual([archived, back, trashed].sort());
+    expect((await findDecisionBackfillCandidates(db.pool)).map((c) => c.workspaceId).sort()).toEqual([archived, back].sort());
+    expect(await backfillDecisionType({ pool: db.pool, ingest: door() })).toEqual({ candidates: 2, defined: 2, refused: 0, alreadyHad: 0 });
+    for (const ws of [archived, back]) expect(await decisionRows(ws), ws).toEqual([expect.objectContaining({ workflow_id: `wf-main-${ws}`, defined_by: SYSTEM_ACTOR_FLOW })]);
+    expect(await decisionRows(trashed)).toEqual([]);
+  });
 });

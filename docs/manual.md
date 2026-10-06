@@ -1589,7 +1589,7 @@ affect you: **a parent cannot be finished while any of its children is still goi
 ## §12 — Setting up your own ticket types (owners and admins)
 
 There is a separate screen for these. It lists your types with their rank, how many custom fields each
-has, and a **Built-in** badge on the four that came with the workspace.
+has, and a **Built-in** badge on the five that came with the workspace.
 
 Each type you made yourself has a **Reorder** button opening a small menu — **Move up**, **Move down**
 and **Move to top** (the top of your own types). An item that cannot apply is greyed out and says why in
