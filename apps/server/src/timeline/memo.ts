@@ -30,7 +30,7 @@ export function coreKey(viewerId: string, scope: TimelineScope, readable: readon
     istDayOf(now.toISOString()),
     readable.map(({ workspaceId, eff }) => [
       workspaceId,
-      asOf[workspaceId] ?? null,
+      asOf[workspaceId], // `readAsOf` answers for every readable workspace
       eff.workspaceRole,
       [...eff.projects].map(([projectId, p]) => [projectId, p.projectAdmin]).sort(),
     ]),

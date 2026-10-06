@@ -218,7 +218,10 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
   });
 
   it('29.299 the key separates viewer, scope, day, asOf and role; control: the same inputs are one key', async () => {
-    const readable: ReadableWorkspace[] = [{ workspaceId: w.A.workspaceId, eff: await resolveEffectiveRole(db.pool, w.ama, w.A.workspaceId) }];
+    const eff = await resolveEffectiveRole(db.pool, w.ama, w.A.workspaceId);
+    const readable: ReadableWorkspace[] = [{ workspaceId: w.A.workspaceId, eff }];
+    expect(eff.workspaceRole).toBe('owner');
+    expect([...eff.projects.values()].some((p) => p.projectAdmin)).toBe(true); // so the two role variants below each change ONE thing
     const asOf = { [w.A.workspaceId]: 41 };
     const base = coreKey(w.ama, scopeOf(), readable, asOf, NOW);
     expect(coreKey(w.ama, scopeOf(), readable, { ...asOf }, at(1000))).toBe(base); // control
@@ -227,7 +230,8 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
       coreKey(w.ama, scopeOf({ mine: true }), readable, asOf, NOW),
       coreKey(w.ama, scopeOf(), readable, asOf, new Date('2026-10-04T06:00:00.000Z')),
       coreKey(w.ama, scopeOf(), readable, { [w.A.workspaceId]: 42 }, NOW),
-      coreKey(w.ama, scopeOf(), [{ workspaceId: w.A.workspaceId, eff: await resolveEffectiveRole(db.pool, w.bo, w.A.workspaceId) }], asOf, NOW),
+      coreKey(w.ama, scopeOf(), [{ workspaceId: w.A.workspaceId, eff: { ...eff, workspaceRole: 'member' } }], asOf, NOW), // the role alone
+      coreKey(w.ama, scopeOf(), [{ workspaceId: w.A.workspaceId, eff: { ...eff, projects: new Map([...eff.projects].map(([id]) => [id, { projectAdmin: false }])) } }], asOf, NOW), // project admin alone
     ];
     for (const v of variants) expect(v).not.toBe(base);
     expect(new Set(variants).size).toBe(variants.length);
