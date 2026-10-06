@@ -281,7 +281,7 @@ describe('reporting v1 scope guard (spec §7: nothing the record does not contai
     expect(answer).toContain('will not forecast');
   });
 
-  it('11.181 the notification vocabulary is closed over exactly the five kinds — no room for a computed-urgency kind to creep in', () => {
+  it('11.181 the notification vocabulary is closed over exactly the shipped kinds — no room for a computed-urgency kind to creep in', () => {
     expect(Object.keys(notificationPayloadSchemaByKind).sort()).toEqual([...NOTIFICATION_KINDS].sort());
   });
 });

@@ -48,10 +48,10 @@ describe('11.94 the gateway contract carries the store’s paging without loss',
     // Exactly once — a cursor rule that used `<=` would repeat the boundary
     // row, and the equality above would still hold if it also dropped one.
     expect(new Set(seen).size).toBe(rows.length);
-    // Three pages for five rows at a page size of two: the walk really paged
-    // rather than getting everything in one answer, which is the only way the
-    // cursor was exercised at all.
-    expect(gateway.listCalls).toHaveLength(3);
+    // Four pages for seven rows (one per kind) at a page size of two: the walk
+    // really paged rather than getting everything in one answer, which is the
+    // only way the cursor was exercised at all.
+    expect(gateway.listCalls).toHaveLength(4);
     expect(gateway.listCalls[0]).toBeUndefined();
   });
 

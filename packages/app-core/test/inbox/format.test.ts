@@ -4,7 +4,9 @@ import { dueClaimLabel, formatClaimDate } from '../../src/claims/claim-labels.js
 import {
   notificationBody,
   notificationHeadline,
+  notificationTarget,
   notificationTicketId,
+  notificationTicketLabel,
 } from '../../src/inbox/format.js';
 import { notificationOf, userName } from './fixtures.js';
 
@@ -25,8 +27,8 @@ import { notificationOf, userName } from './fixtures.js';
  * because it would never be compared to one. So the days below are literals,
  * and the instants either side of the IST midnight boundary are the whole test.
  */
-describe('11.83 every kind is spoken for — a sixth would arrive mute', () => {
-  it('the walk really covers the vocabulary, and the vocabulary is five kinds', () => {
+describe('11.83 every kind is spoken for — an eighth would arrive mute', () => {
+  it('the walk really covers the vocabulary, and the vocabulary is seven kinds', () => {
     // The positive control for the loops below: a walk over an empty list
     // reports "every kind has a headline" in exactly the same green.
     expect(NOTIFICATION_KINDS).toEqual([
@@ -35,6 +37,8 @@ describe('11.83 every kind is spoken for — a sixth would arrive mute', () => {
       'contested-claim',
       'date-approaching',
       'stale-ticket',
+      'flow-ready',
+      'flow-reopened',
     ]);
   });
 
@@ -55,6 +59,43 @@ describe('11.83 every kind is spoken for — a sixth would arrive mute', () => {
       't-contested',
       't-date',
       't-stale',
+      't-flow-ready',
+      't-flow-reopened',
+    ]);
+  });
+});
+
+describe('29.398 the flow rows (wtg2 T18, spec NT-1 / NT-2)', () => {
+  it('29.398 the flow rows read as sentences, hidden or not, and the five older headlines are unchanged', () => {
+    const ready = (payload: Record<string, unknown> = {}) => notificationOf('flow-ready', { payload });
+    expect(notificationHeadline(ready(), userName)).toBe('Ready to start: Draft the brief was closed');
+    expect(notificationHeadline(ready({ label: 'Yes' }), userName)).toBe('Ready to start: Draft the brief chose Yes');
+    expect(notificationHeadline(ready({ becauseTicketId: null, becauseTitle: null, label: null }), userName)).toBe(
+      "Ready to start: a step you can't see was closed",
+    );
+    expect(notificationBody(ready())).toBe('Write the copy');
+    expect(notificationTarget(ready())).toEqual({ kind: 'ticket', ticketId: 't-flow-ready' });
+    expect(notificationTicketLabel(ready())).toBeNull(); // the body IS the moved ticket's title
+    const reopened = (payload: Record<string, unknown> = {}) => notificationOf('flow-reopened', { payload });
+    expect(notificationHeadline(reopened(), userName)).toBe('Reopened by the flow: Ship or redo chose Redo (pass 2)');
+    expect(notificationHeadline(reopened({ toBacklog: true }), userName)).toBe('Back in Backlog by the flow: Ship or redo chose Redo (pass 2)');
+    expect(notificationHeadline(reopened({ pass: 3 }), userName)).toBe('Reopened by the flow: Ship or redo chose Redo (pass 3)');
+    expect(notificationHeadline(reopened({ decisionTicketId: null, decisionTitle: null, outcome: null }), userName)).toBe(
+      "Reopened by the flow: a decision you can't see (pass 2)",
+    );
+    expect(notificationHeadline(reopened({ outcome: null }), userName)).toBe('Reopened by the flow: Ship or redo (pass 2)');
+    expect(notificationBody(reopened())).toBe('Review the copy');
+    expect(notificationTicketId(reopened())).toBe('t-flow-reopened');
+    expect(notificationTarget(reopened())).toEqual({ kind: 'ticket', ticketId: 't-flow-reopened' });
+    expect(notificationTicketLabel(reopened())).toBeNull();
+    // CONTROL: the five older headlines, word for word
+    expect(['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket'].map((kind) =>
+      notificationHeadline(notificationOf(kind as 'assignment'), userName))).toEqual([
+      'Kiro assigned this to you',
+      'Kiro mentioned you',
+      'Your claim was contested',
+      "needed by 30 Aug, Kiro's claim",
+      'In Doing since 1 Aug, moved there by Kiro',
     ]);
   });
 });

@@ -1,10 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { domainRegistry, linkReading, TICKET_EVENT_TYPES, TICKET_LINK_KINDS, type EventTypeRegistration } from '@gisik-nokma/domain';
+import {
+  domainRegistry,
+  linkReading,
+  NOTIFICATION_KINDS,
+  notificationPayloadSchemaByKind,
+  TICKET_EVENT_TYPES,
+  TICKET_LINK_KINDS,
+  type EventTypeRegistration,
+} from '@gisik-nokma/domain';
 import { REFUSALS } from '@gisik-nokma/rule-engine';
 import { payloadIds } from '../../src/purge/check-purged.js';
 import { BOOTSTRAP_BACKFILL_TYPES } from '../../src/sync/sync-routes.js';
+import { createTestDatabase } from '../helpers/db.js';
 
 /** 27.004: the census the sync-routes docblock named as missing. Reads the REGISTRY, never a retyped list. */
 const onTicket = (r: EventTypeRegistration) =>
@@ -116,5 +125,56 @@ describe('29.209 the flow-cause census', () => {
     // control: the 27.004 census still fires on a planted registration
     const planted = { type: 'ticket.planted_for_census', version: 1, entityKind: 'ticket', payloadSchema: undefined as never } as EventTypeRegistration;
     expect(unaccounted([...domainRegistry.registrations(), planted])).toEqual(['ticket.planted_for_census']);
+  });
+});
+
+/**
+ * 29.399 (wtg2 T18): the notification-kind census. A kind lives in four places that no compiler joins: the domain's
+ * `NOTIFICATION_KINDS`, its payload schema, and the two database CHECKs a migration fixes (`notifications_kind_check`,
+ * `user_notification_preferences_muted_kinds_check`). The headline, body, icon and label sites are exhaustive by TYPE
+ * (`never` switches and `Record<NotificationKind, …>`), so this census does not re-test them; 29.398 pins their values.
+ */
+describe('29.399 notification kind census', () => {
+  const missing = (kinds: readonly string[], have: ReadonlySet<string>) => kinds.filter((k) => !have.has(k));
+  it('29.399 every kind has a payload schema and both CHECKs accept it; a planted kind is reported', async () => {
+    const db = await createTestDatabase();
+    try {
+      // One client for BEGIN / INSERT / ROLLBACK: `pool.query` may hand each statement a different client, so the
+      // ROLLBACK would not undo the INSERT. Returns `true` or the error message, so a refusal is told apart from any
+      // other SQL error (a catch-all `false` would let a typo in the INSERT pass the planted-kind control).
+      const accepted = async (table: 'notifications' | 'prefs', kind: string): Promise<true | string> => {
+        const client = await db.pool.connect();
+        try {
+          await client.query('BEGIN');
+          if (table === 'notifications') {
+            await client.query(
+              `INSERT INTO notifications (id, user_id, workspace_id, kind, dedupe_key, payload, read, created_at) VALUES ('c', 'u', 'w', $1, 'c', '{}'::jsonb, false, now())`,
+              [kind],
+            );
+          } else {
+            await client.query(`INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at) VALUES ('u', ARRAY[$1]::text[], now())`, [kind]);
+          }
+          return true;
+        } catch (error) {
+          return (error as Error).message;
+        } finally {
+          await client.query('ROLLBACK');
+          client.release();
+        }
+      };
+      const kinds = [...NOTIFICATION_KINDS];
+      // CONTROL first: each check can fail, and fails on its CHECK
+      expect(await accepted('notifications', 'planted-kind')).toMatch(/notifications_kind_check/);
+      expect(await accepted('prefs', 'planted-kind')).toMatch(/user_notification_preferences_muted_kinds_check/);
+      expect(missing([...kinds, 'planted-kind'], new Set(Object.keys(notificationPayloadSchemaByKind)))).toEqual(['planted-kind']);
+      expect(missing(kinds, new Set(Object.keys(notificationPayloadSchemaByKind)))).toEqual([]);
+      for (const kind of kinds) {
+        expect(await accepted('notifications', kind), `notifications_kind_check refuses ${kind}`).toBe(true);
+        expect(await accepted('prefs', kind), `muted_kinds check refuses ${kind}`).toBe(true);
+      }
+      expect(kinds).toEqual(expect.arrayContaining(['flow-ready', 'flow-reopened']));
+    } finally {
+      await db.drop();
+    }
   });
 });

@@ -14,10 +14,10 @@ import { NotificationsSection } from '../../src/account/notifications-section.js
 describe('NotificationsSection', () => {
   it('11.205 renders one checked-by-default row per real notification kind', () => {
     render(<NotificationsSection mutedKinds={[]} onToggle={vi.fn()} />);
-    // Five, not a hand-copied number: NOTIFICATION_KINDS is the domain's own
-    // list, and this count is what pins the section to it rather than to a
-    // constant this file guessed.
-    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+    // Seven (wtg2 T18, 29.397: the two flow kinds), not a number the section
+    // computed: NOTIFICATION_KINDS is the domain's own list, and this count is
+    // what pins the section to it rather than to a constant this file guessed.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(7);
     for (const box of screen.getAllByRole('checkbox')) {
       expect(box).toBeChecked();
     }
@@ -27,7 +27,23 @@ describe('NotificationsSection', () => {
     render(<NotificationsSection mutedKinds={['mention']} onToggle={vi.fn()} />);
     expect(screen.getByLabelText(/mentioned/i)).not.toBeChecked();
     const checked = screen.getAllByRole('checkbox').filter((box) => (box as HTMLInputElement).checked);
-    expect(checked).toHaveLength(4);
+    expect(checked).toHaveLength(6);
+  });
+
+  it('29.397 the two flow kinds have their own switches, each muting its own kind; control: a muted flow kind is the only unchecked row', async () => {
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    const { unmount } = render(<NotificationsSection mutedKinds={[]} onToggle={onToggle} />);
+    const ready = screen.getByLabelText('A ticket is ready to start');
+    const reopened = screen.getByLabelText('A ticket was reopened by a flow');
+    expect([ready, reopened].map((box) => (box as HTMLInputElement).checked)).toEqual([true, true]);
+    await user.click(ready);
+    await user.click(reopened);
+    expect(onToggle.mock.calls).toEqual([['flow-ready'], ['flow-reopened']]);
+    unmount();
+    render(<NotificationsSection mutedKinds={['flow-ready']} onToggle={vi.fn()} />);
+    expect(screen.getByLabelText('A ticket is ready to start')).not.toBeChecked();
+    expect(screen.getAllByRole('checkbox').filter((box) => !(box as HTMLInputElement).checked)).toHaveLength(1);
   });
 
   it('11.207 clicking a row calls onToggle with that kind, and does not flip local state itself', async () => {

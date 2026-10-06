@@ -75,6 +75,28 @@ const PAYLOADS: Record<NotificationKind, () => Record<string, unknown>> = {
     enteredAt: '2026-08-01T09:00:00.000Z',
     enteredBy: 'user_kiro',
   }),
+  'flow-ready': () => ({
+    ticketId: 't-flow-ready',
+    ticketTitle: 'Write the copy',
+    becauseTicketId: 't-source',
+    becauseTitle: 'Draft the brief',
+    label: null,
+    eventId: 'e1',
+    clientTime: CLIENT_TIME,
+    serverTime: SERVER_TIME,
+  }),
+  'flow-reopened': () => ({
+    ticketId: 't-flow-reopened',
+    ticketTitle: 'Review the copy',
+    decisionTicketId: 't-decision',
+    decisionTitle: 'Ship or redo',
+    outcome: 'Redo',
+    pass: 2,
+    toBacklog: false,
+    eventId: 'e1',
+    clientTime: CLIENT_TIME,
+    serverTime: SERVER_TIME,
+  }),
 };
 
 let counter = 0;

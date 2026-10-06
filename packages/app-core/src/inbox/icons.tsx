@@ -6,16 +6,16 @@ import type { NotificationKind } from '@gisik-nokma/domain';
  *
  * ## A RECORD, not a switch, and that is the whole safety argument
  *
- * `Record<NotificationKind, ReactElement>` is exhaustive by TYPE: a sixth kind
+ * `Record<NotificationKind, ReactElement>` is exhaustive by TYPE: a new kind
  * added to `NOTIFICATION_KINDS` makes this object literal fail to compile. A
  * switch — which is what the plan's draft is a hair away from — would fall
  * through for the new kind and render an EMPTY `<svg>`: an icon-shaped hole,
  * on screen, in a suite that only ever asked whether an svg appeared.
  *
- * The compiler cannot check what the arms CONTAIN, though, only that all five
+ * The compiler cannot check what the arms CONTAIN, though, only that all seven
  * exist. An entry left as an empty fragment, or one kind's paths pasted over
  * another's, compiles and renders. `test/inbox/icons.test.tsx` measures the
- * five rendered `innerHTML`s and asserts there are five DISTINCT ones — the one
+ * seven rendered `innerHTML`s and asserts there are seven DISTINCT ones — the one
  * assertion that catches an empty arm and a copy-paste at the same time.
  *
  * ## `currentColor` and nothing else
@@ -66,6 +66,20 @@ const PATHS: Record<NotificationKind, ReactElement> = {
       <polyline points="12 6 12 12 16 14" />
     </>
   ),
+  /** A play mark in a circle: this is ready to start (wtg2 T18). */
+  'flow-ready': (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="10 8 16 12 10 16 10 8" />
+    </>
+  ),
+  /** A counter-clockwise arrow: the flow sent this back (wtg2 T18). */
+  'flow-reopened': (
+    <>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <polyline points="3 3 3 8 8 8" />
+    </>
+  ),
 };
 
 export type NotificationIconProps = { kind: NotificationKind };
@@ -76,8 +90,8 @@ export type NotificationIconProps = { kind: NotificationKind };
  * here would make every row announce its kind twice.
  *
  * `data-kind` is not decoration — it is how a test can tell WHICH glyph a row
- * drew, and the inbox suite reads it to prove that five kinds render five
- * different icons rather than five copies of one.
+ * drew, and the inbox suite reads it to prove that seven kinds render seven
+ * different icons rather than seven copies of one.
  *
  * NO CLASS, and that is a correction rather than an omission. This element
  * carried `gn-inbox__icon` and `ui.css` had NO RULE for it, at any point — the

@@ -13,9 +13,10 @@ import { NotificationIcon } from '../../src/inbox/icons.js';
  * row draws a hole. And a copy-paste — one kind's paths under another's key —
  * renders a perfectly good icon of the wrong thing.
  *
- * One assertion catches both: collect the five rendered interiors and require
- * five DISTINCT ones. An empty arm collapses the set to four (the empty string
- * is one value); a duplicated arm collapses it to four as well.
+ * One assertion catches both: collect the seven rendered interiors and require
+ * seven DISTINCT ones. An empty arm collapses the set to six (the empty string
+ * is one value); a duplicated arm collapses it to six as well (29.398: the two
+ * flow glyphs are distinct from each other and from the five older ones).
  */
 function interiorOf(kind: (typeof NOTIFICATION_KINDS)[number]): string {
   const { container, unmount } = render(<NotificationIcon kind={kind} />);
@@ -25,7 +26,7 @@ function interiorOf(kind: (typeof NOTIFICATION_KINDS)[number]): string {
   return html;
 }
 
-describe('11.87 all five kinds reach an icon, and no two reach the same one', () => {
+describe('11.87 all seven kinds reach an icon, and no two reach the same one', () => {
   it('every kind renders an svg tagged with its own kind', () => {
     for (const kind of NOTIFICATION_KINDS) {
       const { container, unmount } = render(<NotificationIcon kind={kind} />);
@@ -36,7 +37,7 @@ describe('11.87 all five kinds reach an icon, and no two reach the same one', ()
     }
   });
 
-  it('the five interiors are five DIFFERENT drawings, none of them empty', () => {
+  it('the seven interiors are seven DIFFERENT drawings, none of them empty (29.398)', () => {
     const interiors = NOTIFICATION_KINDS.map(interiorOf);
     // Non-empty: an arm that is an empty fragment draws nothing at all.
     for (const [index, html] of interiors.entries()) {
@@ -47,8 +48,8 @@ describe('11.87 all five kinds reach an icon, and no two reach the same one', ()
     expect(new Set(interiors).size, `interiors:\n${interiors.join('\n---\n')}`).toBe(
       NOTIFICATION_KINDS.length,
     );
-    // The walk really covered the vocabulary — five, not zero, not four.
-    expect(interiors).toHaveLength(5);
+    // The walk really covered the vocabulary — seven, not zero, not six.
+    expect(interiors).toHaveLength(7);
   });
 
   it('names no colour: the stroke is currentColor and there is no fill', () => {

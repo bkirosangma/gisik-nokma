@@ -3,6 +3,8 @@ import type {
   AssignmentNotificationPayload,
   ContestedClaimNotificationPayload,
   DateApproachingNotificationPayload,
+  FlowReadyNotificationPayload,
+  FlowReopenedNotificationPayload,
   MentionNotificationPayload,
   NoteMentionNotificationPayload,
   Notification,
@@ -101,8 +103,27 @@ export function notificationHeadline(notification: Notification, userName: UserN
       const state = payload.stateName ?? payload.stateId;
       return `In ${state} since ${sinceDay(payload.enteredAt)}, moved there by ${userName(payload.enteredBy)}`;
     }
+    case 'flow-ready': {
+      // wtg2 T18, spec NT-1. A source the recipient could not see was stored as null at delivery, so the row names
+      // neither it nor its branch: nothing here can learn what the fan-out withheld.
+      const payload = notification.payload as FlowReadyNotificationPayload;
+      if (payload.becauseTitle === null) return "Ready to start: a step you can't see was closed";
+      return payload.label === null ? `Ready to start: ${payload.becauseTitle} was closed` : `Ready to start: ${payload.becauseTitle} chose ${payload.label}`;
+    }
+    case 'flow-reopened': {
+      // wtg2 T18, spec NT-2; a hidden Decision as above.
+      const payload = notification.payload as FlowReopenedNotificationPayload;
+      const lead = payload.toBacklog ? 'Back in Backlog by the flow' : 'Reopened by the flow';
+      const what =
+        payload.decisionTitle === null
+          ? "a decision you can't see"
+          : payload.outcome === null
+            ? payload.decisionTitle
+            : `${payload.decisionTitle} chose ${payload.outcome}`;
+      return `${lead}: ${what} (pass ${payload.pass})`;
+    }
     default: {
-      // A sixth kind is a COMPILE error rather than a headline-less row. The
+      // A new kind is a COMPILE error rather than a headline-less row. The
       // arms above return strings the compiler cannot check; their VALUES are
       // pinned one by one in `test/inbox/format.test.ts`.
       const exhaustive: never = notification.kind;
@@ -139,6 +160,10 @@ export function notificationBody(notification: Notification): string {
       return (notification.payload as DateApproachingNotificationPayload).ticketTitle;
     case 'stale-ticket':
       return (notification.payload as StaleTicketNotificationPayload).ticketTitle;
+    case 'flow-ready':
+      return (notification.payload as FlowReadyNotificationPayload).ticketTitle;
+    case 'flow-reopened':
+      return (notification.payload as FlowReopenedNotificationPayload).ticketTitle;
     default: {
       const exhaustive: never = notification.kind;
       throw new RangeError(`unknown notification kind: ${String(exhaustive)}`);
@@ -151,8 +176,8 @@ export function notificationBody(notification: Notification): string {
  *
  * E5-35. `mentionNotificationPayloadSchema` carries `ticketTitle`
  * (`notifications.ts:66`) and neither the headline nor the body used it, so a
- * mention said what was written and never where — the one row of the five whose
- * body is not already the title. The other four return `null` here because their
+ * mention said what was written and never where — the one row of the seven whose
+ * body is not already the title. The other six return `null` here because their
  * bodies ARE the title (`notificationBody` above), and repeating it would be the
  * same fact twice on one row.
  *
@@ -193,11 +218,11 @@ export function notificationTarget(notification: Notification): NotificationTarg
 }
 
 /**
- * The deep-link target. Every one of the five payloads names its ticket — the
+ * The deep-link target. Every one of the seven payloads names its ticket — the
  * `contested-claim` schema names it beside the contested event rather than
- * beside a title, which is why this reads the field rather than switching on
- * the kind. `test/inbox/format.test.ts` walks `NOTIFICATION_KINDS` and asserts
- * a ticket id comes back for each, so a sixth kind whose payload omitted `ticketId` would
+ * beside a title, and a flow row names the MOVED ticket, which is why this reads
+ * the field rather than switching on the kind. `test/inbox/format.test.ts` walks
+ * `NOTIFICATION_KINDS` and asserts a ticket id comes back for each, so a new kind whose payload omitted `ticketId` would
  * be caught here rather than by a link that goes nowhere.
  */
 export function notificationTicketId(notification: Notification): string {

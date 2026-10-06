@@ -8,6 +8,7 @@ import {
   markNotificationRead,
   unreadNotificationCount,
 } from '../../src/notifications/store.js';
+import { getNotificationPreferences } from '../../src/notification-preferences/store.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 let db: TestDatabase;
@@ -401,5 +402,39 @@ describe('unreadNotificationCount / listNotifications — muted kinds', () => {
     expect(await unreadNotificationCount(db.pool, 'user_kiro')).toBe(1);
     const page = await listNotifications(db.pool, 'user_kiro', {});
     expect(page.notifications).toHaveLength(1);
+  });
+
+  it('29.397 muting a flow kind hides its rows from the list and the unread count; control: muting mention leaves the flow row; a person with no preferences row receives both', async () => {
+    const flowReady = sample({
+      kind: 'flow-ready',
+      dedupeKey: `flow-ready:${nextId()}`,
+      payload: {
+        ticketId: 't1', ticketTitle: 'Write the copy', becauseTicketId: 't0', becauseTitle: 'Draft the brief', label: null,
+        eventId: nextId(), clientTime: '2026-10-03T10:00:00.000Z', serverTime: '2026-10-03T10:00:01.000Z',
+      },
+    });
+    const flowReopened = sample({
+      kind: 'flow-reopened',
+      dedupeKey: `flow-reopened:${nextId()}`,
+      payload: {
+        ticketId: 't2', ticketTitle: 'Review the copy', decisionTicketId: 'd1', decisionTitle: 'Ship or redo', outcome: 'Redo',
+        pass: 2, toBacklog: false, eventId: nextId(), clientTime: '2026-10-03T10:00:00.000Z', serverTime: '2026-10-03T10:00:01.000Z',
+      },
+    });
+    const mention = mentionSample();
+    for (const n of [flowReady, flowReopened, mention]) await insertNotification(db.pool, n);
+    const kinds = async (mutedKinds: string[]) =>
+      (await listNotifications(db.pool, 'user_kiro', { mutedKinds: mutedKinds as Notification['kind'][] })).notifications.map((n) => n.kind).sort();
+    const unread = (mutedKinds: string[]) => unreadNotificationCount(db.pool, 'user_kiro', mutedKinds as Notification['kind'][]);
+    expect(await kinds(['flow-ready'])).toEqual(['flow-reopened', 'mention']);
+    expect(await unread(['flow-ready'])).toBe(2);
+    expect(await kinds(['flow-reopened'])).toEqual(['flow-ready', 'mention']);
+    expect(await unread(['flow-ready', 'flow-reopened'])).toBe(1);
+    expect(await kinds(['mention'])).toEqual(['flow-ready', 'flow-reopened']); // control
+    // No preferences row: the empty mute list, so both flow rows are delivered and counted.
+    const prefs = await getNotificationPreferences(db.pool, 'user_kiro');
+    expect(prefs).toEqual({ mutedKinds: [] });
+    expect(await kinds(prefs.mutedKinds)).toEqual(['flow-ready', 'flow-reopened', 'mention']);
+    expect(await unread(prefs.mutedKinds)).toBe(3);
   });
 });

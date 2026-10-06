@@ -7,6 +7,8 @@ const LABELS: Record<NotificationKind, string> = {
   'contested-claim': 'A claim of yours is contested',
   'date-approaching': 'A date you are watching is approaching',
   'stale-ticket': 'A ticket has sat unmoved for a while',
+  'flow-ready': 'A ticket is ready to start',
+  'flow-reopened': 'A ticket was reopened by a flow',
 };
 
 export type NotificationsSectionProps = {

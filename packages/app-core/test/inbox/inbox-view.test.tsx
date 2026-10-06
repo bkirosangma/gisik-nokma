@@ -165,7 +165,7 @@ describe('11.89 a row is the notification, whole', () => {
 });
 
 describe('11.90 the delivered letter is rendered — every row, no filter, no re-check', () => {
-  it('renders one row per notification handed in, across all five kinds', () => {
+  it('renders one row per notification handed in, across every kind', () => {
     // The standing ruling — "revocation removes future sight, not letters
     // delivered" — is an ABSENCE in the component, and an absence is what a
     // per-row lookup cannot see: `getByText('Kiro mentioned you')` passes

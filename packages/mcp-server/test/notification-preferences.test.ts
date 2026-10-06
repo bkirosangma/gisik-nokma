@@ -29,19 +29,20 @@ function stateful(initial: string[]) {
   return recordingSession({ routes: { [`GET ${PREFS}`]: () => stored, [`PUT ${PREFS}`]: (body: unknown) => (stored = body as typeof stored) } });
 }
 
-/** The app's labels (`packages/app-core/src/account/notifications-section.tsx:4-10`), restated here so a drift in the tool's copy reddens. */
+/** The app's labels (`packages/app-core/src/account/notifications-section.tsx:4-12`), restated here so a drift in the tool's copy reddens. */
 const KINDS_IN_WORDS =
   'assignment (A ticket is assigned to you); mention (You are mentioned in a comment, description or note); ' +
   'contested-claim (A claim of yours is contested); date-approaching (A date you are watching is approaching); ' +
-  'stale-ticket (A ticket has sat unmoved for a while)';
+  'stale-ticket (A ticket has sat unmoved for a while); flow-ready (A ticket is ready to start); ' +
+  'flow-reopened (A ticket was reopened by a flow)';
 
 describe('get_notification_preferences / set_notification_preferences (package)', () => {
-  it('14.627 a person with nothing saved gets mutedKinds [] and all five kinds unmuted, in the domain\'s order; a malformed answer is an error, never "all on", and set writes nothing on it', async () => {
+  it('14.627 a person with nothing saved gets mutedKinds [] and every kind unmuted, in the domain\'s order; a malformed answer is an error, never "all on", and set writes nothing on it', async () => {
     const none = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: [] } } });
     const out = (await get(none.session)) as { mutedKinds: string[]; kinds: Array<{ kind: string; muted: boolean }> };
     expect(out.mutedKinds).toEqual([]);
     expect(out.kinds).toEqual(NOTIFICATION_KINDS.map((kind) => ({ kind, muted: false })));
-    expect(out.kinds.map((k) => k.kind)).toEqual(['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket']);
+    expect(out.kinds.map((k) => k.kind)).toEqual(['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket', 'flow-ready', 'flow-reopened']);
     // CONTROL, same `it`: a muted kind shows as muted and only that one.
     const some = recordingSession({ routes: { [`GET ${PREFS}`]: { mutedKinds: ['mention'] } } });
     expect(((await get(some.session)) as typeof out).kinds.filter((k) => k.muted).map((k) => k.kind)).toEqual(['mention']);

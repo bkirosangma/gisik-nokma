@@ -23,7 +23,7 @@ const answerSchema = z.enum(['accept', 'decline']);
 const MARK_ALL_PAGES = 10;
 
 /**
- * The app's own words for each kind (`packages/app-core/src/account/notifications-section.tsx:4-10`), copied. The record is
+ * The app's own words for each kind (`packages/app-core/src/account/notifications-section.tsx:4-12`), copied. The record is
  * typed on `NotificationKind`, so a kind added to the domain is a type error here, and 14.632 reds if a description loses one.
  */
 const KIND_WORDS: Record<NotificationKind, string> = {
@@ -32,6 +32,8 @@ const KIND_WORDS: Record<NotificationKind, string> = {
   'contested-claim': 'A claim of yours is contested',
   'date-approaching': 'A date you are watching is approaching',
   'stale-ticket': 'A ticket has sat unmoved for a while',
+  'flow-ready': 'A ticket is ready to start',
+  'flow-reopened': 'A ticket was reopened by a flow',
 };
 const KINDS_IN_WORDS = NOTIFICATION_KINDS.map((kind) => `${kind} (${KIND_WORDS[kind]})`).join('; ');
 const kindSchema = z.enum(NOTIFICATION_KINDS);
@@ -92,7 +94,7 @@ export function discoveryTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'list_notifications',
-      description: 'Your notifications, newest first (mentions, assignments, conflicts). unreadOnly for just the unread; page with cursor (the answer carries nextCursor); limit 1–100.',
+      description: 'Your notifications, newest first (mentions, assignments, conflicts, tickets ready to start, tickets reopened by a flow). unreadOnly for just the unread; page with cursor (the answer carries nextCursor); limit 1–100.',
       inputSchema: notificationArgs,
       handler: async (args) => {
         const a = z.object(notificationArgs).parse(args);

@@ -22,7 +22,7 @@ import { NotificationIcon } from './icons.js';
  *
  * An absence is not something a per-row assertion can see: a test that looks up
  * one headline passes just as happily when a different row was dropped. So
- * `test/inbox/inbox-view.test.tsx` renders a mixed five-kind fixture and
+ * `test/inbox/inbox-view.test.tsx` renders a mixed fixture of every kind and
  * asserts the COUNT of rendered items against the fixture's length — measured against a
  * planted `.filter(...)`, which is the mutation the ruling is really about.
  *
