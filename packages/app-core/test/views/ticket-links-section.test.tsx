@@ -1,5 +1,8 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { IngestResult, ServerStreamFrame } from '@gisik-nokma/domain';
 import type { PrecheckResult } from '../../src/precheck.js';
@@ -12,8 +15,8 @@ import { useLiveQuery } from '../../src/views/use-live-query.js';
 import type { TicketLinkView } from '../../src/view-types.js';
 
 /**
- * Cases 27.065-27.073: the ticket sheet's Links section (typed links, spec A §3.1). The sheet-level
- * cases 27.074-27.076 live in `ticket-sheet.test.tsx`.
+ * Cases 27.065-27.073 and 27.077 (the search field, release walk): the ticket sheet's Links section (typed links,
+ * spec A §3.1). The sheet-level cases 27.074-27.076 live in `ticket-sheet.test.tsx`.
  */
 
 const OTHER = '01J9GTKB000000000000000000';
@@ -542,5 +545,56 @@ describe('Links section', () => {
     await act(async () => releaseSlow());
     expect(screen.queryByRole('button', { name: 'GN-OLD Stale' })).toBeNull();
     expect(screen.getByRole('button', { name: 'GN-133 Chiller' })).toBeInTheDocument();
+  });
+
+  it('27.077 the search field is the shared recessed field with a visible placeholder; its accessible name stays "Find a ticket"', async () => {
+    const source = createFakeDataSource({ getTicketLinks: async () => [] });
+    const user = userEvent.setup();
+    render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit make={make} queryTickets={CHILLER} />);
+    await screen.findByText('No links yet.');
+    await openPicker(user);
+    const field = screen.getByRole('searchbox', { name: 'Find a ticket' });
+    expect(field.getAttribute('placeholder')).toBe('Search by key or title');
+    expect(field.className.split(/\s+/)).toEqual(['gn-field__input']);
+  });
+});
+
+/**
+ * 27.077's stylesheet half. jsdom paints nothing, so "the field is styled" is held where it can fail: the class it
+ * carries has a rule in `packages/ui/src/ui.css`, and the old `gn-input` (which NO stylesheet ever defined; this field
+ * was its only user) has no user left in any source or stylesheet. `(?![-\w])` so `gn-input-*` classes never match.
+ */
+describe('27.077 gn-input has no user left; gn-field__input is defined', () => {
+  const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+  const read = (path: string): string => readFileSync(resolve(ROOT, path), 'utf8');
+  const BARE = /(?<![-\w])gn-input(?![-\w])/;
+
+  it('the links section and the shared stylesheets: no bare gn-input anywhere; control: the section names gn-field__input and ui.css rules it', () => {
+    const section = read('packages/app-core/src/views/ticket-links-section.tsx');
+    const ui = read('packages/ui/src/ui.css');
+    expect(section).toMatch(/className="gn-field__input"/);
+    expect(ui.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/^\.gn-field__input \{/m);
+    // Every source and stylesheet a class can live in: each package's src, and the web app's src and app.
+    const roots = [
+      ...readdirSync(resolve(ROOT, 'packages')).map((pkg) => `packages/${pkg}/src`),
+      'apps/web/src',
+      'apps/web/app',
+    ];
+    const files = roots.flatMap((dir) => {
+      try {
+        return (readdirSync(resolve(ROOT, dir), { recursive: true }) as string[])
+          .filter((f) => /\.(tsx?|css)$/.test(f))
+          .map((f) => `${dir}/${f}`);
+      } catch {
+        return [];
+      }
+    });
+    expect(files).toContain('packages/app-core/src/views/ticket-links-section.tsx');
+    expect(files).toContain('packages/ui/src/ui.css');
+    expect(files).toContain('apps/web/app/globals.css');
+    expect(files.filter((f) => BARE.test(read(f)))).toEqual([]);
+    // control, same it: the pattern matches the old class and not its hyphenated neighbours
+    expect(BARE.test('className="gn-input"')).toBe(true);
+    expect(BARE.test('className="gn-input-group gn-inputs"')).toBe(false);
   });
 });

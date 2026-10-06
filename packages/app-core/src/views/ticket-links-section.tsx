@@ -185,10 +185,13 @@ export function TicketLinksSection({
         onChange={(v) => setChoice(v as Choice)}
         options={CHOICES.map(({ value, label }) => ({ value, label }))}
       />
+      {/* The shared recessed field (`.gn-field__input`, ui.css); the placeholder is the manual's own words (§"Linking
+          tickets": "search for the other ticket by its key or title"), so the empty strip says what it is for. */}
       <input
         type="search"
         aria-label="Find a ticket"
-        className="gn-input"
+        placeholder="Search by key or title"
+        className="gn-field__input"
         value={query}
         onChange={(e) => void search(e.target.value)}
       />
