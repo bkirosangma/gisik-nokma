@@ -15,6 +15,7 @@ import { BLOCKED_STATES_CTE, compileFilterSpec, resolveMeInSpec } from '../read/
 import { epicAncestors, type EpicOf } from '../read/ancestry.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { assembleListCards } from '../read/list-cards.js';
+import { pinCountsFor, pinOf } from '../read/pin-counts.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
 import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
@@ -173,7 +174,7 @@ export async function readList(
     workspaceId,
     cards.map((card) => card.ticketId),
   );
-  const listCards = await assembleListCards(
+  const assembled = await assembleListCards(
     db,
     viewerId,
     workspaceId,
@@ -181,6 +182,10 @@ export async function readList(
     cards,
     new Map([...epics].map(([ticketId, found]) => [ticketId, found.epicId])),
   );
+  // The paper pin (TG-11, TV-10): the notes THIS viewer may read and the attachments each row carries. One batched read for
+  // the page; the ids are the rows the viewer already sees, so nothing here widens what a hidden ticket reveals (29.113).
+  const pins = await pinCountsFor(db, eff, viewerId, assembled.map((card) => card.ticketId));
+  const listCards = assembled.map((card) => ({ ...card, pin: pinOf(pins, card.ticketId) }));
   const groups = await groupCards(db, workspaceId, listCards, pageRows, query.groupBy, epics);
 
   return {
