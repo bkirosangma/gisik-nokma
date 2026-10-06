@@ -189,13 +189,15 @@ describe('29.243 the flow read for one viewer', () => {
       ((await db.pool.query<{ t: Date }>('SELECT server_time AS t FROM events WHERE entity_id = $1 AND type = $2 AND actor_id = $3 ORDER BY server_time DESC LIMIT 1', [ticket, type, SYSTEM_ACTOR_FLOW])).rows[0]!.t).toISOString();
     const closedAt = await atOf(id.c, 'ticket.closed');
     const resetAt = await atOf(id.c, 'ticket.transitioned');
-    const ledToE = { ticketId: id.e, kind: 'led-to', pass: null, outcome: null };
+    const ledToE = { ticketId: id.e, kind: 'led-to', pass: null };
     const member = await viewAs(read.world.member);
     expect(member.autoMoves).toEqual([
       { ticketId: id.c, at: resetAt, kind: 'reopened-by-flow', becauseTicketId: id.d, pass: 1, outcome: 'Need rework' },
       { ticketId: id.c, at: closedAt, kind: 'branch-not-taken', becauseTicketId: id.d, pass: 1, outcome: 'Yes' },
       expect.objectContaining({ ...ledToE, becauseTicketId: null }),
     ]);
+    // the hidden x caused E's move: with its id goes the outcome KEY (29.448), not merely its value
+    expect(member.autoMoves[2]).not.toHaveProperty('outcome');
     const owner = await viewAs(read.world.owner);
     expect(owner.autoMoves.map((m) => [m.ticketId, m.kind, m.becauseTicketId])).toEqual([
       [id.x, 'led-to', id.a],
@@ -203,6 +205,7 @@ describe('29.243 the flow read for one viewer', () => {
       [id.c, 'branch-not-taken', id.d],
       [id.e, 'led-to', id.x],
     ]);
+    expect(owner.autoMoves[3]).toMatchObject({ ...ledToE, becauseTicketId: id.x, outcome: null }); // a seen promotion names no outcome: null
     // the limit: AUTO_MOVE_LIMIT + 1 more flow moves of B, and the read keeps the newest AUTO_MOVE_LIMIT
     expect(AUTO_MOVE_LIMIT).toBe(50);
     const many = Array.from({ length: 51 }, (_, i) =>

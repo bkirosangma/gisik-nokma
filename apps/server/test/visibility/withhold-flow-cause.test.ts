@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { newSubmittedEvent, newUlid, SYSTEM_ACTOR_FLOW, type LedgerEvent, type TicketState } from '@gisik-nokma/domain';
+import { newSubmittedEvent, newUlid, SYSTEM_ACTOR_FLOW, type FlowRead, type LedgerEvent, type TicketState } from '@gisik-nokma/domain';
 import { getTicketStateFromDb } from '../../src/projections/tickets.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
@@ -265,7 +265,7 @@ describe('wtg-flow-cause-withhold, the doors (29.441–29.443)', () => {
     const T_ALL = [H, HS, DECIDER, TRIGGER, HIDDEN_OUTCOME, HIDDEN_LABEL];
     const T_CLOSE = [H, DECIDER, HIDDEN_OUTCOME];
     const TR_RESET = [H, REOPENER, RESET_OUTCOME];
-    const doors: Array<{ door: string; read: (role: ReadRole) => Promise<string>; holds: string[]; pending?: string[] }> = [
+    const doors: Array<{ door: string; read: (role: ReadRole) => Promise<string>; holds: string[] }> = [
       { door: 'T detail', read: (r) => body(r, `/v1/workspaces/${WS}/tickets/${T}`), holds: T_CLOSE },
       { door: 'T /events', read: (r) => body(r, `/v1/workspaces/${WS}/tickets/${T}/events`), holds: T_ALL },
       { door: 'T stream', read: async (r) => JSON.stringify(await streamOn(userOf(r), T)), holds: T_ALL },
@@ -273,10 +273,10 @@ describe('wtg-flow-cause-withhold, the doors (29.441–29.443)', () => {
       { door: 'T bootstrap', read: async (r) => JSON.stringify(await workspaceBoot(r)), holds: T_ALL },
       { door: 'T history', read: (r) => body(r, `/v1/tickets/${T}/history`), holds: T_ALL },
       { door: 'T contests', read: (r) => body(r, `/v1/contests?workspaceId=${WS}&ticketId=${T}`), holds: T_CLOSE },
-      // The flow read serves no person; the owner's walk reaches H and HS over their leads_to links. It still serves a
-      // hidden Decision's outcome (its automatic moves and the node's resolution): a separate door, PENDING
-      // wtg-automoves-outcome-withhold (planner ruling 05:46 (c)), so the outcomes are not asked of it here.
-      { door: 'T flow', read: (r) => body(r, `/v1/workspaces/${WS}/tickets/${T}/flow`), holds: [H, HS], pending: [HIDDEN_OUTCOME, RESET_OUTCOME] },
+      // The flow read serves no person; the owner's walk reaches H and HS over their leads_to links, so the owner's read
+      // names H's outcome in T's automatic moves and resolution, and the member's names it nowhere (29.448). TR is not in
+      // T's flow, so RESET_OUTCOME is in neither read: the TR doors below carry it.
+      { door: 'T flow', read: (r) => body(r, `/v1/workspaces/${WS}/tickets/${T}/flow`), holds: [H, HS, HIDDEN_OUTCOME] },
       // FIX 1: TR's reset (a `ticket.reopened` and its transition) and the forged reopen's contest. TR is open again, so
       // its state carries no cause and its detail has nothing to withhold: T's detail is the state door.
       { door: 'TR /events', read: (r) => body(r, `/v1/workspaces/${WS}/tickets/${TR}/events`), holds: TR_RESET },
@@ -287,13 +287,35 @@ describe('wtg-flow-cause-withhold, the doors (29.441–29.443)', () => {
       { door: 'TR contests', read: (r) => body(r, `/v1/contests?workspaceId=${WS}&ticketId=${TR}`), holds: TR_RESET },
     ];
     const hidden = [H, HS, DECIDER, TRIGGER, REOPENER, HIDDEN_OUTCOME, HIDDEN_LABEL, RESET_OUTCOME];
-    for (const { door, read, holds, pending = [] } of doors) {
+    for (const { door, read, holds } of doors) {
       const ownerBody = await read('owner');
       for (const id of holds) expect(ownerBody, `${door} owner holds ${id}`).toContain(id); // control: the haystack holds its subject
       const memberBody = await read('member');
       expect(memberBody.length, door).toBeGreaterThan(2); // precondition: a body, not an empty answer
-      for (const id of hidden.filter((h) => !pending.includes(h))) expect(memberBody, `${door} member must not hold ${id}`).not.toContain(id);
+      for (const id of hidden) expect(memberBody, `${door} member must not hold ${id}`).not.toContain(id);
     }
+  });
+
+  it('29.448 the flow read serves the blind member T\'s automatic moves with no outcome KEY where H or HS caused them, and T\'s Not-taken resolution with neither H nor its outcome, the kind and the pass kept; control: the owner, whose read holds H and HS, gets the outcome', async () => {
+    const flowOf = async (role: ReadRole) => (await get(role, `/v1/workspaces/${WS}/tickets/${T}/flow`)).json() as FlowRead;
+    const movesOf = (read: FlowRead) => read.autoMoves.filter((m) => m.ticketId === T);
+    const resolutionOf = (read: FlowRead) => read.nodes.find((n) => n.id === T)?.resolution;
+    const member = await flowOf('member');
+    const owner = await flowOf('owner');
+    // precondition: both reads hold T's not-taken moves and its led-to move, the same moves in the same order
+    expect(movesOf(member).map((m) => m.kind).sort()).toEqual(['branch-not-taken', 'branch-not-taken', 'led-to']);
+    expect(movesOf(owner).map((m) => [m.kind, m.at])).toEqual(movesOf(member).map((m) => [m.kind, m.at]));
+    for (const m of movesOf(member)) {
+      expect(m, m.kind).toEqual({ ticketId: T, at: m.at, kind: m.kind, becauseTicketId: null, pass: m.kind === 'led-to' ? null : 1 });
+      expect(m, m.kind).not.toHaveProperty('outcome');
+    }
+    expect(resolutionOf(member)).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
+    expect(resolutionOf(member)).not.toHaveProperty('outcome');
+    // control in the same it(): the owner's read holds H and HS, so the same moves name them, H's outcome and the led-to's null
+    expect(movesOf(owner).map((m) => [m.kind, m.becauseTicketId, m.outcome])).toEqual(
+      movesOf(member).map((m) => (m.kind === 'led-to' ? ['led-to', HS, null] : [m.kind, H, HIDDEN_OUTCOME])),
+    );
+    expect(resolutionOf(owner)).toEqual({ kind: 'not-taken', decisionTicketId: H, outcome: HIDDEN_OUTCOME, pass: 1 });
   });
 });
 
