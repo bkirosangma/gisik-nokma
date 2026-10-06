@@ -53,8 +53,8 @@ function closeStartedGate(opts: DecisionGateOptions): ServerGate {
 
 /**
  * The sentence for a stable block code (planner ruling 2026-10-04, Q14; spec PS-9 "the reason names the ticket"). Called only
- * when the filer can see the ticket; the caller substitutes the generic phrase otherwise (PS-6). A ticket with no key is named
- * by its title alone.
+ * when the filer can see the ticket and it has a row; the caller substitutes the generic phrase otherwise (PS-6). A ticket
+ * with no key is named by its title alone.
  */
 export function cascadeBlockedReason(code: SettleBlockReason, t: { key: string | null; title: string }): string {
   const name = t.key === null ? t.title : `${t.key} ${t.title}`;
