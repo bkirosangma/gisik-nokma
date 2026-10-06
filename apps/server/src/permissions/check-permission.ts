@@ -6,14 +6,14 @@ import {
   membershipRevokedPayload,
   noteAttachedPayload,
   noteCreatedPayload,
-  noteDetachedPayload,
+  noteDetachedPayload, noteMovedPayload,
   projectCreatedPayload,
   projectUpdatedPayload,
   istDayOf,
   ticketAssignedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
-  ticketLinkAddedPayload,
+  ticketLinkAddedPayload, ticketTransitionedPayloadSchema,
   visibilitySetPayload,
   type EventEnvelope,
 } from '@gisik-nokma/domain';
@@ -1009,6 +1009,11 @@ function projectsNamedBy(env: EventEnvelope): readonly string[] {
     // exactly as this docblock records one entity kind over.
     case 'note.created':
       return [noteCreatedPayload.parse(env.payload).homeProjectId].filter((id) => id !== '');
+    // A move re-files the note under the project it names, so that project meets the rule above
+    // (task/notes-cross-workspace-followup, 18.520): before this case a move named any id at all, a project of
+    // another workspace included, and nothing asked.
+    case 'note.moved':
+      return [noteMovedPayload.parse(env.payload).homeProjectId].filter((id) => id !== '');
     default:
       return [];
   }
@@ -1477,6 +1482,63 @@ const NOTE_HOME_REASON = 'You are not a member of the project this note is filed
 const NOTE_TICKET_REASON = 'You cannot see the ticket this note would be attached to.';
 
 /**
+ * Whether `ticketId` names a ticket of `workspaceId`, the note's own workspace (task/notes-cross-workspace-attach,
+ * 18.500–18.503). `canSee` resolves the role in the TICKET's workspace, and the ingest door's entity↔workspace guard
+ * binds only the event's own entity (the note), so on their own they admitted a person who is in both workspaces: a
+ * note of one workspace linked to a ticket of another, and that workspace's readers then read the ticket's title. The
+ * workspace is the one `proj_entity_heads` holds (`readEntityHead`'s row), the binding that guard itself trusts. An
+ * unknown id has no row, and every caller refuses a false with the sentence an unknown ticket gets, so the bind is no
+ * existence oracle.
+ */
+async function ticketInWorkspace(db: Queryable, ticketId: string, workspaceId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    "SELECT 1 FROM proj_entity_heads WHERE entity_kind = 'ticket' AND entity_id = $1 AND workspace_id = $2",
+    [ticketId, workspaceId],
+  );
+  return rowCount === 1;
+}
+
+/**
+ * Whether `entityId` is bound to anything other than a ticket of `workspaceId`: a ticket of another workspace, or an
+ * entity of another kind (task/notes-cross-workspace-followup, 18.524). An id bound NOWHERE answers false, and that is
+ * the point: a reopen's cause names a child that the NEXT event creates (`buildReopenPair` and `reopenAndProceed` file
+ * the parent's transition first), so a child that is not yet a ticket is the ordinary case and is not refused.
+ */
+async function boundElsewhere(db: Queryable, entityId: string, workspaceId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    "SELECT 1 FROM proj_entity_heads WHERE entity_id = $1 AND NOT (entity_kind = 'ticket' AND workspace_id = $2)",
+    [entityId, workspaceId],
+  );
+  return rowCount !== 0;
+}
+
+/**
+ * Whether a reopen in ANOTHER workspace already names `ticketId` as its child (18.524): the other half of
+ * `boundElsewhere`, asked when the child is born, because a cause may name an id that is bound nowhere yet. Served by
+ * the partial index `events_reopen_child_idx` (migration 1792500000000).
+ */
+async function namedAsChildElsewhere(db: Queryable, ticketId: string, workspaceId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    "SELECT 1 FROM events WHERE type = 'ticket.transitioned' AND payload #>> '{cause,childTicketId}' = $1 AND workspace_id <> $2 LIMIT 1",
+    [ticketId, workspaceId],
+  );
+  return rowCount !== 0;
+}
+
+/**
+ * The home-project rule a note is filed under, ONE rule for `note.created` and `note.moved` (18.520–18.521): a
+ * project other than the workspace level must be one the actor is on. `eff.projects` holds only this workspace's
+ * live projects (rule A) and the actor's own roster rows, so a project of another workspace, one nobody founded and
+ * one the actor is not on all get this one sentence: no existence oracle. The OWNER is exempt here and is held instead
+ * by `checkProjectExists` (founded in this workspace) and `checkLifecycle` (not deleted), which every actor also meets.
+ */
+function noteHomeRefusal(ctx: VisibilityContext, homeProjectId: string): Refusal | null {
+  return homeProjectId !== '' && ctx.eff.workspaceRole !== 'owner' && !ctx.eff.projects.has(homeProjectId)
+    ? refuseWith(NOTE_PERMISSION_RULE, NOTE_HOME_REASON)
+    : null;
+}
+
+/**
  * The events only the author (or an admin who can read it, or the owner) may
  * send — spec §4.2's D6 row.
  *
@@ -1484,7 +1546,8 @@ const NOTE_TICKET_REASON = 'You cannot see the ticket this note would be attache
  * change its audience on a ticket and the one that adds a comment. `note.moved`
  * is in the set although it only re-files the note: it moves the note under a
  * different project's visibility, which is a reader-visible change and not a
- * reader's act.
+ * reader's act. And the project it names meets `note.created`'s home rule
+ * (`noteHomeRefusal`, 18.520).
  */
 const NOTE_AUTHOR_EVENTS = new Set([
   'note.renamed',
@@ -1535,16 +1598,22 @@ const NOTE_AUTHOR_EVENTS = new Set([
  * is in this workspace and is not deleted, and that the project in
  * `homeProjectId` exists and is not archived.
  *
- * - The TICKET half is discharged by `canSee`, which answers false for a ticket
- *   that does not exist or is not in the workspace, plus
- *   `loadNoteForVisibility`'s `ticketIsLive` filter — the `attachTicketId` arm
- *   below and the attach/detach arm.
- * - The PROJECT half is discharged in TWO places, and the split is the ordering
- *   rule `checkProjectExists`'s docblock states: EXISTENCE is asked there, which
- *   is why `projectsNamedBy` gained a `note.created` case, and MEMBERSHIP is
- *   asked here (`eff.projects.has`). Existence first is what makes the refusal
- *   honest — someone filing under a project nobody founded is told that, not
- *   that they are not a member of it.
+ * - The TICKET half is discharged by `ticketInWorkspace` (the ticket is in the
+ *   NOTE's workspace: an unknown id is in none) and `canSee` (this person may
+ *   see it), plus `loadNoteForVisibility`'s `ticketIsLive` filter — the
+ *   `attachTicketId` arm below and the attach/detach arm. `canSee` alone never
+ *   said "in this workspace": it resolves the role in the TICKET's own
+ *   workspace, which is how a person in two workspaces linked a note of one to
+ *   a ticket of the other until task/notes-cross-workspace-attach (18.500).
+ * - The PROJECT half is discharged in THREE places, for `note.created` and
+ *   `note.moved` alike: MEMBERSHIP here (`noteHomeRefusal`), EXISTENCE in
+ *   `checkProjectExists` (which is why `projectsNamedBy` has a case for each),
+ *   and LIVENESS in `checkLifecycle`. This pass runs BEFORE the existence pass,
+ *   so a non-owner filing under a project nobody founded, or one of another
+ *   workspace, is told they are not a member of it: one sentence for every
+ *   project they are not on, which is what keeps it from being an existence
+ *   oracle (18.525). The owner, exempt here, is told the project does not
+ *   exist; so is a member holding a roster row for an id nobody founded (18.042).
  * - **The archived half is NOT implemented, for notes or for tickets.** Nothing
  *   in this chain refuses a write under an archived project — `projectExists`
  *   does not read the column and no call site does — so closing it for notes
@@ -1560,10 +1629,14 @@ export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityCon
     // throw here is a sequencing break rather than a user error — the same
     // argument `projectsNamedBy` makes for parsing.
     const p = noteCreatedPayload.parse(env.payload);
-    if (p.homeProjectId !== '' && role !== 'owner' && !ctx.eff.projects.has(p.homeProjectId)) {
-      return refuseWith(NOTE_PERMISSION_RULE, NOTE_HOME_REASON);
-    }
-    if (p.attachTicketId !== undefined && !(await canSee(ctx.db, ctx.sessionUserId, p.attachTicketId))) {
+    const homeRefusal = noteHomeRefusal(ctx, p.homeProjectId);
+    if (homeRefusal !== null) return homeRefusal;
+    // The new note is homed in the event's workspace, so that is the workspace its ticket must be in (18.501).
+    if (
+      p.attachTicketId !== undefined &&
+      !((await ticketInWorkspace(ctx.db, p.attachTicketId, env.workspaceId)) &&
+        (await canSee(ctx.db, ctx.sessionUserId, p.attachTicketId)))
+    ) {
       return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
     }
     return null;
@@ -1580,19 +1653,26 @@ export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityCon
     const isAuthor = loaded.note.authorId === ctx.sessionUserId;
     const isOwner = role === 'owner';
     const isAdminReader = role === 'admin'; // readable is already established above
-    return isAuthor || isOwner || isAdminReader
-      ? null
-      : refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_YOURS_REASON);
+    if (!(isAuthor || isOwner || isAdminReader)) return refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_YOURS_REASON);
+    // Whose note it is comes first; then a move's new home meets the rule a new note's does (18.520–18.521).
+    return env.type === 'note.moved' ? noteHomeRefusal(ctx, noteMovedPayload.parse(env.payload).homeProjectId) : null;
   }
   if (env.type === 'note.attached' || env.type === 'note.detached') {
     // BOTH halves, and the readability half is already spent above: a reader of
     // the note who cannot see the ticket is refused, and a person who can see
     // the ticket but not the note never reaches this line. Attaching is how a
-    // note's audience is widened, so it is not a reader's act alone.
+    // note's audience is widened, so it is not a reader's act alone. And the
+    // ticket must be in the NOTE's workspace (18.500): seeing it is asked in the
+    // ticket's own workspace, so a person in both workspaces could otherwise
+    // link across them. The detach is bound too: it can name any ticket id, and
+    // a committed one puts that id in the note's event stream for its readers.
     const { ticketId } = (env.type === 'note.attached' ? noteAttachedPayload : noteDetachedPayload).parse(
       env.payload,
     );
-    if (!(await canSee(ctx.db, ctx.sessionUserId, ticketId))) {
+    if (
+      !((await ticketInWorkspace(ctx.db, ticketId, loaded.note.workspaceId)) &&
+        (await canSee(ctx.db, ctx.sessionUserId, ticketId)))
+    ) {
       return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
     }
     return null;
@@ -1636,6 +1716,11 @@ export async function checkVisibilityPermission(
       payload.assigneeId ?? null,
     );
     if (assigneeRefusal !== null) return assigneeRefusal;
+    // A reopen elsewhere already names this id as its child (18.524): born here, it would make that workspace's cause
+    // name a ticket of this one. Its own workspace's child is born as usual.
+    if (await namedAsChildElsewhere(ctx.db, env.entity.id, env.workspaceId)) {
+      return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
+    }
     return null;
   }
 
@@ -1648,6 +1733,17 @@ export async function checkVisibilityPermission(
 
   if (!(await canSee(ctx.db, ctx.sessionUserId, env.entity.id))) {
     return refuseWith(PERMISSION_VISIBILITY_RULE, TICKET_NOT_VISIBLE_REASON);
+  }
+
+  // A reopen's cause names its child (task/notes-cross-workspace-followup, 18.524), and the engine reads it as opaque:
+  // it may not name a ticket of another workspace, nor something that is not a ticket. A child not born yet is bound
+  // nowhere and passes (`boundElsewhere`); its birth in another workspace is refused at `ticket.created` above.
+  if (env.type === 'ticket.transitioned') {
+    const transition = ticketTransitionedPayloadSchema.safeParse(env.payload);
+    const child = transition.success ? transition.data.cause?.childTicketId : undefined;
+    if (child !== undefined && (await boundElsewhere(ctx.db, child, env.workspaceId))) {
+      return refuseWith(PERMISSION_VISIBILITY_RULE, LINK_TARGET_NOT_VISIBLE_REASON);
+    }
   }
 
   /**

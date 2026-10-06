@@ -20,10 +20,22 @@ import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
  * list and from a ticket's attached-notes read (Task 6, T10) — the note's own
  * `deleted` column says nothing about its CONTAINER. `n.home_project_id = ''`
  * (a workspace-scoped note) matches no `proj_projects` row, so `NOT EXISTS` is
- * trivially true for it and this clause is a no-op there.
+ * trivially true for it and this clause is a no-op there. The container is a
+ * project of the NOTE's workspace (task/notes-cross-workspace-followup, 18.523):
+ * a note filed under another workspace's project before 18.520 refused that is
+ * not hidden by, and so tells its readers nothing about, that project's deletion.
  */
 export const NOTE_PROJECT_LIVE_WHERE =
-  'NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = n.home_project_id AND dp.deleted_at IS NOT NULL)';
+  'NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = n.home_project_id AND dp.workspace_id = n.workspace_id AND dp.deleted_at IS NOT NULL)';
+
+/**
+ * A note's home project AS EVERY READ SHOWS IT (task/notes-cross-workspace-followup, 18.523): the stored id when it
+ * names a project of the note's OWN workspace, else `''`, the workspace level. A note filed under another workspace's
+ * project before 18.520 refused that, live or since purged, reads as a note with no home project, with no dangling id
+ * in it. The stored id is not rewritten: what to do with such rows is the owner's open question.
+ */
+export const NOTE_HOME_SQL =
+  "(CASE WHEN EXISTS (SELECT 1 FROM proj_projects hp WHERE hp.project_id = n.home_project_id AND hp.workspace_id = n.workspace_id) THEN n.home_project_id ELSE '' END)";
 
 /**
  * The note reads (notes series, Plan 1 of 6, spec §6.4).
@@ -60,6 +72,8 @@ type NoteRow = {
   note_id: string;
   workspace_id: string;
   home_project_id: string;
+  /** `NOTE_HOME_SQL`: the home every read shows. */
+  home_in_workspace: string;
   author_id: string;
   title: string;
   body: unknown;
@@ -78,7 +92,7 @@ function summaryOf(row: NoteRow, attachedTickets: AttachedTicket[]): NoteSummary
   return {
     noteId: row.note_id,
     workspaceId: row.workspace_id,
-    homeProjectId: row.home_project_id,
+    homeProjectId: row.home_in_workspace,
     authorId: row.author_id,
     title: row.title,
     scope: scopeOf(row.scope_mode, row.scope_user_ids),
@@ -128,7 +142,8 @@ export async function attachedTicketsByNote(
   }>(
     `SELECT na.note_id, t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title
        FROM proj_note_attachments na
-       JOIN proj_tickets t ON t.ticket_id = na.ticket_id
+       JOIN proj_notes n ON n.note_id = na.note_id
+       JOIN proj_tickets t ON t.ticket_id = na.ticket_id AND t.workspace_id = n.workspace_id
        JOIN proj_visibility v ON v.ticket_id = na.ticket_id
       WHERE na.note_id = ANY (${ids}::text[]) AND ${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, userId, params)}
       ORDER BY na.note_id, t.ticket_id`,
@@ -203,11 +218,11 @@ export async function listNotes(
   } else {
     clauses.push('n.deleted = FALSE');
   }
-  if (filter.homeProjectId !== undefined) clauses.push(`n.home_project_id = ${params.add(filter.homeProjectId)}`);
+  if (filter.homeProjectId !== undefined) clauses.push(`${NOTE_HOME_SQL} = ${params.add(filter.homeProjectId)}`);
   if (filter.authorId !== undefined) clauses.push(`n.author_id = ${params.add(filter.authorId)}`);
   if (filter.scopeMode !== undefined) clauses.push(`n.scope_mode = ${params.add(filter.scopeMode)}`);
   const { rows } = await db.query<NoteRow>(
-    `SELECT n.* FROM proj_notes n WHERE ${clauses.join(' AND ')} ORDER BY n.updated_at DESC, n.note_id`,
+    `SELECT n.*, ${NOTE_HOME_SQL} AS home_in_workspace FROM proj_notes n WHERE ${clauses.join(' AND ')} ORDER BY n.updated_at DESC, n.note_id`,
     params.toArray(),
   );
   return summariesOf(db, eff, userId, workspaceId, rows);
@@ -226,7 +241,7 @@ export async function getNoteDetail(
   const params = new SqlParams();
   const id = params.add(noteId);
   const { rows } = await db.query<NoteRow>(
-    `SELECT n.* FROM proj_notes n WHERE n.note_id = ${id} AND ${visibleNotesWhere(eff, userId, params)}`,
+    `SELECT n.*, ${NOTE_HOME_SQL} AS home_in_workspace FROM proj_notes n WHERE n.note_id = ${id} AND ${visibleNotesWhere(eff, userId, params)}`,
     params.toArray(),
   );
   const row = rows[0];
@@ -255,12 +270,14 @@ export async function listNotesForTicket(
   const clauses = [
     `n.workspace_id = ${params.add(workspaceId)}`,
     `na.ticket_id = ${params.add(ticketId)}`,
+    // The ticket is one of the note's own workspace (18.522): a link written before 18.500 refused it lists nothing.
+    'EXISTS (SELECT 1 FROM proj_tickets lt WHERE lt.ticket_id = na.ticket_id AND lt.workspace_id = n.workspace_id)',
     'n.deleted = FALSE',
     visibleNotesWhere(eff, userId, params),
     NOTE_PROJECT_LIVE_WHERE,
   ];
   const { rows } = await db.query<NoteRow>(
-    `SELECT n.* FROM proj_notes n
+    `SELECT n.*, ${NOTE_HOME_SQL} AS home_in_workspace FROM proj_notes n
        JOIN proj_note_attachments na ON na.note_id = n.note_id
       WHERE ${clauses.join(' AND ')}
       ORDER BY n.updated_at DESC, n.note_id`,
