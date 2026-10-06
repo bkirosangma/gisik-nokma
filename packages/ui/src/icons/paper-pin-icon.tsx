@@ -5,7 +5,7 @@
  * bar around it and never speaks: the bar's own description carries the counts ("2 notes, 1 attachment"). It is not a button,
  * and `focusable="false"` keeps an old engine from giving the svg a tab stop. 12 px is the timeline's size (ui.css reserves
  * room for exactly that, 29.117); the stroke is heavier than the 18 px icons' 2 so the clip still reads at 12 px. The
- * Timeline graph (Part 4) draws the same glyph from here.
+ * Timeline graph (Part 4) is to draw this glyph too (P4 T6); its painter draws a bordered `.gn-tlg-pin` placeholder today.
  */
 export function PaperPinIcon({ size = 12 }: { size?: number }) {
   return (
