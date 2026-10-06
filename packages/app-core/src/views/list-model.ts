@@ -34,12 +34,13 @@ export type GroupLabels = { epicTitle(epicId: string): string; typeName(typeId: 
 /**
  * Counts always derive from the FLAT row set — sections can never change them,
  * and neither can a collapsed subtree. A summary computed from what is on
- * screen is a count of the user's scroll position.
+ * screen is a count of the user's scroll position. A row closed Not taken by the
+ * flow (`notTaken`) sits in a terminal state but is closed, never done (wtg2 T17).
  */
 export function countRows(rows: ListRow[]): { total: number; terminal: number } {
   return {
     total: rows.length,
-    terminal: rows.filter((row) => row.stateCategory === 'terminal').length,
+    terminal: rows.filter((row) => row.stateCategory === 'terminal' && row.notTaken !== true).length,
   };
 }
 

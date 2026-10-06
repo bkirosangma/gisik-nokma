@@ -448,13 +448,13 @@ screens — ticket types, workflows, and the workspace itself — where the work
 editor live. Nothing to bookmark.
 
 **Can I rename "Epic" and "Story" to something that makes sense to me?**
-Yes. An admin can rename all four built-in types, change their icons, and change which workflow they
+Yes. An admin can rename all five built-in types, change their icons, and change which workflow they
 use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will
 still always need a parent. Custom types you create yourself can be re-ranked either way later.
 
 **Can I put my ticket types in a different order?**
 Your own types, yes: each one has a **Reorder** button with **Move up**, **Move down** and **Move to top**
-(an item that cannot apply is greyed out and says why). The four built-in types have no such button — they
+(an item that cannot apply is greyed out and says why). The five built-in types have no such button — they
 keep their rank.
 
 **Do my existing tickets break when I publish a new version of a workflow?**

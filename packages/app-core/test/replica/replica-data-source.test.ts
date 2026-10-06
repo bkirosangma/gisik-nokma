@@ -31,6 +31,7 @@ import {
   type ReplicaDataSource,
 } from '../../src/replica/replica-data-source.js';
 import { describeEvent } from '../../src/views/history-copy.js';
+import { countRows } from '../../src/views/list-model.js';
 
 /**
  * Plan 10 Task 12 — the replica `DataSource`. Cases 12.172–12.187.
@@ -1686,5 +1687,25 @@ describe('29.207 the replica serves a flow cause as its kind only', () => {
     expect(JSON.stringify(flowCard)).not.toContain(decision);
     expect(JSON.stringify(flowCard)).not.toContain(person);
     expect(cards.find((card) => card.ticketId === epicId)?.cause).toEqual({ kind: 'reopened-for-child', childTicketId: child }); // control
+  });
+});
+
+describe('29.374 the replica list row carries notTaken from the folded close cause', () => {
+  it('29.374 a not-taken ticket is marked and not counted done; a finished one is neither', async () => {
+    const { ds, replica } = await fixture();
+    const [skipped, finished] = [newUlid(), newUlid()];
+    for (const [id, title] of [[skipped, 'Skipped branch'], [finished, 'Finished work']] as const) {
+      await replica.applyServerItem(envelope({ kind: 'ticket', id }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title }));
+    }
+    const cause = { kind: 'branch-not-taken', decisionTicketId: newUlid(), outcome: 'Yes', pass: 1, decidedBy: USER_B, decisionEventId: newUlid() };
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.transitioned', { to: 'done', cause }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.closed', { cause }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: finished }, 'ticket.transitioned', { to: 'done' }));
+    // closed too, by a person (no cause): closed is not Not taken
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: finished }, 'ticket.closed', {}));
+    const rows = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.filter((r) => (r.ticketId === skipped || r.ticketId === finished));
+    expect(rows.find((r) => r.ticketId === skipped)?.notTaken).toBe(true);
+    expect(rows.find((r) => r.ticketId === finished)).not.toHaveProperty('notTaken');
+    expect(countRows(rows)).toEqual({ total: 2, terminal: 1 });
   });
 });

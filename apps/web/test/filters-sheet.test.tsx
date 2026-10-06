@@ -131,7 +131,7 @@ const ROSTER: RosterMember[] = [
   { id: 'u9', name: 'Nine Nonesuch', role: 'member' },
 ];
 
-/** Full `TicketTypeDef` shape — `customDateFieldsByType` (`src/ticket-dates-input.ts:117`) reads `.fields` on every entry unconditionally, so an `{id, name}`-only fixture throws before the sheet is ever reached. */
+/** Full `TicketTypeDef` shape — `customDateFieldsByType` (`src/ticket-dates-input.ts:119`) reads `.fields` on every entry unconditionally, so an `{id, name}`-only fixture throws before the sheet is ever reached. */
 const TYPES: TicketTypeDef[] = [
   { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_1', fields: [] },
   { id: 'bug', name: 'Bug', icon: 'bug', rank: 3, workflowId: 'wf_1', fields: [] },

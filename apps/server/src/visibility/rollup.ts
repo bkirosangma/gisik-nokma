@@ -1,3 +1,4 @@
+import { notTakenOf } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
 import { assigneeArmTickets } from './assignee-arm.js';
@@ -115,16 +116,23 @@ import { canSeeResolved } from './can-see.js';
  * condition, not "always 0 in the product": one ingest transaction writes both
  * or rolls back, and `rebuildProjection` replays the whole ledger into one
  * projection inside one transaction, so what makes this nonzero is a caller
- * that advances one table and not the other. `terminal + uncategorized <= total`.
+ * that advances one table and not the other. `terminal + notTaken + uncategorized <= total`.
  */
 export interface RollupView {
   /** ALL direct children. Never filtered by visibility — that is the honesty. */
   total: number;
   /**
-   * Direct children whose `proj_tickets.state_category` is `'terminal'`.
-   * Over ALL children, including ones this viewer may not see — spec line 116.
+   * Direct children whose `proj_tickets.state_category` is `'terminal'` and that
+   * were not closed Not taken (wtg2 T17: this is a DONE count). Over ALL
+   * children, including ones this viewer may not see — spec line 116.
    */
   terminal: number;
+  /**
+   * wtg2 T17 (Q1): direct children that are terminal AND closed Not taken by the
+   * flow (`notTakenOf(proj_tickets.closed_cause)`), counted apart from
+   * `terminal`: closed, never done. ABSENT when 0.
+   */
+  notTaken?: number;
   /**
    * Direct children `proj_tickets` has no row for, so their category is
    * unknown. Counted in `total`; counted in neither `terminal` nor its
@@ -147,6 +155,8 @@ type ChildRow = {
   draft_author_id: string | null;
   /** From the LEFT JOIN: `null` when `proj_tickets` has no row for this child. */
   state_category: 'open' | 'active' | 'terminal' | null;
+  /** From the LEFT JOIN: the close cause; `notTakenOf` reads it (wtg2 T17). */
+  closed_cause: unknown;
 };
 
 /**
@@ -288,7 +298,7 @@ export async function rollupsFor(
     // Drafts T3 (C2): `v.draft_author_id IS NULL`. A draft is no child anyone counts, not even as
     // "restricted": another person's draft under a visible parent would otherwise read "1 restricted".
     `SELECT v.parent_id, v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
-            v.draft_author_id, t.state_category
+            v.draft_author_id, t.state_category, t.closed_cause
      FROM proj_visibility v
      LEFT JOIN proj_tickets t ON t.ticket_id = v.ticket_id
      WHERE v.parent_id = ANY($1::text[])
@@ -316,13 +326,13 @@ export async function rollupsFor(
 
   // The running tally of ONE parent. `notAdmitted` counts the children the AUDIENCE does not admit,
   // `candidates` the subset of them the assignee arm may still open.
-  type Tally = { total: number; terminal: number; uncategorized: number; notAdmitted: number; candidates: string[] };
+  type Tally = { total: number; terminal: number; notTaken: number; uncategorized: number; notAdmitted: number; candidates: string[] };
   const tallies = new Map<string, Tally>();
 
   for (const child of rows) {
     let tally = tallies.get(child.parent_id);
     if (tally === undefined) {
-      tally = { total: 0, terminal: 0, uncategorized: 0, notAdmitted: 0, candidates: [] };
+      tally = { total: 0, terminal: 0, notTaken: 0, uncategorized: 0, notAdmitted: 0, candidates: [] };
       tallies.set(child.parent_id, tally);
     }
     tally.total += 1;
@@ -333,7 +343,9 @@ export async function rollupsFor(
     if (child.state_category === null) {
       tally.uncategorized += 1;
     } else if (child.state_category === 'terminal') {
-      tally.terminal += 1;
+      // Q1 (wtg2 T17): a not-taken child sits in the terminal state, so the category alone cannot tell it from a finished one.
+      if (notTakenOf(child.closed_cause) !== null) tally.notTaken += 1;
+      else tally.terminal += 1;
     }
 
     // Set by the loop above for every workspace among `rows`.
@@ -372,6 +384,7 @@ export async function rollupsFor(
     out.set(parentId, {
       total: tally.total,
       terminal: tally.terminal,
+      ...(tally.notTaken > 0 ? { notTaken: tally.notTaken } : {}),
       uncategorized: tally.uncategorized,
       restrictedCount: tally.notAdmitted - reached,
     });

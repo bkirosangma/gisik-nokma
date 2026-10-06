@@ -167,7 +167,7 @@ export default function ProjectPage() {
  * a workspace's own types are a superset of these and may be ranked, named and
  * ordered differently (the server's own fixture answers `epic`, `chore`, `task`
  * — see case 7.38), so a ladder shown in place of an answer is a picker
- * asserting four types the workspace was never asked about.
+ * asserting five types the workspace was never asked about.
  *
  * Derived from the DOMAIN's seed list rather than retyped, so the day a built-in
  * is added, renamed or dropped this fallback moves with it instead of becoming a

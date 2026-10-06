@@ -1146,7 +1146,7 @@ server's own `ORDER BY rank, type_id` resolves a tie by an id, which is nothing 
 types are re-ranked in one `submit`.
 
 **The arrow that would move a built-in is DISABLED, not refused after the fact** — for the same per-event
-reason. The four built-ins are rank-locked server-side
+reason. The five built-ins are rank-locked server-side
 (`packages/rule-engine/src/checks/ticket-type.ts:60-62` refunds `type.builtin-rank`), so a swap across one
 would **half commit**: the neighbour's re-rank lands, the built-in's is refused, and the pair ends up tied.
 The control anticipates the refusal rather than discovering it. **A refusal the server returns anyway — for

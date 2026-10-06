@@ -6098,4 +6098,25 @@ describe('TicketSheet: the Links section', () => {
     await pick();
     await waitFor(() => expect(withoutCache.ingested.flat().map((e) => e.type)).toEqual(['ticket.link_added']));
   });
+
+  it('29.130 the sheet passes isDecision from the ticket type: on a Decision the "Leads to" result is disabled until the branch is labelled; control: on a Task it is enabled', async () => {
+    const user = userEvent.setup();
+    const queryTickets = async () => [{ ticketId: OTHER, projectId: 'p', key: 'GN-133', title: 'Chiller' }];
+    const leadsToResult = async (typeId: string) => {
+      const read = ticketRead({ ticket: ticketStateSeed({ typeId }) });
+      const view = render(
+        <TicketSheet dataSource={sheetSource(read)} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" editorSlot={editor} queryTickets={queryTickets} onClose={vi.fn()} />,
+      );
+      await user.click(await screen.findByRole('button', { name: 'Add link' }));
+      await user.click(screen.getByRole('button', { name: /Link type/ }));
+      await user.click(await screen.findByRole('option', { name: 'Leads to' }));
+      await user.type(screen.getByLabelText('Find a ticket'), 'Ch');
+      return { result: await screen.findByRole('button', { name: 'GN-133 Chiller' }), view };
+    };
+    const decision = await leadsToResult('decision');
+    expect(decision.result).toBeDisabled();
+    decision.view.unmount();
+    const task = await leadsToResult('task');
+    expect(task.result).toBeEnabled(); // control: the same add on a Task needs no label
+  });
 });

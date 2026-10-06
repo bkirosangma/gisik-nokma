@@ -207,13 +207,13 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "bold",
-                    "text": "Epic / Story / Task / Sub-task"
+                    "text": "Epic / Story / Task / Sub-task / Decision"
                   }
                 ],
                 [
                   {
                     "kind": "text",
-                    "text": "The four built-in kinds of ticket, biggest to smallest. An admin can rename these."
+                    "text": "The five built-in kinds of ticket. Epic is the biggest and Sub-task the smallest; a Decision sits at the same level as a Task and stands for a choice between branches of work. An admin can rename these."
                   }
                 ]
               ],
@@ -1359,7 +1359,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Four built-in kinds of ticket: "
+                      "text": "Five built-in kinds of ticket: "
                     },
                     {
                       "kind": "bold",
@@ -1383,11 +1383,19 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " and "
+                      "text": ", "
                     },
                     {
                       "kind": "bold",
                       "text": "sub-task"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "decision"
                     },
                     {
                       "kind": "text",
@@ -3120,7 +3128,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — a switch, remembered from your last answer. On means the ticket waits, unordered work with a Start button, until somebody starts it (§8); off means it is born straight into a state. - "
+                      "text": " — a switch, remembered from your last answer. On means the ticket waits, unordered work with a Start button, until somebody starts it, or its flow does (§8); off means it is born straight into a state. - "
                     },
                     {
                       "kind": "bold",
@@ -4470,7 +4478,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " section on its sheet, just under the fields, lists them. A link has one of three kinds, and reads differently from each end:"
+                    "text": " section on its sheet, just under the fields, lists them. A link has one of four kinds, and reads differently from each end:"
                   }
                 ]
               },
@@ -4523,6 +4531,24 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": ": this ticket repeats the other."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Leads to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Comes after"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": the order of the work. This ticket comes first, and the other follows it."
+                    }
                   ]
                 ]
               },
@@ -4556,6 +4582,103 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " and nothing is added."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Leads to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Comes after"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " link can carry a label that names a branch, such as "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Yes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "No"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": type it in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Link label"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " when you add the link, and change it later with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit label"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on its row (a message offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "). Each branch out of a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Decision"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " needs a label, so its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Leads to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " results stay greyed out until you type one, and no two of its branches may share a label ("
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Yes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "yes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " count as the same)."
                   }
                 ]
               },
@@ -5749,7 +5872,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button that moves that ticket into its workflow."
+                    "text": " button that moves that ticket into its workflow. A ticket another one "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "leads to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " does not wait for the button: once what leads to it is finished, the flow starts it, as "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Flow"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Send it back here and it stays."
                   }
                 ]
               },
@@ -8958,7 +9097,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": " badge on the four that came with the workspace."
+                "text": " badge on the five that came with the workspace."
               }
             ]
           },
@@ -8999,7 +9138,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": " (the top of your own types). An item that cannot apply is greyed out and says why in words. The four built-in types have no Reorder button: they keep their rank, and your own types are ordered among themselves."
+                "text": " (the top of your own types). An item that cannot apply is greyed out and says why in words. The five built-in types have no Reorder button: they keep their rank, and your own types are ordered among themselves."
               }
             ]
           }
@@ -9115,8 +9254,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "the-built-in-four",
-            "title": "The built-in four",
+            "id": "the-built-in-five",
+            "title": "The built-in five",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -9131,7 +9270,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rename epic, story, task and sub-task, change their icons, and change which workflow they use. Do it — \"Epic\" and \"Story\" mean nothing in a plumbing business or a design studio."
+                    "text": " rename epic, story, task, sub-task and decision, change their icons, and change which workflow they use. Do it — \"Epic\" and \"Story\" mean nothing in a plumbing business or a design studio."
                   }
                 ]
               },
@@ -14534,7 +14673,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes. An admin can rename all four built-in types, change their icons, and change which workflow they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
+                    "text": "Yes. An admin can rename all five built-in types, change their icons, and change which workflow they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
                   }
                 ]
               }
@@ -14581,7 +14720,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " (an item that cannot apply is greyed out and says why). The four built-in types have no such button — they keep their rank."
+                    "text": " (an item that cannot apply is greyed out and says why). The five built-in types have no such button — they keep their rank."
                   }
                 ]
               }

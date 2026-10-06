@@ -6,4 +6,6 @@ export * from './analysis.js';
 export * from './graph.js';
 export * from './node.js';
 export * from './plan.js';
+export * from './promotion.js';
 export * from './segments.js';
+export * from './settle.js';

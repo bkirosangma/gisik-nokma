@@ -55,8 +55,8 @@ describe('exportLedger — the source of truth, exported', () => {
   /**
    * The plan's draft of this test asserted three lines and that EVERY envelope
    * was a `workspace.created`. Measured: three `workspace.created`
-   * submissions commit twenty-one events, because ingest derives a companion
-   * set per workspace — a default workflow, four ticket types and the owner's
+   * submissions commit twenty-four events, because ingest derives a companion
+   * set per workspace — a default workflow, five ticket types and the owner's
    * membership. So the count is asserted against the database (below and in
    * the third test), and the three submissions are asserted by counting their
    * own type rather than by claiming nothing else exists.

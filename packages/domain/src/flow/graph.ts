@@ -69,16 +69,18 @@ export function liveSet(nodes: readonly FlowNode[], edges: readonly FlowEdge[], 
  * to `D`, i.e. reachable from `T` AND reaching `D` over non-back edges. A ticket the walk merely
  * passes through on its way elsewhere (reachable from `T`, never reaching `D`) is not in it. Taken
  * over the whole flow, not the effective graph: the body is structure, independent of any outcome.
- * The edges must be one read's (FL-1: a hole's links already dropped). Unlike `analyzeFlow` and `liveSet`, this has no
- * node list to check them against, so a link through a hidden id would be walked and the hidden id returned.
+ * A hole edge is dropped (FL-1): an edge with an end that `analysis.order` does not hold (a hidden ticket, which
+ * `analyzeFlow` never ordered) is skipped, as `analyzeFlow` and `liveSet` skip it, so a hidden id is never walked or returned.
  */
 export function loopBody(
   backEdge: Pick<FlowEdge, 'sourceId' | 'targetId'>,
   edges: readonly FlowEdge[],
   analysis: FlowAnalysis,
 ): Set<string> {
+  const known = new Set(analysis.order);
+  // each clause alone is equivalent (planner 2026-10-06 03:50): only a hole self-link reaches here, and either end catches it
+  if (!known.has(backEdge.sourceId) || !known.has(backEdge.targetId)) return new Set();
   const forward = forwardEdges(edges, analysis);
-  const known = new Set(forward.flatMap((e) => [e.sourceId, e.targetId]).concat(backEdge.sourceId, backEdge.targetId));
   const fromTarget = reach([backEdge.targetId], adjacency(forward, known));
   const toDecision = reach([backEdge.sourceId], adjacency(forward, known, true));
   return new Set([...fromTarget].filter((id) => toDecision.has(id)));
@@ -89,8 +91,8 @@ export function loopBody(
  * non-back edges, never passing through the Decision. `label` is null for a Decision's unlabeled edge
  * (the engine requires labels, but a link relabelled out from under a Decision must not crash the plan).
  * Empty when the Decision has no such edge.
- * The edges must be one read's (FL-1: a hole's links already dropped). Unlike `analyzeFlow` and `liveSet`, this has no
- * node list to check them against, so a link through a hidden id would be walked and the hidden id returned.
+ * A hole edge is dropped (FL-1): an edge with an end that `analysis.order` does not hold (a hidden ticket, which
+ * `analyzeFlow` never ordered) is skipped, as `analyzeFlow` and `liveSet` skip it, so a hidden id is never walked or returned.
  */
 export function branchOf(
   decisionId: string,
@@ -98,9 +100,9 @@ export function branchOf(
   edges: readonly FlowEdge[],
   analysis: FlowAnalysis,
 ): Set<string> {
-  const edge = edges.find((e) => e.sourceId === decisionId && sameLabel(e.label, label));
+  const known = new Set(analysis.order);
+  const edge = edges.find((e) => e.sourceId === decisionId && known.has(e.sourceId) && known.has(e.targetId) && sameLabel(e.label, label));
   if (edge === undefined) return new Set();
   const forward = forwardEdges(edges, analysis);
-  const known = new Set(forward.flatMap((e) => [e.sourceId, e.targetId]).concat(edge.targetId));
   return reach([edge.targetId], adjacency(forward, known), decisionId);
 }
