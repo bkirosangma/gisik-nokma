@@ -4,7 +4,7 @@ import { parseRules, ruleExactly, rulesNaming, valueOf } from './helpers/css-rul
 import { cssOf } from './helpers/style-patterns.js';
 import { CONTRAST_PAIRS, TOKEN_ROLES, colorOf, cssVariableName, themeStylesheet } from '../src/tokens.js';
 
-/** Workflow and Timeline graphs, Part 1 — T9: 29.104 (the weekend role) and 29.106 (the stylesheet contract); T11: 29.109 (portrait and the pill). */
+/** Workflow and Timeline graphs, Part 1 — T9: 29.104 (the weekend role) and 29.106 (the stylesheet contract); T11: 29.109 (portrait and the pill); T12: 29.117 (the paper pin). */
 const STYLES = ['hig', 'minimal', 'neo'] as const;
 const THEMES = ['light', 'dark'] as const;
 
@@ -144,5 +144,31 @@ describe('29.109 portrait runs time down a sticky gutter, and the Nothing-in-vie
     // it would be carried away; the pill's place OUTSIDE it is pinned in the DOM by 29.108 (`pill.closest('.gn-timeline__canvas')`).
     expect(valueOf(ruleExactly(ui, '.gn-timeline__canvas'), 'position')).toBe('relative');
     expect(ruleExactly(ui, '.gn-timeline__stage')).not.toContain('overflow');
+  });
+});
+
+describe('29.117 the paper pin is decoration inside the bar\'s trailing edge, or after the key outside a bar too short for both', () => {
+  const ui = cssOf('ui');
+
+  it('29.117 a pinned bar reserves the bar\'s 6 px padding plus the pin\'s 14 px (20 px) on its right; the 12 px pin sits 6 px in, vertically centred; outside the bar it follows the key 2 px after it (2 + 12 = 14 px); in portrait it sits on the bar\'s top line; it takes the ink around it', () => {
+    expect(valueOf(ruleExactly(ui, '.gn-timeline__bar[data-pinned]'), 'padding-right')).toBe('20px');
+    const pin = ruleExactly(ui, '.gn-timeline__pin');
+    expect(valueOf(pin, 'position')).toBe('absolute');
+    expect(valueOf(pin, 'right')).toBe('6px');
+    expect(valueOf(pin, 'top')).toBe('50%');
+    expect(valueOf(pin, 'transform')).toBe('translateY(-50%)');
+    expect(valueOf(pin, 'color')).toBe('inherit');
+    const outside = ruleExactly(ui, '.gn-timeline__key--outside .gn-timeline__pin');
+    expect(valueOf(outside, 'position')).toBe('static');
+    expect(valueOf(outside, 'margin-left')).toBe('2px');
+    expect(valueOf(outside, 'transform')).toBe('none');
+    // Portrait: the bar is a 100 px column, so the pin rides its top line (the key's line) at the right instead of its middle.
+    const portrait = ruleExactly(ui, ".gn-timeline[data-orientation='portrait'] .gn-timeline__pin");
+    expect(valueOf(portrait, 'top')).toBe('2px');
+    expect(valueOf(portrait, 'transform')).toBe('none');
+    // CONTROL, same it: the base bar keeps its 6 px padding, and the pin names no colour of its own (the colour scan covers the rest).
+    expect(valueOf(ruleExactly(ui, '.gn-timeline__bar'), 'padding')).toBe('2px 6px');
+    expect(pin).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|var\(--gn-/);
+    expect('color: #1f2a37;').toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|var\(--gn-/);
   });
 });

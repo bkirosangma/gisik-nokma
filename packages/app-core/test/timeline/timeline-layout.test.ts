@@ -11,7 +11,9 @@ import {
   PORTRAIT_BAR_INSET,
   PORTRAIT_BAR_WIDTH,
   PORTRAIT_GUTTER_PX,
+  PORTRAIT_KEY_FOOTPRINT_PX,
   ROW_PITCH,
+  barLabelPx,
   barsInRange,
   layoutLanes,
   type LayoutItem,
@@ -119,6 +121,68 @@ describe('29.084 the paper pin', () => {
     // A bar with no pinned flag at all (the field is optional) is unpinned: it shares a row with its day-5 neighbour.
     const bare: LayoutLane = { laneId: 'l', items: [{ id: 'a', key: 'GN-1', startDay: 0, endDay: 0 }, item('b', 5, 7, 'GN-2')] };
     expect(layoutLanes([bare], { ppd: 16, measure: fixed(60) }).lanes[0]?.rows).toBe(1);
+  });
+});
+
+/**
+ * 29.116 (the packer's half; the view's half is `timeline-view.test.tsx`): the room a bar's label takes along the time axis is
+ * ONE function, asked by the packer (`layoutLanes`) and by the view (`keyOutside(drawnPx, barLabelPx(…))`), so the pin the view
+ * draws outside is the pin the packer reserved room for (the E10/E11 one-definition rule, applied to TG-11).
+ */
+describe('29.116 the packer and the view ask one function for a label\'s footprint', () => {
+  it('29.116 landscape adds PIN_PX after the key, and a keyless pinned label is the pin inside a bar\'s two paddings (12 + 14 px); portrait adds nothing along time beyond one line; an unpinned label is the key alone', () => {
+    const landscape = (key: string | null) => (key === null || key === '' ? 0 : 60);
+    expect(barLabelPx(landscape, 'GN-1', false, 'landscape')).toBe(60);
+    expect(barLabelPx(landscape, 'GN-1', true, 'landscape')).toBe(74);
+    expect(barLabelPx(landscape, null, true, 'landscape')).toBe(26);
+    expect(barLabelPx(landscape, '', true, 'landscape')).toBe(26);
+    expect(barLabelPx(landscape, null, false, 'landscape')).toBe(0);
+    // The orientation defaults to landscape (the packer's own default).
+    expect(barLabelPx(landscape, 'GN-1', true)).toBe(74);
+    // Portrait: the pin sits on the key's line across the 100 px column. A 20 px key line stays 20 (not one line's 16), a keyless
+    // pinned bar takes one line, and an unpinned keyless bar takes nothing.
+    expect(PORTRAIT_KEY_FOOTPRINT_PX).toBe(16);
+    const portrait = (key: string | null) => (key === null || key === '' ? 0 : 20);
+    expect(barLabelPx(portrait, 'GN-1', true, 'portrait')).toBe(20);
+    expect(barLabelPx(portrait, 'GN-1', false, 'portrait')).toBe(20);
+    expect(barLabelPx(portrait, null, true, 'portrait')).toBe(16);
+    expect(barLabelPx(portrait, null, false, 'portrait')).toBe(0);
+  });
+
+  it('29.116 the packer reserves what the function answers in each orientation: a pinned one-day bar at 16 px/day pushes a bar on the next day to a second row in landscape (16 + 14 px of label after it) and shares its column in portrait (one 16 px line fits the bar)', () => {
+    const line = (key: string | null) => (key === null || key === '' ? 0 : PORTRAIT_KEY_FOOTPRINT_PX);
+    const lane = (pinned: boolean): LayoutLane => ({ laneId: 'l', items: [item('a', 0, 0, 'GN-1', pinned), item('b', 1, 2, 'GN-2')] });
+    expect(layoutLanes([lane(true)], { ppd: 16, measure: line, orientation: 'portrait' }).lanes[0]?.rows).toBe(1);
+    expect(layoutLanes([lane(true)], { ppd: 16, measure: line, orientation: 'landscape' }).lanes[0]?.rows).toBe(2);
+    // CONTROL: unpinned, the same bar holds its 16 px key in landscape too, so the pin is what took the second row.
+    expect(layoutLanes([lane(false)], { ppd: 16, measure: line, orientation: 'landscape' }).lanes[0]?.rows).toBe(1);
+    // A keyless pinned bar reserves its 26 px pin label in landscape: one day at 16 px/day is too short, so it reaches on.
+    const keyless: LayoutLane = { laneId: 'l', items: [item('a', 0, 0, null, true), item('b', 1, 2, 'GN-2')] };
+    expect(layoutLanes([keyless], { ppd: 16, measure: line }).lanes[0]?.rows).toBe(2);
+  });
+
+  it('29.116 PIN_PX is added in one place in app-core, and both the packer and the view ask barLabelPx; control: the scan counts a planted copy and skips comments, imports and the declaration', () => {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../src');
+    // Every use of PIN_PX in CODE (comments, imports and the declaration itself stripped): the one sum in barLabelPx.
+    const adds = (text: string) =>
+      (
+        text
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\/\/.*$/gm, '')
+          .replace(/^import [^;]*;/gm, '')
+          .replace(/export const PIN_PX = \d+;/g, '')
+          .match(/\bPIN_PX\b/g) ?? []
+      ).length;
+    let total = 0;
+    for (const file of readdirSync(root, { recursive: true }) as string[]) {
+      if (/\.tsx?$/.test(file)) total += adds(readFileSync(join(root, file), 'utf8'));
+    }
+    expect(total).toBe(1);
+    expect(adds(readFileSync(join(root, 'timeline/timeline-layout.ts'), 'utf8'))).toBe(1);
+    expect(readFileSync(join(root, 'timeline/timeline-layout.ts'), 'utf8')).toMatch(/labelPx: \(item\) => barLabelPx\(options\.measure, item\.key, byId\.get\(item\.id\)\?\.pinned === true, options\.orientation\)/);
+    expect(readFileSync(join(root, 'timeline/timeline-view.tsx'), 'utf8')).toMatch(/\bbarLabelPx\(measure, row\.key, row\.pin !== null, orientation\)/);
+    expect(adds('return options.measure(item.key) + (pinned ? PIN_PX : 0);')).toBe(1);
+    expect(adds("import { PIN_PX } from './timeline-layout.js';\n// adds PIN_PX\n/** PIN_PX */\nexport const PIN_PX = 14;")).toBe(0);
   });
 });
 

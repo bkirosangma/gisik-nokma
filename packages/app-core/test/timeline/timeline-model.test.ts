@@ -12,6 +12,7 @@ import {
   NO_DATES_NOTE,
   NO_DAY_CLAIMS_NOTE,
   buildTimelineModel,
+  timelinePinLabel,
   type TimelineModel,
   type TimelineRow,
 } from '../../src/timeline/timeline-model.js';
@@ -416,6 +417,29 @@ describe('29.096 todayDay is the day number of the injected today', () => {
     expect(model([], { today: '2031-01-01' }).todayDay).toBe(dayNumberOf('2031-01-01'));
     expect(model([], { today: '2026-02-30' }).todayDay).toBeNull();
     expect(buildTimelineModel([], { userName }).todayDay).toBeNull();
+  });
+});
+
+describe('29.115 a row carries the paper pin only when there is something to count', () => {
+  const pinned = (pin: { notes: number; attachments: number } | undefined): TicketDatesInput => ({
+    ...dated('2026-08-24', '2026-08-28', 'Pinned'),
+    ...(pin === undefined ? {} : { pin }),
+  });
+
+  it('29.115 notes or attachments make a pin; zeros and an unknown producer make none; the words are singular at one and leave a zero out', () => {
+    expect(onlyRow(model([pinned({ notes: 2, attachments: 1 })])).pin).toEqual({ notes: 2, attachments: 1 });
+    expect(onlyRow(model([pinned({ notes: 0, attachments: 3 })])).pin).toEqual({ notes: 0, attachments: 3 });
+    expect(onlyRow(model([pinned({ notes: 3, attachments: 0 })])).pin).toEqual({ notes: 3, attachments: 0 });
+    // One of either is enough: the boundary of each count, on its own.
+    expect(onlyRow(model([pinned({ notes: 1, attachments: 0 })])).pin).toEqual({ notes: 1, attachments: 0 });
+    expect(onlyRow(model([pinned({ notes: 0, attachments: 1 })])).pin).toEqual({ notes: 0, attachments: 1 });
+    // CONTROLS, same it: known-none and unknown both draw no pin, and neither is an error.
+    expect(onlyRow(model([pinned({ notes: 0, attachments: 0 })])).pin).toBeNull();
+    expect(onlyRow(model([pinned(undefined)])).pin).toBeNull();
+    expect(timelinePinLabel({ notes: 2, attachments: 1 })).toBe('2 notes, 1 attachment');
+    expect(timelinePinLabel({ notes: 1, attachments: 2 })).toBe('1 note, 2 attachments');
+    expect(timelinePinLabel({ notes: 0, attachments: 1 })).toBe('1 attachment');
+    expect(timelinePinLabel({ notes: 3, attachments: 0 })).toBe('3 notes');
   });
 });
 

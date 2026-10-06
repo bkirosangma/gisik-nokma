@@ -21,7 +21,21 @@ import type { IsEpicType } from '../../src/hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../../src/view-types.js';
 import { NO_DATES_NOTE, NO_DAY_CLAIMS_NOTE } from '../../src/timeline/timeline-model.js';
 import { dayNumberOf, isoDayOf } from '../../src/timeline/timeline-days.js';
+import { PIN_PX } from '../../src/timeline/timeline-layout.js';
 import { TimelineView } from '../../src/timeline/timeline-view.js';
+
+/** Counts how often a pinned bar renders: `timelinePinLabel` is called in the bar's render body, once per render (29.102 memo case). */
+const barRenders = vi.hoisted(() => ({ n: 0 }));
+vi.mock('../../src/timeline/timeline-model.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/timeline/timeline-model.js')>();
+  return {
+    ...actual,
+    timelinePinLabel: (...args: Parameters<typeof actual.timelinePinLabel>) => {
+      barRenders.n += 1;
+      return actual.timelinePinLabel(...args);
+    },
+  };
+});
 
 /**
  * 11.73–11.81 and 29.097–29.105 — `TimelineView`, one continuous day axis over
@@ -778,6 +792,154 @@ describe('29.440 the Timeline mark knows Not taken (wtg2 T17, AMEND-wtg2-t17-tim
   });
 });
 
+describe('29.116 the paper pin sits inside the bar\'s end, or after the key outside a bar too short for both', () => {
+  const pinnedTicket = (title: string, key: string | null, start: string, due: string, pin?: { notes: number; attachments: number }): TicketDatesInput => ({
+    ...ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } }),
+    ...(key === null ? {} : { key }),
+    ...(pin === undefined ? {} : { pin }),
+  });
+  const rowOf = (bar: HTMLElement) => bar.closest('.gn-timeline__row') as HTMLElement;
+
+  it('29.116 a pinned wide bar draws one pin inside the bar and is marked pinned; its words are the tooltip and part of the description; it is not a button and not announced', () => {
+    renderTimeline([pinnedTicket('Wide', 'GN-12', '2026-08-24', '2026-08-28', { notes: 2, attachments: 1 }), pinnedTicket('Plain', 'GN-14', '2026-08-24', '2026-08-28', { notes: 0, attachments: 0 })]);
+    const wide = screen.getByRole('button', { name: 'Wide' });
+    const pin = wide.querySelector('.gn-timeline__pin') as HTMLElement;
+    expect(pin).not.toBeNull();
+    expect(pin).toHaveAttribute('title', '2 notes, 1 attachment');
+    expect(pin.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(pin.querySelector('svg')).toHaveAttribute('focusable', 'false');
+    // decoration, never a control of its own: the pin is a span inside the bar's one button
+    expect(pin.tagName).toBe('SPAN');
+    expect(pin.closest('button')).toBe(wide);
+    expect(within(wide).queryAllByRole('button', { hidden: true })).toHaveLength(0);
+    expect(wide).toHaveAttribute('data-pinned', 'true');
+    const described = document.getElementById(wide.getAttribute('aria-describedby') as string);
+    expect(described?.textContent).toBe(`GN-12; ${IN_PROGRESS}starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim; 2 notes, 1 attachment`);
+    expect(wide).toHaveAttribute('title', described?.textContent ?? '');
+    // the accessible name stays the title alone, and only the one bar has a pin
+    expect(wide.getAttribute('aria-label')).toBe('Wide');
+    expect(document.querySelectorAll('.gn-timeline__pin')).toHaveLength(1);
+    // CONTROL, same it: a bar with counts of zero has no pin, no data-pinned and no count words
+    const plain = screen.getByRole('button', { name: 'Plain' });
+    expect(plain.querySelector('.gn-timeline__pin')).toBeNull();
+    expect(plain).not.toHaveAttribute('data-pinned');
+    expect(plain.getAttribute('title')).not.toMatch(/note|attachment/);
+  });
+
+  it('29.116 a one-day bar cannot hold key and pin: both stand outside its end and the bar is not marked pinned; the same bar without a pin keeps the key outside only, and a pin on a bar that fits stays inside', () => {
+    renderTimeline([
+      pinnedTicket('Short', 'GN-13', '2026-09-08', '2026-09-08', { notes: 1, attachments: 0 }),
+      pinnedTicket('Short bare', 'GN-15', '2026-09-15', '2026-09-15'),
+      pinnedTicket('Roomy', 'GN-16', '2026-09-01', '2026-09-05', { notes: 1, attachments: 0 }),
+      // A two-day bar is 48 px at 24 px/day: the 45 px key fits, key and 14 px pin (59) do not. PK-4 adds the pin to the footprint.
+      pinnedTicket('Tight pinned', 'GN-17', '2026-09-22', '2026-09-23', { notes: 1, attachments: 0 }),
+      pinnedTicket('Tight bare', 'GN-18', '2026-09-24', '2026-09-25'),
+    ]);
+    const tightPinned = screen.getByRole('button', { name: 'Tight pinned' });
+    expect(tightPinned.querySelector('.gn-timeline__key')).toBeNull();
+    expect(tightPinned.querySelector('.gn-timeline__pin')).toBeNull();
+    expect(rowOf(tightPinned).querySelector('.gn-timeline__key--outside .gn-timeline__pin')).not.toBeNull();
+    // E10: a bar whose key and pin stand outside keeps the bar's own padding (no data-pinned), so it is drawn at barPx and never
+    // runs over the key drawn after its end.
+    expect(tightPinned).not.toHaveAttribute('data-pinned');
+    // CONTROL: the same width without a pin keeps its key inside, so the pin is what pushed it out.
+    expect(screen.getByRole('button', { name: 'Tight bare' }).querySelector('.gn-timeline__key')).toHaveTextContent('GN-18');
+    const short = screen.getByRole('button', { name: 'Short' });
+    expect(short.querySelector('.gn-timeline__pin')).toBeNull();
+    expect(short).not.toHaveAttribute('data-pinned');
+    const outside = rowOf(short).querySelector('.gn-timeline__key--outside') as HTMLElement;
+    expect(outside).toHaveTextContent('GN-13');
+    expect(outside).toHaveAttribute('aria-hidden', 'true');
+    expect(outside.querySelector('.gn-timeline__pin')).toHaveAttribute('title', '1 note');
+    // the pin FOLLOWS the key in the flow: the key's text comes first
+    expect(outside.firstChild?.textContent).toBe('GN-13');
+    const bare = screen.getByRole('button', { name: 'Short bare' });
+    const bareOutside = rowOf(bare).querySelector('.gn-timeline__key--outside') as HTMLElement;
+    expect(bareOutside).toHaveTextContent('GN-15');
+    expect(bareOutside.querySelector('.gn-timeline__pin')).toBeNull();
+    const roomy = screen.getByRole('button', { name: 'Roomy' });
+    expect(roomy.querySelector('.gn-timeline__pin')).not.toBeNull();
+    expect(roomy).toHaveAttribute('data-pinned', 'true');
+    expect(rowOf(roomy).querySelector('.gn-timeline__key--outside')).toBeNull();
+  });
+
+  it('29.116 the view hands the pin to the packer: a pinned one-day bar with a 58 px key reserves one day more than the same bar unpinned, so a bar five days on takes a second row only when the first is pinned', () => {
+    // At the Week preset (24 px/day) the packing bucket is 16 px/day. GN-1234 measures 7 x 6.5 + 12 = 57.5, so 58 px (jsdom).
+    // Unpinned: ceil((4 + 58) / 16) = 4 days after the bar (days 0-4); pinned: ceil((4 + 58 + 14) / 16) = 5 (days 0-5).
+    const rowOfBar = (title: string) => rowOf(screen.getByRole('button', { name: title })).style.getPropertyValue('--row');
+    renderTimeline([pinnedTicket('First', 'GN-1234', '2026-08-24', '2026-08-24', { notes: 1, attachments: 0 }), pinnedTicket('Five on', 'GN-20', '2026-08-29', '2026-08-30')]);
+    expect(rowOfBar('Five on')).toBe('1');
+    document.body.innerHTML = '';
+    // CONTROL: the same two bars with the first unpinned share a row.
+    renderTimeline([pinnedTicket('First', 'GN-1234', '2026-08-24', '2026-08-24'), pinnedTicket('Five on', 'GN-20', '2026-08-29', '2026-08-30')]);
+    expect(rowOfBar('Five on')).toBe('0');
+  });
+
+  it('29.116 a keyless bar too short for its pin puts the pin alone outside its end; a keyless bar that holds it keeps it inside', () => {
+    // A keyless pinned label is the pin inside a bar's two paddings: 12 + 14 = 26 px. A one-day bar at 24 px/day is narrower.
+    renderTimeline([
+      pinnedTicket('Keyless short', null, '2026-09-08', '2026-09-08', { notes: 0, attachments: 1 }),
+      pinnedTicket('Keyless two days', null, '2026-09-15', '2026-09-16', { notes: 0, attachments: 1 }),
+      pinnedTicket('Keyless bare', null, '2026-09-22', '2026-09-22'),
+    ]);
+    const short = screen.getByRole('button', { name: 'Keyless short' });
+    expect(short.querySelector('.gn-timeline__pin')).toBeNull();
+    expect(short).not.toHaveAttribute('data-pinned');
+    const outside = rowOf(short).querySelector('.gn-timeline__key--outside') as HTMLElement;
+    expect(outside).not.toBeNull();
+    expect(outside.textContent).toBe('');
+    expect(outside.querySelector('.gn-timeline__pin')).toHaveAttribute('title', '1 attachment');
+    const two = screen.getByRole('button', { name: 'Keyless two days' });
+    expect(two.querySelector('.gn-timeline__pin')).toHaveAttribute('title', '1 attachment');
+    expect(two).toHaveAttribute('data-pinned', 'true');
+    expect(rowOf(two).querySelector('.gn-timeline__key--outside')).toBeNull();
+    // CONTROL: a keyless bar with nothing to count has no label to put anywhere
+    expect(rowOf(screen.getByRole('button', { name: 'Keyless bare' })).querySelector('.gn-timeline__key--outside')).toBeNull();
+  });
+
+  it('29.116 in portrait the pin rides the key\'s line across the column, so a one-day bar at the Week zoom keeps key and pin inside; control: the same bar in landscape puts both outside', () => {
+    const at = (width: number) => {
+      const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+      try {
+        const { container } = renderTimeline([pinnedTicket('One day', 'GN-13', '2026-08-24', '2026-08-24', { notes: 1, attachments: 1 })]);
+        const bar = screen.getByRole('button', { name: 'One day' });
+        return {
+          orientation: container.querySelector('.gn-timeline')?.getAttribute('data-orientation'),
+          key: bar.querySelector('.gn-timeline__key')?.textContent ?? null,
+          pinInside: bar.querySelector('.gn-timeline__pin')?.getAttribute('title') ?? null,
+          pinned: bar.getAttribute('data-pinned'),
+          outside: container.querySelector('.gn-timeline__key--outside')?.textContent ?? null,
+        };
+      } finally {
+        spy.mockRestore();
+        document.body.innerHTML = '';
+      }
+    };
+    expect(at(390)).toEqual({ orientation: 'portrait', key: 'GN-13', pinInside: '1 note, 1 attachment', pinned: 'true', outside: null });
+    expect(at(1280)).toEqual({ orientation: 'landscape', key: null, pinInside: null, pinned: null, outside: 'GN-13' });
+  });
+
+  it('29.116 ui.css reserves the pin\'s footprint on a pinned bar (BAR_PAD_PX + PIN_PX) and after an outside key (PIN_PX less the icon), so what is drawn is what the packer reserved; the literals are pinned too', () => {
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const body = (selector: string) => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`^${escaped} \\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? '';
+    };
+    const value = (text: string, name: string) => new RegExp(`(?:^|;|\\{)\\s*${name}:\\s*([^;]+);`).exec(text)?.[1]?.trim();
+    renderTimeline([pinnedTicket('Wide', 'GN-12', '2026-08-24', '2026-08-28', { notes: 1, attachments: 0 })]);
+    const icon = Number(screen.getByRole('button', { name: 'Wide' }).querySelector('.gn-timeline__pin svg')?.getAttribute('width'));
+    expect(icon).toBe(12);
+    expect(value(body('.gn-timeline__bar[data-pinned]'), 'padding-right')).toBe(`${BAR_PAD_PX + PIN_PX}px`);
+    expect(value(body('.gn-timeline__pin'), 'right')).toBe(`${BAR_PAD_PX}px`);
+    expect(value(body('.gn-timeline__key--outside .gn-timeline__pin'), 'margin-left')).toBe(`${PIN_PX - icon}px`);
+    expect(PIN_PX).toBe(14);
+    expect(value(body('.gn-timeline__bar[data-pinned]'), 'padding-right')).toBe('20px');
+    expect(value(body('.gn-timeline__key--outside .gn-timeline__pin'), 'margin-left')).toBe('2px');
+    // CONTROL: the reader finds a property it is not looking for as a different value, so the legs above are not vacuous.
+    expect(value(body('.gn-timeline__pin'), 'top')).toBe('50%');
+  });
+});
+
 describe('29.101 the today line is one line, on the prop\'s day', () => {
   it('29.101 one line, aria-hidden, at today\'s day number; a different prop moves it; an invalid day draws none', () => {
     const { container, rerender } = renderTimeline([]);
@@ -850,7 +1012,11 @@ describe('29.055 the view decides an outside key with the packer\'s one predicat
     }
     expect(total).toBe(1);
     expect(comparisons(readFileSync(join(REPO_ROOT, 'packages/viewport/src/pack.ts'), 'utf8'))).toBe(1);
-    expect(readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-view.tsx'), 'utf8')).toMatch(/\bkeyOutside\(drawnPx, measure\(row\.key\)\)/);
+    // The view asks keyOutside about the label the PACKER reserved: the key and the paper pin after it, through the one label
+    // function in timeline-layout.ts (Part 1 T12, 29.116). Control: the T9 call that measured the key alone no longer matches.
+    const callsOneLabel = (text: string) => /\bkeyOutside\(drawnPx, barLabelPx\(measure, row\.key, row\.pin !== null, orientation\)\)/.test(text);
+    expect(callsOneLabel(readFileSync(join(REPO_ROOT, 'packages/app-core/src/timeline/timeline-view.tsx'), 'utf8'))).toBe(true);
+    expect(callsOneLabel('const outside = row.key !== null && keyOutside(drawnPx, measure(row.key));')).toBe(false);
     expect(comparisons('const outside = row.key !== null && barPx < measure(row.key);')).toBe(1);
     expect(comparisons('const outside = measure(row.key) > barPx;')).toBe(1);
   });
@@ -979,6 +1145,25 @@ describe('29.102 a view that re-renders without new data re-renders none of its 
     const memoised = (text: string) => /import \{[^}]*\bmemo\b[^}]*\} from 'react'/.test(text) && /const TimelineBar = memo\(function TimelineBar\(/.test(text);
     expect(memoised(source)).toBe(true);
     expect(memoised("const TimelineBar = function TimelineBar(props) { return null; };")).toBe(false);
+  });
+
+  it('29.102 re-rendering the view with the same tickets, today and handlers draws no bar again (the pan loop re-renders the view on every moving / resting flip); control: a changed ticket list does draw them again', () => {
+    const pinned = (title: string, start: string): TicketDatesInput => ({
+      ...ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: start }) } }),
+      pin: { notes: 1, attachments: 0 },
+    });
+    const tickets = [pinned('A', '2026-08-24'), pinned('B', '2026-08-25'), pinned('C', '2026-08-26')];
+    const onOpenTicket = vi.fn();
+    const element = (list: TicketDatesInput[]) => <TimelineView tickets={list} today={TODAY} userName={userName} onOpenTicket={onOpenTicket} />;
+    const view = render(element(tickets));
+    expect(document.querySelectorAll('.gn-timeline__bar')).toHaveLength(3);
+    const afterMount = barRenders.n;
+    expect(afterMount).toBeGreaterThanOrEqual(3);
+    view.rerender(element(tickets));
+    expect(barRenders.n).toBe(afterMount);
+    // CONTROL, same it: new data does render them, so the counter can see a render
+    view.rerender(element([...tickets, pinned('D', '2026-08-27')]));
+    expect(barRenders.n).toBeGreaterThan(afterMount);
   });
 });
 

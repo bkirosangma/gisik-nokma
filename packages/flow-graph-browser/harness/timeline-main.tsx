@@ -10,6 +10,8 @@ import '@gisik-nokma/ui/ui.css';
  * `above` puts a block that many px tall over the host, where the project page has its filter bar (none by default): 29.040
  * measures the panel filling the window under its own top edge with one there.
  * Today is the fixed day 60 after 2026-08-03 (an injected prop, like the product's: nothing here reads the clock).
+ * `pins=1` gives every third ticket a paper pin (Part 1 T12, a measurement aid no case asserts on), and `keyless=1` drops the key
+ * of every sixth, so a keyless pinned bar is on the page too.
  */
 const params = new URLSearchParams(window.location.search);
 document.documentElement.dataset['style'] = params.get('style') || 'neo';
@@ -28,7 +30,7 @@ const tickets: TicketDatesInput[] = Array.from({ length: n }, (_, i) => {
   const start = Math.floor((i * span) / n);
   const length = 1 + ((i * 7) % 12);
   return {
-    key: `GN-${100 + i}`,
+    key: params.get('keyless') === '1' && i % 6 === 0 ? null : `GN-${100 + i}`,
     state: {
       kind: 'ticket', id: `t${i}`, workspaceId: 'w', projectId: 'p', typeId: 'task', parentId: i % 9 === 0 ? 'epic1' : null, workflowId: 'wf', workflowVersion: 1,
       stateId: 's', stateCategory: i % 4 === 0 ? 'terminal' : i % 4 === 1 ? 'active' : 'open', assigneeId: null, collaboratorIds: [],
@@ -42,6 +44,7 @@ const tickets: TicketDatesInput[] = Array.from({ length: n }, (_, i) => {
     },
     pendingFieldIds: [],
     customDateFields: [{ id: 'filed-on', name: 'Filed on' }],
+    ...(params.get('pins') === '1' && i % 3 === 0 ? { pin: i % 9 === 0 ? { notes: 1, attachments: 0 } : { notes: 2, attachments: 1 } } : {}),
   } as unknown as TicketDatesInput;
 });
 

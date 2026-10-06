@@ -17,16 +17,26 @@ import {
   type ZoomPreset,
 } from '@gisik-nokma/viewport';
 import { resolutionOf } from '@gisik-nokma/domain';
-import { SegmentedControl } from '@gisik-nokma/ui';
+import { PaperPinIcon, SegmentedControl } from '@gisik-nokma/ui';
 import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import type { UserNameFn } from '../claims/claim-labels.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
 import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
 import { isoDayOf } from './timeline-days.js';
-import { PORTRAIT_GUTTER_PX, barsInRange, layoutLanes, type KeyMeasure, type LayoutLane, type Orientation } from './timeline-layout.js';
+import {
+  PORTRAIT_GUTTER_PX,
+  PORTRAIT_KEY_FOOTPRINT_PX,
+  barLabelPx,
+  barsInRange,
+  layoutLanes,
+  type KeyMeasure,
+  type LayoutLane,
+  type Orientation,
+} from './timeline-layout.js';
 import {
   buildTimelineModel,
+  timelinePinLabel,
   type TimelineCustomClaim,
   type TimelineRow,
   type TimelineSideReason,
@@ -97,8 +107,6 @@ const MIN_PANEL_PX = 320;
 const PANEL_BOTTOM_GAP_PX = 16;
 /** PK-7: a container narrower than 40rem (`ui.css:1059`) lays the chart out in portrait, time running down. */
 const PORTRAIT_BELOW_PX = 640;
-/** In portrait a key is a line of text down a column, so its footprint along the time axis is a line height, not a width. */
-const PORTRAIT_KEY_FOOTPRINT_PX = 16;
 /**
  * The portrait key measure: the packer reserves it, and each bar decides inside or outside with it (the one-predicate rule of
  * E10/E11). A 100 px column holds any key across, so only a bar shorter than a line along time puts its key outside, where portrait
@@ -277,6 +285,8 @@ type TimelineBarProps = {
   /** Closed Not taken by the flow (the input's `notTaken` from the server's `notTakenOf`, else `resolutionOf`), so a terminal bar does not read Done. */
   notTaken: boolean;
   measure: KeyMeasure;
+  /** PK-7: the paper pin costs room along time in landscape only (`barLabelPx`). */
+  orientation: Orientation;
   detailId: string;
   onOpen: (ticketId: string) => void;
 };
@@ -287,14 +297,26 @@ type TimelineBarProps = {
  * that is stable between refreshes (`row` comes from the model's memo, `measure` from `useKeyMeasure`, `onOpen` from a ref).
  */
 const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
-  const { row, layoutRow, firstDay, ppd, category, notTaken, measure, detailId, onOpen } = props;
+  const { row, layoutRow, firstDay, ppd, category, notTaken, measure, orientation, detailId, onOpen } = props;
   const mark = stateMark(category, notTaken);
-  const detail = [row.key, mark?.word, row.provenance, ...row.customClaims.map((entry) => entry.label)]
+  // TG-11: the paper pin's words ride the bar's hover and description; the pin itself never speaks.
+  const pinWords = row.pin === null ? null : timelinePinLabel(row.pin);
+  const detail = [row.key, mark?.word, row.provenance, pinWords, ...row.customClaims.map((entry) => entry.label)]
     .filter((part): part is string => part !== null && part !== undefined && part !== '')
     .join('; ');
-  // E11: decided on the DRAWN width (never under MIN_BAR_PX), the width the packer reserved and ui.css draws.
+  // E11: decided on the DRAWN width (never under MIN_BAR_PX), the width the packer reserved and ui.css draws, against the label
+  // the packer reserved: the key, and the paper pin after it (TG-11). A bar too short for both shows both just outside its end.
   const drawnPx = barPx(row.endDay - row.startDay + 1, ppd);
-  const outside = row.key !== null && keyOutside(drawnPx, measure(row.key));
+  const outside = keyOutside(drawnPx, barLabelPx(measure, row.key, row.pin !== null, orientation));
+  // Decoration (aria-hidden svg, not a button): its words are the `title` here and part of the bar's description. Only a bar that
+  // HOLDS its pin is `data-pinned` and reserves room for it (ui.css); one whose key and pin stand outside keeps its own padding, so
+  // it is drawn at `barPx` and never runs over its outside label (E10/E11).
+  const pin =
+    pinWords === null ? null : (
+      <span className="gn-timeline__pin" title={pinWords}>
+        <PaperPinIcon />
+      </span>
+    );
   const vars = {
     ['--d0' as string]: row.startDay - firstDay,
     ['--dn' as string]: row.endDay - row.startDay + 1,
@@ -308,6 +330,7 @@ const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
         data-day-from={row.startDay}
         data-day-to={row.endDay}
         data-pending={row.pending ? 'true' : undefined}
+        data-pinned={pin !== null && !outside ? 'true' : undefined}
         data-state={mark === null ? undefined : mark.state}
         aria-label={row.title}
         aria-describedby={detailId}
@@ -321,10 +344,12 @@ const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
         )}
         {!outside && row.key !== null && <span className="gn-timeline__key">{row.key}</span>}
         <span className="gn-timeline__title-text">{row.title}</span>
+        {!outside && pin}
       </button>
       {outside && (
         <span className="gn-timeline__key gn-timeline__key--outside" aria-hidden="true">
           {row.key}
+          {pin}
         </span>
       )}
       {/* TV-2: custom date claims stay beside the ticket. A bar row has no room for a list, so it is a callout that opens on
@@ -390,7 +415,7 @@ export function TimelineView(props: TimelineViewProps) {
   const layout = useMemo(() => {
     const lanes: LayoutLane[] = model.groups.map((group) => ({
       laneId: group.epicId ?? 'no-epic',
-      items: group.rows.map((row) => ({ id: row.ticketId, key: row.key, startDay: row.startDay, endDay: row.endDay })),
+      items: group.rows.map((row) => ({ id: row.ticketId, key: row.key, startDay: row.startDay, endDay: row.endDay, pinned: row.pin !== null })),
     }));
     return layoutLanes(lanes, { ppd, measure: portrait ? portraitMeasure : measure, orientation });
   }, [model.groups, ppd, measure, orientation, portrait]);
@@ -589,6 +614,7 @@ export function TimelineView(props: TimelineViewProps) {
                       category={categoryById.get(row.ticketId) ?? 'open'}
                       notTaken={notTakenIds.has(row.ticketId)}
                       measure={portrait ? portraitMeasure : measure}
+                      orientation={orientation}
                       detailId={`${idPrefix}-detail-${row.ticketId}`}
                       onOpen={openTicket}
                     />

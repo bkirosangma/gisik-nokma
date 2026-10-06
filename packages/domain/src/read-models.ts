@@ -345,7 +345,8 @@ export type AssignmentProvenance = {
 
 /**
  * A `TicketCard` plus the five facts the LIST route — and only the list route —
- * also serves (ruling P25 clause 1).
+ * also serves (ruling P25 clause 1), and a sixth the list route adds after
+ * assembly: the paper pin's counts (`pin`, Workflow and Timeline graphs T12).
  *
  * ## Why this is a separate type and not five fields on `TicketCard`
  *
@@ -403,6 +404,12 @@ export type AssignmentProvenance = {
  *   restricted parent there would invent an existence the system has no evidence
  *   for. Strictly less than the `parent: { kind: 'restricted', id }` the single
  *   ticket read already serves for the same viewer over the same rows.
+ * - `pin` — the paper pin (Workflow and Timeline graphs T12, 29.113): the notes
+ *   this viewer may read that are attached to the ticket (homed in the card's
+ *   workspace, live, in a live home project, admitted by `visibleNotesWhere`)
+ *   and the attachments the ticket owns there, as two counts. The list route adds
+ *   it to every card, zeros included, after `assembleListCards`; the other list
+ *   reads that share that assembler leave it off, which is why it is optional.
  */
 export type ListCard = TicketCard & {
   typeRank: number;
@@ -410,7 +417,16 @@ export type ListCard = TicketCard & {
   stateName: string;
   assignedProvenance: AssignmentProvenance | null;
   hasRestrictedParent: boolean;
+  /**
+   * The paper pin (Workflow and Timeline graphs, TG-11 and TV-10): the notes THIS viewer may read in the card's workspace that
+   * are attached to its ticket, and the attachments it owns there. The list route sends it on every card (`routes/list.ts`,
+   * `read/pin-counts.ts`); it is optional in the TYPE only because `assembleListCards` (the other list reads share it) omits it.
+   */
+  pin?: PinCounts;
 };
+
+/** How many notes and attachments a ticket has, counted for one viewer (the paper pin, TG-11). */
+export type PinCounts = { notes: number; attachments: number };
 
 export type ListGroup = { key: string; label: string; cards: ListCard[] };
 
