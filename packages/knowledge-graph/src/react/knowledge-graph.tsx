@@ -199,7 +199,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   // "Remove link" (spec A's `ticket.link_removed`, through the host): the cached store drops the edge, and Undo puts it back
   // through `mergeRing` with no refetch (planner ruling 2026-10-04). The camera stays where it is either way, when the change
   // is drawn: if the view moved to another centre while the host answered, nothing is, so nothing is kept (the hook's bump
-  // renders after this line).
+  // renders after this line). Removing the centre's last link is the exception: that draw is an empty state, framed (27.668).
   const removeLink =
     props.onRemoveLink === undefined
       ? undefined
