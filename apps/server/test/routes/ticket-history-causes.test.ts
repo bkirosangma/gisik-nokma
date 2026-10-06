@@ -36,7 +36,7 @@ describe('29.373 History annotates a flow cause per viewer', () => {
     expect(caused[0]?.causeTicket).toBeNull();
   });
 
-  it('29.373 a visible ticket is keyed with the cause whole; a hidden one is null and its ids and people are nulled, the keys kept', async () => {
+  it('29.373 a visible ticket is keyed with the cause whole; a hidden one is null and its ids and people are nulled, the keys kept, its label or outcome gone', async () => {
     const { workspaceId: WS, taskInEpicId: S, sharedTaskId: SH, hiddenTaskId: H } = read.world;
     // Two deciders: the visible close goes out WHOLE (its `decidedBy` is in the member's body by design), so the
     // hidden reopen's decider must be a different id for the `not.toContain(DECIDER)` leg to pass on correct code.
@@ -45,11 +45,13 @@ describe('29.373 History annotates a flow cause per viewer', () => {
     const DECIDER = newUlid();
     const SEEN_DECIDER = newUlid();
     const DEC_EVENT = newUlid();
+    // Branch names, the same way (planner ruling 2026-10-06 05:46: a hidden ticket's label or outcome is withheld with it).
+    const [HIDDEN_LABEL, HIDDEN_OUTCOME, SEEN_LABEL, SEEN_OUTCOME] = ['branch-H-led-S', 'branch-H-reset-S', 'branch-SH-led-S', 'branch-SH-closed-S'];
     const file = (type: string, payload: unknown) => makeCommitted({ workspaceId: WS, actorId: read.world.owner, entity: { kind: 'ticket', id: S }, type, payload });
-    const ledVisible = file('ticket.transitioned', { to: 'doing', cause: { kind: 'led-to', sourceTicketId: SH, triggeredBy: TRIG } });
-    const ledHidden = file('ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: H, label: 'Yes', triggeredBy: HIDDEN_TRIG } });
-    const reopenHidden = file('ticket.reopened', { cause: { kind: 'reopened-by-flow', decisionTicketId: H, outcome: 'No', pass: 1, decidedBy: DECIDER, decisionEventId: DEC_EVENT } });
-    const closedVisible = file('ticket.closed', { cause: { kind: 'branch-not-taken', decisionTicketId: SH, outcome: 'Yes', pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT } });
+    const ledVisible = file('ticket.transitioned', { to: 'doing', cause: { kind: 'led-to', sourceTicketId: SH, label: SEEN_LABEL, triggeredBy: TRIG } });
+    const ledHidden = file('ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: H, label: HIDDEN_LABEL, triggeredBy: HIDDEN_TRIG } });
+    const reopenHidden = file('ticket.reopened', { cause: { kind: 'reopened-by-flow', decisionTicketId: H, outcome: HIDDEN_OUTCOME, pass: 1, decidedBy: DECIDER, decisionEventId: DEC_EVENT } });
+    const closedVisible = file('ticket.closed', { cause: { kind: 'branch-not-taken', decisionTicketId: SH, outcome: SEEN_OUTCOME, pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT } });
     const plain = file('ticket.transitioned', { to: 'doing' });
     await applyCommitted(db.pool, [ledVisible, ledHidden, reopenHidden, closedVisible, plain]);
 
@@ -63,32 +65,33 @@ describe('29.373 History annotates a flow cause per viewer', () => {
 
     const member = await history('member');
     expect(member.byId.get(ledVisible.id)?.causeTicket).toEqual({ key: keys.get(SH) });
-    expect(member.byId.get(ledVisible.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: SH, triggeredBy: TRIG });
+    // visible: whole, the label and the outcome kept (the control for the withheld arms below)
+    expect(member.byId.get(ledVisible.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: SH, label: SEEN_LABEL, triggeredBy: TRIG });
     expect(member.byId.get(closedVisible.id)?.causeTicket).toEqual({ key: keys.get(SH) });
     expect(member.byId.get(closedVisible.id)?.payload.cause).toEqual({
-      kind: 'branch-not-taken', decisionTicketId: SH, outcome: 'Yes', pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT,
-    }); // visible: whole
+      kind: 'branch-not-taken', decisionTicketId: SH, outcome: SEEN_OUTCOME, pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT,
+    });
     expect(member.byId.get(ledHidden.id)?.causeTicket).toBeNull();
-    // AMEND 2: the withheld ids are NULLED with their keys present, never dropped
-    expect(member.byId.get(ledHidden.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: null, label: 'Yes', triggeredBy: null });
+    // AMEND 2: the withheld ids are NULLED with their keys present, never dropped; the label goes (planner 05:46)
+    expect(member.byId.get(ledHidden.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: null, triggeredBy: null });
     // planner 02:37 (3): only the keys the kind HAS are nulled; a led-to cause gains no decision keys
-    expect(Object.keys(member.byId.get(ledHidden.id)?.payload.cause ?? {}).sort()).toEqual(['kind', 'label', 'sourceTicketId', 'triggeredBy']);
+    expect(Object.keys(member.byId.get(ledHidden.id)?.payload.cause ?? {}).sort()).toEqual(['kind', 'sourceTicketId', 'triggeredBy']);
     expect(member.byId.get(ledHidden.id)?.payload.cause).not.toHaveProperty('decisionTicketId');
     expect(member.byId.get(ledHidden.id)?.payload.cause).not.toHaveProperty('decidedBy');
     expect(member.byId.get(reopenHidden.id)?.causeTicket).toBeNull();
     expect(member.byId.get(reopenHidden.id)?.payload.cause).toEqual({
-      kind: 'reopened-by-flow', decisionTicketId: null, outcome: 'No', pass: 1, decidedBy: null, decisionEventId: DEC_EVENT,
+      kind: 'reopened-by-flow', decisionTicketId: null, pass: 1, decidedBy: null, decisionEventId: DEC_EVENT,
     });
-    expect(Object.keys(member.byId.get(reopenHidden.id)?.payload.cause ?? {}).sort()).toEqual(['decidedBy', 'decisionEventId', 'decisionTicketId', 'kind', 'outcome', 'pass']);
-    for (const secret of [H, DECIDER, HIDDEN_TRIG]) expect(member.body, `member body leaks ${secret}`).not.toContain(secret);
+    expect(Object.keys(member.byId.get(reopenHidden.id)?.payload.cause ?? {}).sort()).toEqual(['decidedBy', 'decisionEventId', 'decisionTicketId', 'kind', 'pass']);
+    for (const secret of [H, DECIDER, HIDDEN_TRIG, HIDDEN_LABEL, HIDDEN_OUTCOME]) expect(member.body, `member body leaks ${secret}`).not.toContain(secret);
     // control: an event with no flow cause carries no annotation and an untouched payload
     expect(member.byId.get(plain.id)).not.toHaveProperty('causeTicket');
     expect(member.byId.get(plain.id)?.payload).toEqual({ to: 'doing' });
     // control: the owner sees the hidden ticket, so nothing is withheld from them
     const owner = await history('owner');
     expect(owner.byId.get(ledHidden.id)?.causeTicket).toEqual({ key: keys.get(H) });
-    expect(owner.byId.get(ledHidden.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: H, label: 'Yes', triggeredBy: HIDDEN_TRIG });
-    expect(owner.byId.get(reopenHidden.id)?.payload.cause).toMatchObject({ decisionTicketId: H, decidedBy: DECIDER });
-    expect(owner.body).toContain(H);
+    expect(owner.byId.get(ledHidden.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: H, label: HIDDEN_LABEL, triggeredBy: HIDDEN_TRIG });
+    expect(owner.byId.get(reopenHidden.id)?.payload.cause).toMatchObject({ decisionTicketId: H, outcome: HIDDEN_OUTCOME, decidedBy: DECIDER });
+    for (const secret of [H, DECIDER, HIDDEN_TRIG, HIDDEN_LABEL, HIDDEN_OUTCOME]) expect(owner.body, `owner body holds ${secret}`).toContain(secret);
   });
 });

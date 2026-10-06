@@ -8,8 +8,9 @@ import { buildDoorWorld, callTool, mk, type DoorWorld } from './helpers/flow-wor
  * PTR wtg-flow-cause-withhold, the hosted door (29.444). A member who cannot see a not-taken ticket's Decision is told
  * nothing of it: `get_ticket` lifts the close cause into `resolution` and names the Decision only when the caller can read
  * it (wtg-part5 T2, `ticket-flow-facts.ts`), and `get_ticket_history` phrases the cause the server withheld the way
- * `phrasedCause` does ("a ticket you can't see", "someone you can't see"; wtg2 T8). The decider is a DEDICATED id that
- * appears nowhere else, so `not.toContain` can only fail through the cause. Run LOCALLY.
+ * `phrasedCause` does ("a ticket you can't see", "someone you can't see"; wtg2 T8). The hidden Decision's outcome goes
+ * with it (planner ruling 2026-10-06 05:46): neither answer names the branch it chose. The decider and the outcome are
+ * DEDICATED tokens that appear nowhere else, so `not.toContain` can only fail through the cause. Run LOCALLY.
  */
 let db: TestDatabase;
 beforeAll(async () => { db = await createTestDatabase(); });
@@ -29,13 +30,14 @@ async function file(w: DoorWorld, actorId: string, entityId: string, type: strin
 }
 
 describe('29.444 MCP names no Decision or decider the caller cannot see', () => {
-  it("29.444 get_ticket names no hidden Decision (decision: null) and get_ticket_history reads \"a ticket you can't see\" and \"someone you can't see\", no id; control: the owner's answers name both", async () => {
+  it("29.444 get_ticket names no hidden Decision (decision: null, no outcome) and get_ticket_history reads \"a ticket you can't see\" and \"someone you can't see\", no id and no outcome; control: the owner's answers name all three", async () => {
     const w = await buildDoorWorld(db, '4441');
     const decision = await mk(w, w.owner, 'Client decides', { typeId: 'decision' });
     const skipped = await mk(w, w.owner, 'Rework the pitch');
     await file(w, w.owner.userId, decision, 'visibility.set', { ticketId: decision, mode: 'explicit', userIds: [w.owner.userId] });
     const DECIDER = newUlid();
-    const cause = { kind: 'branch-not-taken', decisionTicketId: decision, outcome: 'No', pass: 1, decidedBy: DECIDER, decisionEventId: newUlid() };
+    const OUTCOME = 'branch-chosen-4441';
+    const cause = { kind: 'branch-not-taken', decisionTicketId: decision, outcome: OUTCOME, pass: 1, decidedBy: DECIDER, decisionEventId: newUlid() };
     await file(w, SYSTEM_ACTOR_FLOW, skipped, 'ticket.transitioned', { to: 'done', cause });
     await file(w, SYSTEM_ACTOR_FLOW, skipped, 'ticket.closed', { cause });
 
@@ -44,25 +46,27 @@ describe('29.444 MCP names no Decision or decider the caller cannot see', () => 
     type Line = { type: string; payload: { cause?: unknown } };
     const closeLine = (json: unknown) => (json as { events: Line[] }).events.find((e) => e.type === 'ticket.closed');
 
-    // control: the owner can read the Decision, so both answers name it and the decider
+    // control: the owner can read the Decision, so both answers name it, its outcome and the decider
     const owner = await ticket(w.owner.token);
     expect(owner.isError, owner.text).toBe(false);
     expect((owner.json as { resolution: { decision: { id: string } | null } }).resolution.decision?.id).toBe(decision);
+    expect((owner.json as { resolution: unknown }).resolution).toMatchObject({ kind: 'not-taken', outcome: OUTCOME, pass: 1 });
     const ownerHistory = await history(w.owner.token);
     expect(closeLine(ownerHistory.json)?.payload.cause).toEqual(cause);
     expect(ownerHistory.text).toContain(DECIDER);
+    expect(ownerHistory.text).toContain(OUTCOME);
 
     const member = await ticket(w.member.token);
     expect(member.isError, member.text).toBe(false);
-    expect((member.json as { resolution: unknown }).resolution).toEqual({ kind: 'not-taken', outcome: 'No', pass: 1, decision: null });
-    expect(member.text).not.toContain(decision);
-    expect(member.text).not.toContain(DECIDER);
+    expect((member.json as { resolution: unknown }).resolution).toEqual({ kind: 'not-taken', pass: 1, decision: null });
+    expect((member.json as { resolution: object }).resolution).not.toHaveProperty('outcome');
+    for (const secret of [decision, DECIDER, OUTCOME]) expect(member.text, `get_ticket names ${secret}`).not.toContain(secret);
     const memberHistory = await history(w.member.token);
     expect(memberHistory.isError, memberHistory.text).toBe(false);
     expect(closeLine(memberHistory.json)?.payload.cause).toEqual({
-      kind: 'branch-not-taken', decisionTicketId: "a ticket you can't see", outcome: 'No', pass: 1, decidedBy: "someone you can't see", decisionEventId: cause.decisionEventId,
+      kind: 'branch-not-taken', decisionTicketId: "a ticket you can't see", pass: 1, decidedBy: "someone you can't see", decisionEventId: cause.decisionEventId,
     });
-    expect(memberHistory.text).not.toContain(decision);
-    expect(memberHistory.text).not.toContain(DECIDER);
+    expect(closeLine(memberHistory.json)?.payload.cause).not.toHaveProperty('outcome');
+    for (const secret of [decision, DECIDER, OUTCOME]) expect(memberHistory.text, `get_ticket_history names ${secret}`).not.toContain(secret);
   });
 });

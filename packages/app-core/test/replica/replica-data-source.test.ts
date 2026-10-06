@@ -1717,8 +1717,9 @@ describe('29.447 the replica folds a SERVED withheld flow cause', () => {
     const decider = newUlid();
     const decisionEvent = newUlid();
     const raw = { kind: 'branch-not-taken', decisionTicketId: decision, outcome: 'Yes', pass: 1, decidedBy: decider, decisionEventId: decisionEvent };
-    // The shape the server's doors serve a viewer who cannot see the Decision (`withholdFlowCause`, T17 AMEND 2).
-    const withheld = { ...raw, decisionTicketId: null, decidedBy: null };
+    // The shape the server's doors serve a viewer who cannot see the Decision (`withholdFlowCause`, T17 AMEND 2): the
+    // Decision and its decider null, and no outcome key, the Decision's branch name gone with it (planner ruling 05:46).
+    const withheld = { kind: 'branch-not-taken', decisionTicketId: null, pass: 1, decidedBy: null, decisionEventId: decisionEvent };
     const fold = async (cause: unknown) => {
       const { ds, replica } = await fixture();
       const skipped = newUlid();
@@ -1742,7 +1743,9 @@ describe('29.447 the replica folds a SERVED withheld flow cause', () => {
     const blind = await fold(withheld);
     expect(blind.state).not.toBeNull(); // the fold did not throw and the ticket is there
     expect(blind.state?.closed?.cause).toEqual(withheld);
-    expect(resolutionOf(blind.state ?? {})).toEqual({ kind: 'not-taken', decisionTicketId: null, outcome: 'Yes', pass: 1 });
+    expect(Object.keys(blind.state?.closed?.cause ?? {}).sort()).toEqual(['decidedBy', 'decisionEventId', 'decisionTicketId', 'kind', 'pass']);
+    expect(resolutionOf(blind.state ?? {})).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
+    expect(resolutionOf(blind.state ?? {})).not.toHaveProperty('outcome'); // control above: the seeing viewer's names 'Yes'
     expect(blind.row?.notTaken).toBe(true);
     expect(countRows(blind.row === undefined ? [] : [blind.row])).toEqual({ total: 1, terminal: 0 }); // Not taken is never done
     expect(blind.card?.cause).toEqual({ kind: 'branch-not-taken' }); // the provenance cause, as the server serves it
