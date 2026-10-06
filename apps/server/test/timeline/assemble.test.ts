@@ -126,8 +126,9 @@ describe('29.295 assembleScope', () => {
     // a flow's blocks link between two members rides the flow (drawn fainter); control: its leads_to is there too
     const withBlocks = assembleScope({ tickets: [t(74, { explicitStart: '2026-10-05', estimate: 1 }), t(75, { estimate: 1 })], edges: [lead(74, 75), { ...blocks, from: id(74), to: id(75) }], keys: none, pins, today: TODAY });
     expect(withBlocks.flows[0]?.edges).toEqual([{ from: id(74), to: id(75), kind: 'leads_to', label: null }, { from: id(74), to: id(75), kind: 'blocks', label: null }]);
-    // between two siblings of a fork a blocks link is drawn, never planned: both start the day after their source ends
-    const fork = assembleScope({ tickets: [t(76, { explicitStart: '2026-10-05', estimate: 1 }), t(77, { estimate: 2 }), t(78, { estimate: 1 })], edges: [lead(76, 77), lead(76, 78), { ...blocks, from: id(77), to: id(78) }], keys: none, pins, today: TODAY });
+    // between two siblings of a fork a blocks link is drawn, never planned: both start the day after their source ends (78
+    // waits for ALL its predecessors, so a blocks edge planned as one would hold it until 77 ends)
+    const fork = assembleScope({ tickets: [t(76, { explicitStart: '2026-10-05', estimate: 1 }), t(77, { estimate: 2 }), t(78, { estimate: 1, waitForAll: true })], edges: [lead(76, 77), lead(76, 78), { ...blocks, from: id(77), to: id(78) }], keys: none, pins, today: TODAY });
     const startOf = (n: number) => fork.entries.find((e) => e.id === id(n))?.segments.find((s) => s.type === 'planned')?.start;
     expect(startOf(77)).toBe('2026-10-06'); // control: chained after 76
     expect(startOf(78)).toBe(startOf(77));
@@ -142,6 +143,9 @@ describe('29.295 assembleScope', () => {
     const edges = [lead(84, 86), lead(86, 85), lead(86, 87), { workspaceId: 'W', from: id(85), to: id(84), kind: 'blocks' as const, label: null }, lead(84, 85), lead(87, 88)];
     const out = assembleScope({ tickets, edges, keys: none, pins, today: TODAY });
     expect(out.flows).toHaveLength(1);
+    expect(out.flows[0]?.id).toBe(id(84)); // named by its smallest member: an edge into the hole re-roots nothing
+    expect(out.flows[0]?.nodes.map((n) => n.id)).toEqual([id(84), id(85)]); // 88 joins nothing through the hole
+    expect(out.entries.find((e) => e.id === id(88))?.flowId).toBeNull();
     expect(out.flows[0]?.edges).toEqual([{ from: id(85), to: id(84), kind: 'blocks', label: null }, { from: id(84), to: id(85), kind: 'leads_to', label: null }]); // input order
     expect(text(out)).not.toContain(id(86)); // a hole is never named
     expect(text(out)).not.toContain(id(87));
@@ -150,13 +154,13 @@ describe('29.295 assembleScope', () => {
   });
 
   it('29.295 a Not-taken resolution names its Decision and that Decision\'s outcome only when this viewer has it loaded (FL-1; planner ruling 2026-10-06 05:46), in items and in flows; control: loaded (even out of scope), both are named', () => {
-    const nt: NotTakenResolution = { kind: 'not-taken', decisionTicketId: id(50), outcome: 'No', pass: 1 };
+    const nt: NotTakenResolution = { kind: 'not-taken', decisionTicketId: id(50), outcome: 'No', pass: 2 }; // the Decision's second pass: a hole keeps 2, not a default
     const target = t(51, { notTaken: nt, category: 'terminal', closed: true });
     const before = t(52, { explicitStart: '2026-10-05', estimate: 1 });
     const blind = assembleScope({ tickets: [before, target], edges: [lead(52, 51)], keys: none, pins, today: TODAY });
     // a hole: no id and no `outcome` key (the hidden Decision's authored branch name), the kind and the pass kept
-    expect(blind.entries.find((e) => e.id === id(51))?.resolution).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
-    expect(blind.flows[0]?.nodes.find((n) => n.id === id(51))?.notTaken).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
+    expect(blind.entries.find((e) => e.id === id(51))?.resolution).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
+    expect(blind.flows[0]?.nodes.find((n) => n.id === id(51))?.notTaken).toStrictEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
     expect(text(blind)).not.toContain(id(50));
     expect(text(blind)).not.toContain('"No"');
     const dec = t(50, { typeId: DECISION_TYPE_ID, explicitStart: '2026-10-04', estimate: 1, inScope: false, outcome: 'Yes' });

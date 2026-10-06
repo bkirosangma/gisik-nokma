@@ -1,4 +1,4 @@
-import { TIMELINE_PAGE_SIZE, type TimelineTrayResponse } from '@gisik-nokma/domain';
+import { TIMELINE_PAGE_SIZE, type TimelineTrayItem, type TimelineTrayResponse } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { readAsOf } from './as-of.js';
 import { sharedCore } from './memo.js';
@@ -17,5 +17,5 @@ export async function readTimelineTray(
   const core = await sharedCore(db, readable, viewerId, scope, now, await readAsOf(db, readable));
   const rows = core.tray.filter((r) => cursor === undefined || r.id > cursor);
   const page = rows.slice(0, pageSize);
-  return { items: page, nextCursor: rows.length > pageSize ? (page[page.length - 1]?.id ?? null) : null };
+  return { items: page, nextCursor: rows.length > pageSize ? (page[page.length - 1] as TimelineTrayItem).id : null };
 }

@@ -1,4 +1,4 @@
-import { TIMELINE_PAGE_SIZE, type TimelineChunkResponse } from '@gisik-nokma/domain';
+import { TIMELINE_PAGE_SIZE, type TimelineChunkResponse, type TimelineEntry } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { readAsOf } from './as-of.js';
 import { sharedCore } from './memo.js';
@@ -26,6 +26,6 @@ export async function readTimelineChunk(
   const page = hit.slice(0, pageSize);
   return {
     items: page.map((e) => core.details.get(e.id)).filter((d): d is NonNullable<typeof d> => d !== undefined),
-    nextCursor: hit.length > pageSize ? (page[page.length - 1]?.id ?? null) : null,
+    nextCursor: hit.length > pageSize ? (page[page.length - 1] as TimelineEntry).id : null,
   };
 }

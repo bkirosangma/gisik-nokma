@@ -65,7 +65,9 @@ beforeAll(async () => {
     ev(A.workspaceId, x.N, 'ticket.transitioned', { to: 'done' }, SYSTEM_ACTOR_FLOW),
     ev(A.workspaceId, x.N, 'ticket.closed', { cause: { kind: 'branch-not-taken', decisionTicketId: x.D, outcome: 'Stop', pass: 1, decidedBy: w.ama, decisionEventId: newUlid() } }, SYSTEM_ACTOR_FLOW),
     // a loop: L1 -> LD (decided 'Rework') -> L2 'Ship', LD -> L1 'Rework'
-    created(A, x.L1, 'Build', { startDate: { date: '2026-10-05' }, estimate: 2, reworkEstimate: 1 }),
+    created(A, x.L1, 'Build', { startDate: { date: '2026-10-05' }, estimate: 2 }),
+    // a birth carries `estimate` alone (`ticket-state.ts`), so the rework estimate is its own claim
+    ev(A.workspaceId, x.L1, 'ticket.field_set', { fieldId: 'reworkEstimate', value: 1 }),
     created(A, x.LD, 'Review', { estimate: 1 }, 'decision'),
     created(A, x.L2, 'Ship', { estimate: 1 }),
     lead(A, x.L1, x.LD),
@@ -205,5 +207,9 @@ describe('29.295 / 29.299 the (c) changes answer exactly what the 1882524a reads
     }
     const desc = fetched.find((r) => r['ticket_id'] === x.desc) as { fields: Record<string, unknown> };
     expect(Object.keys(desc.fields).sort()).toEqual(['estimate', 'startDate', 'title']); // an absent claim is absent, not null
+    const keysOf = (id: string) => Object.keys((fetched.find((r) => r['ticket_id'] === id) as { fields: Record<string, unknown> }).fields).sort();
+    expect(keysOf(x.L1)).toEqual(['estimate', 'reworkEstimate', 'startDate', 'title']); // each plan claim the ticket holds is kept
+    expect(keysOf(x.JT)).toContain('waitForAll');
+    expect(keysOf(x.dueOnly)).toContain('dueDate');
   });
 });

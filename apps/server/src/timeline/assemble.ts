@@ -6,6 +6,7 @@ import {
   TIMELINE_FLOW_CAP,
   TIMELINE_INDEX_CAP,
   type FlowNode,
+  type NodePlan,
   type NotTakenResolution,
   type TimelineDetail,
   type TimelineEntry,
@@ -134,7 +135,7 @@ export function assembleScope(
         ? new Map([[root, planAlone(nodes[0] as FlowNode)]])
         : planFlow({ nodes, edges: leads.map(({ from, to, label }) => ({ sourceId: from, targetId: to, label })) });
     const tooBig = members.length > limits.flow;
-    if (inFlow && members.some((m) => byId.get(m)?.inScope === true)) {
+    if (inFlow && members.some((m) => (byId.get(m) as LoadedTicket).inScope)) {
       flows.push({
         id: root,
         workspaceId: (byId.get(root) as LoadedTicket).workspaceId,
@@ -144,9 +145,8 @@ export function assembleScope(
       });
     }
     for (const m of members) {
-      const tk = byId.get(m) as LoadedTicket;
-      const np = plan.get(m);
-      if (np === undefined) continue;
+      const tk = byId.get(m) as LoadedTicket; // a member is a loaded id (`componentsOf` over `byId`'s keys)
+      const np = plan.get(m) as NodePlan; // `planFlow` answers every node it is given; `planAlone` the one
       const key = i.keys.get(m) ?? null;
       const n = tk.node;
       const segments = segmentsFor({ periods: dayPeriods(n.periods), planned: np.intervals, notTaken: n.notTaken, closedDay: tk.closedDay, today: i.today });
@@ -197,7 +197,7 @@ export function assembleScope(
   return { today: i.today, entries, flows, tray, details, truncated: null };
 }
 
-/** TG-6 / TG-12: the lowest-id Decision with a LABELLED edge into this ticket. Only loaded (visible) Decisions are in `byId`. */
+/** TG-6 / TG-12: the lowest-id Decision with a LABELLED edge into this ticket. Only loaded (visible) Decisions are in `byId`, and an inner edge joins two of them (`edgesByComponent`). */
 function reachedBy(
   target: string,
   edges: readonly LoadedEdge[],
@@ -205,7 +205,7 @@ function reachedBy(
   keys: ReadonlyMap<string, string | null>,
 ): TimelineTrayItem['reachedBy'] {
   const via = edges
-    .filter((e) => e.kind === 'leads_to' && e.to === target && e.label !== null && byId.get(e.from)?.node.isDecision === true)
+    .filter((e) => e.kind === 'leads_to' && e.to === target && e.label !== null && (byId.get(e.from) as LoadedTicket).node.isDecision)
     .sort((a, b) => (a.from < b.from ? -1 : 1))[0];
   if (via === undefined) return null;
   const d = byId.get(via.from) as LoadedTicket;
