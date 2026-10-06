@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Notification } from '@gisik-nokma/domain';
+import { NOTIFICATION_KINDS, type Notification } from '@gisik-nokma/domain';
 import {
   insertNotification,
   listNotifications,
@@ -23,6 +25,12 @@ beforeEach(async () => {
 });
 
 let counter = 0;
+
+/** A raw row of any kind, past the store, so the database's own CHECK is what answers (29.391). */
+const INSERT_RAW = `INSERT INTO notifications (id, user_id, workspace_id, kind, dedupe_key, payload, read, created_at)
+  VALUES ($1, $2, 'w', $3, $1, '{}'::jsonb, false, now())`;
+const PREFS_RAW = 'INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at) VALUES ($1, $2, now())';
+const MIGRATION = new URL('../../migrations/1792100400000_notification-kinds-flow.sql', import.meta.url);
 
 /** ULID-shaped, strictly increasing ids so ORDER BY id DESC is deterministic. */
 function nextId(): string {
@@ -132,7 +140,7 @@ describe('insertNotification', () => {
     ).rejects.toThrow(/notifications_user_dedupe_unique/);
   });
 
-  it('rejects a kind outside the five via the database CHECK constraint (positive control: a valid kind above inserted fine)', async () => {
+  it('rejects a kind outside the vocabulary via the database CHECK constraint (positive control: a valid kind above inserted fine)', async () => {
     const n = sample({ dedupeKey: 'bad-kind-key' });
     await expect(
       db.pool.query(
@@ -141,6 +149,62 @@ describe('insertNotification', () => {
         [nextId(), n.userId, n.workspaceId, 'not-a-real-kind', n.dedupeKey, JSON.stringify(n.payload), n.read, n.createdAt],
       ),
     ).rejects.toThrow(/notifications_kind_check/);
+  });
+
+  it('29.391 the database stores both flow kinds and still refuses an unknown one', async () => {
+    for (const kind of ['flow-ready', 'flow-reopened']) {
+      await expect(db.pool.query(INSERT_RAW, [`n-${kind}`, 'u', kind])).resolves.toBeDefined();
+    }
+    expect((await db.pool.query('SELECT kind FROM notifications ORDER BY kind')).rows).toEqual([{ kind: 'flow-ready' }, { kind: 'flow-reopened' }]);
+    await expect(db.pool.query(INSERT_RAW, ['n-x', 'u', 'flow-bogus'])).rejects.toThrow(/notifications_kind_check/); // control
+  });
+
+  /**
+   * The Down, run for real but inside ONE client's transaction that is rolled back, so the shared database keeps the
+   * Up. It must delete the flow rows and strip the flow mutes BEFORE it restores the five-kind checks (a check is
+   * validated against the rows already there), and the restored checks must refuse a flow kind and take every older one.
+   */
+  it('29.391 the Down removes the flow rows and mutes, then restores the five-kind checks', async () => {
+    const down = readFileSync(fileURLToPath(MIGRATION), 'utf8').split('-- Down Migration')[1]!;
+    const older = NOTIFICATION_KINDS.filter((kind) => !kind.startsWith('flow-'));
+    expect(older).toEqual(['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket']);
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(INSERT_RAW, ['n-d1', 'u-down', 'flow-ready']);
+      await client.query(INSERT_RAW, ['n-d2', 'u-down', 'flow-reopened']);
+      await client.query(INSERT_RAW, ['n-d3', 'u-down', 'mention']);
+      await client.query(PREFS_RAW, ['u-down-a', ['flow-ready', 'mention', 'flow-reopened']]);
+      await client.query(PREFS_RAW, ['u-down-b', ['assignment']]);
+      await client.query(down);
+      expect((await client.query("SELECT id, kind FROM notifications WHERE user_id = 'u-down' ORDER BY id")).rows).toEqual([{ id: 'n-d3', kind: 'mention' }]);
+      expect((await client.query("SELECT user_id, muted_kinds FROM user_notification_preferences WHERE user_id LIKE 'u-down-%' ORDER BY user_id")).rows)
+        .toEqual([{ user_id: 'u-down-a', muted_kinds: ['mention'] }, { user_id: 'u-down-b', muted_kinds: ['assignment'] }]);
+      const refused = async (sql: string, params: unknown[]): Promise<string | null> => {
+        await client.query('SAVEPOINT probe');
+        try {
+          await client.query(sql, params);
+          return null;
+        } catch (error) {
+          return (error as Error).message;
+        } finally {
+          await client.query('ROLLBACK TO SAVEPOINT probe');
+        }
+      };
+      for (const kind of ['flow-ready', 'flow-reopened']) {
+        expect(await refused(INSERT_RAW, [`n-after-${kind}`, 'u-after', kind])).toMatch(/notifications_kind_check/);
+        expect(await refused(PREFS_RAW, [`u-after-${kind}`, [kind]])).toMatch(/user_notification_preferences_muted_kinds_check/);
+      }
+      for (const kind of older) {
+        expect([kind, await refused(INSERT_RAW, [`n-after-${kind}`, 'u-after', kind])]).toEqual([kind, null]);
+        expect([kind, await refused(PREFS_RAW, [`u-after-${kind}`, [kind]])]).toEqual([kind, null]);
+      }
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+    // control: the rollback restored the Up, so a flow row is stored again
+    await expect(db.pool.query(INSERT_RAW, ['n-up', 'u', 'flow-ready'])).resolves.toBeDefined();
   });
 });
 

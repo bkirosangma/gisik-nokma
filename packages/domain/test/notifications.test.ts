@@ -6,6 +6,8 @@ import {
   contestedClaimNotificationPayloadSchema,
   dateApproachingNotificationPayloadSchema,
   dateClaimProvenanceSchema,
+  flowReadyNotificationPayloadSchema,
+  flowReopenedNotificationPayloadSchema,
   isNoteMentionPayload,
   mentionNotificationPayloadSchema,
   notificationPayloadSchemaByKind,
@@ -27,9 +29,13 @@ const approachingPayload = {
   },
 } as const;
 
+/** wtg2 T18: the two flow kinds, each with every member a visibility test can hide filled in (29.390). */
+const flowReady = { ticketId: 't1', ticketTitle: 'Write the copy', becauseTicketId: 't0', becauseTitle: 'Draft the brief', label: null, eventId: 'e1', clientTime: '2026-10-03T10:00:00.000Z', serverTime: '2026-10-03T10:00:01.000Z' };
+const flowReopened = { ticketId: 't1', ticketTitle: 'Write the copy', decisionTicketId: 'd1', decisionTitle: 'Ship or redo', outcome: 'Redo', pass: 2, toBacklog: false, eventId: 'e1', clientTime: '2026-10-03T10:00:00.000Z', serverTime: '2026-10-03T10:00:01.000Z' };
+
 describe('notification vocabulary', () => {
-  it('has exactly the five kinds', () => {
-    expect(NOTIFICATION_KINDS).toEqual(['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket']);
+  it('has exactly the seven kinds', () => {
+    expect(NOTIFICATION_KINDS).toEqual(['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket', 'flow-ready', 'flow-reopened']);
   });
 
   it('every kind has a payload schema', () => {
@@ -226,6 +232,21 @@ const refusalTargets: readonly RefusalTarget[] = [
     required: ['date', 'actorId', 'clientTime', 'serverTime'],
     nonEmpty: ['actorId', 'clientTime', 'serverTime'],
   },
+  // wtg2 T18. A hidden member is NULL, never absent (the row is decided once, at delivery), so each is required.
+  {
+    label: 'flow-ready',
+    schema: flowReadyNotificationPayloadSchema,
+    valid: flowReady,
+    required: ['ticketId', 'ticketTitle', 'becauseTicketId', 'becauseTitle', 'label', 'eventId', 'clientTime', 'serverTime'],
+    nonEmpty: ['ticketId', 'becauseTicketId', 'eventId', 'clientTime', 'serverTime'],
+  },
+  {
+    label: 'flow-reopened',
+    schema: flowReopenedNotificationPayloadSchema,
+    valid: flowReopened,
+    required: ['ticketId', 'ticketTitle', 'decisionTicketId', 'decisionTitle', 'outcome', 'pass', 'toBacklog', 'eventId', 'clientTime', 'serverTime'],
+    nonEmpty: ['ticketId', 'decisionTicketId', 'eventId', 'clientTime', 'serverTime'],
+  },
 ];
 
 type RefusalCase = { name: string; schema: AnySchema; value: unknown };
@@ -271,11 +292,13 @@ describe('what a notification payload refuses', () => {
       'date-approaching',
       'stale-ticket',
       'date-claim provenance',
+      'flow-ready',
+      'flow-reopened',
     ]);
   });
 
   it('the refusal table is populated — an empty it.each registers nothing and passes silently', () => {
-    expect(refusalCases).toHaveLength(72);
+    expect(refusalCases).toHaveLength(100);
   });
 
   it.each(refusalCases)('$name', ({ schema, value }) => {
@@ -308,10 +331,12 @@ const strictCases: RefusalCase[] = [
   },
   { name: 'stale-ticket payload', schema: staleTicketNotificationPayloadSchema, value: { ...stalePayload, urgency: 'high' } },
   { name: 'the date-claim provenance schema itself', schema: dateClaimProvenanceSchema, value: { ...claimProvenance, urgency: 'high' } },
+  { name: 'flow-ready payload', schema: flowReadyNotificationPayloadSchema, value: { ...flowReady, urgency: 'high' } },
+  { name: 'flow-reopened payload', schema: flowReopenedNotificationPayloadSchema, value: { ...flowReopened, urgency: 'high' } },
 ];
 
 describe('no payload has a field where invented urgency could live', () => {
-  it('the strict table covers all five kinds plus both nested claim objects', () => {
+  it('the strict table covers all seven kinds plus both nested claim objects', () => {
     expect(strictCases.map((c) => c.name)).toEqual([
       'assignment payload',
       'mention payload',
@@ -321,6 +346,8 @@ describe('no payload has a field where invented urgency could live', () => {
       "date-approaching payload's nested claim",
       'stale-ticket payload',
       'the date-claim provenance schema itself',
+      'flow-ready payload',
+      'flow-reopened payload',
     ]);
   });
 
@@ -485,5 +512,32 @@ describe('18.410 the mention kind carries a ticket shape or a note shape, never 
     expect(() => parseNotification(row({ mentionedBy: 'user_kiro' }))).toThrow();
     expect(() => parseNotification(row({ ...notePayload, source: 'comment' }))).toThrow();
     expect(() => parseNotification(row({ ...notePayload, noteId: '' }))).toThrow();
+  });
+});
+
+describe('29.390 flow notification payloads', () => {
+  it('29.390 both are strict, nullable where visibility can hide a member, and routed by kind', () => {
+    expect(flowReadyNotificationPayloadSchema.parse(flowReady)).toEqual(flowReady);
+    const labelled = { ...flowReady, label: 'Yes' };
+    expect(flowReadyNotificationPayloadSchema.parse(labelled)).toEqual(labelled);
+    const hiddenReady = { ...flowReady, becauseTicketId: null, becauseTitle: null, label: null };
+    expect(flowReadyNotificationPayloadSchema.parse(hiddenReady)).toEqual(hiddenReady);
+    expect(flowReopenedNotificationPayloadSchema.parse(flowReopened)).toEqual(flowReopened);
+    const hiddenReopened = { ...flowReopened, decisionTicketId: null, decisionTitle: null, outcome: null };
+    expect(flowReopenedNotificationPayloadSchema.parse(hiddenReopened)).toEqual(hiddenReopened);
+    expect(flowReadyNotificationPayloadSchema.safeParse({ ...flowReady, ticketId: '' }).success).toBe(false);
+    expect(flowReadyNotificationPayloadSchema.safeParse({ ...flowReady, urgent: true }).success).toBe(false);
+    expect(flowReopenedNotificationPayloadSchema.safeParse({ ...flowReopened, pass: 1 }).success).toBe(true); // the bound's inside
+    expect(flowReopenedNotificationPayloadSchema.safeParse({ ...flowReopened, pass: 0 }).success).toBe(false);
+    expect(flowReopenedNotificationPayloadSchema.safeParse({ ...flowReopened, pass: 1.5 }).success).toBe(false);
+    expect(flowReopenedNotificationPayloadSchema.safeParse({ ...flowReopened, toBacklog: 'yes' }).success).toBe(false);
+    expect(flowReopenedNotificationPayloadSchema.safeParse({ ...flowReopened, urgent: true }).success).toBe(false);
+    const row = { id: 'n1', userId: 'u', workspaceId: 'w', dedupeKey: 'k', read: false, createdAt: flowReady.serverTime };
+    expect(parseNotification({ ...row, kind: 'flow-ready', payload: flowReady })).toEqual({ ...row, kind: 'flow-ready', payload: flowReady });
+    expect(parseNotification({ ...row, kind: 'flow-reopened', payload: flowReopened })).toEqual({ ...row, kind: 'flow-reopened', payload: flowReopened });
+    expect(() => parseNotification({ ...row, kind: 'flow-ready', payload: flowReopened })).toThrow(); // the wrong shape for the kind
+    expect(() => parseNotification({ ...row, kind: 'flow-reopened', payload: flowReady })).toThrow();
+    // control: an older kind still parses
+    expect(parseNotification({ ...row, kind: 'assignment', payload: { ticketId: 't', ticketTitle: 'x', assignedBy: 'u', eventId: 'e', clientTime: 'c', serverTime: 's' } }).kind).toBe('assignment');
   });
 });

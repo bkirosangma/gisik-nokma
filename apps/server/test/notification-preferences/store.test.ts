@@ -41,7 +41,7 @@ describe('user_notification_preferences store', () => {
     expect(await getNotificationPreferences(db.pool, 'u2')).toEqual({ mutedKinds: [] });
   });
 
-  it('the database CHECK refuses a kind outside the five (positive control: a valid kind above inserted fine)', async () => {
+  it('the database CHECK refuses a kind outside the vocabulary (positive control: a valid kind above inserted fine)', async () => {
     await expect(
       db.pool.query(
         `INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at)
@@ -50,4 +50,15 @@ describe('user_notification_preferences store', () => {
       ),
     ).rejects.toThrow(/user_notification_preferences_muted_kinds_check/);
   });
+
+  it('29.391 the database stores a mute of each flow kind and still refuses an unknown one', async () => {
+    for (const kind of ['flow-ready', 'flow-reopened']) {
+      await expect(db.pool.query(PREFS_RAW, [`u-${kind}`, [kind]])).resolves.toBeDefined();
+      expect(await getNotificationPreferences(db.pool, `u-${kind}`)).toEqual({ mutedKinds: [kind] });
+    }
+    await expect(db.pool.query(PREFS_RAW, ['u-both', ['flow-ready', 'flow-reopened']])).resolves.toBeDefined();
+    await expect(db.pool.query(PREFS_RAW, ['u-x', ['flow-bogus']])).rejects.toThrow(/user_notification_preferences_muted_kinds_check/); // control
+  });
 });
+
+const PREFS_RAW = 'INSERT INTO user_notification_preferences (user_id, muted_kinds, updated_at) VALUES ($1, $2, now())';
