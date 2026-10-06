@@ -80,5 +80,5 @@ export { FireIcon, LeafIcon, SnowflakeIcon, FlagIcon } from './icons/priority-ic
 export { PlusIcon } from './icons/plus-icon.js';
 // The workspace home's Rename cue (UX fixes Task 10, 23.177): one glyph, same terms as `PlusIcon`.
 export { PencilIcon } from './icons/pencil-icon.js';
-// The Timeline's paper pin (Workflow and Timeline graphs, TG-11): one glyph, drawn by the Timeline view and by the Part 4 graphs.
+// The Timeline's paper pin (Workflow and Timeline graphs, TG-11): the glyph the Timeline view draws (the Part 4 painter draws its own `.gn-tlg-pin` mark).
 export { PaperPinIcon } from './icons/paper-pin-icon.js';

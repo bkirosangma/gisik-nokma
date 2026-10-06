@@ -283,7 +283,7 @@ export {
   NO_DATES_NOTE,
   NO_DAY_CLAIMS_NOTE,
   buildTimelineModel,
-  // The paper pin's words (Workflow and Timeline graphs T12, TG-11): the Part 4 graphs title their pin with the same sentence.
+  // The paper pin's words (Workflow and Timeline graphs T12, TG-11): the Timeline view's tooltip and description part, exported for any other surface that titles a pin.
   timelinePinLabel,
   type TimelineCustomClaim,
   type TimelineGroup,
