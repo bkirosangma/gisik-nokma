@@ -337,6 +337,7 @@ describe('29.368 the settle listener', () => {
     expect(await pendingSettle(db.pool, {}, WS, d)).toBe(true); // control: live, it has steps waiting
     await step(db.pool, d, 'ticket.deleted', {});
     expect(await settleDecision(deps, WS, d)).toBe('skipped');
+    expect(await pendingSettle(db.pool, {}, WS, d)).toBe(false);
     const task = await addTicket(db.pool, { start: 'focus', moves: ['doing', 'done'] });
     expect(await settleDecision(deps, WS, task)).toBe('skipped');
     expect(atomic).not.toHaveBeenCalled();
