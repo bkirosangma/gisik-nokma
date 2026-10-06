@@ -256,10 +256,12 @@ describe('27.552 the path walk takes no step on an edge with neither end in the 
     }) as Queryable;
   };
   const blocksPath = (pool: Queryable) => shortestPaths(pool, world.ids.owner, { from: t(T1), to: t(T4), maxHops: 6, groups: new Set(['blocks']) });
+  const linkPaths = (pool: Queryable) => shortestPaths(pool, world.ids.owner, { from: t(T1), to: t(T4), maxHops: 6, groups: new Set(['blocks', 'relates']) });
 
-  it('27.552 a stray T2 → T3 on the first layer changes nothing: exactly [T1, T2, T3, T4]; control: the same walk with no stray', async () => {
-    expect((await blocksPath(db.pool))?.paths.map((p) => p.refs), 'control').toEqual([[t(T1), t(T2), t(T3), t(T4)]]);
-    expect((await blocksPath(withStray({ source_id: T2, target_id: T3 })))?.paths.map((p) => p.refs)).toEqual([[t(T1), t(T2), t(T3), t(T4)]]);
+  it('27.552 a stray T3 → T5 on the first layer changes nothing: exactly the two 3-hop paths, not [T1, T5, T3, T4] over a link that is not there; control: the same walk with no stray', async () => {
+    const both = [[t(T1), t(T2), t(T3), t(T4)], [t(T1), t(T5), t(T6), t(T4)]];
+    expect((await linkPaths(db.pool))?.paths.map((p) => p.refs), 'control').toEqual(both);
+    expect((await linkPaths(withStray({ source_id: T3, target_id: T5 })))?.paths.map((p) => p.refs)).toEqual(both);
   });
 
   it('27.552 a stray T3 → T4 on the first layer (the walk back would cycle T4 → T3 → T4) still answers exactly [T1, T2, T3, T4], no error', async () => {
