@@ -6,12 +6,13 @@ import ts from 'typescript';
 /** The repository root, from `packages/app-core/test/copy`. */
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
-/** The roots whose strings a person reads (UX fixes T11, 23.190-23.194). */
+/** The roots whose strings a person reads (UX fixes T11, 23.190-23.194; the Knowledge Graph view added by its copy follow-ups, 23.191). */
 export const UI_SOURCE_ROOTS: readonly string[] = [
   'apps/web/src',
   'apps/web/app',
   'packages/app-core/src',
   'packages/ui/src',
+  'packages/knowledge-graph/src',
 ];
 
 export type StringHit = { file: string; line: number; text: string };
@@ -71,12 +72,19 @@ export function stringsIn(file: string, source: string): StringHit[] {
   return hits;
 }
 
-/** The strings of every UI source file whose text matches `pattern`. */
-export function uiStringsMatching(pattern: RegExp, roots: readonly string[] = UI_SOURCE_ROOTS): StringHit[] {
+/**
+ * The strings of every UI source file whose text matches `pattern`. `read` is the file reader, so a control can plant a
+ * string in one real file under the real roots without writing to disk.
+ */
+export function uiStringsMatching(
+  pattern: RegExp,
+  roots: readonly string[] = UI_SOURCE_ROOTS,
+  read: (file: string) => string = (file) => readFileSync(file, 'utf8'),
+): StringHit[] {
   const found: StringHit[] = [];
   for (const root of roots) {
     for (const file of sourceFiles(root)) {
-      for (const hit of stringsIn(file, readFileSync(file, 'utf8'))) {
+      for (const hit of stringsIn(file, read(file))) {
         if (pattern.test(hit.text)) found.push({ ...hit, file: relative(REPO_ROOT, file) });
       }
     }

@@ -250,6 +250,10 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   // Empty with a link held means every chip carrying the centre's links is off: the walk follows only the chips that are on,
   // and a neighbour outside the scope is fog, not nothing. The far end must be held, as the walk requires.
   const chipsHideAll = empty && (rings.store.adj.get(centre) ?? []).some((x) => rings.store.items.has(x.to));
+  // The chips the bar shows; "every link type is turned off" is said only when none of them is on, otherwise the chips that
+  // carry the centre's links are off while another is on.
+  const shownGroups = offered.filter((g) => semantic || g !== 'concepts');
+  const everyChipOff = shownGroups.every((g) => !on.has(g));
   // The scope note names its cause. Each half re-asks `inGraphScope` with the other half opened up; the workspace is the
   // outer scope, so it wins when both exclude the centre.
   const outOfWorkspaces = centreItem !== undefined && !inGraphScope(centreItem, { workspaceIds, projectIds: [] });
@@ -277,7 +281,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         onHops={setHops}
         semantic={semantic}
         onSemantic={setSemantic}
-        groups={offered.filter((g) => semantic || g !== 'concepts')}
+        groups={shownGroups}
         on={on}
         counts={model.counts}
         onToggle={(g) => {
@@ -315,7 +319,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           )}
           {empty && (
             <div className="gn-kg__empty">
-              <p>{chipsHideAll ? `Every link type is turned off. Turn one on to see ${label(centre)}'s links.` : `Nothing is linked to ${label(centre)} yet.`}</p>
+              <p>{chipsHideAll ? (everyChipOff ? `Every link type is turned off. Turn one on to see ${label(centre)}'s links.` : `The link types that carry ${label(centre)}'s links are turned off. Turn one on to see them.`) : `Nothing is linked to ${label(centre)} yet.`}</p>
               {!chipsHideAll && centreItem?.kind === 'ticket' && props.onAddLink && (
                 <button type="button" className="gn-button gn-button--primary" onClick={() => props.onAddLink!(centreItem)}>
                   Add link
