@@ -8,6 +8,7 @@ import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../expired-sess
 import { useAppServices, useSessionStatus } from '../providers.js';
 import { readLastWorkspace, type LastWorkspace } from '../use-last-workspace.js';
 import { HomeNumbers } from './home-numbers.js';
+import { useRecordHomeWorkspace } from './record-home-workspace.js';
 import { resolveHomeWorkspace } from './resolve-home-workspace.js';
 import { useHomeHighlight } from './use-home-highlight.js';
 
@@ -17,7 +18,8 @@ export function HomeScreen() {
   const session = useSessionStatus();
   const userId = session.kind === 'signed-in' ? session.user.id : null;
   // Read SYNCHRONOUSLY for the user who is signed in NOW — never `useLastWorkspace`'s state, which answers `none`
-  // before the session lands and lags one render behind it (27.628). `AppNav` keeps its own hook.
+  // before the session lands and lags one render behind it (27.628). `AppNav` keeps its own hook, which a fallback
+  // recorded below reaches through `rememberLastWorkspace`'s listeners.
   const remembered = useMemo<LastWorkspace>(
     () => (userId === null ? { status: 'unknown' } : readLastWorkspace(userId)),
     [userId],
@@ -38,6 +40,8 @@ export function HomeScreen() {
   const expired = useSignInOnExpiredSession([failure, homeError]);
   const error = expired ? null : failure;
   const resolved = resolveHomeWorkspace(remembered, workspaces);
+  // The workspace Home falls back to becomes the current one, so the nav names what the h1 does (spec E).
+  useRecordHomeWorkspace(userId, remembered, resolved);
 
   return (
     <main id="gn-main" className="gn-shell">

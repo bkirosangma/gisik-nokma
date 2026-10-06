@@ -82,6 +82,32 @@ export function clearLastWorkspaceCache(): void {
   cache = null;
 }
 
+/**
+ * Every MOUNTED `useLastWorkspace`, so a record made elsewhere reaches a hook whose own effect has already read storage.
+ * Home is that elsewhere: its `AppNav` is a child, so the nav reads `none` before Home's workspaces answer, and its
+ * effect's deps (`[routeWorkspaceId, userId]`) never change afterwards.
+ */
+const listeners = new Set<(userId: string, value: LastWorkspace) => void>();
+
+/**
+ * THE setter: makes `workspaceId` this person's last workspace. Opening a workspace's route calls it (the hook below),
+ * and so does Home when it falls back to the first live workspace (`home/record-home-workspace.ts`, spec E: Home shows
+ * "the current one (the switcher's)", so the one it shows must BECOME the current one). It writes the keyed record,
+ * the module cache, and every mounted hook for the same person, so the nav names the workspace in the same frame.
+ */
+export function rememberLastWorkspace(userId: string, workspaceId: string): void {
+  try {
+    window.localStorage.setItem(LAST_WORKSPACE_KEY, JSON.stringify({ userId, workspaceId }));
+  } catch {
+    // A private window, or site data blocked. The nav still works from the
+    // route for this page; only the memory is lost, and a nav that refused
+    // to render because it could not write a convenience would be worse.
+  }
+  const value: LastWorkspace = { status: 'remembered', workspaceId };
+  cache = { userId, value };
+  for (const listener of listeners) listener(userId, value);
+}
+
 /** The last workspace this person opened. See the docblock above `cache`. */
 export function useLastWorkspace(
   routeWorkspaceId: string | undefined,
@@ -92,6 +118,18 @@ export function useLastWorkspace(
     // this is the remount's head start and never a source of staleness after.
     userId !== null && cache?.userId === userId ? cache.value : { status: 'unknown' },
   );
+
+  // A record made after this hook read storage (`rememberLastWorkspace`), for the same person only.
+  useEffect(() => {
+    if (userId === null) return undefined;
+    const listener = (recordedFor: string, value: LastWorkspace): void => {
+      if (recordedFor === userId) setRemembered(value);
+    };
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, [userId]);
 
   useEffect(() => {
     // Signed out, or the session has not landed: nothing is remembered FOR
@@ -123,19 +161,11 @@ export function useLastWorkspace(
     };
 
     // The route is authority. Opening a workspace is what makes it the last
-    // one opened, so this is both the write and the answer.
+    // one opened, so this is both the write and the answer: the setter's
+    // listeners include this hook's own (subscribed by the effect above, which
+    // runs first), so the state follows without a second `setRemembered`.
     if (routeWorkspaceId !== undefined) {
-      try {
-        window.localStorage.setItem(
-          LAST_WORKSPACE_KEY,
-          JSON.stringify({ userId, workspaceId: routeWorkspaceId }),
-        );
-      } catch {
-        // A private window, or site data blocked. The nav still works from the
-        // route for this page; only the memory is lost, and a nav that refused
-        // to render because it could not write a convenience would be worse.
-      }
-      remember({ status: 'remembered', workspaceId: routeWorkspaceId });
+      rememberLastWorkspace(userId, routeWorkspaceId);
       return;
     }
 

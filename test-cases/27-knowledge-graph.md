@@ -16,6 +16,7 @@
 | 27.660–27.664 | C follow-ups: list under the canvas (27.660), empty state and scope note by cause (27.661–27.664) | KG-C T8 FIX 1 (planner ruling 2026-10-06 00:00 (3), id pinned 00:47): 27.660 · KV7 copy by cause (lane 1's 22:23 notes (d) and (e)): 27.661–27.664 · `PTR-kg-view-copy-followups` (reviewer A's 02:31 flag, planner ruling): 27.661 amended |
 | 27.668–27.669, 27.673–27.674 | C follow-up, the empty states' frame | `PTR-kg-empty-reframe` (lane 1's 04:43 ⚑, ids pinned 04:4x) + `AMEND-kg-empty-reframe-fit` (planner ruling (A) 06:26, ids pinned 06:2x): 27.668–27.669, 27.673–27.674 |
 | 27.670–27.672 | D follow-up, the per-branch D2 ratchet | `PTR-kg-d2-per-branch-ratchet` (lane 3's 02:50 ⚑ (2) on SL7, ids pinned 2026-10-06 05:4x): 27.670–27.672 |
+| 27.675–27.679 | E follow-up, the release walk: Home's fallback workspace becomes the current one | `PTR-kg-walk-fixes` item 1 (`PTR-kg-home-remember-fallback`, release-walk should-fix #1; ids pinned 2026-10-06 13:3x). Items 2–3 of the same PTR take 27.077–27.078, free in A's T5 block |
 
 Unused ids in a block stay free for that plan's follow-ups. Plans B–E each add their own `## 27.N` sub-section; merges are unions.
 
@@ -540,3 +541,13 @@ Plan `docs/superpowers/plans/2026-10-03-home.md`; spec `docs/superpowers/specs/2
 <!-- KG-E T4 -->
 
 <!-- KG-E end -->
+
+### Release walk follow-up: the fallback becomes the current workspace (27.675–27.679)
+
+`PTR-kg-walk-fixes` item 1 (release-walk should-fix #1): spec E says Home shows "the current one (the switcher's)", and on a first visit Home titled the first live workspace while the nav in the same frame said "No workspace selected". Home now records the workspace it FALLS BACK to through `rememberLastWorkspace` (`apps/web/src/use-last-workspace.ts`, the setter the route write uses), from `useRecordHomeWorkspace` (`apps/web/src/home/record-home-workspace.ts`). All five render the real `Providers`, `HomeScreen` and `AppNav` (`apps/web/test/home-current-workspace.test.tsx`).
+
+- ✅ **27.675 — a fresh browser:** with two live workspaces and nothing stored, the h1 and the nav's workspace link both name the first (`/w/ws_first`), the "No workspace selected" sentence is gone, and the stored last workspace is `{ userId, workspaceId: 'ws_first' }`; a later page's `useLastWorkspace` returns it on its FIRST render (the module cache, Round 26). Mutations: the record call dropped; the setter's listener loop, the hook's `listeners.add`, the storage write or the cache write dropped → red.
+- ✅ **27.676 — CONTROL, a remembered live workspace:** a remembered second workspace titles Home and the nav, stays stored, and the setter is never called; a record made for ANOTHER person leaves this person's mounted nav where it was (control, same it: the same record for this person moves it). Mutations: record unconditionally; the remembered-id comparison flipped; the listener's user check dropped or flipped → red.
+- ✅ **27.677 — a remembered archived or unknown id:** Home falls back to the first live workspace, the nav names it, and it is stored and recorded exactly once. Mutation: the fallback test keyed on the status alone (the id clause dropped) → red.
+- ✅ **27.678 — no live workspace:** "Create or join a workspace" → `/workspaces`, nothing stored, the setter never called, and the scope note stays (nothing is current). Mutation: record on `none` → red.
+- ✅ **27.679 — once per resolution:** a re-render of Home after the record (the nav catching up, a fresh services object that re-reads the same workspaces) leaves exactly one call. Mutation: the effect without its deps (every render) → red.
