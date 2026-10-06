@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -208,7 +208,28 @@ function VisibilityShapedContent() {
   );
 }
 
-function GrowingHost() {
+type InlinePlace = { top: string; bottom: string; left: string; maxHeight: string };
+
+// Where the popover's box is at the end of the commit that opened it. A sibling rendered AFTER the
+// Popover runs its layout effect after the Popover's own, inside that same commit: before any
+// passive effect, any re-render and any paint. react-aria's layout effect writes `top`/`bottom`/
+// `left`/`max-height` onto the element directly (`position` and `data-placement` follow in the
+// re-render its `setPosition` schedules, so they are not read here).
+function OpeningCommitProbe({ open, commits }: { open: boolean; commits: Array<InlinePlace | null> }) {
+  useLayoutEffect(() => {
+    if (!open) return;
+    const popover = document.querySelector<HTMLElement>('.gn-popover');
+    if (popover === null) {
+      commits.push(null);
+      return;
+    }
+    const { top, bottom, left, maxHeight } = popover.style;
+    commits.push({ top, bottom, left, maxHeight });
+  }, [open, commits]);
+  return null;
+}
+
+function GrowingHost({ commits }: { commits: Array<InlinePlace | null> }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -219,6 +240,7 @@ function GrowingHost() {
       <Popover triggerRef={ref} open={open} onClose={() => setOpen(false)} aria-label="Change who can see this">
         <VisibilityShapedContent />
       </Popover>
+      <OpeningCommitProbe open={open} commits={commits} />
     </div>
   );
 }
@@ -245,7 +267,8 @@ describe('Popover — content that grows after it opens', () => {
     const layout = installLayout();
     try {
       const user = userEvent.setup();
-      render(<GrowingHost />);
+      const commits: Array<InlinePlace | null> = [];
+      render(<GrowingHost commits={commits} />);
       layout.place(screen.getByRole('button', { name: 'Trigger' }), TRIGGER_RECT);
       layout.deliver();
 
@@ -255,7 +278,10 @@ describe('Popover — content that grows after it opens', () => {
       const below = { placement: 'bottom', position: 'absolute', top: '448px', bottom: '', left: '880px', maxHeight: '260px' };
       // The first frame: the opening commit itself places it (react-aria's layout effect, which runs
       // before the browser paints), BEFORE any ResizeObserver delivery or animation frame — no first
-      // frame at the unpositioned `position: fixed; top: 0; left: 0`.
+      // frame at the unpositioned `position: fixed; top: 0; left: 0`. The probe's snapshot is taken
+      // inside that commit; `placementOf` after the click also sees what passive effects did.
+      const placedInCommit: InlinePlace = { top: '448px', bottom: '', left: '880px', maxHeight: '260px' };
+      expect(commits).toEqual([placedInCommit]);
       expect(placementOf(popover)).toEqual(below);
       layout.deliver();
       // The first measurement after layout leaves it where it was painted.
@@ -278,9 +304,18 @@ describe('Popover — content that grows after it opens', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
       await user.click(screen.getByRole('button', { name: 'Trigger' }));
       const reopened = screen.getByRole('dialog', { name: 'Change who can see this' });
+      expect(commits).toEqual([placedInCommit, placedInCommit]);
       expect(placementOf(reopened)).toEqual(below);
       layout.deliver();
       expect(placementOf(reopened)).toEqual(below);
+
+      // Reopened, it is observed afresh: the list grows it again and it flips above again. Hooks that
+      // outlived the first close would still observe the first, detached element and leave it below.
+      await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
+      layout.deliver();
+      expect(reopened).toHaveAttribute('data-placement', 'top');
+      expect(reopened.style.bottom).toBe('328px');
+      expect(actionsBottom(reopened)).toBeLessThanOrEqual(VIEWPORT.height);
     } finally {
       layout.restore();
     }
