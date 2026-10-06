@@ -12442,7 +12442,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". People and concepts have no page of their own to open. A concept's panel shows its items and its links instead, and who created it; if you may change it, each item and link has a "
+                      "text": ". People and concepts have no page of their own to open. A concept's panel shows its items and its links instead, who created it, and a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "History"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " of its changes (§18); if you may change it, each item and link has a "
                     },
                     {
                       "kind": "bold",
@@ -12743,7 +12751,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " button goes away. It only changes what you see on this browser: nothing is saved to a ticket, and nobody else's view changes. It starts "
+                      "text": " button goes away; it also hides the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Concepts"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row on tickets and notes (§18). It only changes what you see on this browser: nothing is saved to a ticket, and nobody else's view changes. It starts "
                     },
                     {
                       "kind": "bold",
@@ -12883,6 +12899,380 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " tab, where links are added."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "18-concepts-and-suggestions",
+        "title": "§18 — Concepts and suggestions",
+        "intro": [],
+        "entries": [
+          {
+            "id": "what-a-concept-is",
+            "title": "What a concept is",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A concept is a named topic that ties together tickets and notes about the same thing — for example, "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Scroll position on phone sheets"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " holding three tickets and the note where someone worked out why. Putting a ticket or a note in a concept changes nothing about it: it keeps its project, its links and its own history. In the Knowledge Graph a concept is a teal pill linked to each of its items (§17)."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "who-sees-a-concept",
+            "title": "Who sees a concept",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "You see a concept only if you can see every ticket and note in it. If even one of its items is one you cannot open (in a project you are not in, or private to someone else), the concept is hidden from you altogether: you are never shown a concept with some of its items quietly missing. A ticket or note in the trash leaves its concepts while it is there, and is back in them when it is restored."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Guests can see the concepts they are allowed to, but cannot change them."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-concepts-row",
+            "title": "The Concepts row",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A ticket's "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Details"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shows a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Concepts"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " row directly above "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and a note shows one under its byline: one pill for each concept the ticket or note is in. A ticket or note in no concept has no row."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Press a concept's name"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to open the Knowledge Graph, where the concept sits next to the ticket or note."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "The cross at the end of a pill"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " takes the ticket or note out of that concept (a screen reader names it "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Remove from concept"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and the concept's name). The pill goes at once, and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Undo"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " in the message that follows puts it back. Removing changes nothing else about the ticket or note, and the concept stays."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the change is not allowed, the pill comes back and the page says why."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "a-concept-s-history",
+            "title": "A concept's history",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Select a concept in the Knowledge Graph and open "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in its panel to see every change made to it: who created it, renamed it or changed its summary, which tickets and notes were added or removed, and when. A ticket or note that is no longer in the concept, or that you cannot see, is called \"a ticket\" or \"a note\" there, never by its name."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "suggestions",
+            "title": "Suggestions",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The app looks for groups of tickets and notes that are about the same thing and offers each group as a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Suggested"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " concept. It works them out itself, overnight and after a lot of changes, from what each group of people can see; no assistant is asked. In the Knowledge Graph a suggestion is a dashed pill."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Select a suggestion to see what it would hold. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Confirm"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " turns it into a concept, with a name you can change first; if the new concept would be hidden from some people (because they cannot see every item in it), the panel says how many of the workspace's members will still see it. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Reject"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " dismisses it, and the same group is not suggested again unless more than half of it changes. A suggestion puts nothing in a concept until somebody presses "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Confirm"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Suggestions are shown to members, not to guests."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-semantic-layer-switch",
+            "title": "The semantic layer switch",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The Knowledge Graph's "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Semantic layer"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switch (§17) shows or hides concepts and suggestions on this browser. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Off"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " also hides the Concepts row on tickets and notes. It changes what you see, never the data: no concept is removed, nothing is saved to a ticket or note, and nobody else's view changes. It starts "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "On"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "concepts-and-your-assistant",
+            "title": "Concepts and your assistant",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "An assistant you have connected (§16) can work with concepts too, with your permissions:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "code",
+                      "text": "list_concepts"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "get_concept"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " read the concepts you can see;"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "code",
+                      "text": "manage_concept"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " creates, renames, describes, merges and deletes a concept (merging and deleting need the concept's exact name first);"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "code",
+                      "text": "tag_items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " puts tickets and notes into a concept or takes them out, and asks first if adding one would hide the concept from some people;"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "code",
+                      "text": "link_concepts"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " marks one concept as broader than another, or two as related;"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "code",
+                      "text": "review_suggestions"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "resolve_suggestion"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " read the suggestions and confirm or reject one."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "In a concept's "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", a change your assistant made reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assistant, for"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " your name."
                   }
                 ]
               }
