@@ -6166,7 +6166,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @container (min-width: 150px) {
   .gn-timeline__bar .gn-timeline__title-text { display: block; }
 }
-/* A bar shorter than its key shows the key just outside its end, never hidden (PK-4). It fades out while a zoom is moving
+/* A bar shorter than its key shows the key just outside its end, never hidden (PK-4); a PINNED bar shorter than its key and
+   the 14 px paper pin shows both there, the pin after the key (TG-11, `barLabelPx`). It fades out while a zoom is moving
    and returns after the re-pack. The `+ 4px` is `KEY_GAP_PX` (packages/viewport/src/pack.ts): the packer reserves the key's
    room from the bar's DRAWN end at that gap, so the two move together (29.055 pins both). The drawn end is the bar's `width`
    expression above, floor included (E11, 29.056): a one-day bar at 8 px per day ends 12 px after its start, not 8. */
@@ -6183,6 +6184,26 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   transition: top 200ms ease, opacity 150ms ease;
 }
 .gn-timeline[data-zooming='true'] .gn-timeline__key--outside { opacity: 0; }
+/* The paper pin (TG-11): a 12 px glyph inside the bar's trailing edge, 6 px in (in the bar's own padding), vertically centred, in
+   the bar's own ink. A bar that holds it ([data-pinned]) reserves its 6 px padding plus PIN_PX (14 px: the icon and a 2 px gap)
+   on the right, the room the packer reserved (`barLabelPx`, packages/app-core/src/timeline/timeline-layout.ts; 29.116 pins the
+   numbers to the constants). On a bar too short for key and pin both stand just outside its end, the pin 2 px after the key.
+   Decoration only: the svg is aria-hidden; the counts are in the bar's title and description. */
+.gn-timeline__bar[data-pinned] { padding-right: 20px; }
+.gn-timeline__pin {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  display: inline-flex;
+  transform: translateY(-50%);
+  color: inherit;
+}
+.gn-timeline__key--outside .gn-timeline__pin {
+  position: static;
+  margin-left: 2px;
+  transform: none;
+  vertical-align: middle;
+}
 /* In transit: outlined, never a different hue — a claim on its way to the server is the same claim. The same treatment
    `.gn-calendar__item--pending` uses. */
 .gn-timeline__bar[data-pending] { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
@@ -6331,6 +6352,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   transition-property: left;
 }
 .gn-timeline[data-orientation='portrait'] .gn-timeline__key--outside { display: none; }
+/* TG-11 in portrait: the bar is a 100 px column, so the pin rides its top line at the right, beside the key, and costs no room
+   along time (`barLabelPx`); a bar too short for that line hides key and pin with the outside label above. */
+.gn-timeline[data-orientation='portrait'] .gn-timeline__pin { top: 2px; transform: none; }
 /* TG-7 (ERRATA E9): the title wraps inside the 100 px bar, ellipsis after the third line. */
 .gn-timeline[data-orientation='portrait'] .gn-timeline__bar .gn-timeline__title-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .gn-timeline[data-orientation='portrait'] .gn-timeline__row > .gn-timeline__claims {
