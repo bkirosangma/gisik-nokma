@@ -405,11 +405,11 @@ export type AssignmentProvenance = {
  *   for. Strictly less than the `parent: { kind: 'restricted', id }` the single
  *   ticket read already serves for the same viewer over the same rows.
  * - `pin` — the paper pin (Workflow and Timeline graphs T12, 29.113): the notes
- *   this viewer may read that are attached to the ticket (live, in a live home
- *   project, admitted by `visibleNotesWhere`) and the attachments the ticket
- *   owns, as two counts. The list route adds it to every card, zeros included,
- *   after `assembleListCards`; the other list-shaped reads that share that
- *   assembler leave it off, which is why the field is optional.
+ *   this viewer may read that are attached to the ticket (homed in the card's
+ *   workspace, live, in a live home project, admitted by `visibleNotesWhere`)
+ *   and the attachments the ticket owns there, as two counts. The list route adds
+ *   it to every card, zeros included, after `assembleListCards`; the other list
+ *   reads that share that assembler leave it off, which is why it is optional.
  */
 export type ListCard = TicketCard & {
   typeRank: number;
