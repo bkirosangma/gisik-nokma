@@ -401,12 +401,18 @@ describe('the boot starts the one-shot backfills', () => {
         const read = async () =>
           (await client.query<{ name: string; completed_at: Date }>('SELECT name, completed_at FROM projection_backfills WHERE name = ANY($1::text[])', [names])).rows;
         const child = await startServer();
-        // The haystack: a backend of the child is waiting on the held note lock.
+        // The haystack: a backend of the child is waiting on an advisory lock in THIS database (unique to this file;
+        // the test Postgres is shared), which is the held note lock.
         const waitingDeadline = Date.now() + 20_000;
         let waiting = 0;
         while (Date.now() < waitingDeadline && waiting === 0) {
           await new Promise((resolve) => setTimeout(resolve, 50));
-          waiting = (await client.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted")).rows[0]?.n ?? 0;
+          waiting =
+            (
+              await client.query<{ n: number }>(
+                "SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())",
+              )
+            ).rows[0]?.n ?? 0;
         }
         expect(waiting).toBeGreaterThan(0);
         // A vocabulary pass that did not wait would write its marker now (a few workspaces: milliseconds).
