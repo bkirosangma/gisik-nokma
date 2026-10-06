@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { domainRegistry, makeEnvelope, newUlid, type LedgerEvent, type SuggestionListResponse, type Ulid } from '@gisik-nokma/domain';
+import { domainRegistry, makeEnvelope, newUlid, type GraphRingResponse, type LedgerEvent, type SuggestionListResponse, type Ulid } from '@gisik-nokma/domain';
 import { checkPermission } from '../../src/permissions/check-permission.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
+import { openSuggestionIds } from '../../src/read/suggestions.js';
 import { itemHash, itemKey, parseItemKey, signatureOf } from '../../src/semantic/signature.js';
 import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { buildTestApp } from '../helpers/app.js';
@@ -27,9 +28,10 @@ import { signInWithPhone } from '../helpers/session.js';
  * with `applyCommitted` before the describes that write through the door (27.496, then 27.550–27.551, last): a door
  * write takes the ledger's next seqs.
  *
- * 27.550–27.551 (task kg-sl6-suggested-arm, planner 12:42): a RESOLVED suggestion (rejected, or a live concept made from
- * it) is gone from the list and the door before the job's next run drops its row (`openSuggestionIds`). Their rows hold
- * two more project tickets, R1 and R2 (every non-guest reads them, as TP), and live only inside their own `it`.
+ * 27.550–27.551 (task kg-sl6-suggested-arm, planner 12:42): a RESOLVED suggestion (rejected, or a concept made from it
+ * that is live, or merged into a live one: planner 14:14) is gone from the list and the door before the job's next run
+ * drops its row (`openSuggestionIds`). Their rows hold two more project tickets, R1 and R2 (every non-guest reads them,
+ * as TP), and live only inside their own `it`.
  */
 type Who = NotesUser | 'outsider';
 let db: TestDatabase;
@@ -323,6 +325,14 @@ async function withRows(rows: Array<[string, ItemRef[], number]>, legs: (byId: R
     expect(removed.rowCount, 'every row is removed before the it ends').toBe(rows.length);
   }
 }
+/** The ids of the suggestions `memberIn`'s ring centred on `center` draws (`GET /v1/graph/neighbours`, 27.507's arm). */
+async function drawnFrom(center: string): Promise<string[]> {
+  const res = await get('memberIn', `/v1/graph/neighbours?${new URLSearchParams({ center, hops: '1', ws: world.WS, groups: 'concepts' }).toString()}`);
+  expect(res.statusCode, res.body).toBe(200);
+  return (res.json() as GraphRingResponse).items.filter((item) => item.suggested).map((item) => item.id);
+}
+/** A route answer without its `eventId`, which differs per event: what is left must be byte-equal. */
+const sansEventId = (result: Record<string, unknown>): string => JSON.stringify({ ...result, eventId: undefined });
 
 // After 27.496: these write through the door too.
 describe('27.550–27.551 a resolved suggestion is gone from the list and the door before the job drops its row', () => {
@@ -389,5 +399,91 @@ describe('27.550–27.551 a resolved suggestion is gone from the list and the do
         expect(await createFrom('memberIn', SA)).toBeNull();
       },
     );
+  });
+
+  it('27.550 27.551 a concept merged into a live one keeps its suggestion resolved in the list, the ring and the door, to the end of a two-step merge chain, and one concept names it; once the chain’s end is deleted it is listed, drawn and admitted again; control: an open one is listed throughout', async () => {
+    const [SM, SN] = [newUlid(), newUlid()];
+    const items: ItemRef[] = [{ kind: 'ticket', id: R1 }, { kind: 'ticket', id: world.TP }, { kind: 'note', id: world.NOTES.nWorkspace }];
+    await withRows(
+      [
+        [SM, items, 0.3],
+        [SN, [{ kind: 'ticket', id: R2 }, { kind: 'ticket', id: world.TP }, { kind: 'note', id: world.NOTES.nWorkspace }], 0.29],
+      ],
+      async () => {
+        const concept = (id: string) => ({ kind: 'concept' as const, id });
+        /** A concept made through the route and tagged with SM's items, as `resolve_suggestion accept` makes one. */
+        async function make(id: string, payload: Record<string, unknown>): Promise<void> {
+          expect(await submit('memberIn', concept(id), 'concept.created', payload), `create ${id}`).toMatchObject(COMMITTED);
+          for (const item of items) {
+            expect(await submit('memberIn', concept(id), 'concept.item_tagged', { itemKind: item.kind, itemId: item.id }), `tag ${item.id}`).toMatchObject(COMMITTED);
+          }
+        }
+        const named = async () =>
+          (await db.pool.query('SELECT concept_id, deleted, merged_into FROM proj_concepts WHERE workspace_id = $1 AND from_suggestion = $2', [world.WS, SM])).rows;
+        const madeUp = sansEventId(await submit('memberIn', concept(newUlid()), 'concept.created', { name: 'Made up', fromSuggestion: newUlid() }));
+        expect(JSON.parse(madeUp), 'control: the route refuses a made-up id').toEqual(REFUSED);
+
+        // Control: both open, so both are listed, and SM is drawn from R1 (its only row).
+        expect(await listIds('memberIn')).toEqual([SM, SN]);
+        expect(await drawnFrom(`ticket:${R1}`)).toEqual([SM]);
+
+        const [CM, D, E] = [newUlid(), newUlid(), newUlid()];
+        await make(CM, { name: 'Merge desk', fromSuggestion: SM });
+        await make(D, { name: 'Merge target' });
+        expect(await submit('memberIn', concept(CM), 'concept.merged', { intoId: D })).toMatchObject(COMMITTED);
+        expect(await named(), 'a merge stores CM deleted, merged into D').toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
+
+        async function resolved(why: string): Promise<void> {
+          expect(await listIds('memberIn'), why).toEqual([SN]);
+          expect(await drawnFrom(`ticket:${R1}`), why).toEqual([]);
+          const again = await submit('memberIn', concept(newUlid()), 'concept.created', { name: 'Merge desk again', fromSuggestion: SM });
+          expect(sansEventId(again), `${why}: a second accept gets the made-up id's answer`).toBe(madeUp);
+          expect(await createFrom('memberIn', SM), why).toEqual(UNKNOWN);
+          expect(await named(), `${why}: one concept names SM`).toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
+        }
+        await resolved('CM merged into D, which is live');
+
+        // Two steps: D merged into E, which is live.
+        await make(E, { name: 'Merge end' });
+        expect(await submit('memberIn', concept(D), 'concept.merged', { intoId: E })).toMatchObject(COMMITTED);
+        await resolved('CM → D → E, E live');
+
+        // The chain's end is deleted: nothing live holds the group, as the job would see it, so SM is back.
+        expect(await submit('memberIn', concept(E), 'concept.deleted', {})).toMatchObject(COMMITTED);
+        expect(await listIds('memberIn'), 'CM → D → E, E deleted').toEqual([SM, SN]);
+        expect(await drawnFrom(`ticket:${R1}`)).toEqual([SM]);
+        expect(await createFrom('memberIn', SM), 'admitted again').toBeNull();
+      },
+    );
+  });
+
+  it('27.550 the merge walk is bounded: a merge cycle, which no door admits, ends it and leaves the suggestion open; control: a live concept made from it resolves it in the same transaction', async () => {
+    const SY = newUlid();
+    await withRows([[SY, [{ kind: 'ticket', id: R2 }, { kind: 'note', id: world.NOTES.nProject }, { kind: 'note', id: world.NOTES.nWorkspace }], 0.28]], async () => {
+      const [CX, CY] = [newUlid(), newUlid()];
+      const client = await db.pool.connect();
+      try {
+        // Rolled back below, so the cycle never outlives this `it`; a walk that never ends fails in a second here
+        // instead of holding the test database.
+        await client.query('BEGIN');
+        await client.query("SET LOCAL statement_timeout = '1s'");
+        expect(await openSuggestionIds(client, world.WS, [SY]), 'control: no concept, so open').toEqual([SY]);
+        await client.query(
+          `INSERT INTO proj_concepts (concept_id, workspace_id, name, created_by, created_at, origin, from_suggestion) VALUES ($1, $2, 'Loop', $3, now(), 'web', $4)`,
+          [CX, world.WS, world.ids.owner, SY],
+        );
+        expect(await openSuggestionIds(client, world.WS, [SY]), 'control: a live concept made from it resolves it').toEqual([]);
+        // CX merged into CY and CY into CX, stored as `proj-concepts.ts` stores a merge: both deleted, nothing live.
+        await client.query(
+          `INSERT INTO proj_concepts (concept_id, workspace_id, name, created_by, created_at, origin, deleted, merged_into) VALUES ($1, $2, 'Loop back', $3, now(), 'web', TRUE, $4)`,
+          [CY, world.WS, world.ids.owner, CX],
+        );
+        await client.query('UPDATE proj_concepts SET deleted = TRUE, merged_into = $2 WHERE concept_id = $1', [CX, CY]);
+        await expect(openSuggestionIds(client, world.WS, [SY])).resolves.toEqual([SY]);
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    });
   });
 });

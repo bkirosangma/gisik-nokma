@@ -54,17 +54,31 @@ export async function visibleSuggestions(
 /**
  * Of `ids`, the suggestions of `workspaceId` nobody has resolved yet. A row stays in the cache until the job's next run
  * (nightly, or after 200 changes), so after a Confirm or a Reject no read may offer it again (the list, the graph) and
- * the door must not take it again (`permissions/check-concept.ts`, so one suggestion never makes two concepts):
+ * the door must not take it again (`permissions/check-concept.ts`: while it is resolved, no second concept is made from
+ * it; two accepts at once are serialized by the ingest's workspace lock):
  * - **rejected:** a rejection of the same signature in the same workspace (`proj_concept_rejections`);
- * - **confirmed:** a LIVE concept in the same workspace made from it (`proj_concepts.from_suggestion`). A deleted one
- *   does not count, as it does not for the job (27.490): its group may be offered again.
+ * - **confirmed:** a concept in the same workspace made from it (`proj_concepts.from_suggestion`) that is live, or was
+ *   merged, to the end of its merge chain, into a live concept of the same workspace (planner 14:14). `concept.merged`
+ *   stores the merged concept deleted, with `merged_into` (`projections/proj-concepts.ts`), and only once the target
+ *   holds every live item it held (27.463), so a group it held is still tagged into a live concept, which the job does
+ *   not suggest again (27.490). `made` walks that chain from each concept made from one of `ids`, one hop per
+ *   `merged_into`; the suggestion is resolved when the walk reaches a live concept. A concept deleted outright, or a
+ *   chain whose end is deleted, gives the suggestion back, as the job would offer its group again. `UNION` (not
+ *   `UNION ALL`) adds no row twice, so a merge cycle, which no door admits, ends the walk too.
  */
 export async function openSuggestionIds(db: Queryable, workspaceId: string, ids: readonly string[]): Promise<string[]> {
   const { rows } = await db.query<{ id: string }>(
-    `SELECT s.id FROM sem_suggestions s
+    `WITH RECURSIVE made (suggestion_id, concept_id, deleted, merged_into) AS (
+       SELECT c.from_suggestion, c.concept_id, c.deleted, c.merged_into FROM proj_concepts c
+        WHERE c.workspace_id = $1 AND c.from_suggestion = ANY ($2::text[])
+       UNION
+       SELECT made.suggestion_id, t.concept_id, t.deleted, t.merged_into FROM made
+         JOIN proj_concepts t ON t.concept_id = made.merged_into AND t.workspace_id = $1
+     )
+     SELECT s.id FROM sem_suggestions s
       WHERE s.workspace_id = $1 AND s.id = ANY ($2::text[])
         AND NOT EXISTS (SELECT 1 FROM proj_concept_rejections r WHERE r.workspace_id = s.workspace_id AND r.signature = s.signature)
-        AND NOT EXISTS (SELECT 1 FROM proj_concepts c WHERE c.workspace_id = s.workspace_id AND c.from_suggestion = s.id AND c.deleted = FALSE)`,
+        AND NOT EXISTS (SELECT 1 FROM made WHERE made.suggestion_id = s.id AND made.deleted = FALSE)`,
     [workspaceId, [...ids]],
   );
   return rows.map((row) => row.id);
