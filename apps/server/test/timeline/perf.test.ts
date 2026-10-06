@@ -67,7 +67,7 @@ function scaleEvents(w: TWorkspace, count: number): LedgerEvent[] {
   const link = (from: string, to: string, label?: string) =>
     ev.push(as(ama, from, 'ticket.link_added', { kind: 'leads_to', targetId: to, ...(label === undefined ? {} : { label }) }));
   for (let k = 0; k * 12 < count; k += 1) {
-    const [s, a, d, b, c, m, e] = Array.from({ length: 7 }, () => newUlid()) as [string, string, string, string, string, string, string];
+    const [s, a, d, b, c, m, e] = Array.from({ length: 7 }, (): string => newUlid()) as [string, string, string, string, string, string, string];
     created(s, 0, `Head ${k}`, { startDate: { date: day(k % 240) }, estimate: 2 });
     created(a, 1, `A ${k}`, { estimate: 1 });
     created(d, 2, `Decide ${k}`, { estimate: 1 }, 'decision');

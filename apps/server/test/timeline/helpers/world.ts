@@ -81,7 +81,7 @@ export async function seedTimelineWorld(pool: Pool): Promise<TimelineWorld> {
   const C = await seedWorkspace(pool, cy, []);
   const t = Object.fromEntries(
     ['dated', 'mine', 'collab', 'other', 'hidden', 'step1', 'step2', 'draft', 'fStart', 'fDec', 'fYes', 'fNo', 'bTask'].map((k) => [k, newUlid()]),
-  ) as TimelineWorld['t'];
+  ) as Record<string, string> as TimelineWorld['t'];
   const wa = { workspaceId: A.workspaceId, actorId: ama };
   const task = (id: string, w: TWorkspace, project: string, title: string, extra: Record<string, unknown> = {}, typeId = 'task'): LedgerEvent =>
     makeCommitted({ workspaceId: w.workspaceId, actorId: ama, entity: { kind: 'ticket', id }, type: 'ticket.created', payload: { typeId, projectId: project, parentId: null, title, ...extra } });

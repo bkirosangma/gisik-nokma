@@ -131,6 +131,19 @@ describe('29.295 assembleScope', () => {
     expect(order.entries.map((e) => e.id)).toEqual([id(80), id(82)]);
   });
 
+  it('29.295 each edge goes to the ONE component holding both its ends, in input order; one touching an unloaded id goes nowhere; control: the loaded pair is drawn', () => {
+    // 86 and 87 are never loaded (hidden): one edge has an unloaded target, one an unloaded source, one has BOTH ends unloaded
+    const tickets = [t(84, { explicitStart: '2026-10-05', estimate: 1 }), t(85, { estimate: 2 }), t(88, { explicitStart: '2026-10-20', estimate: 1 })];
+    const edges = [lead(84, 86), lead(86, 85), lead(86, 87), { workspaceId: 'W', from: id(85), to: id(84), kind: 'blocks' as const, label: null }, lead(84, 85), lead(87, 88)];
+    const out = assembleScope({ tickets, edges, keys: none, pins, today: TODAY });
+    expect(out.flows).toHaveLength(1);
+    expect(out.flows[0]?.edges).toEqual([{ from: id(85), to: id(84), kind: 'blocks', label: null }, { from: id(84), to: id(85), kind: 'leads_to', label: null }]); // input order
+    expect(text(out)).not.toContain(id(86)); // a hole is never named
+    expect(text(out)).not.toContain(id(87));
+    expect(out.entries.find((e) => e.id === id(85))?.segments).toEqual([{ start: '2026-10-06', end: '2026-10-07', pass: 1, type: 'planned' }]); // chained by the loaded edge
+    expect(out.entries.find((e) => e.id === id(88))?.flowId).toBeNull(); // the edge from an unloaded id makes no flow of 88
+  });
+
   it('29.295 a Not-taken resolution names its Decision only when this viewer has it loaded (FL-1), in items and in flows; control: loaded (even out of scope), it is named', () => {
     const nt: NotTakenResolution = { kind: 'not-taken', decisionTicketId: id(50), outcome: 'No', pass: 1 };
     const target = t(51, { notTaken: nt, category: 'terminal', closed: true });

@@ -35,7 +35,7 @@ const earlyDated = early();
 const NOW = new Date('2026-10-03T06:00:00.000Z');
 let db: TestDatabase;
 let w: TimelineWorld;
-const undated = [newUlid(), newUlid(), newUlid()];
+const undated: string[] = [newUlid(), newUlid(), newUlid()];
 const notes = { ws: newUlid(), p2: newUlid(), b: newUlid() };
 const due = { bSoon: newUlid(), bPast: newUlid(), aPast: newUlid() };
 const gus = newUlid();

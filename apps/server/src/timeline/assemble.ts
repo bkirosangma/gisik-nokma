@@ -1,5 +1,6 @@
 import {
   istDayOf,
+  planAlone,
   planFlow,
   segmentsFor,
   TIMELINE_FLOW_CAP,
@@ -89,6 +90,22 @@ export function servedResolution(r: NotTakenResolution | null, seen: ReadonlySet
   return r === null ? null : { ...r, decisionTicketId: seen.has(r.decisionTicketId) ? r.decisionTicketId : null };
 }
 
+/**
+ * Each component's edges, in ONE pass over them (owner ruling (c), 10-06: a scan of every edge per component, singletons
+ * included, was the assembler's cost). An edge belongs to the component holding BOTH its ends; one across two components
+ * (a `blocks`) or touching an unloaded id belongs to none. Each bucket keeps the edges' input order.
+ */
+function edgesByComponent(components: ReadonlyMap<string, readonly string[]>, edges: readonly LoadedEdge[]): Map<string, LoadedEdge[]> {
+  const rootOf = new Map<string, string>();
+  for (const [root, members] of components) for (const m of members) rootOf.set(m, root);
+  const out = new Map<string, LoadedEdge[]>([...components.keys()].map((root) => [root, []]));
+  for (const e of edges) {
+    const root = rootOf.get(e.from);
+    if (root !== undefined && root === rootOf.get(e.to)) (out.get(root) as LoadedEdge[]).push(e);
+  }
+  return out;
+}
+
 export function assembleScope(
   i: { tickets: readonly LoadedTicket[]; edges: readonly LoadedEdge[]; keys: ReadonlyMap<string, string | null>; pins: ReadonlyMap<string, TimelinePin>; today: string },
   limits: Limits = DEFAULT_LIMITS,
@@ -99,13 +116,20 @@ export function assembleScope(
   const flows: TimelineFlow[] = [];
   const tray: TimelineTrayItem[] = [];
   const details = new Map<string, TimelineDetail>();
+  const components = componentsOf([...byId.keys()], i.edges);
+  const edgesOf = edgesByComponent(components, i.edges);
 
-  for (const [root, members] of componentsOf([...byId.keys()], i.edges)) {
-    const set = new Set(members);
+  for (const [root, members] of components) {
     const inFlow = members.length > 1;
     const nodes = members.map((m) => (byId.get(m) as LoadedTicket).node);
-    const inner = i.edges.filter((e) => set.has(e.from) && set.has(e.to));
-    const plan = planFlow({ nodes, edges: inner.filter((e) => e.kind === 'leads_to').map(({ from, to, label }) => ({ sourceId: from, targetId: to, label })) });
+    const inner = edgesOf.get(root) as LoadedEdge[];
+    const leads = inner.filter((e) => e.kind === 'leads_to');
+    // A component with no `leads_to` is one ticket (the engine refuses a self-link, `link.self`): `planAlone` answers what
+    // `planFlow` would, without the analysis (owner ruling (c)).
+    const plan =
+      leads.length === 0
+        ? new Map([[root, planAlone(nodes[0] as FlowNode)]])
+        : planFlow({ nodes, edges: leads.map(({ from, to, label }) => ({ sourceId: from, targetId: to, label })) });
     const tooBig = members.length > limits.flow;
     if (inFlow && members.some((m) => byId.get(m)?.inScope === true)) {
       flows.push({
