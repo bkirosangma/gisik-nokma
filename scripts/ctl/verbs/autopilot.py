@@ -17,7 +17,7 @@ A pass, in this order (each seat gets at most one action, each queue item and ea
   (a) a FREE REVIEWER (idle, box empty, a clean worktree, holding no open TOOK; shells are not counted) takes the open REVIEW item the pull rule ranks first:
       FIX re-checks, the critical path, the oldest by (day, clock); A/B their own pool first, C either (KG wins a tie).
   (c) a free lane with nothing startable becomes a reviewer (fluid rule B) for an item that passes the independence rules.
-Every pass also logs `WARN hold >10 min with waiters` when a `ctl run-tests` slot is held past 10 min while another run waits
+Every pass also logs `WARN hold >10 min with waiters` when a `ctl run-tests` slot (normal or express) is held past 10 min while another run waits
 (slot_watch; read-only), and, live only, runs `ctl prune-gate-locks --apply` once an hour.
 Every item skips: needs-tip, an item addressed to another reviewer, a stale sha (origin/<branch> moved: a preflight or a tipmerge is
 in flight), a lane busy/dirty/unpushed/with box text on that branch (preflight in flight), and for a lane-reviewer its own work, a branch stacked on
@@ -700,14 +700,15 @@ def describe(a):
 # ---------------------------------------------------------------- the test-slot watch (read-only)
 def slot_watch(now, log):
     """WARN hold >10 min with waiters: a `ctl run-tests` slot held longer than SLOT_HOLD_WARN_S while at least one other run-tests
-    waits (P10: one mutation driver held the only slot 51 min). Holders are CTL_SEM_DIR/slot-<n>/holder (`pid|lstart|label|epoch`);
+    waits (P10: one mutation driver held the only slot 51 min). Holders are CTL_SEM_DIR/slot-<n>/holder and (P72) express-<n>/holder
+    (`pid|lstart|label|epoch`; sem.sh's glob express-[0-9]*): an express holder is no waiter, and its own hold warns as a slot's does;
     a waiter is a running verbs/run-tests.sh that is no holder and no subshell of one (a fork keeps its parent's argv). Logs only."""
     sem = os.environ.get("CTL_SEM_DIR") or os.path.expanduser("~/.cache/gisik-ctl/sem")
     holds = []
     try:
         for e in sorted(os.listdir(sem)):
             f = os.path.join(sem, e, "holder")
-            if e.startswith("slot-") and os.path.isfile(f):
+            if (e.startswith("slot-") or re.match(r"express-[0-9]", e)) and os.path.isfile(f):
                 pid, _, label, epoch = (read(f).strip().split("|") + ["", "", "", ""])[:4]
                 if pid.isdigit() and epoch.isdigit(): holds.append((e, int(pid), label, now - int(epoch)))
     except OSError:

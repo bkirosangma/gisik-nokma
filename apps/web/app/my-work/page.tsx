@@ -21,6 +21,7 @@ import {
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '../../src/editor-slot.js';
+import { TicketGraphTab } from '../../src/knowledge-graph/ticket-graph-tab.js';
 import { AppNav } from '../../src/app-nav.js';
 import { MyWorkPageShell } from '../../src/skeletons/page-shells.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
@@ -480,6 +481,8 @@ function MyWorkSheet({
       attachmentsUnavailable={attachments.error ?? undefined}
       onClose={onClose}
       editorSlot={TicketEditorSlot}
+      // spec C §1: the fourth tab
+      knowledgeGraphSlot={TicketGraphTab}
       queryTickets={buildProjectPageQueryTickets(dataSource, workspaceId, projectId)}
       resolveTicketHref={ticketRefHrefIn(workspaceId)}
       workspaceName={workspaceName}

@@ -136,6 +136,11 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
       title: 'Assistants',
       sectionIds: ['16-connecting-claude-or-chatgpt'],
     },
+    {
+      id: 'manual-graph',
+      title: 'Knowledge Graph',
+      sectionIds: ['17-the-knowledge-graph'],
+    },
   ],
 };
 

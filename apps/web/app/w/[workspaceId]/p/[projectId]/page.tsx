@@ -50,6 +50,7 @@ import {
   writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, prefetchEditor, uploadAttachmentHttp } from '../../../../../src/editor-slot.js';
+import { TicketGraphTab } from '../../../../../src/knowledge-graph/ticket-graph-tab.js';
 import {
   Avatar,
   Button,
@@ -3754,6 +3755,8 @@ function ProjectBoard() {
             is the argument `canSetVisibility` states at length.
           */
           editorSlot={TicketEditorSlot}
+          // spec C §1: the fourth tab
+          knowledgeGraphSlot={TicketGraphTab}
           queryTickets={queryTickets}
           resolveTicketHref={resolveTicketHref}
           /*

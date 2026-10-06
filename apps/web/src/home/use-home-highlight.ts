@@ -3,8 +3,9 @@ import type { HomeNumberKey, HomeResponse } from '@gisik-nokma/domain';
 
 /**
  * Which number is lit (spec E §2.3). Clicking the lit one clears it; another switches; Escape clears — unless
- * something nearer the focus already handled that Escape (`defaultPrevented`: an open menu, the graph's own
- * `onEscape`, T4). A lit number whose tile turns disabled clears (Review Focus 5; planner ruling 2026-10-04 Q1): a
+ * something nearer the focus already handled that Escape (`defaultPrevented`: an open menu, or the graph). An Escape inside
+ * the graph reaches Home first through the view's `onEscape` (`HomeBody`, KG-E T4), which clears and answers true; the view
+ * then marks the key consumed (`preventDefault`, `knowledge-graph.tsx`'s Escape branch), so this listener skips it. A lit number whose tile turns disabled clears (Review Focus 5; planner ruling 2026-10-04 Q1): a
  * reload that drops it to 0, a Members count withdrawn to `null`, or the whole answer withdrawn (`home` null after a
  * refused read, `use-live-query.ts`'s stale-cache withdrawal). A count that changes but stays above 0 stays lit.
  */

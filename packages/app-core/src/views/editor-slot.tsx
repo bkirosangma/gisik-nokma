@@ -249,6 +249,18 @@ export type EditorSlotProps = {
 export type EditorSlotComponent = (props: EditorSlotProps) => ReactElement | null;
 
 /**
+ * The ticket sheet's Knowledge Graph tab (spec C §1), a slot for the same reason as `EditorSlotComponent`: app-core
+ * never depends on the renderer package, the host mounts it (the web's `TicketGraphTab`). `onShowLinks` returns the
+ * sheet to Details, where spec A's Links section is (the graph's "Add link" on a ticket with no links).
+ */
+export type KnowledgeGraphSlotComponent = (props: {
+  workspaceId: string;
+  ticketId: string;
+  onOpenTicket?: (id: string) => void;
+  onShowLinks: () => void;
+}) => ReactElement | null;
+
+/**
  * The honest read-only default: a plain-text projection of the document,
  * through the domain's one `docToPlainText` (amendment 12's renderer, shared
  * with the search projection and notifications).
