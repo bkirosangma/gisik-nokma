@@ -818,6 +818,16 @@ retired override now points at directly (`dockerfile:`, alongside the `target: d
   carries the `dev` stage, and `docker-compose.hot.yml`'s retired override points its `build.dockerfile`
   at them. `apps/server/test/deploy/dockerfile-cache-shape.test.ts`. Mutation: re-add `FROM node:22-alpine
   AS dev` to the server Dockerfile → red (measured 2026-09-23, Node v22.23.2).
+- 13.2356 ✅ Every workspace package an app builds from (the `dependencies` of `apps/web` and `apps/server`,
+  walked over `workspace:` ranges: app-core, domain, editor, knowledge-graph, mcp-server, rule-engine,
+  sync-client, ui) has its `COPY packages/<d>/package.json packages/<d>/` line in the manifest block ABOVE
+  `RUN pnpm fetch`, in the `build` stage of both production Dockerfiles and the `dev` stage of both
+  `Dockerfile.dev` files, and its `./packages/<d>/src` mounted in both `docker-compose.hot.yml` services
+  (ERRATUM E4, `task/kg-c-t9-wiring`: the web app's new `@gisik-nokma/knowledge-graph` dependency).
+  CONTROL in the same `it`: the closure holds knowledge-graph and neither browser-test package, and has at
+  least 8 members; both services were found and neither slice is empty. Matches are line-anchored, so a
+  commented-out line does not count. `apps/server/test/deploy/dockerfile-cache-shape.test.ts`. Allocated
+  2026-10-06 after the KG tip's `13.2355`, free on KG, WG and every unmerged task tip of the last 3 days.
 - 13.1428 🧪 LOCAL MEASUREMENT (run 2026-09-23, Node v22.23.2, Docker Desktop) — `docker build
   --no-cache -f apps/server/Dockerfile --target runtime .`, then the same command without `--no-cache`,
   then once more after a one-line comment-only edit to `apps/server/src/index.ts` (not the lockfile),
