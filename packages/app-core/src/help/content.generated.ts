@@ -12405,7 +12405,47 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". People and concepts have no page of their own to open."
+                      "text": ". People and concepts have no page of their own to open. A concept's panel shows its items and its links instead, and who created it; if you may change it, each item and link has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Remove"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button, and the concept a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Rename"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". A suggested concept offers "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Confirm"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", with a name you can change, and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Reject"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ],
                   [

@@ -2241,7 +2241,10 @@ how to reach them.
 
 - **Click** an item to select it. The panel beside the graph (on a phone, a card under it) shows what it is,
   its main facts, its direct links grouped by kind, and a button that opens it: **Open ticket**, **Open note**,
-  **Open board** or **Open workspace**. People and concepts have no page of their own to open.
+  **Open board** or **Open workspace**. People and concepts have no page of their own to open. A concept's
+  panel shows its items and its links instead, and who created it; if you may change it, each item and link has a
+  **Remove** button, and the concept a **Rename** and a **Delete**. A suggested concept offers **Confirm**, with a
+  name you can change, and **Reject**.
 - **Double-click** an item, or select it and press **Center on** and its name, to put it in the middle. The
   one you left goes onto the trail at the top left; **Back** or the Esc key returns to it.
 - **Hover** an item to fade everything that is not linked to it. **Hover a line** to read what it means — for

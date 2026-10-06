@@ -45,7 +45,7 @@ const DELETED = 'packages/app-core/src/account/deleted-items-section.tsx';
 const WORKSPACES = 'apps/web/app/workspaces/page.tsx';
 const WORKSPACE = 'apps/web/app/w/[workspaceId]/page.tsx';
 const NOTE_ROW = 'apps/web/src/notes/note-row.tsx';
-const KG = 'packages/app-core/src/views/concept-inspector.tsx'; // Task 8 creates it; the KG view mounts it through renderConceptPanel
+const KG = 'packages/app-core/src/views/concept-inspector.tsx'; // Task 8 created it; the KG view mounts it through renderConceptPanel
 const ROW = 'packages/app-core/src/views/concepts-row.tsx';
 const NOTE_DOC = 'apps/web/src/notes/note-document.tsx';
 const MEMBERS = 'apps/web/app/w/[workspaceId]/members/page.tsx';
@@ -281,8 +281,5 @@ export const KNOWN_D2_GAPS: Readonly<Record<string, { missing: readonly D2Leg[];
   'manage_groups#delete': { missing: ['history', 'remove'], why: 'Group events have no History renderer, and a deleted group cannot be undone.' },
   'define_workflow#create': { missing: ['remove'], why: 'A new workflow cannot be deleted or archived.' },
   'define_ticket_type#create': { missing: ['remove'], why: 'A new ticket type cannot be deleted or archived.' },
-  manage_concept: { missing: ['surface'], why: 'No app surface until KG-D Task 8 creates the concept inspector (concept-inspector.tsx).' },
   tag_items: { missing: ['surface'], why: 'No app surface until KG-D Task 9 creates the Concepts row (concepts-row.tsx).' },
-  link_concepts: { missing: ['surface'], why: 'No app surface until KG-D Task 8 creates the concept inspector (concept-inspector.tsx).' },
-  resolve_suggestion: { missing: ['surface'], why: 'No app surface until KG-D Task 8 creates the concept inspector (concept-inspector.tsx).' },
 };

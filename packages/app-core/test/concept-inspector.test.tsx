@@ -129,6 +129,29 @@ describe('27.521–27.523 a confirmed concept', () => {
     expect(screen.queryByRole('button', { name: 'Remove from concept' })).toBeNull();
   });
 
+  it('27.521 an item\'s button SHOWS "Remove" (the label keeps its room in a 300 px column) and is NAMED "Remove from concept", its item as the description; control: a link\'s button is named just "Remove"', async () => {
+    mount();
+    await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+    const [first] = screen.getAllByRole('button', { name: 'Remove from concept' });
+    expect(first).toHaveAccessibleDescription('CCRE-1 Renew the trade licence');
+    const shown = [...first!.childNodes].filter((n) => !(n instanceof HTMLElement && n.classList.contains('gn-visually-hidden'))).map((n) => n.textContent).join('');
+    expect(shown).toBe('Remove');
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
+  });
+
+  it('27.521 untagging an item or removing a link is a quiet ghost button, as the ticket sheet\'s link Remove is; only Delete, which ends the concept, is in danger red (23.022)', async () => {
+    mount();
+    await screen.findByRole('heading', { level: 3, name: 'Scroll position on phone sheets' });
+    const removes = [...screen.getAllByRole('button', { name: 'Remove from concept' }), ...screen.getAllByRole('button', { name: 'Remove' })];
+    expect(removes).toHaveLength(4);
+    for (const b of removes) {
+      expect(b).toHaveClass('gn-button--ghost');
+      expect(b).not.toHaveClass('gn-button--danger-quiet');
+    }
+    // control: the concept's own Delete keeps the in-list danger variant
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('gn-button--danger-quiet');
+  });
+
   it('27.522 "Remove from concept" ingests ONE concept.item_untagged and the row goes at once; a refusal puts it back, reports exactly that refusal and does not call onChanged', async () => {
     const d = deferredIngest();
     const { ds, onChanged, onRefusal, user } = mount({ ingest: d.script });

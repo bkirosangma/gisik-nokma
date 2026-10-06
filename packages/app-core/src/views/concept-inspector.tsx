@@ -138,7 +138,7 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
                   </span>
                   {readOnly ? null : (
                     <button
-                      className="gn-button gn-button--danger-quiet gn-kg-concept__remove"
+                      className="gn-button gn-button--ghost gn-kg-concept__remove"
                       type="button"
                       aria-describedby={`${ids}-${key}`}
                       onClick={async () => {
@@ -153,7 +153,8 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
                         }
                       }}
                     >
-                      Remove from concept
+                      {/* Shown "Remove", so the item's label keeps its room; named in full for a screen reader. */}
+                      Remove<span className="gn-visually-hidden"> from concept</span>
                     </button>
                   )}
                 </li>
@@ -176,7 +177,7 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
                   </span>
                   {readOnly ? null : (
                     <button
-                      className="gn-button gn-button--danger-quiet gn-kg-concept__remove"
+                      className="gn-button gn-button--ghost gn-kg-concept__remove"
                       type="button"
                       aria-describedby={`${ids}-${key}`}
                       onClick={() => void send(changed, [ev('concept.unlinked', { otherId: l.otherId, relation: l.relation })])}
