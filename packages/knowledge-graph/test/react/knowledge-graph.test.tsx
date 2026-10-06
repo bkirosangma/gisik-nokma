@@ -439,6 +439,18 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
     expect(document.activeElement).toBe(crumb);
   });
 
+  it('27.704 control (jsdom): Esc pressed on Zoom in (focus in the view, not in the trail) empties the trail and leaves focus on Zoom in', async () => {
+    const { fake } = setup();
+    await drawn(fake, T('t126'));
+    doubleClick(fake, T('t133'));
+    await screen.findByRole('button', { name: 'Back to GN-142' });
+    const zoom = screen.getByRole('button', { name: 'Zoom in' });
+    zoom.focus();
+    await userEvent.setup().keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Back to GN-142' })).toBeNull());
+    expect(document.activeElement).toBe(zoom);
+  });
+
   it('27.323 the trail: t142 → t133 → t131 shows Back and three crumbs, a crumb past the loaded rings keeps its label, and the first crumb goes back two steps; control: a new centre prop resets the trail', async () => {
     const { fake, fx, rerender } = setup();
     await drawn(fake, T('t126'));

@@ -88,6 +88,25 @@ describe('Popover: close-on-scroll needs the trigger to have moved', () => {
     expect(screen.queryByRole('dialog', { name: 'Choices' })).toBeNull();
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('27.705 control: a sideways scroll that moved the trigger only across (left 40 → 160) closes it too', async () => {
+    const user = userEvent.setup();
+    render(<Scrolled />);
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+    let left = 40;
+    trigger.getBoundingClientRect = () => ({ top: 300, left, right: left + 120, bottom: 344, width: 120, height: 44, x: left, y: 300, toJSON: () => ({}) }) as DOMRect;
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    act(() => {
+      fireEvent.scroll(screen.getByTestId('scroller'));
+    });
+    expect(screen.getByRole('dialog', { name: 'Choices' })).toBeInTheDocument(); // the haystack: unmoved, it stays
+    left = 160;
+    act(() => {
+      fireEvent.scroll(screen.getByTestId('scroller'));
+    });
+    expect(screen.queryByRole('dialog', { name: 'Choices' })).toBeNull();
+  });
 });
 
 /*

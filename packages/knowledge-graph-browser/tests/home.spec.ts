@@ -212,6 +212,11 @@ test('27.700 a big workspace (444+ rows): the page stays under 2,400 px and the 
   expect(await insideBox(n - 1)).toEqual({ within: true, hit: true });
   await rows.nth(0).focus();
   expect(await insideBox(0)).toEqual({ within: true, hit: true });
+  // the box is min(30rem, 60vh): 60vh binds at 720 (432 px), 30rem at 1000 (480 px)
+  const boxHeight = () => page.evaluate(() => document.querySelector('.gn-kg-list__box')!.getBoundingClientRect().height);
+  expect(await boxHeight()).toBeCloseTo(432, 0);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await expect.poll(boxHeight).toBeCloseTo(480, 0);
 
   // CONTROL, same test: delete the box rule from the live stylesheet and the same page is taller than its rows (2.75rem each)
   const deleted = await page.evaluate(() => {
