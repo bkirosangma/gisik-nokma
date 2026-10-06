@@ -3,6 +3,7 @@ import {
   PURGED_LOOKUP_MAX_IDS,
   ULID_REGEX,
   type ConceptAudienceResponse,
+  type ConceptListResponse,
   type ConceptView,
   type PurgedRef,
   type SuggestionListResponse,
@@ -239,6 +240,12 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       const raw = await http.get(path);
       if (raw === null) throw new HttpError(404, path);
       return raw as ConceptAudienceResponse;
+    },
+    getItemConcepts: async (workspaceId, item) => {
+      const path = `/v1/workspaces/${encodeURIComponent(workspaceId)}/concepts?item=${encodeURIComponent(`${item.kind}:${item.id}`)}`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return (raw as ConceptListResponse).concepts;
     },
     getDeletedItems: async () => mapDeletedItems(await http.get('/v1/me/deleted-items')),
 

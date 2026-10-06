@@ -139,6 +139,8 @@ export function stubServices(
     getConceptHistory: unstubbed('getConceptHistory'),
     getSuggestions: unstubbed('getSuggestions'),
     getConceptAudience: unstubbed('getConceptAudience'),
+    // KG-D Task 9: every ticket sheet and note page asks it; the Concepts row reads a rejection as "no row".
+    getItemConcepts: unstubbed('getItemConcepts'),
     // Every document render asks this in the background (trash Plan 3); "nothing
     // was purged" is exactly what every page saw before the read existed, so a
     // case that does not care is not made to stub it. A case that does, stubs it.

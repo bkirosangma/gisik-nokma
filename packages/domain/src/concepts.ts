@@ -49,3 +49,11 @@ export type SuggestionView = {
 };
 /** Highest score first. */
 export type SuggestionListResponse = { workspaceId: string; suggestions: SuggestionView[] };
+
+/**
+ * The semantic-layer switch's remembered value (Knowledge Graph spec C §6.4, ruling D6): the browser storage key the
+ * graph's switch writes (`packages/knowledge-graph/src/react/semantic-pref.ts`) and the Concepts row on a ticket's or
+ * a note's Details reads (`packages/app-core/src/views/concepts-row.tsx`, spec D §6). It lives here because app-core
+ * never depends on the renderer package, and both must name the same key. `'off'` hides; anything else is On.
+ */
+export const SEMANTIC_KEY = 'gn-kg-semantic';

@@ -370,13 +370,13 @@ const GROUPS_ABSENCES: readonly ReplicaAbsence[] = [
 ];
 
 /**
- * Knowledge Graph D Task 8. Concepts and suggestions are online-only: `concept.*` events are withheld from replica
+ * Knowledge Graph D Task 8 (and Task 9's `getItemConcepts`). Concepts and suggestions are online-only: `concept.*` events are withheld from replica
  * streams (`audienceClassOf` → `'withheld'`, KG-D Task 3), and D4 (a concept reaches a reader only when they can see
  * every live item in it) is decided at read time by the server, so a local answer would decide it on a stale copy.
  */
 const CONCEPTS_ABSENCES: readonly ReplicaAbsence[] = [
   {
-    field: 'ConceptView / ConceptHistory / SuggestionView[] / ConceptAudienceResponse',
+    field: 'ConceptView / ConceptHistory / SuggestionView[] / ConceptAudienceResponse / ConceptSummary[]',
     because:
       'the local replica holds no concept, suggestion or membership-count rows. Concept events are withheld from replica streams, and D4 is decided per reader at read time by the server, so any local answer would be a concept nobody may be allowed to see',
     owner: 'Knowledge Graph spec D: online-only by design (the concept reads are server reads, KG-D Task 3)',
@@ -708,6 +708,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getConceptHistory: CONCEPTS_ABSENCES,
   getSuggestions: CONCEPTS_ABSENCES,
   getConceptAudience: CONCEPTS_ABSENCES,
+  getItemConcepts: CONCEPTS_ABSENCES,
   getDeletedItems: DELETED_ITEMS_NOT_CACHED,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
@@ -1267,6 +1268,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     getConceptHistory: () => Promise.reject(new ReplicaGapError('getConceptHistory', CONCEPTS_ABSENCES)),
     getSuggestions: () => Promise.reject(new ReplicaGapError('getSuggestions', CONCEPTS_ABSENCES)),
     getConceptAudience: () => Promise.reject(new ReplicaGapError('getConceptAudience', CONCEPTS_ABSENCES)),
+    getItemConcepts: () => Promise.reject(new ReplicaGapError('getItemConcepts', CONCEPTS_ABSENCES)),
     getDeletedItems: async () => {
       let body: unknown;
       try {

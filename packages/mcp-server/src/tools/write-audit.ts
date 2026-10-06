@@ -281,5 +281,4 @@ export const KNOWN_D2_GAPS: Readonly<Record<string, { missing: readonly D2Leg[];
   'manage_groups#delete': { missing: ['history', 'remove'], why: 'Group events have no History renderer, and a deleted group cannot be undone.' },
   'define_workflow#create': { missing: ['remove'], why: 'A new workflow cannot be deleted or archived.' },
   'define_ticket_type#create': { missing: ['remove'], why: 'A new ticket type cannot be deleted or archived.' },
-  tag_items: { missing: ['surface'], why: 'No app surface until KG-D Task 9 creates the Concepts row (concepts-row.tsx).' },
 };

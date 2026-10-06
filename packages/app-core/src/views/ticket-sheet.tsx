@@ -49,6 +49,7 @@ import {
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
 import { TicketLinksSection } from './ticket-links-section.js';
+import { ConceptsRow } from './concepts-row.js';
 import { TicketNotesSection } from './ticket-notes-section.js';
 import { LinkedFromSection, linkedFromHref } from './linked-from-section.js';
 import { ReopenDialog } from './reopen-dialog.js';
@@ -4472,12 +4473,27 @@ export function TicketSheet({
           </section>
 
           {/*
-            THE NOTES SECTION — Subtasks → Notes → Comments, the prototype's
-            own order (spec §10.1). `canEdit` is `editorSlot !== undefined`,
-            the same expression `canEditDescription` below uses for the same
-            reason: no client-side edit flag exists, and the ingest door is
-            the one place that actually knows.
+            THE CONCEPTS ROW, THEN THE NOTES SECTION — Subtasks → Concepts →
+            Notes → Comments. Subtasks → Notes → Comments is the prototype's
+            own order (spec §10.1); the Concepts row is Knowledge Graph spec
+            D §6's (KG-D Task 9), directly above Notes, and draws nothing while
+            the semantic layer is off or the ticket is in no concept. Its name
+            opens the Knowledge Graph tab, where the concept sits on the
+            ticket's first ring. `canEdit` (and the row's `readOnly`) is
+            `editorSlot !== undefined`, the same expression
+            `canEditDescription` below uses for the same reason: no
+            client-side edit flag exists, and the ingest door is the one
+            place that actually knows.
           */}
+          <ConceptsRow
+            workspaceId={workspaceId}
+            item={{ kind: 'ticket', id: ticketId }}
+            dataSource={dataSource}
+            make={make}
+            onRefusal={(r) => setServerRefusal(r)}
+            readOnly={editorSlot === undefined}
+            {...(KnowledgeGraphSlot === undefined ? {} : { onOpenConcept: () => setTab('graph') })}
+          />
           <TicketNotesSection
             dataSource={dataSource}
             workspaceId={workspaceId}
