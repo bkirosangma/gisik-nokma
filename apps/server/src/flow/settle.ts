@@ -9,6 +9,8 @@ export type FlowAtomicIngest = { ingestAtomic(events: SubmittedEvent[]): Promise
 export type SettleOutcome = 'applied' | 'empty' | 'blocked' | 'refused' | 'skipped';
 export type FlowSettleDeps = {
   pool: Queryable; ingest: FlowAtomicIngest; log?: (message: string, error?: unknown) => void; plan?: typeof planSettle; now?: () => Date;
+  /** The flow read's cap, `FLOW_SERVER_CAP` unless a test needs a flow that is cut short. */
+  flowCap?: number;
 };
 
 /** As the promoter's: a blocked or refused settle in production is a line on stderr, never silence. */
@@ -53,8 +55,9 @@ function serialised<T>(key: string, work: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function plannedFor(deps: Pick<FlowSettleDeps, 'pool' | 'plan'>, workspaceId: string, decisionId: string) {
-  const flow = await readFlow(deps.pool, { workspaceId, seedId: decisionId, viewerId: null, cap: FLOW_SERVER_CAP });
+/** A flow cut short by the cap cannot tell a back edge from a forward one, so it is skipped, never half-settled (as the promoter's). */
+async function plannedFor(deps: Pick<FlowSettleDeps, 'pool' | 'plan' | 'flowCap'>, workspaceId: string, decisionId: string) {
+  const flow = await readFlow(deps.pool, { workspaceId, seedId: decisionId, viewerId: null, cap: deps.flowCap ?? FLOW_SERVER_CAP });
   if (flow.truncated) return { kind: 'skipped' as const };
   const node = flow.nodes.find((n) => n.id === decisionId);
   const decided = await latestDecided(deps.pool, decisionId);

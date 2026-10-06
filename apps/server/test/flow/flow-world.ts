@@ -7,8 +7,8 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 
 /**
- * The world every flow task's server test uses (wtg2 T13; T14 and T16 import it): one workspace, four ticket types
- * on three workflows, and helpers that put events in through `applyCommitted` (the ledger and every projection, no
+ * The world every flow task's server test uses (wtg2 T13; T14 and T16 import it): one workspace (T16's tenant legs add
+ * a second, `seedSecondWorkspace`), four ticket types on three workflows, and helpers that put events in through `applyCommitted` (the ledger and every projection, no
  * engine and no listener), so nothing promotes unless the test hands an event to the code under test.
  *
  * - `flow-task` and `decision` -> `wf-flow` (To do, Doing, Done; `doing -> todo` declared, so a stale promotion out
@@ -34,6 +34,9 @@ export const ASSIGNEE = '01J9GASN000000000000000000';
 export const TASK = 'flow-task';
 export const KICKOFF_TASK = 'kickoff-task';
 export const SHIPPED_TASK = 'shipped-task';
+/** A second workspace (wtg2 T16's tenant legs): its own workflow, and the Decision and task types under fresh entity ids, as T7's backfill files them. */
+export const WS2 = '01J9GWS2DEC000000000000000';
+export const PROJECT2 = '01J9GPRJ2DEC00000000000000';
 
 type Def = { id: string; initial: string; states: Array<[string, string, 'open' | 'active' | 'terminal']>; edges: Array<[string, string]> };
 const FLOW: Def = { id: 'wf-flow', initial: 'todo', states: [['todo', 'To do', 'open'], ['doing', 'Doing', 'active'], ['done', 'Done', 'terminal']],
@@ -55,6 +58,17 @@ export async function seedFlowWorld(pool: Pool): Promise<void> {
       payload: { id: typeId, name: typeId, icon: 'check', rank, workflowId: def.id, fields: [] } }));
   }
   await applyCommitted(pool, events);
+}
+
+export async function seedSecondWorkspace(pool: Pool): Promise<void> {
+  await applyCommitted(pool, [
+    makeCommitted({ workspaceId: WS2, actorId: PERSON, entity: { kind: 'workflow', id: 'wf-flow2' }, type: 'workflow.defined',
+      payload: { id: 'wf-flow2', version: 1, name: 'wf-flow2', initialStateId: FLOW.initial,
+        states: FLOW.states.map(([id, name, category]) => ({ id, name, category })),
+        transitions: FLOW.edges.map(([from, to]) => ({ from, to, rules: [] })) } }),
+    ...[TASK, DECISION_TYPE_ID].map((typeId) => makeCommitted({ workspaceId: WS2, actorId: PERSON, entity: { kind: 'ticket-type', id: newUlid() }, type: 'ticket-type.defined',
+      payload: { id: typeId, name: typeId, icon: 'check', rank: 3, workflowId: 'wf-flow2', fields: [] } })),
+  ]);
 }
 
 export const realIngest = (pool: Pool) => createIngestService({ pool, evaluate: evaluateEvent, projections: buildProjectionRegistry() });
@@ -100,36 +114,48 @@ export async function stepMany(
 
 /** `start: 'backlog'` by default; `start: 'focus'` + `moves` walks it through the workflow's states; `draft` is born in the backlog. */
 export async function addTicket(
-  pool: Pool, o: { typeId?: string; start?: 'backlog' | 'focus'; moves?: string[]; assigneeId?: string; draft?: boolean; title?: string } = {},
+  pool: Pool,
+  o: { typeId?: string; start?: 'backlog' | 'focus'; moves?: string[]; assigneeId?: string; draft?: boolean; title?: string; workspaceId?: string } = {},
 ): Promise<string> {
   const id = newUlid();
-  await step(pool, id, 'ticket.created', { typeId: o.typeId ?? TASK, projectId: PROJECT, parentId: null, title: o.title ?? `T ${id.slice(-4)}`,
-    start: o.start ?? 'backlog', ...(o.assigneeId === undefined ? {} : { assigneeId: o.assigneeId }), ...(o.draft === true ? { draft: true } : {}) });
-  for (const to of o.moves ?? []) await step(pool, id, 'ticket.transitioned', { to });
+  const ws = o.workspaceId ?? WS;
+  await step(pool, id, 'ticket.created', { typeId: o.typeId ?? TASK, projectId: ws === WS ? PROJECT : PROJECT2, parentId: null, title: o.title ?? `T ${id.slice(-4)}`,
+    start: o.start ?? 'backlog', ...(o.assigneeId === undefined ? {} : { assigneeId: o.assigneeId }), ...(o.draft === true ? { draft: true } : {}) }, PERSON, ws);
+  for (const to of o.moves ?? []) await step(pool, id, 'ticket.transitioned', { to }, PERSON, ws);
   return id;
 }
 
-export const lead = (pool: Pool, source: string, target: string, label?: string) =>
-  step(pool, source, 'ticket.link_added', { kind: 'leads_to', targetId: target, ...(label === undefined ? {} : { label }) });
+/** `n` Backlog tasks, each leading into `target`, in one `applyCommitted`: a flow wider than a cap, one ring deep (wtg2 T16's cap legs). */
+export async function fanIn(pool: Pool, target: string, n: number, workspaceId = WS): Promise<void> {
+  await stepMany(pool, Array.from({ length: n }, () => newUlid()).flatMap((id) => [
+    { ticketId: id, type: 'ticket.created',
+      payload: { typeId: TASK, projectId: workspaceId === WS ? PROJECT : PROJECT2, parentId: null, title: `F ${id.slice(-4)}`, start: 'backlog' } },
+    { ticketId: id, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: target } },
+  ]), workspaceId);
+}
+
+export const lead = (pool: Pool, source: string, target: string, label?: string, workspaceId = WS) =>
+  step(pool, source, 'ticket.link_added', { kind: 'leads_to', targetId: target, ...(label === undefined ? {} : { label }) }, PERSON, workspaceId);
 export const unlink = (pool: Pool, source: string, target: string) => step(pool, source, 'ticket.link_removed', { kind: 'leads_to', targetId: target });
-export const decide = (pool: Pool, decisionId: string, outcome: string | null, extra: Record<string, unknown> = {}) =>
-  step(pool, decisionId, 'ticket.decided', { outcome, ...extra });
+export const decide = (pool: Pool, decisionId: string, outcome: string | null, extra: Record<string, unknown> = {}, workspaceId = WS) =>
+  step(pool, decisionId, 'ticket.decided', { outcome, ...extra }, PERSON, workspaceId);
 
 /**
  * The Decision loop of PS-4 (wtg2 T16): `s(done) -> a(done) -> d(Decision) ; d -[Redo]-> a` is a back edge, `d -[Ship]-> z`
  * (z in the Backlog). `d` is finished last, by a person, unless `finished: false` leaves it in Doing; `finishing` is that
  * transition's envelope (null when it was not filed).
  */
-export async function loopWorld(pool: Pool, o: { finished?: boolean } = {}) {
-  const s = await addTicket(pool, { start: 'focus', moves: ['doing', 'done'] });
-  const a = await addTicket(pool, { start: 'focus', moves: ['doing', 'done'] });
-  const d = await addTicket(pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing'] });
-  const z = await addTicket(pool);
-  await lead(pool, s, a);
-  await lead(pool, a, d);
-  await lead(pool, d, a, 'Redo');
-  await lead(pool, d, z, 'Ship');
-  const finishing = o.finished === false ? null : await step(pool, d, 'ticket.transitioned', { to: 'done' });
+export async function loopWorld(pool: Pool, o: { finished?: boolean; workspaceId?: string } = {}) {
+  const ws = o.workspaceId ?? WS;
+  const s = await addTicket(pool, { start: 'focus', moves: ['doing', 'done'], workspaceId: ws });
+  const a = await addTicket(pool, { start: 'focus', moves: ['doing', 'done'], workspaceId: ws });
+  const d = await addTicket(pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing'], workspaceId: ws });
+  const z = await addTicket(pool, { workspaceId: ws });
+  await lead(pool, s, a, undefined, ws);
+  await lead(pool, a, d, undefined, ws);
+  await lead(pool, d, a, 'Redo', ws);
+  await lead(pool, d, z, 'Ship', ws);
+  const finishing = o.finished === false ? null : await step(pool, d, 'ticket.transitioned', { to: 'done' }, PERSON, ws);
   return { s, a, d, z, finishing };
 }
 

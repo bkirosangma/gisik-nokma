@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DECISION_TYPE_ID,
+  newUlid,
   planSettle,
   SYSTEM_ACTOR_FLOW,
   type IngestResult,
@@ -15,13 +16,23 @@ import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import type { Queryable } from '../../src/db/queryable.js';
-import { createFlowPromoter } from '../../src/flow/promote.js';
+import { createFlowPromoter, FLOW_SERVER_CAP } from '../../src/flow/promote.js';
+import { readFlow } from '../../src/flow/read-flow.js';
 import { createFlowSettler, pendingSettle, settleDecision } from '../../src/flow/settle.js';
 import { runFlowSweep, SETTLE_SCAN_LIMIT, type FlowSweepDeps } from '../../src/flow/sweep.js';
 import type { AtomicOutcome, CommittedEventListener, IngestService } from '../../src/ingest/ingest-service.js';
 import { resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { addTicket, ASSIGNEE, decide, lead, ledger, loopWorld, PERSON, realIngest, seedFlowWorld, stateOf, step, WS } from './flow-world.js';
+import {
+  addTicket, ASSIGNEE, decide, fanIn, lead, ledger, loopWorld, PERSON, PROJECT, realIngest, seedFlowWorld, seedSecondWorkspace, stateOf, step, stepMany, WS, WS2,
+} from './flow-world.js';
+
+// The sweep's settle half calls `settleDecision` through this module's export: a spy that calls through records what the
+// SELECT offered (29.369), skipped candidates included. The listener calls the module's own binding, never the spy.
+vi.mock('../../src/flow/settle.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/flow/settle.js')>();
+  return { ...original, settleDecision: vi.fn(original.settleDecision) };
+});
 
 /**
  * wtg2 T16 (spec PS-9, contract decision 5): the settler. A committed `ticket.decided`, or a Decision's own finishing
@@ -45,13 +56,15 @@ import { addTicket, ASSIGNEE, decide, lead, ledger, loopWorld, PERSON, realInges
  *
  * `flow-world.ts`, one database per case; setup goes in through `applyCommitted`, so nothing settles unless a case
  * hands an event to the code under test. `loopWorld`: `s(done) -> a(done) -> d(Decision, done)`, `d -[Redo]-> a` a
- * back edge, `d -[Ship]-> z`.
+ * back edge, `d -[Ship]-> z`. `settleDecision` is a call-through spy (the `vi.mock` above), so a sweep's candidates are
+ * read off its calls.
  */
 
 let db: TestDatabase;
 let logs: string[];
 let drains: Array<() => Promise<void>>;
 beforeEach(async () => {
+  vi.mocked(settleDecision).mockClear();
   resetEntitySeqs();
   db = await createTestDatabase();
   await seedFlowWorld(db.pool);
@@ -72,6 +85,16 @@ const after = (e: LedgerEvent, ms: number) => () => new Date(Date.parse(e.server
 const counted = (n: { v: number }): Queryable =>
   ({ query: (...a: Parameters<typeof db.pool.query>) => { n.v += 1; return db.pool.query(...a); } }) as unknown as Queryable;
 const blockedOn = (ticketId: string): SettlePlan => ({ steps: [], blocked: { ticketId, reason: 'parent-finished' }, started: [], touchesOthers: false });
+const committedDoor = () => vi.fn(async (_events: SubmittedEvent[]): Promise<AtomicOutcome> => ({ status: 'committed', results: [] }));
+/** A finished Decision `d` with `d -[Ship]-> z` and `d -[Drop]-> y`, both in the Backlog unless `yStarted` puts y in Doing. */
+async function twoBranch(o: { yStarted?: boolean } = {}) {
+  const d = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] });
+  const z = await addTicket(db.pool);
+  const y = await addTicket(db.pool, o.yStarted === true ? { start: 'focus', moves: ['doing'] } : {});
+  await lead(db.pool, d, z, 'Ship');
+  await lead(db.pool, d, y, 'Drop');
+  return { d, z, y };
+}
 
 /**
  * The real door with the settler and T13's promoter on its commit feed, as `app.ts` wires them. `slowMs` delays every
@@ -139,6 +162,10 @@ describe('29.368 the settle listener', () => {
     const settler = createFlowSettler({ pool: counted(n), ingest: { ingestAtomic: atomic }, log: (m) => logs.push(m) });
     await settler.onCommitted(taskDone);
     expect([n.v, atomic.mock.calls.length]).toEqual([1, 0]);
+    // an event on a ticket with no row: the same one read, and nothing to say
+    n.v = 0;
+    await settler.onCommitted({ ...taskDone, entity: { kind: 'ticket', id: newUlid() } });
+    expect([n.v, atomic.mock.calls.length, logs]).toEqual([1, 0, []]);
     // control: the Decision's own finishing transition reads its flow (far more than one statement) and settles
     await decide(db.pool, d, 'Redo');
     n.v = 0;
@@ -153,6 +180,18 @@ describe('29.368 the settle listener', () => {
     });
     await expect(broken.onCommitted(finishing!)).resolves.toBeUndefined();
     expect(logs).toEqual(['flow settle listener failed']);
+  });
+
+  it('29.368 (a) a Decision in a second workspace is settled in ITS workspace, the event\'s', async () => {
+    await seedSecondWorkspace(db.pool);
+    const { a, d } = await loopWorld(db.pool, { workspaceId: WS2 });
+    const r = rig();
+    await r.settler.onCommitted(await decide(db.pool, d, 'Redo', {}, WS2));
+    await r.drain();
+    expect(r.atomic).toHaveBeenCalledTimes(1);
+    expect(r.atomic.mock.calls[0]![0].map((e) => [e.workspaceId, e.entity.id])).toEqual([[WS2, a], [WS2, d]]);
+    expect([await stateOf(db.pool, a), await stateOf(db.pool, d)]).toEqual(['todo', 'backlog']);
+    expect(logs).toEqual([]);
   });
 
   it('29.368 (b) pass 2: the loop target goes straight to To do, the Decision is promoted again when it finishes, without a sweep, and the next choice is pass 2', async () => {
@@ -197,12 +236,35 @@ describe('29.368 the settle listener', () => {
     expect(logs).toEqual([]);
   });
 
+  it('29.368 (c) the chain outlives the run before it: a third run issued while the second is filing still waits its turn', async () => {
+    const { a, d } = await loopWorld(db.pool);
+    await decide(db.pool, d, 'Redo');
+    const ingest = realIngest(db.pool);
+    const atomic = vi.fn(async (events: SubmittedEvent[]): Promise<AtomicOutcome> => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return ingest.ingestAtomic(events);
+    });
+    const deps = { pool: db.pool, ingest: { ingestAtomic: atomic }, log: (m: string) => logs.push(m) };
+    // the first run ends at once (blocked); the second plans after it and files slowly
+    const first = settleDecision({ ...deps, plan: () => blockedOn(a) }, WS, d);
+    const second = settleDecision(deps, WS, d);
+    expect(await first).toBe('blocked');
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the first run's tail has settled and tidied up after itself
+    const third = settleDecision(deps, WS, d);
+    // the second's loop moved d to Backlog: the third, planned after it, finds no settled Decision (a racing third would file again)
+    expect([await second, await third]).toEqual(['applied', 'skipped']);
+    expect(atomic).toHaveBeenCalledTimes(1);
+    expect(logs).toEqual([`flow settle blocked for ${d}: parent-finished (${a})`]);
+  });
+
   it('29.368 (c) a choice stored on an unfinished Decision waits, and its finishing transition alone settles it', async () => {
     const { a, d } = await loopWorld(db.pool, { finished: false });
     const r = rig();
     const decided = await decide(db.pool, d, 'Redo');
     await r.settler.onCommitted(decided);
     expect(r.atomic).not.toHaveBeenCalled();
+    // skipped, not planned: a plan for a Decision in Doing would be empty too, so the answer is what tells them apart
+    expect(await r.settler.settleDecision(WS, d)).toBe('skipped');
     expect(await stateOf(db.pool, d)).toBe('doing');
     const finishing = await step(db.pool, d, 'ticket.transitioned', { to: 'done' });
     await r.settler.onCommitted(finishing);
@@ -262,6 +324,73 @@ describe('29.368 the settle listener', () => {
       [y, 'ticket.transitioned', { kind: 'reopened-by-flow', decisionTicketId: d, outcome: 'Ship', pass: 1, decidedBy: PERSON, decisionEventId: cleared.id }],
     ]);
     expect(await stateOf(db.pool, y)).toBe('backlog');
+  });
+
+  it('29.368 (d) a Decision with no choice, a trashed Decision and a non-Decision are skipped without a word', async () => {
+    const atomic = committedDoor();
+    const deps = { pool: db.pool, ingest: { ingestAtomic: atomic }, log: (m: string) => logs.push(m) };
+    const undecided = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] });
+    await lead(db.pool, undecided, await addTicket(db.pool), 'Ship');
+    expect(await settleDecision(deps, WS, undecided)).toBe('skipped');
+    const { d } = await loopWorld(db.pool);
+    await decide(db.pool, d, 'Redo');
+    expect(await pendingSettle(db.pool, {}, WS, d)).toBe(true); // control: live, it has steps waiting
+    await step(db.pool, d, 'ticket.deleted', {});
+    expect(await settleDecision(deps, WS, d)).toBe('skipped');
+    const task = await addTicket(db.pool, { start: 'focus', moves: ['doing', 'done'] });
+    expect(await settleDecision(deps, WS, task)).toBe('skipped');
+    expect(atomic).not.toHaveBeenCalled();
+    expect(logs).toEqual([]);
+  });
+
+  it('29.368 (d) the LATEST choice\'s close list closes a started ticket on the branch left, its event the cause; control: a started ticket not named waits', async () => {
+    const waits = await twoBranch({ yStarted: true });
+    await decide(db.pool, waits.d, 'Ship');
+    const r = rig();
+    expect(await settleDecision({ pool: db.pool, ingest: { ingestAtomic: r.atomic } }, WS, waits.d)).toBe('empty');
+    expect(await stateOf(db.pool, waits.y)).toBe('doing');
+    const { d, y } = await twoBranch({ yStarted: true });
+    await decide(db.pool, d, 'Drop');
+    const latest = await decide(db.pool, d, 'Ship', { closeStarted: [y] });
+    expect(await settleDecision({ pool: db.pool, ingest: { ingestAtomic: r.atomic } }, WS, d)).toBe('applied');
+    expect(r.atomic).toHaveBeenCalledTimes(1);
+    expect((await ledger(db.pool, y, 'ticket.closed')).map((e) => e.payload.cause)).toEqual([
+      { kind: 'branch-not-taken', decisionTicketId: d, outcome: 'Ship', pass: 1, decidedBy: PERSON, decisionEventId: latest.id },
+    ]);
+    expect(logs).toEqual([]);
+  });
+
+  it('29.368 (d) a revised choice is settled under its NEW label: the old side closes, the new side reopens', async () => {
+    const { d, z, y } = await twoBranch();
+    const r = rig();
+    await r.settler.onCommitted(await decide(db.pool, d, 'Ship'));
+    await r.drain();
+    expect((await ledger(db.pool, y, 'ticket.closed')).map(causeKind)).toEqual(['branch-not-taken']); // precondition
+    const revised = await decide(db.pool, d, 'Drop');
+    await r.settler.onCommitted(revised);
+    await r.drain();
+    expect(r.atomic).toHaveBeenCalledTimes(2);
+    const batch = r.atomic.mock.calls[1]![0];
+    expect(batch.map((e) => [e.entity.id, e.type]).sort()).toEqual([[y, 'ticket.reopened'], [y, 'ticket.transitioned'], [z, 'ticket.closed'], [z, 'ticket.transitioned']].sort());
+    for (const e of batch) {
+      expect((e.payload as { cause?: unknown }).cause).toMatchObject({ decisionTicketId: d, outcome: 'Drop', pass: 1, decisionEventId: revised.id });
+    }
+    expect(logs).toEqual([]);
+  });
+
+  it('29.368 (d) a flow cut short by the cap is skipped, never half-settled; the server cap (2000) holds the flow the read cap (300) would cut', async () => {
+    const { s, a, d } = await loopWorld(db.pool);
+    await decide(db.pool, d, 'Redo');
+    await fanIn(db.pool, s, 301);
+    const read = (cap: number) => readFlow(db.pool, { workspaceId: WS, seedId: d, viewerId: null, cap });
+    expect([(await read(FLOW_SERVER_CAP)).nodes.length, (await read(FLOW_SERVER_CAP)).truncated, (await read(300)).truncated]).toEqual([305, false, true]); // precondition
+    const r = rig();
+    expect(await settleDecision({ pool: db.pool, ingest: { ingestAtomic: r.atomic }, flowCap: 300, log: (m) => logs.push(m) }, WS, d)).toBe('skipped');
+    expect(r.atomic).not.toHaveBeenCalled();
+    expect(await stateOf(db.pool, a)).toBe('done');
+    expect(await settleDecision({ pool: db.pool, ingest: { ingestAtomic: r.atomic }, log: (m) => logs.push(m) }, WS, d)).toBe('applied');
+    expect([await stateOf(db.pool, a), await stateOf(db.pool, d)]).toEqual(['todo', 'backlog']);
+    expect(logs).toEqual([]);
   });
 
   it('29.368 (e) buildApp subscribes the settler only when serverAtomic is given, and unsubscribes it on close; the server passes it', async () => {
@@ -339,6 +468,9 @@ describe('29.369 the sweep settle half', () => {
     // T14's daemon shape (no atomic door): the settle half is off
     expect(await runFlowSweep({ pool: db.pool, ingest, now })).toEqual({ promoted: 0, settled: 0, refused: 0 });
     expect(await stateOf(db.pool, d)).toBe('done');
+    // no `now`: the wall clock, which puts this fixture Decision weeks back, outside the lookback
+    expect(await sweepWith({ ingest })).toEqual({ promoted: 0, settled: 0, refused: 0 });
+    expect(vi.mocked(settleDecision)).not.toHaveBeenCalled();
     // PS-4.2: a goes straight to To do, so the promote half finds nothing (d waits behind a, z behind the released d)
     expect(await sweepWith({ ingest, now })).toEqual({ promoted: 0, settled: 1, refused: 0 });
     expect([await stateOf(db.pool, a), await stateOf(db.pool, d)]).toEqual(['todo', 'backlog']);
@@ -363,6 +495,42 @@ describe('29.369 the sweep settle half', () => {
     expect(await stateOf(db.pool, old.d)).toBe('done');
     expect((await sweepWith({ now: after(decidedOld, 3 * DAY) })).settled).toBe(1);
     expect(await stateOf(db.pool, old.d)).toBe('backlog');
+  });
+
+  it('29.369 (b) a finishing transition after the choice restarts the grace window: the latest choice OR move counts', async () => {
+    const { d } = await loopWorld(db.pool, { finished: false });
+    await decide(db.pool, d, 'Redo');
+    const finishing = await step(db.pool, d, 'ticket.transitioned', { to: 'done' });
+    expect((await sweepWith({ now: after(finishing, 30_000) })).settled).toBe(0);
+    expect(await stateOf(db.pool, d)).toBe('done');
+    expect((await sweepWith({ now: after(finishing, 61_000) })).settled).toBe(1);
+  });
+
+  it('29.369 (b) the scan offers live, finished Decisions holding an outcome or still owning a Not-taken close, newest first; never one in Doing, trashed or undecided, and another event type does not restart the window', async () => {
+    const lost = await loopWorld(db.pool);
+    await decide(db.pool, lost.d, 'Redo');
+    const doing = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing'] });
+    await lead(db.pool, doing, await addTicket(db.pool), 'Ship');
+    await decide(db.pool, doing, 'Ship');
+    const trashed = await loopWorld(db.pool);
+    await decide(db.pool, trashed.d, 'Redo');
+    await step(db.pool, trashed.d, 'ticket.deleted', {});
+    // cleared after its Ship was settled: no outcome, but y still holds the Not-taken close naming it
+    const cleared = await twoBranch();
+    await decide(db.pool, cleared.d, 'Ship');
+    expect(await settleDecision({ pool: db.pool, ingest: realIngest(db.pool) }, WS, cleared.d)).toBe('applied');
+    expect((await ledger(db.pool, cleared.y, 'ticket.closed')).map(causeKind)).toEqual(['branch-not-taken']); // precondition
+    await decide(db.pool, cleared.d, null);
+    const undecided = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] });
+    await lead(db.pool, undecided, await addTicket(db.pool), 'Ship');
+    const edited = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: ['doing', 'done'] });
+    await lead(db.pool, edited, await addTicket(db.pool), 'Ship');
+    await decide(db.pool, edited, 'Ship');
+    const edit = await step(db.pool, edited, 'ticket.field_set', { fieldId: 'note', value: 'edited' });
+    vi.mocked(settleDecision).mockClear();
+    // the choice is 90 s old, the field edit 30 s
+    await sweepWith({ now: after(edit, 30_000) });
+    expect(vi.mocked(settleDecision).mock.calls.map(([, ws, id]) => [ws, id])).toEqual([[WS, edited], [WS, cleared.d], [WS, lost.d]]);
   });
 
   it('29.369 (b) control: a Decision the listener settled is planned again by the sweep and files nothing (settled 0); pendingSettle is false', async () => {
@@ -436,6 +604,38 @@ describe('29.369 the sweep settle half', () => {
     expect([await stateOf(db.pool, newer.d), await stateOf(db.pool, older.d)]).toEqual(['backlog', 'done']);
     expect((await sweepWith({ now, settleScanLimit: 1 })).settled).toBe(1);
     expect(await stateOf(db.pool, older.d)).toBe('backlog');
+  });
+
+  it('29.369 (d) with no limit given, the scan takes exactly 500 of 501 Decisions, the oldest left for the next run', async () => {
+    const filed = await stepMany(db.pool, Array.from({ length: 501 }, () => newUlid()).flatMap((id) => [
+      { ticketId: id, type: 'ticket.created', payload: { typeId: DECISION_TYPE_ID, projectId: PROJECT, parentId: null, title: `D ${id.slice(-4)}`, start: 'focus' } },
+      { ticketId: id, type: 'ticket.transitioned', payload: { to: 'doing' } },
+      { ticketId: id, type: 'ticket.transitioned', payload: { to: 'done' } },
+      { ticketId: id, type: 'ticket.decided', payload: { outcome: 'Go' } },
+    ]));
+    const spy = vi.mocked(settleDecision);
+    const through = spy.getMockImplementation()!;
+    spy.mockImplementation(async () => 'empty');
+    try {
+      expect(await sweepWith({ now: after(filed.at(-1)!, 61_000) })).toEqual({ promoted: 0, settled: 0, refused: 0 });
+      expect(spy).toHaveBeenCalledTimes(500);
+      expect(spy.mock.calls.map(([, , id]) => id)).not.toContain(filed[0]!.entity.id);
+    } finally {
+      spy.mockImplementation(through);
+    }
+  });
+
+  it('29.369 (d) each Decision is settled in its own workspace, the row\'s', async () => {
+    await seedSecondWorkspace(db.pool);
+    const one = await loopWorld(db.pool);
+    await decide(db.pool, one.d, 'Redo');
+    const two = await loopWorld(db.pool, { workspaceId: WS2 });
+    const decidedTwo = await decide(db.pool, two.d, 'Redo', {}, WS2);
+    expect(await sweepWith({ now: after(decidedTwo, 120_000) })).toEqual({ promoted: 0, settled: 2, refused: 0 });
+    const { rows } = await db.pool.query<{ workspace_id: string; entity_id: string }>(
+      "SELECT workspace_id, entity_id FROM events WHERE payload->'cause'->>'kind' = 'reopened-by-flow'");
+    expect(rows.map((r) => [r.workspace_id, r.entity_id]).sort()).toEqual([[WS, one.a], [WS, one.d], [WS2, two.a], [WS2, two.d]].sort());
+    expect(logs).toEqual([]);
   });
 
   it('29.369 (d) the daemon hands its atomic door to the sweep (a source pin: the spawned daemon has no lost Decision inside the lookback)', () => {

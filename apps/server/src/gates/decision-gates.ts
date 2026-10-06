@@ -73,11 +73,12 @@ export function cascadeBlockedReason(code: SettleBlockReason, t: { key: string |
 /**
  * Key and title of a ticket the way the History route names a link target (`routes/ticket-history.ts`: `keysForAncestors` on
  * the row's project; no key composed here). The id comes from this workspace's own flow read, so the by-id fetch needs no
- * workspace clause.
+ * workspace clause; a ticket with no row is `null`, which the caller words as one it cannot see (unknown and invisible are one
+ * answer, as in `canSee`).
  */
-async function describeTicket(db: Queryable, workspaceId: string, ticketId: string): Promise<{ key: string | null; title: string }> {
+async function describeTicket(db: Queryable, workspaceId: string, ticketId: string): Promise<{ key: string | null; title: string } | null> {
   const [row] = await fetchTicketRows(db, [ticketId]);
-  if (row === undefined) return { key: null, title: '' };
+  if (row === undefined) return null;
   const keys = await keysForAncestors(db, workspaceId, [{ ticketId, projectId: row.project_id }]);
   return { key: keys.get(ticketId) ?? null, title: titleOf(row) };
 }
@@ -96,7 +97,8 @@ async function cascadeRefusal(event: SubmittedEvent, db: Queryable, claim: { out
   const plan = (opts.plan ?? planSettle)({ nodes, edges: flow.edges, decisionId: event.entity.id, closeStarted: claim.closeStarted });
   if (plan.blocked === null) return null;
   const visible = await (opts.canSeeTicket ?? ((d, u, t) => canSee(d, u, t)))(db, event.actorId, plan.blocked.ticketId);
-  const why = visible ? cascadeBlockedReason(plan.blocked.reason, await describeTicket(db, event.workspaceId, plan.blocked.ticketId)) : 'a step you cannot see is blocking it';
+  const named = visible ? await describeTicket(db, event.workspaceId, plan.blocked.ticketId) : null;
+  const why = named === null ? 'a step you cannot see is blocking it' : cascadeBlockedReason(plan.blocked.reason, named);
   return { rule: RULE_DECISION_CASCADE_BLOCKED, reason: `This choice cannot be applied: ${why}.` };
 }
 

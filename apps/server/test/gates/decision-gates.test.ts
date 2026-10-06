@@ -9,7 +9,8 @@ import {
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
-import { createFlowPromoter } from '../../src/flow/promote.js';
+import { createFlowPromoter, FLOW_SERVER_CAP } from '../../src/flow/promote.js';
+import { readFlow } from '../../src/flow/read-flow.js';
 import { createFlowSettler } from '../../src/flow/settle.js';
 import {
   cascadeBlockedReason,
@@ -24,7 +25,9 @@ import { canSee } from '../../src/visibility/can-see.js';
 import { applyCommitted, makeCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedMember, seedProject } from '../helpers/seed.js';
-import { addTicket, decide, gatedIngest, lead, ledger, loopWorld, PERSON, PROJECT, seedFlowWorld, stateOf, WS } from '../flow/flow-world.js';
+import {
+  addTicket, decide, fanIn, gatedIngest, lead, ledger, loopWorld, PERSON, PROJECT, PROJECT2, seedFlowWorld, seedSecondWorkspace, stateOf, WS, WS2,
+} from '../flow/flow-world.js';
 
 /**
  * wtg2 T16 (spec PS-9): the two Decision refusals the engine cannot make, because it cannot see a whole flow. Three
@@ -59,8 +62,8 @@ afterEach(async () => {
   await db.drop();
 });
 
-const sub = (ticketId: string, type: string, payload: Record<string, unknown>, actorId = PERSON): SubmittedEvent => ({
-  id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: ticketId }, type, version: 1, payload, actorId, origin: 'web', clientTime: new Date().toISOString(),
+const sub = (ticketId: string, type: string, payload: Record<string, unknown>, actorId = PERSON, workspaceId = WS): SubmittedEvent => ({
+  id: newUlid(), workspaceId, entity: { kind: 'ticket', id: ticketId }, type, version: 1, payload, actorId, origin: 'web', clientTime: new Date().toISOString(),
 });
 const blockedPlan = (ticketId: string, reason: SettleBlockReason = 'parent-finished') => (): SettlePlan => ({ steps: [], blocked: { ticketId, reason }, started: [], touchesOthers: false });
 const clearPlan = (): SettlePlan => ({ steps: [], blocked: null, started: [], touchesOthers: false });
@@ -69,17 +72,18 @@ const no = async () => false;
 /** A pool that counts its statements. */
 const counted = (n: { v: number }): Queryable =>
   ({ query: (...a: Parameters<typeof db.pool.query>) => { n.v += 1; return db.pool.query(...a); } }) as unknown as Queryable;
-async function keyOf(ticketId: string): Promise<string> {
-  const key = (await keysForAncestors(db.pool, WS, [{ ticketId, projectId: PROJECT }])).get(ticketId);
+async function keyOf(ticketId: string, workspaceId = WS, projectId = PROJECT): Promise<string> {
+  const key = (await keysForAncestors(db.pool, workspaceId, [{ ticketId, projectId }])).get(ticketId);
   expect(key).toMatch(/^[A-Z]+-[0-9]+$/); // precondition: a real key, so "names it" and "does not name it" can both fail
   return key!;
 }
 /** A Decision `d` with one branch `d -[Ship]-> z` (z in the Backlog); `finished` puts d in Done, `stored` files the choice Ship. */
-async function shipWorld(o: { finished: boolean; stored: boolean; zTitle?: string }) {
-  const d = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: o.finished ? ['doing', 'done'] : ['doing'] });
-  const z = await addTicket(db.pool, o.zTitle === undefined ? {} : { title: o.zTitle });
-  await lead(db.pool, d, z, 'Ship');
-  if (o.stored) await decide(db.pool, d, 'Ship');
+async function shipWorld(o: { finished: boolean; stored: boolean; zTitle?: string; workspaceId?: string }) {
+  const ws = o.workspaceId ?? WS;
+  const d = await addTicket(db.pool, { typeId: DECISION_TYPE_ID, start: 'focus', moves: o.finished ? ['doing', 'done'] : ['doing'], workspaceId: ws });
+  const z = await addTicket(db.pool, { ...(o.zTitle === undefined ? {} : { title: o.zTitle }), workspaceId: ws });
+  await lead(db.pool, d, z, 'Ship', ws);
+  if (o.stored) await decide(db.pool, d, 'Ship', {}, ws);
   return { d, z };
 }
 const PARENT_FINISHED = (name: string) => `This choice cannot be applied: ${name} would move back under a finished parent.`;
@@ -99,9 +103,35 @@ describe('29.370 the Decision gates', () => {
     expect(await gate.check(sub(d, 'ticket.transitioned', { to: 'todo' }), db.pool)).toBeNull();
     expect(await gate.check(sub(d, 'ticket.transitioned', {}), db.pool)).toBeNull();
     expect(await gate.check(sub(newUlid(), 'ticket.transitioned', { to: 'done' }), db.pool)).toBeNull(); // no such ticket
+    expect(await gates[1]!.check(sub(newUlid(), 'ticket.decided', { outcome: 'Ship' }), db.pool)).toBeNull(); // nor for a choice
     // finishing with no choice made settles nothing (TicketState.outcome is ABSENT until the first choice)
     const bare = await shipWorld({ finished: false, stored: false });
     expect(await makeDecisionGates({ plan: blockedPlan(bare.z), canSeeTicket: yes })[2]!.check(sub(bare.d, 'ticket.transitioned', { to: 'done' }), db.pool)).toBeNull();
+  });
+
+  it('29.370 (a) in a second workspace every read is the event\'s workspace: its ticket, its workflow, its flow, its key', async () => {
+    await seedSecondWorkspace(db.pool);
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: WS2, actorId: PERSON, entity: { kind: 'workspace', id: WS2 }, type: 'workspace.created', payload: { name: 'Second Works' } }),
+    ]);
+    await seedProject(db.pool, WS2, PROJECT2, 'Second');
+    await seedMember(db.pool, WS2, PERSON, 'owner');
+    const { d, z } = await shipWorld({ finished: false, stored: true, zTitle: 'Ship it', workspaceId: WS2 });
+    const zKey = await keyOf(z, WS2, PROJECT2);
+    const seen: string[][] = [];
+    const recorder = (input: Parameters<typeof planSettle>[0]): SettlePlan => {
+      seen.push(input.nodes.map((n) => n.id).sort());
+      return blockedPlan(z)();
+    };
+    const gates = makeDecisionGates({ plan: recorder, canSeeTicket: yes });
+    const refusal = { rule: RULE_DECISION_CASCADE_BLOCKED, reason: PARENT_FINISHED(`${zKey} Ship it`) };
+    expect(await gates[2]!.check(sub(d, 'ticket.transitioned', { to: 'done' }, PERSON, WS2), db.pool)).toEqual(refusal);
+    expect(await gates[1]!.check(sub(d, 'ticket.decided', { outcome: 'Ship' }, PERSON, WS2), db.pool)).toEqual(refusal);
+    expect(seen).toEqual([[d, z].sort(), [d, z].sort()]);
+    // the close list is judged against this workspace's flow; control: a ticket of the first workspace is outside it
+    expect(await gates[0]!.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [z, d] }, PERSON, WS2), db.pool)).toBeNull();
+    const elsewhere = await addTicket(db.pool);
+    expect((await gates[0]!.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [z, elsewhere] }, PERSON, WS2), db.pool))?.rule).toBe(RULE_DECISION_BAD_CLOSE_STARTED);
   });
 
   it('29.370 (b) the cascade gate refuses a choice whose cascade is blocked, planned with the claimed outcome; a clear and an applicable plan pass', async () => {
@@ -167,6 +197,17 @@ describe('29.370 the Decision gates', () => {
     expect(seen).toEqual([{ outcome: 'Ship', category: 'terminal' }]);
   });
 
+  it('29.370 (c) the transition gate plans with the close list of the LATEST stored choice', async () => {
+    const { d } = await shipWorld({ finished: false, stored: false });
+    const y = await addTicket(db.pool, { start: 'focus', moves: ['doing'] });
+    await lead(db.pool, d, y, 'Drop');
+    await decide(db.pool, d, 'Drop');
+    await decide(db.pool, d, 'Ship', { closeStarted: [y] });
+    const withList = vi.fn((_input: Parameters<typeof planSettle>[0]) => clearPlan());
+    expect(await makeDecisionGates({ plan: withList, canSeeTicket: yes })[2]!.check(sub(d, 'ticket.transitioned', { to: 'done' }), db.pool)).toBeNull();
+    expect(withList.mock.calls.map(([input]) => [input.decisionId, input.closeStarted])).toEqual([[d, [y]]]);
+  });
+
   it('29.370 (d) a blocker is named only to a viewer who can see it (the injected and the real canSee); every code reads as a sentence, never the raw code', async () => {
     const { d, z } = await shipWorld({ finished: false, stored: true, zTitle: 'Secret title' });
     const zKey = await keyOf(z);
@@ -183,6 +224,10 @@ describe('29.370 the Decision gates', () => {
     expect([await canSee(db.pool, PERSON, z), await canSee(db.pool, OUTSIDER, z)]).toEqual([true, false]); // precondition
     expect(await refuse(undefined)).toEqual({ rule: RULE_DECISION_CASCADE_BLOCKED, reason: PARENT_FINISHED(`${zKey} Secret title`) });
     expect(await refuse(undefined, OUTSIDER)).toEqual({ rule: RULE_DECISION_CASCADE_BLOCKED, reason: HIDDEN });
+    // a blocker with no row is never named either, even to a viewer the check lets through (unknown and invisible are one answer)
+    expect(await makeDecisionGates({ plan: blockedPlan(newUlid()), canSeeTicket: yes })[2]!.check(sub(d, 'ticket.transitioned', { to: 'done' }), db.pool)).toEqual({
+      rule: RULE_DECISION_CASCADE_BLOCKED, reason: HIDDEN,
+    });
     // the four codes, each a sentence of its own
     const t = { key: 'GNFL-7', title: 'Pay the vendor' };
     expect((['parent-finished', 'child-open', 'outcome-has-no-branch', 'no-terminal-state'] as const).map((code) => cascadeBlockedReason(code, t))).toEqual([
@@ -220,6 +265,17 @@ describe('29.370 the Decision gates', () => {
     expect((await uncapped[1]!.check(sub(d, 'ticket.decided', { outcome: 'Ship' }), db.pool))?.rule).toBe(RULE_DECISION_CASCADE_BLOCKED);
   });
 
+  it('29.370 (e) the server cap (2000), not the read cap (300), bounds the flow both gates judge', async () => {
+    const { d, z } = await shipWorld({ finished: true, stored: false });
+    const other = await addTicket(db.pool);
+    await fanIn(db.pool, d, 301);
+    const read = (cap: number) => readFlow(db.pool, { workspaceId: WS, seedId: d, viewerId: null, cap });
+    expect([(await read(FLOW_SERVER_CAP)).nodes.length, (await read(FLOW_SERVER_CAP)).truncated, (await read(300)).truncated]).toEqual([303, false, true]); // precondition
+    const gates = makeDecisionGates({ plan: blockedPlan(z), canSeeTicket: yes });
+    expect((await gates[0]!.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [z, other] }), db.pool))?.rule).toBe(RULE_DECISION_BAD_CLOSE_STARTED);
+    expect((await gates[1]!.check(sub(d, 'ticket.decided', { outcome: 'Ship' }), db.pool))?.rule).toBe(RULE_DECISION_CASCADE_BLOCKED);
+  });
+
   it('29.370 (f) a promotion, a cascade move and a choice with no close list pass without a single query; a non-Decision transition reads one row', async () => {
     const { d, z } = await shipWorld({ finished: false, stored: true });
     const gates = makeDecisionGates({ plan: blockedPlan(z), canSeeTicket: yes });
@@ -236,6 +292,9 @@ describe('29.370 the Decision gates', () => {
     n.v = 0;
     expect(await gates[1]!.check(sub(task, 'ticket.decided', { outcome: 'Ship' }), counted(n))).toBeNull();
     expect(n.v).toBe(1);
+    n.v = 0;
+    expect(await gates[2]!.check(sub(d, 'ticket.transitioned', {}), counted(n))).toBeNull();
+    expect(n.v).toBe(1); // a Decision's move with no target is answered from its row alone
     // control: the person's finishing transition of the Decision IS refused
     expect((await gates[2]!.check(sub(d, 'ticket.transitioned', { to: 'done' }), db.pool))?.rule).toBe(RULE_DECISION_CASCADE_BLOCKED);
   });
