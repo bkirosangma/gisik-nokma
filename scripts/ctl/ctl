@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# scripts/ctl/ctl — the one door for the controller's mechanical work. `ctl help` lists the verbs.
+# scripts/ctl/ctl — the one door for the controller's mechanical work. `ctl help` lists the verbs; `ctl <verb> … --help` prints one.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-verb="${1:-help}"; shift || true
-case "$verb" in
-  pr) sub="${1:-}"; shift || true; verb="pr-$sub";;
-esac
-case "$verb" in
-  help|-h|--help)
+help_text() {
     cat <<'HELP'
 usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   checks                          the eight checks + two non-zero controls
@@ -44,8 +39,32 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
                                   and audit as no-ref: run condition A on windows from 10-03 on
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
-    exit 0;;
+}
+# usage_of VERB: the verb's rows of the help table — a row naming it (`pr-open` is `pr open`; `postman` has two) and the deeper-indented
+# lines under each. The table is the usage source: it has a row for every verbs/*.sh (13.2373), the README a section for only some.
+usage_of() {
+  help_text | awk -v l="$(printf '%s' "$1" | sed 's/^pr-/pr /')" '/^  [^ ]/ { s = substr($0, 3); on = (s == l || index(s, l " ") == 1) } on && /^  /'
+}
+verb="${1:-help}"; shift || true
+case "$verb" in
+  pr) case "${1:-}" in -h|--help) verb=pr-open;; *) sub="${1:-}"; shift || true; verb="pr-$sub";; esac;;
+esac
+case "$verb" in
+  help|-h|--help) help_text; exit 0;;
 esac
 script="$HERE/verbs/$verb.sh"
 [ -f "$script" ] || { echo "FAIL ctl unknown verb $verb (see: scripts/ctl/ctl help)"; exit 64; }
+# A help probe never acts (P78, 2026-10-06: `ctl rebuild --help` started a real rebuild — a verb acts on arguments it does not know). An
+# argument that is exactly --help or -h, anywhere before a `--`, prints the verb's usage and exits 0 without running the verb. After `--`
+# comes a command (`ctl run-tests -- <cmd…>`, and slot-run.sh through it), whose own -h is its business (13.2375).
+for a in "$@"; do
+  case "$a" in
+    --) break;;
+    --help|-h)
+      u="$(usage_of "$verb")"
+      if [ -n "$u" ]; then echo "ctl ${verb/#pr-/pr } --help: its rows of \`ctl help\` (scripts/ctl/README.md has more); nothing was run"; printf '%s\n' "$u"
+      else echo "ctl $verb: no usage text; read scripts/ctl/README.md"; fi
+      exit 0;;
+  esac
+done
 exec bash "$script" "$@"
