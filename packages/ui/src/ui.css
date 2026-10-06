@@ -3471,6 +3471,22 @@ a.gn-ticket-sheet__crumb--link {
    layout ONLY (`margin-top`), no property conflict with `.gn-button--ghost`'s
    own visual coat. */
 .gn-ticket-sheet__note-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0.5rem 0; }
+/* D: concepts row */
+/* Knowledge Graph spec D §6 (KG-D Task 9): the Concepts row on a ticket's Details (directly above Notes) and under a
+   note's byline (app-core `ConceptsRow`). A confirmed concept is drawn as the canvas draws one (spec C §3.7): a solid
+   pill in the concept fill with its name in `text` (`conceptFill` carries `text` at 4.5, `CONTRAST_PAIRS`). A long name
+   wraps inside its pill rather than truncating, and the remove control is a 24px circle (WCAG 2.5.8) tucked into the
+   pill's end, named for its concept. The caption is the sheet's shared `.gn-ticket-sheet__caption`. The row carries
+   its own space below: the Notes section under it has no top margin (Subtasks' last paragraph used to give it). */
+.gn-concepts-row { display: grid; gap: 0.5rem; min-width: 0; margin-block-end: 1rem; }
+.gn-concepts-row__pills { display: flex; flex-wrap: wrap; gap: 0.375rem; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.gn-concept-pill { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; min-height: 1.75rem; padding: 0.125rem 0.625rem; color: var(--gn-text); background: var(--gn-concept-fill); border-radius: 999px; }
+.gn-concept-pill__name { min-width: 0; padding: 0; font: inherit; font-size: 0.8125rem; font-weight: 500; line-height: 1.25rem; color: inherit; text-align: start; overflow-wrap: anywhere; background: none; border: 0; border-radius: 0.25rem; }
+button.gn-concept-pill__name { cursor: pointer; }
+button.gn-concept-pill__name:hover { text-decoration: underline; text-underline-offset: 0.15em; }
+.gn-concept-pill__remove { display: inline-grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; margin-inline-end: -0.5rem; padding: 0; color: var(--gn-text-muted); background: none; border: 0; border-radius: 50%; cursor: pointer; }
+.gn-concept-pill__remove:hover { color: var(--gn-text); background: var(--gn-fill-quaternary); }
+.gn-concept-pill__name:focus-visible, .gn-concept-pill__remove:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
 /* Knowledge Graph B: "Linked from" — the sources that reference this ticket or note
    (spec B §3.1). Colour ROLES only (token discipline): the count pill and the hover sit
    on --gn-surface-well, the snippet is --gn-text-muted, and the marked reference keeps
@@ -10120,6 +10136,11 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-kg-concept__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .gn-kg-concept__actions .gn-button--primary { min-height: 2.75rem; padding: 0 1.25rem; font-size: 0.9375rem; }
 .gn-kg-concept__confirm { display: grid; gap: 0.625rem; padding: 0.75rem; background: var(--gn-surface-well); border-radius: var(--gn-radius-card); }
+/* KG-D Task 9: the concept's History disclosure. The ticket History's list (`.gn-history`) in a panel a third as wide, so
+   each headline wraps instead of running past the panel's edge. */
+.gn-kg-concept__history > summary { min-height: 2.75rem; display: flex; align-items: center; font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-subtle); cursor: pointer; }
+.gn-kg-concept__history .gn-history__headline { flex-wrap: wrap; row-gap: 0.125rem; }
+.gn-kg-concept__history .gn-history__type { overflow-wrap: anywhere; }
 /* KG: end */
 
 /* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──

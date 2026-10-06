@@ -7,6 +7,7 @@ import type { GraphItemView } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import { AppNav } from '../app-nav.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../expired-session.js';
+import { ConceptPanel } from '../knowledge-graph/graph-panel.js';
 import { useGraphScope } from '../knowledge-graph/use-graph-scope.js';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
 import { ShellRefusal } from '../shell-refusal.js';
@@ -97,7 +98,7 @@ function HomeBody({
   const { dataSource, graph } = useAppServices();
   const viewerId = useCurrentUser()?.id ?? ''; // Home is ready only signed in (`resolveHomeWorkspace`)
   const phone = useIsPhone();
-  const { scope, error: scopeError } = useGraphScope();
+  const { scope, guests, error: scopeError } = useGraphScope();
   const router = useRouter();
   const result = useHome(dataSource, workspaceId);
   const highlight = useHomeHighlight(result.data);
@@ -147,6 +148,12 @@ function HomeBody({
           scope={scope}
           onOpen={onOpen}
           canOpen={(item) => item.kind === 'note' || item.kind === 'project' || item.kind === 'workspace'}
+          // Spec D §6: a concept picked on Home is the inspector the ticket and note hosts show (`GraphPanel`), guarded by
+          // the role in the CONCEPT's workspace (planner ruling 2026-10-06 13:51 (B)(3), case 27.642).
+          renderConceptPanel={(item, ctx) => {
+            const conceptWorkspaceId = item.workspaceId ?? workspaceId;
+            return <ConceptPanel item={item} workspaceId={conceptWorkspaceId} actorId={viewerId} readOnly={guests.has(conceptWorkspaceId)} refresh={ctx.refresh} />;
+          }}
         />
       )}
     </>

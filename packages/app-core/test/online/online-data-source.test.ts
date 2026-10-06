@@ -1634,6 +1634,29 @@ describe('22.123 getGroups reads the workspace group tree', () => {
   });
 });
 
+describe('27.548 getItemConcepts, the concepts that hold one item (Knowledge Graph spec D, KG-D Task 9)', () => {
+  const LIST = { workspaceId: 'w', concepts: [{ id: 'c', name: 'Scroll on phones', summary: '', itemCount: 2, createdBy: 'u1', origin: 'web' }] };
+
+  it('27.548 GETs the workspace list filtered by `item=<kind>:<id>` and answers the body\'s `concepts`; control: a note is asked for as a note', async () => {
+    const { fetchImpl, calls } = recordingFetch({ '/v1/workspaces/w/concepts': LIST });
+    const { query } = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    expect(await query.getItemConcepts('w', { kind: 'ticket', id: 't' })).toBe(LIST.concepts);
+    expect(await query.getItemConcepts('w', { kind: 'note', id: 'n' })).toBe(LIST.concepts);
+    expect(calls.map((call) => call.input)).toEqual(['/v1/workspaces/w/concepts?item=ticket%3At', '/v1/workspaces/w/concepts?item=note%3An']);
+    expect(calls.every((call) => call.init?.method === undefined || call.init.method === 'GET')).toBe(true);
+  });
+
+  it('27.548 a 404 (a hidden or trashed item, a non-member) is re-raised as HttpError 404, never an empty list', async () => {
+    const { query } = createOnlineDataSource({ baseUrl: '', fetchImpl: recordingFetch({}).fetchImpl });
+    const err = await query.getItemConcepts('w', { kind: 'ticket', id: 't' }).then(
+      (value) => ({ resolved: value }),
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(HttpError);
+    expect((err as HttpError).status).toBe(404);
+  });
+});
+
 describe('27.520 the four concept reads (Knowledge Graph spec D, KG-D Task 8)', () => {
   const CONCEPT = { id: 'c', workspaceId: 'w', name: 'Scroll on phones', items: [], links: [] };
   const EVENT = { id: 'e1', type: 'concept.created', version: 1, payload: { name: 'Scroll on phones' }, actorId: 'u1', origin: 'web', clientTime: '2026-10-06T04:00:00.000Z', serverTime: '2026-10-06T04:00:01.000Z', seq: 7 };

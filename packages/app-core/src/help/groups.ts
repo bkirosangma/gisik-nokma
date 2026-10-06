@@ -141,6 +141,11 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
       title: 'Knowledge Graph',
       sectionIds: ['17-the-knowledge-graph'],
     },
+    {
+      id: 'manual-concepts',
+      title: 'Concepts',
+      sectionIds: ['18-concepts-and-suggestions'],
+    },
   ],
 };
 

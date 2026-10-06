@@ -94,14 +94,15 @@ export function GraphPanel(props: GraphPanelProps) {
   );
 }
 
-type ConceptPanelProps = { item: GraphItemView; workspaceId: string; actorId: string; readOnly: boolean; refresh: () => void };
+export type ConceptPanelProps = { item: GraphItemView; workspaceId: string; actorId: string; readOnly: boolean; refresh: () => void };
 
 /**
  * Spec D §6 (KG-D Task 8): the concept inspector inside the view. People are named from the workspace's names-only
  * read; a refusal is reported in the server's words until the next write commits; any commit re-reads the rings in
  * place (`ctx.refresh`), so an untag or a confirmed suggestion is drawn at once. The view mounts one per selection.
+ * Home hands the view this same panel (`home-screen.tsx`, 27.642).
  */
-function ConceptPanel(p: ConceptPanelProps) {
+export function ConceptPanel(p: ConceptPanelProps) {
   const { dataSource } = useAppServices();
   const names = useActorNames(dataSource, p.workspaceId);
   const [refusal, setRefusal] = useState<{ rule: string; reason: string } | null>(null);

@@ -2261,10 +2261,10 @@ how to reach them.
 - **Click** an item to select it. The panel beside the graph (on a phone, a card under it) shows what it is,
   its main facts, its direct links grouped by kind, and a button that opens it: **Open ticket**, **Open note**,
   **Open board** or **Open workspace**. People and concepts have no page of their own to open. A concept's
-  panel shows its items and its links instead, and who created it; if you may change it, each item and link has a
-  **Remove** button, and the concept a **Rename** and a **Delete**. While you rename it or answer Delete's
-  question, **Escape** cancels that instead of going back. A suggested concept offers **Confirm**, with a
-  name you can change, and **Reject**.
+  panel shows its items and its links instead, who created it, and a **History** of its changes (§18); if you
+  may change it, each item and link has a **Remove** button, and the concept a **Rename** and a **Delete**. While
+  you rename it or answer Delete's question, **Escape** cancels that instead of going back. A suggested concept
+  offers **Confirm**, with a name you can change, and **Reject**.
 - **Double-click** an item, or select it and press **Center on** and its name, to put it in the middle. The
   one you left goes onto the trail at the top left; **Back** or the Esc key returns to it.
 - **Hover** an item to fade everything that is not linked to it. **Hover a line** to read what it means — for
@@ -2289,7 +2289,7 @@ the keyboard and a screen reader, and each row selects or opens its item.
   many are outside.
 - **Semantic layer.** Concepts are the topics the app finds across your tickets and notes, and the links it
   suggests between them. **Off** hides the concepts, their links and the suggestions, and the **Concepts**
-  button goes away. It only changes what you see on this browser: nothing is saved to a ticket, and nobody
+  button goes away; it also hides the **Concepts** row on tickets and notes (§18). It only changes what you see on this browser: nothing is saved to a ticket, and nobody
   else's view changes. It starts **On**, and the browser remembers your choice.
 
 On a phone, the scope, the link types and the semantic layer fold into one **Scope and links** button.
@@ -2305,3 +2305,72 @@ assistant**; in the ticket's History the same change reads **Assistant, for** yo
 
 A ticket with no links yet says so in the middle of the graph and offers **Add link**, which takes you to the
 ticket's **Details** tab, where links are added.
+
+## §18 — Concepts and suggestions
+
+### What a concept is
+
+A concept is a named topic that ties together tickets and notes about the same thing — for example, *Scroll
+position on phone sheets* holding three tickets and the note where someone worked out why. Putting a ticket or
+a note in a concept changes nothing about it: it keeps its project, its links and its own history. In the
+Knowledge Graph a concept is a teal pill linked to each of its items (§17).
+
+### Who sees a concept
+
+You see a concept only if you can see every ticket and note in it. If even one of its items is one you cannot
+open (in a project you are not in, or private to someone else), the concept is hidden from you altogether: you
+are never shown a concept with some of its items quietly missing. A ticket or note in the trash leaves its
+concepts while it is there, and is back in them when it is restored.
+
+Guests can see the concepts they are allowed to, but cannot change them.
+
+### The Concepts row
+
+A ticket's **Details** shows a **Concepts** row directly above **Notes**, and a note shows one under its
+byline: one pill for each concept the ticket or note is in. A ticket or note in no concept has no row.
+
+- **Press a concept's name** to open the Knowledge Graph, where the concept sits next to the ticket or note.
+- **The cross at the end of a pill** takes the ticket or note out of that concept (a screen reader names it
+  **Remove from concept** and the concept's name). The pill goes at once, and **Undo** in the message that
+  follows puts it back. Removing changes nothing else about the ticket or note, and the concept stays.
+
+If the change is not allowed, the pill comes back and the page says why.
+
+### A concept's history
+
+Select a concept in the Knowledge Graph and open **History** in its panel to see every change made to it: who
+created it, renamed it or changed its summary, which tickets and notes were added or removed, and when. A
+ticket or note that is no longer in the concept, or that you cannot see, is called "a ticket" or "a note"
+there, never by its name.
+
+### Suggestions
+
+The app looks for groups of tickets and notes that are about the same thing and offers each group as a
+**Suggested** concept. It works them out itself, overnight and after a lot of changes, from what each group of
+people can see; no assistant is asked. In the Knowledge Graph a suggestion is a dashed pill.
+
+Select a suggestion to see what it would hold. **Confirm** turns it into a concept, with a name you can change
+first; if the new concept would be hidden from some people (because they cannot see every item in it), the panel
+says how many of the workspace's members will still see it. **Reject** dismisses it, and the same group is not
+suggested again unless more than half of it changes. A suggestion puts nothing in a concept until somebody
+presses **Confirm**. Suggestions are shown to members, not to guests.
+
+### The semantic layer switch
+
+The Knowledge Graph's **Semantic layer** switch (§17) shows or hides concepts and suggestions on this browser.
+**Off** also hides the Concepts row on tickets and notes. It changes what you see, never the data: no concept
+is removed, nothing is saved to a ticket or note, and nobody else's view changes. It starts **On**.
+
+### Concepts and your assistant
+
+An assistant you have connected (§16) can work with concepts too, with your permissions:
+
+- `list_concepts` and `get_concept` read the concepts you can see;
+- `manage_concept` creates, renames, describes, merges and deletes a concept (merging and deleting need the
+  concept's exact name first);
+- `tag_items` puts tickets and notes into a concept or takes them out, and asks first if adding one would hide
+  the concept from some people;
+- `link_concepts` marks one concept as broader than another, or two as related;
+- `review_suggestions` and `resolve_suggestion` read the suggestions and confirm or reject one.
+
+In a concept's **History**, a change your assistant made reads **Assistant, for** your name.
