@@ -9,6 +9,8 @@ fails=0; n=0   # the step count is COUNTED, never typed: a literal collides in e
 step() { n=$((n+1)); if bash -c "$2" > /dev/null 2>&1; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
 step "hook self-test"        "python3 '$HERE/hooks/ctl-scripts-only.py' --self-test"
 step "lib tests"             "bash '$HERE/test/lib.test.sh'"
+# A help probe never acts (P78): the dispatcher's --help/-h guard, against STUB verbs in a scratch copy (never a real verb).
+step "help-guard suite (every verb's --help/-h prints its rows and runs nothing, the -- boundary, controls run)" "bash '$HERE/test/help-guard.test.sh'"
 # The cached gate is only as sound as turbo.json's inputs: a changed cross-package reader must change the task hash (a MISS).
 step "gate cache correctness (turbo task hashes)" "bash '$HERE/test/gate-cache.test.sh'"
 step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run-tests.test.sh'"
