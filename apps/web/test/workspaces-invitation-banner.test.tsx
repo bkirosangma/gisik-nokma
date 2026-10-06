@@ -268,7 +268,7 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
       within(banner).getByRole('button', { name: 'Accept the invitation to Convenience Corner' }),
     );
     await waitFor(() => expect(accept).toHaveBeenCalledWith('inv1'));
-    expect(push).toHaveBeenCalledWith('/w/ws9/my-work');
+    expect(push).toHaveBeenCalledWith('/my-work');
 
     // Decline, on a fresh mount whose list ANSWERS DIFFERENTLY the second time.
     cleanup();

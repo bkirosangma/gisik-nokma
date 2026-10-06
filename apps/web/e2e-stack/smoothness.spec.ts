@@ -198,7 +198,7 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
       });
       console.log('[smoothness] FIXTURE MISMATCH: per-key comparisons skipped; re-record with SMOOTHNESS_RECORD=raise');
     }
-    const routes = ['/workspaces', `/w/${ws}`, board, `/w/${ws}/my-work`, `/w/${ws}/members`, '/inbox', '/notes', '/account', '/settings'];
+    const routes = ['/workspaces', `/w/${ws}`, board, '/my-work', `/w/${ws}/members`, '/inbox', '/notes', '/account', '/settings'];
 
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -309,8 +309,8 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
     await page.addInitScript(installProbe);
     await signIn(page, OWNER_EMAIL);
     await page.setViewportSize({ width: 390, height: 844 });
+    // My work is ONE global page since my-work-global T4 (the per-workspace route redirects to it): the cell loads `/my-work`.
     await page.goto('/workspaces', { waitUntil: 'networkidle' });
-    const ws = await readWorkspaceId(page);
     const DELAY_MS = 500;
     const strip = (path: string): boolean => /\/v1\/workspaces\/[^/]+\/(attention|contests)$/.test(path);
     const body = (path: string): boolean => /\/v1\/me\/work$/.test(path);
@@ -327,7 +327,7 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
       shifts[slow] = [];
       for (let i = 0; i < 3; i += 1) {
         await page.waitForTimeout(PACE_MS);
-        await page.goto(`/w/${ws}/my-work`, { waitUntil: 'load' });
+        await page.goto('/my-work', { waitUntil: 'load' });
         expect(await page.evaluate(() => window.innerWidth), 'the viewport did not apply').toBe(390);
         const v = await settleAndRead(page);
         // The instrument asserts itself: the read meant to be last really ended last, by most of the delay.

@@ -118,6 +118,10 @@ export function createFakeDataSource(
     }),
     getPreferences: async () => ({ version: 1, projects: {}, savedFilters: [] }),
     putPreferences: async () => {},
+    // The server's own answer for a person who never saved one (my-work-global T2's
+    // DEFAULT_MY_WORK_PREFERENCES), and a write the server stores as given.
+    getMyWorkPreferences: async () => ({ show: ['created', 'assigned'], grouping: 'workspace-project' }),
+    putMyWorkPreferences: async (preferences) => preferences,
     ...overrides,
   };
   const source: FakeDataSource = {
