@@ -9925,6 +9925,21 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 .gn-kg-list__two { display: grid; min-width: 0; }
 .gn-kg-list__two > .gn-kg-links__rel { font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; }
 .gn-kg-list__fog { margin: 0; font-size: 0.8125rem; color: var(--gn-text-subtle); }
+/* Dark theme only (owner ruling 2026-10-06; 27.665–27.667). In dark the track a selected row was filled with sits a notch
+   DARKER than the page while hover's fill lifts, so hover read stronger than selected, and a pill's or a phone well's fill
+   barely parted from its ground. The two arms are the theme stylesheet's own dark selectors (the attribute, and the OS
+   preference unless `data-theme="light"`), with identical bodies; no shared token moves, so light is unchanged. Selected =
+   fill-secondary (above hover's fill-quaternary) plus a 3px accent bar, an inset shadow so nothing shifts, in the idiom of
+   the path's left rule; its relation line steps to text-muted, since text-subtle on that fill is under 4.5:1. The outline
+   skips a suggested pill, whose own ring is its signal. */
+[data-theme="dark"] .gn-kg-list__row[aria-current="true"] { background: var(--gn-fill-secondary); box-shadow: inset 3px 0 0 var(--gn-accent); }
+[data-theme="dark"] .gn-kg-list__row[aria-current="true"] .gn-kg-links__rel { color: var(--gn-text-muted); }
+[data-theme="dark"] .gn-kg-pill:not(.gn-kg-pill--suggested), [data-theme="dark"] .gn-kg-insp--card .gn-kg-insp__outs { box-shadow: inset 0 0 0 1px var(--gn-border); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gn-kg-list__row[aria-current="true"] { background: var(--gn-fill-secondary); box-shadow: inset 3px 0 0 var(--gn-accent); }
+  :root:not([data-theme="light"]) .gn-kg-list__row[aria-current="true"] .gn-kg-links__rel { color: var(--gn-text-muted); }
+  :root:not([data-theme="light"]) .gn-kg-pill:not(.gn-kg-pill--suggested), :root:not([data-theme="light"]) .gn-kg-insp--card .gn-kg-insp__outs { box-shadow: inset 0 0 0 1px var(--gn-border); }
+}
 /* KG: T9 tab+panel */
 /* KG: end */
 

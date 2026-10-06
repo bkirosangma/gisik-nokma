@@ -10,7 +10,7 @@ import { fakeRenderer } from './fake-renderer.js';
 import { fixtureSource, type FixtureOptions } from './fixture/fixture-source.js';
 
 /*
- * The view over a fake renderer (cases 27.313–27.326, 27.365–27.367, 27.661–27.664). The source is a test-only copy of the browser harness's
+ * The view over a fake renderer (cases 27.313–27.326, 27.365–27.367, 27.661–27.664, 27.669). The source is a test-only copy of the browser harness's
  * fixture (the owner-approved mockup's world, centred on GN-142). Every count below is a LITERAL, read off the fixture by
  * an independent brute-force BFS over its raw edge table (roles/mut-out/kg-c-t7-view/oracle.py), never by `zones`.
  */
@@ -792,6 +792,24 @@ describe('KnowledgeGraph: the empty state and the scope note name their cause (K
     await user.click(screen.getByRole('button', { name: 'Remove Gisik Nokma' }));
     await waitFor(() => expect(fx.log.at(-1)!).toMatchObject({ workspaceIds: ['st'], projectIds: ['j_web'] }));
     await waitFor(() => expect(scopeNote()).toBe(workspacesNote));
+  });
+  it('27.669 a chip turned back on after the chips-off state keeps the camera (no forced re-frame), while the chips-off draw itself is framed; control: a selection change keeps the view (KV8)', async () => {
+    const { fake } = setup();
+    await drawn(fake, T('t126'));
+    // control: selecting another item keeps the view, in the drawn graph (KV8)
+    act(() => fake.pick({ kind: 'node', ref: T('t133'), double: false }));
+    expect(fake.last().nodes.find((n) => n.ref === T('t133'))).toBeDefined();
+    expect(fake.last().view.keepView).toBe(true);
+    const user = userEvent.setup();
+    await everyChipOff(user);
+    expect(document.querySelector('.gn-kg__empty p')!.textContent).toBe(chipsOff);
+    expect(fake.last().view.keepView).toBe(false); // the chips-off empty state is framed as nothing-linked is (27.668)
+    const before = fake.calls.length;
+    await user.click(screen.getByRole('button', { name: /^Blocks/ }));
+    await settle();
+    expect(fake.calls.length).toBeGreaterThan(before);
+    expect(fake.last().edges.map((e) => e.id)).toContain('blocks|ticket:t133|ticket:t142'); // the links draw
+    expect(fake.last().view.keepView).toBe(true); // and the camera stays where it is
   });
 });
 
