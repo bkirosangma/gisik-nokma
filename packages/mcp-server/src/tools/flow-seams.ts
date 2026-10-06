@@ -35,7 +35,8 @@ export const flowNodeSchema = z.object({
   assigneeId: z.string().nullable(), waitForAll: z.boolean(),
   estimate: z.number().int().nullable(), reworkEstimate: z.number().int().nullable(), round: z.number().int().min(1),
   outcome: z.string().nullable(), passes: z.array(passRecord),
-  resolution: z.object({ kind: z.literal('not-taken'), decisionTicketId: z.string().nullable(), outcome: z.string(), pass: z.number().int() }).nullable(),
+  // a hole's resolution has no outcome: the server withholds a hidden Decision's branch name with its id (29.449)
+  resolution: z.object({ kind: z.literal('not-taken'), decisionTicketId: z.string().nullable(), outcome: z.string().optional(), pass: z.number().int() }).nullable(),
   alternates: z.array(z.object({ viaDecisionId: z.string().nullable(), outcome: z.string(), firstTicketId: z.string().nullable() })),
   periods: z.array(z.object({ start: at, end: at.nullable(), pass: z.number().int() })),
   planned: z.array(z.object({ pass: z.number().int(), start: z.string(), end: z.string(), basis: z.enum(['explicit', 'chained']), pruned: z.boolean() })),

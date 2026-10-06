@@ -118,6 +118,19 @@ describe('29.380 get_flow shows only what the caller can see', () => {
   });
 });
 
+describe('29.449 get_flow relays a hole\'s Not-taken resolution without an outcome', () => {
+  it('29.449 a resolution served with no outcome (its Decision a hole for the caller) parses and is answered with no outcome key; control: a resolution with its outcome keeps it', async () => {
+    const w = wire();
+    w.nodes[2]!.resolution = { kind: 'not-taken', decisionTicketId: null, pass: 2 };
+    const out = (await tool(fakeFlow({ [FLOW]: w }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })) as ReturnType<typeof wire>;
+    expect(out.nodes[2]?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
+    expect(out.nodes[2]?.resolution).not.toHaveProperty('outcome');
+    // control in the same it(): the complete wire keeps the outcome
+    const kept = (await tool(fakeFlow({ [FLOW]: wire() }), 'get_flow').handler({ workspaceId: WS, ticketId: T1 })) as ReturnType<typeof wire>;
+    expect(kept.nodes[2]?.resolution).toEqual({ kind: 'not-taken', decisionTicketId: D, outcome: 'Approved', pass: 2 });
+  });
+});
+
 describe('29.381 get_ticket flow facts', () => {
   const tw = `/v1/workspaces/${WS}/tickets`;
   const stateOf = (extra: Record<string, unknown>) => ({ ...detail({ typeId: 'task' }), ticketState: { ...detail().ticketState, ...extra } });
