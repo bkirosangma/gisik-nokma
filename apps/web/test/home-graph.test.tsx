@@ -377,6 +377,7 @@ describe('27.649 the highlight note', () => {
       scope: { workspaces: [] },
       onOpen: () => undefined,
       canOpen: () => false,
+      renderConceptPanel: () => null,
     });
     const { rerender } = render(<HomeGraph {...props(1)} />);
     report({ clear: ['person:u_9'] });
