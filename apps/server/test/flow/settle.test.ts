@@ -191,6 +191,13 @@ describe('29.368 the settle listener', () => {
     expect(r.atomic).toHaveBeenCalledTimes(1);
     expect(r.atomic.mock.calls[0]![0].map((e) => [e.workspaceId, e.entity.id])).toEqual([[WS2, a], [WS2, d]]);
     expect([await stateOf(db.pool, a), await stateOf(db.pool, d)]).toEqual(['todo', 'backlog']);
+    // the settler's own method and pendingSettle read the workspace they are given
+    const second = await loopWorld(db.pool, { workspaceId: WS2 });
+    await decide(db.pool, second.d, 'Redo', {}, WS2);
+    expect(await pendingSettle(db.pool, {}, WS2, second.d)).toBe(true);
+    expect(await r.settler.settleDecision(WS2, second.d)).toBe('applied');
+    expect(await pendingSettle(db.pool, {}, WS2, second.d)).toBe(false);
+    expect(r.atomic).toHaveBeenCalledTimes(2);
     expect(logs).toEqual([]);
   });
 
