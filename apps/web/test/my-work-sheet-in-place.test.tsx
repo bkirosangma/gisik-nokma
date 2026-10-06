@@ -11,6 +11,7 @@ import type {
 } from '@gisik-nokma/app-core';
 import { createClientStateCache } from '@gisik-nokma/app-core';
 import { Providers, type AppServices } from '../src/providers.js';
+import { clearMyWorkspacesCache } from '../src/use-my-workspaces.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -73,7 +74,7 @@ let searchParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: WORKSPACE }),
-  usePathname: () => `/w/${WORKSPACE}/my-work`,
+  usePathname: () => '/my-work',
   useSearchParams: () => searchParams,
 }));
 
@@ -87,7 +88,7 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import MyWorkPage from '../app/w/[workspaceId]/my-work/page.js';
+import MyWorkPage from '../app/my-work/page.js';
 
 const CLAIM = {
   actorId: ANSELMA,
@@ -127,6 +128,7 @@ function workItem(over: Partial<WorkItem> & { ticketId: string; title: string })
 function attentionItem(over: Partial<AttentionItem> & { ticketId: string; title: string }): AttentionItem {
   return {
     kind: 'blocked',
+    workspaceId: WORKSPACE,
     projectId: PROJECT,
     reason: 'nothing has moved it for nine days',
     claim: null,
@@ -318,7 +320,7 @@ async function openByClicking(
           { name: button },
         );
   await userEvent.click(target);
-  searchParams = new URLSearchParams({ ticket: ticketIdFor(button) });
+  searchParams = new URLSearchParams({ ticket: ticketIdFor(button), ws: WORKSPACE });
   view.rerender(
     <Providers services={services}>
       <MyWorkPage />
@@ -358,8 +360,9 @@ afterEach(() => {
   // The workspace name is MODULE-cached (`use-workspace-name.ts`) and jsdom
   // modules are shared across the cases in one file — a cached name would make
   // the second case's crumbs appear synchronously and hide a regression in the
-  // read they come from.
+  // read they come from. The workspace list is module-cached the same way (`use-my-workspaces.ts`).
   clearWorkspaceNameCache();
+  clearMyWorkspacesCache();
 });
 
 describe('13.1391 opening a ticket from My work opens the sheet THERE', () => {
@@ -381,7 +384,7 @@ describe('13.1391 opening a ticket from My work opens the sheet THERE', () => {
     // drives. `toHaveBeenCalledTimes(1)` is the load-bearing half: the defect
     // this case exists for is a SECOND push to the project page.
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith(`/w/${WORKSPACE}/my-work?ticket=${ASSIGNED}`, {
+      expect(push).toHaveBeenCalledWith(`/my-work?ticket=${ASSIGNED}&ws=${WORKSPACE}`, {
         scroll: false,
       }),
     );
@@ -394,7 +397,7 @@ describe('13.1391 opening a ticket from My work opens the sheet THERE', () => {
     // AND THE SHEET IS ON THAT PAGE. The push above has not been applied (the
     // mock does not simulate Next's router — see the file docblock), so this is
     // the landing.
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     view.rerender(
       <Providers services={services}>
         <MyWorkPage />
@@ -439,7 +442,7 @@ describe('13.1392 the open ticket lives in the URL, so a reload opens the same s
     // or their own reload — reaches the page with the ticket already named, and
     // the sheet is there. Component state cannot do this: it starts empty on
     // every mount.
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     const { services } = mount();
     render(
       <Providers services={services}>
@@ -455,7 +458,7 @@ describe('13.1392 the open ticket lives in the URL, so a reload opens the same s
   });
 
   it('13.1395 closing the sheet is the param’s removal, and it stays on My work', async () => {
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     const { services } = mount();
     render(
       <Providers services={services}>
@@ -470,7 +473,7 @@ describe('13.1392 the open ticket lives in the URL, so a reload opens the same s
     // of closed — and not to the project page, which is where a close would have
     // to go if the sheet were living somewhere else.
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith(`/w/${WORKSPACE}/my-work`, { scroll: false }),
+      expect(push).toHaveBeenCalledWith('/my-work', { scroll: false }),
     );
     expect(push).toHaveBeenCalledTimes(1);
   });
@@ -533,7 +536,7 @@ describe('13.1396 the open ticket’s files are keyed per ticket', () => {
     // previous one's files under its heading. On My work the swap is REACHABLE
     // WITHOUT LEAVING THE PAGE — the sheet's parent chip does it in place — so
     // the page never unmounts to hide the mistake.
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     const { services, counters } = mount({
       view: emptyView({
         assigned: [workItem({ ticketId: ASSIGNED, title: ASSIGNED_TITLE })],
@@ -570,7 +573,7 @@ describe('13.1396 the open ticket’s files are keyed per ticket', () => {
 
     // The swap, as the router's landing produces it: a NEW param on the same
     // mounted page.
-    searchParams = new URLSearchParams({ ticket: SHARED });
+    searchParams = new URLSearchParams({ ticket: SHARED, ws: WORKSPACE });
     view.rerender(
       <Providers services={services}>
         <MyWorkPage />
@@ -616,7 +619,7 @@ describe('13.1397 the sheet’s parent chip opens the parent HERE', () => {
             }),
       locate,
     });
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     const view = render(
       <Providers services={services}>
         <MyWorkPage />
@@ -630,14 +633,14 @@ describe('13.1397 the sheet’s parent chip opens the parent HERE', () => {
     // "the chip is a control" is itself the assertion that the prop is wired.
     await userEvent.click(within(bar).getByRole('button', { name: PARENT_TITLE }));
 
-    expect(push).toHaveBeenCalledWith(`/w/${WORKSPACE}/my-work?ticket=${PARENT}`, {
+    expect(push).toHaveBeenCalledWith(`/my-work?ticket=${PARENT}&ws=${WORKSPACE}`, {
       scroll: false,
     });
     expect(push).toHaveBeenCalledTimes(1);
 
     // The parent is in NO section of this page's view, so it is placed the way
     // the contested section is: asked of the locator, in place.
-    searchParams = new URLSearchParams({ ticket: PARENT });
+    searchParams = new URLSearchParams({ ticket: PARENT, ws: WORKSPACE });
     view.rerender(
       <Providers services={services}>
         <MyWorkPage />
@@ -699,13 +702,14 @@ describe('13.1399 an ended session mounts no sheet', () => {
         getMyWork: async () => {
           throw new Error('HTTP 401 for /v1/me/work');
         },
+        getMyWorkspaces: async () => [workspaceRow()],
         getAttention: async () => {
           throw new Error('HTTP 401 for /v1/me/work/attention');
         },
       },
       { ticketLocation: { locate } },
     );
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     render(
       <Providers services={services}>
         <MyWorkPage />
@@ -727,7 +731,7 @@ describe('13.1400 a My work deletion leaves the view', () => {
     // defect the project page's own handler records. This page has two reads and
     // both hold the row, so both are re-asked.
     const ingested: SubmittedEvent[][] = [];
-    searchParams = new URLSearchParams({ ticket: ASSIGNED });
+    searchParams = new URLSearchParams({ ticket: ASSIGNED, ws: WORKSPACE });
     const { services, counters } = mount();
     services.dataSource = {
       ...services.dataSource,

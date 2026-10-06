@@ -38,6 +38,7 @@ const ITEMS: AttentionItem[] = [
   {
     kind: 'blocked',
     ticketId: 't1',
+    workspaceId: 'w',
     projectId: 'prj_1',
     title: 'DLT registration',
     reason: BLOCKED_REASON,
@@ -46,6 +47,7 @@ const ITEMS: AttentionItem[] = [
   {
     kind: 'due-soon',
     ticketId: 't2',
+    workspaceId: 'w',
     projectId: 'prj_1',
     title: 'File the GST return',
     reason: DUE_SOON_REASON,
@@ -54,6 +56,7 @@ const ITEMS: AttentionItem[] = [
   {
     kind: 'contested',
     ticketId: 't3',
+    workspaceId: 'w',
     projectId: 'prj_1',
     title: 'Bank mandate',
     reason: CONTESTED_REASON,
@@ -62,6 +65,7 @@ const ITEMS: AttentionItem[] = [
   {
     kind: 'stale',
     ticketId: 't4',
+    workspaceId: 'w',
     projectId: 'prj_1',
     title: 'Old errand',
     reason: STALE_REASON,

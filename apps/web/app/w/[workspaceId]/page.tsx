@@ -809,14 +809,14 @@ function WorkspaceLinks({
   return (
     <nav className="gn-workspace-home__links" aria-label="Workspace sections">
       <Link
-        href={`/w/${workspaceId}/my-work`}
+        href="/my-work"
         className="gn-workspace-home__link"
         aria-label="My work"
         aria-describedby="gn-link-note-my-work"
       >
         <span className="gn-workspace-home__link-label">My work</span>
         <span className="gn-workspace-home__link-note" id="gn-link-note-my-work">
-          Everything assigned to you across this workspace.
+          Everything assigned to you, across all your workspaces.
         </span>
       </Link>
       <Link

@@ -147,7 +147,7 @@ describe('25.049 a write that changes the person\'s workspace list reaches the n
     await expectWarmRemountAsksNothing(view, tree, read);
 
     await user.click(await screen.findByRole('button', { name: 'Accept the invitation to New Shop' }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/w/ws_new/my-work'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/my-work'));
 
     view.rerender(tree('ws_new'));
     await waitFor(() => expect(name()).toBe('New Shop'));
@@ -172,7 +172,7 @@ describe('25.049 a write that changes the person\'s workspace list reaches the n
     await expectWarmRemountAsksNothing(view, tree, read);
 
     await user.click(await screen.findByRole('button', { name: 'Join New Shop' }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/w/ws_new/my-work'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/my-work'));
 
     view.rerender(tree('ws_new'));
     await waitFor(() => expect(name()).toBe('New Shop'));
