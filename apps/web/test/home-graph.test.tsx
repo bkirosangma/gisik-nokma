@@ -391,6 +391,8 @@ describe('27.649 the highlight note', () => {
     expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'line-height')).toBe('1.25rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note', '@media (max-width: 40rem)'), 'min-height')).toBe('2.5rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note', '@media (max-width: 40rem)'), 'flex-basis')).toBe('100%'); // its own row, Start from below
+    // …which only a wrapping row gives: without `wrap` a 100% basis shrinks beside Start from instead (reviewer C, P44 C_wrap).
+    expect(valueOf(ruleExactly(CSS, '.gn-home__graph-head'), 'flex-wrap')).toBe('wrap');
     // Wider, the note takes 20rem before Start from wraps under it, and Start from's label is set at the note's size.
     expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'flex')).toBe('1 1 20rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'font-size')).toBe('0.8125rem');
