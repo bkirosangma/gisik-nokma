@@ -35,6 +35,10 @@ let W2: string;
 let P2: string;
 /** A workspace-scope note homed in W2, authored by `author`. */
 let away: string;
+/** A W2 note that already links TP: the shape of a link made before the fix (seeded, not through the door). */
+let legacy: string;
+/** A WS ticket that is soft-deleted: deleted, not erased, so its head row is still in WS. */
+let TD: string;
 
 beforeAll(async () => {
   db = await createTestDatabase();
@@ -58,6 +62,26 @@ beforeAll(async () => {
       type: 'note.created',
       payload: { title: 'Homed in the second workspace', homeProjectId: P2, scope: { mode: 'workspace' } },
     }),
+  ]);
+  // The world of the last describe, seeded here for the reason the docblock gives.
+  legacy = newUlid();
+  TD = newUlid();
+  const inWS = { workspaceId: world.WS, actorId: world.ids.owner };
+  await applyCommitted(db.pool, [
+    makeCommitted({
+      ...inW2,
+      entity: { kind: 'note', id: legacy },
+      type: 'note.created',
+      payload: { title: 'Linked before the fix', homeProjectId: P2, scope: { mode: 'workspace' } },
+    }),
+    makeCommitted({ ...inW2, entity: { kind: 'note', id: legacy }, type: 'note.attached', payload: { ticketId: world.TP } }),
+    makeCommitted({
+      ...inWS,
+      entity: { kind: 'ticket', id: TD },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId: world.P, parentId: null, title: 'Deleted before anyone linked it' },
+    }),
+    makeCommitted({ ...inWS, entity: { kind: 'ticket', id: TD }, type: 'ticket.deleted', payload: {} }),
   ]);
   ingest = createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections: buildProjectionRegistry(), gates: buildServerGates() });
 }, 120_000);
@@ -177,5 +201,75 @@ describe('18.502 the refusal for a foreign REAL ticket is the refusal for a made
     const unknownCreate = pick(await create(madeUp));
     expect(foreignCreate).toEqual(unknownCreate);
     expect(unknownCreate).toEqual({ rule: RULE, reason: UNKNOWN_TICKET });
+  });
+});
+
+/**
+ * Three cases the legs above do not reach:
+ * - The bind names the KIND. Entity ids are the client's to mint and `proj_entity_heads` is keyed
+ *   `(entity_kind, entity_id)`, so a person may file, in W2, a note whose id IS a WS ticket's id. Without
+ *   `entity_kind = 'ticket'` the bind would read that note's head row as "the ticket is in W2".
+ * - A link made before the fix (the rows the audit query counts) cannot be detached through the door either: the
+ *   detach is bound too, which is what Features.md §15 says of such a link.
+ * - A soft-deleted ticket keeps its head row, so it answers like any other ticket of the other workspace.
+ */
+describe('18.500–18.502 the bind holds for a reused id, a link made before the fix and a deleted ticket', () => {
+  it('18.500 18.501 a W2 note minted with a WS ticket\'s id does not put that ticket in W2: the attach and the create naming it are refused', async () => {
+    // CONTROL first: the id really is reused. The note commits, and TP's id now has a head row in W2 (kind note)
+    // beside TP's own in WS (kind ticket).
+    expect(
+      await door(W2, world.TP, 'note.created', { title: 'Same id as the WS ticket', homeProjectId: P2, scope: { mode: 'workspace' } }),
+    ).toMatchObject({ status: 'committed' });
+    const heads = await db.pool.query<{ entity_kind: string; workspace_id: string }>(
+      'SELECT entity_kind, workspace_id FROM proj_entity_heads WHERE entity_id = $1 ORDER BY entity_kind',
+      [world.TP],
+    );
+    expect(heads.rows).toEqual([
+      { entity_kind: 'note', workspace_id: W2 },
+      { entity_kind: 'ticket', workspace_id: world.WS },
+    ]);
+
+    expect(await door(W2, away, 'note.attached', { ticketId: world.TP })).toMatchObject({ status: 'refused', rule: RULE, reason: UNKNOWN_TICKET });
+    expect(await links(away, world.TP)).toBe(0);
+    const born = newUlid();
+    expect(
+      await door(W2, born, 'note.created', {
+        title: 'Born linked across',
+        homeProjectId: P2,
+        scope: { mode: 'workspace' },
+        attachTicketId: world.TP,
+      }),
+    ).toMatchObject({ status: 'refused', rule: RULE, reason: UNKNOWN_TICKET });
+    expect(await links(born, world.TP)).toBe(0);
+  });
+
+  it('18.500 a link made before the fix cannot be detached through the door: the detach answers the unknown-ticket sentence and the row stays', async () => {
+    // CONTROL first: the seeded link is there, and this person detaches TP from a note of TP's own workspace.
+    expect(await links(legacy, world.TP)).toBe(1);
+    expect(await door(world.WS, world.NOTES.nWorkspace, 'note.attached', { ticketId: world.TP })).toMatchObject({ status: 'committed' });
+    expect(await door(world.WS, world.NOTES.nWorkspace, 'note.detached', { ticketId: world.TP })).toMatchObject({ status: 'committed' });
+
+    expect(await door(W2, legacy, 'note.detached', { ticketId: world.TP })).toMatchObject({ status: 'refused', rule: RULE, reason: UNKNOWN_TICKET });
+    expect(await links(legacy, world.TP)).toBe(1);
+  });
+
+  it('18.502 a soft-deleted WS ticket answers byte for byte what a never-issued ticket id answers', async () => {
+    // CONTROL first: TD is deleted, not erased: its head row is still in WS.
+    expect(
+      (await db.pool.query('SELECT workspace_id FROM proj_entity_heads WHERE entity_kind = $1 AND entity_id = $2', ['ticket', TD])).rows,
+    ).toEqual([{ workspace_id: world.WS }]);
+    expect((await db.pool.query('SELECT 1 FROM proj_tickets WHERE ticket_id = $1 AND deleted_at IS NOT NULL', [TD])).rowCount).toBe(1);
+
+    const madeUp = newUlid();
+    const pick = (r: { rule?: string; reason?: string }) => ({ rule: r.rule, reason: r.reason });
+    const deletedAttach = pick(await door(W2, away, 'note.attached', { ticketId: TD }));
+    expect(deletedAttach).toEqual(pick(await door(W2, away, 'note.attached', { ticketId: madeUp })));
+    expect(deletedAttach).toEqual({ rule: RULE, reason: UNKNOWN_TICKET });
+
+    const create = (ticketId: string) =>
+      door(W2, newUlid(), 'note.created', { title: 'Probe', homeProjectId: P2, scope: { mode: 'workspace' }, attachTicketId: ticketId });
+    const deletedCreate = pick(await create(TD));
+    expect(deletedCreate).toEqual(pick(await create(madeUp)));
+    expect(deletedCreate).toEqual({ rule: RULE, reason: UNKNOWN_TICKET });
   });
 });
