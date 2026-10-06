@@ -144,6 +144,7 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     await chooseKind(user, 'Comes after');
     expect(screen.getByLabelText('Link label')).toHaveValue(''); // the first add took its label with it
     await findTicket(user);
+    expect(source.ingested.flat()).toHaveLength(2);
     const second = source.ingested.flat()[1]!;
     expect([second.type, second.entity.id, second.payload]).toEqual(['ticket.link_added', OTHER, { kind: 'leads_to', targetId: TICKET }]);
     expect('label' in (second.payload as object)).toBe(false);
@@ -170,6 +171,7 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     await user.clear(screen.getByLabelText('Link label'));
     await user.type(screen.getByLabelText('Link label'), '   ');
     await findTicket(user);
+    expect(source.ingested.flat()).toHaveLength(2);
     const payload = source.ingested.flat()[1]!.payload as object;
     expect(payload).toEqual({ kind: 'leads_to', targetId: OTHER });
     expect('label' in payload).toBe(false);
@@ -350,7 +352,7 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
 
   it('29.131 a label given to a label-free row is undone back to NO label; control: the relabel itself carries the new label', async () => {
     const source = await relabelTo([row('leads_to', 'out', 'GN-147')], false, 'Edit label: leads to GN-147', 'Yes');
-    expect(calls(source)[0]![1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]);
+    expect(calls(source)[0]?.[1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'Yes' }]);
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(source.ingested).toHaveLength(2));
     expect(calls(source)[1]).toEqual([
@@ -407,13 +409,13 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     await user.type(screen.getByLabelText('New label'), 'no');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(local.ingested).toHaveLength(1));
-    expect(calls(local)[0]![1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: SIBLING, label: 'no' }]);
+    expect(calls(local)[0]?.[1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: SIBLING, label: 'no' }]);
     await screen.findByText('Relabelled: leads to GN-150 (no)');
     expect(screen.queryByRole('alert')).toBeNull(); // the commit cleared the local refusal
     // its Undo goes back to "No" although the reloaded row (still "No" here) folds to the same key: the row is not its own sibling
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(local.ingested).toHaveLength(2));
-    expect(calls(local)[1]![1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: SIBLING, label: 'No' }]);
+    expect(calls(local)[1]?.[1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: SIBLING, label: 'No' }]);
   });
 
   it("29.132 when the server commits the removal and refuses the add, the original link is filed again and the server's reason shows; control: a refused or unanswered REMOVAL is one call with its reason", async () => {
@@ -486,21 +488,21 @@ describe('Links section: leads-to links (wtg2 T3)', () => {
     cleanup();
 
     const incomingBlank = await relabelTo([row('leads_to', 'in', 'GN-133', 'Yes')], true, 'Edit label: comes after GN-133', '');
-    expect(calls(incomingBlank)[0]![1]).toEqual(['ticket.link_added', OTHER, { kind: 'leads_to', targetId: TICKET }]);
+    expect(calls(incomingBlank)[0]?.[1]).toEqual(['ticket.link_added', OTHER, { kind: 'leads_to', targetId: TICKET }]);
     cleanup();
 
     const siblings = [yes, row('leads_to', 'out', 'GN-150', 'No', SIBLING)];
     const taskRepeat = await relabelTo(siblings, false, 'Edit label: leads to GN-150', 'yes');
-    expect(calls(taskRepeat)[0]![1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: SIBLING, label: 'yes' }]);
+    expect(calls(taskRepeat)[0]?.[1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: SIBLING, label: 'yes' }]);
     cleanup();
 
     const mixed = [yes, row('leads_to', 'in', 'GN-133', 'Maybe', SIBLING)];
     const outToIncomingLabel = await relabelTo(mixed, true, 'Edit label: leads to GN-147', 'maybe');
-    expect(calls(outToIncomingLabel)[0]![1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'maybe' }]);
+    expect(calls(outToIncomingLabel)[0]?.[1]).toEqual(['ticket.link_added', TICKET, { kind: 'leads_to', targetId: OTHER, label: 'maybe' }]);
     cleanup();
 
     const incomingToOutLabel = await relabelTo(mixed, true, 'Edit label: comes after GN-133', 'Yes');
-    expect(calls(incomingToOutLabel)[0]![1]).toEqual(['ticket.link_added', SIBLING, { kind: 'leads_to', targetId: TICKET, label: 'Yes' }]);
+    expect(calls(incomingToOutLabel)[0]?.[1]).toEqual(['ticket.link_added', SIBLING, { kind: 'leads_to', targetId: TICKET, label: 'Yes' }]);
   });
 
   it('29.133 on a phone the relabel form opens in the row and the Link label input sits in the "Add link" bottom sheet; control: on desktop the same controls are in the row and the Popover', async () => {

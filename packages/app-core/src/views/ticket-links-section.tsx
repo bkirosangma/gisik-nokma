@@ -228,7 +228,7 @@ export function TicketLinksSection({
   /**
    * Edit label (workflow-timeline-graphs LK-4): `[link_removed, link_added]` in ONE `ingest` call, on the stored
    * source's stream (a draft's sheet: the from-form on the draft's, through `eventFor`). LK-4 calls it one batch, but
-   * `ingestBatch` commits each event on its own and never rolls back a neighbour (`ingest-service.ts:56-58`), so an
+   * `ingestBatch` commits each event on its own and never rolls back a neighbour (`apps/server/src/ingest/ingest-service.ts:82-84`), so an
    * add refused after its removal committed is COMPENSATED: the old link is filed again and the branch is never lost.
    * A Decision's own branches are checked here first, with the engine's sentences (LK-3.3), so a clash sends nothing.
    * The client precheck is not used: the cache still holds the pair, so it would answer `link.duplicate`.
