@@ -30,8 +30,12 @@ describe('createHttpGraphGateway', () => {
     expect(http.calls).toEqual([{ method: 'GET', path: '/v1/graph/neighbours?center=ticket%3A01A&hops=2&ws=w1%2Cw2&groups=blocks%2Cstructure' }]);
     expect(answer).toBe(BODY);
 
-    // CONTROL, same it: with one project chosen, the same query gains `proj` (so the absence above is the projectIds branch).
+    // CONTROL, same it: with projects chosen, the same query gains `proj` (so the absence above is the projectIds branch);
+    // two of them, so a fold that kept only the first would fail.
+    await gateway.ring({ center: 'ticket:01A', hops: 2, workspaceIds: ['w1', 'w2'], projectIds: ['p1', 'p2'], groups: ['blocks', 'structure'] });
+    expect(http.calls[1]).toEqual({ method: 'GET', path: '/v1/graph/neighbours?center=ticket%3A01A&hops=2&ws=w1%2Cw2&groups=blocks%2Cstructure&proj=p1%2Cp2' });
+    // ...and ONE project is enough (the guard is `> 0`, not `> 1`).
     await gateway.ring({ center: 'ticket:01A', hops: 2, workspaceIds: ['w1', 'w2'], projectIds: ['p1'], groups: ['blocks', 'structure'] });
-    expect(http.calls[1]).toEqual({ method: 'GET', path: '/v1/graph/neighbours?center=ticket%3A01A&hops=2&ws=w1%2Cw2&groups=blocks%2Cstructure&proj=p1' });
+    expect(http.calls[2]).toEqual({ method: 'GET', path: '/v1/graph/neighbours?center=ticket%3A01A&hops=2&ws=w1%2Cw2&groups=blocks%2Cstructure&proj=p1' });
   });
 });
