@@ -219,6 +219,14 @@ describe('18.520 note.moved names a project of the note\'s own workspace', () =>
       reason: `There is no project ${world.P} in this workspace.`,
     });
     expect(await home(away)).toBe(P2b);
+
+    // ONE rule for both events: a new note homed in W2's project is refused by the same person with the same
+    // sentence (CONTROL: homed in a project of WS, it commits). Since rule A (2026-09-29) this is the only kind of id
+    // that reaches the membership half for a member: a foreign, deleted or made-up one.
+    const born = (homeProjectId: string) =>
+      door('author', world.WS, note(newUlid()), 'note.created', { title: 'Born here', homeProjectId, scope: { mode: 'workspace' } });
+    expect(await born(PB)).toMatchObject({ status: 'committed' });
+    expect(await born(P2)).toMatchObject({ status: 'refused', rule: NOTE_RULE, reason: HOME });
   });
 });
 
@@ -250,7 +258,9 @@ describe('18.521 note.moved names a project the mover can see, and a live one', 
 
 describe('18.524 ticket.transitioned cause.childTicketId names no entity of another workspace', () => {
   it('18.524 a reopen cause naming a ticket of ANOTHER workspace, or an entity that is not a ticket, is refused with the other-ticket sentence; a same-workspace child commits', async () => {
-    // CONTROL first: the same person, the same parent, a child of the parent's own workspace.
+    // CONTROL first: the same person, the same parent, a child of the parent's own workspace; and a transition with
+    // no cause at all, which the new check must let through untouched.
+    expect(await door('author', world.WS, ticket(world.TP), 'ticket.transitioned', { to: 'done' })).toMatchObject({ status: 'committed' });
     expect(await reopenFor(TQ, 'doing')).toMatchObject({ status: 'committed' });
     expect(await stateOf(world.TP)).toBe('doing');
 
