@@ -728,6 +728,29 @@ describe('27.523, 27.536 focus follows the rename form and the Delete question, 
     expect(screen.queryByRole('heading', { name: SUG.label })).toBeNull();
   });
 
+  it('27.536 a suggestion inspector re-pointed from A to B shows B even when A\'s list FAILS after B\'s answered; control: A alone, failing, says the suggestions could not be loaded', async () => {
+    const lists: Array<{ answer: (v: SuggestionView[]) => void; fail: (e: unknown) => void }> = [];
+    const ds = createFakeDataSource({
+      getSuggestions: () => new Promise<SuggestionView[]>((answer, fail) => lists.push({ answer, fail })),
+      getConceptAudience: async (): Promise<ConceptAudienceResponse> => ({ conceptId: null, members: 9, before: 9, after: 9 }),
+    });
+    const props = { ...baseProps(), dataSource: ds };
+    // control: A alone, failing, says so
+    const alone = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    act(() => lists[0]!.fail(new Error('network down')));
+    expect(await screen.findByText('Suggestions could not be loaded.')).toBeInTheDocument();
+    alone.unmount();
+    lists.length = 0;
+    const { rerender } = render(<ConceptInspector item={suggestedItem()} {...props} />);
+    rerender(<ConceptInspector item={B()} {...props} />); // A's list is still out
+    act(() => lists[1]!.answer([OTHER_SUG, SUG])); // B's answers first
+    expect(await screen.findByRole('heading', { level: 3, name: OTHER_SUG.label })).toBeInTheDocument();
+    act(() => lists[0]!.fail(new Error('network down'))); // A's fails last
+    await settle();
+    expect(screen.getByRole('heading', { level: 3, name: OTHER_SUG.label })).toBeInTheDocument();
+    expect(screen.queryByText('Suggestions could not be loaded.')).toBeNull();
+  });
+
   it('27.536 the narrowing preview answers only for the suggestion on screen: re-pointed from A to B, A\'s late preview neither writes its sentence under B nor, failing, clears B\'s; control: A alone shows its own sentence', async () => {
     const previews: Array<{ answer: (v: ConceptAudienceResponse) => void; fail: (e: unknown) => void }> = [];
     const ds = createFakeDataSource({

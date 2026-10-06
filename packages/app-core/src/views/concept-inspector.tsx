@@ -81,7 +81,7 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
   const editing = renaming !== null;
   const opened = useRef(false);
   // Keyboard focus follows the rename form, which stands in for the heading and the buttons: into the name, its text
-  // selected, when it opens; back on Rename when it closes (Cancel, Esc, a committed Save). Never on the first draw.
+  // selected, when it opens; back on Rename, when drawn, as it closes (Cancel, Esc, a committed Save). Never on the first draw.
   useEffect(() => {
     if (editing) {
       opened.current = true;
@@ -130,7 +130,7 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
     },
   };
   const items = c.items.filter((i) => !removed.has(`${i.kind}:${i.id}`));
-  // The question goes and focus goes back to the Delete that asked it (drawn all the while the question is open).
+  // The question goes and focus goes back to the Delete that asked it, when drawn (Rename's form hides it meanwhile).
   const cancelDelete = () => {
     setConfirmDelete(false);
     deleteButton.current?.focus();
