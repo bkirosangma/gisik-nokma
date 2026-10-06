@@ -144,6 +144,14 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/app/globals.css", "$TURBO_ROOT$/apps/web/src/shell-refusal.tsx"]
     },
+    // The same hole in `typecheck` (13.1719): this package's tsconfig includes `harness`, so tsc follows
+    // `harness/sheet-errors.tsx` into `shell-refusal.tsx` (`tsc --listFiles` lists it), and a change to ShellRefusal's props
+    // must re-check the harness. Only `inputs` differ from the generic `typecheck`. `globals.css` is left out: it carries no
+    // types (`vite/client` declares `*.css`), so it cannot change what tsc reports.
+    "@gisik-nokma/workflow-canvas-browser#typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/src/shell-refusal.tsx"]
+    },
     // `reporting-scope-guard.test.ts` walks SEVEN trees (its own `SCANNED_ROOTS`),
     // and three CSS-binding suites read `packages/ui/src/ui.css` — the stylesheet
     // whose class names they assert against rendered markup. A rule deleted from

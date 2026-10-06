@@ -8,7 +8,7 @@
 # miss, an unchanged hash is a hit. The fast mode compares hashes; --real shows the same through turbo's own cache and is
 # the evidence the fast mode stands in for (run it after editing turbo.json's `inputs`).
 #
-# Cases (13.1705-13.1709 and 13.1712-13.1715, test-cases/13-deploy-and-ops.md). The shape is the #270 stale-cache incident: a test in one
+# Cases (13.1705-13.1709, 13.1712-13.1715 and 13.1718-13.1719, test-cases/13-deploy-and-ops.md). The shape is the #270 stale-cache incident: a test in one
 # package reads a file in ANOTHER, and the cache key never saw it.
 #   ui#test     reads every client source file (the colour scan) — change an apps/web/src file → MISS; a docs file → HIT
 #   mobile#test reads the editor webview bundle — change a packages/editor CSS file → MISS; a docs file → HIT
@@ -39,10 +39,10 @@ fi
 cd "$work" || exit 1
 rm -rf .git; /usr/bin/git init -q . && /usr/bin/git add -A && /usr/bin/git -c user.name=t -c user.email=t@t commit -q -m copy
 
-dry() { "$TURBO" run test --filter="$1" --dry=json 2>/dev/null; }
-# field <pkg> <taskId> <hash|status|deps>
+dry() { "$TURBO" run "${2:-test}" --filter="$1" --dry=json 2>/dev/null; }
+# field <pkg> <taskId> <hash|status|deps> — the task run is the taskId's own (`<pkg>#typecheck` dries `typecheck`)
 field() {
-  dry "$1" | python3 -c '
+  dry "$1" "${2##*#}" | python3 -c '
 import json,sys
 d=json.load(sys.stdin); t=[x for x in d["tasks"] if x["taskId"]==sys.argv[1]][0]
 print({"hash":t["hash"],"status":t["cache"]["status"],"deps":" ".join(t["dependencies"])}[sys.argv[2]])' "$2" "$3"
@@ -58,9 +58,10 @@ ctl_file=docs/lanes/gate-lock/README.md   # read by neither suite: the HIT contr
 check "13.1707 mobile#test depends on editor#build:webview (the stale-build root cause)" 'field "$MOBILE" "$MOBILE#test" deps | grep -q "@gisik-nokma/editor#build:webview"'
 
 if [ "$MODE" != --real ]; then
-  # THE TABLE: id | task's package | probe file | what it stands for | HIT control (a file the task does not read).
-  # Every row asserts the control leaves the hash alone and the probe changes it. A row exists for each input turbo.json
-  # declares that is NOT a dependency of the task (13.1712-13.1715, 13.1718): remove the entry and its row goes red
+  # THE TABLE: id | task's package | probe file | what it stands for | HIT control (a file the task does not read) | task
+  # (optional, default `test`). Every row asserts the control leaves the hash alone and the probe changes it. A row exists
+  # for each input turbo.json declares that is NOT a dependency of the task (13.1712-13.1715, 13.1718-13.1719): remove the
+  # entry and its row goes red
   # (shown 2026-10-02 by deleting each entry in turn). The server rows use CLAUDE.md as the control because server#test
   # reads docs/** — the README control would be a read file there.
   desktop_file=$(/usr/bin/git ls-files apps/desktop/src | sed -n 1p)
@@ -82,17 +83,19 @@ if [ "$MODE" != --real ]; then
     "13.1715|$EDITOR|packages/ui/test/helpers/css-rules.ts|the ui css-rules helper four editor tests import|$ctl_file"
     "13.1718|$WCB|apps/web/app/globals.css|apps/web globals.css, which the sheet-errors harness imports|$ctl_file"
     "13.1718|$WCB|apps/web/src/shell-refusal.tsx|the ShellRefusal component the sheet-errors harness renders|$ctl_file"
+    "13.1719|$WCB|apps/web/src/shell-refusal.tsx|the ShellRefusal component tsc follows from the harness|$ctl_file|typecheck"
   )
   for t in "${rows[@]}"; do
-    IFS='|' read -r id pkg file what ctl <<<"$t"
+    IFS='|' read -r id pkg file what ctl task <<<"$t"
+    task=${task:-test}
     [ -f "$file" ] && [ -f "$ctl" ] || { echo "  FAIL $id probe or control file missing ($file / $ctl)"; fails=$((fails+1)); continue; }
-    h0=$(field "$pkg" "$pkg#test" hash)
-    touch_file "$ctl";  h1=$(field "$pkg" "$pkg#test" hash); reset
-    touch_file "$file"; h2=$(field "$pkg" "$pkg#test" hash); reset
-    h3=$(field "$pkg" "$pkg#test" hash)
-    check "$id $pkg#test: CONTROL — a file it does not read ($ctl) leaves the hash alone (a HIT)" '[ -n "$h0" ] && [ "$h0" = "$h1" ]'
-    check "$id $pkg#test: changing $what ($file) changes the hash (a MISS)" '[ -n "$h2" ] && [ "$h0" != "$h2" ]'
-    check "$id $pkg#test: CONTROL — reverting $file restores the hash" '[ "$h0" = "$h3" ]'
+    h0=$(field "$pkg" "$pkg#$task" hash)
+    touch_file "$ctl";  h1=$(field "$pkg" "$pkg#$task" hash); reset
+    touch_file "$file"; h2=$(field "$pkg" "$pkg#$task" hash); reset
+    h3=$(field "$pkg" "$pkg#$task" hash)
+    check "$id $pkg#$task: CONTROL — a file it does not read ($ctl) leaves the hash alone (a HIT)" '[ -n "$h0" ] && [ "$h0" = "$h1" ]'
+    check "$id $pkg#$task: changing $what ($file) changes the hash (a MISS)" '[ -n "$h2" ] && [ "$h0" != "$h2" ]'
+    check "$id $pkg#$task: CONTROL — reverting $file restores the hash" '[ "$h0" = "$h3" ]'
   done
 else
   # Real cache. A cache hit prints `cache hit` for the task; a miss prints `cache miss`.
