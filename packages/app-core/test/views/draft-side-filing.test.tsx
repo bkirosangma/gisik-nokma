@@ -31,11 +31,11 @@ const committing = (overrides: Parameters<typeof createFakeDataSource>[0] = {}):
 const filed = (source: FakeDataSource) => source.ingested.flat().map((e) => [e.entity.id, e.type, e.payload]);
 
 /** `ticket-links-section.test.tsx`'s Harness: the section reads the `links` query the sheet owns. */
-function Harness(props: Omit<TicketLinksSectionProps, 'links'>) {
+function Harness(props: Omit<TicketLinksSectionProps, 'links' | 'isDecision'>) {
   const links = useLiveQuery(props.dataSource, props.workspaceId, `${props.ticketId}:links`, () =>
     props.dataSource.query.getTicketLinks(props.workspaceId, props.ticketId),
   );
-  return <TicketLinksSection {...props} links={links} />;
+  return <TicketLinksSection isDecision={false} {...props} links={links} />;
 }
 
 /** Add "Is blocked by S" (stored source S), remove it from the row the reload draws, then press the toast's Undo. */
