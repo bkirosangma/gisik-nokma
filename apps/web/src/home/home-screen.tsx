@@ -1,12 +1,19 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery, type DataSource, type WorkspaceRef } from '@gisik-nokma/app-core';
+import type { GraphItemView } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import { AppNav } from '../app-nav.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../expired-session.js';
-import { useAppServices, useSessionStatus } from '../providers.js';
+import { useGraphScope } from '../knowledge-graph/use-graph-scope.js';
+import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { ShellRefusal } from '../shell-refusal.js';
+import { useIsPhone } from '../use-is-phone.js';
 import { readLastWorkspace, type LastWorkspace } from '../use-last-workspace.js';
+import { HomeGraph } from './home-graph.js';
+import { HomeGraphPlaceholder } from './home-graph-canvas.js';
 import { HomeNumbers } from './home-numbers.js';
 import { useRecordHomeWorkspace } from './record-home-workspace.js';
 import { resolveHomeWorkspace } from './resolve-home-workspace.js';
@@ -64,7 +71,6 @@ export function HomeScreen() {
         {resolved.status === 'ready' ? (
           <HomeBody key={resolved.workspace.id} workspaceId={resolved.workspace.id} expired={expired} onError={setHomeError} />
         ) : null}
-        {/* KG-E T4: graph */}
       </div>
     </main>
   );
@@ -77,9 +83,11 @@ function useHome(source: DataSource, workspaceId: string) {
 }
 
 /**
- * The numbers for one workspace (T3). Keyed by the workspace at its call site, so a lit number and the last known
- * window never leak from one workspace to the next. Its read error goes UP (`onError`): `HomeScreen` owns the
- * expired-session check, and passes back `expired` so a 401 shows the notice and not "Couldn't load the numbers."
+ * The numbers and the graph for one workspace (T3, T4). Keyed by the workspace at its call site, so a lit number, the
+ * last known window and the graph's Start from never leak from one workspace to the next. Its read error goes UP
+ * (`onError`): `HomeScreen` owns the expired-session check, and passes back `expired` so a 401 shows the notice and not
+ * "Couldn't load the numbers." The graph waits for the scope pickers' options (`useGraphScope`) in the canvas's own box,
+ * and says a refused read the way `GraphPanel` does.
  */
 function HomeBody({
   workspaceId,
@@ -90,7 +98,11 @@ function HomeBody({
   expired: boolean;
   onError: (error: string | null) => void;
 }) {
-  const { dataSource } = useAppServices();
+  const { dataSource, graph } = useAppServices();
+  const viewerId = useCurrentUser()?.id ?? ''; // Home is ready only signed in (`resolveHomeWorkspace`)
+  const phone = useIsPhone();
+  const { scope, error: scopeError } = useGraphScope();
+  const router = useRouter();
   const result = useHome(dataSource, workspaceId);
   const highlight = useHomeHighlight(result.data);
   // The last answer's window, so a failed reload keeps its label (planner ruling 2026-10-04 Q2).
@@ -102,14 +114,45 @@ function HomeBody({
     onError(result.error);
   }, [onError, result.error]);
   useEffect(() => () => onError(null), [onError]);
+  // The graph's pages, as `GraphPanel` opens them (C plan Task 9). Home has no ticket sheet, so a ticket has no Open.
+  const onOpen = (item: GraphItemView) => {
+    if (item.kind === 'note') router.push(`/notes/${item.id}`);
+    else if (item.kind === 'project' && item.workspaceId !== null) router.push(`/w/${item.workspaceId}/p/${item.id}`);
+    else if (item.kind === 'workspace') router.push(`/w/${item.id}`);
+  };
   return (
-    <HomeNumbers
-      home={result.data}
-      failed={!expired && result.error !== null && result.data === null}
-      onRetry={result.reload}
-      pressed={highlight.pressed}
-      onToggle={highlight.toggle}
-      dueSoonDays={lastDueSoonDays}
-    />
+    <>
+      <HomeNumbers
+        home={result.data}
+        failed={!expired && result.error !== null && result.data === null}
+        onRetry={result.reload}
+        pressed={highlight.pressed}
+        onToggle={highlight.toggle}
+        dueSoonDays={lastDueSoonDays}
+      />
+      {scopeError !== null ? (
+        <ShellRefusal what="Your workspaces" message={scopeError} />
+      ) : scope === null ? (
+        <HomeGraphPlaceholder />
+      ) : (
+        <HomeGraph
+          workspaceId={workspaceId}
+          viewerId={viewerId}
+          home={result.data}
+          pressed={highlight.pressed}
+          // Esc inside the graph: a lit number clears first and the view does nothing more; with none lit, the view's Back.
+          onEscape={() => {
+            if (highlight.pressed === null) return false;
+            highlight.clear();
+            return true;
+          }}
+          phone={phone}
+          source={graph}
+          scope={scope}
+          onOpen={onOpen}
+          canOpen={(item) => item.kind === 'note' || item.kind === 'project' || item.kind === 'workspace'}
+        />
+      )}
+    </>
   );
 }

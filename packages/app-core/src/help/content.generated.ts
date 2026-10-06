@@ -1105,6 +1105,111 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "home",
+            "title": "Home",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Click "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Gisik Nokma"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at the far left of the bar to come home. Home shows six numbers for your workspace — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Tickets"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Past due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due in N days"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Members"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — counting only what you can see, and the workspace's Knowledge Graph under them. Click a number to light those items up on the graph; everything else fades. Click it again, or press Escape, to clear it. If a menu is open, Escape closes the menu first."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The note under the numbers says how many are lit. Items further out than the graph shows are counted there too, with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show more hops"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to bring them in (up to four hops). "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start from"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " puts the workspace, or you, at the centre of the graph; the numbers stay the workspace's either way."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a phone the numbers sit in two rows of three, and the graph shows one hop around its centre, as it does everywhere on a phone, so there is no Show more hops."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "light-or-dark",
             "title": "Light or dark",
             "blocks": [
@@ -10075,7 +10180,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a ticket. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the ticket it came from is closed. A note can be attached to a ticket as well, but it does not have to be, and attaching it does not make it that ticket's property."
+                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a ticket. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the ticket it came from is closed. A note can be attached to a ticket of its own workspace as well, but it does not have to be, and attaching it does not make it that ticket's property."
                   }
                 ]
               },

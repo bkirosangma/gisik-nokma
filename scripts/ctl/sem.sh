@@ -8,14 +8,21 @@
 #   gate-slots        optional: the gate cap (read after CTL_SEM_GATE_SLOTS, re-read every poll, so a rewrite needs no restart)
 #                     (the marker globs are gate-[0-9]*, so this file is never mistaken for a stale marker and reclaimed)
 #   slots             optional: the slot count (read before CTL_TEST_SLOTS so two callers cannot disagree on N)
+#   express-<n>/holder the EXPRESS slots (P72, 13.2360-13.2363): held only by a `--short` run, and only when no normal slot is available to it (the gate cap
+#                     reached, or every slot-<n> held); same holder format, same pressure / swap-in / stale-reclaim rules; NOT counted against the gate cap
+#                     (ctl_sem_held counts slot-* only). The glob is express-[0-9]*, so the express-slots file is never mistaken for a slot.
+#   express-slots     optional: the express slot count E (read after CTL_SEM_EXPRESS_SLOTS, re-read every poll; 0 = none; else 1)
 #   swap.verdict      `<epoch> <ok|high>`: the last swap-in sample's result, shared by every waiter while it is at most CTL_SEM_SWAP_TTL s old
 #   waits.tsv         one row per run: time, label, queue wait seconds, reason, slot count, probe seconds (the grant poll's own sampling time, which the
-#                     wait excludes: wait + probe = queue entry to grant; 0 when a shared verdict was reused) — the history the count is tuned from
+#                     wait excludes: wait + probe = queue entry to grant; 0 when a shared verdict was reused), slot class (normal|express), short-overrun
+#                     (the seconds a `--short` hold lasted when that was past CTL_SEM_SHORT_MAX, else -) — the history the count is tuned from. The row is
+#                     written at RELEASE (the overrun is known only then), its time still the grant's; a run killed by SIGKILL writes none.
 # macOS has no flock(1): mkdir is the lock. Bash 3.2-safe (no wait -n, mapfile, declare -A, EPOCHREALTIME; no empty array under set -u).
 # Test seams (env): CTL_SEM_CLOCK_FILE (fake clock: ctl_sem_sleep advances it and runs CTL_SEM_SLEEP_HOOK with CTL_SEM_NOW / CTL_SEM_SLEEP_SECS),
 # CTL_SEM_CLAIM_HOOK (runs right after a slot was claimed), CTL_SEM_POLL_SECS, CTL_SEM_SAMPLE_SECS.
 # Knobs: CTL_TEST_SLOTS (2), CTL_SEM_MIN_FREE_PCT (15), CTL_SEM_MAX_SWAPIN_MBS (8), CTL_SEM_SAMPLE_SECS (3), CTL_SEM_SWAP_TTL (10), CTL_SEM_POLL_SECS (1),
-# CTL_SEM_MAX_WAIT (1800), CTL_SEM_GRACE_SECS (10), CTL_SEM_GATE_SLOTS (the gate-slots file, else 1).
+# CTL_SEM_MAX_WAIT (1800), CTL_SEM_GRACE_SECS (10), CTL_SEM_GATE_SLOTS (the gate-slots file, else 1), CTL_SEM_EXPRESS_SLOTS (the express-slots file,
+# else 1), CTL_SEM_SHORT_MAX (90: a `--short` hold longer than this is logged as SHORT-OVERRUN, never killed).
 
 ctl_sem_dir() { local d="${CTL_SEM_DIR:-$HOME/.cache/gisik-ctl/sem}"; mkdir -p "$d"; echo "$d"; }
 ctl_sem_now() { if [ -n "${CTL_SEM_CLOCK_FILE:-}" ]; then cat "$CTL_SEM_CLOCK_FILE"; else date +%s; fi; }
@@ -55,7 +62,7 @@ ctl_sem_drop() {
 # it is a file mtime), a claimant that died between mkdir and writing its holder once it is older.
 ctl_sem_reclaim() {
   local sem d now; sem="$(ctl_sem_dir)"; now="$(date +%s)"
-  for d in "$sem"/slot-*; do
+  for d in "$sem"/slot-* "$sem"/express-[0-9]*; do
     [ -d "$d" ] || continue
     case "$d" in *.stale.*) continue;; esac
     if [ -f "$d/holder" ]; then ctl_sem_holder_live "$d/holder" || ctl_sem_drop "$d"
@@ -81,6 +88,16 @@ ctl_sem_held() {
   for d in "$sem"/slot-*; do case "$d" in *.stale.*) continue;; esac; [ -f "$d/holder" ] && n=$((n+1)); done
   echo "$n"
 }
+# The express slot count E (P72): CTL_SEM_EXPRESS_SLOTS when set to a number, else the `express-slots` file's trimmed content when a number, else 1.
+# 0 is valid in either (no express slot). Re-read on every poll, as gate-slots is.
+ctl_sem_express_slots() {
+  local c="${CTL_SEM_EXPRESS_SLOTS:-}"
+  case "$c" in ''|*[!0-9]*) c="$( { tr -d '[:space:]' < "$(ctl_sem_dir)/express-slots"; } 2>/dev/null )";; esac
+  case "$c" in ''|*[!0-9]*) c=1;; esac
+  echo "$c"
+}
+# The `--short` contract (P72): a hold past this many seconds is logged (SHORT-OVERRUN), not stopped. 90 unless CTL_SEM_SHORT_MAX is a number.
+ctl_sem_short_max() { local m="${CTL_SEM_SHORT_MAX:-90}"; case "$m" in ''|*[!0-9]*) m=90;; esac; echo "$m"; }
 ctl_sem_gate_live() { local g sem; sem="$(ctl_sem_dir)"; for g in "$sem"/gate-[0-9]*; do [ -f "$g" ] && ctl_sem_holder_live "$g" && return 0; done; return 1; }
 
 # The gate's priority marker. begin before the REAL gate run, end by an EXIT trap (green, red, ^C). Written by verbs/gate.sh only.
@@ -137,15 +154,19 @@ ctl_sem_swap_why() {
   echo "swap-in at least ${CTL_SEM_MAX_SWAPIN_MBS:-8} MB/s over two ${CTL_SEM_SAMPLE_SECS:-3} s windows"; return 1
 }
 
-# ctl_sem_acquire LABEL — wait for a slot. Order per poll: reclaim stale → a gate runs with the gate cap already held? → a slot free? →
+# ctl_sem_acquire LABEL [short] — wait for a slot. Order per poll: reclaim stale → a gate runs with the gate cap already held? → a slot free? →
 # pressure → swap-in → claim → re-check the gate (one that began between the probe and the claim gets the slot back when, counting the claim,
-# more than the gate cap are held); every CTL_SEM_POLL_SECS (1) while nothing is granted. Sets CTL_SEM_SLOT, CTL_SEM_SLOTS, CTL_SEM_WAITED (seconds
-# from entering the queue to the grant, minus the grant poll's own sampling time CTL_SEM_PROBE_SECS: a measurement, not a wait; 0 on a reused
-# verdict) and CTL_SEM_REASONS (a+b, "-" none). The waits.tsv row carries both: wait + probe = queue entry to grant.
+# more than the gate cap are held); every CTL_SEM_POLL_SECS (1) while nothing is granted. A `short` run (P72) whose normal path is blocked by the
+# gate cap or by every slot held tries an EXPRESS slot next, in the same poll: one of express-1..E free → pressure → swap-in → claim, with no gate
+# re-check (express slots are not counted against the cap). A normal slot is always tried first; a run that is not `short` never takes an express one.
+# Sets CTL_SEM_SLOT, CTL_SEM_CLASS (normal|express), CTL_SEM_SLOTS (N, or E for express), CTL_SEM_WAITED (seconds from entering the queue to the
+# grant, minus the grant poll's own sampling time CTL_SEM_PROBE_SECS: a measurement, not a wait; 0 on a reused verdict) and CTL_SEM_REASONS (a+b,
+# "-" none). The waits.tsv row is written by ctl_sem_release (it carries the short-overrun, known only then): wait + probe = queue entry to grant.
+# A grant also sets the row's fields for release: CTL_SEM_GRANTED (ctl_sem_now), CTL_SEM_GRANT_UTC, CTL_SEM_SHORT, CTL_SEM_LABEL, CTL_SEM_ROW_N.
 # Returns 75 when CTL_SEM_MAX_WAIT elapses first (nothing claimed).
 ctl_sem_acquire() {
-  local label="$1" sem n N free got start now reasons="" why max="${CTL_SEM_MAX_WAIT:-1800}"
-  sem="$(ctl_sem_dir)"; start="$(ctl_sem_now)"; CTL_SEM_SLOT=""
+  local label="$1" short="${2:-}" sem n N E free got start now reasons="" why max="${CTL_SEM_MAX_WAIT:-1800}"
+  sem="$(ctl_sem_dir)"; start="$(ctl_sem_now)"; CTL_SEM_SLOT=""; CTL_SEM_CLASS=""
   while :; do
     CTL_SEM_PROBE_SECS=0; why=""; N="$(ctl_sem_slots)"; CTL_SEM_SLOTS="$N"
     ctl_sem_reclaim
@@ -164,7 +185,24 @@ ctl_sem_acquire() {
           printf '%s|%s|%s|%s\n' "$$" "$(ctl_sem_lstart $$)" "$label" "$(ctl_sem_now)" > "$sem/slot-$got/holder.tmp" && mv "$sem/slot-$got/holder.tmp" "$sem/slot-$got/holder"
           if [ -n "${CTL_SEM_CLAIM_HOOK:-}" ]; then "$CTL_SEM_CLAIM_HOOK"; fi
           if ctl_sem_gate_live && [ "$(ctl_sem_held)" -gt "$(ctl_sem_gate_slots)" ]; then rm -rf "$sem/slot-$got"; why=gate
-          else CTL_SEM_SLOT="$got"; break; fi
+          else CTL_SEM_SLOT="$got"; CTL_SEM_CLASS=normal; break; fi
+        fi
+      fi
+    fi
+    # The express fallback (P72): only for a short run, and only when the NORMAL path was refused for want of a slot (gate cap or all held) —
+    # pressure and swap-in refusals bind it too, so they are not retried here.
+    if [ "$short" = short ] && { [ "$why" = gate ] || [ "$why" = slots ]; }; then
+      E="$(ctl_sem_express_slots)"
+      free=""; n=1; while [ "$n" -le "$E" ]; do [ -d "$sem/express-$n" ] || { free="$n"; break; }; n=$((n+1)); done
+      if [ -n "$free" ]; then
+        if ! ctl_sem_pressure_why > /dev/null; then why=pressure
+        elif ! ctl_sem_swap_why > /dev/null; then why=swap
+        else
+          got=""; n=1; while [ "$n" -le "$E" ]; do if mkdir "$sem/express-$n" 2>/dev/null; then got="$n"; break; fi; n=$((n+1)); done
+          if [ -n "$got" ]; then
+            printf '%s|%s|%s|%s\n' "$$" "$(ctl_sem_lstart $$)" "$label" "$(ctl_sem_now)" > "$sem/express-$got/holder.tmp" && mv "$sem/express-$got/holder.tmp" "$sem/express-$got/holder"
+            CTL_SEM_SLOT="$got"; CTL_SEM_CLASS=express; CTL_SEM_SLOTS="$E"; break
+          fi
         fi
       fi
     fi
@@ -174,15 +212,25 @@ ctl_sem_acquire() {
     ctl_sem_sleep "${CTL_SEM_POLL_SECS:-1}"
   done
   now="$(ctl_sem_now)"; CTL_SEM_WAITED=$(( now - start - CTL_SEM_PROBE_SECS )); [ "$CTL_SEM_WAITED" -ge 0 ] || CTL_SEM_WAITED=0
-  CTL_SEM_REASONS="${reasons:--}"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$label" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$N" "$CTL_SEM_PROBE_SECS" >> "$sem/waits.tsv"
+  CTL_SEM_REASONS="${reasons:--}"; CTL_SEM_GRANTED="$now"; CTL_SEM_SHORT="$short"; CTL_SEM_LABEL="$label"; CTL_SEM_ROW_N="$N"
+  CTL_SEM_GRANT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   return 0
 }
-# Only while the holder file names THIS run: a slot that was wrongly reclaimed and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both survive our exit.
+# ctl_sem_release writes the run's waits.tsv row, then frees the slot — only while the holder file names THIS run: a slot that was wrongly reclaimed
+# and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both survive our exit. It sets CTL_SEM_OVERRUN,
+# the row's 8th column: the seconds a `short` hold lasted when that is past ctl_sem_short_max, else empty (written `-`). Computed ONCE, here, on
+# every exit path (a signal too), so the log line run-tests writes from it (its release_slot) and the row never disagree.
 ctl_sem_release() {
-  local d hp hrest
+  local d hp hrest sem held
   if [ -n "${CTL_SEM_SLOT:-}" ]; then
-    d="$(ctl_sem_dir)/slot-$CTL_SEM_SLOT"; hp=""; { IFS='|' read -r hp hrest < "$d/holder"; } 2>/dev/null || true
+    sem="$(ctl_sem_dir)"; CTL_SEM_OVERRUN=""
+    if [ "${CTL_SEM_SHORT:-}" = short ]; then
+      held=$(( $(ctl_sem_now) - CTL_SEM_GRANTED ))
+      if [ "$held" -gt "$(ctl_sem_short_max)" ]; then CTL_SEM_OVERRUN="$held"; fi
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$CTL_SEM_GRANT_UTC" "$CTL_SEM_LABEL" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$CTL_SEM_ROW_N" "$CTL_SEM_PROBE_SECS" "$CTL_SEM_CLASS" "${CTL_SEM_OVERRUN:--}" >> "$sem/waits.tsv"
+    if [ "$CTL_SEM_CLASS" = express ]; then d="$sem/express-$CTL_SEM_SLOT"; else d="$sem/slot-$CTL_SEM_SLOT"; fi
+    hp=""; { IFS='|' read -r hp hrest < "$d/holder"; } 2>/dev/null || true
     [ "$hp" = "$$" ] && rm -rf "$d"
   fi
   CTL_SEM_SLOT=""; return 0

@@ -190,6 +190,20 @@ the contents list to jump to it, or just keep scrolling.
   matches appear inside the panel; picking one closes it and takes you to that entry, wherever you were
   on the page.
 
+### Home
+
+Click **Gisik Nokma** at the far left of the bar to come home. Home shows six numbers for your workspace —
+**Tickets**, **Open**, **Past due**, **Due in N days**, **Members** and **Notes** — counting only what you can see,
+and the workspace's Knowledge Graph under them. Click a number to light those items up on the graph; everything
+else fades. Click it again, or press Escape, to clear it. If a menu is open, Escape closes the menu first.
+
+The note under the numbers says how many are lit. Items further out than the graph shows are counted there too,
+with **Show more hops** to bring them in (up to four hops). **Start from** puts the workspace, or you, at the
+centre of the graph; the numbers stay the workspace's either way.
+
+On a phone the numbers sit in two rows of three, and the graph shows one hop around its centre, as it does
+everywhere on a phone, so there is no Show more hops.
+
 ### Light or dark
 
 On your **Account** page there is a **Theme** control with the three choices side by side — not a button
@@ -1856,7 +1870,7 @@ no undo.
 
 A note is a page of writing that belongs to a workspace or a project — not to a ticket. Use one for
 anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to
-keep even after the ticket it came from is closed. A note can be attached to a ticket as well, but it does
+keep even after the ticket it came from is closed. A note can be attached to a ticket of its own workspace as well, but it does
 not have to be, and attaching it does not make it that ticket's property.
 
 Notes have their own place: **Notes** in the left-hand nav, immediately above **Inbox**. Click it and

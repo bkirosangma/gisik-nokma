@@ -373,7 +373,22 @@ input, textarea, select { font-family: inherit; }
   .gn-home__number { padding: 0.5rem 0.625rem; }
   .gn-home__number-value { font-size: 1.25rem; }
 }
-/* KG-E T4: graph */
+/* KG-E T4: graph. Under the numbers, ONE row holds the highlight note (first, so it reads right after the numbers, spec
+   E §2.3) and Start from; the view fills the rest. The row is as tall as Start from (2.75rem segments in a 0.25rem
+   track), which holds the note's 2.75rem Show more hops button, so lighting a number does not move the graph. A phone
+   stacks them: the note keeps two lines (a phone has no hop control), Start from under it. */
+.gn-home__graph { display: grid; gap: 0.75rem; min-width: 0; }
+.gn-home__graph-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; min-height: 3.25rem; }
+.gn-home__note { flex: 1 1 20rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; min-width: 0; margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--gn-text-muted); }
+.gn-home__from { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+.gn-home__from-label { font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-subtle); }
+/* The view's canvas height (`.gn-kg__canvas`; 70vh in its phone form), as `GraphPanel`'s loading box keeps it. */
+.gn-home__graph-placeholder { display: block; height: clamp(26rem, 62vh, 46rem); }
+@media (max-width: 40rem) {
+  .gn-home__note { flex-basis: 100%; min-height: 2.5rem; }
+  .gn-home__from { margin-left: 0; }
+  .gn-home__graph-placeholder { height: 70vh; }
+}
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 
    Both page-specific radius bumps below (`.gn-workspace-list .gn-card`,

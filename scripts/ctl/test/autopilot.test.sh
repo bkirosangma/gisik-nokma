@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2149 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
+# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2149 and 13.2370 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
 # Nothing here reads or writes the live pipeline: a SCRATCH lanes root (CTL_LANES_DIR), a scratch origin + repo (CTL_AUTOPILOT_REPO),
 # a seats fixture (CTL_AUTOPILOT_SEATS_CMD), a stub `ctl` that logs its argv (CTL_AUTOPILOT_CTL), a stub make-reviewer-boot.py, a fixed
 # clock, and a PATH-front `tmux` shim that logs every call. A guard case has its CONTROL in the same check: the same world with the one
@@ -393,6 +393,14 @@ H='4001 1 bash /x/scripts/ctl/verbs/run-tests.sh --label mut-driver -- python3 m
 sw 660 "$H" "$SUB" "$WT"; a=$out; sw 601 "$H" "$WT"; b=$out; sw 600 "$H" "$WT"; c=$out; sw 3060 "$H" "$SUB"; d=$out
 check "13.2134 WARN hold >10 min with waiters: a slot held 11 min (and 601 s) while another run-tests waits logs the WARN naming the slot, the label and the hold; CONTROL in the same check: exactly 600 s with a waiter, and 51 min with NO waiter (the holder's own subshell, which keeps its argv, is no waiter) log nothing" \
   'printf "%s" "$a" | grep -q "WARN hold >10 min with waiters: slot-1 .mut-driver. (pid 4001) held 11 min while 1 run(s) wait" && printf "%s" "$b" | grep -q "WARN hold >10 min" && ! printf "%s%s" "$c" "$d" | grep -q "WARN hold"'
+# 13.2370: the EXPRESS slot (P72) — sw's slot-1 plus express-1 held $2 s by pid 5001 (and the express-slots FILE beside it, as live)
+swx() { world; rm -rf "$T/sem"; mkdir -p "$T/sem/slot-1" "$T/sem/express-1"; printf '4001|Sun Oct 4 05:40:06 2026 |mut-driver|%s\n' $((NOW - $1)) > "$T/sem/slot-1/holder"
+  printf '5001|Sun Oct 4 05:50:06 2026 |one-mutant|%s\n' $((NOW - $2)) > "$T/sem/express-1/holder"; echo 1 > "$T/sem/express-slots"; printf '%s\n' "${@:3}" > "$T/ps.txt"
+  out=$(CTL_SEM_DIR="$T/sem" CTL_AUTOPILOT_PS_CMD="cat $T/ps.txt" PATH="$T/shim:$PATH" python3 "$AP" once --shadow --no-fetch 2>&1); }
+XH='5001 1 bash /x/scripts/ctl/verbs/run-tests.sh --short --label one-mutant -- pnpm vitest'; W2='5002 1 bash /x/scripts/ctl/verbs/run-tests.sh --label lane2 -- pnpm vitest'
+swx 660 20 "$H" "$XH"; a=$out; swx 660 20 "$H" "$XH" "$W2"; b=$out; swx 20 660 "$H" "$XH" "$W2"; c=$out
+check "13.2370 an EXPRESS slot's holder (express-<n>/holder) is a holder, not a waiter: slot-1 held 11 min while the only other run-tests holds express-1 logs NO WARN; its own hold warns as a slot's does: express-1 held 11 min while a run waits logs the WARN naming express-1 (and none for a slot-1 held 20 s); CONTROL in the same check: the first state plus a real waiter (pid 5002, no holder) warns for slot-1 with 1 run waiting, not 2" \
+  '! printf "%s" "$a" | grep -q "WARN hold" && printf "%s" "$b" | grep -q "WARN hold >10 min with waiters: slot-1 .mut-driver. (pid 4001) held 11 min while 1 run(s) wait" && printf "%s" "$c" | grep -q "WARN hold >10 min with waiters: express-1 .one-mutant. (pid 5001) held 11 min while 1 run(s) wait" && ! printf "%s" "$c" | grep -q "WARN hold >10 min with waiters: slot-1"'
 
 # ================================================================ PULL protocol
 world; freerev 9; echo "$R/BOOT-x.md" > "$R/PULL-B.boot"; echo boot > "$R/BOOT-x.md"; ap; a=$out; seat 9 box=text; ap; b=$out
