@@ -3387,10 +3387,8 @@ a.gn-ticket-sheet__crumb--link {
 .gn-ticket-sheet__chips { display: flex; gap: 0.625rem; align-items: center; flex-wrap: wrap; margin: 0 0 1rem; }
 .gn-ticket-sheet__restricted { color: var(--gn-restricted); }
 /* The sheet's four sections (Details, History, Attachments, Knowledge Graph), the track `ticket-sheet.tsx` passes as
-   `className` (kg-walk-fixes-2, release walk part 2 P2-1; cases 27.680–27.686). Each label is ONE line at every width:
-   the shared item's `flex: 1` shares the track from a zero basis, so the longest label wrapped ("Knowledge" over
-   "Graph", even in the 640px desktop sheet) and neo's selected bar, drawn 6px above the item's foot, crossed "Graph".
-   `nowrap` here, inherited by the items, and not on the shared item: tracks that wrap today would overflow instead.
+   `className` (kg-walk-fixes-2, release walk part 2 P2-1; cases 27.680–27.686). Each label is ONE line at every width
+   by the shared item's own `nowrap` (`.gn-segmented__item`), so the longest no longer breaks "Knowledge" over "Graph".
    On a phone the four one-line labels (412px of track at 0.625rem a side, measured) are wider than the track's box
    (312px at 360, 342 at 390), so below 40rem the track scrolls inside itself, the same shape as the project rail
    (21.110, 23.345): `fade` cues the hidden side, the scroll-padding is the fade's width (the selected tab is brought
@@ -3398,7 +3396,6 @@ a.gn-ticket-sheet__crumb--link {
    box is at least 593px and the four fit (~460px at 1rem a side), so no scroller: the overflow would clip hig's
    lifted selected tab for nothing. Selectors that do not END in `.gn-segmented__item`,
    so `components.test.tsx`'s first-match `rule()` keeps reading the shared rule (`segmented-control.tsx`'s `className`). */
-.gn-ticket-sheet__sections { white-space: nowrap; }
 @media (max-width: 40rem) {
   .gn-ticket-sheet__sections {
     overflow-x: auto;
@@ -7689,6 +7686,14 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   font: inherit;
   font-size: 0.95rem;
   font-weight: 500;
+  /* kg-walk-fixes-2 item 1 (planner 14:48, release walk P2-1(b); cases 27.681, 27.686): a label is ONE line in
+     every segmented control. `flex: 1` shares the track from a zero basis, so a two-word label ("Knowledge Graph" in the
+     ticket sheet, "This workspace" in Home's Start from) broke at its space even with room to spare, and neo's
+     selected bar, drawn 6px above the item's foot, crossed its second line. A track whose one-line labels outgrow its
+     box trims its side padding (/account's Style below 26rem, My work's Group below 22.5rem) or scrolls inside itself
+     (the ticket sheet's phone arm, the project rail, the board picker, the builder panel, /account's Style below
+     22.4375rem); every host measured in Chromium at 320, 360, 390, 641, 768 and 1280 (2026-10-06). */
+  white-space: nowrap;
   cursor: pointer;
   /* N9 (case 24.043): the pressed segment's inset eases in rather than snapping. */
   transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);
@@ -9919,8 +9924,14 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
 }
 /* The Group pair's segments are CONTENT-sized: the shared `flex: 1` split this content-sized track into equal halves, so
    "By workspace and project" wrapped to two lines at every width up to 1280px (measured in T4's static fixture sweep).
-   The board's rail opts out of `flex: 1` the same way (`.gn-project__rail`). A row too narrow for both still wraps. */
+   The board's rail opts out of `flex: 1` the same way (`.gn-project__rail`). Each label is ONE line now (the shared item,
+   kg-walk-fixes-2 item 1, case 27.686), so a row too narrow for both no longer wraps a label: at 320 the pair is 283px
+   at `0 1rem` against a 272px row (Chromium, 2026-10-06), and the arm below trims the side padding to 0.625rem (259px).
+   The whole pair fits at `0 1rem` from 331px. */
 .gn-group-toggle .gn-segmented__item { flex: 0 1 auto; }
+@media (max-width: 22.5rem) {
+  .gn-group-toggle .gn-segmented__item { padding-inline: 0.625rem; }
+}
 /* Under neo the pressed segment's bar sits 0.375rem off the item's bottom edge, and a wrapped label's second line ran
    into it. A deeper bottom padding keeps the bar below the text at any line count; one line stays at the 44px floor. */
 [data-style="neo"] .gn-group-toggle .gn-segmented__item {

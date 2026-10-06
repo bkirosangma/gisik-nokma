@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dropRules, dropSharedNowrap } from './css-controls.js';
 
 /*
  * The ticket sheet's four sections in a real browser (kg-walk-fixes-2 item 1; the release walk's P2-1), on
@@ -8,9 +9,9 @@ import { expect, test, type Page } from '@playwright/test';
  * - 27.680 / 27.681: with each section selected in turn, `.gn-sheet__body` never scrolls sideways, every label is ONE line
  *   (`Range.getClientRects()` of the tab's text, not the 44px button's height), and neo's selected bar lies below the whole
  *   label and within it. Below 40rem the track itself scrolls (overflow-x auto, wider than its box, 0.625rem a side); from
- *   641px it does not (overflow-x visible, 1rem a side). CONTROL, same leg at 360 and 1280: the sheet's rules deleted from
- *   the live stylesheet, the body scrolls sideways at 360 and "Knowledge Graph" breaks onto two lines under the bar at 1280
- *   while the other three stay one line.
+ *   641px it does not (overflow-x visible, 1rem a side). CONTROLs, same leg, on the live stylesheet: at 360 the sheet's
+ *   phone arm deleted, the body scrolls sideways; at 1280 the shared item's `nowrap` removed (case 27.686, ui.css
+ *   `.gn-segmented__item`), "Knowledge Graph" breaks onto two lines under the bar while the other three stay one line.
  * - 27.682: the keyboard alone (arrows with wraparound, Home, End) reaches all four at 360, and the selected tab is the
  *   focused one and wholly inside the track, clear of a faded edge.
  * - 27.683: a TAP on the visible sliver of Knowledge Graph at 360 and 390 brings it wholly into view, and the graph's
@@ -79,6 +80,8 @@ function inView(m: Measure, name: string): boolean {
 async function open(page: Page, width: number, query = ''): Promise<void> {
   await page.setViewportSize({ width, height: 800 });
   await page.goto(`/sheet-tabs.html${query}`);
+  // Vite may discover a dependency on a fresh cache and reload the page once: read nothing before the load that sticks.
+  await page.waitForLoadState('networkidle');
   expect(await page.evaluate(() => window.innerWidth), 'the literal viewport width took').toBe(width);
   await expect(page.getByRole('tablist', { name: 'Ticket sections' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Knowledge Graph' })).toBeVisible();
@@ -89,26 +92,6 @@ async function choose(page: Page, name: (typeof NAMES)[number]): Promise<void> {
   await page.getByRole('tab', { name }).click();
   await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
   if (name === 'Knowledge Graph') await expect(page.locator('.gn-kg__bar')).toBeVisible();
-}
-
-/** Deletes every rule naming the sheet's track class (inside media rules too); returns how many went. */
-function dropSectionsRules(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    let dropped = 0;
-    const sweep = (list: CSSRuleList, remove: (i: number) => void) => {
-      for (let i = list.length - 1; i >= 0; i -= 1) {
-        const rule = list[i]!;
-        if (rule instanceof CSSStyleRule && rule.selectorText.includes('gn-ticket-sheet__sections')) {
-          remove(i);
-          dropped += 1;
-        } else if (rule instanceof CSSMediaRule) {
-          sweep(rule.cssRules, (j) => rule.deleteRule(j));
-        }
-      }
-    };
-    for (const sheet of [...document.styleSheets]) sweep(sheet.cssRules, (i) => sheet.deleteRule(i));
-    return dropped;
-  });
 }
 
 const WIDTHS = [360, 390, 640, 641, 768, 1280] as const;
@@ -134,20 +117,23 @@ for (const width of WIDTHS) {
       if (width <= 390) expect(m.track.sw, 'the four are wider than the track: it really scrolls').toBeGreaterThan(m.track.cw);
       if (!phone) expect(m.track.sw, 'the four fit from 641px').toBe(m.track.cw);
     }
-    if (width === 360 || width === 1280) {
-      // CONTROL, same leg: the sheet's own rules gone, the walk's two failures come back.
-      // Knowledge Graph is still the selected section (the loop's last); layout is read synchronously after the deletion.
-      expect(await dropSectionsRules(page), 'the rules this leg depends on were found and deleted').toBe(3);
+    if (width === 360) {
+      // CONTROL, same leg: the sheet's phone arm gone, the walk's failure comes back. Knowledge Graph is still the selected
+      // section (the loop's last); layout is read synchronously after the deletion.
+      expect(await dropRules(page, 'gn-ticket-sheet__sections'), 'the phone arm\'s two rules were found and deleted').toBe(2);
       const bare = await measure(page);
       expect(bare.tabs.find((x) => x.selected)!.name).toBe('Knowledge Graph');
-      if (width === 360) {
-        expect(bare.body.sw, 'CONTROL: without the rules the body scrolls sideways at 360').toBeGreaterThan(bare.body.cw);
-      } else {
-        const graph = bare.tabs.find((x) => x.name === 'Knowledge Graph')!;
-        expect(graph.lines, 'CONTROL: without nowrap "Knowledge Graph" breaks in the 640px sheet').toBe(2);
-        expect(graph.bar!.top, 'CONTROL: and the bar crosses its second line').toBeLessThan(graph.textBottom);
-        for (const tab of bare.tabs.filter((x) => x.name !== 'Knowledge Graph')) expect(tab.lines, `CONTROL: ${tab.name} still one line`).toBe(1);
-      }
+      expect(bare.body.sw, 'CONTROL: without the phone arm the body scrolls sideways at 360').toBeGreaterThan(bare.body.cw);
+    }
+    if (width === 1280) {
+      // CONTROL, same leg: the shared item's nowrap gone (ui.css `.gn-segmented__item`), "Knowledge Graph" breaks again.
+      expect(await dropSharedNowrap(page), 'the shared one-line declaration was found and removed').toBe(1);
+      const bare = await measure(page);
+      const graph = bare.tabs.find((x) => x.name === 'Knowledge Graph')!;
+      expect(graph.selected).toBe(true);
+      expect(graph.lines, 'CONTROL: without nowrap "Knowledge Graph" breaks in the 640px sheet').toBe(2);
+      expect(graph.bar!.top, 'CONTROL: and the bar crosses its second line').toBeLessThan(graph.textBottom);
+      for (const tab of bare.tabs.filter((x) => x.name !== 'Knowledge Graph')) expect(tab.lines, `CONTROL: ${tab.name} still one line`).toBe(1);
     }
   });
 }

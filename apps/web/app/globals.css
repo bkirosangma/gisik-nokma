@@ -1148,14 +1148,24 @@ input, textarea, select { font-family: inherit; }
    button that should hug its label. */
 .gn-account__appearance { align-items: stretch; gap: 1rem; }
 
-/* At phone width the Style control's three labels (Apple HIG, Minimal, Neumorphic) need ~284px with the shared item's
-   `padding: 0 1rem`, and the card's content is 256px at 320 (12px shell + 20px card padding a side, less the track's own 4px),
-   so the track spilled ~36px out of the card in EVERY style; it only read as a page scroll (scrollWidth 321) in neo, where
-   the selected item is the longest label in weight 600. Half the side padding below 23rem (the card starts being narrower
-   than its labels at about 356px) makes them fit with room to spare. Scoped to this card and this width: the shared
-   `.gn-segmented__item` keeps `0 1rem` for sign-in, inbox, help and the ticket-type editor (20.661). */
-@media (max-width: 23rem) {
+/* At phone width the Style control's three labels (Apple HIG, Minimal, Neumorphic) are wider than the card. Each label is
+   ONE line (the shared `.gn-segmented__item`, kg-walk-fixes-2 item 1, case 27.686), so the track is measured whole: in neo
+   with Neumorphic selected (the longest label in weight 600; Chromium, 2026-10-06) it is 319px at the shared `0 1rem`
+   and 271px at `0 0.5rem`, against a card content of `viewport - 88px` (24px shell + 20px card padding a side), 232px at
+   320. Half the side padding up to 26rem (the whole track fits from 407px); below 22.4375rem (359px) even the half-padded
+   track is wider than the card, so it scrolls inside itself with a fading edge (`StyleToggle` passes `fade` and
+   `keepSelectedInView`) rather than spilling out of the card. Scoped to this card and these widths: the shared item keeps
+   `0 1rem` for sign-in, inbox, help and the ticket-type editor (20.661). */
+@media (max-width: 26rem) {
   .gn-account__appearance .gn-segmented__item { padding: 0 0.5rem; }
+}
+@media (max-width: 22.4375rem) {
+  .gn-account__appearance .gn-segmented {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-padding-inline: var(--gn-scroll-fade-size);
+  }
 }
 
 .gn-account__appearance-group {

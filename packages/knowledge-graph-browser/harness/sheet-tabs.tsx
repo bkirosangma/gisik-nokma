@@ -1,12 +1,14 @@
 import { createRoot } from 'react-dom/client';
+// The web app's stylesheet, then ui.css: the order the BUILT app serves them (measured on the stack, 2026-10-06:
+// globals.css's chunk is linked before ui.css's, although `apps/web/app/layout.tsx` imports ui.css first), so an
+// equal-specificity tie is won here as it is in the product (kg-walk-fixes-2 item 2, case 27.687).
+import '../../../apps/web/app/globals.css';
 import '@gisik-nokma/ui/ui.css';
 import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import { TicketSheet, type KnowledgeGraphSlotComponent } from '@gisik-nokma/app-core';
 import type { GraphRingResponse } from '@gisik-nokma/domain';
 import { KnowledgeGraph, type GraphSource, type ScopeChoices } from '@gisik-nokma/knowledge-graph';
 import { createSigmaRenderer } from '@gisik-nokma/knowledge-graph/sigma';
-// The web app's stylesheet, as the running app loads it beside ui.css (`apps/web/app/layout.tsx`).
-import '../../../apps/web/app/globals.css';
 // app-core's own sanctioned fake and seeds (`packages/app-core/test/helpers`), so the sheet reads what its unit cases read.
 import { createFakeDataSource } from '../../app-core/test/helpers/fake-data-source.js';
 import { WF_ERRAND, claim, ticketStateSeed } from '../../app-core/test/helpers/seed.js';

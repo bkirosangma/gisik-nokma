@@ -5,6 +5,9 @@ import { defineConfig } from 'vite';
 // configuration the product ships. Port KG_PW_PORT, else 3191 (never 3190, G-9's harness, or 3001, the dev stack); playwright.config.ts passes the same port.
 export default defineConfig({
   root: 'harness',
+  // The web app's Home components load spec C's view through `next/dynamic` (`home-graph-canvas.tsx`); the harness has no
+  // Next, so the import is answered by a React.lazy stand-in (`harness/next-dynamic-shim.tsx`, kg-walk-fixes-2).
+  resolve: { alias: { 'next/dynamic': resolve(__dirname, 'harness/next-dynamic-shim.tsx') } },
   esbuild: { jsx: 'automatic' },
   // The automatic runtime is injected by esbuild, so the dependency scan never sees it: without this Vite discovers it on the
   // first page load and RELOADS the page mid-test.

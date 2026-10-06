@@ -71,7 +71,7 @@ export function StyleToggle() {
   return (
     <div className="gn-account__appearance-group">
       <span className="gn-account__appearance-label">Style</span>
-      <SegmentedControl options={OPTIONS} value={style} onChange={apply} aria-label="Style" />
+      <SegmentedControl options={OPTIONS} value={style} onChange={apply} aria-label="Style" fade keepSelectedInView />
       <p className="gn-account__appearance-note">{NOTES[style]}</p>
     </div>
   );
