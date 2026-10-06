@@ -1,4 +1,5 @@
 'use client';
+import { Fragment, type ReactNode } from 'react';
 import { GROUP_OF_EDGE_KIND, type GraphGroup, type GraphItemView, type StateCategory } from '@gisik-nokma/domain';
 import { truncate } from '../engine/levels.js';
 import type { GraphStore } from '../engine/model.js';
@@ -33,12 +34,17 @@ export type InspectorProps = {
   onPick: (ref: string) => void;
   onAddScope: (key: ScopeKey) => void;
   status: string;
+  /** The host's concept body (`KnowledgeGraphProps.renderConceptPanel`, KG-D Task 8), for a selected concept only. */
+  renderConceptPanel?: (item: GraphItemView, ctx: { refresh: () => void }) => ReactNode;
+  /** The panel's `ctx.refresh`: the view re-reads the rings. */
+  onRefresh: () => void;
 };
 
 /**
  * The item inspector (the item half of `renderInsp`, `knowledge-graph-sigma.html:998-1027`): what it is, Center and Open,
  * what Center would bring in, the links that lead outside the scope, how it connects to the centre, and on a desktop the
- * references into it and its direct links.
+ * references into it and its direct links. For a concept the host may hand in its own body (spec D §6, KG-D Task 8):
+ * it stands in for the pill, the title and the "Items" list, and is keyed by the item, so a new selection is a new panel.
  */
 export function Inspector(p: InspectorProps) {
   const { item, store, zones } = p;
@@ -50,15 +56,16 @@ export function Inspector(p: InspectorProps) {
   const project = item.kind !== 'project' && item.projectId !== null ? p.scopeNames.project(item.projectId) : null;
   const home = item.kind === 'project' && item.workspaceId !== null ? p.scopeNames.workspace(item.workspaceId) : null;
   const addName = (key: ScopeKey) => ('projectId' in key ? p.scopeNames.project(key.projectId) : p.scopeNames.workspace(key.workspaceId)) ?? '';
+  const panel = item.kind === 'concept' && p.renderConceptPanel !== undefined ? <Fragment key={item.ref}>{p.renderConceptPanel(item, { refresh: p.onRefresh })}</Fragment> : null;
 
   return (
     <>
       <div className="gn-kg-insp__head">
         <Glyph item={item} />
         <span>{kindWord(item)}</span>
-        {item.kind === 'concept' && <span className={`gn-kg-pill${item.suggested ? ' gn-kg-pill--suggested' : ''}`}>{item.suggested ? 'Suggested' : 'Confirmed'}</span>}
+        {item.kind === 'concept' && panel === null && <span className={`gn-kg-pill${item.suggested ? ' gn-kg-pill--suggested' : ''}`}>{item.suggested ? 'Suggested' : 'Confirmed'}</span>}
       </div>
-      <h3 className="gn-kg-insp__title">{item.kind === 'ticket' ? item.title ?? item.label : item.label}</h3>
+      {panel ?? <h3 className="gn-kg-insp__title">{item.kind === 'ticket' ? item.title ?? item.label : item.label}</h3>}
       {(item.category !== null || project !== null || home !== null) && (
         <div className="gn-kg-insp__meta">
           {item.category !== null && (
@@ -112,7 +119,7 @@ export function Inspector(p: InspectorProps) {
           </ol>
         </section>
       )}
-      {!p.phone && <DesktopLists {...p} />}
+      {!p.phone && panel === null && <DesktopLists {...p} />}
     </>
   );
 }

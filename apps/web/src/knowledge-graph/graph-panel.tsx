@@ -2,7 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { makeSubmittedFactory } from '@gisik-nokma/app-core';
+import { useState } from 'react';
+import { ConceptInspector, actorLabel, actorLabelFrom, makeSubmittedFactory, useActorNames } from '@gisik-nokma/app-core';
 import { parseGraphRef, type GraphEdgeView, type GraphItemView, type TicketLinkKind } from '@gisik-nokma/domain';
 import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { useAppServices, useCurrentUser } from '../providers.js';
@@ -26,13 +27,14 @@ export type GraphPanelProps = {
 
 /**
  * The Knowledge Graph as the web hosts it (KG-C T9): the ticket sheet's fourth tab and the note's panel. It hands the
- * view the app's graph gateway, the viewer's scope choices, a page per kind to open, and spec A's link removal.
+ * view the app's graph gateway, the viewer's scope choices, a page per kind to open, spec A's link removal, and spec
+ * D's concept inspector for a selected concept (KG-D Task 8).
  */
 export function GraphPanel(props: GraphPanelProps) {
   const { graph, dataSource } = useAppServices();
   const actorId = useCurrentUser()?.id ?? ''; // the panel only mounts signed in (the sheet and the note are)
   const phone = useIsPhone();
-  const { scope, error } = useGraphScope();
+  const { scope, guests, error } = useGraphScope();
   const router = useRouter();
   if (error !== null) return <ShellRefusal what="Your workspaces" message={error} />;
   if (scope === null) {
@@ -83,7 +85,42 @@ export function GraphPanel(props: GraphPanelProps) {
         canOpen={(item) => item.kind !== 'person' && item.kind !== 'concept' && (item.kind !== 'ticket' || props.onOpenTicket !== undefined)}
         onAddLink={props.onShowLinks ? () => props.onShowLinks!() : undefined}
         onRemoveLink={onRemoveLink}
+        renderConceptPanel={(item, ctx) => {
+          const workspaceId = item.workspaceId ?? props.workspaceId;
+          return <ConceptPanel item={item} workspaceId={workspaceId} actorId={actorId} readOnly={guests.has(workspaceId)} refresh={ctx.refresh} />;
+        }}
       />
     </div>
+  );
+}
+
+type ConceptPanelProps = { item: GraphItemView; workspaceId: string; actorId: string; readOnly: boolean; refresh: () => void };
+
+/**
+ * Spec D §6 (KG-D Task 8): the concept inspector inside the view. People are named from the workspace's names-only
+ * read; a refusal is reported in the server's words until the next write commits; any commit re-reads the rings in
+ * place (`ctx.refresh`), so an untag or a confirmed suggestion is drawn at once. The view mounts one per selection.
+ */
+function ConceptPanel(p: ConceptPanelProps) {
+  const { dataSource } = useAppServices();
+  const names = useActorNames(dataSource, p.workspaceId);
+  const [refusal, setRefusal] = useState<{ rule: string; reason: string } | null>(null);
+  return (
+    <>
+      <ConceptInspector
+        item={p.item}
+        workspaceId={p.workspaceId}
+        dataSource={dataSource}
+        make={makeSubmittedFactory({ actorId: p.actorId, origin: 'web' })}
+        nameOf={(id) => actorLabel(id, actorLabelFrom(id, null, names))}
+        onChanged={() => {
+          setRefusal(null);
+          p.refresh();
+        }}
+        onRefusal={setRefusal}
+        readOnly={p.readOnly}
+      />
+      {refusal !== null && <p role="alert" className="gn-refusal gn-refusal--server">{`Refused by the server: ${refusal.rule}: ${refusal.reason}`}</p>}
+    </>
   );
 }

@@ -407,6 +407,12 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
               onPick={pick}
               onAddScope={addScope}
               status={status}
+              renderConceptPanel={props.renderConceptPanel}
+              onRefresh={() =>
+                rings.reload(() => {
+                  keepView.current = true;
+                })
+              }
             />
           ) : (
             <p className="gn-kg__status" aria-live="polite">

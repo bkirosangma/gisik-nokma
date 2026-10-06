@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { GraphEdgeView, GraphGroup, GraphItemView, GraphRingResponse } from '@gisik-nokma/domain';
 import type { RingConfigName } from '../engine/layout.js';
 import type { CreateRenderer } from '../render/renderer.js';
@@ -40,6 +41,13 @@ export type KnowledgeGraphProps = {
   onRemoveLink?: (edge: GraphEdgeView) => Promise<{ undo: () => Promise<void> }>;
   /** A typed link this viewer may not remove gets no button (A §2.3). Default: all. */
   canRemoveLink?: (edge: GraphEdgeView) => boolean;
+  /**
+   * Spec D §6 (KG-D Task 8): the host's body for a selected concept, a suggestion included. It stands in for the
+   * inspector's own concept body (the Confirmed/Suggested pill, the title and the "Items" list); the head's kind word,
+   * Center, the live region and the path stay the view's. `ctx.refresh` re-reads the rings after a write the panel
+   * committed and redraws in place, the camera kept. Absent = the view's own body.
+   */
+  renderConceptPanel?: (item: GraphItemView, ctx: { refresh: () => void }) => ReactNode;
   /** Hide the bar's Hops control (Home draws its own). */
   showHops?: boolean;
   /** Tests and the harness inject a renderer; default = the Sigma adapter, loaded with `import()`. */
