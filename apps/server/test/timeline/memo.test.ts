@@ -127,7 +127,7 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     expect(c.computes()).toBe(2);
   });
 
-  it('29.299 the memo holds 8 cores: with 8 kept every one is sliced; a 9th evicts the OLDEST, and only it', async () => {
+  it('29.299 the memo holds 8 cores: with 8 kept every one is sliced; a 9th evicts the OLDEST kept, and only it (a core kept again is the newest)', async () => {
     expect(TIMELINE_CORE_MEMO_MAX).toBe(8);
     const c = counting();
     const keys = [w.ama, w.bo].flatMap((viewer) =>
@@ -138,12 +138,14 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     expect(c.computes()).toBe(8);
     for (const k of keys.slice(0, 8)) await (await view(k)).chunk();
     expect(c.computes()).toBe(8); // all 8 kept
+    await (await view(keys[0] as (typeof keys)[number])).index(); // kept again: now the newest
     await (await view(keys[8] as (typeof keys)[number])).index();
-    expect(c.computes()).toBe(9);
-    await (await view(keys[1] as (typeof keys)[number])).chunk();
-    expect(c.computes()).toBe(9); // the second-oldest is still kept
+    expect(c.computes()).toBe(10);
+    await (await view(keys[2] as (typeof keys)[number])).chunk();
     await (await view(keys[0] as (typeof keys)[number])).chunk();
-    expect(c.computes()).toBe(10); // the oldest was evicted
+    expect(c.computes()).toBe(10); // the third-oldest and the re-kept one are still kept
+    await (await view(keys[1] as (typeof keys)[number])).chunk();
+    expect(c.computes()).toBe(11); // the oldest kept (keys[1], once keys[0] moved up) was evicted
   });
 
   it('29.299 a compute that fails is not kept: the next read computes again; control: a kept core is reused', async () => {
@@ -163,6 +165,56 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     expect(c.computes()).toBe(1);
     await r.tray();
     expect(c.computes()).toBe(1);
+  });
+
+  /** A pool whose scope statement hangs until `fail()` rejects it; `started` settles once that statement is issued (its core is kept by then). */
+  function gated(): { pool: Queryable; fail: () => void; started: Promise<void> } {
+    let fail = (): void => undefined;
+    let start = (): void => undefined;
+    const started = new Promise<void>((resolve) => {
+      start = resolve;
+    });
+    const gate = new Promise<never>((_resolve, reject) => {
+      fail = () => reject(new Error('scope statement failed late'));
+    });
+    gate.catch(() => undefined);
+    const pool = new Proxy(db.pool, {
+      get(target, prop, receiver) {
+        if (prop !== 'query') return Reflect.get(target, prop, receiver);
+        return (text: string, values?: unknown[]) => {
+          if (typeof text !== 'string' || !text.includes('AS in_scope')) return (target.query as (t: string, v?: unknown[]) => Promise<unknown>)(text, values);
+          start();
+          return gate;
+        };
+      },
+    }) as unknown as Queryable;
+    return { pool, fail: () => fail(), started };
+  }
+
+  it('29.299 a compute that fails LATE never drops the newer core kept for its key; control: that core is then sliced', async () => {
+    const c = counting();
+    const slow = gated();
+    const lost = (await reads(slow.pool, w.ama)).chunk();
+    await slow.started; // kept, still computing
+    await (await reads(c.pool, w.ama)).index(); // the same key, kept again, done
+    slow.fail();
+    await expect(lost).rejects.toThrow('scope statement failed late');
+    await (await reads(c.pool, w.ama)).chunk();
+    expect(c.computes()).toBe(1); // the index's core survived the late failure
+  });
+
+  it('29.299 a compute that fails after its key was evicted fails quietly (no stray rejection); control: the key computes again', async () => {
+    const c = counting();
+    const slow = gated();
+    const lost = (await reads(slow.pool, w.ama)).chunk();
+    await slow.started;
+    for (const projectIds of [[w.A.p1], [w.A.p2], [w.A.p1, w.A.p2].sort()]) for (const mine of [false, true]) await (await reads(c.pool, w.bo, scopeOf({ mine, projectIds }))).index();
+    for (const mine of [false, true]) await (await reads(c.pool, w.bo, scopeOf({ mine }))).index(); // 8 newer cores: the slow one's key is out
+    slow.fail();
+    await expect(lost).rejects.toThrow('scope statement failed late');
+    await new Promise((resolve) => setTimeout(resolve, 20)); // let a throwing catch handler surface as an unhandled rejection
+    await (await reads(c.pool, w.ama)).chunk();
+    expect(c.computes()).toBe(9);
   });
 
   it('29.299 the key separates viewer, scope, day, asOf and role; control: the same inputs are one key', async () => {

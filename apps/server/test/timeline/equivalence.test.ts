@@ -25,8 +25,8 @@ const NOW = new Date('2026-10-03T06:00:00.000Z');
 let db: TestDatabase;
 let w: TimelineWorld;
 const x = Object.fromEntries(
-  ['desc', 'worked', 'reopened', 'ranked', 'child', 'D', 'T', 'N', 'L1', 'LD', 'L2', 'bHead', 'bTail', 'single1', 'single2', 'dueOnly'].map((k) => [k, newUlid()]),
-) as Record<string, string> as Record<'desc' | 'worked' | 'reopened' | 'ranked' | 'child' | 'D' | 'T' | 'N' | 'L1' | 'LD' | 'L2' | 'bHead' | 'bTail' | 'single1' | 'single2' | 'dueOnly', string>;
+  ['desc', 'worked', 'reopened', 'ranked', 'child', 'D', 'T', 'N', 'L1', 'LD', 'L2', 'bHead', 'bTail', 'single1', 'single2', 'dueOnly', 'J1', 'J2', 'JT'].map((k) => [k, newUlid()]),
+) as Record<string, string> as Record<'desc' | 'worked' | 'reopened' | 'ranked' | 'child' | 'D' | 'T' | 'N' | 'L1' | 'LD' | 'L2' | 'bHead' | 'bTail' | 'single1' | 'single2' | 'dueOnly' | 'J1' | 'J2' | 'JT', string>;
 let draft = '';
 
 beforeAll(async () => {
@@ -77,6 +77,13 @@ beforeAll(async () => {
     created(A, x.single2, 'Single undated'),
     created(A, x.dueOnly, 'Due only', { dueDate: { date: '2026-10-12' } }),
     ev(A.workspaceId, x.single1, 'ticket.link_added', { kind: 'blocks', targetId: x.single2 }),
+    // a join that waits for all: JT starts after the LATER of J1 and J2 (without waitForAll, after the earlier)
+    created(A, x.J1, 'Join one', { startDate: { date: '2026-10-05' }, estimate: 1 }),
+    created(A, x.J2, 'Join two', { startDate: { date: '2026-10-08' }, estimate: 1 }),
+    created(A, x.JT, 'Joined', { estimate: 1 }),
+    ev(A.workspaceId, x.JT, 'ticket.field_set', { fieldId: 'waitForAll', value: true }),
+    lead(A, x.J1, x.JT),
+    lead(A, x.J2, x.JT),
     // a flow in B
     created(B, x.bHead, 'B head', { startDate: { date: '2026-10-08' }, estimate: 2 }),
     created(B, x.bTail, 'B tail', { estimate: 3 }),
@@ -161,5 +168,33 @@ describe('29.295 / 29.299 the (c) changes answer exactly what the 1882524a reads
     for (const id of [x.desc, x.worked, x.L1, x.L2, w.t.fNo, draft, x.bHead, x.single1]) expect(amaAll).toContain(id);
     expect(amaAll).toContain('"type":"ghost"');
     expect(amaAll).not.toContain('A long description');
+    expect(amaAll).toContain(`{"id":"${x.JT}"`);
+    const jt = JSON.parse(amaAll).items.find((e: { id: string }) => e.id === x.JT) as { segments: { start: string }[] };
+    expect(jt.segments[0]?.start).toBe('2026-10-09'); // waits for J2 (10-08): the waitForAll claim reached the plan
+  });
+
+  it('29.295 the scope and draft statements fetch no history, links or description: only the fold\'s columns and claims; control: the table holds them', async () => {
+    const fetched: Record<string, unknown>[] = [];
+    const recording = new Proxy(db.pool, {
+      get(target, prop, receiver) {
+        if (prop !== 'query') return Reflect.get(target, prop, receiver);
+        return async (text: string, values?: unknown[]) => {
+          const r = (await (target.query as (t: string, v?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>)(text, values));
+          // the load's two ticket statements: the scope statement (`AS in_scope`) and the draft statement (its deleted-draft clause)
+          if (typeof text === 'string' && /FROM proj_tickets t/.test(text) && (text.includes('AS in_scope') || text.includes('AND t.deleted_at IS NULL'))) fetched.push(...r.rows);
+          return r;
+        };
+      },
+    }) as unknown as typeof db.pool;
+    const scope = scopeOf([w.A.workspaceId], false);
+    await readTimelineIndex(recording, await readableWorkspaces(db.pool, w.ama, scope), w.ama, scope, NOW);
+    expect(fetched.some((r) => r['ticket_id'] === draft)).toBe(true); // the draft statement is among them
+    expect(fetched.some((r) => r['ticket_id'] === x.desc)).toBe(true);
+    for (const r of fetched) {
+      expect(Object.keys(r).filter((k) => ['transitions', 'links', 'pending_children', 'rank', 'reopened_at', 'draft_author_id', 'started_at'].includes(k))).toEqual([]);
+      expect(Object.keys(r['fields'] as object).filter((k) => !['title', 'startDate', 'dueDate', 'estimate', 'reworkEstimate', 'waitForAll'].includes(k))).toEqual([]);
+    }
+    const desc = fetched.find((r) => r['ticket_id'] === x.desc) as { fields: Record<string, unknown> };
+    expect(Object.keys(desc.fields).sort()).toEqual(['estimate', 'startDate', 'title']); // an absent claim is absent, not null
   });
 });

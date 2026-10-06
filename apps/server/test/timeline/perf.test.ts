@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, planFlow, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, planAlone, planFlow, type FlowNode, type LedgerEvent } from '@gisik-nokma/domain';
+import type { Queryable } from '../../src/db/queryable.js';
 import { readFlowView } from '../../src/flow/flow-view.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { cardKeysFor } from '../../src/read/ticket-cards.js';
-import { assembleScope, componentsOf } from '../../src/timeline/assemble.js';
+import { assembleScope, componentsOf, type LoadedEdge } from '../../src/timeline/assemble.js';
 import { computeScope } from '../../src/timeline/compute.js';
 import { loadPins, loadWorkspace } from '../../src/timeline/load.js';
+import { forgetCores } from '../../src/timeline/memo.js';
 import { readTimelineChunk } from '../../src/timeline/read-chunk.js';
 import { readTimelineIndex } from '../../src/timeline/read-index.js';
 import { readHomeSummary } from '../../src/timeline/read-summary.js';
@@ -44,6 +46,21 @@ let bigRoot = '';
 function percentile(sorted: number[], fraction: number): number {
   const at = Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1);
   return sorted[Math.max(0, at)] as number;
+}
+
+/** A pool that counts core computes (the scope statement, one per workspace per compute). */
+function counting(): { pool: Queryable; computes: () => number } {
+  let n = 0;
+  const pool = new Proxy(db.pool, {
+    get(target, prop, receiver) {
+      if (prop !== 'query') return Reflect.get(target, prop, receiver);
+      return (text: string, values?: unknown[]) => {
+        if (typeof text === 'string' && text.includes('AS in_scope')) n += 1;
+        return (target.query as (t: string, v?: unknown[]) => Promise<unknown>)(text, values);
+      };
+    },
+  }) as unknown as Queryable;
+  return { pool, computes: () => n };
 }
 
 /** 10 warm-up calls, `RUNS` timed ones, the p95. */
@@ -174,15 +191,24 @@ describe('29.290–29.293 the Timeline reads meet their bars at the floor size',
     for (const p95 of out) expect.soft(p95, 'spec §13: index p95 ≤ 400 ms').toBeLessThanOrEqual(400);
   }, 3_600_000);
 
-  it('29.291 readTimelineChunk p95 ≤ 150 ms per 200-item page, six 28-day windows across the range', async () => {
+  it('29.291 readTimelineChunk p95 ≤ 150 ms per 200-item page after its index (the client\'s order), six 28-day windows across the range', async () => {
     const windows = [0, 56, 112, 168, 224, 280].map((s) => ({ from: day(s), to: day(s + 27) }));
     const out: number[] = [];
     for (const c of combos()) {
       const readable = await readableFor(c.id, c.scope);
-      const sizes = await Promise.all(windows.map(async (win) => (await readTimelineChunk(db.pool, readable, c.id, c.scope, NOW, win)).items.length));
-      const p95 = await p95Of((i) => readTimelineChunk(db.pool, readable, c.id, c.scope, NOW, windows[i % 6] as { from: string; to: string }));
-      console.log(`timeline-perf: readTimelineChunk p95 ${p95.toFixed(1)} ms (page sizes ${sizes.join('/')}, 3 workspaces, ${c.role}, ${c.mine ? 'mine' : 'everyone'}), machine ${MACHINE}`);
+      const counted = counting();
+      await readTimelineIndex(db.pool, readable, c.id, c.scope, NOW); // the index computes and keeps the core (memo.ts, owner ruling (b))
+      const sizes = await Promise.all(windows.map(async (win) => (await readTimelineChunk(counted.pool, readable, c.id, c.scope, NOW, win)).items.length));
+      const p95 = await p95Of((i) => readTimelineChunk(counted.pool, readable, c.id, c.scope, NOW, windows[i % 6] as { from: string; to: string }));
+      expect(counted.computes(), 'every timed chunk sliced the kept core: none recomputed it').toBe(0);
+      console.log(`timeline-perf: readTimelineChunk p95 ${p95.toFixed(1)} ms (page sizes ${sizes.join('/')}, 3 workspaces, ${c.role}, ${c.mine ? 'mine' : 'everyone'}, after its index), machine ${MACHINE}`);
       out.push(p95);
+      // report only: a chunk whose core is NOT kept (the TTL ran out, or another instance) costs a compute
+      const cold = await p95Of((i) => {
+        forgetCores();
+        return readTimelineChunk(db.pool, readable, c.id, c.scope, NOW, windows[i % 6] as { from: string; to: string });
+      });
+      console.log(`timeline-perf-profile: readTimelineChunk COLD p95 ${cold.toFixed(1)} ms (no kept core; report only), ${c.role}, ${c.mine ? 'mine' : 'everyone'}`);
     }
     for (const p95 of out) expect.soft(p95, 'spec §13: chunk page p95 ≤ 150 ms').toBeLessThanOrEqual(150);
   }, 3_600_000);
@@ -241,15 +267,21 @@ describe('29.290–29.293 the Timeline reads meet their bars at the floor size',
           t0 = performance.now();
           assembleScope({ tickets: loaded.tickets, edges: loaded.edges, keys, pins, today: '2026-10-03' });
           sums.assemble += performance.now() - t0;
-          // planFlow alone over the same components (what assembleScope plans, without the segments and the rows)
+          // the planning alone, as assembleScope does it since (c): edges bucketed in one pass, an edgeless component by planAlone
           const byId = new Map(loaded.tickets.map((t) => [t.id, t.node]));
           t0 = performance.now();
-          for (const members of componentsOf([...byId.keys()], loaded.edges).values()) {
-            const set = new Set(members);
-            planFlow({
-              nodes: members.map((m) => byId.get(m) as never),
-              edges: loaded.edges.filter((e) => e.kind === 'leads_to' && set.has(e.from) && set.has(e.to)).map((e) => ({ sourceId: e.from, targetId: e.to, label: e.label })),
-            });
+          const components = componentsOf([...byId.keys()], loaded.edges);
+          const rootOf = new Map<string, string>();
+          for (const [root, members] of components) for (const m of members) rootOf.set(m, root);
+          const leadsOf = new Map<string, LoadedEdge[]>();
+          for (const e of loaded.edges) {
+            const r = rootOf.get(e.from);
+            if (e.kind === 'leads_to' && r !== undefined && r === rootOf.get(e.to)) leadsOf.set(r, [...(leadsOf.get(r) ?? []), e]);
+          }
+          for (const [root, members] of components) {
+            const leads = leadsOf.get(root) ?? [];
+            if (leads.length === 0) planAlone(byId.get(root) as FlowNode);
+            else planFlow({ nodes: members.map((m) => byId.get(m) as FlowNode), edges: leads.map((e) => ({ sourceId: e.from, targetId: e.to, label: e.label })) });
           }
           sums.planOnly += performance.now() - t0;
           if (round === 0 && workspaceId === readable[0]?.workspaceId) {
@@ -262,6 +294,12 @@ describe('29.290–29.293 the Timeline reads meet their bars at the floor size',
         await computeScope(db.pool, readable, c.id, c.scope, NOW);
         stage.core.push(performance.now() - t0);
       }
+      // the memo bound (TIMELINE_CORE_MEMO_MAX) is chosen against this: one core as JSON, and the heap it holds
+      const heap0 = process.memoryUsage().heapUsed;
+      const held = await computeScope(db.pool, readable, c.id, c.scope, NOW);
+      const heap1 = process.memoryUsage().heapUsed;
+      const json = JSON.stringify(held, (_k, v: unknown) => (v instanceof Map ? [...v] : v)).length;
+      console.log(`timeline-perf-profile: one core ${c.role} ${c.mine ? 'mine' : 'everyone'}: JSON ${(json / 1e6).toFixed(2)} MB, heap delta ${((heap1 - heap0) / 1e6).toFixed(1)} MB (no forced GC: a rough upper reading)`);
       const line = (Object.keys(stage) as (keyof typeof stage)[]).map((k) => `${k} ${median(stage[k]).toFixed(1)}`).join(', ');
       console.log(`timeline-perf-profile: ${c.role} ${c.mine ? 'mine' : 'everyone'} medians over 12 rounds, ms, summed over the 3 workspaces (computeScope runs them in parallel): ${line}`);
       expect(explain.length).toBeGreaterThan(0);

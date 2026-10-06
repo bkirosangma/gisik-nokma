@@ -175,7 +175,8 @@ export function planAlone(n: FlowNode): NodePlan {
   for (let k = 2; k <= n.rounds; k += 1) cells.push(laterPass(n, k, null));
   const intervals = cells.flatMap((c) => (c.interval === null ? [] : [c.interval]));
   const last = cells[cells.length - 1] as Cell;
-  return { intervals, unscheduled: last.interval === null ? last.reason : null, onTimeline: intervals.length > 0 || n.periods.length > 0 };
+  // a cell with an interval carries `reason: null` (`firstPass`, `laterPass`), so the last cell's reason is planFlow's `unscheduled`
+  return { intervals, unscheduled: last.reason, onTimeline: intervals.length > 0 || n.periods.length > 0 };
 }
 
 /** PL-3, row by row, in the spec's order: explicit dates win. */
