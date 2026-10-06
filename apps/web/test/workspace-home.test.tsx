@@ -525,7 +525,7 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.673 the workspace-section links resolve to the real routes', () => {
-  it('carries four links, two workspace-scoped and two query-scoped, ABOVE the Projects heading (22.120)', async () => {
+  it('carries four links, My work (global since my-work-global T4), one workspace-scoped and two query-scoped, ABOVE the Projects heading (22.120)', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     // 22.120 (prefixes and groups Task 7): the section row moved from the foot of the page to the top —
@@ -534,7 +534,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
     const projectsHeading = screen.getByRole('heading', { name: 'Projects' });
     expect(nav.compareDocumentPosition(projectsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const expected: Array<[string, string]> = [
-      ['My work', `/w/${WORKSPACE}/my-work`],
+      ['My work', '/my-work'],
       ['Members', `/w/${WORKSPACE}/members`],
       ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
       ['Workflows', `/settings?workspaceId=${WORKSPACE}&tab=workflows`],
@@ -569,7 +569,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     expect(
-      within(nav).getByText('Everything assigned to you across this workspace.'),
+      within(nav).getByText('Everything assigned to you, across all your workspaces.'),
     ).toBeInTheDocument();
     expect(
       within(nav).getByText('5 people: roles and pending invitations.'),

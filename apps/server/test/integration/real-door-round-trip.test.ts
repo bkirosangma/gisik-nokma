@@ -477,6 +477,11 @@ describe('GET /v1/me/workspaces — the directory', () => {
           // real `POST /v1/workspaces`.
           prefix: 'RT',
           role: 'owner',
+          // My-work-global T1 (30.011), and NOT empty: the project this run
+          // founded through the real door put its founder on the roster as its
+          // project admin, so the owner administers it — the one place that is
+          // asserted against the real ingest path rather than a seeded row.
+          adminProjectIds: [projectId],
           archived: false,
           // Task 16's counts, and this file is the one place they are asserted
           // against a world built ENTIRELY through the real doors — the
