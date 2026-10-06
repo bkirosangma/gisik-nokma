@@ -126,7 +126,7 @@ describe('29.370 the Decision gates', () => {
     // control: the same choice with an applicable plan
     expect(await makeDecisionGates({ plan: clearPlan, canSeeTicket: yes })[1]!.check(sub(d, 'ticket.decided', { outcome: 'Ship' }), db.pool)).toBeNull();
     // closeStarted reaches the planner (from the claim)
-    const withList = vi.fn(clearPlan);
+    const withList = vi.fn((_input: Parameters<typeof planSettle>[0]) => clearPlan());
     await makeDecisionGates({ plan: withList, canSeeTicket: yes })[1]!.check(sub(d, 'ticket.decided', { outcome: 'Ship', closeStarted: [z] }), db.pool);
     expect(withList.mock.calls[0]![0].closeStarted).toEqual([z]);
   });
