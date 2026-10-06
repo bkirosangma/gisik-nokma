@@ -136,3 +136,16 @@ describe('27.532 KG-D Task 8: the concept inspector is three tools\' app surface
     expect(legsOf({ ...links, surface: { ...links.surface!, marker: 'gn-kg-concept__links' } })).toEqual(['surface']);
   });
 });
+
+describe('27.547 KG-D Task 9: the Concepts row is tag_items\' app surface, so the ratchet holds no concept tool', () => {
+  it('27.547 KNOWN_D2_GAPS holds no concept tool and tag_items passes all three legs on concepts-row.tsx; control: the same row with its marker renamed fails surface alone', () => {
+    const conceptTools = ['manage_concept', 'tag_items', 'link_concepts', 'resolve_suggestion'];
+    // precondition: these four are the audit's concept write tools, each with a row
+    expect(Object.keys(MCP_WRITE_AUDIT).filter((tool) => MCP_WRITE_AUDIT[tool]!.events.some((type) => type.startsWith('concept.') || type.includes('concept_suggestion'))).sort()).toEqual([...conceptTools].sort());
+    expect(Object.keys(KNOWN_D2_GAPS).filter((key) => conceptTools.includes(key.split('#')[0]!))).toEqual([]);
+    expect(MCP_WRITE_AUDIT['tag_items']!.surface).toEqual({ file: 'packages/app-core/src/views/concepts-row.tsx', marker: 'Remove from concept' });
+    expect(failuresOf('tag_items')).toEqual([]);
+    const tag = MCP_WRITE_AUDIT['tag_items']!;
+    expect(legsOf({ ...tag, surface: { ...tag.surface!, marker: 'Untag from concept' } })).toEqual(['surface']);
+  });
+});

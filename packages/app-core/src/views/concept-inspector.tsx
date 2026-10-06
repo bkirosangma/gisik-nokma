@@ -1,9 +1,11 @@
-import { newUlid, type GraphItemView, type IngestResult, type SubmittedEvent, type SuggestionView } from '@gisik-nokma/domain';
+import { newUlid, type ConceptView, type GraphItemView, type IngestResult, type SubmittedEvent, type SuggestionView } from '@gisik-nokma/domain';
 import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { DataSource } from '../data-source.js';
 import { attributionLabel } from '../provenance.js';
 import type { MakeSubmitted } from '../submit.js';
+import type { TicketHistoryEvent } from '../view-types.js';
+import { HistoryList } from './history-list.js';
 import { useConcept } from './use-concept.js';
 
 export type ConceptInspectorProps = {
@@ -263,7 +265,54 @@ function ConfirmedPanel(props: ConceptInspectorProps) {
           </div>
         </div>
       ) : null}
+      {/* Keyed by the concept: selecting another one closes the disclosure and drops what this one read. */}
+      <ConceptHistory key={c.id} concept={c} dataSource={props.dataSource} nameOf={props.nameOf} />
     </section>
+  );
+}
+
+/**
+ * Spec D §6 (KG-D Task 9): the concept's History, every `concept.*` event in its ledger. Read only when the disclosure is
+ * opened (and again on each opening), never with the panel. The sentences name only what the reader can see: a linked
+ * concept by its name in this concept's links, a tagged item by its label among this concept's live items; any other
+ * item (redacted by the server, `itemId: ''`, or no longer held) reads "a ticket" / "a note".
+ */
+function ConceptHistory(props: { concept: ConceptView; dataSource: DataSource; nameOf: (userId: string) => string }) {
+  const { concept, dataSource } = props;
+  const [read, setRead] = useState<TicketHistoryEvent[] | 'loading' | 'failed' | null>(null);
+  function load(): void {
+    setRead((r) => (Array.isArray(r) ? r : 'loading'));
+    dataSource.query.getConceptHistory(concept.id).then(setRead, () => setRead('failed'));
+  }
+  return (
+    <details
+      className="gn-kg-concept__history"
+      onToggle={(e) => {
+        if (e.currentTarget.open) load();
+      }}
+    >
+      <summary>History</summary>
+      {read === 'failed' ? (
+        <div className="gn-kg-concept__note">
+          <p>The history could not be loaded.</p>
+          <button className="gn-button gn-button--ghost" type="button" onClick={load}>
+            Try again
+          </button>
+        </div>
+      ) : Array.isArray(read) ? (
+        <HistoryList
+          events={read}
+          nameOf={props.nameOf}
+          conceptName={(id) => concept.links.find((l) => l.otherId === id)?.otherName ?? id}
+          itemLabel={(kind, id) => concept.items.find((i) => i.kind === kind && i.id === id)?.label}
+        />
+      ) : read === null ? null : (
+        // The wait is a skeleton named once for assistive tech, never a sentence (spec S7, case 25.121).
+        <SkeletonRegion label="Loading history">
+          <Skeleton rows={3} height="0.875rem" />
+        </SkeletonRegion>
+      )}
+    </details>
   );
 }
 

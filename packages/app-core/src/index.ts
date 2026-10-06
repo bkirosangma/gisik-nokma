@@ -148,6 +148,7 @@ export {
 export { TicketSheet, HISTORY_PAGE_LIMIT, type TicketSheetProps } from './views/ticket-sheet.js';
 export { TicketNotesSection, type TicketNotesSectionProps } from './views/ticket-notes-section.js';
 export { ConceptInspector, type ConceptInspectorProps } from './views/concept-inspector.js';
+export { ConceptsRow, type ConceptsRowProps } from './views/concepts-row.js';
 export { LinkedFromSection, linkedFromHref, type LinkedFromSectionProps } from './views/linked-from-section.js';
 export {
   UnansweredClaimError,

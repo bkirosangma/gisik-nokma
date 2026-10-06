@@ -46,20 +46,30 @@ import { describeEvent, type HistoryCopyContext } from './history-copy.js';
  * twice would say nothing extra. `ctx` is optional in full: with no resolvers
  * the sentences fall back to the raw ids, which is the same floor `nameOf`
  * gives the actor line — never blank, never invented.
+ *
+ * It renders a ticket's history (the sheet's History tab) and, since Knowledge
+ * Graph D Task 9, a concept's (the concept inspector's History disclosure, with
+ * the `conceptName` / `itemLabel` resolvers below). An item `itemLabel` does not
+ * know reads "a ticket" / "a note", never its id (`history-copy.ts`).
  */
 export function HistoryList({
   events,
   nameOf,
   stateName,
   typeName,
+  conceptName,
+  itemLabel,
 }: {
   events: TicketHistoryEvent[];
   nameOf: (userId: string) => string;
   /** Optional resolvers for the sentences — see `HistoryCopyContext`. */
   stateName?: (stateId: string) => string;
   typeName?: (typeId: string) => string;
+  /** Knowledge Graph spec D (KG-D Task 9): a concept's History names the concepts it links to and the items it holds. */
+  conceptName?: (conceptId: string) => string;
+  itemLabel?: (kind: 'ticket' | 'note', id: string) => string | undefined;
 }) {
-  const ctx: HistoryCopyContext = { nameOf, stateName, typeName };
+  const ctx: HistoryCopyContext = { nameOf, stateName, typeName, conceptName, itemLabel };
   return (
     <>
       <ol className="gn-history">

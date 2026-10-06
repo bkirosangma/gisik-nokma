@@ -1,5 +1,7 @@
 import type {
   ConceptAudienceResponse,
+  ConceptItemRef,
+  ConceptSummary,
   ConceptView,
   DeletedItem,
   GroupRow,
@@ -275,6 +277,12 @@ export type DataSourceQuery = {
    * `add`. `conceptId` is null for a concept that does not exist yet (a suggestion being confirmed). A 404 is re-raised.
    */
   getConceptAudience(workspaceId: string, conceptId: string | null, add: readonly ConceptAudienceItem[]): Promise<ConceptAudienceResponse>;
+  /**
+   * The concepts that hold one item, for the Concepts row on its Details (KG-D Task 9, spec D §6): `GET
+   * /v1/workspaces/:id/concepts?item=<kind>:<id>`, D4 per reader. A 404 (a hidden or trashed item, a non-member) is
+   * re-raised, never `[]`. Replica: refuses with `ReplicaGapError` (concepts are online-only).
+   */
+  getItemConcepts(workspaceId: string, item: ConceptItemRef): Promise<ConceptSummary[]>;
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:

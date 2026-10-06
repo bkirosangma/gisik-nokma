@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { GRAPH_CHIP_ORDER, type GraphGroup, type GraphItemView, type HomeNumberKey, type HomeResponse } from '@gisik-nokma/domain';
 // Types only: erased at build, so nothing from the package root reaches the server (27.657).
-import type { GraphSource, GraphZonesSummary, HopChoice, ScopeChoices } from '@gisik-nokma/knowledge-graph';
+import type { GraphSource, GraphZonesSummary, HopChoice, KnowledgeGraphProps, ScopeChoices } from '@gisik-nokma/knowledge-graph';
 import { kgNodeId } from '@gisik-nokma/knowledge-graph/ids'; // C's sigma-free entry (planner ruling 2026-10-04 Q6)
 import { Button, SegmentedControl } from '@gisik-nokma/ui';
 import { HomeGraphCanvas } from './home-graph-canvas.js';
@@ -44,6 +44,8 @@ export type HomeGraphProps = {
   scope: ScopeChoices;
   onOpen: (item: GraphItemView) => void;
   canOpen: (item: GraphItemView) => boolean;
+  /** Spec D §6: a selected concept's body, the inspector the ticket and note hosts hand the view (`ConceptPanel`). */
+  renderConceptPanel: NonNullable<KnowledgeGraphProps['renderConceptPanel']>;
 };
 
 /**
@@ -53,7 +55,7 @@ export type HomeGraphProps = {
  * form (`config: 'phone'`: one clear hop, the folded bar, the inspector card), as the mockup's phone Home does; the
  * view forces one hop there, and Home offers no hop control.
  */
-export function HomeGraph({ workspaceId, viewerId, home, pressed, onEscape, phone, source, scope, onOpen, canOpen }: HomeGraphProps) {
+export function HomeGraph({ workspaceId, viewerId, home, pressed, onEscape, phone, source, scope, onOpen, canOpen, renderConceptPanel }: HomeGraphProps) {
   const [from, setFrom] = useState<StartFrom>('workspace');
   // The default follows the CURRENT breakpoint (phone 1, desktop 2) until the user picks; then the pick holds
   // across resizes (planner ruling 2026-10-04 Q8). Never `useState(phone ? 1 : 2)`: that reads the breakpoint once.
@@ -110,6 +112,7 @@ export function HomeGraph({ workspaceId, viewerId, home, pressed, onEscape, phon
         onEscape={onEscape}
         onOpen={onOpen}
         canOpen={canOpen}
+        renderConceptPanel={renderConceptPanel}
       />
     </section>
   );

@@ -15,6 +15,7 @@ import {
   actorLabelFrom,
   UNKNOWN_PERSON,
   LinkedFromSection,
+  ConceptsRow,
   classifyBatch,
   linkedFromHref,
   makeSubmittedFactory,
@@ -672,6 +673,8 @@ function NoteDocumentBody({
    */
   const [markedHere, setMarkedHere] = useState(false);
   const [restoreRefusal, setRestoreRefusal] = useState<string | null>(null);
+  /** The Concepts row's refused write (KG-D Task 9), in the page's one server-refusal shape. */
+  const [conceptRefusal, setConceptRefusal] = useState<string | null>(null);
 
   /**
    * READ or EDIT (smoothness G-3, 25.340–25.349). An existing note opens to read: the rendered document, no
@@ -796,6 +799,26 @@ function NoteDocumentBody({
         onOpenGraph={() => setGraphOpen(true)}
         {...(canEditNow ? { onDelete: () => setDeleting(true) } : {})}
       />
+
+      {/* Knowledge Graph spec D §6 (KG-D Task 9): the note's concepts, directly under the byline on every width. Removing
+          is a member's (spec D §3.3), not only the author's, so it is the workspace role that withholds it, never
+          `canEdit`; a concept's name opens this note's Knowledge Graph, where the concept sits on the first ring. */}
+      {user === null ? null : (
+        <ConceptsRow
+          workspaceId={note.workspaceId}
+          item={{ kind: 'note', id: note.noteId }}
+          dataSource={dataSource}
+          make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })}
+          onRefusal={(r) => setConceptRefusal(r.reason)}
+          readOnly={workspace === null || workspace.role === 'guest'}
+          onOpenConcept={() => setGraphOpen(true)}
+        />
+      )}
+      {conceptRefusal === null ? null : (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {conceptRefusal}
+        </p>
+      )}
 
       {note.deleted ? (
         <div className="gn-notes__deleted-banner" role="status" data-testid="note-deleted-banner">

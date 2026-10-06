@@ -33,12 +33,14 @@ export function createFakeDataSource(
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => [],
     getGroups: async () => [],
-    // These four REJECT with the server's 404 by default rather than answering empty, as their neighbours do: an
+    // These five REJECT with the server's 404 by default rather than answering empty, as their neighbours do: an
     // empty concept would be one the server never sent (online, `getConcept` re-raises the 404). A case stubs them.
+    // The Concepts row (KG-D Task 9) reads a rejected `getItemConcepts` as "no row", so a sheet case is unaffected.
     getConcept: async (conceptId) => Promise.reject(new HttpError(404, `/v1/concepts/${conceptId}`)),
     getConceptHistory: async (conceptId) => Promise.reject(new HttpError(404, `/v1/concepts/${conceptId}/history`)),
     getSuggestions: async (workspaceId) => Promise.reject(new HttpError(404, `/v1/workspaces/${workspaceId}/suggestions`)),
     getConceptAudience: async (workspaceId) => Promise.reject(new HttpError(404, `/v1/workspaces/${workspaceId}/concepts/audience`)),
+    getItemConcepts: async (workspaceId) => Promise.reject(new HttpError(404, `/v1/workspaces/${workspaceId}/concepts`)),
     getDeletedItems: async () => [],
     purgedAmong: async () => [],
     getMembers: async () => [],

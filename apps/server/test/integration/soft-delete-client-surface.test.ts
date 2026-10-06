@@ -504,6 +504,8 @@ type AbsenceDecision =
   | 'getConceptHistory'
   | 'getSuggestions'
   | 'getConceptAudience'
+  // Knowledge Graph D Task 9 (27.548): the concepts that hold one item, for the Concepts row.
+  | 'getItemConcepts'
   | 'getBoard'
   | 'getTickets'
   | 'getTicket'
@@ -607,6 +609,7 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getConceptHistory: { verdict: 'excluded', carries: false, why: 'The ledger names an item by kind and id (`concept.item_tagged`), never its title.' },
   getSuggestions: { verdict: 'excluded', carries: false, why: 'The fixture has no suggestion job run: the list is empty before and after.' },
   getConceptAudience: { verdict: 'excluded', carries: false, why: 'Three counts: members, before, after.' },
+  getItemConcepts: { verdict: 'excluded', carries: false, why: 'A concept summary (`ConceptSummary`: name, summary, a count, who made it) names no item, so the marker (a ticket TITLE) cannot reach it; a trashed item is refused by the route as absent (`seesLiveItems`, the one 404).' },
   getBoard: { verdict: 'excluded', carries: true },
   getTickets: { verdict: 'excluded', carries: true },
   getTicket: {
@@ -800,6 +803,8 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getSuggestions: () => ds.getSuggestions(workspaceId),
     // the PARENT, which stays live: a trashed item is refused by the audience route as absent (the one 404)
     getConceptAudience: () => ds.getConceptAudience(workspaceId, conceptId, [{ kind: 'ticket', id: parentId }]),
+    // the PARENT again, which stays live (a trashed child is refused by the route as absent, the one 404); a summary names no item either way
+    getItemConcepts: () => ds.getItemConcepts(workspaceId, { kind: 'ticket', id: parentId }),
     getBoard: () => ds.getBoard(projectId),
     getTickets: () => ds.getTickets(projectId, {}, 'status'),
     getTicket: () => ds.getTicket(workspaceId, childId),
@@ -935,8 +940,8 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`; 30 until Knowledge Graph E
   // Task 3 added `getHome`; 31 until my-work-global T3 added the
   // user-level `getMyWorkPreferences` / `putMyWorkPreferences` pair (33), and
-  // Knowledge Graph D Task 8 the four concept reads (37).
-  expect(MEMBERS).toHaveLength(37);
+  // Knowledge Graph D Task 8 the four concept reads (37), and Task 9 `getItemConcepts` (38).
+  expect(MEMBERS).toHaveLength(38);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);
