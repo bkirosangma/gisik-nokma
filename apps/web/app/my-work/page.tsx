@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DEFAULT_MY_WORK_PREFERENCES, type AttentionShow, type MyWorkPreferences } from '@gisik-nokma/domain';
 import {
@@ -187,6 +187,25 @@ function GlobalMyWorkBoard() {
 
   const global = useGlobalMyWork(dataSource, ready ? rows : NOT_YET, show);
   const { attention, myWork, workspaceOf } = global;
+  /**
+   * THE TWO REGIONS SWAP IN ONE COMMIT ON THE FIRST LOAD (smoothness-2 G1, 25.250-25.252; ported here from the per-workspace
+   * page when My work went global, planner ruling 2026-10-06 at the main -> release sync). The attention strip and the body are
+   * two reads and two swaps; the strip's skeleton is 4rem and the real strip taller, so whichever swap committed SECOND, in a
+   * frame where the first had already painted, dragged the other region by the difference (the per-workspace page measured CLS
+   * 0.6923 at 390, 0.289 at 768, 0.1898 at 1440). So on the first load both regions, and the per-workspace refusals under them,
+   * stay on their skeletons until BOTH reads have settled (an answer or a refusal), and are shown together: the swap replaces
+   * nodes, and a new node is not a shift.
+   *
+   * - The first load starts at the first render that ASKS the reads (`ready`); before it the `!ready` arm draws both skeletons.
+   * - A region already settled at that render (an answer served from a cache) is not held (SM-01). Forward-compatible only:
+   *   the fan-out keeps no cache, so both reads are pending at every first ask today.
+   * - Released once, released for good: a later Show or Group change re-asks both reads and each region swaps on its own, as
+   *   it did before the port (the ruling keeps that behaviour and adds no chip-change hold).
+   */
+  const firstLoad = useRef<'not-asked' | 'held' | 'released'>('not-asked');
+  if (firstLoad.current === 'not-asked' && ready) firstLoad.current = attention.settled || myWork.settled ? 'released' : 'held';
+  if (firstLoad.current === 'held' && attention.settled && myWork.settled) firstLoad.current = 'released';
+  const held = firstLoad.current === 'held';
   const askedIds = useMemo(() => (rows ?? []).filter((workspace) => !workspace.archived).map((workspace) => workspace.id), [rows]);
   // Names the claimant of a contested claim (R3 N4, case 6.256), over every workspace asked.
   const actorLabelOf = useActorLabels(askedIds);
@@ -352,7 +371,9 @@ function GlobalMyWorkBoard() {
               <SaveRefusal message={preferences.saveError} />
             ) : null}
 
-            {attention.error !== null ? (
+            {held ? (
+              <AttentionBandSkeleton />
+            ) : attention.error !== null ? (
               <ShellRefusal what="What needs your attention" message={attention.error} />
             ) : attention.data === null ? (
               <AttentionBandSkeleton />
@@ -363,11 +384,15 @@ function GlobalMyWorkBoard() {
               // when EVERY asked workspace answered: a failed one is not an all-clear (below).
               <p className="gn-my-work__empty">{`Nothing needs your attention for ${summaryOf(show)}`}</p>
             ) : null}
-            {attentionFailures.map(([workspaceId, message]) => (
-              <ShellRefusal key={workspaceId} what={`What needs your attention in ${nameOf(workspaceId)}`} message={message} />
-            ))}
+            {held
+              ? null
+              : attentionFailures.map(([workspaceId, message]) => (
+                  <ShellRefusal key={workspaceId} what={`What needs your attention in ${nameOf(workspaceId)}`} message={message} />
+                ))}
 
-            {myWork.error !== null ? (
+            {held ? (
+              <MyWorkSkeleton />
+            ) : myWork.error !== null ? (
               <ShellRefusal what="My work" message={myWork.error} />
             ) : myWork.data !== null ? (
               <MyWork
@@ -380,9 +405,11 @@ function GlobalMyWorkBoard() {
             ) : (
               <MyWorkSkeleton />
             )}
-            {myWorkFailures.map(([workspaceId, message]) => (
-              <ShellRefusal key={workspaceId} what={`My work in ${nameOf(workspaceId)}`} message={message} />
-            ))}
+            {held
+              ? null
+              : myWorkFailures.map(([workspaceId, message]) => (
+                  <ShellRefusal key={workspaceId} what={`My work in ${nameOf(workspaceId)}`} message={message} />
+                ))}
           </>
         )}
       </div>
