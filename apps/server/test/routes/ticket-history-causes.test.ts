@@ -46,14 +46,15 @@ describe('29.373 History annotates a flow cause per viewer', () => {
     const SEEN_DECIDER = newUlid();
     const DEC_EVENT = newUlid();
     // Branch names, the same way (planner ruling 2026-10-06 05:46: a hidden ticket's label or outcome is withheld with it).
-    const [HIDDEN_LABEL, HIDDEN_OUTCOME, SEEN_LABEL, SEEN_OUTCOME] = ['branch-H-led-S', 'branch-H-reset-S', 'branch-SH-led-S', 'branch-SH-closed-S'];
+    const [HIDDEN_LABEL, HIDDEN_OUTCOME, SEEN_LABEL, SEEN_OUTCOME, SEEN_RESET] = ['branch-H-led-S', 'branch-H-reset-S', 'branch-SH-led-S', 'branch-SH-closed-S', 'branch-SH-reset-S'];
     const file = (type: string, payload: unknown) => makeCommitted({ workspaceId: WS, actorId: read.world.owner, entity: { kind: 'ticket', id: S }, type, payload });
     const ledVisible = file('ticket.transitioned', { to: 'doing', cause: { kind: 'led-to', sourceTicketId: SH, label: SEEN_LABEL, triggeredBy: TRIG } });
     const ledHidden = file('ticket.transitioned', { to: 'todo', cause: { kind: 'led-to', sourceTicketId: H, label: HIDDEN_LABEL, triggeredBy: HIDDEN_TRIG } });
     const reopenHidden = file('ticket.reopened', { cause: { kind: 'reopened-by-flow', decisionTicketId: H, outcome: HIDDEN_OUTCOME, pass: 1, decidedBy: DECIDER, decisionEventId: DEC_EVENT } });
+    const reopenVisible = file('ticket.reopened', { cause: { kind: 'reopened-by-flow', decisionTicketId: SH, outcome: SEEN_RESET, pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT } });
     const closedVisible = file('ticket.closed', { cause: { kind: 'branch-not-taken', decisionTicketId: SH, outcome: SEEN_OUTCOME, pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT } });
     const plain = file('ticket.transitioned', { to: 'doing' });
-    await applyCommitted(db.pool, [ledVisible, ledHidden, reopenHidden, closedVisible, plain]);
+    await applyCommitted(db.pool, [ledVisible, ledHidden, reopenHidden, reopenVisible, closedVisible, plain]);
 
     const history = async (role: ReadRole): Promise<{ body: string; byId: Map<string, Served> }> => {
       const response = await read.app.inject({ method: 'GET', url: `/v1/tickets/${S}/history`, headers: read.authOf(role) });
@@ -71,6 +72,10 @@ describe('29.373 History annotates a flow cause per viewer', () => {
     expect(member.byId.get(closedVisible.id)?.payload.cause).toEqual({
       kind: 'branch-not-taken', decisionTicketId: SH, outcome: SEEN_OUTCOME, pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT,
     });
+    expect(member.byId.get(reopenVisible.id)?.causeTicket).toEqual({ key: keys.get(SH) });
+    expect(member.byId.get(reopenVisible.id)?.payload.cause).toEqual({
+      kind: 'reopened-by-flow', decisionTicketId: SH, outcome: SEEN_RESET, pass: 1, decidedBy: SEEN_DECIDER, decisionEventId: DEC_EVENT,
+    }); // the reopened-by-flow arm's own control (planner 06:1x): a reset by a Decision the member sees keeps its outcome
     expect(member.byId.get(ledHidden.id)?.causeTicket).toBeNull();
     // AMEND 2: the withheld ids are NULLED with their keys present, never dropped; the label goes (planner 05:46)
     expect(member.byId.get(ledHidden.id)?.payload.cause).toEqual({ kind: 'led-to', sourceTicketId: null, triggeredBy: null });

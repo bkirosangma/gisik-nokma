@@ -177,6 +177,8 @@ describe('wtg-flow-cause-withhold, the helper (29.445)', () => {
     expect(await withholdFlowCause(visible, member)).toBe(visible);
     const visibleLed = ledTo(SH, SEEN_LABEL, SEEN_TRIGGER);
     expect(await withholdFlowCause(visibleLed, member)).toBe(visibleLed);
+    const visibleReset = reset(SH, SEEN_DECIDER); // the reopened-by-flow arm's own control (planner 06:1x)
+    expect(await withholdFlowCause(visibleReset, member)).toBe(visibleReset);
     const child = { kind: 'reopened-for-child', childTicketId: H };
     expect(await withholdFlowCause(child, member)).toBe(child); // not a flow cause: served whole, as it always was (29.207)
     expect(await withholdFlowCause(undefined, member)).toBeUndefined();
