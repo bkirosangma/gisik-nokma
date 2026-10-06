@@ -162,6 +162,7 @@ ctl_sem_swap_why() {
 # Sets CTL_SEM_SLOT, CTL_SEM_CLASS (normal|express), CTL_SEM_SLOTS (N, or E for express), CTL_SEM_WAITED (seconds from entering the queue to the
 # grant, minus the grant poll's own sampling time CTL_SEM_PROBE_SECS: a measurement, not a wait; 0 on a reused verdict) and CTL_SEM_REASONS (a+b,
 # "-" none). The waits.tsv row is written by ctl_sem_release (it carries the short-overrun, known only then): wait + probe = queue entry to grant.
+# A grant also sets the row's fields for release: CTL_SEM_GRANTED (ctl_sem_now), CTL_SEM_GRANT_UTC, CTL_SEM_SHORT, CTL_SEM_LABEL, CTL_SEM_ROW_N.
 # Returns 75 when CTL_SEM_MAX_WAIT elapses first (nothing claimed).
 ctl_sem_acquire() {
   local label="$1" short="${2:-}" sem n N E free got start now reasons="" why max="${CTL_SEM_MAX_WAIT:-1800}"
@@ -200,7 +201,6 @@ ctl_sem_acquire() {
           got=""; n=1; while [ "$n" -le "$E" ]; do if mkdir "$sem/express-$n" 2>/dev/null; then got="$n"; break; fi; n=$((n+1)); done
           if [ -n "$got" ]; then
             printf '%s|%s|%s|%s\n' "$$" "$(ctl_sem_lstart $$)" "$label" "$(ctl_sem_now)" > "$sem/express-$got/holder.tmp" && mv "$sem/express-$got/holder.tmp" "$sem/express-$got/holder"
-            if [ -n "${CTL_SEM_CLAIM_HOOK:-}" ]; then "$CTL_SEM_CLAIM_HOOK"; fi
             CTL_SEM_SLOT="$got"; CTL_SEM_CLASS=express; CTL_SEM_SLOTS="$E"; break
           fi
         fi
@@ -216,23 +216,19 @@ ctl_sem_acquire() {
   CTL_SEM_GRANT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   return 0
 }
-# The seconds a `short` hold has lasted, when that is past ctl_sem_short_max; nothing otherwise (and nothing for a run that is not short).
-ctl_sem_short_overrun() {
-  local held
-  [ "${CTL_SEM_SHORT:-}" = short ] && [ -n "${CTL_SEM_GRANTED:-}" ] || return 0
-  held=$(( $(ctl_sem_now) - CTL_SEM_GRANTED ))
-  if [ "$held" -gt "$(ctl_sem_short_max)" ]; then echo "$held"; fi
-  return 0
-}
-# ctl_sem_release [OVERRUN] writes the run's waits.tsv row (8 columns; the 8th is OVERRUN when given — the value the caller already logged —
-# else ctl_sem_short_overrun now; empty = -), then frees the slot — only while the holder file names THIS
-# run: a slot that was wrongly reclaimed and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both
-# survive our exit.
+# ctl_sem_release writes the run's waits.tsv row, then frees the slot — only while the holder file names THIS run: a slot that was wrongly reclaimed
+# and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both survive our exit. It sets CTL_SEM_OVERRUN,
+# the row's 8th column: the seconds a `short` hold lasted when that is past ctl_sem_short_max, else empty (written `-`). Computed ONCE, here, on
+# every exit path (a signal too), so the log line run-tests writes from it and the row never disagree.
 ctl_sem_release() {
-  local d hp hrest over sem
+  local d hp hrest sem held
   if [ -n "${CTL_SEM_SLOT:-}" ]; then
-    sem="$(ctl_sem_dir)"; if [ $# -ge 1 ]; then over="$1"; else over="$(ctl_sem_short_overrun)"; fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$CTL_SEM_GRANT_UTC" "$CTL_SEM_LABEL" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$CTL_SEM_ROW_N" "$CTL_SEM_PROBE_SECS" "$CTL_SEM_CLASS" "${over:--}" >> "$sem/waits.tsv"
+    sem="$(ctl_sem_dir)"; CTL_SEM_OVERRUN=""
+    if [ "${CTL_SEM_SHORT:-}" = short ]; then
+      held=$(( $(ctl_sem_now) - CTL_SEM_GRANTED ))
+      if [ "$held" -gt "$(ctl_sem_short_max)" ]; then CTL_SEM_OVERRUN="$held"; fi
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$CTL_SEM_GRANT_UTC" "$CTL_SEM_LABEL" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$CTL_SEM_ROW_N" "$CTL_SEM_PROBE_SECS" "$CTL_SEM_CLASS" "${CTL_SEM_OVERRUN:--}" >> "$sem/waits.tsv"
     if [ "$CTL_SEM_CLASS" = express ]; then d="$sem/express-$CTL_SEM_SLOT"; else d="$sem/slot-$CTL_SEM_SLOT"; fi
     hp=""; { IFS='|' read -r hp hrest < "$d/holder"; } 2>/dev/null || true
     [ "$hp" = "$$" ] && rm -rf "$d"

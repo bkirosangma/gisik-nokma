@@ -161,13 +161,12 @@ if [ "$cap_fired" = 1 ] && kill -0 "$child" 2>/dev/null; then
 elif [ "$cap_fired" = 1 ] && [ "$rc" -eq $((128 + $(kill -l USR1))) ]; then
   capline="CAP RACE: the cap fired as the job ended; its own rc is lost ($rc), so re-run"
 fi
-# The --short contract's record (P72): before the cap's line, so TIMEOUT stays the log's last.
-overrun="$(ctl_sem_short_overrun)"
-[ -z "$overrun" ] || echo "SHORT-OVERRUN $label $overrun" >> "$log"
-[ -z "$capline" ] || echo "$capline" >> "$log"
 stop_timer
 child=""
-ctl_sem_release "$overrun"
+ctl_sem_release
+# The --short contract's record (P72), from the value the waits.tsv row got: before the cap's line, so TIMEOUT stays the log's last.
+[ -z "$CTL_SEM_OVERRUN" ] || echo "SHORT-OVERRUN $label $CTL_SEM_OVERRUN" >> "$log"
+[ -z "$capline" ] || echo "$capline" >> "$log"
 echo "run-tests: $label — $shown (in $rundir)"
 echo "$waitline"
 [ -z "$portline" ] || echo "$portline"
