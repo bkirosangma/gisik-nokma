@@ -693,18 +693,18 @@ This is the honest list. Each one is an absence, not a hidden button.
 
 ### Linking tickets
 
-A ticket can be linked to other tickets, and the **Links** section on its sheet, just under the fields, lists
-them. A link has one of three kinds, and reads differently from each end:
+A ticket can be linked to other tickets, and the **Links** section on its sheet, just under the fields, lists them. A link has one of four kinds, and reads differently from each end:
 
 - **Blocks** / **Is blocked by**: this ticket has to be finished before the other can go ahead.
 - **Relates to**: the two tickets are connected. It reads the same from both.
 - **Duplicates** / **Is duplicated by**: this ticket repeats the other.
+- **Leads to** / **Comes after**: the order of the work. This ticket comes first, and the other follows it.
 
-Press **Add link**, pick how this ticket relates (**Is blocked by**, say), search for the other ticket by its key
-or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and
-GN-133 is blocked by GN-142, added on GN-133, make the same link. The new row shows at once, faded, and settles when
-it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block
-each other), the reason appears beside **Add link** and nothing is added.
+Press **Add link**, pick how this ticket relates (**Is blocked by**, say), search for the other ticket by its key or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and GN-133 is blocked by GN-142, added on GN-133, make the same link.
+The new row shows at once, faded, and settles when it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block each other), the reason appears beside **Add link** and nothing is added.
+
+A **Leads to** or **Comes after** link can carry a label that names a branch, such as *Yes* or *No*: type it in **Link label** when you add the link, and change it later with **Edit label** on its row (a message offers **Undo**).
+Each branch out of a **Decision** needs a label, so its **Leads to** results stay greyed out until you type one, and no two of its branches may share a label (*Yes* and *yes* count as the same).
 
 **Remove** takes a link away, from either end, and a message offers **Undo** for a few seconds. Links to
 tickets you cannot see are not shown, and neither is a count of them.

@@ -4478,7 +4478,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " section on its sheet, just under the fields, lists them. A link has one of three kinds, and reads differently from each end:"
+                    "text": " section on its sheet, just under the fields, lists them. A link has one of four kinds, and reads differently from each end:"
                   }
                 ]
               },
@@ -4531,6 +4531,24 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": ": this ticket repeats the other."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Leads to"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Comes after"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": the order of the work. This ticket comes first, and the other follows it."
+                    }
                   ]
                 ]
               },
@@ -4564,6 +4582,103 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " and nothing is added."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Leads to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Comes after"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " link can carry a label that names a branch, such as "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Yes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "No"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": type it in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Link label"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " when you add the link, and change it later with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit label"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on its row (a message offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "). Each branch out of a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Decision"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " needs a label, so its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Leads to"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " results stay greyed out until you type one, and no two of its branches may share a label ("
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Yes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "yes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " count as the same)."
                   }
                 ]
               },

@@ -24,12 +24,12 @@ const row = (kind: TicketLinkView['kind'], direction: 'out' | 'in', key: string,
 });
 
 /** Mirrors `TicketSheet`'s own lift: the section reads the `links` query the sheet owns. */
-function Harness(props: Omit<TicketLinksSectionProps, 'links' | 'isDraft'> & { isDraft?: boolean }) {
+function Harness(props: Omit<TicketLinksSectionProps, 'links' | 'isDraft' | 'isDecision'> & { isDraft?: boolean; isDecision?: boolean }) {
   const links = useLiveQuery(props.dataSource, props.workspaceId, `${props.ticketId}:links`, () =>
     props.dataSource.query.getTicketLinks(props.workspaceId, props.ticketId),
   );
   // These cases are a published ticket's sheet; a draft's is 28.173's (`draft-side-filing.test.tsx`).
-  return <TicketLinksSection isDraft={false} {...props} links={links} />;
+  return <TicketLinksSection isDraft={false} isDecision={false} {...props} links={links} />;
 }
 
 const make = makeSubmittedFactory({ actorId: 'user_kiro', origin: 'web' });
