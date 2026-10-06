@@ -33,7 +33,9 @@ export function scanTerminalReaders(root: string, dirs: readonly string[]): Map<
 /** definition: authors or validates a workflow. invariant: "terminal" means finished, and a Not-taken ticket parked there IS finished (parent close, attention, sweeps, the board column). done-meaning: a count or sentence that means DONE; T17 makes each exclude a not-taken resolution. */
 type Reader = 'definition' | 'invariant' | 'done-meaning';
 export const TERMINAL_READERS: Record<string, Reader> = {
-  // definition (17)
+  // definition (18)
+  // wtg2 T13: AP-1 skips a promotion whose workflow's INITIAL state is terminal (the Start edge would finish it).
+  'apps/server/src/flow/promote.ts': 'definition',
   'apps/server/src/routes/builder-reads.ts': 'definition',
   'apps/server/src/tools/wtg-preflight.ts': 'definition',
   'packages/app-core/src/workflow-builder/anchor-issues.ts': 'definition',
@@ -51,7 +53,7 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/workflow-rebind.ts': 'definition',
   'packages/rule-engine/src/workflow-defined.ts': 'definition',
   'packages/ui/src/components/chip.tsx': 'definition',
-  // invariant (17)
+  // invariant (18)
   'apps/server/src/auto-close/sweep.ts': 'invariant',
   'apps/server/src/notifications/sweep.ts': 'invariant',
   'apps/server/src/routes/attention.ts': 'invariant',
@@ -70,6 +72,9 @@ export const TERMINAL_READERS: Record<string, Reader> = {
   'packages/rule-engine/src/checks/close.ts': 'invariant',
   // wtg2 T8: the flow parks a Not-taken ticket in the FIRST terminal state and never passes over a finished one (PS-8, PS-11).
   'packages/rule-engine/src/checks/flow-cause.ts': 'invariant',
+  // wtg2 T13: an edge is satisfied by the source's terminal CATEGORY (AP-1, never the closed flag), and the promotion rule
+  // excludes a Not-taken source itself (AP-3), so this is not on T17's done-meaning work list.
+  'packages/domain/src/flow/promotion.ts': 'invariant',
   'packages/rule-engine/src/checks/hierarchy.ts': 'invariant',
   'packages/rule-engine/src/transition.ts': 'invariant',
   // done-meaning (12): T17 made these not-taken aware, except routes/my-work.ts (its `closed_at IS NULL` already drops a

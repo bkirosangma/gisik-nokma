@@ -32,7 +32,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * ## How the failure is injected, and why this way
  *
- * `bootstrapWorkspace` appends its seven events through the INTERNAL door, one
+ * `bootstrapWorkspace` appends its eight events through the INTERNAL door, one
  * transaction each. A projection registered behind the real ones therefore gets
  * to fail a single event of the sequence while its predecessors stay committed —
  * which is exactly the shape 6.53 describes and the shape no ordinary error can

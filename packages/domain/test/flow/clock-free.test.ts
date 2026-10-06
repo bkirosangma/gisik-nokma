@@ -27,6 +27,7 @@ describe('29.186 the flow directory is clock-free', () => {
     expect(files).toContain('graph.ts');
     expect(files).toContain('node.ts');
     expect(files).toContain('plan.ts');
+    expect(files).toContain('promotion.ts');
     expect(files).toContain('settle.ts');
     const dirty = files.filter((f) => hitsIn(readFileSync(FLOW_SRC + f, 'utf8')).length > 0);
     expect(dirty).toEqual([]);

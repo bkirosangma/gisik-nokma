@@ -279,7 +279,7 @@ describe('POST /v1/workspaces — the founding door', () => {
     // workspace, founded or not. Task 12 wired it, and the reserved text — "a
     // founded workspace accepts a ticket immediately" — is now the true one.
     //
-    // The discriminator survives the inversion, pointing the other way: the four
+    // The discriminator survives the inversion, pointing the other way: the five
     // type definitions in the ledger are the half Plan 4's founding sequence
     // owns, and the resolution of `task` against them is the half Task 12 owns.
     // A commit here needs both.
@@ -358,7 +358,7 @@ describe('POST /v1/workspaces — the founding door', () => {
 
     // The premise, still asserted: `task` really is defined in this workspace's
     // ledger, by the founding sequence, bound to the workspace's only workflow.
-    // Without those four events the create would be refused `ticket.unknown-type`
+    // Without those five events the create would be refused `ticket.unknown-type`
     // by a context that reads the table correctly and finds nothing in it — "a
     // context that can read the table is not the same thing as a table with the
     // type in it".

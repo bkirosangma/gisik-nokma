@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { builtinTicketTypeDefs, DECISION_TYPE_ID, newUlid } from '@gisik-nokma/domain';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
@@ -35,6 +37,8 @@ const runDaemon = (
   new Promise((resolve) => {
     const child = spawn('pnpm', ['exec', 'tsx', 'src/ops/backup-daemon-main.ts'], {
       cwd: SERVER_DIR,
+      // Its own process group, so the hard stop below can end the WHOLE run (see there).
+      detached: true,
       env: {
         ...process.env,
         OBJECT_STORE: 'local',
@@ -60,7 +64,16 @@ const runDaemon = (
     const stopWhenScheduled = setInterval(() => {
       if (until(stdout, stderr)) child.kill('SIGTERM');
     }, 100);
-    const hardStop = setTimeout(() => child.kill('SIGKILL'), 30_000);
+    // The whole group, not `pnpm` alone: a SIGKILL to `pnpm` orphans its tsx grandchild, which keeps the stdout pipe open,
+    // so `close` never fired, the case died on vitest's timeout instead of its assertion, and the daemon ran on at ppid 1
+    // (four of them after wtg2 T7's mutation pass, 2026-10-06).
+    const hardStop = setTimeout(() => {
+      try {
+        process.kill(-(child.pid as number), 'SIGKILL');
+      } catch {
+        child.kill('SIGKILL');
+      }
+    }, 30_000);
     child.on('close', (code) => {
       clearInterval(stopWhenScheduled);
       clearTimeout(hardStop);
@@ -68,7 +81,7 @@ const runDaemon = (
     });
   });
 
-describe('backup-daemon-main — one scheduler for all six jobs', () => {
+describe('backup-daemon-main — one scheduler for all eight jobs', () => {
   let db: TestDatabase;
   beforeAll(async () => {
     db = await createTestDatabase();
@@ -199,12 +212,12 @@ describe('backup-daemon-main — one scheduler for all six jobs', () => {
 
   /**
    * 13.731 — the auto-close job's own interval is validated the same way, and it
-   * is on the SAME scheduler as the other four.
+   * is on the SAME scheduler as the others.
    *
    * The positive control is the case above (13.203): the same command with only
    * the notification variable set announces itself, and `AUTO_CLOSE_SWEEP_INTERVAL_MS`
    * is unset there — so it takes its `'3600000'` default and the daemon really
-   * does arm all five jobs in this environment. Without that control, this case
+   * does arm every job in this environment. Without that control, this case
    * would pass against a daemon that died for an unrelated reason.
    *
    * **Where this case lives, and why it is not in `test/auto-close/sweep.test.ts`.**
@@ -286,4 +299,51 @@ describe('backup-daemon-main — one scheduler for all six jobs', () => {
     expect(sweepLine(ok.stdout)).toBeDefined();
     expect(ok.stderr).not.toContain('"job":"expired-sessions"');
   }, 90_000);
+
+  it('29.143 the daemon runs the decision-backfill job at boot: a legacy workspace gains its Decision type, and the run is logged; control: the same workspace holds no decision type before', async () => {
+    const ws = newUlid();
+    const wf = `wf-legacy-${ws}`;
+    const legacy = builtinTicketTypeDefs(wf).filter((d) => d.id !== DECISION_TYPE_ID);
+    await applyCommitted(db.pool, legacy.map((def) => makeCommitted({ workspaceId: ws, actorId: '01J9GUKR000000000000000000', entity: { kind: 'ticket-type', id: newUlid() }, type: 'ticket-type.defined', payload: def })));
+    const before = await db.pool.query(`SELECT 1 FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = $2`, [ws, DECISION_TYPE_ID]);
+    expect(before.rowCount).toBe(0);
+    const run = await runDaemon(
+      { DATABASE_URL: db.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000', DECISION_BACKFILL_INTERVAL_MS: '300' },
+      (out) => out.includes('"msg":"decision backfill complete"'),
+    );
+    expect(run.stdout, `stderr: ${run.stderr}`).toContain('"msg":"decision backfill complete"');
+    expect(run.stderr).not.toContain('"job":"decision-backfill"'); // the control for the failure case below
+    const after = await db.pool.query<{ workflow_id: string }>(`SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = $2`, [ws, DECISION_TYPE_ID]);
+    expect(after.rows).toEqual([{ workflow_id: wf }]);
+  }, 60_000);
+
+  it('29.143 a failing decision backfill is reported under its own job name "decision-backfill" and the daemon keeps running; control: the run above, on an intact database, logs completion and no failure', async () => {
+    const broken = await createTestDatabase();
+    try {
+      await broken.pool.query(`ALTER TABLE proj_ticket_types RENAME TO proj_ticket_types_renamed`);
+      const failed = await runDaemon(
+        { DATABASE_URL: broken.url, NOTIFICATION_SWEEP_INTERVAL_MS: '3600000', DECISION_BACKFILL_INTERVAL_MS: '300' },
+        (_out, err) => err.includes('"job":"decision-backfill"'),
+      );
+      expect(failed.stderr).toContain('"msg":"backup job failed","job":"decision-backfill"');
+      expect(failed.stdout).toContain(SCHEDULED);
+      expect(failed.stdout).not.toContain('"msg":"decision backfill complete"');
+    } finally {
+      await broken.drop();
+    }
+  }, 60_000);
+
+  /**
+   * 29.143 - the job's delay is ONE `firstThenEvery` closure, built once in `main()`. The run above cannot tell: with an
+   * interval of 300 ms, `min(30 s, 300)` equals the interval, so a `delayMs: () => firstThenEvery(...)()` that mints a fresh
+   * `first` flag on every call (and so re-runs the job every 30 s forever in production, where the interval is a day)
+   * reads the same, and a 30 s boot is beyond the harness's hard stop. The closure's own behaviour is pinned in
+   * `test/flow/decision-backfill.test.ts`; this pins that `main()` hands the scheduler the closure itself.
+   */
+  it('29.143 the decision-backfill job is armed with one firstThenEvery closure, not a factory called per delay; control: the interval is read once from the env reader', () => {
+    const source = readFileSync(join(SERVER_DIR, 'src/ops/backup-daemon-main.ts'), 'utf8');
+    expect(source).toContain('const decisionBackfillEveryMs = decisionBackfillIntervalMs(process.env);');
+    expect(source.match(/delayMs:\s*firstThenEvery\(\s*decisionBackfillEveryMs,\s*DECISION_BACKFILL_BOOT_DELAY_MS\s*\),/g)).toHaveLength(1);
+    expect(source.match(/firstThenEvery\(/g)).toHaveLength(1);
+  });
 });

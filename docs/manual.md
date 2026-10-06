@@ -45,7 +45,7 @@ that what you read here matches what you see.
 | **Workspace** | Your whole business. "Marak Design", "Robert's Plumbing". Everybody and everything sits inside one. |
 | **Project** | A bucket of work inside a workspace. "Shop operations". "Residential repairs". |
 | **Ticket** | One piece of work. |
-| **Epic / Story / Task / Sub-task** | The four built-in kinds of ticket, biggest to smallest. An admin can rename these. |
+| **Epic / Story / Task / Sub-task / Decision** | The five built-in kinds of ticket. Epic is the biggest and Sub-task the smallest; a Decision sits at the same level as a Task and stands for a choice between branches of work. An admin can rename these. |
 | **Workflow** | Your set of states that work moves through, and the allowed moves between them. |
 | **State** | One step in a workflow. Each state is a column on the board. |
 | **Transition** | One allowed move from one state to another. |
@@ -227,8 +227,8 @@ forgets your choice and follows your device, including its automatic day/night s
 You become the **owner** of that workspace. It also sets you up with:
 
 - A basic set of states for work to move through — a simple to-do / doing / done arrangement.
-- Four built-in kinds of ticket: **epic**, **story**, **task** and **sub-task**. Those names come from
-  software teams and may mean nothing to you. An admin can rename them (§12).
+- Five built-in kinds of ticket: **epic**, **story**, **task**, **sub-task** and **decision**. Those names
+  come from software teams and may mean nothing to you. An admin can rename them (§12).
 
 ### The project problem
 
@@ -513,8 +513,8 @@ settings are kept for about a month in case they come back.
 3. A small window opens with these things:
    - **Title** — what the ticket is. "Fix Mrs. Patel's leaking pipe."
    - **Starts in the backlog?** — a switch, remembered from your last answer. On means the ticket waits,
-     unordered work with a Start button, until somebody starts it (§8); off means it is born straight
-     into a state.
+     unordered work with a Start button, until somebody starts it, or its flow does (§8); off means it
+     is born straight into a state.
    - **Type** — what kind of ticket this is, from your workspace's list.
    - **Starting status** — which state of the workflow the ticket is born in, defaulting to the workflow's
      own first state. Disabled, with a note explaining where the ticket will actually start, while "Starts
@@ -693,18 +693,18 @@ This is the honest list. Each one is an absence, not a hidden button.
 
 ### Linking tickets
 
-A ticket can be linked to other tickets, and the **Links** section on its sheet, just under the fields, lists
-them. A link has one of three kinds, and reads differently from each end:
+A ticket can be linked to other tickets, and the **Links** section on its sheet, just under the fields, lists them. A link has one of four kinds, and reads differently from each end:
 
 - **Blocks** / **Is blocked by**: this ticket has to be finished before the other can go ahead.
 - **Relates to**: the two tickets are connected. It reads the same from both.
 - **Duplicates** / **Is duplicated by**: this ticket repeats the other.
+- **Leads to** / **Comes after**: the order of the work. This ticket comes first, and the other follows it.
 
-Press **Add link**, pick how this ticket relates (**Is blocked by**, say), search for the other ticket by its key
-or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and
-GN-133 is blocked by GN-142, added on GN-133, make the same link. The new row shows at once, faded, and settles when
-it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block
-each other), the reason appears beside **Add link** and nothing is added.
+Press **Add link**, pick how this ticket relates (**Is blocked by**, say), search for the other ticket by its key or title and choose it. You can add a link from either ticket: GN-142 blocks GN-133, added on GN-142, and GN-133 is blocked by GN-142, added on GN-133, make the same link.
+The new row shows at once, faded, and settles when it is saved. If the link cannot be made (a ticket cannot be linked to itself, and two tickets cannot block each other), the reason appears beside **Add link** and nothing is added.
+
+A **Leads to** or **Comes after** link can carry a label that names a branch, such as *Yes* or *No*: type it in **Link label** when you add the link, and change it later with **Edit label** on its row (a message offers **Undo**).
+Each branch out of a **Decision** needs a label, so its **Leads to** results stay greyed out until you type one, and no two of its branches may share a label (*Yes* and *yes* count as the same).
 
 **Remove** takes a link away, from either end, and a message offers **Undo** for a few seconds. Links to
 tickets you cannot see are not shown, and neither is a count of them.
@@ -971,7 +971,7 @@ The first tab, and where a new ticket starts its life. It lists the tickets that
 you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Those buttons move a
 ticket in the order of the whole backlog, not only within the group it is listed under, and they stay
 visible when the backlog is grouped; hover one and it says so. Each row also has a **Start** button that
-moves that ticket into its workflow.
+moves that ticket into its workflow. A ticket another one *leads to* does not wait for the button: once what leads to it is finished, the flow starts it, as **Flow**. Send it back here and it stays.
 
 It does not leave closed tickets out, unlike the Calendar and the Timeline below. When it is empty it says
 so: *"Nothing in the backlog. Tickets you add land here."* — or, when the only thing it would have listed
@@ -1589,11 +1589,11 @@ affect you: **a parent cannot be finished while any of its children is still goi
 ## §12 — Setting up your own ticket types (owners and admins)
 
 There is a separate screen for these. It lists your types with their rank, how many custom fields each
-has, and a **Built-in** badge on the four that came with the workspace.
+has, and a **Built-in** badge on the five that came with the workspace.
 
 Each type you made yourself has a **Reorder** button opening a small menu — **Move up**, **Move down**
 and **Move to top** (the top of your own types). An item that cannot apply is greyed out and says why in
-words. The four built-in types have no Reorder button: they keep their rank, and your own types are
+words. The five built-in types have no Reorder button: they keep their rank, and your own types are
 ordered among themselves.
 
 ### Making a new type
@@ -1615,9 +1615,9 @@ you the consequence at the moment you are choosing.
 it is refused. Same if you try to give options to a field that is not a dropdown, or reuse a field
 name.
 
-### The built-in four
+### The built-in five
 
-You **can** rename epic, story, task and sub-task, change their icons, and change which workflow they
+You **can** rename epic, story, task, sub-task and decision, change their icons, and change which workflow they
 use. Do it — "Epic" and "Story" mean nothing in a plumbing business or a design studio.
 
 What you **cannot** change is where a built-in type sits in the hierarchy. The rank boxes are locked

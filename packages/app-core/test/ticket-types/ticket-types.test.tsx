@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   builtinTicketTypeDefs,
   CUSTOM_FIELD_KINDS,
+  DECISION_TYPE_ID,
   newUlid,
   ticketTypeDefSchema,
   type TicketTypeDef,
@@ -21,7 +22,7 @@ import { cloneTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/te
 import type { BuilderSession } from '../../src/workflow-builder/ui/builder-context.js';
 import { TicketTypeEditorScreen } from '../../src/workflow-builder/ticket-types/ticket-type-editor-screen.js';
 import { IconPicker } from '../../src/workflow-builder/ticket-types/icon-picker.js';
-import { TYPE_ICON_NAMES } from '../../src/workflow-builder/ticket-types/icons.js';
+import { TYPE_ICON_NAMES, TYPE_ICONS, TypeIcon } from '../../src/workflow-builder/ticket-types/icons.js';
 import { TicketTypeListScreen } from '../../src/workflow-builder/ticket-types/ticket-type-list-screen.js';
 
 // The shared Select's panel is portal-rendered to document.body, so the
@@ -236,17 +237,18 @@ describe('TicketTypeListScreen', () => {
     // `<ul>`, in the order rendered, with nothing between them.
     const rows = container.querySelector('.ticket-type-list__rows')!;
     const children = Array.from(rows.children);
-    expect(children).toHaveLength(6);
+    expect(children).toHaveLength(builtins.length + 1);
     expect(children.every((child) => child.tagName === 'LI')).toBe(true);
     const rowTexts = children.map((child) => child.querySelector('.ticket-type-list__row')?.textContent ?? '');
     expect(rowTexts.every((text) => text.length > 0)).toBe(true);
     // The order is `listTicketTypes`'s own — position is what the parity keys
-    // on, so the sixth row is asserted to be the custom type rather than any of
-    // the five seeds (the Decision since wtg2 T5).
-    expect(rowTexts[5]).toContain('Invoice');
-    expect(rowTexts.slice(0, 5).some((text) => text.includes('Invoice'))).toBe(false);
+    // on, so the row after the seeds is asserted to be the custom type rather
+    // than any of the seeds (five since wtg2 T5: the Decision), counted from the
+    // seed list rather than spelled as a literal.
+    expect(rowTexts[builtins.length]).toContain('Invoice');
+    expect(rowTexts.slice(0, builtins.length).some((text) => text.includes('Invoice'))).toBe(false);
     // NO "the even rows number two" assertion here, deliberately. It would be
-    // arithmetic off `toHaveLength(6)` two lines up — a control that cannot fail
+    // arithmetic off `toHaveLength(builtins.length + 1)` above — a control that cannot fail
     // independently of the assertion beside it. The parity itself is not this
     // half's to measure: it is read out of `ui.css` in
     // `packages/ui/test/tokens.test.ts`, which is the only place it can be
@@ -339,7 +341,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
 
     const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(builtins.length + 2);
 
     const reorder = screen.getByRole('button', { name: 'Reorder Invoice' });
     expect(reorder.tagName).toBe('BUTTON');
@@ -1984,5 +1986,18 @@ describe('23.094 Save is quiet while the form is unchanged', () => {
     renderEditor(null);
     await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'Site inspection');
     expect(screen.getByRole('button', { name: 'Save ticket type' }).className).toContain('gn-button--primary');
+  });
+});
+
+describe('29.144 the built-in seeds draw their own icons', () => {
+  it('29.144 every built-in seed names an icon this build can draw, and the Decision draws a diamond, not the folder fallback', () => {
+    for (const def of builtinTicketTypeDefs('wf')) expect(TYPE_ICON_NAMES, def.id).toContain(def.icon);
+    const decision = builtinTicketTypeDefs('wf').find((d) => d.id === DECISION_TYPE_ID)!;
+    expect(decision.icon).toBe('diamond');
+    const { container } = render(<TypeIcon name={decision.icon} />);
+    const drawn = container.querySelector('path')?.getAttribute('d');
+    // The diamond's own path, not merely "not the folder": an absent <path> reads `undefined`, which is not the folder either.
+    expect(drawn).toBe(TYPE_ICONS.diamond[0].d);
+    expect(drawn).not.toBe(TYPE_ICONS.folder[0].d);
   });
 });
