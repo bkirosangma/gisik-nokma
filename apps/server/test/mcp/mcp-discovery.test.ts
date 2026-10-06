@@ -7,6 +7,8 @@ import { buildDoorWorld, callTool, runDoorMatrix, type DoorWorld } from './helpe
 /**
  * MCP-everything T10: the discovery and "me" tools through the HOSTED door (a token caller, `POST /mcp`).
  * Cases 14.485 and 14.486. The unit cases are in `packages/mcp-server/test/discovery-tools.test.ts`.
+ * My-work-global T5 adds the hosted legs of 30.051, 30.053 and 30.055: the global (no `workspaceId`) forms
+ * pass the door's `inputSchema` and reach T1's real `?show=` route.
  */
 let db: TestDatabase;
 let w: DoorWorld;
@@ -110,5 +112,43 @@ describe('14.486 the door matrix over the discovery tools', () => {
     expect(body.nextCursor).toBe(total > 1 ? '1' : null);
     const notes = await callTool(w.app, w.member.token, 'list_notifications', { limit: 1 });
     expect(notes.json).toHaveProperty('nextCursor');
+  });
+});
+
+describe('30.5 the global my_work and get_attention through the hosted door (my-work-global T5)', () => {
+  it('30.051 30.053 30.055 no workspaceId reaches every workspace; a role the caller lacks there skips it, never fails', async () => {
+    type Global = { workspaces: Array<{ workspaceId: string; name: string | null; items?: unknown[]; groups?: unknown }> };
+    const entry = (json: unknown) => (json as Global).workspaces.find((x) => x.workspaceId === w.workspaceId);
+
+    // 30.051: get_attention({}) — the door accepts it (workspaceId is optional in the inputSchema) and the
+    // default show=created,assigned is an answer T1's route gives a plain member
+    const attention = await callTool(w.app, w.member.token, 'get_attention', {});
+    expect(attention.isError, attention.text).toBe(false);
+    expect(entry(attention.json)).toEqual({ workspaceId: w.workspaceId, name: w.workspaceName, items: expect.any(Array) });
+
+    // 30.055: my_work({}) — the same fan-out over /v1/me/work
+    const work = await callTool(w.app, w.member.token, 'my_work', {});
+    expect(work.isError, work.text).toBe(false);
+    expect(entry(work.json)).toMatchObject({ workspaceId: w.workspaceId, name: w.workspaceName, groups: expect.any(Object) });
+
+    // 30.053: ws-admin. The route 400s a member's ws-admin, so the member's workspace must be SKIPPED;
+    // CONTROL: the owner is asked for it and answered.
+    const memberAdmin = await callTool(w.app, w.member.token, 'get_attention', { show: ['ws-admin'] });
+    expect(memberAdmin.isError, memberAdmin.text).toBe(false);
+    expect(entry(memberAdmin.json)).toBeUndefined();
+    const ownerAdmin = await callTool(w.app, w.owner.token, 'get_attention', { show: ['ws-admin'] });
+    expect(ownerAdmin.isError, ownerAdmin.text).toBe(false);
+    expect(entry(ownerAdmin.json)).toEqual({ workspaceId: w.workspaceId, name: w.workspaceName, items: expect.any(Array) });
+    // and named outright, the member's ws-admin is the route's refusal, said in the sentence that says why
+    const named = await callTool(w.app, w.member.token, 'get_attention', { workspaceId: w.workspaceId, show: ['ws-admin'] });
+    expect(named.isError).toBe(true);
+    expect(named.text).toBe(
+      "invalid_query: show was refused for this workspace. 'ws-admin' needs the owner or admin role in it, and 'project-admin' needs a project you run in it; leave out workspaceId to ask every workspace for only what it allows.",
+    );
+
+    // the stranger's global answer never names a workspace it is not in
+    const stranger = await callTool(w.app, w.stranger.token, 'get_attention', {});
+    expect(stranger.isError, stranger.text).toBe(false);
+    expect(entry(stranger.json)).toBeUndefined();
   });
 });

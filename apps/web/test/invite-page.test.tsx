@@ -71,7 +71,9 @@ describe('3.118 the invite page — a live link', () => {
     expect(screen.getByRole('button', { name: 'Join Convenience Corner' })).toBeInTheDocument();
   });
 
-  it('3.118 accepts and routes into the workspace the server named', async () => {
+  // my-work-global T4 (spec D4): the join lands on the GLOBAL My work page, which now covers the workspace just joined,
+  // so the push no longer carries the id the server named; the accept still has to have been sent, and only once.
+  it('3.118 accepts and routes to My work, which now covers the workspace the server named', async () => {
     const accepted: string[] = [];
     mount({
       getInvite: async () => SUMMARY,
@@ -81,7 +83,7 @@ describe('3.118 the invite page — a live link', () => {
       },
     });
     await userEvent.setup().click(await screen.findByRole('button', { name: /^Join / }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/w/01J9WORKSPACE0000000000000/my-work'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/my-work'));
     expect(accepted).toEqual(['tok_e2e']);
   });
 });
@@ -269,7 +271,7 @@ describe('6.261 the invite page — a link addressed to another account', () => 
 
     // CONTROL (same it): the same page joins when the door says yes.
     await user.click(screen.getByRole('button', { name: /^Join / }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/w/${SUMMARY.workspaceId}/my-work`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/my-work'));
   });
 });
 
