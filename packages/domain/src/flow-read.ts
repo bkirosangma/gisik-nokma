@@ -1,6 +1,6 @@
 import { istDayOf } from './ist-day.js';
 import type { FlowAlternateRead, FlowAutoMoveRead, FlowEdgeRead, FlowNodeRead, FlowRead } from './read-models-flow.js';
-import { branchOf, edgeKey, sameLabel, type FlowAnalysis, type FlowEdge, type FlowNode, type FlowPlan } from './flow/index.js';
+import { branchOf, edgeKey, sameLabel, type FlowAnalysis, type FlowEdge, type FlowNode, type FlowPlan, type NotTakenResolution } from './flow/index.js';
 
 /** What the server knows about a ticket that Part 2's `FlowNode` (a planning input) does not carry. */
 export type FlowCardFacts = {
@@ -61,6 +61,16 @@ function alternatesFor(nodes: readonly FlowNode[], edges: readonly FlowEdge[], a
   return out;
 }
 
+/**
+ * PS-8's resolution as this read serves it. A Decision the read does not hold is a hole for this viewer (FL-1): neither its
+ * id nor its outcome, the hidden Decision's authored branch name (planner ruling 2026-10-06 05:46), is served; the kind and
+ * the pass stay.
+ */
+function resolutionRead(r: NotTakenResolution, byId: ReadonlyMap<string, FlowNode>): FlowNodeRead['resolution'] {
+  if (r.decisionTicketId !== null && byId.has(r.decisionTicketId)) return { ...r };
+  return { kind: r.kind, decisionTicketId: null, pass: r.pass };
+}
+
 function edgeRead(edge: FlowEdge, byId: ReadonlyMap<string, FlowNode>, analysis: FlowAnalysis): FlowEdgeRead {
   const source = byId.get(edge.sourceId);
   const base = { id: edgeKey(edge), kind: 'leads_to' as const, from: edge.sourceId, to: edge.targetId, label: edge.label, loop: analysis.backEdges.has(edgeKey(edge)) };
@@ -74,7 +84,8 @@ function edgeRead(edge: FlowEdge, byId: ReadonlyMap<string, FlowNode>, analysis:
 /**
  * The Workflow graph's whole answer, from Part 2's pure pieces and the facts the server read. Pure: no clock, no database, so the
  * same input is the same bytes (the route is a thin shell around it, and the replica could call it too).
- * A Not-taken ticket's Decision is named only when that Decision is in `nodes`: for this viewer anything else is a hole (FL-1).
+ * A Not-taken ticket's Decision, and its outcome, are named only when that Decision is in `nodes`: for this viewer anything
+ * else is a hole (FL-1).
  */
 export function buildFlowRead(input: FlowReadInput): FlowRead {
   const byId = new Map(input.nodes.map((n) => [n.id, n] as const));
@@ -107,7 +118,7 @@ export function buildFlowRead(input: FlowReadInput): FlowRead {
       round: n.rounds,
       outcome: n.outcome,
       passes: n.passes,
-      resolution: n.notTaken === null ? null : { ...n.notTaken, decisionTicketId: byId.has(n.notTaken.decisionTicketId) ? n.notTaken.decisionTicketId : null },
+      resolution: n.notTaken === null ? null : resolutionRead(n.notTaken, byId),
       alternates: alternates.get(n.id) ?? [],
       periods: n.periods.map((p) => ({ start: istDayOf(p.start), end: p.end === null ? null : istDayOf(p.end), pass: p.pass })),
       planned: (plan?.intervals ?? []).map((i) => ({ pass: i.pass, start: i.start, end: i.end, basis: i.basis, pruned: i.pruned === true })),

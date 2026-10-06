@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildFlowRead, type FlowCardFacts, type FlowReadInput } from '../src/flow-read.js';
 import type { FlowAnalysis, FlowEdge, FlowNode, FlowPlan } from '../src/flow/index.js';
+import type { FlowRead } from '../src/read-models-flow.js';
 
 const node = (id: string, over: Partial<FlowNode> = {}): FlowNode => ({
   id, typeId: 'task', stateId: 'todo', category: 'open', closed: false, trashed: false, draft: false, parentId: null, isDecision: false, outcome: null, passes: [],
@@ -190,11 +191,11 @@ describe('buildFlowRead (Part 3 T3)', () => {
     expect(a2.tray).toBe('start-after-due');
   });
 
-  it('29.242 a Not-taken ticket whose Decision the read does not hold keeps its resolution without naming that Decision (a hole leaves no id)', () => {
+  it('29.242 a Not-taken ticket whose Decision the read does not hold keeps its resolution without naming that Decision or its outcome (a hole leaves no id, 29.449)', () => {
     const input = diamond();
-    input.nodes = input.nodes.map((n) => (n.id === 'C' ? { ...n, notTaken: { kind: 'not-taken', decisionTicketId: 'HIDDEN', outcome: 'Yes', pass: 2 } } : n));
+    input.nodes = input.nodes.map((n) => (n.id === 'C' ? { ...n, notTaken: { kind: 'not-taken', decisionTicketId: 'HIDDEN', outcome: 'HIDDEN-branch', pass: 2 } } : n));
     const read = buildFlowRead(input);
-    expect(read.nodes.find((n) => n.id === 'C')!.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, outcome: 'Yes', pass: 2 });
+    expect(read.nodes.find((n) => n.id === 'C')!.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
     expect(JSON.stringify(read)).not.toContain('HIDDEN');
   });
 
@@ -253,5 +254,32 @@ describe('buildFlowRead (Part 3 T3)', () => {
     expect(read.nodes.find((n) => n.id === 'B')).toMatchObject({ notes: [{ id: 'n1', title: 'Brief' }], pin: { notes: 1, attachments: 2 }, assigneeId: 'u1', assigneeName: 'Ama', initialStateName: 'Ready' });
     expect(read.autoMoves).toEqual([move]);
     expect(read.draftCount).toBe(3);
+  });
+  it('29.449 a Not-taken ticket whose Decision the read does not hold (a hole) has a resolution with no outcome KEY, the kind and the pass kept; control: the Decision in the read keeps its id and outcome', () => {
+    const resolutionOfC = (read: FlowRead) => read.nodes.find((n) => n.id === 'C')?.resolution;
+    // D is a hole for this viewer: no node, its labelled edges passed in anyway (the strongest input; the walk drops them)
+    const hole = buildFlowRead(diamond({ nodes: diamond().nodes.filter((n) => n.id !== 'D') }));
+    expect(resolutionOfC(hole)).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
+    expect(resolutionOfC(hole)).not.toHaveProperty('outcome');
+    // a client's withheld cause folds to no id and no outcome: still no outcome key
+    const served = diamond();
+    served.nodes = served.nodes.map((n) => (n.id === 'C' ? { ...n, notTaken: { kind: 'not-taken', decisionTicketId: null, pass: 2 } } : n));
+    expect(resolutionOfC(buildFlowRead(served))).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
+    // control in the same it(): D in the read
+    expect(resolutionOfC(buildFlowRead(diamond()))).toEqual({ kind: 'not-taken', decisionTicketId: 'D', outcome: 'Yes', pass: 2 });
+  });
+
+  it('29.450 an alternate never names a Decision the read does not hold: with D a hole (its labelled edges still passed in) no node gets an alternate; control: D in the read gives B the No branch and C the Yes branch, via D', () => {
+    const alternatesOf = (read: FlowRead) => read.nodes.map((n) => [n.id, n.alternates]);
+    const hole = buildFlowRead(diamond({ nodes: diamond().nodes.filter((n) => n.id !== 'D') }));
+    expect(alternatesOf(hole)).toEqual([['A', []], ['B', []], ['C', []], ['E', []]]);
+    // control in the same it(): the same edges with D a node of the read
+    expect(alternatesOf(buildFlowRead(diamond()))).toEqual([
+      ['A', []],
+      ['D', []],
+      ['B', [{ viaDecisionId: 'D', outcome: 'No', firstTicketId: 'C' }]],
+      ['C', [{ viaDecisionId: 'D', outcome: 'Yes', firstTicketId: 'B' }]],
+      ['E', []],
+    ]);
   });
 });

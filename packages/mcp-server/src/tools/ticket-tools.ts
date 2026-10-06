@@ -67,7 +67,8 @@ const FLOW_CAUSE_EVENT_TYPES: readonly string[] = ['ticket.transitioned', 'ticke
 /**
  * A flow cause with its withheld ids phrased (wtg2 T8, 29.208): a ticket id the server nulled (`sourceTicketId`,
  * `decisionTicketId`) reads as a hidden ticket, a person it nulled (`triggeredBy`, `decidedBy`) as a hidden person. Every
- * other member, the kind, outcome, label and pass among them, is kept. Any other cause passes through untouched.
+ * other member, the kind, outcome, label and pass among them, is kept as it arrived: a cause the server withheld arrives
+ * with no outcome or label (planner ruling 2026-10-06 05:46). Any other cause passes through untouched.
  */
 function phrasedCause(cause: unknown): unknown {
   if (typeof cause !== 'object' || cause === null) return cause;

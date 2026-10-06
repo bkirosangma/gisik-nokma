@@ -410,8 +410,8 @@ describe('3.70 HistoryList — neither clock moves with the viewer’s laptop', 
 describe('29.372 HistoryList — the pass label', () => {
   it('29.372 HistoryList puts "(pass n)" on a reset ticket from round 2, and leaves round 1 and the raw fallback bare', () => {
     const at = (id: string, type: string, payload: unknown, seq: number): TicketHistoryEvent => ({ ...SKEWED, id, type, payload, seq });
-    // the withheld shape (AMEND 2): ids nulled, the decision event kept for the pairing
-    const cause = { kind: 'reopened-by-flow', decisionTicketId: null, outcome: 'No', pass: 1, decidedBy: null, decisionEventId: 'dec-1' };
+    // the withheld shape (AMEND 2): ids nulled, the decision event kept for the pairing, no outcome (planner 2026-10-06 05:46)
+    const cause = { kind: 'reopened-by-flow', decisionTicketId: null, pass: 1, decidedBy: null, decisionEventId: 'dec-1' };
     render(<HistoryList events={[
       at('e1', 'ticket.created', { typeId: 'task' }, 1),
       at('e2', 'ticket.reopened', { cause }, 2),
@@ -419,8 +419,8 @@ describe('29.372 HistoryList — the pass label', () => {
       at('e4', 'ticket.never_seen', {}, 4),
     ]} nameOf={() => 'Anselma Marak'} typeName={() => 'Task'} stateName={() => 'Backlog'} />);
     expect(screen.getByText('Created as Task')).toBeInTheDocument();
-    expect(screen.getByText('Reopened by the flow, because an earlier decision chose No (pass 2)')).toBeInTheDocument();
-    expect(screen.getByText('Moved to Backlog by the flow, because an earlier decision chose No (pass 2)')).toBeInTheDocument();
+    expect(screen.getByText('Reopened by the flow, because of an earlier decision (pass 2)')).toBeInTheDocument();
+    expect(screen.getByText('Moved to Backlog by the flow, because of an earlier decision (pass 2)')).toBeInTheDocument();
     expect(screen.getByText('ticket.never_seen')).toBeInTheDocument();
   });
 });
