@@ -222,6 +222,20 @@ describe('the two regions swap in one commit (G1 §3)', () => {
     });
     expect(await screen.findByText(/Beta work could not be read\./)).toBeInTheDocument();
     expect(frame().strip && frame().body).toBe(true);
+    // The strip leg's mirror: the WHOLE body read refusing first is a settled read too, and its refusal waits with the band rather
+    // than standing in the body's place above a strip skeleton (the hold outranks both regions' refusals, not only the strip's).
+    cleanup();
+    clearMyWorkspacesCache();
+    clearWorkspaceNameCache();
+    const rb = world();
+    mount(rb.services);
+    await asked(rb);
+    await act(async () => rb.body[0]!.reject(new Error('Your work could not be read.')));
+    expect(frame().bandSkeleton && frame().bodySkeleton).toBe(true);
+    expect(screen.queryByText(/Your work could not be read\./), 'a body refusal drawn while the strip is still a skeleton').toBeNull();
+    await act(async () => rb.attention[0]!.resolve([ITEM]));
+    expect(await screen.findByText(/Your work could not be read\./)).toBeInTheDocument();
+    expect(frame().strip).toBe(true);
   });
 
   it('25.252 a region already present at the first ask is not held behind the slow one, and a Show change after the first load is not held; control: with both pending at the first ask the first answer is held', async () => {
@@ -232,6 +246,16 @@ describe('the two regions swap in one commit (G1 §3)', () => {
     mount(cached.services);
     await waitFor(() => expect(document.querySelector('aside.gn-attention:not([aria-busy])'), 'the answered strip must not wait for the slow body').not.toBeNull());
     expect(frame().bodySkeleton).toBe(true);
+    // Its mirror: the BODY answered at the first ask and the strip still out. Each region's answer releases the page on its own.
+    cleanup();
+    clearMyWorkspacesCache();
+    clearWorkspaceNameCache();
+    override.attention = waiting();
+    override.myWork = answered(VIEW);
+    const cachedBody = world();
+    mount(cachedBody.services);
+    await waitFor(() => expect(frame().body, 'the answered body must not wait for the slow strip').toBe(true));
+    expect(frame().bandSkeleton).toBe(true);
     // Control: both pending at the first ask, the strip answers alone: it is held (the other cases' rule).
     cleanup();
     clearMyWorkspacesCache();
