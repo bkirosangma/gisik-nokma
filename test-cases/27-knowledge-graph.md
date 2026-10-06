@@ -12,7 +12,7 @@
 | 27.360–27.362 | C follow-ups, harness port | `ctl-pw-ports` (planner P35, 2026-10-05): 27.360–27.362 |
 | 27.665–27.667 | C follow-up, dark-theme contrast | `PTR-kg-dark-contrast` (owner ruling 2026-10-06 ~02:55, ids pinned 02:5x): 27.665–27.667 |
 | 27.400–27.549 | D, MCP graph query and semantic layer | `2026-10-03-mcp-graph-semantic-layer.md` |
-| 27.600–27.659 | E, Home | `2026-10-03-home.md` |
+| 27.600–27.659 | E, Home | `2026-10-03-home.md`; 27.642 is KG-D T9's Home concept panel (planner ruling 2026-10-06 13:51 (B)(3)), claimed from T3's spare 27.641–27.645 |
 | 27.660–27.664 | C follow-ups: list under the canvas (27.660), empty state and scope note by cause (27.661–27.664) | KG-C T8 FIX 1 (planner ruling 2026-10-06 00:00 (3), id pinned 00:47): 27.660 · KV7 copy by cause (lane 1's 22:23 notes (d) and (e)): 27.661–27.664 · `PTR-kg-view-copy-followups` (reviewer A's 02:31 flag, planner ruling): 27.661 amended |
 | 27.668–27.669, 27.673–27.674 | C follow-up, the empty states' frame | `PTR-kg-empty-reframe` (lane 1's 04:43 ⚑, ids pinned 04:4x) + `AMEND-kg-empty-reframe-fit` (planner ruling (A) 06:26, ids pinned 06:2x): 27.668–27.669, 27.673–27.674 |
 | 27.670–27.672 | D follow-up, the per-branch D2 ratchet | `PTR-kg-d2-per-branch-ratchet` (lane 3's 02:50 ⚑ (2) on SL7, ids pinned 2026-10-06 05:4x): 27.670–27.672 |
