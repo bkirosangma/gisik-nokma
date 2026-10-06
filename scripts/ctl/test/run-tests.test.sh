@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235, 13.2270-13.2276, 13.2280-13.2286 and 13.2310-13.2317, test-cases/13-deploy-and-ops.md);
+# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, 13.1850, 13.2230-13.2235, 13.2270-13.2276, 13.2280-13.2286, 13.2310-13.2317 and 13.2360-13.2363, test-cases/13-deploy-and-ops.md);
 # run by `ctl selftest`. Every case id starts its check's name. No real load is needed: `memory_pressure`, `sysctl` and `vm_stat` are PATH
 # stubs that read files, the clock is a file (CTL_SEM_CLOCK_FILE: a sleep advances it and runs CTL_SEM_SLEEP_HOOK, so a wait of minutes costs
 # no real time), and a slot is "held" by planting its directory with a live pid. Two cases (13.1767, 13.1774) use the REAL clock and real
@@ -15,7 +15,7 @@ cleanup() { while read -r p; do kill "$p" 2>/dev/null; done < "$fx/pids" 2>/dev/
 trap cleanup EXIT
 st="$fx/state"; FB="$fx/bin"; mkdir -p "$st" "$FB" "$fx/logs"
 export CTL_SEM_DIR="$fx/sem" CTL_LOG_DIR="$fx/logs" FX_STATE="$st"   # NEVER the machine's real semaphore
-unset CTL_TEST_SLOTS CTL_SEM_MAX_WAIT CTL_SEM_GATE_SLOTS CTL_SEM_POLL_SECS CTL_SEM_SAMPLE_SECS CTL_SEM_SWAP_TTL
+unset CTL_TEST_SLOTS CTL_SEM_MAX_WAIT CTL_SEM_GATE_SLOTS CTL_SEM_POLL_SECS CTL_SEM_SAMPLE_SECS CTL_SEM_SWAP_TTL CTL_SEM_EXPRESS_SLOTS CTL_SEM_SHORT_MAX
 repo="$fx/repo"; mkdir -p "$repo/sub"; ( cd "$repo" && /usr/bin/git init -q . )
 
 # --- stubs (bare names, found first on PATH — the way the docker stub in lib.test.sh works) ---
@@ -235,12 +235,12 @@ dreset; verdict 990 ok; o_10=$(rtd -- true); c_10=$(clock); s_10=$(sleeps)
 check "13.2311 a verdict 11 s old is stale: exactly one sample (one 3 s sleep, clock 1003, the verdict rewritten '1003 ok'); at 10 s old (the TTL itself) it is still reused — no sleep, clock 1000" 'printf "%s" "$o_11" | grep -q "^queue wait: 0s (slot " && [ "$c_11" = 1003 ] && [ "$s_11" = "3 " ] && [ "$v_11" = "1003 ok" ] && printf "%s" "$o_10" | grep -q "^queue wait: 0s (slot " && [ "$c_10" = 1000 ] && [ -z "$s_10" ]'
 
 dreset; verdict 1000 high; o_high=$(rtd --label high -- true); s_high=$(sleeps)
-check "13.2312 a fresh high verdict blocks as a sampled one does, with swap-in quiet: no grant while it is fresh (eleven 1 s polls, no sample), then one 3 s sample at 1011 finds it calm — queue wait 11s, reason swap, probe 3 in waits.tsv" 'printf "%s" "$o_high" | grep -q "^queue wait: 11s (waited for: swap)\$" && [ "$s_high" = "1 1 1 1 1 1 1 1 1 1 1 3 " ] && [ "$(col6 high)" = "6:3" ]'
+check "13.2312 a fresh high verdict blocks as a sampled one does, with swap-in quiet: no grant while it is fresh (eleven 1 s polls, no sample), then one 3 s sample at 1011 finds it calm — queue wait 11s, reason swap, probe 3 in waits.tsv" 'printf "%s" "$o_high" | grep -q "^queue wait: 11s (waited for: swap)\$" && [ "$s_high" = "1 1 1 1 1 1 1 1 1 1 1 3 " ] && [ "$(col6 high)" = "8:3" ]'
 
 dreset; echo 1000 > "$st/swaprate"; o_two=$(CTL_SEM_MAX_WAIT=5 rtd -- true); r_two=$?; v_two=$(cat "$CTL_SEM_DIR/swap.verdict"); s_two=$(sleeps)
 rm -f "$st/sleeps"; echo 0 > "$st/swaprate"; o_next=$(CTL_SEM_MAX_WAIT=5 rtd -- true); r_next=$?; s_next=$(sleeps)
 dreset; echo 1000 > "$st/swaprate"; script_line "1003 echo 0 > \"$st/swaprate\""; o_one=$(rtd --label blip -- true); v_one=$(cat "$CTL_SEM_DIR/swap.verdict")
-check "13.2313 a NEW sample keeps the two-window rule: two consecutive high windows are written as '1006 high' and block (CTL_SEM_MAX_WAIT=5: rc 75, reason swap); the next waiter, with swap-in now quiet, is blocked by that verdict without sampling (five 1 s polls, rc 75); one high window then a quiet one is '1006 ok', granted at 0 s, probe 6" '[ $r_two -eq 75 ] && printf "%s" "$o_two" | tail -1 | grep -q "waited for: swap" && [ "$v_two" = "1006 high" ] && [ "$s_two" = "3 3 " ] && [ $r_next -eq 75 ] && printf "%s" "$o_next" | tail -1 | grep -q "waited for: swap" && [ "$s_next" = "1 1 1 1 1 " ] && printf "%s" "$o_one" | grep -q "^queue wait: 0s (slot " && [ "$v_one" = "1006 ok" ] && [ "$(col6 blip)" = "6:6" ]'
+check "13.2313 a NEW sample keeps the two-window rule: two consecutive high windows are written as '1006 high' and block (CTL_SEM_MAX_WAIT=5: rc 75, reason swap); the next waiter, with swap-in now quiet, is blocked by that verdict without sampling (five 1 s polls, rc 75); one high window then a quiet one is '1006 ok', granted at 0 s, probe 6" '[ $r_two -eq 75 ] && printf "%s" "$o_two" | tail -1 | grep -q "waited for: swap" && [ "$v_two" = "1006 high" ] && [ "$s_two" = "3 3 " ] && [ $r_next -eq 75 ] && printf "%s" "$o_next" | tail -1 | grep -q "waited for: swap" && [ "$s_next" = "1 1 1 1 1 " ] && printf "%s" "$o_one" | grep -q "^queue wait: 0s (slot " && [ "$v_one" = "1006 ok" ] && [ "$(col6 blip)" = "8:6" ]'
 
 dreset; verdict 995 ok; CTL_SEM_SWAP_TTL=3 rtd -- true >/dev/null; s_t3=$(sleeps)
 dreset; verdict 995 ok; CTL_SEM_SWAP_TTL=abc rtd -- true >/dev/null; s_tabc=$(sleeps)
@@ -262,7 +262,50 @@ el=$(python3 -c "print(round($t1 - $t0, 2))")
 check "13.2316 REAL clock, default knobs: the only slot held by a live pid killed at t+0.5, a fresh ok verdict on file — the waiter (reason slots) is done by t+3 (measured ${el}s; a 5 s poll or a missed verdict's 3 s sample would not be), and not before t+0.5" 'printf "%s" "$o_real" | grep -q "waited for: slots" && python3 -c "import sys; sys.exit(0 if 0.5 <= $el < 3.0 else 1)"'
 
 dreset; verdict 1000 ok; rtd --label reused -- true >/dev/null; rm -f "$CTL_SEM_DIR/swap.verdict"; rtd --label sampled -- true >/dev/null
-check "13.2317 every waits.tsv row has 6 tab-separated columns, the 6th the grant poll's probe seconds: 0 on a reused verdict, 3 on a sampled grant (whose queue wait, column 3, stays 0)" '[ "$(col6 reused)" = "6:0" ] && [ "$(col6 sampled)" = "6:3" ] && awk -F"\t" "\$2==\"sampled\" && \$3==0 {f=1} END{exit !f}" "$CTL_SEM_DIR/waits.tsv" && [ "$(wc -l < "$CTL_SEM_DIR/waits.tsv" | tr -d " ")" -eq 2 ]'
+check "13.2317 every waits.tsv row has 8 tab-separated columns (the 7th and 8th, slot class and short-overrun, are 13.2360/13.2363), the 6th the grant poll's probe seconds: 0 on a reused verdict, 3 on a sampled grant (whose queue wait, column 3, stays 0)" '[ "$(col6 reused)" = "8:0" ] && [ "$(col6 sampled)" = "8:3" ] && awk -F"\t" "\$2==\"sampled\" && \$3==0 {f=1} END{exit !f}" "$CTL_SEM_DIR/waits.tsv" && [ "$(wc -l < "$CTL_SEM_DIR/waits.tsv" | tr -d " ")" -eq 2 ]'
+# --- the EXPRESS slot (P72, 13.2360-13.2363): `--short` may take express-1..E (CTL_SEM_EXPRESS_SLOTS, else the express-slots file, else 1) when no
+# normal slot is available to it; never preferred over a free normal slot; never taken by a run without --short; not counted against the gate cap;
+# a --short hold past CTL_SEM_SHORT_MAX (90) s logs SHORT-OVERRUN (log + waits.tsv column 8). rt's fake clock lets a command "hold" N s by advancing it.
+xhold() { local p="${2:-$(live_pid)}"; mkdir -p "$CTL_SEM_DIR/express-$1"; printf '%s|%s|planted|0\n' "$p" "${3-$(lstart "$p")}" > "$CTL_SEM_DIR/express-$1/holder"; }
+cls() { awk -F'\t' -v l="$1" '$2==l {print NF ":" $7 ":" $8}' "$CTL_SEM_DIR/waits.tsv"; }   # NF:class:short-overrun of label $1's row
+xfiles() { ls "$CTL_SEM_DIR" | grep -E '^(slot|express)-[0-9]+$' | tr '\n' ' '; }
+xslots() { printf '%s' "$1" > "$CTL_SEM_DIR/express-slots"; }
+reset; hold 1; hold 2; rm -f "$fx/x2360"; o_sx=$(rt --short --label sx -- sh -c 'ls "$CTL_SEM_DIR" | grep -E "^(slot|express)-" | tr "\n" " " > "$1"' x "$fx/x2360"); a_sx=$(xfiles); c_sx=$(cls sx)
+reset; hold 1; hold 2; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_nx=$(rt --label nx -- true); c_nx=$(cls nx)
+check "13.2360 a --short job with every normal slot held gets the EXPRESS slot at once: 'queue wait: 0s (express slot 1/1)', express-1 held while it ran (beside slot-1 and slot-2), released after (the planted slots untouched), waits.tsv class express; CONTROL — a job without --short in the same state WAITS (20 s, reason slots) until a normal slot frees" 'printf "%s" "$o_sx" | grep -q "^queue wait: 0s (express slot 1/1)\$" && [ "$(cat "$fx/x2360")" = "express-1 slot-1 slot-2 " ] && [ "$a_sx" = "slot-1 slot-2 " ] && [ "$c_sx" = "8:express:-" ] && printf "%s" "$o_nx" | grep -q "^queue wait: 20s (waited for: slots)\$" && [ "$c_nx" = "8:normal:-" ]'
+reset; hold 1; hold 2; xhold 1; script_line "1020 rm -rf \"$CTL_SEM_DIR/express-1\""; o_xh=$(rt --short --label xh -- true)
+reset; hold 1; hold 2; xhold 1 "$(dead_pid)" "Thu Jan  1 00:00:00 1970"; o_xs=$(rt --short --label xs -- true)
+check "13.2360 the express slot is exclusive and reclaimable: held by a live pid, a --short job waits (20 s, reason slots) until it frees, then takes it ('waited for: slots; express slot 1/1'); held by a DEAD pid it is reclaimed and granted at 0 s" 'printf "%s" "$o_xh" | grep -q "^queue wait: 20s (waited for: slots; express slot 1/1)\$" && printf "%s" "$o_xs" | grep -q "^queue wait: 0s (express slot 1/1)\$"'
+reset; hold 1; hold 2; echo 5 > "$st/free"; script_line "1030 echo 60 > \"$st/free\""; o_xp=$(rt --short --label xp -- true)
+reset; hold 1; hold 2; echo 1000 > "$st/swaprate"; script_line "1040 echo 0 > \"$st/swaprate\""; o_xw=$(rt --short --label xw -- true)
+check "13.2360 the express slot obeys the probes: free memory 5% waits until it recovers (30 s, reason pressure), a sustained swap-in waits until it drops (>= 35 s, reason swap) — each then granted express" 'printf "%s" "$o_xp" | grep -q "^queue wait: 30s (waited for: pressure; express slot 1/1)\$" && printf "%s" "$o_xw" | grep -qE "^queue wait: [0-9]+s \(waited for: swap; express slot 1/1\)\$" && w=$(printf "%s" "$o_xw" | sed -n "s/^queue wait: \([0-9]*\)s.*/\1/p") && [ "$w" -ge 35 ]'
+reset; hold 1; o_sn=$(rt --short --label sn -- true); c_sn=$(cls sn)
+reset; hold 1; hold 2; xslots $'0\n'; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_z=$(rt --short --label z -- true); c_z=$(cls z)
+reset; hold 1; hold 2; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_ze=$(CTL_SEM_EXPRESS_SLOTS=0 rt --short --label ze -- true)
+check "13.2361 with a normal slot free a --short job takes the NORMAL slot ('queue wait: 0s (slot 2/2)', class normal) — express is the fallback; CONTROL — express-slots 0 (the file, and CTL_SEM_EXPRESS_SLOTS=0) makes a --short job wait like any other (20 s, reason slots, then a normal slot)" 'printf "%s" "$o_sn" | grep -q "^queue wait: 0s (slot 2/2)\$" && [ "$c_sn" = "8:normal:-" ] && printf "%s" "$o_z" | grep -q "^queue wait: 20s (waited for: slots)\$" && [ "$c_z" = "8:normal:-" ] && printf "%s" "$o_ze" | grep -q "^queue wait: 20s (waited for: slots)\$"'
+reset; hold 1; hold 2; xhold 1; xslots $'2\n'; o_f2=$(rt --short --label f2 -- true)
+reset; hold 1; hold 2; xhold 1; xslots '  2  '; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_e1=$(CTL_SEM_EXPRESS_SLOTS=1 rt --short --label e1 -- true); c_e1=$(cls e1)
+reset; hold 1; hold 2; xslots abc; o_fa=$(rt --short --label fa -- true)
+reset; hold 1; hold 2; xhold 1; xslots $'1\n'; script_line "1010 echo 0 > \"$CTL_SEM_DIR/express-slots\"; rm -rf \"$CTL_SEM_DIR/express-1\""; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_rr=$(rt --short --label rr -- true); c_rr=$(cls rr)
+check "13.2361 the express count E: the express-slots file sets it with the env unset (file 2, express-1 held: granted 'express slot 2/2'); the env wins over the file (CTL_SEM_EXPRESS_SLOTS=1 over file '  2  ', express-1 held: waits 20 s for a normal slot); a file that is not a number (abc) is 1, never 0 (granted express 1/1); re-read every poll (rewritten to 0 at 1010 just as express-1 frees: the job waits on to 1020 and is granted the normal slot, not express)" 'printf "%s" "$o_f2" | grep -q "^queue wait: 0s (express slot 2/2)\$" && printf "%s" "$o_e1" | grep -q "^queue wait: 20s (waited for: slots)\$" && [ "$c_e1" = "8:normal:-" ] && printf "%s" "$o_fa" | grep -q "^queue wait: 0s (express slot 1/1)\$" && printf "%s" "$o_rr" | grep -q "^queue wait: 20s (waited for: slots)\$" && [ "$c_rr" = "8:normal:-" ]'
+reset; hold 1; plant_gate >/dev/null; rm -f "$fx/x2362"; o_gs=$(rt --short --label gs -- sh -c 'ls "$CTL_SEM_DIR" | grep -E "^(slot|express|gate)-" | sed "s/^gate-.*/gate/" | tr "\n" " " > "$1"' x "$fx/x2362")
+reset; hold 1; plant_gate >/dev/null; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; o_gn=$(rt --label gn -- true)
+reset; xhold 1; plant_gate >/dev/null; o_gx=$(rt --label gx -- true)
+check "13.2362 a gate runs with the gate cap (1) held and slot 2 physically FREE: a --short job still gets the EXPRESS slot at 0 s (express-1 held beside slot-1, the gate live while it ran), and a job without --short waits (20 s, reason gate); the express slot is not counted against the cap — express-1 held, no normal slot held, a live gate: a job without --short is granted a normal slot at 0 s" 'printf "%s" "$o_gs" | grep -q "^queue wait: 0s (express slot 1/1)\$" && [ "$(cat "$fx/x2362")" = "express-1 gate slot-1 " ] && printf "%s" "$o_gn" | grep -q "^queue wait: 20s (waited for: gate)\$" && printf "%s" "$o_gx" | grep -q "^queue wait: 0s (slot 1/2)\$"'
+adv() { echo "sh -c 'echo \$(( \$(cat \"\$1\") + $1 )) > \"\$1\"' x $st/clock"; }   # a command that holds its slot $1 fake seconds
+ovlog() { printf '%s\n' "$1" | sed -n "s/^log: //p"; }
+reset; o91=$(rt --short --label o91 -- sh -c "$(adv 91)"); l91=$(ovlog "$o91"); g91=$(grep -c '^SHORT-OVERRUN' "$l91"); t91=$(tail -1 "$l91"); c_o91=$(cls o91)
+reset; o90=$(rt --short --label o90 -- sh -c "$(adv 90)"); l90=$(ovlog "$o90"); g90=$(grep -c 'SHORT-OVERRUN' "$l90"); c_o90=$(cls o90)
+reset; o9n=$(rt --label o9n -- sh -c "$(adv 900)"); l9n=$(ovlog "$o9n"); g9n=$(grep -c 'SHORT-OVERRUN' "$l9n"); c_o9n=$(cls o9n)
+check "13.2363 a --short hold past the default CTL_SEM_SHORT_MAX (90) is logged, never stopped: held 91 s, the log has exactly one line 'SHORT-OVERRUN o91 91' (its last) and waits.tsv column 8 is 91, rc 0; CONTROL — held 90 s (the max itself) writes none ('-'), nor does a job without --short held 900 s" '[ "$g91" = 1 ] && [ "$t91" = "SHORT-OVERRUN o91 91" ] && [ "$c_o91" = "8:normal:91" ] && printf "%s" "$o91" | grep -q "^exit code: 0\$" && [ "$g90" = 0 ] && [ "$c_o90" = "8:normal:-" ] && [ "$g9n" = 0 ] && [ "$c_o9n" = "8:normal:-" ]'
+reset; o6=$(CTL_SEM_SHORT_MAX=5 rt --short --label o6 -- sh -c "$(adv 6)"); l6=$(ovlog "$o6"); g6=$(grep -cx "SHORT-OVERRUN o6 6" "$l6"); c_o6=$(cls o6)
+reset; o5=$(CTL_SEM_SHORT_MAX=5 rt --short --label o5 -- sh -c "$(adv 5)"); l5=$(ovlog "$o5"); g5=$(grep -c SHORT-OVERRUN "$l5"); c_o5=$(cls o5)
+reset; hold 1; hold 2; oxo=$(rt --short --label oxo -- sh -c "$(adv 95)"); c_oxo=$(cls oxo)
+reset; oab=$(CTL_SEM_SHORT_MAX=abc rt --short --label oab -- sh -c "$(adv 91)"); c_oab=$(cls oab)
+check "13.2363 CTL_SEM_SHORT_MAX=5: held 6 s logs 'SHORT-OVERRUN o6 6', held 5 s none; an EXPRESS hold of 95 s is logged (class express, column 8 95); a max that is not a number (abc) is 90 (held 91 logged)" '[ "$g6" = 1 ] && [ "$c_o6" = "8:normal:6" ] && [ "$g5" = 0 ] && [ "$c_o5" = "8:normal:-" ] && [ "$c_oxo" = "8:express:95" ] && [ "$c_oab" = "8:normal:91" ]'
+reset; otm=$(CTL_RUN_SECS_PER_MIN=1 CTL_RUN_KILL_GRACE_SECS=1 rt --short --max-min 1 --label otm -- sh -c "$(adv 100); sleep 30"); rtm=$?; ltm=$(ovlog "$otm"); tm1=$(tail -1 "$ltm"); tm2=$(tail -2 "$ltm" | sed -n 1p)
+reset; dsh=$(rt --dry-run --short -- true); dno=$(rt --dry-run -- true)
+check "13.2363 a --short job the cap stops keeps TIMEOUT as the log's LAST line, SHORT-OVERRUN the line before it (rc 124); --dry-run --short names the express slots and the 90 s contract, and a plain --dry-run names neither" '[ $rtm -eq 124 ] && [ "$tm1" = "TIMEOUT after 1 min" ] && [ "$tm2" = "SHORT-OVERRUN otm 100" ] && printf "%s" "$dsh" | grep -qF "; --short: express slot 1..1 when no normal slot is available, SHORT-OVERRUN logged past 90 s, then in " && ! printf "%s" "$dno" | grep -q "express"'
 reset; d=$(dead_pid); plant_gate "$d" "Thu Jan  1 00:00:00 1970" >/dev/null; lp=$(live_pid); plant_gate "$lp" "Mon Jan  1 00:00:00 2001" >/dev/null
 out=$(rt -- true)
 check "13.1765 a stale gate marker is ignored and removed: a dead pid, and a live pid whose start time differs (pid reuse)" 'printf "%s" "$out" | grep -q "^queue wait: 0s" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^gate-")" ]'

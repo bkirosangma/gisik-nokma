@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ctl run-tests [--repo W] [--label L] [--max-min N] [--dry-run] -- <command…> — run a vitest / tsc / build command through the machine-wide test semaphore
+# ctl run-tests [--repo W] [--label L] [--max-min N] [--short] [--dry-run] -- <command…> — run a vitest / tsc / build command through the machine-wide test semaphore
 # (sem.sh), its WHOLE output in a log file, and print at most 30 lines: the counts, the first failure's name and assertion, the log path and the
 # exit code. The verb's own exit code is the command's, never masked; 75 = no slot within CTL_SEM_MAX_WAIT (the command was not run); 124 WITH a
 # `TIMEOUT after N min` line (the log's last, and the summary's last) = the command held its slot past --max-min and its process group was stopped
@@ -7,6 +7,9 @@
 # --max-min N: minutes of SLOT time (the clock starts when the slot is taken; the queue wait never counts), default 30 (planner ruling 2026-10-05 14:36), GISIK_RUN_MAX_MIN overrides
 # the default; 0 = no cap, accepted only as an explicit --max-min 0 (GISIK_RUN_MAX_MIN=0 is refused). Seams (tests): CTL_RUN_SECS_PER_MIN (60),
 # CTL_RUN_KILL_GRACE_SECS (10: TERM → KILL of the group).
+# --short (P72, 13.2360-13.2363): the caller promises a short job (one mutant, one test file). It may take an EXPRESS slot (sem.sh) when no normal slot is
+# available to it — never in preference to a free normal one. The promise is checked by logging, not by killing: a --short hold past CTL_SEM_SHORT_MAX
+# (90) s writes `SHORT-OVERRUN <label> <secs>` to its log (before any TIMEOUT line, which stays the last) and the secs to waits.tsv's 8th column.
 # A command that runs Playwright for knowledge-graph-browser / flow-graph-browser gets a free KG_PW_PORT / FG_PW_PORT of its own (verbs/pw-ports.py; 13.2281-13.2285).
 # ctl_ok / ctl_fail exit 0 / 1, so this verb prints its own last line (OK|FAIL run-tests …) and exits with the real code.
 set -u
@@ -24,12 +27,13 @@ done
 # its directory (`pnpm exec vitest run test/x` from a package dir; `pnpm test` there is NOT the root's whole-monorepo `turbo run test`). CTL_REPO is derived from $PWD,
 # so the caller's directory is always inside it.
 explicit_repo=0; for a in ${left[@]+"${left[@]}"}; do [ "$a" = --repo ] && explicit_repo=1; done
-usage() { echo "FAIL run-tests $1 — usage: ctl run-tests [--repo W] [--label L] [--max-min N] -- <command…>"; exit 64; }
+usage() { echo "FAIL run-tests $1 — usage: ctl run-tests [--repo W] [--label L] [--max-min N] [--short] -- <command…>"; exit 64; }
 ctl_parse_common ${left[@]+"${left[@]}"} || exit 64
-label=""; max_min=""
+label=""; max_min=""; short=""
 set -- ${CTL_ARGS[@]+"${CTL_ARGS[@]}"}
 while [ $# -gt 0 ]; do case "$1" in
   --label) [ $# -ge 2 ] || usage "--label needs a value"; label="$2"; shift 2;;
+  --short) short=short; shift;;
   --max-min) [ $# -ge 2 ] || usage "--max-min needs a value"; max_min="$2"; shift 2
              case "$max_min" in ''|*[!0-9]*) usage "--max-min $max_min is not a whole number of minutes";; esac;;
   *) usage "unknown arg $1";;
@@ -66,7 +70,8 @@ pw_exports() {   # $1 = slot (0 = a dry-run holds none): sets KG_PW_PORT / FG_PW
 }
 if [ "$CTL_DRY_RUN" = 1 ]; then
   portnote=""; if [ -n "$pw_ports" ]; then pw_exports 0 || ctl_fail run-tests "no free Playwright ports"; portnote=" with KG_PW_PORT=$KG_PW_PORT FG_PW_PORT=$FG_PW_PORT"; fi
-  echo "DRY: acquire a slot (1..$(ctl_sem_slots) in $(ctl_sem_dir); waits while a gate runs and at least $(ctl_sem_gate_slots) slot(s) are held (CTL_SEM_GATE_SLOTS), memory pressure is not normal, or swap-in is high), then in $rundir: $shown > $(ctl_log run-tests)$portnote; $capnote"
+  shortnote=""; [ -z "$short" ] || shortnote="; --short: express slot 1..$(ctl_sem_express_slots) when no normal slot is available, SHORT-OVERRUN logged past $(ctl_sem_short_max) s"
+  echo "DRY: acquire a slot (1..$(ctl_sem_slots) in $(ctl_sem_dir); waits while a gate runs and at least $(ctl_sem_gate_slots) slot(s) are held (CTL_SEM_GATE_SLOTS), memory pressure is not normal, or swap-in is high)$shortnote, then in $rundir: $shown > $(ctl_log run-tests)$portnote; $capnote"
   ctl_ok run-tests "dry-run"
 fi
 log="$(ctl_log run-tests)"
@@ -106,15 +111,21 @@ trap cleanup EXIT
 trap 'abort 2' INT
 trap 'abort 15' TERM
 trap 'cap_fired=1' USR1
-ctl_sem_acquire "$label"; arc=$?
+ctl_sem_acquire "$label" "$short"; arc=$?
 if [ "$arc" -ne 0 ]; then
   echo "FAIL run-tests $label no slot after ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS) — nothing was run"; exit 75
 fi
-if [ "$CTL_SEM_REASONS" = "-" ]; then waitline="queue wait: ${CTL_SEM_WAITED}s (slot $CTL_SEM_SLOT/$CTL_SEM_SLOTS)"; else waitline="queue wait: ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS)"; fi
+# A normal grant prints as it always did; an express one names its class in both forms (13.2360: the class is what the tests read).
+if [ "$CTL_SEM_CLASS" = express ]; then slotname="express slot $CTL_SEM_SLOT/$CTL_SEM_SLOTS"; else slotname="slot $CTL_SEM_SLOT/$CTL_SEM_SLOTS"; fi
+if [ "$CTL_SEM_REASONS" = "-" ]; then waitline="queue wait: ${CTL_SEM_WAITED}s ($slotname)"
+elif [ "$CTL_SEM_CLASS" = express ]; then waitline="queue wait: ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS; $slotname)"
+else waitline="queue wait: ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS)"; fi
 portline=""
 if [ -n "$pw_ports" ]; then
   # after the slot: the slot decides the window, so two concurrent runs never start on the same port
-  pw_exports "${CTL_SEM_SLOT:-0}" || { ctl_sem_release; echo "FAIL run-tests $label no free Playwright ports — nothing was run"; exit 1; }
+  # an express slot's window follows the normal ones (slot N+n), so it never starts in normal slot n's window
+  pwslot="${CTL_SEM_SLOT:-0}"; [ "$CTL_SEM_CLASS" != express ] || pwslot=$(( $(ctl_sem_slots) + CTL_SEM_SLOT ))
+  pw_exports "$pwslot" || { ctl_sem_release; echo "FAIL run-tests $label no free Playwright ports — nothing was run"; exit 1; }
   portline="ports: KG_PW_PORT=$KG_PW_PORT FG_PW_PORT=$FG_PW_PORT"
 fi
 { echo "# ctl run-tests: $shown"; echo "# $waitline; in $rundir"; [ -z "$portline" ] || echo "# $portline"; echo "# $capnote"; } > "$log"
@@ -143,16 +154,20 @@ if [ "$cap_secs" -gt 0 ]; then
   timer=$!
 fi
 { wait "$child"; } 2>/dev/null; rc=$?
-timed_out=0
+timed_out=0; capline=""
 if [ "$cap_fired" = 1 ] && kill -0 "$child" 2>/dev/null; then
   timed_out=1; cap_stop; { wait "$child"; } 2>/dev/null; rc=124
-  echo "TIMEOUT after $max_min min" >> "$log"
+  capline="TIMEOUT after $max_min min"
 elif [ "$cap_fired" = 1 ] && [ "$rc" -eq $((128 + $(kill -l USR1))) ]; then
-  echo "CAP RACE: the cap fired as the job ended; its own rc is lost ($rc), so re-run" >> "$log"
+  capline="CAP RACE: the cap fired as the job ended; its own rc is lost ($rc), so re-run"
 fi
+# The --short contract's record (P72): before the cap's line, so TIMEOUT stays the log's last.
+overrun="$(ctl_sem_short_overrun)"
+[ -z "$overrun" ] || echo "SHORT-OVERRUN $label $overrun" >> "$log"
+[ -z "$capline" ] || echo "$capline" >> "$log"
 stop_timer
 child=""
-ctl_sem_release
+ctl_sem_release "$overrun"
 echo "run-tests: $label — $shown (in $rundir)"
 echo "$waitline"
 [ -z "$portline" ] || echo "$portline"
