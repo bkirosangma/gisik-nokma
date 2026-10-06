@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import {
+  BACKLOG_STATE_ID,
   docToPlainText,
   extractMentionedUserIds,
+  flowCauseSchema,
   newUlid,
   type EventEnvelope,
+  type FlowCause,
   type Notification,
   type NotificationKind,
   type NotificationPayload,
@@ -143,6 +146,79 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
         ticketId: env.entity.id,
         ticketTitle: await titleOf(env.workspaceId, env.entity.id),
         assignedBy: env.actorId,
+        eventId: env.id,
+        clientTime: env.clientTime,
+        serverTime: env.serverTime,
+      }),
+      log,
+    );
+  }
+
+  /** A draft (or a discarded one, whose `draft` stays with `discarded: true`) is not a ticket to anyone but its author, and makes no notice (O2). */
+  async function isDraft(workspaceId: string, ticketId: string): Promise<boolean> {
+    return (await getTicketStateFromDb(deps.pool, workspaceId, ticketId))?.draft !== undefined;
+  }
+
+  /**
+   * `led-to` (wtg2 T18, NT-1): the target is ready to start. Its assignee is told, unless nobody is assigned or the
+   * assignee is the person whose finish triggered the promotion (they know). Keyed on THIS transition, so two
+   * promotions out of one source are two rows and a redelivery is one.
+   */
+  async function handleFlowReady(env: EventEnvelope, cause: Extract<FlowCause, { kind: 'led-to' }>): Promise<void> {
+    const ticket = await getTicketStateFromDb(deps.pool, env.workspaceId, env.entity.id);
+    // O2 (owner, 2026-10-04): nothing is produced by or about a draft, not even for its author; the flow's
+    // notices start after publish. `draft` is ABSENT on every non-draft (Drafts T1/T3).
+    if (ticket?.draft !== undefined || (await isDraft(env.workspaceId, cause.sourceTicketId))) return;
+    const assigneeId = ticket?.assigneeId ?? null;
+    if (assigneeId === null || assigneeId === cause.triggeredBy) return;
+    if (!(await canSeeTicket(deps.pool, assigneeId, env.entity.id))) return;
+    // Decided ONCE, here: the source, its title and its branch label are named only to someone who can see it
+    // (the second ruling above rules out redaction on read). A hidden source is stored as null.
+    const sourceVisible = await canSeeTicket(deps.pool, assigneeId, cause.sourceTicketId);
+    await deliverToAll(
+      deps.transports,
+      compose('flow-ready', assigneeId, env.workspaceId, `flow-ready:${env.id}`, {
+        ticketId: env.entity.id,
+        ticketTitle: await titleOf(env.workspaceId, env.entity.id),
+        becauseTicketId: sourceVisible ? cause.sourceTicketId : null,
+        becauseTitle: sourceVisible ? await titleOf(env.workspaceId, cause.sourceTicketId) : null,
+        label: sourceVisible ? (cause.label ?? null) : null,
+        eventId: env.id,
+        clientTime: env.clientTime,
+        serverTime: env.serverTime,
+      }),
+      log,
+    );
+  }
+
+  /**
+   * `reopened-by-flow` (wtg2 T18): a Decision's choice sent this ticket back, and its assignee is told. Keyed on THIS
+   * transition, so one reset that moves several tickets of one assignee is one row per ticket. The Decision's own
+   * reset tells nobody (NT-4: the person chose), nor does any move told to the person who made the choice.
+   */
+  async function handleFlowReopened(
+    env: EventEnvelope,
+    cause: Extract<FlowCause, { kind: 'reopened-by-flow' }>,
+    to: unknown,
+  ): Promise<void> {
+    if (cause.decisionTicketId === env.entity.id) return;
+    const ticket = await getTicketStateFromDb(deps.pool, env.workspaceId, env.entity.id);
+    if (ticket?.draft !== undefined || (await isDraft(env.workspaceId, cause.decisionTicketId))) return; // O2, as handleFlowReady
+    const assigneeId = ticket?.assigneeId ?? null;
+    if (assigneeId === null || assigneeId === cause.decidedBy) return;
+    if (!(await canSeeTicket(deps.pool, assigneeId, env.entity.id))) return;
+    // The Decision, its title and its outcome are named only to someone who can see the Decision (decided once, here).
+    const decisionVisible = await canSeeTicket(deps.pool, assigneeId, cause.decisionTicketId);
+    await deliverToAll(
+      deps.transports,
+      compose('flow-reopened', assigneeId, env.workspaceId, `flow-reopened:${env.id}`, {
+        ticketId: env.entity.id,
+        ticketTitle: await titleOf(env.workspaceId, env.entity.id),
+        decisionTicketId: decisionVisible ? cause.decisionTicketId : null,
+        decisionTitle: decisionVisible ? await titleOf(env.workspaceId, cause.decisionTicketId) : null,
+        outcome: decisionVisible ? cause.outcome : null,
+        pass: cause.pass,
+        toBacklog: to === BACKLOG_STATE_ID,
         eventId: env.id,
         clientTime: env.clientTime,
         serverTime: env.serverTime,
@@ -383,6 +459,14 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           // redelivery is one row. A payload with no `assigneeId` fails the
           // handler's parse and addresses nobody: born unassigned.
           await handleAssigned(env);
+        } else if (env.type === 'ticket.transitioned') {
+          // wtg2 T18: only the flow's two causes notify. A person's move, or the older `reopened-for-child`
+          // cause, fails the parse; `branch-not-taken` closed the ticket for an unchosen branch and tells nobody (NT-4).
+          const payload = env.payload as { to?: unknown; cause?: unknown };
+          const cause = flowCauseSchema.safeParse(payload.cause);
+          if (!cause.success) return;
+          if (cause.data.kind === 'led-to') await handleFlowReady(env, cause.data);
+          else if (cause.data.kind === 'reopened-by-flow') await handleFlowReopened(env, cause.data, payload.to);
         } else if (env.type === 'comment.added' || env.type === 'comment.edited') {
           const parsed = commentPayloadSchema.safeParse(env.payload);
           if (!parsed.success) return;
@@ -413,9 +497,11 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           }
         } else if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
           // Spec A §7: links notify nobody. An explicit arm writes the decision where the next reader of this chain looks; case 27.007 pins that nobody is notified.
-        } else if (env.type === 'ticket.decided') {
-          // Outcomes notify nobody (workflow-timeline-graphs NT-4). An explicit arm writes the decision where the next
-          // reader of this chain looks; case 27.007's loop pins that nobody is notified.
+        } else if (env.type === 'ticket.decided' || env.type === 'ticket.closed' || env.type === 'ticket.reopened') {
+          // Outcomes notify nobody (workflow-timeline-graphs NT-4), nor do a close (a not-taken one included) or the
+          // `ticket.reopened` a flow reset pairs with its transition: the transition above is the one row per moved
+          // ticket (wtg2 T18, 29.396). An explicit arm writes the decision where the next reader of this chain looks;
+          // case 27.007's loop pins that nobody is notified.
         } else if (env.type === 'ticket.published') {
           await handlePublished(env);
         } else if (env.type === 'ticket.discarded') {
