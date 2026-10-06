@@ -149,7 +149,7 @@ Cached: 26 cached, 41 total …`); a `gate.sh` that ran a different mode than as
 **The cache is only as sound as `turbo.json`'s `inputs`.** `scripts/ctl/test/gate-cache.test.sh` (a `ctl selftest` step) proves a
 changed cross-package reader changes the task hash (`ui#test` after an `apps/web/src` edit; `mobile#test` after a
 `packages/editor` CSS edit; and one row for every other declared non-dependency input, cases 13.1712–13.1715, each shown red when its
-`turbo.json` entry is removed) and that an unrelated file does not; `ctl gate` itself fails any run that is not 41/41 or 46/46 (13.1716, 13.1840–13.1849, 13.2020–13.2024; the 41 arm is TEMPORARY until WTG Part 1 T1 pins 46-only); `--real` shows it through turbo's own cache (warm → HIT → change →
+`turbo.json` entry is removed) and that an unrelated file does not; `ctl gate` itself fails any run that is not 41/41, 46/46 or 49/49 (13.1716, 13.1840–13.1849, 13.2020–13.2024, 13.2364–13.2368): 41 is Knowledge Graph's graph, 46 Workflow and Timeline graphs' before Part 3 T1, and 49 Workflow and Timeline graphs' after Part 3 T1 (its PR B adds `packages/flow-graph`: 46 + 3, measured 2026-10-06); the verb that runs is the primary checkout's, which gates both release branches; `--real` shows it through turbo's own cache (warm → HIT → change →
 MISS), run 2026-10-02: `warm=miss rerun=hit unrelated-change=hit reader-change=miss` for both. The audit found, and `turbo.json`
 now declares: ui (client source roots + `apps/*/test`, `packages/*/test`, the `package.json` globs), app-core (the help suite walks
 `apps/**` and `packages/**`, minus build output — the `!` negations are mandatory: a glob input walks the DISK and ignores
