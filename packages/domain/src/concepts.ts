@@ -14,6 +14,11 @@ export type ConceptItemView = {
   taggedAt: string;
   origin: string;
 };
+/**
+ * A ticket or a note as a concept read names it (`getItemConcepts`, KG-D Task 9). A NAMED type, never an inline `{ … }`
+ * in `DataSourceQuery`: the server's client-contract pin (7.201) reads that block as text up to its first `}`.
+ */
+export type ConceptItemRef = Pick<ConceptItemView, 'kind' | 'id'>;
 /** `direction` is the OTHER concept's place relative to this one: `broader` (it is broader), `narrower`, or `related`. */
 export type ConceptLinkView = { otherId: string; otherName: string; relation: ConceptRelation; direction: 'broader' | 'narrower' | 'related' };
 /** `itemCount` counts live items only. */

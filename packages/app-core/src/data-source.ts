@@ -1,5 +1,6 @@
 import type {
   ConceptAudienceResponse,
+  ConceptItemRef,
   ConceptSummary,
   ConceptView,
   DeletedItem,
@@ -281,7 +282,7 @@ export type DataSourceQuery = {
    * /v1/workspaces/:id/concepts?item=<kind>:<id>`, D4 per reader. A 404 (a hidden or trashed item, a non-member) is
    * re-raised, never `[]`. Replica: refuses with `ReplicaGapError` (concepts are online-only).
    */
-  getItemConcepts(workspaceId: string, item: { kind: 'ticket' | 'note'; id: string }): Promise<ConceptSummary[]>;
+  getItemConcepts(workspaceId: string, item: ConceptItemRef): Promise<ConceptSummary[]>;
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:

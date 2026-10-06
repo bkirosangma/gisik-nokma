@@ -1,4 +1,4 @@
-import { SEMANTIC_KEY, type ConceptSummary, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
+import { SEMANTIC_KEY, type ConceptItemRef, type ConceptSummary, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Toast } from '@gisik-nokma/ui';
 import { useEffect, useId, useState } from 'react';
 import type { DataSource } from '../data-source.js';
@@ -7,7 +7,7 @@ import type { MakeSubmitted } from '../submit.js';
 export type ConceptsRowProps = {
   workspaceId: string;
   /** The ticket or note whose Details this row sits on. */
-  item: { kind: 'ticket' | 'note'; id: string };
+  item: ConceptItemRef;
   dataSource: DataSource;
   make: MakeSubmitted;
   /** The first refusal of a write, as `ticket-notes-section.tsx` reports one. */
