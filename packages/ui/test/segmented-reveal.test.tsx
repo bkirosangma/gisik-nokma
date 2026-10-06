@@ -97,6 +97,9 @@ describe('27.684 SegmentedControl keepSelectedInView', () => {
     BOXES['Gamma'] = [302, 420];
     mount('c'); // 420 against the bare port's 400: "auto" is a zero inset, not a reason to stay put
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 20, behavior: 'smooth' });
+    BOXES['Alpha'] = [60, 120];
+    mount('a'); // and at the start: 60 against the bare port's 100
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: -40, behavior: 'smooth' });
   });
 
   it('27.684 a reader who asked for less motion gets an instant scroll', () => {
