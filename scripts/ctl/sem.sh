@@ -219,7 +219,7 @@ ctl_sem_acquire() {
 # ctl_sem_release writes the run's waits.tsv row, then frees the slot — only while the holder file names THIS run: a slot that was wrongly reclaimed
 # and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both survive our exit. It sets CTL_SEM_OVERRUN,
 # the row's 8th column: the seconds a `short` hold lasted when that is past ctl_sem_short_max, else empty (written `-`). Computed ONCE, here, on
-# every exit path (a signal too), so the log line run-tests writes from it and the row never disagree.
+# every exit path (a signal too), so the log line run-tests writes from it (its release_slot) and the row never disagree.
 ctl_sem_release() {
   local d hp hrest sem held
   if [ -n "${CTL_SEM_SLOT:-}" ]; then

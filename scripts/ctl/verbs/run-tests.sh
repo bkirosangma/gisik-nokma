@@ -105,8 +105,13 @@ cap_stop() {
   n=0; while [ "$n" -lt 20 ] && kill -0 -- "-$child" 2>/dev/null; do sleep 0.1; n=$((n+1)); done
   return 0
 }
-abort() { local sig="$1"; stop_timer; stop_child; ctl_sem_release; echo "FAIL run-tests $label terminated by signal $sig — slot released"; exit $((128 + sig)); }
-cleanup() { stop_timer; ctl_sem_release; }
+# Every exit path frees its slot HERE (the normal end, a signal, the EXIT trap, the port refusal): ctl_sem_release writes the waits.tsv row and sets
+# CTL_SEM_OVERRUN, and the --short contract's log line (P72) is written from that same value, so log and row never disagree. Only the call that freed
+# the slot writes it — the EXIT trap after the normal end, or a TERM during the summary, adds no second line. `log` is set before the traps; a hold
+# that overran before the header was written (only the port probe runs there) would start the run's own log rather than lose the line.
+release_slot() { local had="${CTL_SEM_SLOT:-}"; ctl_sem_release; [ -n "$had" ] && [ -n "${CTL_SEM_OVERRUN:-}" ] && echo "SHORT-OVERRUN $label $CTL_SEM_OVERRUN" >> "$log"; return 0; }
+abort() { local sig="$1"; stop_timer; stop_child; release_slot; echo "FAIL run-tests $label terminated by signal $sig — slot released"; exit $((128 + sig)); }
+cleanup() { stop_timer; release_slot; }
 trap cleanup EXIT
 trap 'abort 2' INT
 trap 'abort 15' TERM
@@ -125,7 +130,7 @@ if [ -n "$pw_ports" ]; then
   # after the slot: the slot decides the window, so two concurrent runs never start on the same port
   # an express slot's window follows the normal ones (slot N+n), so it never starts in normal slot n's window
   pwslot="${CTL_SEM_SLOT:-0}"; [ "$CTL_SEM_CLASS" != express ] || pwslot=$(( $(ctl_sem_slots) + CTL_SEM_SLOT ))
-  pw_exports "$pwslot" || { ctl_sem_release; echo "FAIL run-tests $label no free Playwright ports — nothing was run"; exit 1; }
+  pw_exports "$pwslot" || { release_slot; echo "FAIL run-tests $label no free Playwright ports — nothing was run"; exit 1; }
   portline="ports: KG_PW_PORT=$KG_PW_PORT FG_PW_PORT=$FG_PW_PORT"
 fi
 { echo "# ctl run-tests: $shown"; echo "# $waitline; in $rundir"; [ -z "$portline" ] || echo "# $portline"; echo "# $capnote"; } > "$log"
@@ -163,9 +168,7 @@ elif [ "$cap_fired" = 1 ] && [ "$rc" -eq $((128 + $(kill -l USR1))) ]; then
 fi
 stop_timer
 child=""
-ctl_sem_release
-# The --short contract's record (P72), from the value the waits.tsv row got: before the cap's line, so TIMEOUT stays the log's last.
-[ -z "$CTL_SEM_OVERRUN" ] || echo "SHORT-OVERRUN $label $CTL_SEM_OVERRUN" >> "$log"
+release_slot   # the SHORT-OVERRUN line goes before the cap's, so TIMEOUT stays the log's last
 [ -z "$capline" ] || echo "$capline" >> "$log"
 echo "run-tests: $label — $shown (in $rundir)"
 echo "$waitline"
