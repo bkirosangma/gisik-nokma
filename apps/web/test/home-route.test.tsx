@@ -38,6 +38,13 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
+// Task 4: Home's graph is `home-graph.test.tsx`'s. Here its one door draws nothing, so spec C's view (Sigma, WebGL)
+// never loads in jsdom and its own states (a Retry of its own) never join these cases' queries.
+vi.mock('../src/home/home-graph-canvas.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/home/home-graph-canvas.js')>()),
+  HomeGraphCanvas: () => null,
+}));
+
 import { HomeScreen } from '../src/home/home-screen.js';
 import { resolveHomeWorkspace } from '../src/home/resolve-home-workspace.js';
 import { LAST_WORKSPACE_KEY, clearLastWorkspaceCache } from '../src/use-last-workspace.js';
