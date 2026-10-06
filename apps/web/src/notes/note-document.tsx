@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { TicketEditorSlotProps } from '@gisik-nokma/editor';
 import { ReadingProgress, extractReadingMeta, readingTimeMinutes, type ReadingMeta } from '@gisik-nokma/editor/reading';
 import { TicketEditorSlot, exportMarkdown, prefetchEditor, uploadAttachmentHttp } from '../editor-slot.js';
+import { TicketGraphTab } from '../knowledge-graph/ticket-graph-tab.js';
 import { Button } from '@gisik-nokma/ui';
 import {
   DeleteDialog,
@@ -921,6 +922,8 @@ function NoteDocumentBody({
           attachmentsUnavailable={openTicketAttachments.error ?? undefined}
           onClose={closeTicket}
           editorSlot={TicketEditorSlot}
+          // spec C §1: the fourth tab
+          knowledgeGraphSlot={TicketGraphTab}
           queryTickets={buildProjectPageQueryTickets(dataSource, note.workspaceId, openTicketProjectId)}
           resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
           workspaceName={workspace?.name ?? null}

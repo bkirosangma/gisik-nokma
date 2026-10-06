@@ -15,6 +15,7 @@ import {
 import {
   createHttpClient,
   createHttpFoundingGateway,
+  createHttpGraphGateway,
   createHttpInviteAdminGateway,
   createHttpMembersGateway,
   createHttpPeopleGateway,
@@ -24,6 +25,7 @@ import {
   createHttpNotificationsGateway,
   createOnlineDataSource,
   type FoundingGateway,
+  type GraphGateway,
   type InviteAdminGateway,
   type MembersGateway,
   type PeopleGateway,
@@ -87,6 +89,8 @@ export type AppServices = {
   people: PeopleGateway;
   /** Access follow-ups R5. Remove a person from the workspace. */
   members: MembersGateway;
+  /** Knowledge Graph (spec C §2.2): one ring per call, `GET /v1/graph/neighbours`; the view's `GraphSource`. */
+  graph: GraphGateway;
 };
 
 const AppServicesContext = createContext<AppServices | null>(null);
@@ -178,6 +182,7 @@ export function Providers({
       ticketLocation: createHttpTicketLocator(http),
       people: createHttpPeopleGateway(http),
       members: createHttpMembersGateway(http),
+      graph: createHttpGraphGateway(http),
     };
   }, [services]);
   const value = services ?? constructed;

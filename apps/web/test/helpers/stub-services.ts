@@ -10,6 +10,7 @@ import {
   SERVING_GAPS,
   ServingGapError,
   type FoundingGateway,
+  type GraphGateway,
   type InviteAdminGateway,
   type InviteGateway,
   type MyInvitationsGateway,
@@ -78,6 +79,8 @@ export type GatewayStubs = {
   /** Access plan: the exact-email lookup and the outsider door. Same rule: un-stubbed members reject BY NAME. */
   people?: Partial<PeopleGateway>;
   members?: Partial<MembersGateway>;
+  /** Knowledge Graph (spec C): same rule, an un-stubbed ring rejects BY NAME rather than inventing an empty graph. */
+  graph?: Partial<GraphGateway>;
   /**
    * Task 17's caller-scoped invitations. Same rule as every gateway here:
    * un-stubbed members reject BY NAME. A case that mounts `/workspaces` and
@@ -255,6 +258,10 @@ export function stubServices(
       remove: unstubbedGateway('members.remove'),
       ...gateways.members,
     } as MembersGateway,
+    graph: {
+      ring: unstubbedGateway('graph.ring'),
+      ...gateways.graph,
+    } as GraphGateway,
     myInvitations: {
       list: unstubbedGateway('myInvitations.list'),
       accept: unstubbedGateway('myInvitations.accept'),
