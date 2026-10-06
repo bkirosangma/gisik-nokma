@@ -107,7 +107,10 @@ export function buildFlowRead(input: FlowReadInput): FlowRead {
       round: n.rounds,
       outcome: n.outcome,
       passes: n.passes,
-      resolution: n.notTaken === null ? null : { ...n.notTaken, decisionTicketId: byId.has(n.notTaken.decisionTicketId) ? n.notTaken.decisionTicketId : null },
+      resolution:
+        n.notTaken === null
+          ? null
+          : { ...n.notTaken, decisionTicketId: n.notTaken.decisionTicketId !== null && byId.has(n.notTaken.decisionTicketId) ? n.notTaken.decisionTicketId : null },
       alternates: alternates.get(n.id) ?? [],
       periods: n.periods.map((p) => ({ start: istDayOf(p.start), end: p.end === null ? null : istDayOf(p.end), pass: p.pass })),
       planned: (plan?.intervals ?? []).map((i) => ({ pass: i.pass, start: i.start, end: i.end, basis: i.basis, pruned: i.pruned === true })),

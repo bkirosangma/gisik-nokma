@@ -134,7 +134,10 @@ describe('29.380 29.381 get_flow and get_ticket through the hosted door', () => 
     const asOwner = await read(w.owner);
     expect((asOwner.json as { resolution: unknown }).resolution).toMatchObject({ kind: 'not-taken', outcome: 'Yes', pass: 1, decision: { id: decision } }); // control: the owner can read the Decision
     const asMember = await read(w.member);
-    expect((asMember.json as { resolution: unknown }).resolution).toEqual({ kind: 'not-taken', outcome: 'Yes', pass: 1, decision: null });
+    // the hidden Decision's branch goes with it (planner ruling 2026-10-06 05:46): no outcome key, where the owner's above keeps it
+    const memberResolution = (asMember.json as { resolution: Record<string, unknown> }).resolution;
+    expect(memberResolution).toEqual({ kind: 'not-taken', pass: 1, decision: null });
+    expect(Object.keys(memberResolution).sort()).toEqual(['decision', 'kind', 'pass']);
     expect(asMember.text).not.toContain(decision); // the WHOLE reply, not just the member this tool knows about
     // the real flow answer parses with passes, a Not-taken resolution, alternates, an estimate and the automatic close in it
     const flow = (await ok(w, w.owner, 'get_flow', { workspaceId: w.workspaceId, ticketId: no })) as {

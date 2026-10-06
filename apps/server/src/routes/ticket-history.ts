@@ -45,8 +45,10 @@ import { NOT_FOUND_BODY } from './tickets.js';
  * withheld, per viewer (`visibility/withhold-link-targets.ts`). The second
  * (wtg2 T17, AMEND 2): a flow cause naming a ticket this viewer cannot see goes
  * out with that ticket id and its person (`triggeredBy` / `decidedBy`) nulled,
- * their keys kept (`withholdCauseTicket`, `read/history-causes.ts`); its kind,
- * label or outcome, pass and decision event id stay.
+ * their keys kept (`withholdEvent`'s `withholdFlowCause`, the one rule every
+ * door serves, wtg-flow-cause-withhold; `read/history-causes.ts` then reads
+ * such a cause as `causeTicket: null`); its kind, label or outcome, pass and
+ * decision event id stay.
  */
 export type TicketHistoryEvent = {
   id: string;

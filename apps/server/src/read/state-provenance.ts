@@ -88,8 +88,10 @@ export async function stateProvenanceFor(
 /**
  * A transition's cause as a viewer may see it (wtg2 T8, spec FL-1). A flow cause names a source or Decision ticket and a
  * person this viewer may not be able to see, so it is served as `{ kind }` only (`viewerSafeCause`); the old
- * `reopened-for-child` cause passes through whole, as it always has (29.207). Nothing serves `closed.cause` yet: the
- * projection stores no close cause, so `rowToTicketState` has none to hand a route.
+ * `reopened-for-child` cause passes through whole, as it always has (29.207). A close's cause (`closed.cause`) is
+ * another door's: the detail read and the bootstraps' snapshot serve it through `withholdState`
+ * (`visibility/withhold-link-targets.ts`), whole to a viewer who can see its Decision, with the Decision and its decider
+ * nulled to one who cannot (wtg-flow-cause-withhold, 29.441).
  */
 export function servedCause(raw: unknown): TransitionCause | null {
   return isFlowCause(raw) ? viewerSafeCause(raw) : (raw as TransitionCause);
