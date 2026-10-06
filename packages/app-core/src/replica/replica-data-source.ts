@@ -22,6 +22,7 @@ import {
   isFlowCause,
   isWithheldLinkEvent,
   linkPayloadDirection,
+  resolutionOf,
   statesWithBacklog,
   viewerSafeCause,
   type Priority,
@@ -1251,6 +1252,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       // rig), so this fallback is aimed at hand-built states in fixtures rather
       // than at a second meaning for the field.
       rank: state.rank ?? null,
+      // wtg2 T17 (Q1): the ONE reading of the folded close cause (`resolutionOf`), as the server's card reads `closed_cause`.
+      ...(resolutionOf(state) === null ? {} : { notTaken: true as const }),
     };
   }
 

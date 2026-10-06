@@ -639,6 +639,14 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
 });
 
 describe('3.37 mapHistory and mapWorkflowDef — the two shapes that already agree', () => {
+  it('29.373 mapHistory carries causeTicket as {key}, null and absent', () => {
+    const wire = (id: string, extra: Record<string, unknown>) => ({ id, type: 'ticket.closed', version: 1, payload: {}, actorId: ANSELMA, origin: 'web', clientTime: 'c', serverTime: 's', seq: 1, ...extra });
+    const [keyed, withheld, bare] = mapHistory({ ticketId: 't', events: [wire('e1', { causeTicket: { key: 'GN-1' } }), wire('e2', { causeTicket: null }), wire('e3', {})] });
+    expect(keyed?.causeTicket).toEqual({ key: 'GN-1' });
+    expect(withheld?.causeTicket).toBeNull();
+    expect(bare).not.toHaveProperty('causeTicket');
+  });
+
   it('validates every history event rather than casting the array', () => {
     const events = mapHistory({
       ticketId: 't',
@@ -1850,6 +1858,14 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
       ...overrides,
     };
   }
+
+  it('29.374 mapListPage carries the card notTaken mark and mapRollup carries notTakenChildren; absent stays absent', () => {
+    const page = (card: ListCard): ListResponse => ({ workspaceId: '01J9GWS0000000000000000000', projectId: 'p', groupBy: 'flat', groups: [{ key: 'all', label: 'All', cards: [card] }], nextCursor: null });
+    expect(mapListPage(page(serverListCard({ ticketId: 't1', notTaken: true }))).rows[0]?.notTaken).toBe(true);
+    expect(mapListPage(page(serverListCard({ ticketId: 't2' }))).rows[0]).not.toHaveProperty('notTaken');
+    expect(mapRollup({ totalChildren: 8, terminalChildren: 4, notTakenChildren: 1, uncategorizedChildren: 0, restrictedCount: 0 })).toEqual({ totalChildren: 8, terminalChildren: 4, notTakenChildren: 1, restrictedCount: 0 });
+    expect(mapRollup({ totalChildren: 8, terminalChildren: 5, uncategorizedChildren: 0, restrictedCount: 0 })).not.toHaveProperty('notTakenChildren');
+  });
 
   it('maps a list body into rows carrying all five formerly-absent facts', () => {
     const body: ListResponse = {

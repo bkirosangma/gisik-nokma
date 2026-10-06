@@ -93,8 +93,9 @@ export function toTicketDatesInput(
     fields: row.fields,
     transitions: [],
   };
-  // The row's key (`CCSO-4`, or null with no prefix): the calendar names a marker by it (UX fixes T8, 23.140).
-  return { state, pendingFieldIds: [], customDateFields, key: row.key };
+  // The row's key (`CCSO-4`, null with no prefix) names a calendar marker (UX fixes T8, 23.140). `notTaken` is the server's
+  // `notTakenOf` (`ListRow.notTaken`), absent when not: `state` has no `closed` for `resolutionOf`, so the Timeline reads this (29.440).
+  return { state, pendingFieldIds: [], customDateFields, key: row.key, ...(row.notTaken === true ? { notTaken: true as const } : {}) };
 }
 
 /**

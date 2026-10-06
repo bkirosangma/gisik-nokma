@@ -16,6 +16,7 @@ import {
   type Frame,
   type ZoomPreset,
 } from '@gisik-nokma/viewport';
+import { resolutionOf } from '@gisik-nokma/domain';
 import { SegmentedControl } from '@gisik-nokma/ui';
 import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import type { UserNameFn } from '../claims/claim-labels.js';
@@ -255,10 +256,14 @@ function axisLabels(first: number, last: number): Array<{ day: number; month: st
   return out;
 }
 
-/** TG-14: status is never colour alone. A finished bar carries a check, one in progress a play mark, a not-started one nothing. */
-function stateMark(category: string): { glyph: string; word: string } | null {
-  if (category === 'terminal') return { glyph: '✓', word: 'Done' };
-  if (category === 'active') return { glyph: '▶', word: 'In progress' };
+/**
+ * TG-14: status is never colour alone. A finished bar carries a check, one in progress a play mark, a not-started one nothing.
+ * A terminal bar the flow closed Not taken (wtg2 T17, AMEND-wtg2-t17-timeline-mark; spec TG-10, WG-8) is closed, never done:
+ * it reads "Not taken" with its own glyph. `notTaken` is the one definition's answer (the input's `notTaken`, the server's `notTakenOf`; else `resolutionOf` on its state); this view tests no cause.
+ */
+function stateMark(category: string, notTaken: boolean): { glyph: string; word: string; state: 'done' | 'not-taken' | 'active' } | null {
+  if (category === 'terminal') return notTaken ? { glyph: '⊘', word: 'Not taken', state: 'not-taken' } : { glyph: '✓', word: 'Done', state: 'done' };
+  if (category === 'active') return { glyph: '▶', word: 'In progress', state: 'active' };
   return null;
 }
 
@@ -269,6 +274,8 @@ type TimelineBarProps = {
   firstDay: number;
   ppd: number;
   category: string;
+  /** Closed Not taken by the flow (the input's `notTaken` from the server's `notTakenOf`, else `resolutionOf`), so a terminal bar does not read Done. */
+  notTaken: boolean;
   measure: KeyMeasure;
   detailId: string;
   onOpen: (ticketId: string) => void;
@@ -280,8 +287,8 @@ type TimelineBarProps = {
  * that is stable between refreshes (`row` comes from the model's memo, `measure` from `useKeyMeasure`, `onOpen` from a ref).
  */
 const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
-  const { row, layoutRow, firstDay, ppd, category, measure, detailId, onOpen } = props;
-  const mark = stateMark(category);
+  const { row, layoutRow, firstDay, ppd, category, notTaken, measure, detailId, onOpen } = props;
+  const mark = stateMark(category, notTaken);
   const detail = [row.key, mark?.word, row.provenance, ...row.customClaims.map((entry) => entry.label)]
     .filter((part): part is string => part !== null && part !== undefined && part !== '')
     .join('; ');
@@ -301,7 +308,7 @@ const TimelineBar = memo(function TimelineBar(props: TimelineBarProps) {
         data-day-from={row.startDay}
         data-day-to={row.endDay}
         data-pending={row.pending ? 'true' : undefined}
-        data-state={mark === null ? undefined : mark.word === 'Done' ? 'done' : 'active'}
+        data-state={mark === null ? undefined : mark.state}
         aria-label={row.title}
         aria-describedby={detailId}
         title={detail}
@@ -393,6 +400,7 @@ export function TimelineView(props: TimelineViewProps) {
     return byId;
   }, [model.groups]);
   const categoryById = useMemo(() => new Map(props.tickets.map((t) => [t.state.id, t.state.stateCategory])), [props.tickets]);
+  const notTakenIds = useMemo(() => new Set(props.tickets.filter((t) => t.notTaken === true || resolutionOf(t.state) !== null).map((t) => t.state.id)), [props.tickets]);
 
   // ---- the adapter ----
   useLayoutEffect(() => {
@@ -579,6 +587,7 @@ export function TimelineView(props: TimelineViewProps) {
                       firstDay={firstDay}
                       ppd={ppd}
                       category={categoryById.get(row.ticketId) ?? 'open'}
+                      notTaken={notTakenIds.has(row.ticketId)}
                       measure={portrait ? portraitMeasure : measure}
                       detailId={`${idPrefix}-detail-${row.ticketId}`}
                       onOpen={openTicket}

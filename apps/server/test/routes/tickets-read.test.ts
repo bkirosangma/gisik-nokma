@@ -359,6 +359,25 @@ describe('the single read carries the rollup — true totals with the restrictio
     expect(reachable.statusCode).toBe(200);
   });
 
+  it('29.374 the single read serves notTakenChildren as the card does', async () => {
+    // The single read builds its OWN rollup literal (routes/tickets.ts), which 25.190 compares with the card's only over a
+    // world with no not-taken child; this is the leg that reaches it.
+    const ws = newUlid();
+    const prj = newUlid();
+    await seedProject(db.pool, ws, prj);
+    const { userId, headers } = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: prj }]);
+    const [parentId, finished, skipped] = [newUlid(), newUlid(), newUlid()];
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parentId });
+    for (const id of [finished, skipped]) await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: id, parentId, stateCategory: 'terminal' });
+    await applyAll(db.pool, [finished, skipped].map((id) => setVisibilityEnv(ws, id, 'workspace')));
+    const cause = { kind: 'branch-not-taken', decisionTicketId: newUlid(), outcome: 'Yes', pass: 1, decidedBy: newUlid(), decisionEventId: newUlid() };
+    await db.pool.query('UPDATE proj_tickets SET closed_cause = $2::jsonb WHERE ticket_id = $1', [skipped, JSON.stringify(cause)]);
+    const res = await get(`/v1/workspaces/${ws}/tickets/${parentId}`, headers);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().rollup).toEqual({ totalChildren: 2, terminalChildren: 1, notTakenChildren: 1, uncategorizedChildren: 0, restrictedCount: 0 });
+  });
+
   /**
    * 6.87 — `null` means "no direct children", and a nonexistent ticket answers the same `null`. Not a zeroed family: the key is present rather than omitted.
    */
