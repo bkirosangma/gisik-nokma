@@ -8,7 +8,7 @@ import type { Queryable } from '../db/queryable.js';
  *
  * The OWNER is here by deviation D1: owner reads were already total
  * (`canSeeResolved`'s owner arm), but the `ticket.created` door asks the project
- * set and has no owner exemption (`check-permission.ts:1367`), so without this
+ * set and has no owner exemption (`check-permission.ts:1372`), so without this
  * an admin could create where the owner could not. A GUEST is not here: a guest
  * reaches work through explicit lists and assignment (W3), never a project.
  *
