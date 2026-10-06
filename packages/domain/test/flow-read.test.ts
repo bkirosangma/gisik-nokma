@@ -191,11 +191,11 @@ describe('buildFlowRead (Part 3 T3)', () => {
     expect(a2.tray).toBe('start-after-due');
   });
 
-  it('29.242 a Not-taken ticket whose Decision the read does not hold keeps its resolution without naming that Decision (a hole leaves no id)', () => {
+  it('29.242 a Not-taken ticket whose Decision the read does not hold keeps its resolution without naming that Decision or its outcome (a hole leaves no id, 29.449)', () => {
     const input = diamond();
-    input.nodes = input.nodes.map((n) => (n.id === 'C' ? { ...n, notTaken: { kind: 'not-taken', decisionTicketId: 'HIDDEN', outcome: 'Yes', pass: 2 } } : n));
+    input.nodes = input.nodes.map((n) => (n.id === 'C' ? { ...n, notTaken: { kind: 'not-taken', decisionTicketId: 'HIDDEN', outcome: 'HIDDEN-branch', pass: 2 } } : n));
     const read = buildFlowRead(input);
-    expect(read.nodes.find((n) => n.id === 'C')!.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, outcome: 'Yes', pass: 2 });
+    expect(read.nodes.find((n) => n.id === 'C')!.resolution).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
     expect(JSON.stringify(read)).not.toContain('HIDDEN');
   });
 
