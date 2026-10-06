@@ -8,7 +8,7 @@ import { readActorNames, readActorNamesForGuest, readOwnName } from '../routes/b
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 import { visibleConceptIds } from './concepts.js';
 import { requireMember } from './membership.js';
-import { NOTE_PROJECT_LIVE_WHERE } from './notes.js';
+import { NOTE_HOME_SQL, NOTE_PROJECT_LIVE_WHERE } from './notes.js';
 import { SqlParams } from './sql-params.js';
 import { cardKeysFor } from './ticket-cards.js';
 import { visibleProjects } from './visible-projects.js';
@@ -125,7 +125,7 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
       if (eff === null) continue;
       const params = new SqlParams();
       const { rows } = await db.query<{ note_id: string; workspace_id: string; home_project_id: string; title: string }>(
-        `SELECT n.note_id, n.workspace_id, n.home_project_id, n.title FROM proj_notes n
+        `SELECT n.note_id, n.workspace_id, ${NOTE_HOME_SQL} AS home_project_id, n.title FROM proj_notes n
           WHERE n.workspace_id = ${params.add(workspaceId)} AND n.note_id = ANY (${params.add(noteIds)}::text[])
             AND n.deleted = FALSE AND ${visibleNotesWhere(eff, viewerId, params)} AND ${NOTE_PROJECT_LIVE_WHERE}`,
         params.toArray(),
@@ -233,8 +233,13 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
     for (const r of rows) add(r.kind, graphRef('ticket', r.source_id), graphRef('ticket', r.target_id), { addedById: r.created_by, addedAt: r.created_at, origin: r.origin });
   }
   if (groups.has('attached') && (t.length > 0 || n.length > 0)) {
+    // A note links only to a ticket of its own workspace (18.522): a link written before 18.500 refused it is no edge,
+    // even for a viewer who could see both ends, each in its own workspace.
     const { rows } = await db.query<{ note_id: string; ticket_id: string; attached_at: Date }>(
-      `SELECT note_id, ticket_id, attached_at FROM proj_note_attachments WHERE note_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} ticket_id = ANY ($2::text[])`, [n, t]);
+      `SELECT na.note_id, na.ticket_id, na.attached_at FROM proj_note_attachments na
+         JOIN proj_notes an ON an.note_id = na.note_id
+         JOIN proj_tickets tk ON tk.ticket_id = na.ticket_id AND tk.workspace_id = an.workspace_id
+        WHERE na.note_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} na.ticket_id = ANY ($2::text[])`, [n, t]);
     for (const r of rows) add('attached', graphRef('note', r.note_id), graphRef('ticket', r.ticket_id), { addedAt: r.attached_at });
   }
   type RefRow = {
@@ -275,8 +280,11 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
       for (const r of rows) add('in', graphRef('project', r.project_id), graphRef('ticket', r.ticket_id));
     }
     if (n.length > 0 || pr.length > 0) {
+      // Only a home project of the note's own workspace (18.522), as the item's `projectId` (`NOTE_HOME_SQL`).
       const { rows } = await db.query<{ note_id: string; home_project_id: string }>(
-        `SELECT note_id, home_project_id FROM proj_notes WHERE home_project_id <> '' AND (note_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} home_project_id = ANY ($2::text[]))`, [n, pr]);
+        `SELECT hn.note_id, hn.home_project_id FROM proj_notes hn
+           JOIN proj_projects hp ON hp.project_id = hn.home_project_id AND hp.workspace_id = hn.workspace_id
+          WHERE hn.note_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} hn.home_project_id = ANY ($2::text[])`, [n, pr]);
       for (const r of rows) add('in', graphRef('project', r.home_project_id), graphRef('note', r.note_id));
     }
     if (pr.length > 0 || w.length > 0) {
