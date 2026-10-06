@@ -525,6 +525,8 @@ describe('13.371 the shape the directory already served is unchanged', () => {
       // a new field on this route must be impossible to add by accident.
       prefix: 'UC',
       role: 'member',
+      // My-work-global T1 (30.011): on the project's roster, not its admin.
+      adminProjectIds: [],
       // Trash series, Plan 1 Task 5 (spec T8): served for every caller told
       // about this workspace at all, never a withholding.
       archived: false,

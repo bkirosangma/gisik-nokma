@@ -1395,7 +1395,7 @@ failure this bucket has recorded before, caught here by a compiler instead of by
 - 12.185 ✅ **The methods that refuse, enumerated by id rather than counted**, and the enumeration is
   compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift, in that
   registry's key order:
-  `getMyWorkspaces`, `getGroups`, `getDeletedItems`, `getMembers`, `getTicketAttachments`, `getTicketComments`, `search`, `searchNotes`, `getMyWork`, `getAttention`, `getFlow`, `getWorkspaceSettings`, `getPreferences`, `putPreferences`, `getLinkedFrom`. **⚠ CORRECTED 2026-10-05 (the Workflow graph, Part 3 T3, which added `getFlow`): this
+  `getMyWorkspaces`, `getGroups`, `getDeletedItems`, `getMembers`, `getTicketAttachments`, `getTicketComments`, `search`, `searchNotes`, `getMyWork`, `getAttention`, `getFlow`, `getWorkspaceSettings`, `getPreferences`, `putPreferences`, `getMyWorkPreferences`, `putMyWorkPreferences`, `getLinkedFrom` *(AMENDED 2026-10-06, the main sync: my-work-global T2's two preference methods joined the registry from main, ahead of `getLinkedFrom`)*. **⚠ CORRECTED 2026-10-05 (the Workflow graph, Part 3 T3, which added `getFlow`): this
   read "NINE methods refuse" and listed nine, while the test's own title said FOURTEEN: `getGroups`,
   `getDeletedItems`, `getTicketComments`, `searchNotes` and `getLinkedFrom` had joined the registry
   without joining this line. The count is gone from the line and from the test's title; the list is the

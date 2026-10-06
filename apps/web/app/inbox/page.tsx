@@ -195,9 +195,9 @@ export const PAGING_FAILURE_PREFIX = 'More of your inbox could not be loaded, so
  * person no read names still renders as their id: attributed, never anonymous.
  */
 /**
- * The next step out of an empty inbox (23.195, SYS-18): a real link, not a sentence about one. This page has no
- * `[workspaceId]` segment, so My work is reached through the workspace the shell remembers; a person with none yet
- * is sent to the workspace list, which is where one is chosen or created.
+ * The next step out of an empty inbox (23.195, SYS-18): a real link, not a sentence about one. My work is global
+ * (`/my-work`, my-work-global T4), and the workspace the shell remembers picks the step: one opened sends a person
+ * to My work, none yet to the workspace list, which is where one is chosen or created.
  */
 function EmptyInboxNext(): React.JSX.Element {
   const session = useSessionStatus();
@@ -205,7 +205,7 @@ function EmptyInboxNext(): React.JSX.Element {
   const remembered = useLastWorkspace(undefined, userId);
   return remembered.status === 'remembered' ? (
     <p className="gn-inbox__next">
-      <Link href={`/w/${remembered.workspaceId}/my-work`}>Open My work</Link>
+      <Link href="/my-work">Open My work</Link>
     </p>
   ) : (
     <p className="gn-inbox__next">
