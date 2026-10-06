@@ -1,6 +1,6 @@
 /**
  * Knowledge Graph spec D §5.1 (KG-D Task 6): `GET /v1/graph/path` and `GET /v1/graph/trace` (`src/routes/graph-query.ts`
- * over `src/read/graph-path.ts` and `src/read/graph-trace.ts`). Cases 27.508–27.510 (`test-cases/27-knowledge-graph.md`
+ * over `src/read/graph-path.ts` and `src/read/graph-trace.ts`). Cases 27.508–27.510 and 27.552 (`test-cases/27-knowledge-graph.md`
  * §27.D, under `<!-- D T6 -->`).
  *
  * ## Seeded through EVENTS
@@ -232,6 +232,38 @@ describe('27.508 graph/path: up to three shortest paths, only through what the r
     linkReads = 0;
     await shortestPaths(counting, world.ids.owner, { from: t(T1), to: t(T4), maxHops: 6, groups: new Set(['blocks']) });
     expect(linkReads).toBe(3);
+  });
+});
+
+describe('27.552 the path walk takes no step on an edge with neither end in the frontier', () => {
+  /**
+   * `shortestPaths` over a pool whose FIRST link read (the layer whose frontier is `[T1]`) also answers `stray`, a link
+   * between two items off that frontier, as a faulty emitter would (task kg-sl6-suggested-arm: plan Task 6's suggestion
+   * arm did, planner 12:42). The real links are read as they are, so the answer must be the plain `blocks` path.
+   */
+  const withStray = (stray: { source_id: string; target_id: string }): Queryable => {
+    let first = true;
+    return new Proxy(db.pool, {
+      get(target, prop, receiver) {
+        if (prop !== 'query') return Reflect.get(target, prop, receiver) as unknown;
+        return async (text: unknown, params?: unknown[]) => {
+          const result = await target.query(text as string, params);
+          if (!String(text).includes('FROM proj_ticket_links') || !first) return result;
+          first = false;
+          return { ...result, rows: [...result.rows, { ...stray, kind: 'blocks', created_by: world.ids.owner, created_at: new Date(), origin: 'web' }] };
+        };
+      },
+    }) as Queryable;
+  };
+  const blocksPath = (pool: Queryable) => shortestPaths(pool, world.ids.owner, { from: t(T1), to: t(T4), maxHops: 6, groups: new Set(['blocks']) });
+
+  it('27.552 a stray T2 → T3 on the first layer changes nothing: exactly [T1, T2, T3, T4]; control: the same walk with no stray', async () => {
+    expect((await blocksPath(db.pool))?.paths.map((p) => p.refs), 'control').toEqual([[t(T1), t(T2), t(T3), t(T4)]]);
+    expect((await blocksPath(withStray({ source_id: T2, target_id: T3 })))?.paths.map((p) => p.refs)).toEqual([[t(T1), t(T2), t(T3), t(T4)]]);
+  });
+
+  it('27.552 a stray T3 → T4 on the first layer (the walk back would cycle T4 → T3 → T4) still answers exactly [T1, T2, T3, T4], no error', async () => {
+    await expect(blocksPath(withStray({ source_id: T3, target_id: T4 })).then((found) => found?.paths.map((p) => p.refs))).resolves.toEqual([[t(T1), t(T2), t(T3), t(T4)]]);
   });
 });
 

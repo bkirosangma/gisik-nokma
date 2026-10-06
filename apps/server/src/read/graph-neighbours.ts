@@ -11,7 +11,7 @@ import { requireMember } from './membership.js';
 import { NOTE_PROJECT_LIVE_WHERE } from './notes.js';
 import { SqlParams } from './sql-params.js';
 import { cardKeysFor } from './ticket-cards.js';
-import { openSuggestionIds, visibleSuggestions } from './suggestions.js';
+import { visibleSuggestions } from './suggestions.js';
 import { visibleProjects } from './visible-projects.js';
 import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from './visible-where.js';
 
@@ -171,12 +171,11 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
     }
     // Spec D §4.2/§6 (27.507): a concept id that is no concept may be a model suggestion (a `sem_suggestions` id, a ULID like
     // a concept's, never the same one), drawn as a concept with `suggested: true`. `visibleSuggestions` decides who sees it,
-    // as it does for the suggestions list (members only, every item visible); a rejected or confirmed one is not drawn,
-    // although its row waits for the job's next run (`openSuggestionIds`).
+    // as it does for the suggestions list: members only, every item visible, and not a rejected or confirmed one, although
+    // its row waits for the job's next run.
     const leftover = ids.concept.filter((id) => !out.has(graphRef('concept', id)));
     for (const [workspaceId, suggestionIds] of await groupByWorkspace('sem_suggestions', 'id', leftover)) {
-      const open = await openSuggestionIds(db, workspaceId, suggestionIds);
-      for (const row of await visibleSuggestions(db, await roleIn(workspaceId), viewerId, workspaceId, open)) {
+      for (const row of await visibleSuggestions(db, await roleIn(workspaceId), viewerId, workspaceId, suggestionIds)) {
         const ref = graphRef('concept', row.id);
         out.set(ref, { ref, kind: 'concept', id: row.id, workspaceId, projectId: null, label: row.label, title: null, category: null, suggested: true });
       }

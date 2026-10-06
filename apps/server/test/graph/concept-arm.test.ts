@@ -32,6 +32,7 @@ import type { FastifyInstance } from 'fastify';
 import { newUlid, type GraphPathResponse, type GraphRingResponse, type LedgerEvent } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
+import { visibleSuggestions } from '../../src/read/suggestions.js';
 import { readActorNames } from '../../src/routes/builder-reads.js';
 import { itemHash, itemKey, parseItemKey, signatureOf } from '../../src/semantic/signature.js';
 import { buildTestApp } from '../helpers/app.js';
@@ -259,6 +260,10 @@ describe('27.507 the ring read draws model suggestions as concepts, for members 
       expect(await getRing('memberIn', query(`concept:${SF}`, 'concepts'))).toEqual(unknown);
       // Control: the owner may centre on S2.
       expect(refs(await ring('owner', `concept:${S2}`, 'concepts'))).toContain(`ticket:${world.TE}`);
+      // The read the ring resolves through answers only the ids it is asked about (control: unasked, the owner's three).
+      const ownerEff = await resolveEffectiveRole(db.pool, ids.owner, world.WS);
+      expect((await visibleSuggestions(db.pool, ownerEff, ids.owner, world.WS)).map((row) => row.id).sort(), 'control').toEqual([S1, S2, SG].sort());
+      expect((await visibleSuggestions(db.pool, ownerEff, ids.owner, world.WS, [S1])).map((row) => row.id)).toEqual([S1]);
     });
   });
 

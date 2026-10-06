@@ -42,7 +42,10 @@ export async function shortestPaths(db: Queryable, viewerId: string, req: GraphP
     const next: string[] = [];
     for (const edge of raw) {
       if (!known.has(edge.from) || !known.has(edge.to)) continue; // a hidden end: no edge, and no step through it
-      // `expand` answers only edges touching the frontier; one with BOTH ends in it reaches back a layer and the next check drops it.
+      // `expand` answers only edges touching the frontier, but an edge with NEITHER end in it is no step from this layer: read
+      // as one, its `to` would become the predecessor of a node off the walk, which the walk back can cycle through (27.552).
+      if (!inFrontier.has(edge.from) && !inFrontier.has(edge.to)) continue;
+      // One with BOTH ends in the frontier reaches back a layer, and the next check drops it.
       const near = inFrontier.has(edge.from) ? edge.from : edge.to;
       const far = near === edge.from ? edge.to : edge.from;
       if (dist.has(far) && dist.get(far) !== hop) continue; // reached on an earlier layer: not a shortest step
