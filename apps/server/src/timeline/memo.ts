@@ -17,8 +17,14 @@ import { scopeKey, type ReadableWorkspace, type TimelineScope } from './scope.js
  * changes a plan input moves a head and the next read misses; the TTL bounds only what no event stamps.
  */
 export const TIMELINE_CORE_TTL_MS = 30_000;
-/** The most cores kept per process (a 10,000-ticket core is several MB; the server runs on 1 GB): the oldest goes first. */
-export const TIMELINE_CORE_MEMO_MAX = 8;
+/**
+ * The most cores kept per process; the oldest goes first. 4 by the planner's ruling of 2026-10-06 11:45 (wtg4-reads FIX 1;
+ * it was 8, the lane's own choice): one Everyone core at the 10,000-ticket perf floor held about 44–61 MB of heap
+ * (`perf.test.ts`'s profile leg, no forced GC: a rough upper reading), so 8 kept cores came to about 350–490 MB on
+ * production's single 1 GB server instance (`deploy/do/app.yaml`, professional-xs). 4 caps that near 245 MB, and with few
+ * concurrent viewers a chunk still slices the core its own index kept (29.291).
+ */
+export const TIMELINE_CORE_MEMO_MAX = 4;
 
 type Slot = { at: number; core: Promise<ScopeCore> };
 const slots = new Map<string, Slot>();

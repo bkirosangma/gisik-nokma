@@ -35,7 +35,7 @@ import {
   type ScopeCore,
 } from '../../../src/timeline/assemble.js';
 import { readAsOf } from '../../../src/timeline/as-of.js';
-import { loadPins } from '../../../src/timeline/load.js';
+import { pinCountsFor } from '../../../src/read/pin-counts.js';
 import type { ReadableWorkspace, TimelineScope } from '../../../src/timeline/scope.js';
 
 /**
@@ -44,8 +44,10 @@ import type { ReadableWorkspace, TimelineScope } from '../../../src/timeline/sco
  * reads answer byte-identical bodies to these. Each function body below is a VERBATIM copy of 1882524a's
  * (`git show 1882524a:apps/server/src/timeline/{load,assemble,compute,read-index,read-chunk,read-tray}.ts`), renamed with
  * `BeforeC` and calling its own siblings; the helpers (c) did not touch (`componentsOf`, `dayPeriods`, `servedResolution`,
- * `mergeCores`, `loadPins`, `cardKeysFor`, `readAsOf`) are imported from the shipped code. Never edit a body here to make
- * the comparison pass: the point is that it is the old code.
+ * `mergeCores`, `pinCountsFor`, `cardKeysFor`, `readAsOf`) are imported from the shipped code. One line is not 1882524a's:
+ * `computeScopeBeforeC`'s pin call reads `pinCountsFor` bound to the core's workspace, where 1882524a called the Timeline's own
+ * pin reader, which bound no workspace (wtg4-reads FIX 1 deleted it: both paths read the one shipped reader, which (c) never touched).
+ * Never edit a body here to make the comparison pass: the point is that it is the old code.
  */
 
 /** The projection row `rowToTicketState` folds, declared as Part 2 T12's `walkFlow` declares it (`read-flow.ts`). `t.*` carries Part 2's and Drafts' columns. */
@@ -260,7 +262,7 @@ export async function computeScopeBeforeC(
     readable.map(async ({ workspaceId, eff }) => {
       const loaded = await loadWorkspaceBeforeC(db, eff, viewerId, workspaceId, scope);
       const keys = await cardKeysFor(db, loaded.rows);
-      const pins = await loadPins(db, eff, viewerId, loaded.tickets.filter((t) => t.inScope).map((t) => t.id));
+      const pins = await pinCountsFor(db, eff, viewerId, workspaceId, loaded.tickets.filter((t) => t.inScope).map((t) => t.id));
       return assembleScopeBeforeC({ tickets: loaded.tickets, edges: loaded.edges, keys, pins, today }, limits);
     }),
   );

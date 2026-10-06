@@ -168,7 +168,7 @@ export function planFlow(input: { nodes: readonly FlowNode[]; edges: readonly Fl
  * What `planFlow` answers for a node with no edge, without the analysis (owner ruling (c), wtg4 T1: the Timeline plans each
  * edgeless component, one ticket, with this). A lone node is its own root, so it is live and never pruned, and it has no
  * ready day: pass 1 is PL-3 from its own dates, and every later pass its round reached is chained from nothing ('no-dates').
- * It shares `firstPass` and `laterPass` with `planFlow`, and `plan.test.ts` (29.295) proves the two equal on every shape.
+ * It shares `firstPass` and `laterPass` with `planFlow`, and `plan-alone.test.ts` (29.295) proves the two equal on every shape.
  */
 export function planAlone(n: FlowNode): NodePlan {
   const cells: Cell[] = [firstPass(n, null)];

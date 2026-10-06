@@ -1,11 +1,10 @@
-import { flowNodeOf, istDayOf, statesWithBacklog, type TimelinePin } from '@gisik-nokma/domain';
+import { flowNodeOf, istDayOf, statesWithBacklog } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { rowToTicketState } from '../projections/tickets.js';
 import { listMyDrafts } from '../read/drafts.js';
-import { NOTE_PROJECT_LIVE_WHERE } from '../read/notes.js';
 import { SqlParams } from '../read/sql-params.js';
-import { LIVE_TICKET_WHERE, visibleNotesWhere, visibleTicketsWhere } from '../read/visible-where.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 import { foldedDefKey, foldedWorkflowDefs } from '../read/workflow-defs.js';
 import type { LoadedEdge, LoadedTicket } from './assemble.js';
 import type { TimelineScope } from './scope.js';
@@ -147,31 +146,4 @@ export async function loadWorkspace(
     .filter((e) => ids.has(e.source_id) && ids.has(e.target_id))
     .map((e) => ({ workspaceId, from: e.source_id, to: e.target_id, kind: e.kind, label: e.label }));
   return { tickets, edges, rows: all };
-}
-
-/**
- * TG-11 / D-W4-2: per ticket, the notes THIS viewer can see attached to it and its ticket-owned attachments. A note-owned attachment has
- * `ticket_id IS NULL` (`1790110000000_attachments-note-owner.sql`) and is not counted; no attachment-removal event exists on the tip, so every row is live
- * until a purge deletes it (`purge/erasure.ts`).
- */
-export async function loadPins(db: Queryable, eff: EffectiveRole, viewerId: string, ticketIds: readonly string[]): Promise<Map<string, TimelinePin>> {
-  const pins = new Map<string, TimelinePin>();
-  if (ticketIds.length === 0) return pins;
-  const params = new SqlParams();
-  const ids = params.add([...ticketIds]);
-  const notes = await db.query<{ ticket_id: string; n: number }>(
-    `SELECT pa.ticket_id, count(DISTINCT n.note_id)::int AS n
-       FROM proj_note_attachments pa
-       JOIN proj_notes n ON n.note_id = pa.note_id
-      WHERE pa.ticket_id = ANY(${ids}::text[]) AND n.deleted = FALSE AND ${NOTE_PROJECT_LIVE_WHERE} AND ${visibleNotesWhere(eff, viewerId, params)}
-      GROUP BY pa.ticket_id`,
-    params.toArray(),
-  );
-  const files = await db.query<{ ticket_id: string; n: number }>(
-    `SELECT ticket_id, count(*)::int AS n FROM attachments WHERE ticket_id = ANY($1::text[]) GROUP BY ticket_id`,
-    [[...ticketIds]],
-  );
-  for (const r of notes.rows) pins.set(r.ticket_id, { notes: r.n, attachments: 0 });
-  for (const r of files.rows) pins.set(r.ticket_id, { notes: pins.get(r.ticket_id)?.notes ?? 0, attachments: r.n });
-  return pins;
 }

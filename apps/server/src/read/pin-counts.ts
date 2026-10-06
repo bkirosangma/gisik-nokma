@@ -19,9 +19,10 @@ import { visibleNotesWhere } from './visible-where.js';
  *   writes a row this leaves out). A note-owned attachment has `ticket_id IS NULL` (`1790110000000_attachments-note-owner.sql`)
  *   and is not a ticket's. No attachment-removal event exists, so a row is live until a purge deletes it.
  *
- * The caller passes ONLY ids the viewer can already see (the list page's own rows), so this makes no ticket-visibility
- * decision of its own. One batched read per page (two queries, none for an empty page), never one per row. A ticket with
- * neither is absent from the map, and `pinOf` spells the absence as zeros.
+ * The caller passes ONLY ids the viewer can already see (the list page's own rows; the Timeline's in-scope loaded tickets, one
+ * call per workspace core, `timeline/compute.ts`), so this makes no ticket-visibility decision of its own. One batched read
+ * per call (two queries, none for an empty list), never one per row. A ticket with neither is absent from the map, and
+ * `pinOf` spells the absence as zeros.
  */
 export const NO_PIN: PinCounts = { notes: 0, attachments: 0 };
 

@@ -153,29 +153,45 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     expect(c.computes()).toBe(2);
   });
 
-  it('29.299 the memo holds 8 cores: with 8 kept every one is sliced; a 9th evicts the OLDEST kept, and only it (a core kept again is the newest)', async () => {
-    expect(TIMELINE_CORE_MEMO_MAX).toBe(8);
+  it('29.299 the memo holds TIMELINE_CORE_MEMO_MAX cores: with that many kept every one is sliced; one more evicts the OLDEST kept, and only it (a core kept again is the newest)', async () => {
+    const N = TIMELINE_CORE_MEMO_MAX;
     const c = counting();
     const keys = [w.ama, w.bo].flatMap((viewer) =>
       [false, true].flatMap((mine) => [[], [w.A.p1], [w.A.p2], [w.A.p1, w.A.p2].sort()].map((projectIds) => ({ viewer, scope: scopeOf({ mine, projectIds }) }))),
     );
-    const view = (k: (typeof keys)[number]) => reads(c.pool, k.viewer, k.scope);
-    for (const k of keys.slice(0, 8)) await (await view(k)).index();
-    expect(c.computes()).toBe(8);
-    for (const k of keys.slice(0, 8)) await (await view(k)).chunk();
-    expect(c.computes()).toBe(8); // all 8 kept
-    await (await view(keys[0] as (typeof keys)[number])).index(); // kept again: now the newest
-    await (await view(keys[8] as (typeof keys)[number])).index();
-    expect(c.computes()).toBe(10);
-    await (await view(keys[2] as (typeof keys)[number])).chunk();
-    await (await view(keys[0] as (typeof keys)[number])).chunk();
-    expect(c.computes()).toBe(10); // the third-oldest and the re-kept one are still kept
-    await (await view(keys[1] as (typeof keys)[number])).chunk();
-    expect(c.computes()).toBe(11); // the oldest kept (keys[1], once keys[0] moved up) was evicted
-    // kept again while the memo is full and it is NOT the oldest: it moves up and evicts nothing (kept now: 3-7, 0, 8, 1)
-    await (await view(keys[5] as (typeof keys)[number])).index();
-    await (await view(keys[3] as (typeof keys)[number])).chunk();
-    expect(c.computes()).toBe(12); // the oldest kept (keys[3]) survived it
+    expect(N).toBeGreaterThanOrEqual(4); // the walk below ends with keys[3] the oldest kept
+    expect(keys.length).toBeGreaterThan(N); // control: one key more than the memo holds
+    const view = (i: number) => reads(c.pool, (keys[i] as (typeof keys)[number]).viewer, (keys[i] as (typeof keys)[number]).scope);
+    for (let i = 0; i < N; i += 1) await (await view(i)).index();
+    expect(c.computes()).toBe(N);
+    for (let i = 0; i < N; i += 1) await (await view(i)).chunk();
+    expect(c.computes()).toBe(N); // all N kept
+    await (await view(0)).index(); // kept again: now the newest
+    await (await view(N)).index();
+    expect(c.computes()).toBe(N + 2);
+    await (await view(2)).chunk();
+    await (await view(0)).chunk();
+    expect(c.computes()).toBe(N + 2); // the third-oldest and the re-kept one are still kept
+    await (await view(1)).chunk();
+    expect(c.computes()).toBe(N + 3); // the oldest kept (keys[1], once keys[0] moved up) was evicted
+    // kept again while the memo is full and it is NOT the oldest: it moves up and evicts nothing (kept now: 3..N-1, 0, N, 1)
+    await (await view(N)).index();
+    await (await view(3)).chunk();
+    expect(c.computes()).toBe(N + 4); // the oldest kept (keys[3]) survived it
+  });
+
+  it('29.299 the cap is 4 cores (planner ruling 2026-10-06 11:45): with 4 kept every one is sliced; a 5th evicts the oldest', async () => {
+    const c = counting();
+    const scopes = [[], [w.A.p1], [w.A.p2]].flatMap((projectIds) => [false, true].map((mine) => scopeOf({ mine, projectIds })));
+    const view = (i: number) => reads(c.pool, w.ama, scopes[i] as TimelineScope);
+    for (const i of [0, 1, 2, 3]) await (await view(i)).index();
+    for (const i of [0, 1, 2, 3]) await (await view(i)).chunk();
+    expect(c.computes()).toBe(4); // all 4 kept
+    await (await view(4)).index();
+    for (const i of [1, 2, 3]) await (await view(i)).chunk();
+    expect(c.computes()).toBe(5); // the 5th evicted only the oldest: the other three are still kept
+    await (await view(0)).chunk();
+    expect(c.computes()).toBe(6); // the oldest was evicted
   });
 
   it('29.299 a compute that fails is not kept: the next read computes again; control: a kept core is reused', async () => {
@@ -238,13 +254,14 @@ describe('29.299 the chunk and the tray slice the core their index kept (owner r
     const slow = gated();
     const lost = (await reads(slow.pool, w.ama)).chunk();
     await slow.started;
-    for (const projectIds of [[w.A.p1], [w.A.p2], [w.A.p1, w.A.p2].sort()]) for (const mine of [false, true]) await (await reads(c.pool, w.bo, scopeOf({ mine, projectIds }))).index();
-    for (const mine of [false, true]) await (await reads(c.pool, w.bo, scopeOf({ mine }))).index(); // 8 newer cores: the slow one's key is out
+    const newer = [[], [w.A.p1], [w.A.p2], [w.A.p1, w.A.p2].sort()].flatMap((projectIds) => [false, true].map((mine) => scopeOf({ mine, projectIds })));
+    expect(newer.length).toBeGreaterThanOrEqual(TIMELINE_CORE_MEMO_MAX); // control: enough of bo's keys to fill the memo
+    for (const scope of newer.slice(0, TIMELINE_CORE_MEMO_MAX)) await (await reads(c.pool, w.bo, scope)).index(); // a memo full of newer cores: the slow one's key is out
     slow.fail();
     await expect(lost).rejects.toThrow('scope statement failed late');
     await new Promise((resolve) => setTimeout(resolve, 20)); // let a throwing catch handler surface as an unhandled rejection
     await (await reads(c.pool, w.ama)).chunk();
-    expect(c.computes()).toBe(9);
+    expect(c.computes()).toBe(TIMELINE_CORE_MEMO_MAX + 1);
   });
 
   it('29.299 the key separates viewer, scope, day, asOf and role; control: the same inputs are one key', async () => {

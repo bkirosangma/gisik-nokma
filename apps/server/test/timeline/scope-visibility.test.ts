@@ -42,6 +42,8 @@ describe('29.296 scope gate and visibility', () => {
     const r = await readableWorkspaces(db.pool, w.ama, scope);
     expect(r.map((x) => x.workspaceId).sort()).toEqual([w.A.workspaceId, w.B.workspaceId].sort());
     expect(await readableWorkspaces(db.pool, w.ama, scopeOf([w.C.workspaceId]))).toEqual([]);
+    // a made-up workspace id answers exactly as a forbidden one: the read cannot tell a caller which of the two it was
+    expect(await readableWorkspaces(db.pool, w.ama, scopeOf([newUlid()]))).toEqual(await readableWorkspaces(db.pool, w.ama, scopeOf([w.C.workspaceId])));
     expect(await readableWorkspaces(db.pool, w.cy, scopeOf([w.C.workspaceId]))).toHaveLength(1);
     expect(parseTimelineScope({ ws: '' })).toBeNull();
     expect(parseTimelineScope({})).toBeNull(); // no ws at all

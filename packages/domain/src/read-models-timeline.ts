@@ -5,7 +5,8 @@ import type { StateCategory } from './workflow.js';
 /**
  * What the Timeline reads answer (Workflow and Timeline graphs, Part 4 T1): `readTimelineIndex / Chunk / Tray` and
  * `readHomeSummary` over a scope of workspaces, projects and Me | Everyone. Every answer is read for ONE viewer: a ticket
- * they cannot see is a hole, and no id of it appears anywhere in the answer. Days are IST days (`YYYY-MM-DD`).
+ * they cannot see is a hole, and no id of it appears anywhere in the answer except as a visible child's `parentId` (spec §6's
+ * one disclosed parent id, as `TicketCard.parentId`). Days are IST days (`YYYY-MM-DD`).
  */
 
 /** Spec §4 / PR-0 / §13. */

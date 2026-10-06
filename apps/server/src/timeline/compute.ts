@@ -1,13 +1,16 @@
 import { istDayOf } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { pinCountsFor } from '../read/pin-counts.js';
 import { cardKeysFor } from '../read/ticket-cards.js';
 import { assembleScope, DEFAULT_LIMITS, mergeCores, type Limits, type ScopeCore } from './assemble.js';
-import { loadPins, loadWorkspace } from './load.js';
+import { loadWorkspace } from './load.js';
 import type { ReadableWorkspace, TimelineScope } from './scope.js';
 
 /**
  * The ONE core the index, chunk, tray (and Part 5's `get_timeline`) slice. Planning runs per flow component inside `assembleScope`.
  * The reads reach it through `memo.ts` (the index computes and keeps it per viewer; a chunk or tray slices the kept one).
+ * Each workspace's core pins its in-scope tickets with the list's own reader, `pinCountsFor`, bound to THAT workspace: a note
+ * homed in another workspace, or a file row filed under one, counts for nobody here (29.297, as the list's 29.113).
  */
 export async function computeScope(
   db: Queryable,
@@ -22,7 +25,7 @@ export async function computeScope(
     readable.map(async ({ workspaceId, eff }) => {
       const loaded = await loadWorkspace(db, eff, viewerId, workspaceId, scope);
       const keys = await cardKeysFor(db, loaded.rows);
-      const pins = await loadPins(db, eff, viewerId, loaded.tickets.filter((t) => t.inScope).map((t) => t.id));
+      const pins = await pinCountsFor(db, eff, viewerId, workspaceId, loaded.tickets.filter((t) => t.inScope).map((t) => t.id));
       return assembleScope({ tickets: loaded.tickets, edges: loaded.edges, keys, pins, today }, limits);
     }),
   );

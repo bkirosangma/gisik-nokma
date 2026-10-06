@@ -3,10 +3,11 @@ import { newUlid, planAlone, planFlow, type FlowNode, type LedgerEvent } from '@
 import type { Queryable } from '../../src/db/queryable.js';
 import { readFlowView } from '../../src/flow/flow-view.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
+import { pinCountsFor } from '../../src/read/pin-counts.js';
 import { cardKeysFor } from '../../src/read/ticket-cards.js';
 import { assembleScope, componentsOf, type LoadedEdge } from '../../src/timeline/assemble.js';
 import { computeScope } from '../../src/timeline/compute.js';
-import { loadPins, loadWorkspace } from '../../src/timeline/load.js';
+import { loadWorkspace } from '../../src/timeline/load.js';
 import { forgetCores } from '../../src/timeline/memo.js';
 import { readTimelineChunk } from '../../src/timeline/read-chunk.js';
 import { readTimelineIndex } from '../../src/timeline/read-index.js';
@@ -262,7 +263,7 @@ describe('29.290–29.293 the Timeline reads meet their bars at the floor size',
           const keys = await cardKeysFor(db.pool, loaded.rows);
           sums.keys += performance.now() - t0;
           t0 = performance.now();
-          const pins = await loadPins(db.pool, eff, c.id, loaded.tickets.filter((t) => t.inScope).map((t) => t.id));
+          const pins = await pinCountsFor(db.pool, eff, c.id, workspaceId, loaded.tickets.filter((t) => t.inScope).map((t) => t.id));
           sums.pins += performance.now() - t0;
           t0 = performance.now();
           assembleScope({ tickets: loaded.tickets, edges: loaded.edges, keys, pins, today: '2026-10-03' });

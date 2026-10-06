@@ -257,6 +257,7 @@ describe("29.293 Home's numbers over a scope", () => {
     const me = await summary(w.ama, scopeOf(ws, { mine: true }));
     expect(me.counts.tickets).toBeLessThan(everyone.counts.tickets);
     expect(me.ids.tickets).toContain(w.t.collab); // Me is assigned OR collaborating, here too
+    expect(me.ids.tickets).toContain(w.t.mine); // assigned to ama, no collaboration: the assignee half
     expect(me.ids.tickets).not.toContain(w.t.other);
     expect(me.counts.members).toBe(everyone.counts.members);
     expect(me.counts.notes).toBe(everyone.counts.notes);
