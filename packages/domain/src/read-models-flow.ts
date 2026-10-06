@@ -12,7 +12,7 @@ export type FlowStateRead = { id: string; name: string; category: StateCategory 
 /**
  * PS-7: one of the Decision's OTHER forward labelled edges, for a ticket that sits on exactly one branch of it. Never a
  * hidden Decision's: `buildFlowRead` takes the Decisions from the read's own nodes, and the server's walk keeps only edges
- * with both ends in the read, so `viaDecisionId` and `firstTicketId` are always nodes of it (29.450).
+ * with both ends in the read, so `viaDecisionId` and `firstTicketId` are always nodes of it (29.450; the walk: 29.243).
  */
 export type FlowAlternateRead = { viaDecisionId: string; outcome: string; firstTicketId: string };
 
