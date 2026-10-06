@@ -10067,7 +10067,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a ticket. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the ticket it came from is closed. A note can be attached to a ticket as well, but it does not have to be, and attaching it does not make it that ticket's property."
+                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a ticket. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the ticket it came from is closed. A note can be attached to a ticket of its own workspace as well, but it does not have to be, and attaching it does not make it that ticket's property."
                   }
                 ]
               },
