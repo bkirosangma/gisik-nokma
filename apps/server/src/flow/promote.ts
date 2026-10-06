@@ -48,7 +48,7 @@ async function terminalInitial(db: Queryable, workspaceId: string, ids: string[]
 }
 
 /**
- * Evaluate `targetIds` and file what is due. The ONE promotion path: the listener (AP-5), the settler (T16) and the sweep (T14) call it.
+ * Evaluate `targetIds` and file what is due. The ONE promotion path: the listener (AP-5) and the sweep (T14) call it.
  * Each flow component is read once, and filed as one batch. A flow cut short by the cap is skipped, counted and logged (it is
  * not half-evaluated); a target the read does not return (trashed, a draft) has nothing to promote and is not counted.
  */
