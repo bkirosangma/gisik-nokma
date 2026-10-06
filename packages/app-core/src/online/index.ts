@@ -42,6 +42,7 @@ export {
   type PendingInvite,
 } from './invites-admin.js';
 export { createHttpPeopleGateway, PeopleLookupError, type PeopleGateway } from './people.js';
+export { createHttpGraphGateway, type GraphGateway, type GraphRingQuery } from './graph.js';
 export {
   MemberRemovalError,
   createHttpMembersGateway,

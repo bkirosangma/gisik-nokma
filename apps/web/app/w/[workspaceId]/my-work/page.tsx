@@ -12,6 +12,7 @@ import {
   type MyWorkView,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '../../../../src/editor-slot.js';
+import { TicketGraphTab } from '../../../../src/knowledge-graph/ticket-graph-tab.js';
 import { AppNav } from '../../../../src/app-nav.js';
 import { ListPageShell } from '../../../../src/skeletons/page-shells.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
@@ -411,6 +412,8 @@ function MyWorkBoard() {
             and a caller that mounts none gets the read-only fallback.
           */
           editorSlot={TicketEditorSlot}
+          // spec C §1: the fourth tab
+          knowledgeGraphSlot={TicketGraphTab}
           /*
             18.287 (final review, 2026-09-23): the project page's mount
             supplies these (Task 4, case 18.274); this one never did, so a
