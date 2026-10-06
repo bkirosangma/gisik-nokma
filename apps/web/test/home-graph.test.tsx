@@ -55,7 +55,7 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import { homeNodeIds } from '../src/home/home-graph.js';
+import { HomeGraph, homeNodeIds } from '../src/home/home-graph.js';
 import { highlightNote } from '../src/home/home-highlight-note.js';
 import { HomeScreen } from '../src/home/home-screen.js';
 import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
@@ -365,12 +365,36 @@ describe('27.649 the highlight note', () => {
     expect(note.textContent).toBe('');
   });
 
+  it('27.649 a lit count withdrawn to null (Members, in the render before the highlight clears it) says nothing; control: the same report with a count of 1 reads "None to light up."', () => {
+    const props = (members: number | null) => ({
+      workspaceId: 'ws_649n',
+      viewerId: 'u_kiro',
+      home: home('ws_649n', { counts: { members }, ids: { members: [] } }),
+      pressed: 'members' as const,
+      onEscape: () => false,
+      phone: false,
+      source: { ring: async () => ({ nodes: [], edges: [] }) } as never,
+      scope: { workspaces: [] },
+      onOpen: () => undefined,
+      canOpen: () => false,
+    });
+    const { rerender } = render(<HomeGraph {...props(1)} />);
+    report({ clear: ['person:u_9'] });
+    expect(noteText()).toBe('None to light up.');
+    rerender(<HomeGraph {...props(null)} />);
+    expect(noteText()).toBe('');
+  });
+
   it('27.649 the note row keeps one height: it is as tall as Start from (2.75rem segments in a 0.25rem track), which holds the 2.75rem button; a phone keeps two text lines', () => {
     expect(valueOf(ruleExactly(CSS, '.gn-home__graph-head'), 'min-height')).toBe('3.25rem');
     expect(valueOf(ruleExactly(UI_CSS, '.gn-button'), 'min-height')).toBe('2.75rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'line-height')).toBe('1.25rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note', '@media (max-width: 40rem)'), 'min-height')).toBe('2.5rem');
     expect(valueOf(ruleExactly(CSS, '.gn-home__note', '@media (max-width: 40rem)'), 'flex-basis')).toBe('100%'); // its own row, Start from below
+    // Wider, the note takes 20rem before Start from wraps under it, and Start from's label is set at the note's size.
+    expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'flex')).toBe('1 1 20rem');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__note'), 'font-size')).toBe('0.8125rem');
+    expect(valueOf(ruleExactly(CSS, '.gn-home__from-label'), 'font-size')).toBe('0.8125rem');
   });
 });
 
@@ -490,8 +514,12 @@ describe('27.652 capped ids: further out is what the graph reports, not the unca
  */
 const KG = '@gisik-nokma/knowledge-graph';
 const DYNAMIC_DOORS = new Set(['src/home/home-graph-canvas.tsx', 'src/knowledge-graph/graph-panel.tsx']);
+/** The source with its comments gone, so a docblock naming a form (`ssr: false`, an import) never stands in for the code. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+}
 function kgImportViolations(file: string, source: string): string[] {
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+  const code = stripComments(source);
   const out: string[] = [];
   const runtimeOk = (spec: string) => spec === `${KG}/ids`;
   for (const m of code.matchAll(/^\s*(import|export)\s+(type\s+)?[^;'"`]*?\bfrom\s*['"](@gisik-nokma\/knowledge-graph(?:\/[^'"]*)?)['"]/gm)) {
@@ -521,7 +549,9 @@ describe('27.657 the SSR seam: Sigma loads client-only, through one door', () =>
     expect(files).toContain('src/home/home-graph-canvas.tsx');
     expect(files.flatMap((file) => kgImportViolations(file, readFileSync(join(WEB, file), 'utf8')))).toEqual([]);
 
-    const canvas = readFileSync(join(WEB, 'src/home/home-graph-canvas.tsx'), 'utf8');
+    // Its CODE, not its docblock (which names `ssr: false` too): control, a comment alone does not pass.
+    expect(stripComments('/** `ssr: false` keeps it to the browser. */\n// ssr: false')).not.toMatch(/\bssr:\s*false\b/);
+    const canvas = stripComments(readFileSync(join(WEB, 'src/home/home-graph-canvas.tsx'), 'utf8'));
     expect(canvas).toContain('dynamic(');
     expect(canvas).toMatch(/\bssr:\s*false\b/);
     expect(canvas).toMatch(/import\(\s*'@gisik-nokma\/knowledge-graph'\s*\)/);
