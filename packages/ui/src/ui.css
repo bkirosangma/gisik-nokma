@@ -4875,7 +4875,11 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
    are the full-screen scrim/dialog pair, a different role), because both
    are anchored surfaces over the sheet and two treatments for one role is
    the drift this file's comments exist to prevent.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083).
+   It scrolls inside its own box (case 18.256b): react-aria writes a pixel `max-height` inline (the room on the side it
+   opened), and content taller than that — the visibility menu with its lock-out warning, 408 px under a 380 px cap — used
+   to spill out of the box with Apply hanging over the trigger. `overscroll-behavior: contain` keeps a scroll that runs past
+   the end from chaining into the page, whose scroll is react-aria's close-on-scroll (18.256c). */
 .gn-popover {
   position: absolute;
   z-index: 30;
@@ -4884,6 +4888,8 @@ body:has(.workflow-builder-screen[data-fullscreen="true"]) :is(.gn-popover, .gn-
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-near-lg);
   max-width: min(22rem, calc(100vw - 2rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .gn-select__list { list-style: none; margin: 0; padding: 0; }

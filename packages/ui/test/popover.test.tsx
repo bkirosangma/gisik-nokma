@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Popover } from '../src/components/popover.js';
+import { readUiCss } from './helpers/css-rules.js';
 
 function Host() {
   const ref = useRef<HTMLButtonElement>(null);
@@ -74,8 +75,9 @@ function contentHeight(popover: HTMLElement): number {
   return height;
 }
 
-// Its box: the content, capped by a pixel `max-height` (react-aria's own cap). `.gn-popover` sets
-// no `overflow`, so content past the cap spills out of the box, as it does in the browser.
+// Its box: the content, capped by a pixel `max-height` (react-aria's own cap). Content past the cap
+// is modelled as spilling out of the box, as it did before `.gn-popover` scrolled (18.256b); in this
+// case's geometry no box is ever capped below its content (232 under 260, then 293 under 380).
 function boxHeight(popover: HTMLElement): number {
   const cap = /^(\d+(?:\.\d+)?)px$/.exec(popover.style.maxHeight);
   return Math.min(contentHeight(popover), cap ? Number(cap[1]) : Number.POSITIVE_INFINITY);
@@ -253,7 +255,7 @@ function placementOf(popover: HTMLElement) {
 }
 
 // The bottom edge of the popover's last row (Apply) in the viewport: the box's top, wherever
-// react-aria anchored it, plus the content (which spills past a capped box) less the padding.
+// react-aria anchored it, plus the content (modelled as spilling past a capped box) less the padding.
 function actionsBottom(popover: HTMLElement): number {
   const top =
     popover.style.top !== ''
@@ -319,5 +321,66 @@ describe('Popover — content that grows after it opens', () => {
     } finally {
       layout.restore();
     }
+  });
+});
+
+/*
+ * 18.256b / 18.256c — content taller than react-aria's cap. With the visibility menu's lock-out
+ * warning showing, the flipped popover's content is 408 px under a `max-height: 380px` cap (lane 3,
+ * 2026-10-06): `.gn-popover` had no overflow rule, so the content spilled 28 px out of the box and
+ * Apply hung over the trigger chip. The box now scrolls; a scroll inside it must not be the scroll
+ * that closes it.
+ */
+describe('Popover — content taller than its cap', () => {
+  it('18.256b scrolls inside its own box: its computed overflow-y is auto, from the stylesheet and not an inline style; the control, a list that must not scroll, is not auto', async () => {
+    const sheet = document.createElement('style');
+    sheet.textContent = readUiCss();
+    document.head.append(sheet);
+    try {
+      const user = userEvent.setup();
+      render(
+        <>
+          <Host />
+          <ul className="gn-select__list" data-testid="control" />
+        </>,
+      );
+      // CONTROL first: the stylesheet is live in this document — the list picks up its own
+      // `list-style: none` from it — and yet it does not scroll.
+      const control = screen.getByTestId('control');
+      expect(getComputedStyle(control).listStyle).toBe('none');
+      expect(getComputedStyle(control).overflowY).not.toBe('auto');
+
+      await user.click(screen.getByRole('button', { name: 'Trigger' }));
+      const dialog = screen.getByRole('dialog', { name: 'Choices' });
+      // From the cascade, not from react-aria's inline style (which writes only position and size).
+      expect(dialog.style.overflowY).toBe('');
+      expect(dialog.style.overflow).toBe('');
+      expect(getComputedStyle(dialog).overflowY).toBe('auto');
+      expect(getComputedStyle(dialog).getPropertyValue('overscroll-behavior')).toBe('contain');
+    } finally {
+      sheet.remove();
+    }
+  });
+
+  it('18.256c a scroll INSIDE the open popover does not close it; the control, a scroll of the region that holds the trigger (react-aria\'s close-on-scroll), still closes it', async () => {
+    const user = userEvent.setup();
+    render(
+      // The ticket sheet's scrolling body, standing in: the trigger lives inside it.
+      <div data-testid="sheet-body" style={{ overflowY: 'auto', height: 200 }}>
+        <Host />
+      </div>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Trigger' }));
+    const dialog = screen.getByRole('dialog', { name: 'Choices' });
+
+    // The popover's own scroll, and a scroll of a row inside it: the trigger is in neither.
+    fireEvent.scroll(dialog);
+    fireEvent.scroll(screen.getByRole('button', { name: 'Apply' }));
+    expect(screen.getByRole('dialog', { name: 'Choices' })).toBe(dialog);
+
+    // CONTROL: the region holding the trigger scrolls — the popover would drift off its anchor, so
+    // react-aria closes it.
+    fireEvent.scroll(screen.getByTestId('sheet-body'));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
