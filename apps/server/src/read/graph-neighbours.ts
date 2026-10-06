@@ -295,10 +295,10 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
         WHERE ((item_kind = 'ticket' AND item_id = ANY ($1::text[])) OR (item_kind = 'note' AND item_id = ANY ($2::text[])))
               ${within ? 'AND' : 'OR'} concept_id = ANY ($3::text[])`, [t, n, c]);
     for (const r of rows) add('tag', graphRef('concept', r.concept_id), graphRef(r.item_kind, r.item_id), { addedById: r.tagged_by, addedAt: r.tagged_at, origin: r.origin });
-    // A model suggestion's tags (27.507), `suggested: true`. `item_id &&` matches a WHOLE row, so each of its items is
-    // checked again here: an edge is answered only when it touches the frontier (or, `within`, has both ends in it), as
-    // every other arm's rows are selected. An edge between two of the row's items outside the frontier would have
-    // neither end in it, which `graph-path.ts` reads as a step. (`item_id &&` also ignores the kind; the check pairs it.)
+    // A model suggestion's tags (27.507), `suggested: true`. `item_id &&` matches a WHOLE row and ignores the kind, so
+    // each item is checked again here, with its kind: an edge is answered only when it touches the frontier (or,
+    // `within`, has both ends in it), as every other arm's rows are selected. The emitter stays exact so no read has to
+    // rely on `graph-path.ts`'s guard: the path walk also skips an edge with neither end in the frontier (27.552).
     const suggestionRows = await db.query<{ id: string; item_kind: ('ticket' | 'note')[]; item_id: string[] }>(
       `SELECT id, item_kind, item_id FROM sem_suggestions
         WHERE (item_id && $1::text[] OR item_id && $2::text[]) ${within ? 'AND' : 'OR'} id = ANY ($3::text[])`, [t, n, c]);

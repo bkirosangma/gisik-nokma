@@ -10,7 +10,8 @@ const key = (item: ItemRef): string => `${item.kind}:${item.id}`;
 
 /**
  * `GET /v1/workspaces/:workspaceId/suggestions` (Knowledge Graph spec D §4.1/§5.2, KG-D Task 5): the suggestion job's
- * cache (`sem_suggestions`), highest score first, each served only to a reader who sees every live item in it.
+ * cache (`sem_suggestions`), highest score first, each served only to a reader who sees every live item in it, and
+ * only while nobody has resolved it (`openSuggestionIds`).
  *
  * - **Who may read it:** owners, admins and members. A guest and a non-member get the one 404 (`READ_NOT_FOUND_BODY`),
  *   as `routes/groups.ts` answers them.

@@ -285,7 +285,7 @@ describe('27.507 the ring read draws model suggestions as concepts, for members 
     });
   });
 
-  it('27.507 a rejected or confirmed suggestion is not drawn (its row waits for the job), and the confirmed concept reads suggested: false; another workspace\'s rejection or concept hides nothing; a deleted concept gives its suggestion back', async () => {
+  it('27.507 a rejected or confirmed suggestion is not drawn (its row waits for the job), and the confirmed concept reads suggested: false; another workspace\'s rejection or concept hides nothing; a deleted concept gives its suggestion back, and so does one merged into another workspace\'s concept', async () => {
     const tpTq = [ticket(world.TP), ticket(TQ)];
     await withSuggestions({ [SR]: { items: [...tpTq, note(world.NOTES.nProject)] }, [SA]: { items: [...tpTq, note(world.NOTES.nWorkspace)] } }, async (cached) => {
       const drawn = async () => refs(await ring('memberIn', `ticket:${world.TP}`, 'concepts')).filter((ref) => ref === `concept:${SR}` || ref === `concept:${SA}`).sort();

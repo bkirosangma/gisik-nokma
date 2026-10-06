@@ -433,13 +433,14 @@ describe('27.550–27.551 a resolved suggestion is gone from the list and the do
         expect(await submit('memberIn', concept(CM), 'concept.merged', { intoId: D })).toMatchObject(COMMITTED);
         expect(await named(), 'a merge stores CM deleted, merged into D').toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
 
+        // Soft, so a broken walk reports every read it reaches (the list, the ring, the door), not only the first.
         async function resolved(why: string): Promise<void> {
-          expect(await listIds('memberIn'), why).toEqual([SN]);
-          expect(await drawnFrom(`ticket:${R1}`), why).toEqual([]);
+          expect.soft(await listIds('memberIn'), `${why}: the list`).toEqual([SN]);
+          expect.soft(await drawnFrom(`ticket:${R1}`), `${why}: the ring`).toEqual([]);
           const again = await submit('memberIn', concept(newUlid()), 'concept.created', { name: 'Merge desk again', fromSuggestion: SM });
-          expect(sansEventId(again), `${why}: a second accept gets the made-up id's answer`).toBe(madeUp);
-          expect(await createFrom('memberIn', SM), why).toEqual(UNKNOWN);
-          expect(await named(), `${why}: one concept names SM`).toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
+          expect.soft(sansEventId(again), `${why}: a second accept gets the made-up id's answer`).toBe(madeUp);
+          expect.soft(await createFrom('memberIn', SM), `${why}: the door`).toEqual(UNKNOWN);
+          expect.soft(await named(), `${why}: one concept names SM`).toEqual([{ concept_id: CM, deleted: true, merged_into: D }]);
         }
         await resolved('CM merged into D, which is live');
 
