@@ -14,9 +14,10 @@
  *
  * ## The guest's items
  *
- * GT1 (a ticket) and GN1 (a note) are listed for the guest and mention her: the two items her ring may hold. H1–H5 also
+ * GT1 (a ticket) and GN1 (a note) are listed for the guest and mention her: the two items her ring may hold. H1–H6 also
  * mention her and she cannot open any of them: H1 a ticket she is not listed on, H2 such a ticket's COMMENT, H3 a
- * workspace note, H4 a ticket listed for her and then deleted, H5 a ticket of a workspace she is not in, listed for her.
+ * workspace note, H4 a ticket listed for her and then deleted, and H5 a ticket and H6 a note of a workspace she is not
+ * in, each listed for her there (a tenant leg per arm).
  * Links and references are written straight into the migrated tables, as `./neighbours.test.ts` does (its header).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -33,7 +34,7 @@ const NAMES = { owner: 'Kiro Sangma', member: 'Mira Marak', guest: 'Gita Guest' 
 /** The read world's phone users' names: `auth.ts`'s `getTempName` is the phone itself (`helpers/read-app.ts` PHONES). */
 const PHONE_NAMES = { admin: '+911111111107', projectLead: '+911111111108' } as const;
 const NOT_FOUND = '{"error":"not_found"}';
-const ids = { GT1: '', GN1: '', H1: '', H2: '', H3: '', H4: '', H5: '', PX: '' };
+const ids = { GT1: '', GN1: '', H1: '', H2: '', H3: '', H4: '', H5: '', H6: '', PX: '' };
 
 const w = () => read.world;
 const ws = () => read.world.workspaceId;
@@ -78,9 +79,14 @@ beforeAll(async () => {
     created(ids.PX, 'Mentions the phone admin'),
   ];
   await applyCommitted(db.pool, events);
-  // H5 is the neighbour workspace's own ticket, listed for the guest there, a workspace the guest is not in.
+  // H5 is the neighbour workspace's own ticket and H6 a note of its project, each listed for the guest there, a
+  // workspace the guest is not in.
   ids.H5 = read.neighbour.ticketId;
-  await applyCommitted(db.pool, [listed(ids.H5, [w().guest], { workspaceId: read.neighbour.workspaceId, actorId: read.userIds.neighbour })]);
+  const there = { workspaceId: read.neighbour.workspaceId, actorId: read.userIds.neighbour };
+  await applyCommitted(db.pool, [
+    listed(ids.H5, [w().guest], there),
+    makeCommitted({ ...there, entity: { kind: 'note', id: ids.H6 }, type: 'note.created', payload: { title: 'A note listed for her elsewhere', homeProjectId: read.neighbour.projectId, scope: { mode: 'explicit', userIds: [w().guest] } } }),
+  ]);
 
   await mentionFromTicket(ids.GT1, w().guest);
   await reference(ws(), { kind: 'note', id: ids.GN1, parentKind: 'note', parentId: ids.GN1 }, w().guest);
@@ -89,6 +95,7 @@ beforeAll(async () => {
   await reference(ws(), { kind: 'note', id: ids.H3, parentKind: 'note', parentId: ids.H3 }, w().guest);
   await mentionFromTicket(ids.H4, w().guest);
   await mentionFromTicket(ids.H5, w().guest, read.neighbour.workspaceId);
+  await reference(read.neighbour.workspaceId, { kind: 'note', id: ids.H6, parentKind: 'note', parentId: ids.H6 }, w().guest);
   await mentionFromTicket(ids.PX, read.userIds.admin);
   // A link the GUEST added, between two tickets she can open (27.692's addedBy leg).
   // columns: A's migration, apps/server/migrations/1791700000000_proj-ticket-links.sql:7-16
@@ -147,15 +154,16 @@ describe('27.690–27.693 the viewer’s own person node (KG release blocker P2-
     expect((await ring('guest', P(w().owner))).body.center).toEqual(personCentre(w().owner, 'Kiro Sangma'));
   });
 
-  it('27.691 the guest’s rings around herself never hold a ticket or note she cannot open (not listed, a comment on one, a workspace note, deleted, another workspace); control: the owner’s ring around her holds the first three, and her own reads refuse them', async () => {
+  it('27.691 the guest’s rings around herself never hold a ticket or note she cannot open (not listed, a comment on one, a workspace note, deleted, a ticket and a note of another workspace); control: the owner’s ring around her holds the first three, and her own reads refuse them', async () => {
     const guest = w().guest;
-    const hidden = [T(ids.H1), T(ids.H2), N(ids.H3), T(ids.H4), T(ids.H5)];
-    // the haystack holds its subjects: the owner sees H1–H3 linked to her (H4 is deleted for everyone; H5's workspace is not the owner's)
+    const hidden = [T(ids.H1), T(ids.H2), N(ids.H3), T(ids.H4), T(ids.H5), N(ids.H6)];
+    // the haystack holds its subjects: the owner sees H1–H3 linked to her (H4 is deleted for everyone; H5's and H6's workspace is not the owner's)
     const owner = await ring('owner', P(guest));
     expect(refsOf(owner.body)).toEqual([T(ids.GT1), N(ids.GN1), T(ids.H1), T(ids.H2), N(ids.H3)].sort());
-    // H4 and H5 are linked to her in the raw table (the haystack for the two the owner cannot see either)
+    // H4, H5 and H6 are linked to her in the raw table (the haystack for the three the owner cannot see either), and H6 is live
     const { rows } = await db.pool.query<{ id: string }>(`SELECT source_parent_id AS id FROM proj_references WHERE target_kind = 'person' AND target_id = $1`, [guest]);
-    expect(rows.map((r) => r.id)).toEqual(expect.arrayContaining([ids.H4, ids.H5]));
+    expect(rows.map((r) => r.id)).toEqual(expect.arrayContaining([ids.H4, ids.H5, ids.H6]));
+    expect((await db.pool.query(`SELECT 1 FROM proj_notes WHERE note_id = $1 AND deleted = FALSE AND $2 = ANY (scope_user_ids)`, [ids.H6, guest])).rowCount).toBe(1);
     // and she cannot open H1–H3 herself
     expect((await get('guest', `/v1/workspaces/${ws()}/tickets/${ids.H1}`)).status).toBe(404);
     expect((await get('guest', `/v1/workspaces/${ws()}/tickets/${ids.H2}`)).status).toBe(404);
@@ -166,7 +174,7 @@ describe('27.690–27.693 the viewer’s own person node (KG release blocker P2-
         const answer = await ring('guest', P(guest), hops, groups);
         expect(answer.status).toBe(200);
         expect(refsOf(answer.body).filter((ref) => hidden.includes(ref))).toEqual([]);
-        for (const id of [ids.H1, ids.H2, ids.H3, ids.H4, ids.H5]) expect(answer.raw).not.toContain(id);
+        for (const id of [ids.H1, ids.H2, ids.H3, ids.H4, ids.H5, ids.H6]) expect(answer.raw).not.toContain(id);
       }
     }
     // the path read: her own node to a hidden ticket is the one 404
@@ -174,7 +182,7 @@ describe('27.690–27.693 the viewer’s own person node (KG release blocker P2-
     expect({ status: path.status, raw: path.raw }).toEqual({ status: 404, raw: NOT_FOUND });
   });
 
-  it('27.692 the owner and the member are drawn exactly as before: their own nodes, each other, and the guest, with the labels every names read gives, and the same rings', async () => {
+  it('27.692 the owner and the member are drawn as before: their own nodes, each other, and the guest, with the labels every names read gives, and the same rings; the one change for every role: a trace from your own node answers its empty chain', async () => {
     const actorNames = new Map((await readActorNames(db.pool, ws())).map((n) => [n.userId, n.displayName]));
     for (const [role, label] of [['owner', 'Kiro Sangma'], ['member', 'Mira Marak'], ['guest', 'Gita Guest']] as const) expect(actorNames.get(w()[role])).toBe(label);
     const ownerSelf = await ring('owner', P(w().owner));
@@ -195,6 +203,14 @@ describe('27.690–27.693 the viewer’s own person node (KG release blocker P2-
     const edgeFor = async (role: ReadRole) => (await ring(role, T(ids.GT1), '1', 'relates')).body.edges.find((e) => e.id === linkId);
     expect((await edgeFor('owner'))?.addedBy).toBe('Gita Guest');
     expect(await edgeFor('guest')).toMatchObject({ id: linkId, addedBy: null });
+    // The one change for every role (planner, 14:46: ALWAYS): a trace primes no workspace, so on the base nobody was named
+    // there and a trace from any person, your own included, was 404. Your own node now starts it; people are never chain
+    // steps, so the chain is empty. Control: from another person it is still the 404.
+    const trace = await get('owner', `/v1/graph/trace?${new URLSearchParams({ from: P(w().owner), kind: 'ref', direction: 'out' })}`);
+    expect(trace.status).toBe(200);
+    expect(JSON.parse(trace.raw)).toEqual({ from: P(w().owner), kind: 'ref', direction: 'out', chain: [], items: [personCentre(w().owner, 'Kiro Sangma')], sentences: [] });
+    const traceOther = await get('owner', `/v1/graph/trace?${new URLSearchParams({ from: P(w().member), kind: 'ref', direction: 'out' })}`);
+    expect({ status: traceOther.status, raw: traceOther.raw }).toEqual({ status: 404, raw: NOT_FOUND });
   });
 
   it('27.693 a phone user no names read labels is drawn to themselves by their own name; control: FD3 still hides them from everyone else with the same 404, and a blank name with only a synthetic address is no label', async () => {
