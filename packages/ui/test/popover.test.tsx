@@ -52,6 +52,45 @@ describe('Popover', () => {
 });
 
 /*
+ * 27.705 (release walk row 5): react-aria's close-on-scroll closes on ANY scroll event from an ancestor of the trigger, and a
+ * browser dispatches one at the frame after the scroll, so a scroll made just before Enter closed the picker it opened.
+ * jsdom has no layout: the trigger's rect is stubbed, and a scroll event is dispatched on the scroller around it.
+ */
+describe('Popover: close-on-scroll needs the trigger to have moved', () => {
+  function Scrolled() {
+    return (
+      <div data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <Host />
+      </div>
+    );
+  }
+  it('27.705 opened by Enter, 20 scroll events that moved nothing leave it open; control: a scroll that moved the trigger closes it', async () => {
+    const user = userEvent.setup();
+    render(<Scrolled />);
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+    let top = 300;
+    trigger.getBoundingClientRect = () => ({ top, left: 40, right: 160, bottom: top + 44, width: 120, height: 44, x: 40, y: top, toJSON: () => ({}) }) as DOMRect;
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('dialog', { name: 'Choices' })).toBeInTheDocument();
+    const scroller = screen.getByTestId('scroller');
+    for (let i = 0; i < 20; i += 1) {
+      act(() => {
+        fireEvent.scroll(scroller);
+      });
+      expect(screen.queryByRole('dialog', { name: 'Choices' }), `scroll event ${i + 1}`).not.toBeNull();
+    }
+    // CONTROL: the same event after the trigger moved 120px up (a real scroll) closes it, as react-aria intends
+    top = 180;
+    act(() => {
+      fireEvent.scroll(scroller);
+    });
+    expect(screen.queryByRole('dialog', { name: 'Choices' })).toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+/*
  * 18.256a — the browser case 18.256's failure, without a browser. jsdom has no layout, so this
  * models the three inputs react-aria's `useOverlayPosition` reads — the viewport, the trigger's
  * rect, and the overlay's offset size — plus the ResizeObserver delivery a browser makes after
@@ -370,15 +409,21 @@ describe('Popover — content taller than its cap', () => {
         <Host />
       </div>,
     );
-    await user.click(screen.getByRole('button', { name: 'Trigger' }));
+    // jsdom has no layout: the trigger's rect is stubbed, and it has MOVED before any scroll below (27.705: only a scroll
+    // that moved the trigger closes), so the legs that stay open stay open because the trigger is in no scrolled region.
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+    let top = 300;
+    trigger.getBoundingClientRect = () => ({ top, left: 40, right: 160, bottom: top + 44, width: 120, height: 44, x: 40, y: top, toJSON: () => ({}) }) as DOMRect;
+    await user.click(trigger);
     const dialog = screen.getByRole('dialog', { name: 'Choices' });
+    top = 180;
 
     // The popover's own scroll, and a scroll of a row inside it: the trigger is in neither.
     fireEvent.scroll(dialog);
     fireEvent.scroll(screen.getByRole('button', { name: 'Apply' }));
     expect(screen.getByRole('dialog', { name: 'Choices' })).toBe(dialog);
 
-    // CONTROL: the region holding the trigger scrolls — the popover would drift off its anchor, so
+    // CONTROL: the region holding the trigger scrolls (and moved it) — the popover would drift off its anchor, so
     // react-aria closes it.
     fireEvent.scroll(screen.getByTestId('sheet-body'));
     expect(screen.queryByRole('dialog')).toBeNull();

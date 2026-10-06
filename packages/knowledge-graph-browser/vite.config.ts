@@ -10,5 +10,5 @@ export default defineConfig({
   // first page load and RELOADS the page mid-test.
   optimizeDeps: { include: ['react/jsx-dev-runtime'] },
   server: { port: Number(process.env.KG_PW_PORT) || 3191, strictPort: true },
-  build: { rollupOptions: { input: [resolve(__dirname, 'harness/index.html'), resolve(__dirname, 'harness/stress.html'), resolve(__dirname, 'harness/adapter.html'), resolve(__dirname, 'harness/home.html')] } },
+  build: { rollupOptions: { input: [resolve(__dirname, 'harness/index.html'), resolve(__dirname, 'harness/stress.html'), resolve(__dirname, 'harness/adapter.html'), resolve(__dirname, 'harness/home.html'), resolve(__dirname, 'harness/popover.html')] } },
 });
