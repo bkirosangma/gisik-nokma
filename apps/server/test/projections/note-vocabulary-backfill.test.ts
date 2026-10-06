@@ -205,6 +205,16 @@ describe('18.530 it runs once, one instance at a time, and a stop leaves no mark
     await failing.settled();
     expect(logs).toEqual(['backfill proj_note_lexemes:rederive-all failed; the next boot re-runs it: boom at the first workspace']);
     expect(await markerRows()).toEqual([]);
+    // With no log to write to, a failure still ends quietly: settled() resolves, nothing is thrown.
+    const unlogged = startNoteVocabularyBackfill(db.pool, {
+      after: async () => undefined,
+      probe: async () => {
+        throw new Error('boom, unlogged');
+      },
+    });
+    unlogged.run();
+    await expect(unlogged.settled()).resolves.toBeUndefined();
+    expect(await markerRows()).toEqual([]);
   });
 });
 
