@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { TicketEditorSlotProps } from '@gisik-nokma/editor';
 import { ReadingProgress, extractReadingMeta, readingTimeMinutes, type ReadingMeta } from '@gisik-nokma/editor/reading';
 import { TicketEditorSlot, exportMarkdown, prefetchEditor, uploadAttachmentHttp } from '../editor-slot.js';
+import { GraphPanel } from '../knowledge-graph/graph-panel.js';
 import { TicketGraphTab } from '../knowledge-graph/ticket-graph-tab.js';
-import { Button } from '@gisik-nokma/ui';
+import { Button, Sheet } from '@gisik-nokma/ui';
+import { kgNodeId } from '@gisik-nokma/knowledge-graph/ids';
 import {
   DeleteDialog,
   TicketSheet,
@@ -636,6 +638,8 @@ function NoteDocumentBody({
   const authorName = useMemo(() => (note === null ? '' : nameOf(note.authorId)), [note, nameOf]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** Spec C §1: the note's Knowledge Graph panel, a byline action like History. Closed, the graph is not mounted. */
+  const [graphOpen, setGraphOpen] = useState(false);
   /**
    * Bumped on any write whose effect a mounted `NoteEditorPane` cannot pick
    * up from a changed PROP alone, and folded into the pane's `key` below —
@@ -789,6 +793,7 @@ function NoteDocumentBody({
           else void markdown.then((text) => navigator.clipboard.writeText(text));
         }}
         onOpenHistory={() => setHistoryOpen(true)}
+        onOpenGraph={() => setGraphOpen(true)}
         {...(canEditNow ? { onDelete: () => setDeleting(true) } : {})}
       />
 
@@ -891,6 +896,21 @@ function NoteDocumentBody({
           });
         }}
       />
+
+      {/* The note's Knowledge Graph (spec C §1). The note has no tabbed side panel, so it is built as History is: a byline
+          action that opens a Sheet. `Sheet` renders nothing while closed (`packages/ui/src/components/sheet.tsx:117`), so
+          the graph mounts when it opens and unmounts when it closes: closed, it costs nothing. A ticket opened from it
+          closes the Sheet and opens on this page, as every badge does. */}
+      <Sheet open={graphOpen} title="Knowledge Graph" onClose={() => setGraphOpen(false)}>
+        <GraphPanel
+          centre={kgNodeId('note', note.noteId)}
+          workspaceId={note.workspaceId}
+          onOpenTicket={(id) => {
+            setGraphOpen(false);
+            openTicket(id);
+          }}
+        />
+      </Sheet>
 
       {/* A ticket the locator will not place mounts no sheet at all and
           leaves this sentence in its place — the same arm My Work draws for

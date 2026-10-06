@@ -43,7 +43,7 @@ function stubViewport(phone: boolean): void {
   });
 }
 
-function byline(over: { onDelete?: () => void; onOpenHistory?: () => void; onCopyMarkdown?: () => void } = {}) {
+function byline(over: { onDelete?: () => void; onOpenHistory?: () => void; onOpenGraph?: () => void; onCopyMarkdown?: () => void } = {}) {
   return render(
     <Providers services={stubServices({ getMyWorkspaces: async () => [WORKSPACE] })}>
       <NoteByline
@@ -59,6 +59,7 @@ function byline(over: { onDelete?: () => void; onOpenHistory?: () => void; onCop
         readingLabel="1 min read"
         onCopyMarkdown={over.onCopyMarkdown ?? (() => undefined)}
         onOpenHistory={over.onOpenHistory ?? (() => undefined)}
+        onOpenGraph={over.onOpenGraph ?? (() => undefined)}
         {...(over.onDelete === undefined ? {} : { onDelete: over.onDelete })}
       />
     </Providers>,
@@ -69,17 +70,19 @@ beforeEach(() => cleanup());
 afterEach(() => Reflect.deleteProperty(window, 'matchMedia'));
 
 describe('21.131 the note byline on a phone', () => {
-  it('21.131 at phone width Copy / History / Delete sit behind one "⋯" menu whose items run the same handlers; above it they are inline buttons and there is no menu', async () => {
+  it('21.131 / 27.345 at phone width Copy / History / Knowledge Graph / Delete sit behind one "⋯" menu whose items run the same handlers; above it they are inline buttons and there is no menu', async () => {
     stubViewport(true);
     const user = userEvent.setup();
     const onHistory = vi.fn();
     const onCopy = vi.fn();
     const onDelete = vi.fn();
-    byline({ onOpenHistory: onHistory, onCopyMarkdown: onCopy, onDelete });
+    const onGraph = vi.fn();
+    byline({ onOpenHistory: onHistory, onCopyMarkdown: onCopy, onDelete, onOpenGraph: onGraph });
 
     // Closed: no inline action, one trigger named for the note.
     expect(screen.queryByRole('button', { name: 'Copy as Markdown' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Knowledge Graph' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete…' })).toBeNull();
     const trigger = screen.getByRole('button', { name: 'More actions for Compressor log' });
     expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
@@ -89,10 +92,11 @@ describe('21.131 the note byline on a phone', () => {
     expect(trigger.parentElement?.classList.contains('gn-card-menu')).toBe(true);
     expect(trigger.parentElement?.classList.contains('gn-card-menu--inline')).toBe(true);
 
-    // Open: the three actions are menu items, in the inline order, and each runs its handler.
+    // Open: the actions are menu items, in the inline order, and each runs its handler (Knowledge Graph after History,
+    // spec C §1, KG-C T9).
     await user.click(trigger);
     const menu = screen.getByRole('menu', { name: 'Note actions' });
-    expect(within(menu).getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Copy as Markdown', 'History', 'Delete…']);
+    expect(within(menu).getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Copy as Markdown', 'History', 'Knowledge Graph', 'Delete…']);
     await user.click(within(menu).getByRole('menuitem', { name: 'History' }));
     expect(onHistory).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('menu')).toBeNull();
@@ -102,14 +106,23 @@ describe('21.131 the note byline on a phone', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Compressor log' }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete…' }));
     expect(onDelete).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'More actions for Compressor log' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Knowledge Graph' }));
+    expect(onGraph).toHaveBeenCalledTimes(1);
+    expect(onHistory).toHaveBeenCalledTimes(1);
 
-    // CONTROL — the same props above phone width: three inline buttons, no trigger, no menu.
+    // CONTROL — the same props above phone width: inline buttons, no trigger, no menu.
     cleanup();
     stubViewport(false);
-    byline({ onDelete });
+    byline({ onDelete, onOpenGraph: onGraph });
     expect(screen.getByRole('button', { name: 'Copy as Markdown' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'History' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Knowledge Graph' }));
+    expect(onGraph).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('button', { name: 'Delete…' })).toBeTruthy();
+    // The inline order is the menu's: the manual's "Delete… beside History and Knowledge Graph" (§15, 27.348).
+    const ACTIONS = ['Copy as Markdown', 'History', 'Knowledge Graph', 'Delete…'];
+    expect(screen.getAllByRole('button').map((el) => el.textContent).filter((t) => ACTIONS.includes(t ?? ''))).toEqual(ACTIONS);
     expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
     expect(screen.queryByRole('menu')).toBeNull();
   });
@@ -128,11 +141,11 @@ describe('21.131 the note byline on a phone', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('21.131 a reader (no Delete) gets a menu of Copy and History only', async () => {
+  it('21.131 a reader (no Delete) gets a menu of Copy, History and Knowledge Graph only', async () => {
     stubViewport(true);
     const user = userEvent.setup();
     byline();
     await user.click(screen.getByRole('button', { name: 'More actions for Compressor log' }));
-    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Copy as Markdown', 'History']);
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Copy as Markdown', 'History', 'Knowledge Graph']);
   });
 });
