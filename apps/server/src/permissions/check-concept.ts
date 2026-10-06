@@ -120,7 +120,7 @@ async function seesItem(db: Queryable, ctx: VisibilityContext, workspaceId: stri
 
 /**
  * Knowledge Graph spec D §3.3, one pass for the whole `concept` kind, placed after `checkNotePermission`
- * for the reason that one gives (`check-permission.ts:2007-2012`): `checkVisibilityPermission` returns early on a
+ * for the reason that one gives (`check-permission.ts:2071-2076`): `checkVisibilityPermission` returns early on a
  * non-ticket kind, so nothing else would ask.
  * - guests: read only;
  * - every write: the actor sees the concept (D4), plus every item or concept the event adds;

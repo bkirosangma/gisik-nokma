@@ -245,7 +245,10 @@ async function reindexNotesAttachedInWorkspace(tx: PoolClient, workspaceId: stri
 }
 
 /**
- * `"<key> <title>\n"` per attached LIVE ticket, in ticket-id order.
+ * `"<key> <title>\n"` per attached LIVE ticket of the note's OWN workspace (`workspaceId`), in ticket-id order. A
+ * link to another workspace's ticket, written before 18.500 refused it, indexes nothing (18.522): it would make the
+ * note a hit for that ticket's words, and put them in this workspace's vocabulary. Rows written before this line are
+ * re-derived once at boot (`backfill-note-search-binds.ts`).
  *
  * A deleted ticket contributes nothing — its line is dropped rather than kept
  * and marked, because a search hit whose snippet names a ticket the reader
@@ -255,10 +258,10 @@ async function ticketTextOf(tx: PoolClient, workspaceId: string, noteId: string)
   const { rows } = await tx.query<AttachedTicketRow>(
     `SELECT t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title
        FROM proj_note_attachments na
-       JOIN proj_tickets t ON t.ticket_id = na.ticket_id
+       JOIN proj_tickets t ON t.ticket_id = na.ticket_id AND t.workspace_id = $2
       WHERE na.note_id = $1 AND ${LIVE_TICKET_WHERE}
       ORDER BY t.ticket_id`,
-    [noteId],
+    [noteId, workspaceId],
   );
   // The common case, and the one worth short-circuiting: no attachments means
   // none of the three key reads below runs at all.
