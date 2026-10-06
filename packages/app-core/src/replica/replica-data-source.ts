@@ -20,6 +20,7 @@ import {
   isDraft,
   isTicketLinkEvent,
   isFlowCause,
+  isWithheldFlowCause,
   isWithheldLinkEvent,
   linkPayloadDirection,
   resolutionOf,
@@ -760,6 +761,8 @@ function causeOf(event: LedgerEvent): TransitionCause | null {
   if (typeof cause !== 'object' || cause === null) return null;
   // A flow cause (wtg2 T8) is served as its kind only, as the server serves it (`state-provenance.ts` `servedCause`).
   if (isFlowCause(cause)) return viewerSafeCause(cause);
+  // So is one a server door withheld from this viewer (wtg-flow-cause-withhold): its kind is all it ever names.
+  if (isWithheldFlowCause(cause)) return { kind: cause.kind };
   const record = cause as { kind?: unknown; childTicketId?: unknown };
   if (record.kind !== 'reopened-for-child' || typeof record.childTicketId !== 'string') return null;
   return { kind: 'reopened-for-child', childTicketId: record.childTicketId };

@@ -461,15 +461,21 @@ describe('29.371 history copy: flow and decision sentences', () => {
     expect(move({ ...ledTo, label: 'Yes' }, { key: 'GN-145' })).toBe('Moved to To do automatically, because GN-145 was closed (Yes)');
     expect(move(ledTo, null)).toBe('Moved to To do automatically, because an earlier step was finished');
     expect(move(ledTo)).toBe('Moved to To do automatically, because an earlier step was finished'); // causeTicket absent
-    // what the route serves a viewer who cannot see the source (AMEND 2: the ids nulled, the keys kept)
-    expect(move({ kind: 'led-to', sourceTicketId: null, label: 'Yes', triggeredBy: null }, null)).toBe('Moved to To do automatically, because an earlier step was finished (Yes)');
+    // what the route serves a viewer who cannot see the source (AMEND 2: the ids nulled, the keys kept; the label gone, planner 2026-10-06 05:46)
+    expect(move({ kind: 'led-to', sourceTicketId: null, triggeredBy: null }, null)).toBe('Moved to To do automatically, because an earlier step was finished');
     expect(describeEvent(ev('ticket.transitioned', { to: 'backlog', cause: decision('reopened-by-flow') }, { key: 'GN-151' }), ctx)).toBe('Moved to Backlog by the flow, because GN-151 was decided Yes');
     expect(describeEvent(ev('ticket.transitioned', { to: 'done', cause: decision('branch-not-taken') }, { key: 'GN-151' }), ctx)).toBe('Moved to Done as not taken, because GN-151 was decided Yes');
     expect(describeEvent(ev('ticket.reopened', { cause: decision('reopened-by-flow') }, { key: 'GN-151' }))).toBe('Reopened by the flow, because GN-151 was decided Yes');
     expect(describeEvent(ev('ticket.closed', { cause: decision('branch-not-taken') }, { key: 'GN-151' }))).toBe('Closed as not taken, because GN-151 was decided Yes');
-    const hidden = { kind: 'branch-not-taken', decisionTicketId: null, outcome: 'Yes', pass: 1, decidedBy: null, decisionEventId: 'dec-1' };
-    expect(describeEvent(ev('ticket.closed', { cause: hidden }, null))).toBe('Closed as not taken, because an earlier decision chose Yes');
-    expect(describeEvent(ev('ticket.reopened', { cause: { ...hidden, kind: 'reopened-by-flow' } }, null))).toBe('Reopened by the flow, because an earlier decision chose Yes');
+    // what the route serves a viewer who cannot see the Decision: no Decision, no decider and no outcome (planner 05:46),
+    // still the flow's, with neither the Decision nor its branch named
+    const hidden = { kind: 'branch-not-taken', decisionTicketId: null, pass: 1, decidedBy: null, decisionEventId: 'dec-1' };
+    expect(describeEvent(ev('ticket.closed', { cause: hidden }, null))).toBe('Closed as not taken, because of an earlier decision');
+    expect(describeEvent(ev('ticket.reopened', { cause: { ...hidden, kind: 'reopened-by-flow' } }, null))).toBe('Reopened by the flow, because of an earlier decision');
+    expect(describeEvent(ev('ticket.transitioned', { to: 'done', cause: hidden }, null), ctx)).toBe('Moved to Done as not taken, because of an earlier decision');
+    expect(describeEvent(ev('ticket.transitioned', { to: 'backlog', cause: { ...hidden, kind: 'reopened-by-flow' } }, null), ctx)).toBe('Moved to Backlog by the flow, because of an earlier decision');
+    // control: an older server's cause with no causeTicket still names the branch it chose
+    expect(describeEvent(ev('ticket.closed', { cause: decision('branch-not-taken') }))).toBe('Closed as not taken, because an earlier decision chose Yes');
     // controls: no cause, a cause of the wrong kind for the event, and the pre-existing cause read as before
     expect(describeEvent(ev('ticket.closed', {}))).toBe('Closed');
     expect(describeEvent(ev('ticket.reopened', {}))).toBe('Reopened');
@@ -499,8 +505,8 @@ describe('29.371 history copy: flow and decision sentences', () => {
 describe('29.372 historyRounds', () => {
   const e = (id: string, type: string, payload: unknown): TicketHistoryEvent => ({ ...eventOf(type), id, payload });
   const reset = (n: number) => ({ kind: 'reopened-by-flow', decisionTicketId: '01J9GTKB000000000000000000', outcome: 'No', pass: n, decidedBy: 'u', decisionEventId: `dec-${n}` });
-  // what the route leaves a viewer who cannot see the Decision (AMEND 2: the ids nulled, the keys kept)
-  const withheld = { kind: 'reopened-by-flow', decisionTicketId: null, outcome: 'No', pass: 2, decidedBy: null, decisionEventId: 'dec-2' };
+  // what the route leaves a viewer who cannot see the Decision (AMEND 2: the ids nulled, the keys kept; no outcome, planner 2026-10-06 05:46)
+  const withheld = { kind: 'reopened-by-flow', decisionTicketId: null, pass: 2, decidedBy: null, decisionEventId: 'dec-2' };
 
   it('29.372 counts a reset once, however its pair is split, and nothing else', () => {
     const events = [

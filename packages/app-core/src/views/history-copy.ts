@@ -303,11 +303,13 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
 
 type CauseView =
   | { kind: 'led-to'; label: string | null }
-  | { kind: 'reopened-by-flow' | 'branch-not-taken'; outcome: string; decisionEventId: string | null };
+  | { kind: 'reopened-by-flow' | 'branch-not-taken'; outcome: string | null; decisionEventId: string | null };
 
 /**
  * A flow cause off an opaque payload, read defensively and never parsed whole: for a viewer who cannot see the cause's
- * ticket the route serves its ticket ids and people as `null` (wtg2 T17, AMEND 2), which the domain schema refuses.
+ * ticket the route serves its ticket ids and people as `null` (wtg2 T17, AMEND 2), which the domain schema refuses, and
+ * no label or outcome (planner ruling 2026-10-06 05:46): the hidden ticket's branch name goes with it. Such a decision
+ * cause is still the flow's and still read, with `outcome` null; one that names its Decision but no outcome is not.
  */
 function causeOf(payload: Record<string, unknown>): CauseView | null {
   const raw = asRecord(payload['cause']);
@@ -315,7 +317,7 @@ function causeOf(payload: Record<string, unknown>): CauseView | null {
   if (kind === 'led-to') return { kind, label: str(raw, 'label') };
   if (kind === 'reopened-by-flow' || kind === 'branch-not-taken') {
     const outcome = str(raw, 'outcome');
-    return outcome === null ? null : { kind, outcome, decisionEventId: str(raw, 'decisionEventId') };
+    return outcome === null && raw['decisionTicketId'] !== null ? null : { kind, outcome, decisionEventId: str(raw, 'decisionEventId') };
   }
   return null;
 }
@@ -326,6 +328,7 @@ function because(cause: CauseView, event: TicketHistoryEvent): string {
     const label = cause.label === null ? '' : ` (${cause.label})`;
     return key === null ? `because an earlier step was finished${label}` : `because ${key} was closed${label}`;
   }
+  if (cause.outcome === null) return 'because of an earlier decision'; // withheld: neither the Decision nor its branch named
   return key === null ? `because an earlier decision chose ${cause.outcome}` : `because ${key} was decided ${cause.outcome}`;
 }
 

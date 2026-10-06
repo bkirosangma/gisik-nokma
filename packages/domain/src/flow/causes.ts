@@ -37,17 +37,40 @@ export const isFlowCause = (c: unknown): c is FlowCause => flowCauseSchema.safeP
 export const viewerSafeCause = (c: FlowCause): { kind: FlowCause['kind'] } => ({ kind: c.kind });
 
 /**
- * A flow cause as the History route serves it to a viewer who cannot see the ticket it names (wtg2 T17, AMEND 2): the
+ * A flow cause as every server door serves it to a viewer who cannot see the ticket it names (wtg2 T17, AMEND 2; the
+ * doors: `withholdFlowCause`, `apps/server/src/visibility/withhold-link-targets.ts`, wtg-flow-cause-withhold): the
  * ticket id and the person are NULL, their keys kept, as `withholdEvent` serves a hidden link target (`targetId: null`)
  * and MCP's `redactedPayload` reads a null as "a ticket you can't see" / "someone you can't see". Only the keys the
- * kind has: a `led-to` cause gains no decision keys. The kind, the label or outcome, the pass and the opaque decision
- * event id stay (History pairs a reset by it).
+ * kind has: a `led-to` cause gains no decision keys. The kind, the pass and the opaque decision event id stay (History
+ * pairs a reset by it). The label or outcome goes, its key absent: it is the hidden ticket's own branch name, authored
+ * content of a ticket the viewer cannot see (planner ruling 2026-10-06 05:46, on the 00:13 principle).
  */
 export type WithheldFlowCause =
-  | { kind: 'led-to'; sourceTicketId: null; label?: string; triggeredBy: null }
-  | { kind: 'reopened-by-flow' | 'branch-not-taken'; decisionTicketId: null; outcome: string; pass: number; decidedBy: null; decisionEventId: string };
+  | { kind: 'led-to'; sourceTicketId: null; triggeredBy: null }
+  | { kind: 'reopened-by-flow' | 'branch-not-taken'; decisionTicketId: null; pass: number; decidedBy: null; decisionEventId: string };
+
+/**
+ * The SERVED shape as a schema (wtg-flow-cause-withhold, planner ruling 2026-10-06 03:49, Q1 = A): what every server door
+ * hands a viewer who cannot see the cause's ticket (`withholdFlowCause`, `visibility/withhold-link-targets.ts`). Only a
+ * client's fold reads it (`ticket-state.ts`, `servedPayload`): the ingest door parses with the vocabulary's strict
+ * payload schemas, which keep `flowCauseSchema`'s ULIDs, so no client can FILE a nulled cause (29.446). Each arm is
+ * strict, as `flowCauseSchema`'s are; the members the kind keeps are bounded as there. No arm has a label or outcome
+ * key, so a branch name carried through is refused like any other extra key.
+ */
+const withheldDecision = {
+  decisionTicketId: z.null(),
+  pass: z.number().int().min(1),
+  decidedBy: z.null(),
+  decisionEventId: ulidString,
+};
+export const withheldFlowCauseSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('led-to'), sourceTicketId: z.null(), triggeredBy: z.null() }).strict(),
+  z.object({ kind: z.literal('reopened-by-flow'), ...withheldDecision }).strict(),
+  z.object({ kind: z.literal('branch-not-taken'), ...withheldDecision }).strict(),
+]);
+export const isWithheldFlowCause = (c: unknown): c is WithheldFlowCause => withheldFlowCauseSchema.safeParse(c).success;
 
 export function withholdCauseTicket(cause: FlowCause): WithheldFlowCause {
-  if (cause.kind === 'led-to') return { kind: 'led-to', sourceTicketId: null, ...(cause.label === undefined ? {} : { label: cause.label }), triggeredBy: null };
-  return { kind: cause.kind, decisionTicketId: null, outcome: cause.outcome, pass: cause.pass, decidedBy: null, decisionEventId: cause.decisionEventId };
+  if (cause.kind === 'led-to') return { kind: 'led-to', sourceTicketId: null, triggeredBy: null };
+  return { kind: cause.kind, decisionTicketId: null, pass: cause.pass, decidedBy: null, decisionEventId: cause.decisionEventId };
 }

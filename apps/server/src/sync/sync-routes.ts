@@ -4,7 +4,7 @@ import { TICKET_FOLD_VERSION, type LedgerEvent, type TicketState, type Workspace
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { canOpen, noteEventVisibleTo } from '../visibility/can-open.js';
-import { targetSight, withholdEvent, withholdLinks, type TargetSight } from '../visibility/withhold-link-targets.js';
+import { targetSight, withholdEvent, withholdState, type TargetSight } from '../visibility/withhold-link-targets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
 import { bootRestate } from './snapshot-writer.js';
@@ -223,8 +223,11 @@ export type BootstrapResponse = {
  *
  * **The payload is per viewer** (typed-links T4b, spec A §2.4): `sees` is the
  * caller's `targetSight`, and a link whose target that viewer cannot see is
- * withheld from the snapshot's `state.links` (`withholdLinks`) and from every
- * event, the backfilled contests included (`withholdEvent`).
+ * withheld from the snapshot's `state.links` and from every event, the
+ * backfilled contests included (`withholdEvent`). A flow cause naming a ticket
+ * that viewer cannot see is served with that ticket and its person nulled, on
+ * the snapshot's `closed.cause` (`withholdState`) and on every event that
+ * carries one (wtg-flow-cause-withhold).
  *
  * **A snapshot from an older fold waits for the boot restate pass** (wtg2
  * fold-version bootstrap, planner ruling D of 2026-10-05). A row whose
@@ -273,7 +276,7 @@ export async function bootstrapTicket(client: PoolClient, ticketId: string, sees
           // a wrong state downstream, never here.
           {
             seq: snapshot.seq,
-            state: await withholdLinks(snapshot.state as unknown as TicketState, sees),
+            state: await withholdState(snapshot.state as unknown as TicketState, sees),
             // Passed through as read. The server does not recompute it here and
             // could not: the events it was read from are, by definition, below
             // this snapshot's seq and are exactly what this payload omits.
