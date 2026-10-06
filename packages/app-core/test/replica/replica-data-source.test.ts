@@ -488,7 +488,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 27.141 27.633 FIFTEEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 27.141 27.633 27.520 NINETEEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -496,6 +496,12 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       // `REPLICA_GAPS` gained the key at. No replica table folds `group.*` events yet, so the tree refuses
       // rather than answering `[]`, which would claim a workspace with forty groups has none.
       ['getGroups', () => ds.query.getGroups(WS)],
+      // Added by Knowledge Graph D Task 8 (case 27.520), directly under `getGroups`: the position `REPLICA_GAPS` gained
+      // the keys at. Concepts and suggestions are online-only (`audienceClassOf` → `'withheld'`, KG-D Task 3).
+      ['getConcept', () => ds.query.getConcept(newUlid())],
+      ['getConceptHistory', () => ds.query.getConceptHistory(newUlid())],
+      ['getSuggestions', () => ds.query.getSuggestions(WS)],
+      ['getConceptAudience', () => ds.query.getConceptAudience(WS, null, [{ kind: 'ticket', id: newUlid() }])],
       // Added by the trash series (Plan 1 Task 8), directly under
       // `getMyWorkspaces` — the same position `REPLICA_GAPS` gained the key at,
       // for the same order-sensitive reason every other entry here is placed

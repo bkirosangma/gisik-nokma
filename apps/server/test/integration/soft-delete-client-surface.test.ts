@@ -39,7 +39,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * So the enumeration here is **self-maintaining**. `absenceTripwire` returns its
  * argument typed as `AbsenceDecision`; `keyof DataSourceQuery` widening past
- * those twenty-three members makes that return unassignable and `tsc` refuses it with
+ * the union's members makes that return unassignable and `tsc` refuses it with
  * TS2322. The device is not new — it is `paginationTripwire`
  * (`packages/app-core/test/views/list-model.test.ts:68`), which this file copies
  * in shape for the same reason: its docblock records that a widened
@@ -184,6 +184,12 @@ let dead2Id: string;
  */
 let noteId: string;
 let deletedNoteId: string;
+/**
+ * A concept that holds the child (Knowledge Graph D Task 8). `getConcept` labels an item with its key and TITLE, so
+ * before the delete the concept carries the marker; after it the trashed item is in no list (`read/concepts.ts`
+ * reads live items only), and the concept, now empty, is still answered to this member.
+ */
+let conceptId: string;
 
 /** Every ticket this file deletes. The count assertions are derived from it. */
 const TOMBSTONES: string[] = [];
@@ -458,6 +464,12 @@ beforeAll(async () => {
     payload: { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Linked ${MARKER} ` }, { type: 'wikiLink', attrs: { noteId, title: 'Boundary note live' } }] }] } },
   });
 
+  // ⚠ A CONCEPT THAT HOLDS THE CHILD (Knowledge Graph D Task 8): the `getConcept` row below is a carrier only
+  // because of it, the way the comment above makes `getLinkedFrom` one.
+  conceptId = newUlid();
+  await post({ workspaceId, entity: { kind: 'concept', id: conceptId }, type: 'concept.created', payload: { name: 'Boundary concept' } });
+  await post({ workspaceId, entity: { kind: 'concept', id: conceptId }, type: 'concept.item_tagged', payload: { itemKind: 'ticket', itemId: childId } });
+
   TOMBSTONES.push(childId, sharedDeadId, dead2Id);
   baselineProjectTicketCount = await directoryTicketCount();
   baselineParentRollup = await parentRollup();
@@ -486,6 +498,12 @@ type AbsenceDecision =
   | 'getActorNames'
   // Prefixes and groups Task 6/7 (22.123): the workspace's group tree, one flat row per group.
   | 'getGroups'
+  // Knowledge Graph D Task 8: the concept reads. `getConcept` is a carrier (an item's label is its key and title);
+  // the history carries ids, the suggestions and the audience counts, so the marker cannot reach those three.
+  | 'getConcept'
+  | 'getConceptHistory'
+  | 'getSuggestions'
+  | 'getConceptAudience'
   | 'getBoard'
   | 'getTickets'
   | 'getTicket'
@@ -577,6 +595,14 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   // `proj_projects` / `proj_groups`. It never reads `proj_tickets`, so the marker (a ticket TITLE)
   // cannot reach it even before the delete.
   getGroups: { verdict: 'excluded', carries: false },
+  getConcept: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'Knowledge Graph D: the fixture concept holds the child, and an item is labelled with its key and title. `readConceptView` lists LIVE items only (`deleted_at IS NULL` in `read/concepts.ts`), so after the delete the item, and its title, are gone while the concept stays.',
+  },
+  getConceptHistory: { verdict: 'excluded', carries: false, why: 'The ledger names an item by kind and id (`concept.item_tagged`), never its title.' },
+  getSuggestions: { verdict: 'excluded', carries: false, why: 'The fixture has no suggestion job run: the list is empty before and after.' },
+  getConceptAudience: { verdict: 'excluded', carries: false, why: 'Three counts: members, before, after.' },
   getBoard: { verdict: 'excluded', carries: true },
   getTickets: { verdict: 'excluded', carries: true },
   getTicket: {
@@ -759,6 +785,11 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getMembers: () => ds.getMembers(workspaceId),
     getActorNames: () => ds.getActorNames(workspaceId),
     getGroups: () => ds.getGroups(workspaceId),
+    getConcept: () => ds.getConcept(conceptId),
+    getConceptHistory: () => ds.getConceptHistory(conceptId),
+    getSuggestions: () => ds.getSuggestions(workspaceId),
+    // the PARENT, which stays live: a trashed item is refused by the audience route as absent (the one 404)
+    getConceptAudience: () => ds.getConceptAudience(workspaceId, conceptId, [{ kind: 'ticket', id: parentId }]),
     getBoard: () => ds.getBoard(projectId),
     getTickets: () => ds.getTickets(projectId, {}, 'status'),
     getTicket: () => ds.getTicket(workspaceId, childId),
@@ -890,8 +921,8 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
   // Task 7 (22.123) added `getGroups`; 28 until typed links T4 added
   // `getTicketLinks`; 29 until Knowledge Graph B Task 3 added `getLinkedFrom`; 30 until Knowledge Graph E
-  // Task 3 added `getHome`.
-  expect(MEMBERS).toHaveLength(31);
+  // Task 3 added `getHome`; 31 until Knowledge Graph D Task 8 added the four concept reads.
+  expect(MEMBERS).toHaveLength(35);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

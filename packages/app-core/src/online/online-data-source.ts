@@ -1,4 +1,12 @@
-import { EMPTY_LINKED_FROM, PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type PurgedRef } from '@gisik-nokma/domain';
+import {
+  EMPTY_LINKED_FROM,
+  PURGED_LOOKUP_MAX_IDS,
+  ULID_REGEX,
+  type ConceptAudienceResponse,
+  type ConceptView,
+  type PurgedRef,
+  type SuggestionListResponse,
+} from '@gisik-nokma/domain';
 import type { DataSource, DataSourceQuery } from '../data-source.js';
 import type { Actor, FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
 import { SessionExpiredError } from '../session-expired.js';
@@ -201,6 +209,35 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       // So the transport's `null` is re-raised as the STATUS it was, as `getBoard` does, never as an empty tree.
       if (raw === null) throw new HttpError(404, path);
       return mapGroupRows(raw);
+    },
+    // Knowledge Graph spec D (KG-D Task 8): the concept reads. Each re-raises the transport's `null` as the 404 it
+    // was, as `getGroups` does: an empty concept, list or audience would be an answer the server never gave.
+    getConcept: async (conceptId) => {
+      const path = `/v1/concepts/${encodeURIComponent(conceptId)}`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return raw as ConceptView;
+    },
+    getConceptHistory: async (conceptId) => {
+      const path = `/v1/concepts/${encodeURIComponent(conceptId)}/history`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return mapHistory(raw); // the ticket history's event shape (`ConceptHistoryResponse`), mapped as that one is
+    },
+    getSuggestions: async (workspaceId) => {
+      const path = `/v1/workspaces/${encodeURIComponent(workspaceId)}/suggestions`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return (raw as SuggestionListResponse).suggestions;
+    },
+    getConceptAudience: async (workspaceId, conceptId, add) => {
+      const qs = [conceptId === null ? null : `conceptId=${encodeURIComponent(conceptId)}`, ...add.map((i) => `add=${encodeURIComponent(`${i.kind}:${i.id}`)}`)]
+        .filter((x) => x !== null)
+        .join('&');
+      const path = `/v1/workspaces/${encodeURIComponent(workspaceId)}/concepts/audience?${qs}`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return raw as ConceptAudienceResponse;
     },
     getDeletedItems: async () => mapDeletedItems(await http.get('/v1/me/deleted-items')),
 

@@ -1,4 +1,6 @@
 import type {
+  ConceptAudienceResponse,
+  ConceptView,
   DeletedItem,
   GroupRow,
   HomeResponse,
@@ -9,6 +11,7 @@ import type {
   PurgedRef,
   ServerStreamFrame,
   SubmittedEvent,
+  SuggestionView,
   TicketTypeDef,
   WorkflowDef,
 } from '@gisik-nokma/domain';
@@ -256,6 +259,21 @@ export type DataSourceQuery = {
    * "no tree to show", never as an empty tree. Replica: refuses with `ReplicaGapError` (no local fold).
    */
   getGroups(workspaceId: string): Promise<GroupRow[]>;
+  /**
+   * Knowledge Graph spec D (KG-D Task 8): one concept, D4 decided by the server. Online: `GET /v1/concepts/:id`,
+   * whose 404 (absent, deleted, or holding an item this reader cannot see) is re-raised, never an empty concept.
+   * Replica: refuses with `ReplicaGapError` (concepts are online-only).
+   */
+  getConcept(conceptId: string): Promise<ConceptView>;
+  /** The concept's ledger, mapped as a ticket's history is (`GET /v1/concepts/:id/history`); a 404 is re-raised. */
+  getConceptHistory(conceptId: string): Promise<TicketHistoryEvent[]>;
+  /** The workspace's suggestions, D4 per reader (`GET /v1/workspaces/:id/suggestions`). Members only: a guest's 404 is re-raised. */
+  getSuggestions(workspaceId: string): Promise<SuggestionView[]>;
+  /**
+   * The narrowing preview's numbers (spec D §3.2): how many of the workspace's people see the concept now and with
+   * `add`. `conceptId` is null for a concept that does not exist yet (a suggestion being confirmed). A 404 is re-raised.
+   */
+  getConceptAudience(workspaceId: string, conceptId: string | null, add: readonly { kind: 'ticket' | 'note'; id: string }[]): Promise<ConceptAudienceResponse>;
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:

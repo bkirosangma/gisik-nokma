@@ -133,6 +133,12 @@ export function stubServices(
     // page treats a rejection as "no tree to show" and falls back to the plain list, so a case that never
     // asked for the grouped view is unaffected by the rejection.
     getGroups: unstubbed('getGroups'),
+    // UNSTUBBED (Knowledge Graph D Task 8): an empty concept, suggestion list or audience would be this helper
+    // inventing an answer the server never gave; the concept panel reads these only once a concept is selected.
+    getConcept: unstubbed('getConcept'),
+    getConceptHistory: unstubbed('getConceptHistory'),
+    getSuggestions: unstubbed('getSuggestions'),
+    getConceptAudience: unstubbed('getConceptAudience'),
     // Every document render asks this in the background (trash Plan 3); "nothing
     // was purged" is exactly what every page saw before the read existed, so a
     // case that does not care is not made to stub it. A case that does, stubs it.
