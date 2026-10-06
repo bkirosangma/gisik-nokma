@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { DECISION_TYPE_ID, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { buildServerGates } from '../../src/gates/index.js';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
@@ -57,6 +58,9 @@ export async function seedFlowWorld(pool: Pool): Promise<void> {
 }
 
 export const realIngest = (pool: Pool) => createIngestService({ pool, evaluate: evaluateEvent, projections: buildProjectionRegistry() });
+/** The real door with the production server gates armed (wtg2 T16), as `src/index.ts` builds it. */
+export const gatedIngest = (pool: Pool, gates = buildServerGates()) =>
+  createIngestService({ pool, evaluate: evaluateEvent, projections: buildProjectionRegistry(), gates });
 
 /** One ticket event, numbered after what the LEDGER holds (see the docblock), applied with no engine and no listener. */
 export async function step(
@@ -96,10 +100,10 @@ export async function stepMany(
 
 /** `start: 'backlog'` by default; `start: 'focus'` + `moves` walks it through the workflow's states; `draft` is born in the backlog. */
 export async function addTicket(
-  pool: Pool, o: { typeId?: string; start?: 'backlog' | 'focus'; moves?: string[]; assigneeId?: string; draft?: boolean } = {},
+  pool: Pool, o: { typeId?: string; start?: 'backlog' | 'focus'; moves?: string[]; assigneeId?: string; draft?: boolean; title?: string } = {},
 ): Promise<string> {
   const id = newUlid();
-  await step(pool, id, 'ticket.created', { typeId: o.typeId ?? TASK, projectId: PROJECT, parentId: null, title: `T ${id.slice(-4)}`,
+  await step(pool, id, 'ticket.created', { typeId: o.typeId ?? TASK, projectId: PROJECT, parentId: null, title: o.title ?? `T ${id.slice(-4)}`,
     start: o.start ?? 'backlog', ...(o.assigneeId === undefined ? {} : { assigneeId: o.assigneeId }), ...(o.draft === true ? { draft: true } : {}) });
   for (const to of o.moves ?? []) await step(pool, id, 'ticket.transitioned', { to });
   return id;

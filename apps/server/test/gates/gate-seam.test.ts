@@ -142,9 +142,9 @@ afterAll(async () => {
 
 describe('the gate seam', () => {
   /**
-   * 9.229 — `buildServerGates()` covers exactly `comment.added`, `comment.edited` (26.053, MCP-everything T2: an edit is held to the embed rule of the comment it replaces), `ticket.field_set` and `ticket.transitioned` — and nothing else.
+   * 9.229 — `buildServerGates()` covers exactly `comment.added`, `comment.edited` (26.053, MCP-everything T2: an edit is held to the embed rule of the comment it replaces), `ticket.field_set` and `ticket.transitioned`, and the three Decision gates (29.370, wtg2 T16: `ticket.decided` twice, for the close list and the cascade, and a second `ticket.transitioned` for a Decision's finishing move) — and nothing else.
    */
-  it('buildServerGates covers comment.added, comment.edited, ticket.field_set and ticket.transitioned — and nothing else', () => {
+  it('buildServerGates covers comment.added, comment.edited, ticket.field_set, ticket.transitioned and the three decision gates (ticket.decided twice, ticket.transitioned) — and nothing else', () => {
     // The event types themselves, not a count. A length assertion goes green
     // for a build that dropped the evidence gate and added a second embed gate,
     // and this is the ONLY place that says which doors are gated at all: a gate
@@ -153,6 +153,9 @@ describe('the gate seam', () => {
       'comment.added',
       'comment.edited',
       'ticket.field_set',
+      'ticket.transitioned',
+      'ticket.decided',
+      'ticket.decided',
       'ticket.transitioned',
     ]);
   });
