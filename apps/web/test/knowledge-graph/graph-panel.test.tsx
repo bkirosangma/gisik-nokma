@@ -220,7 +220,7 @@ describe('GraphPanel (KG-C T9)', () => {
     // A refusal reaches the inspector as the server's own rule and reason; an invalid event as its message.
     ingest.mockResolvedValueOnce([{ status: 'refused', eventId: 'e2', rule: 'link-permission', reason: 'only a member of both projects may unlink' }]);
     await expect(last().onRemoveLink!(edge(SOURCE, TARGET))).rejects.toThrow(new Error('refused by link-permission: only a member of both projects may unlink'));
-    ingest.mockResolvedValueOnce([{ status: 'invalid', eventId: null, code: 'invalid_payload', message: 'targetId must be a ticket' } as IngestResult]);
+    ingest.mockResolvedValueOnce([{ status: 'invalid', eventId: null, code: 'invalid-payload', message: 'targetId must be a ticket' }]);
     await expect(last().onRemoveLink!(edge(SOURCE, TARGET))).rejects.toThrow(new Error('targetId must be a ticket'));
     // No result at all is the note doors' failure, never a silent success (the inspector would say "Link removed.").
     ingest.mockResolvedValueOnce([]);
