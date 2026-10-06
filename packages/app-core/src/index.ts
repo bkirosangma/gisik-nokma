@@ -101,6 +101,28 @@ export {
   type RankRow,
 } from './views/backlog-rank.js';
 export { MyWork, useMyWork, type MyWorkProps } from './views/my-work.js';
+// my-work-global T3: the global My work page's pieces — the pure grouping and chip helpers,
+// the fan-out hook, and the Show / Group controls. `MyWorkGroups` is My Work's grouped arm;
+// `placeLookup` / `ItemPlace` its flat arm's per-row label (T4).
+export type { MyWorkGroups } from './views/my-work.js';
+export {
+  groupByWorkspaceProject,
+  placeLookup,
+  showForWorkspace,
+  showOptionsFor,
+  UNKNOWN_PROJECT_NAME,
+  type ItemPlace,
+  type WorkspaceGroup,
+} from './views/my-work-global.js';
+export { useGlobalMyWork, type GlobalMyWork, type GlobalSection } from './views/use-global-my-work.js';
+export {
+  GroupToggle,
+  SHOW_LABELS,
+  ShowFilter,
+  type GroupToggleProps,
+  type MyWorkGrouping,
+  type ShowFilterProps,
+} from './views/my-work-controls.js';
 export {
   PlainTextEditorSlot,
   type EditorSlotComponent,

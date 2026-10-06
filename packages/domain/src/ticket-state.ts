@@ -45,6 +45,7 @@ import {
 } from './workflow.js';
 import { isCreatableState, stateCategoryOf } from './workflow-helpers.js';
 import { foldWorkPeriods, setPeriods } from './flow/periods.js';
+import { isWithheldFlowCause, type FlowCause, type WithheldFlowCause } from './flow/causes.js';
 
 /**
  * What the reducer needs looked up, and nothing more.
@@ -136,6 +137,26 @@ const entryOf = (p: { kind: TicketLinkKind; targetId: string; from?: string | un
   ...(p.from === undefined ? {} : { from: p.from }),
   ...(p.label === undefined ? {} : { label: p.label }),
 });
+
+/**
+ * A SERVED copy's payload on the three flow-cause types (wtg-flow-cause-withhold, planner ruling 2026-10-06 03:49, Q1 =
+ * A). A server door hands a viewer who cannot see a cause's ticket the cause with that ticket and its person NULLED
+ * (`isWithheldFlowCause`, `visibility/withhold-link-targets.ts`), and the strict payload schema refuses a null id. So
+ * the cause is set aside, the rest parsed strictly as before, and the withheld cause put back: the fold still knows its
+ * kind (a reset counts, a not-taken move opens no period, a not-taken close stays Not taken, 29.447). A withheld cause
+ * of a kind this type cannot carry is parsed whole, and refused. Only a client folds a served copy; the ingest door
+ * parses with the vocabulary's strict schemas (`parse-event.ts`), so no client can FILE the shape (29.446).
+ */
+function servedPayload<T extends { cause?: unknown }>(
+  schema: { parse(payload: unknown): T },
+  payload: unknown,
+  kinds: readonly FlowCause['kind'][],
+): T | (Omit<T, 'cause'> & { cause: WithheldFlowCause }) {
+  const cause = typeof payload === 'object' && payload !== null ? (payload as { cause?: unknown }).cause : undefined;
+  if (!isWithheldFlowCause(cause) || !kinds.includes(cause.kind)) return schema.parse(payload);
+  const { cause: _withheld, ...rest } = payload as Record<string, unknown>;
+  return { ...schema.parse(rest), cause };
+}
 
 /**
  * Pure fold of one ACCEPTED ticket event into head state. Both the proj_tickets
@@ -316,7 +337,7 @@ export function applyTicketEvent(
 
   switch (env.type) {
     case 'ticket.transitioned': {
-      const p = ticketTransitionedPayloadSchema.parse(env.payload);
+      const p = servedPayload(ticketTransitionedPayloadSchema, env.payload, ['led-to', 'reopened-by-flow', 'branch-not-taken']);
       const wf = deps.getWorkflow(state.workflowId);
       if (!wf) {
         throw new Error(
@@ -483,14 +504,14 @@ export function applyTicketEvent(
       // flag and the state are orthogonal, on purpose (spec §1.2). The flow's "Not
       // taken" close keeps its cause on the flag (wtg2 T8); a person's close has
       // none, and the key is then absent rather than undefined (29.206).
-      const p = ticketClosedPayload.parse(env.payload);
+      const p = servedPayload(ticketClosedPayload, env.payload, ['branch-not-taken']);
       return { ...state, closed: { actorId: env.actorId, at: env.serverTime, ...(p.cause === undefined ? {} : { cause: p.cause }) } };
     }
     case 'ticket.reopened': {
       // The explicit reopen (spec §1.2): clears the flag, moves nothing else. A
       // flow reopen's `reopened-by-flow` cause is provenance only here; `closed:
       // null` drops a not-taken close's cause with the flag (wtg2 T8).
-      ticketReopenedPayload.parse(env.payload);
+      servedPayload(ticketReopenedPayload, env.payload, ['reopened-by-flow']);
       return {
         ...state,
         closed: null,

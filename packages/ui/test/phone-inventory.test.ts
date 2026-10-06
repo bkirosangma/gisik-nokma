@@ -9,9 +9,9 @@ import { themeStylesheet } from '../src/tokens.js';
 
 /** The web app on phones, Plan Task 1 — cases 21.001–21.003 (§21.1). */
 describe('21.001 every route has a phone owner', () => {
-  it('21.001 27 routes, all owned, none stale', () => {
+  it('21.001 28 routes, all owned, none stale', () => {
     const routes = listPageRoutes();
-    expect(routes).toHaveLength(27); // 27 since drafts T8 (`w/[workspaceId]/drafts`)
+    expect(routes).toHaveLength(28); // 27 since drafts T8 (`w/[workspaceId]/drafts`), 28 since my-work-global T4 (`app/my-work`)
     expect(unownedRoutes(routes, PHONE_OWNERS)).toEqual({ unowned: [], stale: [] });
     // CONTROL — a planted route and a planted owner are both reported.
     const planted = unownedRoutes([...routes, 'apps/web/app/zz/page.tsx'], { ...PHONE_OWNERS, 'apps/web/app/gone/page.tsx': 'T0' });

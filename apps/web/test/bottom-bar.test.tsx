@@ -100,7 +100,7 @@ afterEach(() => {
 
 describe('21.023 the bar renders the slots in order with More last', () => {
   it('21.023 four slots in order then More; the current one is aria-current AND carries an indicator element; More stays last when the bar is full', async () => {
-    render(bar({ pathname: `/w/${WS}/my-work` }));
+    render(bar({ pathname: '/my-work' }));
     await waitFor(() => expect(items()).toEqual(['Board', 'My work', 'Notes', 'Inbox', 'More']));
     const nav = phoneNav();
     const current = within(nav).getByRole('link', { name: 'My work' });
@@ -157,7 +157,7 @@ describe('21.024 project-view slots remember the tab, then go to the last projec
 
     // CONTROL — My work is a plain route and clicking it leaves the project's tab alone.
     const myWork = within(phoneNav()).getByRole('link', { name: 'My work' });
-    expect(myWork.getAttribute('href')).toBe(`/w/${WS}/my-work`);
+    expect(myWork.getAttribute('href')).toBe('/my-work');
     await user.click(myWork);
     expect(readProjectTab('p1', U)).toBe('list');
   });
@@ -263,7 +263,7 @@ describe('21.027 workspace-scoped slots follow the nav’s "does not offer a lin
     projects: [],
   });
 
-  it('21.027 a remembered workspace that does not resolve gets Notes + Inbox + More only (no padding); once it resolves the scoped slots render', async () => {
+  it('21.027 a remembered workspace that does not resolve gets the global slots (My work, Notes, Inbox) + More only (no padding); once it resolves the scoped slots render', async () => {
     stubPhoneViewport(true);
     window.localStorage.setItem('gn-last-workspace', JSON.stringify({ userId: U, workspaceId: 'ws_gone' }));
     render(
@@ -271,10 +271,11 @@ describe('21.027 workspace-scoped slots follow the nav’s "does not offer a lin
         <AppNav />
       </Providers>,
     );
-    await waitFor(() => expect(items()).toEqual(['Notes', 'Inbox', 'More']));
+    // My work is GLOBAL since my-work-global T4 (`/my-work`), so it resolves with no workspace, like Notes and Inbox.
+    await waitFor(() => expect(items()).toEqual(['My work', 'Notes', 'Inbox', 'More']));
     // Give the (settled) name lookup every chance to wrongly promote the stale id.
     await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(items()).toEqual(['Notes', 'Inbox', 'More']);
+    expect(items()).toEqual(['My work', 'Notes', 'Inbox', 'More']);
 
     // CONTROL — the same remembered id, once the directory names it, brings the scoped slots in.
     cleanup();
@@ -447,15 +448,29 @@ const _all: readonly BarDestination[] = ['board', 'my-work', 'notes', 'inbox', '
 void _all;
 void fireEvent;
 
+describe('30.043 the bar sends My work to the global page', () => {
+  it('30.043 My work is /my-work with a workspace in scope and with none (it is global now, like Notes and Inbox)', async () => {
+    render(bar({ pathname: `/w/${WS}` }));
+    await waitFor(() => expect(items()).toContain('My work'));
+    expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('href')).toBe('/my-work');
+
+    // No workspace at all: the scoped slots go (21.027), and My work stays, pointing at the same page.
+    cleanup();
+    render(bar({ workspaceId: undefined, pathname: '/inbox' }));
+    await waitFor(() => expect(items()).toEqual(['My work', 'Notes', 'Inbox', 'More']));
+    expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('href')).toBe('/my-work');
+  });
+});
+
 describe('23.044 the bar lights a destination on the same segment-bounded prefix rule as the top nav', () => {
   it('23.044 My work is current on a route under it, not on a lookalike; the project-tab slot rule is unchanged', async () => {
-    render(bar({ pathname: `/w/${WS}/my-work/anything` }));
+    render(bar({ pathname: '/my-work/anything' }));
     await waitFor(() => expect(items()).toContain('My work'));
     expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBe('page');
 
     // CONTROL (same `it`): a lookalike segment is not current (`/w/<id>` lighting nothing in the bar is asserted in the next block).
     cleanup();
-    render(bar({ pathname: `/w/${WS}/my-workshop` }));
+    render(bar({ pathname: '/my-workshop' }));
     await waitFor(() => expect(items()).toContain('My work'));
     expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBeNull();
   });
@@ -487,8 +502,8 @@ describe('23.044 the top nav and the bar light My work and Members the same way'
   const topLink = (name: string): HTMLElement =>
     screen.getAllByRole('link', { name }).find((a) => !phoneNav().contains(a)) as HTMLElement;
 
-  it('23.044 /w/<id>/my-work/x lights My work in BOTH, /w/<id>/members/x lights Members in the top nav; a lookalike lights neither; /w/<id> lights nothing in the bar', async () => {
-    await renderBoth(`/w/${WS}/my-work/x`);
+  it('23.044 /my-work/x lights My work in BOTH, /w/<id>/members/x lights Members in the top nav; a lookalike lights neither; /w/<id> lights nothing in the bar', async () => {
+    await renderBoth('/my-work/x');
     expect(lit(topLink('My work'))).toBe(true);
     expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(true);
     expect(lit(topLink('Members'))).toBe(false);
@@ -500,7 +515,7 @@ describe('23.044 the top nav and the bar light My work and Members the same way'
 
     // CONTROL (same `it`): a lookalike segment lights neither surface …
     cleanup();
-    await renderBoth(`/w/${WS}/my-workshop`);
+    await renderBoth('/my-workshop');
     expect(lit(topLink('My work'))).toBe(false);
     expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(false);
     cleanup();

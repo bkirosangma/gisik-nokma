@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   newSubmittedEvent,
   newUlid,
+  resolutionOf,
   SYSTEM_ACTOR_FLOW,
   type IngestResult,
   type LedgerEvent,
@@ -540,6 +541,11 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['getWorkspaceSettings', () => ds.query.getWorkspaceSettings(WS)],
       ['getPreferences', () => ds.query.getPreferences(WS)],
       ['putPreferences', () => ds.query.putPreferences(WS, { version: 1, projects: {}, savedFilters: [] })],
+      // 30.029 (my-work-global T3): the user-level My work document is a server row like the
+      // per-workspace one above, so the replica refuses both halves rather than answering
+      // the defaults as if they were the person's choice.
+      ['getMyWorkPreferences', () => ds.query.getMyWorkPreferences()],
+      ['putMyWorkPreferences', () => ds.query.putMyWorkPreferences({ show: ['created'], grouping: 'flat' })],
       // Added by Knowledge Graph B (case 27.141), LAST because REPLICA_GAPS gained the key last: the local
       // store holds no reference index, and an empty page would claim nothing links here.
       ['getLinkedFrom', () => ds.query.getLinkedFrom(WS, { kind: 'ticket', id: newUlid() })],
@@ -601,6 +607,23 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
    *
    * Amended by trash Plan 3 (19.197): this fixture's transport answers `deletedItems` with a failure and nothing is cached, which is now the only way this read refuses.
    */
+  it('30.029 the two My work preference methods reject with ReplicaGapError, naming the document', async () => {
+    const { ds } = await fixture();
+    for (const [name, call] of [
+      ['getMyWorkPreferences', () => ds.query.getMyWorkPreferences()],
+      ['putMyWorkPreferences', () => ds.query.putMyWorkPreferences({ show: ['created'], grouping: 'flat' })],
+    ] as const) {
+      const err = await call().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(err, name).toBeInstanceOf(ReplicaGapError);
+      expect((err as ReplicaGapError).absences.map((absence) => absence.field), name).toEqual([
+        'MyWorkPreferences (the whole document)',
+      ]);
+    }
+  });
+
   it('19.071 getDeletedItems rejects with ReplicaGapError while nothing is cached; control: getTicketTypes on the same replica resolves', async () => {
     const { ds } = await fixture();
     await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(ReplicaGapError);
@@ -1707,5 +1730,47 @@ describe('29.374 the replica list row carries notTaken from the folded close cau
     expect(rows.find((r) => r.ticketId === skipped)?.notTaken).toBe(true);
     expect(rows.find((r) => r.ticketId === finished)).not.toHaveProperty('notTaken');
     expect(countRows(rows)).toEqual({ total: 2, terminal: 1 });
+  });
+});
+
+describe('29.447 the replica folds a SERVED withheld flow cause', () => {
+  it('29.447 a blind viewer folds the withheld not-taken pair without throwing and still reads Not taken with no decision link; control: the seeing viewer folds the decision id', async () => {
+    const decision = newUlid();
+    const decider = newUlid();
+    const decisionEvent = newUlid();
+    const raw = { kind: 'branch-not-taken', decisionTicketId: decision, outcome: 'Yes', pass: 1, decidedBy: decider, decisionEventId: decisionEvent };
+    // The shape the server's doors serve a viewer who cannot see the Decision (`withholdFlowCause`, T17 AMEND 2): the
+    // Decision and its decider null, and no outcome key, the Decision's branch name gone with it (planner ruling 05:46).
+    const withheld = { kind: 'branch-not-taken', decisionTicketId: null, pass: 1, decidedBy: null, decisionEventId: decisionEvent };
+    const fold = async (cause: unknown) => {
+      const { ds, replica } = await fixture();
+      const skipped = newUlid();
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: 'Skipped branch' }));
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.transitioned', { to: 'done', cause }, { actorId: SYSTEM_ACTOR_FLOW }));
+      // The card BEFORE the close: a closed ticket leaves the board.
+      const card = (await ds.query.getBoard(PROJECT)).groups.flatMap((g) => g.columns.flatMap((c) => c.cards)).find((c) => c.ticketId === skipped);
+      await replica.applyServerItem(envelope({ kind: 'ticket', id: skipped }, 'ticket.closed', { cause }, { actorId: SYSTEM_ACTOR_FLOW }));
+      const state = (await replica.getTicket(skipped))?.confirmed ?? null;
+      const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find((r) => r.ticketId === skipped);
+      return { state, row, card };
+    };
+    const seeing = await fold(raw);
+    expect(seeing.state?.closed?.cause).toEqual(raw); // control: the seeing viewer's fold holds the decision id
+    expect(resolutionOf(seeing.state ?? {})).toEqual({ kind: 'not-taken', decisionTicketId: decision, outcome: 'Yes', pass: 1 });
+    expect(seeing.row?.notTaken).toBe(true);
+    expect(seeing.card?.cause).toEqual({ kind: 'branch-not-taken' }); // precondition for the blind leg: the card is on the board
+
+    // A SERVED copy built on purpose: the setup's door guard (`test/setup.ts`) would refuse it, as the ingest door does (29.446).
+    (globalThis as Record<string, unknown>)['__gnAllowRefusedPayloads'] = true;
+    const blind = await fold(withheld);
+    expect(blind.state).not.toBeNull(); // the fold did not throw and the ticket is there
+    expect(blind.state?.closed?.cause).toEqual(withheld);
+    expect(Object.keys(blind.state?.closed?.cause ?? {}).sort()).toEqual(['decidedBy', 'decisionEventId', 'decisionTicketId', 'kind', 'pass']);
+    expect(resolutionOf(blind.state ?? {})).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 1 });
+    expect(resolutionOf(blind.state ?? {})).not.toHaveProperty('outcome'); // control above: the seeing viewer's names 'Yes'
+    expect(blind.row?.notTaken).toBe(true);
+    expect(countRows(blind.row === undefined ? [] : [blind.row])).toEqual({ total: 1, terminal: 0 }); // Not taken is never done
+    expect(blind.card?.cause).toEqual({ kind: 'branch-not-taken' }); // the provenance cause, as the server serves it
+    expect(JSON.stringify([blind.row, blind.card])).not.toContain(decision);
   });
 });

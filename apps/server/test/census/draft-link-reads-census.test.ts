@@ -10,6 +10,7 @@ const READERS: Record<string, string> = {
   'flow/flow-view.ts': "the Workflow graph's blocks read (wtg3 T3, 29.243): both ends must be among the ids Part 2's walk already admitted for this viewer (LIVE_TICKET_WHERE and visibleTicketsWhere, or their own drafts), so no blocks link to a hole or to someone else's draft is read",
   'flow/promote.ts': "the promoter's re-target (wtg2 T13): a source-side event re-reads the source's leads_to targets, and only a live, non-draft Backlog target is returned (LIVE_TICKET_WHERE), so a draft-side row (source = from) never promotes its draft",
   'flow/read-flow.ts': "the flow read (wtg2 T12): the ring statement walks leads_to only, and an end is admitted through LIVE_TICKET_WHERE and visibleTicketsWhere or as the viewer's own draft (listMyDrafts); the closing statement keeps a link only when both ends were admitted, so no edge to someone else's draft (29.188)",
+  'flow/sweep.ts': "the flow sweep's candidate statement (wtg2 T14): a live, non-draft Backlog target (LIVE_TICKET_WHERE) with an incoming leads_to from a live terminal source; a draft-side row (source = from) names a draft target, which LIVE_TICKET_WHERE drops, so it never promotes its draft",
   'projections/ticket-links.ts': 'writes the table, keyed by from ?? entity (drafts R42)',
   'projections/tickets.ts': "a docblock naming the table as the queryable copy of TicketState.links; it reads nothing from it",
   'purge/erasure.ts': 'deletes the rows naming an erased ticket, either end (28.102)',

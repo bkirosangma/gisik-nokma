@@ -10,8 +10,10 @@ type CauseRow = { entity_id: string; server_time: Date; payload: { cause?: { kin
  * What the flow actor did to the tickets of one read (WG-3's "Automatic moves in this flow"), newest first. The two event
  * types are the ones Part 2's causes ride on: `ticket.transitioned` for a promotion or a reset, `ticket.closed` for a
  * Not-taken close. A reset of a FINISHED ticket files a `ticket.reopened` beside its `ticket.transitioned`, both carrying
- * the cause; only the transition is read, so one reset is one move. The cause is read off the payload, and
- * `becauseTicketId` is blanked when that ticket is not in the viewer's flow (FL-1: a hole leaves no id).
+ * the cause; only the transition is read, so one reset is one move. The cause is read off the payload. When the ticket it
+ * names is not in the viewer's flow, `becauseTicketId` is blanked (FL-1: a hole leaves no id) and the `outcome` key is
+ * absent: a hidden Decision's outcome is its authored branch name (planner ruling 2026-10-06 05:46). A `led-to` cause's
+ * label is never read here.
  */
 export async function loadAutoMoves(db: Queryable, workspaceId: string, ids: readonly string[]): Promise<FlowAutoMoveRead[]> {
   if (ids.length === 0) return [];
@@ -29,13 +31,14 @@ export async function loadAutoMoves(db: Queryable, workspaceId: string, ids: rea
     const cause = row.payload.cause ?? {};
     const kind = cause.kind as FlowAutoMoveRead['kind'];
     const because = kind === 'led-to' ? cause.sourceTicketId : cause.decisionTicketId;
+    const seen = because !== undefined && inFlow.has(because);
     return {
       ticketId: row.entity_id,
       at: row.server_time.toISOString(),
       kind,
-      becauseTicketId: because !== undefined && inFlow.has(because) ? because : null,
+      becauseTicketId: seen ? because : null,
       pass: typeof cause.pass === 'number' ? cause.pass : null,
-      outcome: typeof cause.outcome === 'string' ? cause.outcome : null,
+      ...(seen ? { outcome: typeof cause.outcome === 'string' ? cause.outcome : null } : {}),
     };
   });
 }

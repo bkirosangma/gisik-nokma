@@ -25,6 +25,7 @@ import {
   listWorkspaceId,
   mapMyWork,
   mapDraftRows,
+  mapMyWorkPreferences,
   mapNoteComments,
   mapNoteDetail,
   mapLinkedFromPage,
@@ -584,10 +585,16 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
      * value that parameter accepts (`open=false` is a 400 by design), so this is
      * the filter applied, not a filter omitted.
      */
-    getAttention: async (workspaceId) => {
+    getAttention: async (workspaceId, show) => {
+      // `show` goes to BOTH routes (my-work-global, plan AMEND 16:3x): the strip is the
+      // swept kinds PLUS every open contest, so a filter on the sweep alone would still list
+      // every visible contest in the workspace. Built by hand rather than with
+      // `URLSearchParams`, which writes the separator as `%2C`; absent, both URLs are
+      // today's, byte for byte (case 30.025).
+      const filter = show === undefined ? '' : `show=${show.join(',')}`;
       const [raw, contests, roster] = await Promise.all([
-        http.get(`/v1/workspaces/${workspaceId}/attention`),
-        http.get(`/v1/contests?workspaceId=${workspaceId}&open=true`),
+        http.get(`/v1/workspaces/${workspaceId}/attention${filter === '' ? '' : `?${filter}`}`),
+        http.get(`/v1/contests?workspaceId=${workspaceId}&open=true${filter === '' ? '' : `&${filter}`}`),
         workspaceRoster(workspaceId),
       ]);
       return mapAttention(raw, contests, roster);
@@ -664,6 +671,24 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         toServerPreferences(preferences),
       );
     },
+
+    /**
+     * The user-level My work document (my-work-global T3). A 404 is re-raised rather than
+     * answered with the defaults, for `getPreferences`' reason: the server already answers
+     * the defaults for a person who never saved one, so a 404 here is a route that is not
+     * there, and folding it into the defaults would hide that.
+     */
+    getMyWorkPreferences: async () => {
+      const path = '/v1/me/my-work-preferences';
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return mapMyWorkPreferences(raw);
+    },
+
+    putMyWorkPreferences: async (preferences) =>
+      // A refused write throws `HttpError` inside `http.put` (only a GET's 404 comes back as
+      // `null`), and a 200 is mapped like the read: it is the document that was STORED.
+      mapMyWorkPreferences(await http.put('/v1/me/my-work-preferences', preferences)),
   };
 
   return {

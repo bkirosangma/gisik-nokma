@@ -10,7 +10,7 @@ import { sanitizeFilename } from '../attachments/filename.js';
 import { listTicketComments } from '../read/ticket-comments.js';
 import { canSee } from '../visibility/can-see.js';
 import { canOpen } from '../visibility/can-open.js';
-import { targetSight, withholdEvent, withholdLinks } from '../visibility/withhold-link-targets.js';
+import { targetSight, withholdEvent, withholdState } from '../visibility/withhold-link-targets.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { ticketNumber } from '../read/ticket-numbers.js';
@@ -292,7 +292,10 @@ export type LedgerRow = {
  * ticket's title. The claim is not cut: the event, its id, type, actor, origin,
  * both clocks and seq all go out. Only the other end's id and a contest's cause
  * are withheld, by `visibility/withhold-link-targets.ts`, which the `/events`
- * handler applies to this function's output.
+ * handler applies to this function's output. The same module withholds a flow
+ * cause's ticket and person from a viewer who cannot see that ticket, on
+ * `ticket.transitioned` / `ticket.closed` / `ticket.reopened`
+ * (`withholdFlowCause`, wtg-flow-cause-withhold).
  *
  * Both instants are rendered with `.toISOString()` rather than left to the JSON
  * serializer, for the reason `sync/contests-route.ts` gives at the same spot:
@@ -721,7 +724,9 @@ export function registerTicketRoutes(
       // draft-side entry, else `targetId`), and no key at all when none remain (the
       // reducer's absent-not-empty shape), so nothing counts a hidden one. The
       // one predicate every door uses (`withhold-link-targets.ts`, typed-links T4b).
-      const servedState: TicketState = await withholdLinks(state, targetSight(deps.pool, request.currentUserId));
+      // A flow close cause naming a Decision this viewer cannot see goes out with
+      // that Decision and its decider nulled (`withholdState`, wtg-flow-cause-withhold).
+      const servedState: TicketState = await withholdState(state, targetSight(deps.pool, request.currentUserId));
 
       return {
         ticket: toTicketView(ticket),

@@ -13,7 +13,7 @@ import ProjectLoading from '../app/w/[workspaceId]/p/[projectId]/loading.js';
  */
 const APP = join(__dirname, '..', 'app');
 const SRC = join(__dirname, '..', 'src');
-const ROUTES_WITH_SHELLS = ['workspaces', 'w/[workspaceId]', 'w/[workspaceId]/p/[projectId]', 'w/[workspaceId]/my-work', 'w/[workspaceId]/drafts', 'w/[workspaceId]/members', 'w/[workspaceId]/settings', 'inbox', 'notes', 'notes/[noteId]', 'account', 'settings'];
+const ROUTES_WITH_SHELLS = ['workspaces', 'w/[workspaceId]', 'w/[workspaceId]/p/[projectId]', 'w/[workspaceId]/my-work', 'my-work', 'w/[workspaceId]/drafts', 'w/[workspaceId]/members', 'w/[workspaceId]/settings', 'inbox', 'notes', 'notes/[noteId]', 'account', 'settings'];
 const read = (...parts: string[]) => readFileSync(join(...parts), 'utf8');
 
 describe('route shells (spec D5, S1; audit SM-02)', () => {

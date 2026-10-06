@@ -5,7 +5,11 @@ import {
   flowCauseSchema,
   isFlowCause,
   isSystemActor,
+  isWithheldFlowCause,
   makeEnvelope,
+  notTakenOf,
+  resolutionOf,
+  withholdCauseTicket,
   SYSTEM_ACTOR_FLOW,
   SYSTEM_ACTOR_NAMES,
   ticketClosedPayload,
@@ -137,5 +141,67 @@ describe('29.206 the reducer arms', () => {
     expect(applyTicketEvent(closed, flowReopen, deps).closed).toBeNull(); // a caused reopen drops the close's cause too
     const plain = applyTicketEvent(decision, makeEnvelope({ type: 'ticket.closed', entity: { kind: 'ticket', id: decision.id }, payload: {} }), deps);
     expect('cause' in (plain.closed ?? {})).toBe(false); // an uncaused close stays {actorId, at}
+  });
+});
+
+describe('29.447 the fold reads a SERVED withheld cause', () => {
+  it('29.447 a withheld cause folds on a type that may carry its kind and nowhere else, keeps its kind for the fold, and a half-withheld or extra-keyed one is refused', () => {
+    const wNotTaken = withholdCauseTicket(notTaken as Parameters<typeof withholdCauseTicket>[0]);
+    const wReopened = withholdCauseTicket(reopenedByFlow as Parameters<typeof withholdCauseTicket>[0]);
+    const wLed = withholdCauseTicket(ledTo as Parameters<typeof withholdCauseTicket>[0]);
+    // The hidden ticket's branch name goes with it (planner ruling 2026-10-06 05:46): no outcome or label KEY, kind and
+    // pass kept; control: the raw causes carry both, so the withholding is what removed them.
+    expect([notTaken, reopenedByFlow].map((c) => 'outcome' in c)).toEqual([true, true]);
+    expect('label' in ledTo).toBe(true);
+    expect(Object.keys(wNotTaken).sort()).toEqual(['decidedBy', 'decisionEventId', 'decisionTicketId', 'kind', 'pass']);
+    expect(Object.keys(wReopened).sort()).toEqual(['decidedBy', 'decisionEventId', 'decisionTicketId', 'kind', 'pass']);
+    expect(Object.keys(wLed).sort()).toEqual(['kind', 'sourceTicketId', 'triggeredBy']);
+    const fold = (type: string, payload: unknown, state: TicketState = bornState()) =>
+      applyTicketEvent(state, makeEnvelope({ type, entity: { kind: 'ticket', id: TICKET }, payload, actorId: SYSTEM_ACTOR_FLOW }), deps);
+
+    // A withheld Not-taken close folds, keeps the served cause, and is still Not taken with no Decision; control: the raw cause names it.
+    const closed = fold('ticket.closed', { cause: wNotTaken });
+    expect(closed.closed?.cause).toEqual(wNotTaken);
+    expect(resolutionOf(closed)).toEqual({ kind: 'not-taken', decisionTicketId: null, pass: 2 });
+    expect(resolutionOf(closed)).not.toHaveProperty('outcome'); // no branch to name, the key absent
+    expect(resolutionOf(fold('ticket.closed', { cause: notTaken }))).toEqual({ kind: 'not-taken', decisionTicketId: DEC, outcome: 'No', pass: 2 });
+    expect(notTakenOf(wReopened)).toBeNull(); // only a not-taken kind is Not taken, withheld or not
+
+    // The kind still drives the fold: a withheld reset counts a round and releases a Decision's outcome.
+    expect(fold('ticket.transitioned', { to: 'todo', cause: wReopened }).rounds).toBe(2);
+    const decision = { ...bornState(), typeId: DECISION_TYPE_ID, outcome: 'No' } as TicketState;
+    expect('outcome' in fold('ticket.transitioned', { to: 'todo', cause: wReopened }, decision)).toBe(false);
+    expect(fold('ticket.transitioned', { to: 'todo', cause: wLed }).stateId).toBe('todo');
+    expect(() => fold('ticket.reopened', { cause: wReopened }, closed)).not.toThrow();
+
+    // A kind the type cannot carry is refused, withheld as raw.
+    expect(() => fold('ticket.closed', { cause: wReopened })).toThrow();
+    expect(() => fold('ticket.closed', { cause: wLed })).toThrow();
+    expect(() => fold('ticket.reopened', { cause: wNotTaken }, closed)).toThrow();
+    // Only the whole served shape is read: a half-withheld cause, an extra key on the cause or beside it are refused.
+    expect(() => fold('ticket.closed', { cause: { ...wNotTaken, decidedBy: WHO } })).toThrow();
+    expect(() => fold('ticket.closed', { cause: { ...wNotTaken, decisionTicketId: DEC } })).toThrow();
+    expect(() => fold('ticket.closed', { cause: { ...wNotTaken, extra: 1 } })).toThrow();
+    expect(() => fold('ticket.closed', { cause: wNotTaken, extra: 1 })).toThrow();
+    expect(() => fold('ticket.transitioned', { to: 'todo', cause: { ...wLed, sourceTicketId: SRC } })).toThrow();
+
+    // The served schema keeps flowCauseSchema's bounds on what it keeps; the vocabulary (the ingest door) refuses it whole.
+    expect(isWithheldFlowCause(wNotTaken) && isWithheldFlowCause(wReopened) && isWithheldFlowCause(wLed)).toBe(true);
+    expect(isWithheldFlowCause({ ...wNotTaken, pass: 1 })).toBe(true); // control: the boundary pass
+    expect(isWithheldFlowCause({ ...wNotTaken, pass: 0 })).toBe(false);
+    expect(isWithheldFlowCause({ ...wNotTaken, pass: 1.5 })).toBe(false); // an integer, as flowCauseSchema's
+    expect(isWithheldFlowCause({ ...wNotTaken, decisionEventId: 'nope' })).toBe(false);
+    // Each arm is strict on its own: an extra key on any one of the three is refused.
+    expect(isWithheldFlowCause({ ...wLed, extra: 1 })).toBe(false);
+    expect(isWithheldFlowCause({ ...wReopened, extra: 1 })).toBe(false);
+    expect(isWithheldFlowCause({ ...wNotTaken, extra: 1 })).toBe(false);
+    // A branch name carried through is not the served shape either (planner 05:46), on each arm that had one.
+    expect(isWithheldFlowCause({ ...wLed, label: 'Yes' })).toBe(false);
+    expect(isWithheldFlowCause({ ...wReopened, outcome: 'No' })).toBe(false);
+    expect(isWithheldFlowCause({ ...wNotTaken, outcome: 'No' })).toBe(false);
+    expect(isWithheldFlowCause(notTaken)).toBe(false); // a raw cause is not the served shape
+    expect(ticketClosedPayload.safeParse({ cause: wNotTaken }).success).toBe(false);
+    expect(ticketTransitionedPayloadSchema.safeParse({ to: 'todo', cause: wLed }).success).toBe(false);
+    expect(ticketReopenedPayload.safeParse({ cause: wReopened }).success).toBe(false);
   });
 });
