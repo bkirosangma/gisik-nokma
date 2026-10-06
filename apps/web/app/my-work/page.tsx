@@ -199,8 +199,8 @@ function GlobalMyWorkBoard() {
    * - The first load starts at the first render that ASKS the reads (`ready`); before it the `!ready` arm draws both skeletons.
    * - A region already settled at that render (an answer served from a cache) is not held (SM-01). Forward-compatible only:
    *   the fan-out keeps no cache, so both reads are pending at every first ask today.
-   * - Released once, released for good: a later Show or Group change re-asks both reads and each region swaps on its own, as
-   *   it did before the port (the ruling keeps that behaviour and adds no chip-change hold).
+   * - Released once, released for good: a later Show change re-asks both reads and each region swaps on its own, as before the
+   *   port (the ruling adds no chip-change hold). A Group change asks nothing again: grouping is not in the fan-out's question.
    */
   const firstLoad = useRef<'not-asked' | 'held' | 'released'>('not-asked');
   if (firstLoad.current === 'not-asked' && ready) firstLoad.current = attention.settled || myWork.settled ? 'released' : 'held';
