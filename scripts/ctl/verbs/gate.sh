@@ -53,13 +53,17 @@ orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,
 summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
 [ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
-# The gate graph: 36 (through G-9's workflow-canvas-browser) + 5 for Knowledge Graph C T1 (packages/knowledge-graph: build, test, typecheck;
-# packages/knowledge-graph-browser: test, typecheck) = 41. The match is anchored, so 141, 410 and mixed pairs fail (13.1840-13.1849).
-# TEMPORARY "41 or 46": Workflow and Timeline graphs Part 1 T1 adds packages/viewport (build, test, typecheck) and packages/flow-graph-browser
-# (test, typecheck), so its gate is 46, while the verb that runs is the PRIMARY checkout's (41-only). Both halves must match one graph: an anchored
-# two-alternative match, so 146, 460/410 and mixed pairs fail. WTG Part 1 T1's LAST commit pins 46-ONLY here (and flips 13.2025 to a FAIL control);
-# delete this comment with the 41 arm. Same shape as KG C T1's "36 or 41" (13.1844-13.1849).
-echo "$T" | grep -Eq '^Tasks: +(41 successful, 41|46 successful, 46) total *$' || ctl_fail gate "$summary (log $log)"
+# The gate graph: THREE counts, because the verb that runs is the PRIMARY checkout's (on release/knowledge-graph) and it gates both release branches.
+# Both halves must match one graph: an anchored three-alternative match, so 141/146/149, 410/460/490 and mixed pairs fail.
+# - 41, Knowledge Graph's: 36 (through G-9's workflow-canvas-browser) + 5 for Knowledge Graph C T1 (packages/knowledge-graph: build, test, typecheck;
+#   packages/knowledge-graph-browser: test, typecheck) (13.1840-13.1849).
+# - 46, Workflow and Timeline graphs' before Part 3 T1: TEMPORARY "41 or 46": Workflow and Timeline graphs Part 1 T1 adds packages/viewport (build, test,
+#   typecheck) and packages/flow-graph-browser (test, typecheck) = 41 + 5 (13.2020-13.2024). WTG Part 1 T1's LAST commit pins 46-ONLY here (and flips
+#   13.2025 to a FAIL control) in release/workflow-graph's copy only; this copy keeps 41 for Knowledge Graph's own gates. Same shape as KG C T1's "36 or 41".
+# - 49, Workflow and Timeline graphs' from Part 3 T1: Part 3 T1's PR B (task/wtg3-measure) adds packages/flow-graph (build, test, typecheck) = 46 + 3,
+#   measured 2026-10-06 (13.2364-13.2368). PR B pins release/workflow-graph's copy 49-only (13.2369); the 46 arm here stays while a release/workflow-graph
+#   tip without packages/flow-graph can still be gated.
+echo "$T" | grep -Eq '^Tasks: +(41 successful, 41|46 successful, 46|49 successful, 49) total *$' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"
