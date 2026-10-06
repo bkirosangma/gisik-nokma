@@ -274,7 +274,7 @@ export type DataSourceQuery = {
    * The narrowing preview's numbers (spec D §3.2): how many of the workspace's people see the concept now and with
    * `add`. `conceptId` is null for a concept that does not exist yet (a suggestion being confirmed). A 404 is re-raised.
    */
-  getConceptAudience(workspaceId: string, conceptId: string | null, add: readonly { kind: 'ticket' | 'note'; id: string }[]): Promise<ConceptAudienceResponse>;
+  getConceptAudience(workspaceId: string, conceptId: string | null, add: readonly ConceptAudienceItem[]): Promise<ConceptAudienceResponse>;
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:
@@ -509,6 +509,13 @@ export type DataSourceQuery = {
   /** Stores the document and answers what was STORED (the server de-duplicates `show`). */
   putMyWorkPreferences(preferences: MyWorkPreferences): Promise<MyWorkPreferences>;
 };
+
+/**
+ * One item of `getConceptAudience`'s `add`: a concept's item, a ticket or a note. Named here, AFTER the query block and
+ * not inline in it, for `NoteSearchQueryOptions`' reason: case 7.201 reads that block's methods out of this file's text,
+ * and an inline object type inside it hides the whole block from that reader (measured again, KG-D Task 8 FIX 1).
+ */
+export type ConceptAudienceItem = Pick<ConceptView['items'][number], 'kind' | 'id'>;
 
 /** Coordination amendment 10 — the one seam between views and the world. */
 export type DataSource = {
