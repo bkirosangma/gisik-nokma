@@ -42,6 +42,11 @@ export type KnowledgeGraphProps = {
   canRemoveLink?: (edge: GraphEdgeView) => boolean;
   /** Hide the bar's Hops control (Home draws its own). */
   showHops?: boolean;
+  /**
+   * The "Linked to" list scrolls in its own bounded box (Home: a page has no sheet body to scroll it in, so 444 rows made a
+   * 25,075 px page, release walk row 8). Default: the list takes its full height, inside the host's scroller (the sheet).
+   */
+  listBox?: boolean;
   /** Tests and the harness inject a renderer; default = the Sigma adapter, loaded with `import()`. */
   createRenderer?: () => Promise<CreateRenderer>;
 };

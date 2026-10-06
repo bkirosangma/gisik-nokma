@@ -182,3 +182,46 @@ test('27.656 Escape in the graph with A lit clears it and keeps the centre; a se
   await still(page);
   expect(await centreName(page)).toBe('Knowledge Graph of items linked to Gisik Nokma');
 });
+
+/*
+ * 27.700 (release walk row 8): Home's "Linked to" list scrolls in its own box (`listBox`, `.gn-kg-list__box`), so a big
+ * workspace no longer makes a page as tall as its rows (444 rows were 25,075 px on the dev stack). `?big=430` adds 430
+ * tickets to Mobile web: with the fixture's own items that is more than 444 clear rows at two hops, under the 500 cap.
+ */
+test('27.700 a big workspace (444+ rows): the page stays under 2,400 px and the first and last rows are both reachable inside the box; control: without the box rule the page is taller than the rows', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openHome(page, '?big=430');
+  const rows = page.locator('.gn-kg-list__row');
+  const n = await rows.count();
+  expect(n).toBeGreaterThanOrEqual(444);
+  expect(await page.locator('.gn-kg__count').textContent()).not.toContain('nearest'); // every row is a clear item (no cap)
+  const pageHeight = () => page.evaluate(() => document.documentElement.scrollHeight);
+  expect(await pageHeight()).toBeLessThan(2400);
+
+  // reachable: a row focused by keyboard is scrolled into the box's visible rectangle and is the element at its centre
+  const insideBox = (i: number) =>
+    page.evaluate((k) => {
+      const row = document.querySelectorAll<HTMLElement>('.gn-kg-list__row')[k]!;
+      const boxEl = row.closest('.gn-kg-list__box')!;
+      row.scrollIntoView({ block: 'nearest' });
+      const r = row.getBoundingClientRect(), b = boxEl.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { within: r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5, hit: hit !== null && row.contains(hit) };
+    }, i);
+  await rows.nth(n - 1).focus();
+  expect(await insideBox(n - 1)).toEqual({ within: true, hit: true });
+  await rows.nth(0).focus();
+  expect(await insideBox(0)).toEqual({ within: true, hit: true });
+
+  // CONTROL, same test: delete the box rule from the live stylesheet and the same page is taller than its rows (2.75rem each)
+  const deleted = await page.evaluate(() => {
+    let k = 0;
+    for (const sheet of [...document.styleSheets]) {
+      const list = [...sheet.cssRules];
+      for (let i = list.length - 1; i >= 0; i -= 1) if ((list[i] as CSSStyleRule).selectorText === '.gn-kg-list__box') (sheet.deleteRule(i), (k += 1));
+    }
+    return k;
+  });
+  expect(deleted).toBe(1);
+  expect(await pageHeight()).toBeGreaterThan(n * 44);
+});

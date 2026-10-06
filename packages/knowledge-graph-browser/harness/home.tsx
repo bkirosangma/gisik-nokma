@@ -5,17 +5,18 @@ import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import { KnowledgeGraph, type DrawEdge, type GraphRenderer, type GraphZonesSummary, type HopChoice, type RendererProbe, type ScopeChoices } from '@gisik-nokma/knowledge-graph';
 import { createSigmaRenderer } from '@gisik-nokma/knowledge-graph/sigma';
 import { GRAPH_CHIP_ORDER } from '@gisik-nokma/domain';
-import { fixtureRing } from './fixture-source.js';
+import { fixtureRing, setBigWorld } from './fixture-source.js';
 
 /*
  * Home's seed (KG-E T4, cases 27.653–27.656): `KnowledgeGraph` mounted the way `HomeBody` mounts it
  * (`apps/web/src/home/home-graph.tsx`): centred on the fixture's workspace (`workspace:wgn`), every chip including
- * Projects, no Hops control, `config` 'home' with hops 2 on a desktop and 'phone' with hops 1 at 40rem and under (the
+ * Projects, no Hops control, the list in its own box (`listBox`), `config` 'home' with hops 2 on a desktop and 'phone' with hops 1 at 40rem and under (the
  * width the page opened at; `?hops=3` stands for a pick Show more hops made earlier, which Home keeps passing), and
  * `onEscape` as `HomeBody` wires it: a lit set clears and the view does nothing more;
  * with none lit it answers false and the view goes Back. Three buttons set the highlight, from the last `onZones`:
  * `light-a` = the first three clear items other than the centre; `light-b` = the first fog item and the first clear
- * item outside A; `clear`. `window.__kgHome` exposes the probe, the zones, the drawn edges and the lit set.
+ * item outside A; `clear`. `window.__kgHome` exposes the probe, the zones, the drawn edges and the lit set. `?big=<n>` adds
+ * n tickets to Mobile web (the release walk's big workspace, row 8).
  */
 const style = document.createElement('style');
 style.textContent = themeStylesheet();
@@ -23,6 +24,8 @@ document.head.prepend(style);
 
 const phone = window.matchMedia('(max-width: 40rem)').matches;
 const held = new URLSearchParams(location.search).get('hops');
+const big = new URLSearchParams(location.search).get('big');
+if (big !== null) setBigWorld(Number(big));
 const hops: HopChoice = held !== null ? (Number(held) as HopChoice) : phone ? 1 : 2;
 const CENTRE = 'workspace:wgn';
 const SCOPE: ScopeChoices = {
@@ -116,6 +119,7 @@ function Home() {
         defaultWorkspaceIds={['gn']}
         groups={GRAPH_CHIP_ORDER}
         showHops={false}
+        listBox
         hops={hops}
         highlight={lit}
         onZones={(z) => (state.zones = z)}

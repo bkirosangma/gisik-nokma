@@ -674,6 +674,23 @@ describe('KnowledgeGraph: states, keys and the trail (spec C §3, §6)', () => {
   });
 });
 
+describe('KnowledgeGraph: Home\'s list box (release walk row 8)', () => {
+  it('27.700 jsdom: listBox puts the "Linked to" rows in the bounded box (.gn-kg-list__box), and only the rows; control: the default list is unboxed', async () => {
+    const a = setup({ listBox: true });
+    await drawn(a.fake, T('t126'));
+    const boxed = document.querySelector('.gn-kg-list__box')!;
+    expect(boxed).not.toBeNull();
+    expect(boxed.matches('ul.gn-kg-links')).toBe(true);
+    expect(boxed.querySelectorAll('.gn-kg-list__row').length).toBe(document.querySelectorAll('.gn-kg-list__row').length);
+    expect(boxed.querySelectorAll('.gn-kg-list__row').length).toBeGreaterThan(0);
+    cleanup();
+    const b = setup();
+    await drawn(b.fake, T('t126'));
+    expect(document.querySelectorAll('.gn-kg-list__row').length).toBeGreaterThan(0); // the haystack: a list is there
+    expect(document.querySelector('.gn-kg-list__box')).toBeNull();
+  });
+});
+
 describe('KnowledgeGraph: the empty state and the scope note name their cause (KV7 follow-up)', () => {
   const chipsOff = "Every link type is turned off. Turn one on to see GN-142's links.";
   const workspacesNote = 'GN-142 is outside the workspaces you picked. It stays in the middle, and its links follow your scope.';

@@ -1,11 +1,21 @@
-import { GROUP_OF_EDGE_KIND, inGraphScope, type GraphGroup, type GraphRingResponse } from '@gisik-nokma/domain';
+import { GROUP_OF_EDGE_KIND, inGraphScope, type GraphEdgeView, type GraphGroup, type GraphItemView, type GraphRingResponse } from '@gisik-nokma/domain';
 import { emptyStore, mergeRing, walk, type GraphStore } from '@gisik-nokma/knowledge-graph';
 import { fixtureEdges, fixtureItems, titleOverride } from './fixture.js';
 
+/** Extra tickets in Mobile web (`setBigWorld`): Home's big workspace (release walk row 8, 444 clear items). */
+let extra = 0;
 let all: GraphStore = build();
 function build(): GraphStore {
-  const items = fixtureItems();
-  return mergeRing(emptyStore(), { hop: 1, center: items[0]!, items, edges: fixtureEdges(), frontier: [], truncated: false, cursor: null });
+  const big: GraphItemView[] = Array.from({ length: extra }, (_, i) => ({ ref: `ticket:big${i}`, kind: 'ticket', id: `big${i}`, workspaceId: 'gn', projectId: 'j_mw', label: `GN-${1000 + i}`, title: `Seeded ticket ${i + 1}`, category: 'open', hop: 0, out: false, suggested: false }));
+  const bigEdges: GraphEdgeView[] = big.map((t) => ({ id: `in|project:j_mw|${t.ref}`, kind: 'in', from: 'project:j_mw', to: t.ref, snippet: null, addedBy: null, addedAt: null, origin: null, suggested: false }));
+  const items = [...fixtureItems(), ...big];
+  return mergeRing(emptyStore(), { hop: 1, center: items[0]!, items, edges: [...fixtureEdges(), ...bigEdges], frontier: [], truncated: false, cursor: null });
+}
+
+/** Adds `n` tickets to Mobile web, each linked only by its project (`?big=n`), and rebuilds the world. */
+export function setBigWorld(n: number): void {
+  extra = n;
+  all = build();
 }
 export type FixtureQuery = { center: string; hops: number; workspaceIds: string[]; projectIds: string[]; groups: GraphGroup[] };
 export const fixtureLog: FixtureQuery[] = [];

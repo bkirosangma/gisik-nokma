@@ -159,6 +159,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('27.700 Home\'s "Linked to" list scrolls in its own box (release walk row 8)', () => {
+  it('27.700 Home passes listBox on a desktop and on a phone (a page has no sheet to scroll the list in)', async () => {
+    renderHome('ws_1');
+    await mounted();
+    expect(last().listBox).toBe(true);
+    flipPhone(true);
+    expect(last().config).toBe('phone'); // the flip landed
+    expect(last().listBox).toBe(true);
+  });
+});
+
 describe('27.646 Home mounts the view in its configuration, the hops following the breakpoint until picked', () => {
   it('27.646 desktop: config "home", centre "workspace:ws_1", hops 2 and C\'s required props; a phone flip gives config "phone" and hops 1, and back', async () => {
     const services = renderHome('ws_1', () => home('ws_1'), async () => [

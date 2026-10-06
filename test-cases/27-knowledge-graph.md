@@ -15,6 +15,7 @@
 | 27.600–27.659 | E, Home | `2026-10-03-home.md` |
 | 27.660–27.664 | C follow-ups: list under the canvas (27.660), empty state and scope note by cause (27.661–27.664) | KG-C T8 FIX 1 (planner ruling 2026-10-06 00:00 (3), id pinned 00:47): 27.660 · KV7 copy by cause (lane 1's 22:23 notes (d) and (e)): 27.661–27.664 · `PTR-kg-view-copy-followups` (reviewer A's 02:31 flag, planner ruling): 27.661 amended |
 | 27.668–27.669, 27.673–27.674 | C follow-up, the empty states' frame | `PTR-kg-empty-reframe` (lane 1's 04:43 ⚑, ids pinned 04:4x) + `AMEND-kg-empty-reframe-fit` (planner ruling (A) 06:26, ids pinned 06:2x): 27.668–27.669, 27.673–27.674 |
+| 27.700–27.709 | C and E follow-ups, the release walk part 2 rows 8, 9, 10 and 5 | `PTR-kg-walk-fixes-3` (planner 14:55 ruling; ids taken after 27.699, the top of `task/kg-walk-fixes-2`'s 27.680–27.699 row, grepped on KG 1460330b and the live KG task tips 2026-10-06 15:2x): 27.700–27.706 |
 | 27.670–27.672 | D follow-up, the per-branch D2 ratchet | `PTR-kg-d2-per-branch-ratchet` (lane 3's 02:50 ⚑ (2) on SL7, ids pinned 2026-10-06 05:4x): 27.670–27.672 |
 
 Unused ids in a block stay free for that plan's follow-ups. Plans B–E each add their own `## 27.N` sub-section; merges are unions.
@@ -553,3 +554,11 @@ Plan `docs/superpowers/plans/2026-10-03-home.md`; spec `docs/superpowers/specs/2
 - 27.658–27.659 are reserved and unused.
 
 <!-- KG-E end -->
+
+### Release walk part 2 follow-ups: Home's list, the manual's chips, Back's focus, Add link's first key (27.700–27.709)
+
+`PTR-kg-walk-fixes-3` (the planner's 14:55 ruling promoted walk rows 8, 9, 10 and 5 from polish to should-fix; `HANDOFF-kg-release-walk.md` § Part 2). 27.707–27.709 are reserved and unused.
+
+- ✅ **27.700 — Home's "Linked to" list scrolls in its own box** (walk row 8): Home passes `listBox` on a desktop and on a phone, and the view then puts the rows (only the rows) in `.gn-kg-list__box`. In Chromium at 1280×720 a workspace with 444+ clear rows (`harness/home.tsx?big=430`, no cap) keeps the page under 2,400 px, and the last and first rows, focused, sit inside the box and are the element at their centre; control, same test: the box rule deleted from the live stylesheet makes the page taller than its rows (2.75rem each). Mutation: `listBox` dropped from the harness → the page is 22,174 px (red). (`packages/knowledge-graph-browser/tests/home.spec.ts`, `packages/knowledge-graph/test/react/knowledge-graph.test.tsx`, `apps/web/test/home-graph.test.tsx`)
+- ✅ **27.701 — CONTROL: the sheet is unchanged:** the ticket tab and the note panel (both `GraphPanel`) pass no `listBox`, and in Chromium the view in a sheet has an unboxed list (`max-height: none`, `overflow-y: visible`) inside the sheet body's own scroller, while the box rule is in the same stylesheet. (`packages/knowledge-graph-browser/tests/panel.spec.ts`, `apps/web/test/knowledge-graph/graph-panel.test.tsx`)
+

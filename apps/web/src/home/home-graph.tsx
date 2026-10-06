@@ -103,6 +103,7 @@ export function HomeGraph({ workspaceId, viewerId, home, pressed, onEscape, phon
         defaultWorkspaceIds={[workspaceId]}
         groups={HOME_GROUPS}
         showHops={false}
+        listBox
         hops={hops}
         onHopsChange={setPicked}
         highlight={lit?.ids ?? null}

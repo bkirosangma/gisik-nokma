@@ -79,3 +79,16 @@ test('27.342 (browser) the loading box is the canvas\'s own height at four windo
     expect(canvas.height, `window height ${height}`).toBeCloseTo(Math.min(736, Math.max(416, height * 0.62)), 0);
   }
 });
+
+test('27.701 CONTROL (browser): the ticket tab and the note panel (the view in a sheet) keep the list unboxed, inside the sheet\'s own scroller; Home\'s box rule is in the same stylesheet', async ({ page }) => {
+  await openView(page, '?panel=sheet');
+  const list = await page.evaluate(() => {
+    const ul = document.querySelector('.gn-kg-list .gn-kg-links')!;
+    const cs = getComputedStyle(ul);
+    return { boxed: ul.classList.contains('gn-kg-list__box'), maxHeight: cs.maxHeight, overflowY: cs.overflowY, scroller: getComputedStyle(document.querySelector('.gn-sheet__body')!).overflowY };
+  });
+  expect(list).toEqual({ boxed: false, maxHeight: 'none', overflowY: 'visible', scroller: 'auto' });
+  // the haystack: the rule exists here, so `none` above is the sheet not taking it, not a stylesheet without it
+  const ruled = await page.evaluate(() => [...document.styleSheets].some((s) => [...s.cssRules].some((r) => (r as CSSStyleRule).selectorText === '.gn-kg-list__box')));
+  expect(ruled).toBe(true);
+});

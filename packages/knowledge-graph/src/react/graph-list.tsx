@@ -13,6 +13,8 @@ export type GraphListProps = {
   selected: string | null;
   label: (ref: string) => string;
   onPick: (ref: string) => void;
+  /** The rows scroll in a bounded box (`.gn-kg-list__box`): the host has no scroller of its own around the view (Home). */
+  box?: boolean;
 };
 
 /**
@@ -30,7 +32,7 @@ export function GraphList(p: GraphListProps) {
       <h4 id={id} className="gn-kg-list__head">
         {`Linked to ${p.label(p.centre)}`} <span className="gn-kg-badge">{rows.length}</span>
       </h4>
-      <ul className="gn-kg-links">
+      <ul className={p.box === true ? 'gn-kg-links gn-kg-list__box' : 'gn-kg-links'}>
         {rows.map((ref) => {
           const it = p.store.items.get(ref)!;
           const parent = p.zones.walk.parent.get(ref)!;

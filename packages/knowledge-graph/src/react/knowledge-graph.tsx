@@ -426,7 +426,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           {!phone && props.showHops !== false && (
             <p className="gn-kg__keys">Keys: 1–4 hops, C center on the selected item, Esc back. Scroll or pinch to zoom, drag to pan, double-click an item to center on it.</p>
           )}
-          {centreItem !== undefined && <GraphList centre={centre} store={rings.store} zones={z} selected={selectedEdge === null ? selected : null} label={label} onPick={pick} />}
+          {centreItem !== undefined && <GraphList centre={centre} store={rings.store} zones={z} selected={selectedEdge === null ? selected : null} label={label} onPick={pick} box={props.listBox === true} />}
         </div>
       </div>
     </div>

@@ -93,6 +93,14 @@ beforeEach(() => {
 });
 
 describe('GraphPanel (KG-C T9)', () => {
+  it('27.701 CONTROL: the ticket tab and the note panel (both GraphPanel) pass no listBox and no groups, so the list stays in the sheet\'s scroller and the chips are the view\'s default (27.702)', async () => {
+    mount();
+    await screen.findByTestId('kg-view');
+    expect(last().centre).toBe(`ticket:${SOURCE}`); // the haystack: the panel's own props were recorded
+    expect('listBox' in last()).toBe(false);
+    expect('groups' in last()).toBe(false);
+  });
+
   it('27.342 hands the view the app\'s own gateway, the host\'s workspace and the viewer\'s live scope; desktop by default; control: the phone query makes it the phone view', async () => {
     const services = mount();
     await screen.findByTestId('kg-view');
