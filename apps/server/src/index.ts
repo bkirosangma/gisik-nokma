@@ -24,8 +24,8 @@ async function main(): Promise<void> {
   // and the pool is byte-for-byte what it was.
   const pool = createPool(config.databaseUrl, { caCert: config.databaseCaCert });
   const projections = buildProjectionRegistry();
-  // `gates` switches on the server-owned refusals: an embedded attachment must
-  // be this ticket's own image, and named evidence must exist on this ticket.
+  // `gates` switches on the server-owned refusals: an embedded attachment must be this ticket's own image, named evidence
+  // must exist on this ticket, and a Decision's choice is refused when its cascade is blocked or its close list leaves the flow.
   // This is the only NON-TEST site that passes them, and
   // `test/gates/gate-seam.test.ts` pins what `buildServerGates()` covers.
   //

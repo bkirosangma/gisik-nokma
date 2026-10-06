@@ -17,12 +17,12 @@ export type GateRefusal = { rule: string; reason: string };
  * `ingest-service.ts` already states, that sync calls `ingestClientBatch` and
  * does not append behind it. That route does not exist on this branch.
  *
- * Gates are CONSTRUCTION-TIME and UNCONDITIONAL: unlike the permission gate,
- * they do not distinguish the client door from the internal one. There is no
- * legitimate append, from any door, of a document embedding an attachment that
- * is not this ticket's image, or of a transition naming evidence that does not
- * exist here — so nothing about which door the event arrived through changes
- * the answer.
+ * Gates are CONSTRUCTION-TIME and UNCONDITIONAL: unlike the permission gate, they do not distinguish the client door from
+ * the internal one. There is no legitimate append, from any door, of a document embedding an attachment that is not this
+ * ticket's image, or of a transition naming evidence that does not exist here — so nothing about which door the event
+ * arrived through changes the answer. The Decision gates (`decision-gates.ts`) judge the ACTOR, not the door: they pass the
+ * reserved Flow actor at once (its cascade and promotions are the consequence of a choice already judged), and that actor
+ * files only through the internal door.
  *
  * `check` receives the SUBMITTED event, not the ledger envelope, on purpose: a
  * gate judges the CLAIM, and must not be able to read `seq`, `workspaceSeq` or

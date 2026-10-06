@@ -1,3 +1,4 @@
+import { makeDecisionGates } from './decision-gates.js';
 import { makeEvidenceGate } from './evidence-gate.js';
 import { makeImageEmbedGates } from './image-embed-gate.js';
 import type { ServerGate } from './server-gate.js';
@@ -9,9 +10,10 @@ import type { ServerGate } from './server-gate.js';
  * all — is pinned by a test rather than left to review.
  */
 export function buildServerGates(): ServerGate[] {
-  return [...makeImageEmbedGates(), makeEvidenceGate()];
+  return [...makeImageEmbedGates(), makeEvidenceGate(), ...makeDecisionGates()];
 }
 
 export * from './server-gate.js';
 export * from './image-embed-gate.js';
 export * from './evidence-gate.js';
+export * from './decision-gates.js';
