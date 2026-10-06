@@ -56,6 +56,9 @@ ctl_file=docs/lanes/gate-lock/README.md   # read by neither suite: the HIT contr
 [ -n "$web_file" ] && [ -n "$css_file" ] && [ -f "$ctl_file" ] || { echo "FAIL gate-cache: probe files missing ($web_file / $css_file / $ctl_file)"; exit 1; }
 
 check "13.1707 mobile#test depends on editor#build:webview (the stale-build root cause)" 'field "$MOBILE" "$MOBILE#test" deps | grep -q "@gisik-nokma/editor#build:webview"'
+# 13.1719: the package's own `#typecheck` entry keeps the generic `dependsOn: ["^build"]`. Emptied, the hash stops folding in the
+# builds of app-core, domain and ui, so a type change there replays the harness's typecheck green; the hash rows below cannot see it.
+check "13.1719 $WCB#typecheck depends on app-core, domain and ui #build (the generic typecheck's ^build, kept)" 'tc_deps=$(field "$WCB" "$WCB#typecheck" deps); for tc_pkg in app-core domain ui; do printf "%s\n" $tc_deps | grep -qx "@gisik-nokma/$tc_pkg#build" || tc_deps=MISSING; done; [ "$tc_deps" != MISSING ]'
 
 if [ "$MODE" != --real ]; then
   # THE TABLE: id | task's package | probe file | what it stands for | HIT control (a file the task does not read) | task
@@ -63,7 +66,8 @@ if [ "$MODE" != --real ]; then
   # for each input turbo.json declares that is NOT a dependency of the task (13.1712-13.1715, 13.1718-13.1719): remove the
   # entry and its row goes red
   # (shown 2026-10-02 by deleting each entry in turn). The server rows use CLAUDE.md as the control because server#test
-  # reads docs/** — the README control would be a read file there.
+  # reads docs/** — the README control would be a read file there. 13.1719 also probes the package's OWN harness: an entry
+  # whose inputs name only the foreign file (`$TURBO_DEFAULT$` dropped) stops re-checking the harness itself.
   desktop_file=$(/usr/bin/git ls-files apps/desktop/src | sed -n 1p)
   pkgs_file=$(/usr/bin/git ls-files packages/mcp-server/src | sed -n 1p)
   ref_file=$(/usr/bin/git ls-files reference | sed -n 1p)
@@ -84,6 +88,7 @@ if [ "$MODE" != --real ]; then
     "13.1718|$WCB|apps/web/app/globals.css|apps/web globals.css, which the sheet-errors harness imports|$ctl_file"
     "13.1718|$WCB|apps/web/src/shell-refusal.tsx|the ShellRefusal component the sheet-errors harness renders|$ctl_file"
     "13.1719|$WCB|apps/web/src/shell-refusal.tsx|the ShellRefusal component tsc follows from the harness|$ctl_file|typecheck"
+    "13.1719|$WCB|packages/workflow-canvas-browser/harness/sheet-errors.tsx|the package's own harness, still an input beside the foreign file|$ctl_file|typecheck"
   )
   for t in "${rows[@]}"; do
     IFS='|' read -r id pkg file what ctl task <<<"$t"
